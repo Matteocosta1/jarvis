@@ -1,0 +1,1090 @@
+import Foundation
+import Combine
+import AVFoundation
+import Speech
+import Security
+import CryptoKit
+import UIKit
+
+// MARK: - Modello
+
+struct Messaggio: Identifiable, Codable, Equatable {
+    var id = UUID()
+    let ruolo: String          // "user" oppure "assistant"
+    var testo: String
+    var azioni: [String] = []
+    var data = Date()
+    var conFoto = false
+    var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
+
+    /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
+    var testoPerCervello: String { conFoto ? "(il signore ha mandato una foto) \(testo)" : testo }
+}
+
+enum Fase: String {
+    case attesa = "IN ATTESA"
+    case ascolto = "LA ASCOLTO"
+    case elaboro = "ELABORO"
+    case parlo = "PARLO"
+}
+
+enum Impostazioni {
+    static let indirizzoPredefinito = "https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis"
+    static var indirizzo: String { UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito }
+    static var voce: String { UserDefaults.standard.string(forKey: "voce") ?? "" }
+    static var muto: Bool { UserDefaults.standard.bool(forKey: "muto") }
+    /// Voce di JARVIS in cloud (ElevenLabs, tramite il cervello). Se non risponde, ripiega sulla voce dell'iPhone.
+    static var voceCloud: Bool { UserDefaults.standard.bool(forKey: "voceCloud") }
+    static var idVoceCloud: String { UserDefaults.standard.string(forKey: "idVoceCloud") ?? "" }
+    /// Mentre JARVIS parla, l'iPhone ascolta: «Jarvis», «basta», «aspetta» lo interrompono.
+    static var interruzioneVocale: Bool { UserDefaults.standard.object(forKey: "interruzioneVocale") as? Bool ?? true }
+}
+
+// MARK: - Portachiavi (la parola d'ordine non sta in chiaro)
+
+enum Portachiavi {
+    private static let servizio = "it.discosizer.jarvis.token"
+
+    static func leggi() -> String {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                kSecAttrService as String: servizio,
+                                kSecReturnData as String: true,
+                                kSecMatchLimit as String: kSecMatchLimitOne]
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return "" }
+        return String(decoding: d, as: UTF8.self)
+    }
+
+    static func salva(_ valore: String) {
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: servizio]
+        SecItemDelete(base as CFDictionary)
+        guard !valore.isEmpty else { return }
+        var nuovo = base
+        nuovo[kSecValueData as String] = Data(valore.utf8)
+        nuovo[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(nuovo as CFDictionary, nil)
+    }
+}
+
+enum ErroreJarvis: LocalizedError {
+    case indirizzo
+    nonisolated var errorDescription: String? { "L'indirizzo nelle impostazioni non è valido." }
+}
+
+// MARK: - JARVIS
+
+@MainActor
+final class Jarvis: NSObject, ObservableObject {
+    @Published var messaggi: [Messaggio] = []
+    @Published var fase: Fase = .attesa
+    @Published var parziale = ""
+    @Published var stato: String?          // es. «cerco sul web»
+    @Published var avviso: String?
+    @Published var foto: Data?             // foto in attesa di essere mandata col prossimo messaggio
+    private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
+    private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
+    @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
+    @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
+    @Published var occhi: Occhiata?        // fotocamera aperta (occhi di JARVIS)
+    @Published var interprete: Lingua?     // modalità interprete aperta
+    @Published var allenatore = false      // modalità allenatore aperta
+    private var attesaOcchi: CheckedContinuation<[Data], Never>?
+
+    let strumenti = Strumenti()
+
+    private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
+    private let motore = AVAudioEngine()
+    private var richiesta: SFSpeechAudioBufferRecognitionRequest?
+    private var compito: SFSpeechRecognitionTask?
+    private var timerSilenzio: Timer?
+    private var turnoAscolto = 0           // ogni ascolto ha il suo numero: i callback di un ascolto vecchio vengono ignorati
+
+    private let sintesi = AVSpeechSynthesizer()
+    private var bufferVoce = ""
+    private var inCoda: Set<ObjectIdentifier> = []   // frasi consegnate alla sintesi e non ancora finite
+    private var frasiVive: [ObjectIdentifier: AVSpeechUtterance] = [:]   // tenute in vita finché il delegato risponde (id mai riciclati)
+    private var flussoFinito = true
+    private var compitoRete: Task<Void, Never>?
+    private let cloud = VoceCloud()
+    private var vocePerCloud = false    // decisa a inizio discorso: tutte le frasi passano dalla stessa voce, in ordine
+    private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
+    private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
+
+    /// Frasi brevi dette subito se il cervello non ha ancora iniziato a parlare dopo un secondo: la risposta sembra istantanea.
+    static let ponti = [
+        "Vediamo, Sir.", "Un attimo, Sir.", "Ci penso.", "Subito, Sir.", "Mi dia un istante.",
+        "Un momento, Sir.", "Me ne occupo.", "Controllo subito.", "Lasci fare a me.", "Ci siamo quasi.",
+        "Ricevuto, Sir.", "Ci guardo.", "Verifico, Sir.", "Con piacere.", "Mi metto all'opera.",
+        "Sto raccogliendo i dati.", "Un istante soltanto.", "Lo trovo subito.", "Certamente, Sir.", "Ah, interessante.",
+    ]
+    private static var ultimoPonte = ""
+    /// Una frase a caso, mai la stessa due volte di fila.
+    static func ponteCasuale() -> String {
+        let scelta = ponti.filter { $0 != ultimoPonte }.randomElement() ?? "Un attimo, Sir."
+        ultimoPonte = scelta
+        return scelta
+    }
+
+    override init() {
+        super.init()
+        sintesi.delegate = self
+        Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
+        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti) }       // le frasi ponte sono già pronte in cache, a costo zero
+        cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave) }
+        orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
+        orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
+        strumenti.apriOcchi = { [weak self] automatico, video in
+            guard let self else { return [] }
+            return await self.apriOcchi(automatico: automatico, video: video)
+        }
+        strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
+        carica()
+    }
+
+    // MARK: Interazione
+
+    func toccaReattore() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Suoni.tocco()
+        switch fase {
+        case .attesa: Task { await avviaAscolto() }
+        case .ascolto: fermaAscolto(invia: true)
+        case .parlo, .elaboro:
+            interrompi()                    // lo zittisce e ascolta subito
+            Task { await avviaAscolto() }
+        }
+    }
+
+    func ascoltaSubito() {
+        guard fase == .attesa else { return }
+        Task { await avviaAscolto() }
+    }
+
+    /// Il signore ha iniziato a parlare mentre JARVIS parlava: JARVIS tace all'istante e resta in ascolto
+    /// (l'orecchio continua a raccogliere la frase e la consegna a `interrottoAVoce` quando è finita).
+    private func zittisciPerAscolto() {
+        compitoRete?.cancel()
+        compitoRete = nil
+        occhiChiusi([])
+        sintesi.stopSpeaking(at: .immediate)
+        cloud.ferma()
+        bufferVoce = ""
+        inCoda.removeAll()
+        flussoFinito = true
+        stato = "La ascolto, Sir…"
+        strumenti.annullaInSospeso()
+        orecchio.testoDetto = ""
+        fase = .ascolto
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    /// Il signore ha detto «Jarvis», «basta», «aspetta»… mentre JARVIS parlava, oppure ha finito la frase con cui l'ha interrotto.
+    private func interrottoAVoce(_ resto: String) {
+        interrompi()
+        fase = .attesa
+        stato = nil
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let parole = resto.split(separator: " ").count
+        if eseguiComando(resto) { return }
+        if parole >= 2 {
+            Task { await invia(resto) }       // ha già detto cosa vuole, in un fiato: «Jarvis, che ore sono»
+        } else {
+            Task { await avviaAscolto() }     // solo «Jarvis»: tace e lo ascolta
+        }
+    }
+
+    // MARK: Comandi vocali
+
+    /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
+    @discardableResult
+    func eseguiComando(_ frase: String) -> Bool {
+        guard case .apri(let reparto)? = ComandoVocale.riconosci(frase) else { return false }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if let a = reparto.annuncio {
+            flussoFinito = true                     // una frase sola: finita quella, JARVIS torna in attesa
+            accodaVoce(a, forza: true)
+        }
+        repartoRichiesto = reparto
+        return true
+    }
+
+    /// Il giro con gli occhi chiesto a voce: 5 secondi, 4 fotogrammi, poi JARVIS dice cosa ha visto.
+    func giroAVoce() {
+        Task {
+            let dati = await apriOcchi(automatico: true, video: true)
+            guard !dati.isEmpty else { return }
+            preparaFoto(dati)
+            await invia("Cosa vedi in questo giro?")
+        }
+    }
+
+    // MARK: Occhi
+
+    /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
+    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false) async -> [Data] {
+        occhiChiusi([])                        // se ne era rimasta aperta una, si chiude
+        return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
+            attesaOcchi = c
+            occhi = Occhiata(automatico: automatico, video: video, cucina: cucina)
+        }
+    }
+
+    /// Le foto scelte dal signore partono col prossimo messaggio: una come foto, più d'una come giro.
+    private func preparaFoto(_ dati: [Data]) {
+        if dati.count > 1 { fotoGiro = dati } else { foto = dati.first }
+    }
+
+    /// La fotocamera si è chiusa: consegna le foto a chi le aspettava.
+    func occhiChiusi(_ dati: [Data]) {
+        if occhi != nil { occhi = nil }
+        guard let c = attesaOcchi else { return }
+        attesaOcchi = nil
+        c.resume(returning: dati)
+    }
+
+    /// Icona 👁️: mirino con il tasto, poi JARVIS guarda la foto (comodo per le copertine).
+    func guardaManuale() {
+        Task {
+            let dati = await apriOcchi(automatico: false)
+            guard !dati.isEmpty else { return }
+            preparaFoto(dati)
+            await invia(dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?")
+        }
+    }
+
+    /// «Ehi Siri, Jarvis guarda»: scatta da sola e chiede cosa c'è davanti.
+    func guardaAutomatico() {
+        Task {
+            let dati = await apriOcchi(automatico: true)
+            guard !dati.isEmpty else { return }
+            preparaFoto(dati)
+            await invia("Cosa sto guardando?")
+        }
+    }
+
+    /// Icona Cucina: inquadra frigo o dispensa (scatto manuale), JARVIS propone cosa cucinare e cosa manca.
+    func guardaCucina() {
+        Task {
+            let dati = await apriOcchi(automatico: false, cucina: true)
+            guard !dati.isEmpty else { return }
+            preparaFoto(dati)
+            switch UserDefaults.standard.integer(forKey: "cucinaModo") {
+            case 1: await invia("Cucina: che piatto è questo? Dimmi come si chiama, da dove viene e la ricetta in breve, con le dosi per due.")
+            case 2: await invia("Cucina: stima i valori di questo piatto o prodotto: calorie, proteine, carboidrati e grassi per porzione, dicendo che è una stima a occhio.")
+            default: await invia("Cosa cucino stasera con quello che vedi? Proponimi due o tre piatti e dimmi se manca qualcosa da mettere nella lista della spesa.")
+            }
+        }
+    }
+
+    /// INTELLIGENCE · Wiretap: la trascrizione va al cervello (anche lunga) e JARVIS ne fa il verbale.
+    func verbaleWiretap(_ trascrizione: String, minuti: Int) {
+        let t = trascrizione.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        allegato = t
+        Task { await invia("Wiretap: il verbale della registrazione (\(minuti) min).") }
+    }
+
+    /// INTELLIGENCE · Profiler: la foto di una persona (o i fotogrammi di un giro) e, se il signore lo dice, chi è.
+    func profila(_ dati: [Data], nome: String) {
+        guard !dati.isEmpty else { return }
+        preparaFoto(dati)
+        let n = nome.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task { await invia(n.isEmpty ? "Modalità Profiler: fammi la scheda di questa persona." : "Modalità Profiler: questo è \(n). Fammi la scheda.") }
+    }
+
+    /// La domanda del diario della sera: JARVIS la dice e subito dopo ascolta la risposta.
+    private var ascoltaDopo = false
+    func chiediDiario(_ domanda: String) {
+        ascoltaDopo = true
+        leggi(domanda)
+    }
+
+    /// Una notifica di JARVIS (briefing, avviso) da mettere in chat e dire ad alta voce, senza passare dal cervello.
+    func leggi(_ testo: String) {
+        let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        interrompi()
+        messaggi.append(Messaggio(ruolo: "assistant", testo: t))
+        salva()
+        flussoFinito = true
+        accodaVoce(t, forza: true)
+    }
+
+    func interrompi() {
+        compitoRete?.cancel()
+        compitoRete = nil
+        compitoPonte?.cancel()
+        compitoPonte = nil
+        occhiChiusi([])                    // interrotto mentre guardava: la fotocamera si chiude
+        orecchio.ferma()
+        orecchio.testoDetto = ""
+        sintesi.stopSpeaking(at: .immediate)
+        cloud.ferma()
+        bufferVoce = ""
+        inCoda.removeAll()                  // i didCancel in arrivo per queste frasi verranno ignorati
+        flussoFinito = true
+        stato = nil
+        strumenti.annullaInSospeso()        // interrotto: niente chiamate/app aperte più tardi a sorpresa
+        if fase != .ascolto { fase = .attesa }
+    }
+
+    func invia(_ testoGrezzo: String) async {
+        var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fotoDaMandare = foto
+        let giroDaMandare = fotoGiro
+        if testo.isEmpty && fotoDaMandare == nil && giroDaMandare.isEmpty { fase = .attesa; return }
+        if testo.isEmpty { testo = "Che cos'è?" }
+        foto = nil
+        fotoGiro = []
+        let allegatoDaMandare = allegato
+        allegato = nil
+        interrompi()
+        avviso = nil
+
+        messaggi.append(Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty))
+        let storia: [[String: Any]] = messaggi.suffix(20)
+            .filter { !$0.testo.isEmpty }
+            .map { ["role": $0.ruolo, "content": $0.testoPerCervello] }
+        let risposta = Messaggio(ruolo: "assistant", testo: "")
+        messaggi.append(risposta)
+        salva()
+
+        fase = .elaboro
+        flussoFinito = false
+        compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare, id: risposta.id) }
+        armaPonte(id: risposta.id, testo: testo)
+    }
+
+    /// Se dopo un secondo il cervello non ha ancora detto nulla, JARVIS riempie l'attesa con una frase breve.
+    private func armaPonte(id: UUID, testo: String) {
+        compitoPonte?.cancel()
+        guard !Impostazioni.muto, testo.count > 12 else { return }     // i comandi secchi («pausa», «avanti») rispondono già in un lampo
+        compitoPonte = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1000))
+            guard let self, !Task.isCancelled, self.fase == .elaboro, self.inCoda.isEmpty, self.bufferVoce.isEmpty,
+                  self.messaggi.first(where: { $0.id == id })?.testo.isEmpty ?? false else { return }
+            self.dici(Jarvis.ponteCasuale())
+        }
+    }
+
+    /// Una chiamata leggera al cervello all'avvio: Supabase si sveglia ora e la prima domanda non paga l'avvio a freddo.
+    static func riscalda() async {
+        guard let url = URL(string: Impostazioni.indirizzo) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 10
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["sveglia": true])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    func nuovaConversazione() {
+        interrompi()
+        messaggi.removeAll()
+        salva()
+    }
+
+    // MARK: Un turno di dialogo con il cervello (streaming + strumenti del telefono)
+
+    private enum Esito { case fine(String, [String]), client([String: Any]), errore(String) }
+
+    private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], allegato: String? = nil, id: UUID) async {
+        var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "iphone", "strumenti_client": Strumenti.nomi]
+        if let foto { corpo["immagine"] = foto.base64EncodedString() }
+        if !giro.isEmpty { corpo["immagini"] = giro.map { $0.base64EncodedString() } }   // i fotogrammi del giro, in ordine
+        if let allegato { corpo["allegato"] = allegato }                                  // la trascrizione del Wiretap
+        let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
+        if let posizione { corpo["posizione"] = posizione }
+        // iOS ci lascia finire la risposta anche se lo schermo si spegne o il signore cambia app per un momento
+        let sfondo = UIApplication.shared.beginBackgroundTask(withName: "jarvis-risposta") { }
+        defer { if sfondo != .invalid { UIApplication.shared.endBackgroundTask(sfondo) } }
+        do {
+            for _ in 0..<6 {
+                // ogni passo ha un suo numero: se la linea cade e si riprova, il cervello riconosce la stessa richiesta e non ripete le azioni
+                let esito = try await flussoConRitentativi(corpo, id: id, richiesta: UUID().uuidString)
+                try Task.checkCancellation()
+                switch esito {
+                case .fine(let testo, let azioni):
+                    concludi(id: id, testo: testo, azioni: azioni)
+                    return
+                case .errore(let msg):
+                    concludi(id: id, testo: msg, azioni: [])
+                    return
+                case .client(let e):
+                    let richieste = e["richieste"] as? [[String: Any]] ?? []
+                    var risultati = e["risultati_server"] as? [[String: Any]] ?? []
+                    for q in richieste {
+                        try Task.checkCancellation()
+                        let nome = q["name"] as? String ?? ""
+                        if nome == "riconosci_musica" { await aspettaFineVoce() }   // Shazam non deve sentire JARVIS
+                        try Task.checkCancellation()
+                        stato = Strumenti.descrizione(nome)
+                        let (contenuto, errore) = await strumenti.esegui(nome, q["input"] as? [String: Any] ?? [:])
+                        aggiungiImmagini(strumenti.prendiImmagini(), id: id)
+                        var esito: [String: Any] = ["tool_use_id": q["id"] as? String ?? "", "content": contenuto, "is_error": errore]
+                        let viste = strumenti.prendiFotoOcchi()
+                        if !viste.isEmpty {
+                            // il cervello riceve la foto (o i fotogrammi del giro) insieme al risultato di «guarda»
+                            esito["immagini"] = viste.map { $0.base64EncodedString() }
+                            segnaFoto(id: id)
+                        }
+                        risultati.append(esito)
+                    }
+                    try Task.checkCancellation()
+                    let lavoro: Any = e["lavoro"] ?? [Any]()
+                    let modello: Any = e["modello"] ?? ""
+                    let azioniFatte: Any = e["azioni"] ?? [Any]()
+                    let detto: Any = e["detto"] ?? ""
+                    let continua: [String: Any] = ["lavoro": lavoro, "risultati": risultati,
+                                                   "modello": modello, "azioni": azioniFatte, "detto": detto]
+                    corpo = ["messaggi": [Any](), "dispositivo": "iphone", "strumenti_client": Strumenti.nomi,
+                             "continua": continua]
+                    if let posizione { corpo["posizione"] = posizione }
+                }
+            }
+            concludi(id: id, testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni: [])
+        } catch is CancellationError {
+            rimuoviSeVuoto(id)              // interrotto dal signore: niente da dire
+        } catch let e as URLError where e.code == .cancelled {
+            rimuoviSeVuoto(id)
+        } catch {
+            Suoni.errore()
+            concludi(id: id, testo: Jarvis.spiegaErroreRete(error), azioni: [])
+        }
+    }
+
+    /// Gli errori di rete che meritano un secondo tentativo: linea caduta, tempo scaduto, niente campo.
+    nonisolated private static func lineaCaduta(_ e: URLError) -> Bool {
+        [.networkConnectionLost, .timedOut, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost,
+         .dnsLookupFailed, .secureConnectionFailed, .resourceUnavailable].contains(e.code)
+    }
+
+    /// Al posto del messaggio inglese di iOS, una frase in italiano.
+    nonisolated private static func spiegaErroreRete(_ e: Error) -> String {
+        guard let u = e as? URLError else { return "Non riesco a raggiungere il mio cervello, Sir. \(e.localizedDescription)" }
+        switch u.code {
+        case .networkConnectionLost: return "Il server è irraggiungibile, Sir: ho insistito quattro volte, la linea non ha collaborato. Mi conceda un momento e me lo richieda."
+        case .timedOut: return "Il mio cervello non ha risposto in tempo, Sir, nemmeno al quarto tentativo. La linea è lenta: riprovi tra poco."
+        case .notConnectedToInternet: return "Siamo senza rete, Sir. Appena torna il campo sono di nuovo operativo."
+        case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed: return "Non raggiungo il mio cervello, Sir: la rete c'è ma non mi fa passare. Riprovi tra un momento."
+        default: return "Un intoppo di rete, Sir (\(u.code.rawValue)). Riprovi tra un momento."
+        }
+    }
+
+    /// Se la linea cade (o scade il tempo), riprova da sola fino a quattro volte (pause di 1, 2 e 4 secondi), con lo stesso
+    /// numero di richiesta. Al secondo inciampo JARVIS lo dice a voce, così il signore non parla con un muro.
+    private func flussoConRitentativi(_ corpo: [String: Any], id: UUID, richiesta: String) async throws -> Esito {
+        var tentativo = 0
+        while true {
+            do {
+                return try await flusso(corpo, id: id, richiesta: richiesta)
+            } catch let e as URLError where Jarvis.lineaCaduta(e) && tentativo < 3 {
+                tentativo += 1
+                azzeraTesto(id)                       // quello arrivato a metà si butta: la risposta ricomincia intera
+                switch tentativo {
+                case 1: stato = "Connessione persa, riprovo…"
+                case 2:
+                    stato = "La linea fa i capricci, insisto…"
+                    accodaVoce("Un attimo, Sir: la linea fa i capricci. Insisto.")
+                    accodaVoce("", forza: true)
+                default: stato = "Ultimo tentativo…"
+                }
+                try await Task.sleep(for: .seconds(Double(1 << (tentativo - 1))))   // 1, 2, 4 secondi
+            }
+        }
+    }
+
+    private func azzeraTesto(_ id: UUID) {
+        if let i = messaggi.firstIndex(where: { $0.id == id }) { messaggi[i].testo = "" }
+        bufferVoce = ""
+    }
+
+    private func flusso(_ corpo: [String: Any], id: UUID, richiesta: String) async throws -> Esito {
+        guard let url = URL(string: Impostazioni.indirizzo) else { throw ErroreJarvis.indirizzo }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 120
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(richiesta, forHTTPHeaderField: "x-richiesta")
+        req.httpBody = try JSONSerialization.data(withJSONObject: corpo)
+
+        let (righe, resp) = try await URLSession.shared.bytes(for: req)
+        let codice = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if codice == 401 { return .errore("La parola d'ordine non coincide, signore. La controlli nelle impostazioni.") }
+        guard codice == 200 else { return .errore("Il mio cervello ha risposto con un errore (codice \(codice)).") }
+
+        for try await riga in righe.lines {
+            try Task.checkCancellation()        // interrotto: le righe già arrivate non vanno più lette né dette
+            guard let dati = riga.data(using: .utf8),
+                  let e = (try? JSONSerialization.jsonObject(with: dati)) as? [String: Any],
+                  let tipo = e["t"] as? String else { continue }
+            switch tipo {
+            case "testo":
+                if let pezzo = e["d"] as? String { aggiungi(pezzo, id: id) }
+            case "stato":
+                stato = e["d"] as? String
+            case "immagini":
+                aggiungiImmagini(Immagine.daJSON(e["d"]), id: id)
+            case "fine":
+                return .fine(e["testo"] as? String ?? "", e["azioni"] as? [String] ?? [])
+            case "client":
+                return .client(e)
+            case "errore":
+                return .errore(e["d"] as? String ?? "Un intoppo tecnico, signore.")
+            default:
+                break
+            }
+        }
+        return .errore("La risposta si è interrotta a metà, signore. Riprovi.")
+    }
+
+    /// Nella chat, la domanda che ha fatto aprire gli occhi prende l'icona 📷.
+    private func segnaFoto(id: UUID) {
+        guard let i = messaggi.firstIndex(where: { $0.id == id }), i > 0, messaggi[i - 1].ruolo == "user" else { return }
+        messaggi[i - 1].conFoto = true
+        salva()
+    }
+
+    private func rimuoviSeVuoto(_ id: UUID) {
+        if let i = messaggi.firstIndex(where: { $0.id == id }), messaggi[i].testo.isEmpty { messaggi.remove(at: i) }
+        salva()
+    }
+
+    private func aggiungiImmagini(_ nuove: [Immagine], id: UUID) {
+        guard !nuove.isEmpty, let i = messaggi.firstIndex(where: { $0.id == id }) else { return }
+        var tutte = messaggi[i].immagini ?? []
+        for n in nuove where !tutte.contains(where: { $0.id == n.id }) { tutte.append(n) }
+        messaggi[i].immagini = Array(tutte.prefix(40))
+        salva()
+    }
+
+    /// Prima di ascoltare la musica: finisce di dire la frase in corso («Ascolto.») e poi tace.
+    private func aspettaFineVoce() async {
+        orecchio.ferma()
+        accodaVoce("", forza: true)
+        for _ in 0..<80 where !inCoda.isEmpty {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        if !inCoda.isEmpty {
+            sintesi.stopSpeaking(at: .immediate)
+            cloud.ferma()
+            inCoda.removeAll()
+        }
+        if fase == .parlo { fase = .elaboro }
+    }
+
+    private func aggiungi(_ pezzo: String, id: UUID) {
+        compitoPonte?.cancel()
+        if let i = messaggi.firstIndex(where: { $0.id == id }) { messaggi[i].testo += pezzo }
+        stato = nil
+        accodaVoce(pezzo)
+    }
+
+    private func concludi(id: UUID, testo: String, azioni: [String]) {
+        let giaDetto = messaggi.first(where: { $0.id == id })?.testo ?? ""
+        if let i = messaggi.firstIndex(where: { $0.id == id }) {
+            messaggi[i].testo = testo
+            messaggi[i].azioni = azioni
+        }
+        salva()
+        stato = nil
+        // se il testo finale non è stato letto in streaming (es. un errore), lo leggo ora
+        if giaDetto.isEmpty { accodaVoce(testo) }
+        accodaVoce("", forza: true)
+        flussoFinito = true
+        compitoRete = nil
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        if inCoda.isEmpty { fineParlato() }
+    }
+
+    // MARK: Voce in streaming: legge frase per frase mentre il resto arriva
+
+    private func accodaVoce(_ pezzo: String, forza: Bool = false) {
+        bufferVoce += pezzo
+        guard !Impostazioni.muto else { bufferVoce = ""; return }
+        if forza {
+            let resto = bufferVoce.trimmingCharacters(in: .whitespacesAndNewlines)
+            bufferVoce = ""
+            if !resto.isEmpty { dici(resto) }
+            return
+        }
+        // taglio all'ultima fine di frase seguita da uno spazio (così «10.500» non si spezza)
+        let caratteri = Array(bufferVoce)
+        var taglio: Int?
+        for k in caratteri.indices.dropLast() where ".!?…;:\n".contains(caratteri[k]) && caratteri[k + 1].isWhitespace {
+            taglio = k + 1
+        }
+        guard let t = taglio else { return }
+        let frase = String(caratteri[..<t]).trimmingCharacters(in: .whitespacesAndNewlines)
+        bufferVoce = String(caratteri[t...])
+        if !frase.isEmpty { dici(frase) }
+    }
+
+    private func dici(_ frase: String) {
+        guard fase != .ascolto else { return }   // mai prendersi l'audio mentre il signore parla
+        let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto
+        if inCoda.isEmpty {
+            let sessione = AVAudioSession.sharedInstance()
+            if conOrecchio {
+                // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
+                try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
+            } else {
+                try? sessione.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            }
+            try? sessione.setActive(true)
+            // la scelta si fa solo qui, quando nessuna delle due voci sta parlando: così non si accavallano
+            vocePerCloud = Impostazioni.voceCloud && cloud.disponibile
+        }
+        let u = AVSpeechUtterance(string: frase)
+        u.voice = Jarvis.voceScelta()
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
+        let chiave = ObjectIdentifier(u)
+        inCoda.insert(chiave)
+        frasiVive[chiave] = u
+        fase = .parlo
+        orecchio.testoDetto += " " + frase          // così l'orecchio riconosce la propria eco
+        if conOrecchio, !orecchio.attivo { orecchio.avvia() }
+        if vocePerCloud {
+            cloud.accoda(u)                 // voce di JARVIS dal cloud; se fallisce, legge questa stessa frase con la voce dell'iPhone
+        } else {
+            sintesi.speak(u)
+        }
+    }
+
+    /// Per «Prova la voce» nelle impostazioni.
+    func parla(_ testo: String) async {
+        interrompi()
+        accodaVoce(testo, forza: true)
+    }
+
+    fileprivate func fraseFinita(_ chiave: ObjectIdentifier) {
+        frasiVive[chiave] = nil
+        guard inCoda.remove(chiave) != nil else { return }   // frase di un discorso già interrotto
+        guard inCoda.isEmpty else { return }
+        if flussoFinito { fineParlato() } else if fase == .parlo { fase = .elaboro }   // detto tutto, il resto è in arrivo
+    }
+
+    private func fineParlato() {
+        orecchio.ferma()
+        orecchio.testoDetto = ""
+        guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
+        fase = .attesa
+        Suoni.pronto()
+        Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+        strumenti.apriInSospeso()    // WhatsApp, Mappe, telefono: si aprono quando JARVIS ha finito di parlare
+        if let l = strumenti.interpreteDaAprire {   // «traduci in spagnolo»: l'interprete parte appena ha finito la frase
+            strumenti.interpreteDaAprire = nil
+            interprete = l
+        }
+        if ascoltaDopo {             // diario della sera: finita la domanda, il microfono si apre da solo
+            ascoltaDopo = false
+            Task { await avviaAscolto() }
+        }
+        if strumenti.pulireChat {    // «cancella la conversazione»: dopo aver risposto, schermo pulito
+            strumenti.pulireChat = false
+            nuovaConversazione()
+        }
+    }
+
+    static func vociItaliane() -> [AVSpeechSynthesisVoice] {
+        AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("it") }
+            .sorted { ($0.quality.rawValue, $0.name) > ($1.quality.rawValue, $1.name) }
+    }
+
+    static func voceScelta() -> AVSpeechSynthesisVoice? {
+        if let v = AVSpeechSynthesisVoice(identifier: Impostazioni.voce) { return v }
+        return Jarvis.vociItaliane().first ?? AVSpeechSynthesisVoice(language: "it-IT")
+    }
+
+    // MARK: Foto
+
+    func impostaFoto(_ immagine: UIImage) {
+        let lato: CGFloat = 1280
+        let scala = min(1, lato / max(immagine.size.width, immagine.size.height))
+        let misura = CGSize(width: immagine.size.width * scala, height: immagine.size.height * scala)
+        let formato = UIGraphicsImageRendererFormat.default()
+        formato.scale = 1                   // pixel veri, non punti ×3: la foto resta sotto i limiti del cervello
+        let ridotta = UIGraphicsImageRenderer(size: misura, format: formato).image { _ in immagine.draw(in: CGRect(origin: .zero, size: misura)) }
+        foto = ridotta.jpegData(compressionQuality: 0.7)
+    }
+
+    // MARK: Ascolto
+
+    private func avviaAscolto() async {
+        avviso = nil
+        guard fase == .attesa else { return }
+        guard await Jarvis.chiediPermessi() else {
+            avviso = "Servono microfono e riconoscimento vocale: li attivi in Impostazioni › Jarvis."
+            return
+        }
+        guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
+        guard let riconoscitore, riconoscitore.isAvailable else {
+            avviso = "Il riconoscimento vocale non è disponibile in questo momento."
+            return
+        }
+        do {
+            let sessione = AVAudioSession.sharedInstance()
+            try sessione.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .duckOthers])
+            try sessione.setActive(true, options: .notifyOthersOnDeactivation)
+
+            let r = SFSpeechAudioBufferRecognitionRequest()
+            r.shouldReportPartialResults = true
+            r.contextualStrings = ["Discosizer", "Jarvis", "Discogs", "Resident Advisor", "SumUp"]
+            richiesta = r
+            try Jarvis.collegaMicrofono(motore.inputNode, a: r)
+            motore.prepare()
+            try motore.start()
+
+            parziale = ""
+            fase = .ascolto
+            Suoni.ascolto()
+            turnoAscolto += 1
+            let mio = turnoAscolto
+            compito = Jarvis.avviaRiconoscimento(riconoscitore, r) { [weak self] testo, finale, errore in
+                Task { @MainActor [weak self] in self?.aggiorna(testo: testo, finale: finale, errore: errore, ascolto: mio) }
+            }
+            armaSilenzio(secondi: 7)
+        } catch {
+            avviso = "Microfono non disponibile: \(error.localizedDescription)"
+            fermaAscolto(invia: false)
+        }
+    }
+
+    private func aggiorna(testo: String?, finale: Bool, errore: Bool, ascolto: Int) {
+        guard fase == .ascolto, ascolto == turnoAscolto else { return }
+        if let testo, !testo.isEmpty {
+            parziale = testo
+            armaSilenzio(secondi: 0.8)
+        }
+        if finale || errore { fermaAscolto(invia: true) }
+    }
+
+    private func armaSilenzio(secondi: Double) {
+        timerSilenzio?.invalidate()
+        let mio = turnoAscolto
+        timerSilenzio = Timer.scheduledTimer(withTimeInterval: secondi, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.turnoAscolto == mio else { return }
+                self.fermaAscolto(invia: true)
+            }
+        }
+    }
+
+    private func fermaAscolto(invia: Bool) {
+        guard fase == .ascolto || !invia else { return }
+        timerSilenzio?.invalidate()
+        timerSilenzio = nil
+        if motore.isRunning { motore.stop() }
+        motore.inputNode.removeTap(onBus: 0)
+        richiesta?.endAudio()
+        compito?.cancel()
+        richiesta = nil
+        compito = nil
+        let testo = parziale
+        parziale = ""
+        fase = .attesa
+        if invia, foto == nil, eseguiComando(testo) { return }       // «attiva la Sentinella»: lo apro io, niente cervello
+        if invia, !testo.isEmpty || foto != nil { Task { await self.invia(testo) } }
+    }
+
+    // MARK: Memoria locale della conversazione
+
+    private func salva() {
+        if let d = try? JSONEncoder().encode(Array(messaggi.suffix(60))) {
+            UserDefaults.standard.set(d, forKey: "messaggi")
+        }
+    }
+
+    private func carica() {
+        if let d = UserDefaults.standard.data(forKey: "messaggi"),
+           let m = try? JSONDecoder().decode([Messaggio].self, from: d) { messaggi = m.filter { !$0.testo.isEmpty } }
+    }
+
+    // MARK: Ponti fuori dal thread principale
+    // I callback audio arrivano su altri thread: queste funzioni non sono legate al MainActor.
+
+    nonisolated private static func chiediPermessi() async -> Bool {
+        let parlato = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            SFSpeechRecognizer.requestAuthorization { @Sendable stato in c.resume(returning: stato == .authorized) }
+        }
+        let microfono = await AVAudioApplication.requestRecordPermission()
+        return parlato && microfono
+    }
+
+    nonisolated private static func collegaMicrofono(_ input: AVAudioInputNode, a r: SFSpeechAudioBufferRecognitionRequest) throws {
+        let formato = input.outputFormat(forBus: 0)
+        guard formato.sampleRate > 0, formato.channelCount > 0 else {
+            throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
+        }
+        input.removeTap(onBus: 0)
+        nonisolated(unsafe) let richiesta = r
+        input.installTap(onBus: 0, bufferSize: 1024, format: formato) { buffer, _ in
+            richiesta.append(buffer)
+            Volume.voce.misura(buffer)          // il reattore si gonfia con la voce
+        }
+    }
+
+    nonisolated private static func avviaRiconoscimento(
+        _ ric: SFSpeechRecognizer,
+        _ r: SFSpeechAudioBufferRecognitionRequest,
+        risultato: @escaping @Sendable (String?, Bool, Bool) -> Void
+    ) -> SFSpeechRecognitionTask {
+        ric.recognitionTask(with: r) { ris, err in
+            risultato(ris?.bestTranscription.formattedString, ris?.isFinal ?? false, err != nil)
+        }
+    }
+}
+
+extension Jarvis: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
+        let chiave = ObjectIdentifier(u)
+        Task { @MainActor in self.fraseFinita(chiave) }
+    }
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) {
+        let chiave = ObjectIdentifier(u)
+        Task { @MainActor in self.fraseFinita(chiave) }
+    }
+}
+
+// MARK: - Voce di JARVIS dal cloud (ElevenLabs tramite il cervello)
+// Ogni frase si scarica appena arriva (in parallelo) e si ascolta in ordine. Se una frase non arriva,
+// la legge la voce dell'iPhone: JARVIS non resta mai muto.
+
+nonisolated struct VoceRemota: Identifiable, Decodable, Hashable, Sendable {
+    let id: String
+    let nome: String
+    let descrizione: String?
+}
+
+@MainActor
+final class VoceCloud: NSObject {
+    var finita: ((ObjectIdentifier) -> Void)?
+
+    private struct Pezzo { let frase: AVSpeechUtterance; let audio: Task<Data?, Never> }
+    private var coda: [Pezzo] = []
+    private var generazione = 0              // cambia a ogni interruzione: i lavori vecchi si fermano da soli
+    private var inCorso = false
+    private var sospesaFino = Date.distantPast
+    private var lettore: AVAudioPlayer?
+    private let riserva = AVSpeechSynthesizer()
+    private var attesa: CheckedContinuation<Bool, Never>?
+    private var attuale: ObjectIdentifier?   // il suono (mp3 o frase di riserva) che sta andando adesso
+    private var inDownload = 0               // frasi in scaricamento in questo momento
+
+    /// Falso per qualche minuto se il cervello dice che la voce cloud non è configurata.
+    var disponibile: Bool { Date() >= sospesaFino }
+
+    override init() {
+        super.init()
+        riserva.delegate = self
+    }
+
+    func accoda(_ u: AVSpeechUtterance) {
+        let testo = u.speechString
+        let token = Portachiavi.leggi()
+        let id = Impostazioni.idVoceCloud
+        let url = URL(string: Impostazioni.indirizzo)
+        let audio = Task { [weak self] () async -> Data? in
+            guard let url, let self else { return nil }
+            // le frasi già dette una volta sono in cache: partono subito, senza rete e senza consumare credito
+            if let pronta = CacheVoce.leggi(testo, id: id) { return pronta }
+            // al massimo 2 frasi scaricate insieme: ElevenLabs ne accetta poche in parallelo,
+            // e se si esagera alcune frasi tornano con la voce dell'iPhone (voce che cambia a metà)
+            while self.inDownload >= 2 && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(60)) }
+            if Task.isCancelled { return nil }
+            self.inDownload += 1
+            let (dati, codice) = await VoceCloud.scarica(testo, id: id, url: url, token: token)
+            self.inDownload -= 1
+            if codice == 503 || codice == 401 { self.sospesaFino = Date().addingTimeInterval(300) }
+            if let dati { CacheVoce.salva(dati, testo: testo, id: id) }
+            return dati
+        }
+        coda.append(Pezzo(frase: u, audio: audio))
+        if !inCorso {
+            inCorso = true
+            let g = generazione
+            Task { await self.ciclo(g) }
+        }
+    }
+
+    /// Scarica in sottofondo le frasi fisse non ancora in cache (frasi ponte, annunci): la prima volta che servono sono già pronte.
+    func prepara(_ frasi: [String]) {
+        let token = Portachiavi.leggi()
+        let id = Impostazioni.idVoceCloud
+        guard let url = URL(string: Impostazioni.indirizzo), !token.isEmpty else { return }
+        let mancanti = frasi.filter { CacheVoce.leggi($0, id: id) == nil }
+        guard !mancanti.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for f in mancanti {
+                let (dati, _) = await VoceCloud.scarica(f, id: id, url: url, token: token)
+                if let dati { CacheVoce.salva(dati, testo: f, id: id) }
+                try? await Task.sleep(for: .milliseconds(400))   // una alla volta, senza intralciare la voce vera
+            }
+        }
+    }
+
+    func ferma() {
+        generazione += 1
+        coda.forEach { $0.audio.cancel() }
+        coda.removeAll()
+        lettore?.stop()
+        lettore = nil
+        riserva.stopSpeaking(at: .immediate)
+        rilascia(false)
+        inCorso = false
+    }
+
+    private func ciclo(_ g: Int) async {
+        while g == generazione, !coda.isEmpty {
+            let p = coda.removeFirst()
+            let dati = await p.audio.value
+            guard g == generazione else { return }
+            var detta = false
+            if let dati { detta = await suona(dati) }
+            guard g == generazione else { return }
+            if !detta {
+                _ = await leggiConRiserva(p.frase)
+                guard g == generazione else { return }
+            }
+            finita?(ObjectIdentifier(p.frase))
+        }
+        if g == generazione { inCorso = false }
+    }
+
+    private func suona(_ dati: Data) async -> Bool {
+        guard let p = try? AVAudioPlayer(data: dati) else { return false }
+        p.delegate = self
+        lettore = p
+        Volume.segui(p)
+        return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            attesa = c
+            attuale = ObjectIdentifier(p)
+            if !p.play() { rilascia(false) }
+        }
+    }
+
+    private func leggiConRiserva(_ u: AVSpeechUtterance) async -> Bool {
+        await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            attesa = c
+            attuale = ObjectIdentifier(u)
+            riserva.speak(u)
+        }
+    }
+
+    fileprivate func chiudi(_ id: ObjectIdentifier, _ ok: Bool) {
+        guard id == attuale else { return }  // segnale di un suono già interrotto
+        rilascia(ok)
+    }
+
+    private func rilascia(_ ok: Bool) {
+        let c = attesa
+        attesa = nil
+        attuale = nil
+        lettore = nil
+        c?.resume(returning: ok)
+    }
+
+    nonisolated static func scarica(_ testo: String, id: String, url: URL, token: String) async -> (Data?, Int) {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 15                 // il cervello può riprovare con ElevenLabs: diamogli tempo
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        var corpo: [String: Any] = ["voce": testo]
+        if !id.isEmpty { corpo["id_voce"] = id }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
+        do {
+            let (d, r) = try await URLSession.shared.data(for: req)
+            let http = r as? HTTPURLResponse
+            let codice = http?.statusCode ?? 0
+            let tipo = http?.value(forHTTPHeaderField: "Content-Type") ?? ""
+            return (codice == 200 && tipo.contains("audio") && !d.isEmpty) ? (d, 200) : (nil, codice)
+        } catch {
+            return (nil, 0)
+        }
+    }
+
+    /// Le voci dell'account ElevenLabs, per sceglierle nelle impostazioni. nil = voce cloud non configurata o non raggiungibile.
+    static func elencoVoci() async -> [VoceRemota]? {
+        guard let url = URL(string: Impostazioni.indirizzo) else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 15
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.httpBody = Data(#"{"voci":true}"#.utf8)
+        struct Risposta: Decodable { let attiva: Bool; let voci: [VoceRemota] }
+        guard let (d, _) = try? await URLSession.shared.data(for: req),
+              let r = try? JSONDecoder().decode(Risposta.self, from: d), r.attiva else { return nil }
+        return r.voci
+    }
+}
+
+/// La cache delle frasi già pronunciate: un file audio per frase (e per voce), nella cartella Caches dell'app.
+/// Le frasi che JARVIS ripete (ponti, conferme, annunci) partono all'istante; iOS può svuotare la cartella se serve spazio.
+nonisolated enum CacheVoce {
+    private static let cartella: URL? = {
+        guard let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let c = base.appendingPathComponent("voce-jarvis", isDirectory: true)
+        try? FileManager.default.createDirectory(at: c, withIntermediateDirectories: true)
+        return c
+    }()
+    private static let massimoFile = 400
+
+    private static func file(_ testo: String, id: String) -> URL? {
+        let chiave = "\(id)|\(testo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
+        let hash = SHA256.hash(data: Data(chiave.utf8)).map { String(format: "%02x", $0) }.joined()
+        return cartella?.appendingPathComponent(hash + ".mp3")
+    }
+
+    static func leggi(_ testo: String, id: String) -> Data? {
+        guard let f = file(testo, id: id), let d = try? Data(contentsOf: f), d.count > 200 else { return nil }
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: f.path)   // usata ora: resta tra le recenti
+        return d
+    }
+
+    static func salva(_ dati: Data, testo: String, id: String) {
+        guard let f = file(testo, id: id), testo.count <= 300 else { return }   // le frasi lunghe non si ripetono mai uguali
+        try? dati.write(to: f, options: .atomic)
+        potatura()
+    }
+
+    /// Se i file sono troppi, via i meno usati di recente.
+    private static func potatura() {
+        guard let c = cartella,
+              let elenco = try? FileManager.default.contentsOfDirectory(at: c, includingPropertiesForKeys: [.contentModificationDateKey]),
+              elenco.count > massimoFile else { return }
+        let ordinati = elenco.sorted {
+            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return a < b
+        }
+        for f in ordinati.prefix(elenco.count - massimoFile) { try? FileManager.default.removeItem(at: f) }
+    }
+}
+
+extension VoceCloud: AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(_ p: AVAudioPlayer, successfully ok: Bool) {
+        let id = ObjectIdentifier(p)
+        Task { @MainActor in self.chiudi(id, ok) }
+    }
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ p: AVAudioPlayer, error: (any Error)?) {
+        let id = ObjectIdentifier(p)
+        Task { @MainActor in self.chiudi(id, false) }
+    }
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) {
+        let id = ObjectIdentifier(u)
+        Task { @MainActor in self.chiudi(id, true) }
+    }
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) {
+        let id = ObjectIdentifier(u)
+        Task { @MainActor in self.chiudi(id, true) }
+    }
+}

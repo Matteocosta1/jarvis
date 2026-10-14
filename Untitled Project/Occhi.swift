@@ -1,0 +1,459 @@
+#if os(iOS)
+import SwiftUI
+import AVFoundation
+import UIKit
+import ImageIO
+import UniformTypeIdentifiers
+
+/// Gli occhi di JARVIS: la fotocamera posteriore con un mirino da HUD.
+/// Automatico: si apre, aggancia e scatta da solo dopo poco più di un secondo («Jarvis, cosa sto guardando?»).
+/// Manuale: mirino con il tasto di scatto (icona 👁️, comodo per le copertine dei dischi).
+/// Giro (video): 5 secondi mentre il signore muove il telefono, 4 fotogrammi ben distanziati
+/// («fai un giro», scaffali, file di dischi, stanze). Si avvia a voce o con il tasto REC del mirino manuale.
+/// Le foto escono già ridotte (lato massimo 1280 px, 1024 nel giro, JPEG) e vanno al cervello, che le guarda e risponde a voce.
+struct Occhiata: Identifiable {
+    let id = UUID()
+    let automatico: Bool
+    var video = false
+    var cucina = false
+}
+
+struct Occhi: View {
+    let automatico: Bool
+    var video = false
+    /// Cucina (icona forchetta): stessa fotocamera, ma con la sua veste calda e tre richieste da scegliere.
+    var cucina = false
+    /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
+    let fine: ([Data]) -> Void
+
+    /// Il giro: quanto dura e quanti fotogrammi manda a JARVIS.
+    static let durataGiro = 5.0
+    static let fotogrammiGiro = 4
+
+    @State private var motore = MotoreOcchi()
+    @State private var stato = "AGGANCIO OTTICO"
+    @State private var lampo = false
+    @State private var scattando = false
+    @State private var chiuso = false
+    @State private var agganciato = false
+    @State private var registrando = false
+    @State private var mancano = 5
+    @State private var davanti = false          // selfie: fotocamera frontale
+    @State private var cambiando = false
+    /// Cucina: 0 cosa cucino con quello che vedo, 1 che piatto è (e la ricetta), 2 valori nutrizionali.
+    @AppStorage("cucinaModo") private var modoCucina = 0
+    static let richiesteCucina = ["COSA CUCINO", "CHE PIATTO È", "VALORI"]
+    private var tinta: Color { Color.ciano }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            AnteprimaOcchi(sessione: motore.sessione)
+                .ignoresSafeArea()
+                .opacity(agganciato && !cambiando ? 1 : 0)
+                .animation(.easeOut(duration: 0.4), value: agganciato && !cambiando)
+            MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            if registrando {
+                VStack {
+                    HStack(spacing: 8) {
+                        Circle().fill(Color.red).frame(width: 10, height: 10)
+                            .shadow(color: .red, radius: 6)
+                        Text("REC · \(mancano)")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .tracking(3)
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText(countsDown: true))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Capsule())
+                    .padding(.top, 70)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
+            Color.white.opacity(lampo ? 0.85 : 0)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+            VStack(spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("J.A.R.V.I.S.")
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .tracking(4)
+                        Text(cucina ? "CUCINA · \(video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])"
+                                    : "OCCHI · \(video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE")")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .tracking(2)
+                            .opacity(0.7)
+                    }
+                    .foregroundStyle(tinta)
+                    .shadow(color: tinta.opacity(0.6), radius: 6)
+                    Spacer()
+                    Button { Suoni.tocco(); chiudi([]) } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(tinta)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.4))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
+                    }
+                    .accessibilityLabel("Chiudi")
+                }
+                Spacer()
+                Text(stato)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .tracking(3)
+                    .foregroundStyle(tinta)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color.black.opacity(0.45))
+                    .clipShape(Capsule())
+                    .contentTransition(.opacity)
+                if cucina && !video && !registrando {
+                    // cosa vuole sapere: si sceglie prima di scattare, e resta ricordato
+                    HStack(spacing: 6) {
+                        ForEach(0..<3, id: \.self) { k in
+                            Button { Suoni.tocco(); withAnimation(.easeOut(duration: 0.2)) { modoCucina = k } } label: {
+                                Text(Occhi.richiesteCucina[k])
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1)
+                                    .foregroundStyle(modoCucina == k ? Color.black : tinta)
+                                    .padding(.horizontal, 10).padding(.vertical, 7)
+                                    .background(modoCucina == k ? tinta : Color.black.opacity(0.5))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(tinta.opacity(0.6), lineWidth: 1))
+                            }
+                            .buttonStyle(StileStark())
+                        }
+                    }
+                }
+                if !automatico && !video {
+                    HStack(spacing: 34) {
+                        // selfie: si vede lei e chi c'è dietro
+                        Button { Task { await giraFotocamera() } } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(tinta)
+                                .frame(width: 54, height: 54)
+                                .background(Color.black.opacity(0.45))
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(tinta.opacity(0.6), lineWidth: 1.5))
+                        }
+                        .buttonStyle(StileStark())
+                        .disabled(!agganciato || scattando || registrando || cambiando)
+                        .accessibilityLabel(davanti ? "Fotocamera posteriore" : "Selfie")
+                        Button { scatta() } label: {
+                            ZStack {
+                                Circle().stroke(tinta, lineWidth: 3).frame(width: 74, height: 74)
+                                Circle().fill(tinta.opacity(scattando ? 0.9 : 0.25)).frame(width: 60, height: 60)
+                                Image(systemName: cucina ? "fork.knife" : "eye").font(.system(size: 22, weight: .semibold)).foregroundStyle(.white)
+                            }
+                            .shadow(color: tinta.opacity(0.7), radius: 10)
+                        }
+                        .buttonStyle(StileStark())
+                        .disabled(!agganciato || scattando || registrando)
+                        .accessibilityLabel("Scatta")
+                        // giro di 5 secondi: muova il telefono lungo lo scaffale o la stanza
+                        Button { Task { await giro() } } label: {
+                            ZStack {
+                                Circle().stroke(Color.red.opacity(0.85), lineWidth: 2).frame(width: 54, height: 54)
+                                Text("REC").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
+                            }
+                            .shadow(color: .red.opacity(0.5), radius: 8)
+                        }
+                        .buttonStyle(StileStark())
+                        .disabled(!agganciato || scattando || registrando)
+                        .accessibilityLabel("Giro di cinque secondi")
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+        }
+        .statusBarHidden()
+        .task { await prepara() }
+        .onDisappear { motore.ferma() }
+    }
+
+    // MARK: Lavoro
+
+    private func prepara() async {
+        guard await AVCaptureDevice.requestAccess(for: .video) else {
+            stato = "ACCESSO NEGATO · IMPOSTAZIONI › JARVIS › FOTOCAMERA"
+            Suoni.errore()
+            try? await Task.sleep(for: .seconds(2.5))
+            chiudi([])
+            return
+        }
+        let pronto = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            motore.avvia { ok in c.resume(returning: ok) }
+        }
+        guard pronto else {
+            stato = "FOTOCAMERA NON DISPONIBILE"
+            Suoni.errore()
+            try? await Task.sleep(for: .seconds(2))
+            chiudi([])
+            return
+        }
+        agganciato = true
+        Suoni.ascolto()
+        if video {
+            stato = "SISTEMI OTTICI ATTIVI"
+            try? await Task.sleep(for: .milliseconds(700))     // il tempo di mettere a fuoco
+            await giro()
+        } else if automatico {
+            stato = "ANALISI OTTICA"
+            try? await Task.sleep(for: .milliseconds(1300))   // il tempo di mettere a fuoco
+            scatta()
+        } else {
+            stato = cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI"
+        }
+    }
+
+    /// Fotocamera davanti (selfie) o dietro.
+    private func giraFotocamera() async {
+        guard !cambiando else { return }
+        Suoni.tocco()
+        cambiando = true
+        let nuova = !davanti
+        let m = motore
+        let ok = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            m.avvia(posizione: nuova ? .front : .back) { ok in c.resume(returning: ok) }
+        }
+        if ok {
+            davanti = nuova
+            stato = nuova ? "SELFIE · LEI E CHI LE STA DIETRO" : (cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI")
+        }
+        try? await Task.sleep(for: .milliseconds(250))
+        cambiando = false
+    }
+
+    private func scatta() {
+        guard agganciato, !scattando, !chiuso, !cambiando else { return }
+        scattando = true
+        stato = "ACQUISIZIONE"
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        Suoni.tocco()
+        withAnimation(.easeOut(duration: 0.06)) { lampo = true }
+        withAnimation(.easeIn(duration: 0.45).delay(0.06)) { lampo = false }
+        motore.scatta(veloce: false) { dati in
+            let jpeg = dati.flatMap { Occhi.riduci($0) }
+            Task { @MainActor in chiudi(jpeg.map { [$0] } ?? []) }
+        }
+    }
+
+    /// Il giro: 5 secondi, 4 fotogrammi distribuiti nel tempo (circa uno ogni secondo e un quarto), poi si chiude da solo.
+    private func giro() async {
+        guard agganciato, !scattando, !registrando, !chiuso else { return }
+        registrando = true
+        stato = "ACQUISIZIONE IN MOVIMENTO"
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        let inizio = Date()
+        let passo = Occhi.durataGiro / Double(Occhi.fotogrammiGiro)
+        var fotogrammi: [Data] = []
+        let conto = Task { @MainActor in                       // il conto alla rovescia sullo schermo
+            for s in stride(from: Int(Occhi.durataGiro), through: 1, by: -1) {
+                withAnimation { mancano = s }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+        for k in 0..<Occhi.fotogrammiGiro {
+            let quando = passo * (Double(k) + 0.4)               // 0,5 · 1,75 · 3 · 4,25 secondi
+            let attesa = quando - Date().timeIntervalSince(inizio)
+            if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
+            guard !chiuso else { conto.cancel(); return }
+            let dati = await withCheckedContinuation { (c: CheckedContinuation<Data?, Never>) in
+                motore.scatta(veloce: true) { d in c.resume(returning: d) }
+            }
+            if let dati, let jpeg = Occhi.riduci(dati, lato: 1024) { fotogrammi.append(jpeg) }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        let resto = Occhi.durataGiro - Date().timeIntervalSince(inizio)
+        if resto > 0 { try? await Task.sleep(for: .seconds(resto)) }
+        conto.cancel()
+        guard !chiuso else { return }
+        registrando = false
+        stato = "ANALISI"
+        Suoni.tocco()
+        chiudi(fotogrammi)
+    }
+
+    private func chiudi(_ dati: [Data]) {
+        guard !chiuso else { return }
+        chiuso = true
+        motore.ferma()
+        fine(dati)
+    }
+
+    /// Lato massimo 1280 px (1024 nel giro) e JPEG al 70%: la foto resta leggera per il cervello, ma la copertina si legge bene.
+    /// Fatto con ImageIO: gira fuori dal thread principale e raddrizza la foto secondo l'orientamento del telefono.
+    nonisolated static func riduci(_ dati: Data, lato: Int = 1280) -> Data? {
+        guard let sorgente = CGImageSourceCreateWithData(dati as CFData, nil) else { return nil }
+        let opzioni: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: lato,
+        ]
+        guard let piccola = CGImageSourceCreateThumbnailAtIndex(sorgente, 0, opzioni as CFDictionary) else { return nil }
+        let uscita = NSMutableData()
+        guard let destinazione = CGImageDestinationCreateWithData(uscita as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destinazione, piccola, [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
+        guard CGImageDestinationFinalize(destinazione) else { return nil }
+        return uscita as Data
+    }
+}
+
+// MARK: - Mirino da HUD: angoli, reticolo che gira, riga di scansione
+
+struct MirinoHUD: View {
+    let agganciato: Bool
+    let scattando: Bool
+    var tinta: Color = .ciano
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            Canvas { gc, size in
+                let w = Double(size.width), h = Double(size.height)
+                let c = CGPoint(x: w / 2, y: h / 2)
+                let lato = min(w, h) * 0.72
+                let colore = scattando ? Color.orange : tinta
+                let x0 = (w - lato) / 2, y0 = (h - lato) / 2
+                let braccio = lato * 0.12
+
+                // angoli del riquadro
+                var angoli = Path()
+                for (ax, ay, dx, dy) in [(x0, y0, 1.0, 1.0), (x0 + lato, y0, -1.0, 1.0), (x0, y0 + lato, 1.0, -1.0), (x0 + lato, y0 + lato, -1.0, -1.0)] {
+                    angoli.move(to: CGPoint(x: ax, y: ay + dy * braccio))
+                    angoli.addLine(to: CGPoint(x: ax, y: ay))
+                    angoli.addLine(to: CGPoint(x: ax + dx * braccio, y: ay))
+                }
+                gc.stroke(angoli, with: .color(colore.opacity(0.9)), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+
+                // reticolo al centro: due archi che girano in senso opposto
+                let giro = t * (agganciato ? 0.8 : 2.4)
+                for (r, verso, lung) in [(lato * 0.16, 1.0, 0.6), (lato * 0.21, -1.0, 0.35)] {
+                    var arco = Path()
+                    let inizio = Angle(radians: giro * verso)
+                    arco.addArc(center: c, radius: r, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
+                    gc.stroke(arco, with: .color(colore.opacity(0.7)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                }
+                var croce = Path()
+                croce.move(to: CGPoint(x: c.x - 8, y: c.y)); croce.addLine(to: CGPoint(x: c.x + 8, y: c.y))
+                croce.move(to: CGPoint(x: c.x, y: c.y - 8)); croce.addLine(to: CGPoint(x: c.x, y: c.y + 8))
+                gc.stroke(croce, with: .color(colore.opacity(0.8)), lineWidth: 1)
+
+                // riga di scansione che scende nel riquadro
+                let p = (t * 0.55).truncatingRemainder(dividingBy: 1)
+                let y = y0 + lato * p
+                let riga = Path(CGRect(x: x0, y: y - 1, width: lato, height: 2))
+                gc.fill(riga, with: .color(colore.opacity(0.55)))
+                let scia = Path(CGRect(x: x0, y: max(y0, y - 40), width: lato, height: min(40, y - y0)))
+                gc.fill(scia, with: .linearGradient(Gradient(colors: [colore.opacity(0), colore.opacity(0.14)]),
+                                                    startPoint: CGPoint(x: 0, y: y - 40), endPoint: CGPoint(x: 0, y: y)))
+
+                // tacche laterali con lettura «telemetrica»
+                for k in 0..<12 {
+                    let ty = y0 + lato * Double(k) / 11
+                    var tacca = Path()
+                    tacca.move(to: CGPoint(x: x0 - 14, y: ty)); tacca.addLine(to: CGPoint(x: x0 - (k % 3 == 0 ? 4 : 8), y: ty))
+                    tacca.move(to: CGPoint(x: x0 + lato + 14, y: ty)); tacca.addLine(to: CGPoint(x: x0 + lato + (k % 3 == 0 ? 4 : 8), y: ty))
+                    gc.stroke(tacca, with: .color(colore.opacity(0.45)), lineWidth: 1)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Anteprima della fotocamera
+
+struct AnteprimaOcchi: UIViewRepresentable {
+    let sessione: AVCaptureSession
+
+    final class Vista: UIView {
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+        var anteprima: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+
+    func makeUIView(context: Context) -> Vista {
+        let v = Vista()
+        v.backgroundColor = .black
+        v.anteprima.session = sessione
+        v.anteprima.videoGravity = .resizeAspectFill
+        return v
+    }
+
+    func updateUIView(_ v: Vista, context: Context) {}
+}
+
+// MARK: - Motore della fotocamera (lavora su una coda sua, fuori dal thread principale)
+
+nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
+    let sessione = AVCaptureSession()
+    private let uscita = AVCapturePhotoOutput()
+    private let coda = DispatchQueue(label: "it.discosizer.jarvis.occhi")
+    private var configurata = false
+    private var consegna: (@Sendable (Data?) -> Void)?
+    /// Quale fotocamera è montata: quella dietro (di solito) o quella davanti (selfie nel Profiler).
+    private var montata: AVCaptureDevice.Position = .back
+
+    func avvia(posizione: AVCaptureDevice.Position = .back, pronto: @escaping @Sendable (Bool) -> Void) {
+        coda.async {
+            if !self.configurata || posizione != self.montata {
+                self.sessione.beginConfiguration()
+                self.sessione.sessionPreset = .photo
+                for vecchio in self.sessione.inputs { self.sessione.removeInput(vecchio) }
+                guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: posizione),
+                      let ingresso = try? AVCaptureDeviceInput(device: cam),
+                      self.sessione.canAddInput(ingresso) else {
+                    self.sessione.commitConfiguration()
+                    pronto(false)
+                    return
+                }
+                self.sessione.addInput(ingresso)
+                if !self.sessione.outputs.contains(self.uscita) {
+                    guard self.sessione.canAddOutput(self.uscita) else { self.sessione.commitConfiguration(); pronto(false); return }
+                    self.sessione.addOutput(self.uscita)
+                }
+                self.sessione.commitConfiguration()
+                self.montata = posizione
+                if cam.isFocusModeSupported(.continuousAutoFocus), (try? cam.lockForConfiguration()) != nil {
+                    cam.focusMode = .continuousAutoFocus
+                    cam.unlockForConfiguration()
+                }
+                self.configurata = true
+            }
+            if !self.sessione.isRunning { self.sessione.startRunning() }
+            pronto(self.sessione.isRunning)
+        }
+    }
+
+    func ferma() {
+        coda.async { if self.sessione.isRunning { self.sessione.stopRunning() } }
+    }
+
+    /// veloce: per i fotogrammi del giro, scatto immediato senza elaborazioni pesanti.
+    func scatta(veloce: Bool, _ fine: @escaping @Sendable (Data?) -> Void) {
+        coda.async {
+            guard self.sessione.isRunning, self.consegna == nil else { fine(nil); return }
+            self.consegna = fine
+            let impostazioni = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            if veloce { impostazioni.photoQualityPrioritization = .speed }
+            self.uscita.capturePhoto(with: impostazioni, delegate: self)
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: (any Error)?) {
+        let dati = error == nil ? photo.fileDataRepresentation() : nil
+        coda.async {
+            let f = self.consegna
+            self.consegna = nil
+            f?(dati)
+        }
+    }
+}
+#endif

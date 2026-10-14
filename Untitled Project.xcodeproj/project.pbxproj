@@ -1,0 +1,773 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 90;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		6303067330785BD8005C3D6F /* JarvisOrologio Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		630306B03079AF9C005C3D6F /* BrowserPrivato.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */; };
+		630306B13079AF9C005C3D6F /* BrowserPrivato.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */; };
+		630306BF3079C368005C3D6F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 630306BE3079C367005C3D6F /* WidgetKit.framework */; };
+		630306C13079C368005C3D6F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 630306C03079C368005C3D6F /* SwiftUI.framework */; };
+		630306CC3079C369005C3D6F /* JarvisComplicazioneExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		630306D3307C20E0005C3D6F /* ReattoreHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630306D2307C20E0005C3D6F /* ReattoreHUD.swift */; };
+		630306D4307C20E0005C3D6F /* ReattoreHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630306D2307C20E0005C3D6F /* ReattoreHUD.swift */; };
+		63030717307F445D005C3D6F /* SchedeSistemi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63030716307F445D005C3D6F /* SchedeSistemi.swift */; };
+		63030718307F445D005C3D6F /* SchedeSistemi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63030716307F445D005C3D6F /* SchedeSistemi.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		6303067130785BD8005C3D6F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6303066830785BD7005C3D6F;
+			remoteInfo = "JarvisOrologio Watch App";
+		};
+		630306CA3079C369005C3D6F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 630306BB3079C367005C3D6F;
+			remoteInfo = JarvisComplicazioneExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		6303067730785BD8005C3D6F /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolder = Product;
+			files = (
+				6303067330785BD8005C3D6F /* JarvisOrologio Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+		};
+		630306D13079C369005C3D6F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				630306CC3079C369005C3D6F /* JarvisComplicazioneExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000120 /* Untitled Project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Untitled Project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "JarvisOrologio Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6303069130796D9D005C3D6F /* JarvisOrologio-Watch-App-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "JarvisOrologio-Watch-App-Info.plist"; sourceTree = "<group>"; };
+		630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserPrivato.swift; sourceTree = "<group>"; };
+		630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JarvisComplicazioneExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		630306BE3079C367005C3D6F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		630306C03079C368005C3D6F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		630306D2307C20E0005C3D6F /* ReattoreHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReattoreHUD.swift; sourceTree = "<group>"; };
+		63030716307F445D005C3D6F /* SchedeSistemi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedeSistemi.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		630306B73079C18A005C3D6F /* Exceptions for "Untitled Project" folder in "JarvisOrologio Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				avvio.m4a,
+				Benessere.swift,
+				ComandiVocali.swift,
+				SaluteStorica.swift,
+				scheda.m4a,
+				schedapronta.m4a,
+				tick.m4a,
+				VolumeVoce.swift,
+			);
+			target = 6303066830785BD7005C3D6F /* JarvisOrologio Watch App */;
+		};
+		630306D03079C369005C3D6F /* Exceptions for "JarvisComplicazione" folder in "JarvisComplicazioneExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		000000000000000000000010 /* Untitled Project */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				630306B73079C18A005C3D6F /* Exceptions for "Untitled Project" folder in "JarvisOrologio Watch App" target */,
+			);
+			path = "Untitled Project";
+			sourceTree = "<group>";
+		};
+		6303066A30785BD7005C3D6F /* JarvisOrologio Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "JarvisOrologio Watch App";
+			sourceTree = "<group>";
+		};
+		630306C23079C368005C3D6F /* JarvisComplicazione */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				630306D03079C369005C3D6F /* Exceptions for "JarvisComplicazione" folder in "JarvisComplicazioneExtension" target */,
+			);
+			path = JarvisComplicazione;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		6303066630785BD7005C3D6F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		630306B93079C367005C3D6F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				630306C13079C368005C3D6F /* SwiftUI.framework in Frameworks */,
+				630306BF3079C368005C3D6F /* WidgetKit.framework in Frameworks */,
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				63030716307F445D005C3D6F /* SchedeSistemi.swift */,
+				630306D2307C20E0005C3D6F /* ReattoreHUD.swift */,
+				630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */,
+				6303069130796D9D005C3D6F /* JarvisOrologio-Watch-App-Info.plist */,
+				000000000000000000000010 /* Untitled Project */,
+				6303066A30785BD7005C3D6F /* JarvisOrologio Watch App */,
+				630306C23079C368005C3D6F /* JarvisComplicazione */,
+				630306BD3079C367005C3D6F /* Frameworks */,
+				000000000000000000000020 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000120 /* Untitled Project.app */,
+				6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */,
+				630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		630306BD3079C367005C3D6F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				630306BE3079C367005C3D6F /* WidgetKit.framework */,
+				630306C03079C368005C3D6F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000100000000 /* Untitled Project */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "Untitled Project" */;
+			buildPhases = (
+				000000000000000120000000 /* Sources */,
+				000000000000000130000000 /* Frameworks */,
+				000000000000000140000000 /* Resources */,
+				6303067730785BD8005C3D6F /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6303067230785BD8005C3D6F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000010 /* Untitled Project */,
+			);
+			name = "Untitled Project";
+			productName = MyApp;
+			productReference = 000000000000000000000120 /* Untitled Project.app */;
+			productType = "com.apple.product-type.application";
+		};
+		6303066830785BD7005C3D6F /* JarvisOrologio Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6303067430785BD8005C3D6F /* Build configuration list for PBXNativeTarget "JarvisOrologio Watch App" */;
+			buildPhases = (
+				6303066530785BD7005C3D6F /* Sources */,
+				6303066630785BD7005C3D6F /* Frameworks */,
+				6303066730785BD7005C3D6F /* Resources */,
+				630306D13079C369005C3D6F /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				630306CB3079C369005C3D6F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6303066A30785BD7005C3D6F /* JarvisOrologio Watch App */,
+			);
+			name = "JarvisOrologio Watch App";
+			productName = "JarvisOrologio Watch App";
+			productReference = 6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 630306CD3079C369005C3D6F /* Build configuration list for PBXNativeTarget "JarvisComplicazioneExtension" */;
+			buildPhases = (
+				630306B83079C367005C3D6F /* Sources */,
+				630306B93079C367005C3D6F /* Frameworks */,
+				630306BA3079C367005C3D6F /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				630306C23079C368005C3D6F /* JarvisComplicazione */,
+			);
+			name = JarvisComplicazioneExtension;
+			productName = JarvisComplicazioneExtension;
+			productReference = 630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					000000000000000100000000 = {
+						CreatedOnToolsVersion = 26.3;
+						LastSwiftMigration = 2700;
+					};
+					6303066830785BD7005C3D6F = {
+						CreatedOnToolsVersion = 27.0;
+						LastSwiftMigration = 2700;
+					};
+					630306BB3079C367005C3D6F = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "Untitled Project" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				it,
+			);
+			mainGroup = 000000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 90;
+			productRefGroup = 000000000000000000000020 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000100000000 /* Untitled Project */,
+				6303066830785BD7005C3D6F /* JarvisOrologio Watch App */,
+				630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		6303066730785BD7005C3D6F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		630306BA3079C367005C3D6F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				630306D4307C20E0005C3D6F /* ReattoreHUD.swift in Sources */,
+				630306B13079AF9C005C3D6F /* BrowserPrivato.swift in Sources */,
+				63030717307F445D005C3D6F /* SchedeSistemi.swift in Sources */,
+			);
+		};
+		6303066530785BD7005C3D6F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				630306B03079AF9C005C3D6F /* BrowserPrivato.swift in Sources */,
+				630306D3307C20E0005C3D6F /* ReattoreHUD.swift in Sources */,
+				63030718307F445D005C3D6F /* SchedeSistemi.swift in Sources */,
+			);
+		};
+		630306B83079C367005C3D6F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6303067230785BD8005C3D6F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6303066830785BD7005C3D6F /* JarvisOrologio Watch App */;
+			targetProxy = 6303067130785BD8005C3D6F /* PBXContainerItemProxy */;
+		};
+		630306CB3079C369005C3D6F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */;
+			targetProxy = 630306CA3079C369005C3D6F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000011000000 /* Debug configuration for PBXProject "Untitled Project" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.6.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PROJECT_UNIQUE_VALUE = PJP8CSYV;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		000000000000000012000000 /* Release configuration for PBXProject "Untitled Project" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.6.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PROJECT_UNIQUE_VALUE = PJP8CSYV;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		000000000000000111000000 /* Debug configuration for PBXNativeTarget "Untitled Project" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "Untitled Project/Untitled Project.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "JARVIS usa la fotocamera per guardare ciò che gli mostra, Sir.\n";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Per chiamare e scrivere ai suoi contatti.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Per capire ciò che dice a JARVIS.\n";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		000000000000000112000000 /* Release configuration for PBXNativeTarget "Untitled Project" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "Untitled Project/Untitled Project.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "JARVIS usa la fotocamera per guardare ciò che gli mostra, Sir.\n";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Per chiamare e scrivere ai suoi contatti.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Per capire ciò che dice a JARVIS.\n";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6303067530785BD8005C3D6F /* Debug configuration for PBXNativeTarget "JarvisOrologio Watch App" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "JarvisOrologio Watch App/JarvisOrologio Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "JarvisOrologio-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Per leggere i battiti e avvisare il contatto di emergenza, Sir.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS legge soltanto i battiti, non scrive nulla in Salute, Sir.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Per ascoltare le sue domande, Sir.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = it.discosizer.jarvis;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Debug;
+		};
+		6303067630785BD8005C3D6F /* Release configuration for PBXNativeTarget "JarvisOrologio Watch App" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "JarvisOrologio Watch App/JarvisOrologio Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "JarvisOrologio-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Per leggere i battiti e avvisare il contatto di emergenza, Sir.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS legge soltanto i battiti, non scrive nulla in Salute, Sir.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Per ascoltare le sue domande, Sir.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = it.discosizer.jarvis;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Release;
+		};
+		630306CE3079C369005C3D6F /* Debug configuration for PBXNativeTarget "JarvisComplicazioneExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JarvisComplicazione/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = JarvisComplicazione;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp.JarvisComplicazione;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Debug;
+		};
+		630306CF3079C369005C3D6F /* Release configuration for PBXNativeTarget "JarvisComplicazioneExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JarvisComplicazione/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = JarvisComplicazione;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp.JarvisComplicazione;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000010000000 /* Build configuration list for PBXProject "Untitled Project" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000011000000 /* Debug configuration for PBXProject "Untitled Project" */,
+				000000000000000012000000 /* Release configuration for PBXProject "Untitled Project" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000000 /* Build configuration list for PBXNativeTarget "Untitled Project" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Untitled Project" */,
+				000000000000000112000000 /* Release configuration for PBXNativeTarget "Untitled Project" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		6303067430785BD8005C3D6F /* Build configuration list for PBXNativeTarget "JarvisOrologio Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6303067530785BD8005C3D6F /* Debug configuration for PBXNativeTarget "JarvisOrologio Watch App" */,
+				6303067630785BD8005C3D6F /* Release configuration for PBXNativeTarget "JarvisOrologio Watch App" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		630306CD3079C369005C3D6F /* Build configuration list for PBXNativeTarget "JarvisComplicazioneExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				630306CE3079C369005C3D6F /* Debug configuration for PBXNativeTarget "JarvisComplicazioneExtension" */,
+				630306CF3079C369005C3D6F /* Release configuration for PBXNativeTarget "JarvisComplicazioneExtension" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000000 /* Project object */;
+}

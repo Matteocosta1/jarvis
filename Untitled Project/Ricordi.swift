@@ -1,0 +1,251 @@
+#if os(iOS)
+import SwiftUI
+
+/// La seconda memoria di JARVIS, sull'iPhone: tutti i ricordi e i posti (qualsiasi luogo salvato, macchina compresa),
+/// con ricerca, spunta e cancellazione con uno scorrimento. La lista della spesa ha la sua scheda (icona Spesa).
+struct VistaRicordi: View {
+    enum Scheda: String, CaseIterable, Identifiable { case ricordi = "Ricordi", posti = "Posti"; var id: String { rawValue } }
+    var iniziale: Scheda = .ricordi
+    /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
+    let chiedi: (String) -> Void
+
+    @Environment(\.dismiss) private var chiudi
+    @State private var scheda: Scheda = .ricordi
+    @State private var dati: DatiRicordi?
+    @State private var cerca = ""
+    @State private var errore = false
+    @State private var fotoAperta: Data?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.fondo.ignoresSafeArea()
+                VStack(spacing: 0) {
+                    Picker("Sezione", selection: $scheda) {
+                        ForEach(Scheda.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 16).padding(.top, 8)
+
+                    if let d = dati {
+                        List {
+                            switch scheda {
+                            case .posti: posti(d)
+                            case .ricordi: ricordi(d)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .scrollDismissesKeyboard(.interactively)
+                    } else if errore {
+                        Text("Non raggiungo la memoria, Sir.").foregroundStyle(.orange).padding(.top, 40)
+                        Spacer()
+                    } else {
+                        ProgressView().tint(Color.ciano).padding(.top, 60)
+                        Spacer()
+                    }
+                }
+            }
+            .navigationTitle(scheda.rawValue)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
+            }
+            .onAppear { scheda = iniziale }
+            .task { await carica() }
+            .task(id: cerca) {
+                try? await Task.sleep(for: .milliseconds(350))
+                if !Task.isCancelled { await carica() }
+            }
+            .sheet(isPresented: Binding(get: { fotoAperta != nil }, set: { if !$0 { fotoAperta = nil } })) {
+                if let d = fotoAperta, let img = UIImage(data: d) {
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        Image(uiImage: img).resizable().scaledToFit()
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .aperturaHUD("Ricordi")
+    }
+
+    // MARK: Ricordi
+
+    @ViewBuilder private func ricordi(_ d: DatiRicordi) -> some View {
+        Section {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
+                TextField("Cerchi: chiavi, Luca, vino, targa…", text: $cerca).foregroundStyle(.white)
+                if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
+            }
+            .listRowBackground(Color.ciano.opacity(0.06))
+        }
+        Section {
+            if d.ricordi.isEmpty {
+                Text(cerca.isEmpty ? "Ancora nessun ricordo. Dica a JARVIS «ricordati che le chiavi sono sul mobile»." : "Niente con «\(cerca)».")
+                    .font(.footnote).foregroundStyle(Color.tenue).listRowBackground(Color.clear)
+            }
+            ForEach(d.ricordi) { r in
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: VistaRicordi.icona(r.tipo)).foregroundStyle(Color.ciano).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(r.testo).font(.system(size: 15)).foregroundStyle(.white)
+                        Text([r.persona, r.luogo, r.quando].compactMap { $0 }.joined(separator: " · "))
+                            .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
+                    }
+                    Spacer()
+                    if r.conFoto {
+                        Button { Task { await apriFoto(r.id) } } label: { Image(systemName: "photo").foregroundStyle(Color.ciano) }
+                            .buttonStyle(.plain).accessibilityLabel("Vedi la foto")
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { Task { await elimina(r.id) } } label: { Label("Elimina", systemImage: "trash") }
+                    Button { Task { await fatto(r.id) } } label: { Label("Ritrovato", systemImage: "checkmark") }.tint(.green)
+                }
+            }
+        } header: { intestazione("brain.head.profile", cerca.isEmpty ? "ULTIMI RICORDI" : "RISULTATI") }
+        Section {
+            Button { chiedi("Com'è andata oggi?") } label: {
+                Label("Com'è andata oggi?", systemImage: "clock.arrow.circlepath").foregroundStyle(Color.ciano)
+            }
+            Button { chiedi("Ricordati questo posto: dove sono adesso.") } label: {
+                Label("Ricorda dove sono", systemImage: "mappin.and.ellipse").foregroundStyle(Color.ciano)
+            }
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    // MARK: Posti (qualsiasi ricordo con una posizione: la macchina, un locale, dove ha visto qualcuno)
+
+    @ViewBuilder private func posti(_ d: DatiRicordi) -> some View {
+        Section {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
+                TextField("Cerchi un posto: bar, Luca, macchina…", text: $cerca).foregroundStyle(.white)
+                if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
+            }
+            .listRowBackground(Color.ciano.opacity(0.06))
+        }
+        Section {
+            if d.posti.isEmpty {
+                Text(cerca.isEmpty ? "Nessun posto salvato. Dica a JARVIS «ricordati questo posto» o «ho parcheggiato»." : "Niente con «\(cerca)».")
+                    .font(.footnote).foregroundStyle(Color.tenue).listRowBackground(Color.clear)
+            }
+            ForEach(d.posti) { r in
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: r.tipo == "parcheggio" ? "car.fill" : VistaRicordi.icona(r.tipo)).foregroundStyle(Color.ciano).frame(width: 22)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(r.testo).font(.system(size: 15)).foregroundStyle(.white)
+                            Text([r.luogo, r.persona, r.quando].compactMap { $0 }.joined(separator: " · "))
+                                .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
+                        }
+                    }
+                    if let lat = r.lat, let lon = r.lon, let url = URL(string: "https://maps.apple.com/?daddr=\(lat),\(lon)&dirflg=w") {
+                        Link(destination: url) {
+                            Label("Portami lì", systemImage: "figure.walk")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(Color.ciano)
+                        }
+                        .padding(.leading, 32)
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { Task { await elimina(r.id) } } label: { Label("Elimina", systemImage: "trash") }
+                    Button { Task { await fatto(r.id) } } label: { Label("Fatto", systemImage: "checkmark") }.tint(.green)
+                }
+            }
+        } header: { intestazione("mappin.and.ellipse", cerca.isEmpty ? "POSTI" : "RISULTATI") }
+        Section {
+            Button { chiedi("Ricordati questo posto: dove sono adesso.") } label: {
+                Label("Ricorda dove sono", systemImage: "mappin.and.ellipse").foregroundStyle(Color.ciano)
+            }
+            Button { chiedi("Ho parcheggiato qui, segnalo.") } label: {
+                Label("Ho parcheggiato qui", systemImage: "car").foregroundStyle(Color.ciano)
+            }
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private func intestazione(_ icona: String, _ titolo: String) -> some View {
+        Label(titolo, systemImage: icona).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(Color.ciano)
+    }
+
+    static func icona(_ tipo: String) -> String {
+        switch tipo {
+        case "oggetto": return "key.fill"
+        case "posto": return "mappin.and.ellipse"
+        case "persona": return "person.fill"
+        case "visto": return "eye.fill"
+        case "idea": return "lightbulb.fill"
+        default: return "note.text"
+        }
+    }
+
+    // MARK: Rete
+
+    private func carica() async {
+        var corpo: [String: Any] = ["ricordi": true]
+        if !cerca.isEmpty { corpo["cerca"] = cerca }
+        guard let o = await VistaVitals.chiama(corpo) else { errore = true; return }
+        errore = false
+        withAnimation(.easeOut(duration: 0.25)) { dati = DatiRicordi(o) }
+    }
+
+    private func fatto(_ id: Int) async {
+        Suoni.pronto()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        _ = await VistaVitals.chiama(["ricordo_fatto": id])
+        await carica()
+    }
+
+    private func elimina(_ id: Int) async {
+        _ = await VistaVitals.chiama(["ricordo_elimina": id])
+        await carica()
+    }
+
+    private func apriFoto(_ id: Int) async {
+        guard let o = await VistaVitals.chiama(["ricordi": true, "con_foto": true]) else { return }
+        let tutti = (o["ricordi"] as? [[String: Any]] ?? [])
+        guard let r = tutti.first(where: { ($0["id"] as? NSNumber)?.intValue == id }), let b64 = r["foto"] as? String,
+              let d = Data(base64Encoded: b64) else { return }
+        fotoAperta = d
+    }
+}
+
+/// I dati della pagina, letti dal JSON del cervello.
+struct DatiRicordi {
+    struct Riga: Identifiable {
+        let id: Int
+        let tipo: String
+        let testo: String
+        let persona: String?
+        let luogo: String?
+        let lat: Double?
+        let lon: Double?
+        let quando: String
+        let avviso: String?
+        let conFoto: Bool
+    }
+    let spesa: [Riga]
+    let posti: [Riga]
+    let ricordi: [Riga]
+
+    init(_ o: [String: Any]) {
+        func riga(_ r: [String: Any]) -> Riga? {
+            guard let id = (r["id"] as? NSNumber)?.intValue, let t = r["testo"] as? String else { return nil }
+            let quando = r["quando_leggibile"] as? String ?? ""
+            return Riga(id: id, tipo: r["tipo"] as? String ?? "", testo: t, persona: r["persona"] as? String, luogo: r["luogo"] as? String,
+                        lat: (r["lat"] as? NSNumber)?.doubleValue, lon: (r["lon"] as? NSNumber)?.doubleValue,
+                        quando: quando, avviso: r["quando"] != nil ? quando : nil, conFoto: (r["con_foto"] as? Bool) ?? false)
+        }
+        posti = (o["posti"] as? [[String: Any]] ?? []).compactMap(riga)
+        spesa = (o["spesa"] as? [[String: Any]] ?? []).compactMap(riga)
+        ricordi = (o["ricordi"] as? [[String: Any]] ?? []).compactMap(riga)
+    }
+}
+#endif
