@@ -329,10 +329,21 @@ struct VistaOrologio: View {
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»
 
-            ("SISTEMI", "chevron.left.forwardslash.chevron.right", "#github"),
-            ("SISTEMI", "cylinder.split.1x2", "#supabase"),
-            ("SISTEMI", "externaldrive.badge.icloud", "#archivio"),
+            ("SISTEMI", "logo:github-logo", "#github"),          // i loghi veri, come sull'iPhone
+            ("SISTEMI", "logo:supabase-logo", "#supabase"),
+            ("SISTEMI", "archivio", "#archivio"),                // la cartella con la nuvola
         ]
+    }
+
+    /// L'icona di una scorciatoia: un simbolo di sistema, un logo dagli Assets («logo:nome») o la cartella dell'Archivio.
+    @ViewBuilder private func iconaScorciatoia(_ icona: String) -> some View {
+        if icona.hasPrefix("logo:") {
+            Image(String(icona.dropFirst(5))).resizable().renderingMode(.template).scaledToFit().frame(width: 15, height: 15)
+        } else if icona == "archivio" {
+            IconaArchivioOrologio().scaleEffect(0.75)
+        } else {
+            Image(systemName: icona)
+        }
     }
 
     private var barraRapida: some View {
@@ -353,7 +364,7 @@ struct VistaOrologio: View {
                         else if let frase = s.frase { iconaAttiva = k; jarvis.chiedi(frase) }
                         else { chiediPulizia = true }
                     } label: {
-                        Image(systemName: s.icona)
+                        iconaScorciatoia(s.icona)
                             .font(.system(size: 14))
                             .symbolEffect(.pulse, options: .repeating, isActive: inCorso)
                             .frame(width: 34, height: 34)
@@ -845,5 +856,22 @@ struct VistaFoto: View {
             }
         }
         .tabViewStyle(.verticalPage)
+    }
+}
+
+/// Archivio: la cartella con la piccola nuvola, la stessa dell'iPhone.
+struct IconaArchivioOrologio: View {
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: 5)); p.addLine(to: CGPoint(x: 6.5, y: 5)); p.addLine(to: CGPoint(x: 8.5, y: 7.5))
+                p.addLine(to: CGPoint(x: 21, y: 7.5)); p.addLine(to: CGPoint(x: 21, y: 19)); p.addLine(to: CGPoint(x: 0, y: 19))
+                p.closeSubpath()
+            }
+            .stroke(style: StrokeStyle(lineWidth: 1.4, lineJoin: .round))
+            Image(systemName: "cloud.fill").font(.system(size: 8, weight: .semibold))
+                .position(x: 15, y: 3.5)
+        }
+        .frame(width: 21, height: 19)
     }
 }
