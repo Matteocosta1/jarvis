@@ -5,6 +5,7 @@ import AVFoundation
 enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono
     case github, supabase, archivio
+    case scanner
     var id: String { rawValue }
 }
 
@@ -132,6 +133,7 @@ struct ContentView: View {
             case .github: VistaGitHub(chiedi: daScheda, apri: apriPagina)
             case .supabase: VistaSupabase(chiedi: daScheda)
             case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
+            case .scanner: VistaScanner(chiedi: daScheda)
             }
         }
         .fullScreenCover(isPresented: $jarvis.allenatore) {
@@ -304,6 +306,7 @@ struct ContentView: View {
 
             ("SENSI", "eye", "Occhi", { tastiera = false; jarvis.guardaManuale() }),
             ("SENSI", "fork.knife", "Cucina", { tastiera = false; jarvis.guardaCucina() }),
+            ("SENSI", "barcode.viewfinder", "Scanner", { tastiera = false; scheda = .scanner }),
             ("SENSI", "shazam.logo", "Shazam", { tastiera = false; jarvis.interrompi(); scheda = .shazam }),
             ("SENSI", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
 
@@ -473,6 +476,7 @@ struct ContentView: View {
             case .occhi: jarvis.guardaManuale()
             case .giro: jarvis.giroAVoce()
             case .cucina: jarvis.guardaCucina()
+            case .scanner: scheda = .scanner
             case .diario: scheda = .diario
             case .sonno: scheda = .sonno
             case .cuore: scheda = .cuore

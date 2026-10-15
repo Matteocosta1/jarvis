@@ -7,7 +7,7 @@ import Speech
 /// I reparti che si aprono a voce.
 enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi
-    case sentinella, occhi, giro, profiler, wiretap, cucina
+    case sentinella, occhi, giro, profiler, wiretap, cucina, scanner
     // le schede della corona
     case diario, sonno, cuore, vitals, confidente, allenatore
     case briefing, meteo, email, spesa
@@ -25,6 +25,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .giro: return "Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare."
         case .profiler: return "Profiler pronto. Inquadri il soggetto."
         case .cucina: return "Cucina. Inquadri frigo, dispensa o piatto, Sir."
+        case .scanner: return "Scanner pronto. Inquadri il codice a barre, Sir."
         case .wiretap: return nil
         case .diario: return "Il diario, Sir."
         case .sonno: return "Il suo sonno, Sir."
@@ -88,6 +89,7 @@ enum ComandoVocale: Equatable {
         }
         if c(" occhi ") && comanda { return .apri(.occhi) }
         if c(" cucina ") && comanda { return .apri(.cucina) }
+        if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && comanda { return .apri(.scanner) }
 
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [
@@ -156,7 +158,7 @@ final class OrecchioComandi {
         guard acceso, let riconoscitore else { return }
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
-        r.contextualStrings = ["Jarvis", "Sentinella", "Wiretap", "Profiler", "Occhi", "Diario", "Vitals", "Briefing", "Shazam", "Cucina"]
+        r.contextualStrings = ["Jarvis", "Sentinella", "Wiretap", "Profiler", "Occhi", "Diario", "Vitals", "Briefing", "Shazam", "Cucina", "Scanner"]
         if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
         presa.metti(r)
         turno += 1

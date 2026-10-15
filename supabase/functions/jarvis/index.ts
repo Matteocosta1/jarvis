@@ -135,6 +135,7 @@ Messaggi e chiamate: per un nome di persona cerca prima il numero con contatti_c
 Musica: se il signore chiede che canzone è o cosa sta suonando, usa riconosci_musica se il dispositivo lo offre; prima di usarlo di' soltanto «Ascolto.». Poi di' titolo e artista e chiedi in una sola frase se vuole ascoltarla su Apple Music (solo se apri_apple_music è disponibile) e se deve cercarla anche su Discogs. Se vuole Apple Music usa musica_riproduci con artista e titolo (o apri_apple_music col link se musica_riproduci non c'è); se vuole Discogs usa discogs_cerca con artista e titolo.
 Email: per la posta del signore (iCloud) usa email_leggi; riassumi mittente e oggetto in parole semplici, metti prima le persone vere e salta pubblicità, newsletter e notifiche automatiche, a meno che non le chieda. Non leggi il testo completo delle email: se serve, dillo.
 Chat: se il signore chiede di cancellare o pulire la conversazione usa conversazione_pulisci (memoria e note restano) e conferma in poche parole.
+Scanner: il signore scansiona i prodotti dalla voce Scanner dell'app; se ti scrive «Ho scansionato …» o ti detta un codice a barre, usa prodotto_scansiona. Rispondi come Yuka ma da JARVIS: il voto e il giudizio, poi in una o due frasi cosa pesa (additivi a rischio, zuccheri, sale, grassi saturi, ultra-trasformato) e, se il voto è basso, che tipo di alternativa cercare. Il voto è nostro, i dati sono di Open Food Facts: non sono consigli medici.
 Credito: JARVIS funziona con il credito delle API di Anthropic, ricaricato a mano dal signore (mai automatico). «Ho ricaricato 50 dollari» → credito ricarica con importo 50; «il saldo nella Console è 42» → credito saldo; «quanto credito ho?», «quanto mi resta?» → credito stato, e rispondi con il residuo stimato in una frase («circa 31 dollari su 50, Sir; è una stima»). Se il signore parla di euro, usa il numero com'è e ricordagli che la Console conta in dollari. Se il contesto contiene [Avviso credito …], dillo in una frase all'inizio della risposta.
 Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti», «funziona tutto?» o lamenta che qualcosa non va senza sapere cosa, usa diagnostica. Riferisci in poche frasi: prima ciò che NON funziona o sta per finire (crediti voce quasi esauriti, chiave rifiutata, servizio che non risponde) con il rimedio in parole semplici; se è tutto a posto dillo in una frase e aggiungi i crediti voce rimasti. Non elencare i servizi che vanno bene uno per uno.
 Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando.
@@ -208,6 +209,8 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { id: { type: "number" }, giorno: { type: "string" }, tutto: { type: "boolean" } } } },
   { name: "vitals", description: "I parametri vitali del signore: per ogni giorno umore, punteggio, energia, sonno, battito a riposo e passi dal diario, con medie, andamento e i temi più frequenti nei giorni migliori e peggiori. Default 30 giorni.",
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "7-180, default 30" } } } },
+  { name: "prodotto_scansiona", description: "Scheda di un prodotto alimentare dal codice a barre (EAN), con i dati aperti di Open Food Facts: nome, marca, voto 0-100 calcolato da JARVIS (eccellente/buono/mediocre/scarso), Nutri-Score, NOVA, additivi con il loro rischio, nutrienti per 100 g, ingredienti, allergeni.",
+    input_schema: { type: "object", properties: { codice: { type: "string", description: "il numero del codice a barre" } }, required: ["codice"] } },
   { name: "credito", description: "Il credito delle API di Anthropic che fa funzionare JARVIS (stima dai token consumati, in dollari). azione stato: quanto resta. azione ricarica: il signore ha appena ricaricato «importo» dollari (si somma al residuo). azione saldo: il signore legge dalla Console il saldo esatto «importo» (riparte da lì).",
     input_schema: { type: "object", properties: { azione: { type: "string", enum: ["stato", "ricarica", "saldo"] }, importo: { type: "number" } }, required: ["azione"] } },
   { name: "diagnostica", description: "Controlla in pochi secondi tutti i collegamenti di JARVIS: voce ElevenLabs (crediti rimasti e scadenza), Gemini, Google Immagini (Serper), Discogs, posta iCloud, SMS e chiamate ClickSend (saldo), WhatsApp d'emergenza, database. Restituisce per ciascuno ok / problema / non configurato con il dettaglio.",
@@ -342,6 +345,7 @@ type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | 
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
     case "credito": return await credito(i);
+    case "prodotto_scansiona": return await prodotto(String(i.codice ?? ""));
     case "memoria_salva": {
       const { error } = await db.from("jarvis_memoria").insert({ fatto: String(i.fatto).slice(0, 500), categoria: i.categoria || "generale" });
       if (error) throw error; return { ok: true };
@@ -1337,6 +1341,70 @@ async function consumi() {
     dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr };
 }
 
+// ───────── Scanner alimentare (stile Yuka) con Open Food Facts: gratuito, aperto, senza chiave ─────────
+// Il voto (0-100) lo calcoliamo noi: 60% qualità nutrizionale (Nutri-Score), 30% additivi, 10% biologico.
+// Un additivo a rischio alto tiene il voto sotto 50, come fa Yuka.
+const ADDITIVI_RISCHIO: Record<string, [string, "alto" | "moderato"]> = {
+  e249: ["nitrito di potassio", "alto"], e250: ["nitrito di sodio", "alto"], e251: ["nitrato di sodio", "alto"], e252: ["nitrato di potassio", "alto"],
+  e171: ["biossido di titanio", "alto"], e320: ["BHA", "alto"], e321: ["BHT", "alto"], e102: ["tartrazina", "alto"], e104: ["giallo di chinolina", "alto"],
+  e110: ["giallo tramonto", "alto"], e122: ["azorubina", "alto"], e124: ["rosso cocciniglia A", "alto"], e129: ["rosso allura", "alto"],
+  e150c: ["caramello ammoniacale", "moderato"], e150d: ["caramello solfito-ammoniacale", "alto"], e951: ["aspartame", "alto"],
+  e950: ["acesulfame K", "moderato"], e955: ["sucralosio", "moderato"], e954: ["saccarina", "moderato"], e621: ["glutammato monosodico", "moderato"],
+  e211: ["benzoato di sodio", "moderato"], e220: ["anidride solforosa", "moderato"], e221: ["solfito di sodio", "moderato"], e223: ["metabisolfito di sodio", "moderato"],
+  e224: ["metabisolfito di potassio", "moderato"], e228: ["bisolfito di potassio", "moderato"], e407: ["carragenina", "moderato"],
+  e433: ["polisorbato 80", "moderato"], e466: ["carbossimetilcellulosa", "moderato"], e338: ["acido fosforico", "moderato"],
+  e339: ["fosfati di sodio", "moderato"], e340: ["fosfati di potassio", "moderato"], e341: ["fosfati di calcio", "moderato"],
+  e450: ["difosfati", "moderato"], e451: ["trifosfati", "moderato"], e452: ["polifosfati", "moderato"], e471: ["mono e digliceridi", "moderato"],
+};
+const LIVELLI: Record<string, string> = { low: "basso", moderate: "moderato", high: "alto" };
+async function prodotto(codice: string) {
+  const c = String(codice ?? "").replace(/\D/g, "");
+  if (c.length < 6 || c.length > 14) return { errore: "codice a barre non valido" };
+  const campi = "product_name,product_name_it,brands,quantity,image_front_url,nutriscore_grade,nutriscore_score,nova_group,ecoscore_grade,additives_tags,ingredients_text_it,ingredients_text,nutriments,nutrient_levels,allergens_tags,labels_tags";
+  const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${c}.json?fields=${campi}`, {
+    headers: { "user-agent": "JARVIS-assistente-personale/3.0" }, signal: AbortSignal.timeout(10000),
+  });
+  if (r.status === 404) return { trovato: false, codice: c, errore: "prodotto non presente in Open Food Facts" };
+  if (!r.ok) return { errore: `Open Food Facts non risponde (${r.status})` };
+  const d = await r.json();
+  if (d.status !== 1 || !d.product) return { trovato: false, codice: c, errore: "prodotto non presente in Open Food Facts" };
+  const p = d.product, n = p.nutriments ?? {};
+  const additivi = [...new Set<string>((p.additives_tags ?? []).map((t: string) => t.replace(/^en:/, "").toLowerCase().replace(/^(e\d+[a-d]?)(i{1,3}|iv|v)$/, "$1")))].map((k: string) => {
+    const info = ADDITIVI_RISCHIO[k];
+    return { codice: k.toUpperCase(), nome: info?.[0] ?? "", rischio: info?.[1] ?? "basso" };
+  });
+  const grado = String(p.nutriscore_grade ?? "").toLowerCase();
+  const puntiNutri: Record<string, number> = { a: 100, b: 78, c: 55, d: 30, e: 8 };
+  const nutri = puntiNutri[grado] ?? (p.nova_group ? [0, 80, 65, 45, 25][Number(p.nova_group)] ?? 50 : 50);
+  const alti = additivi.filter((a: any) => a.rischio === "alto").length, moderati = additivi.filter((a: any) => a.rischio === "moderato").length;
+  const puntiAdd = Math.max(0, 100 - alti * 60 - moderati * 20);
+  const bio = (p.labels_tags ?? []).some((t: string) => /(^|:)(organic|bio|biologico|eu-organic)$/i.test(t));
+  const nova = Number(p.nova_group) || 0;
+  // ultra-trasformato (NOVA 4): meno 10 punti
+  let voto = Math.round(nutri * 0.6 + puntiAdd * 0.3 + (bio ? 10 : 0) - (nova === 4 ? 10 : 0));
+  if (alti > 0) voto = Math.min(voto, 49);
+  voto = Math.max(0, Math.min(100, voto));
+  const giudizio = voto >= 75 ? "eccellente" : voto >= 50 ? "buono" : voto >= 25 ? "mediocre" : "scarso";
+  const val = (k: string) => (typeof n[`${k}_100g`] === "number" ? Math.round(n[`${k}_100g`] * 10) / 10 : null);
+  const livelli = p.nutrient_levels ?? {};
+  const nutrienti = [
+    { nome: "Energia", valore: val("energy-kcal"), unita: "kcal", livello: "" },
+    { nome: "Grassi", valore: val("fat"), unita: "g", livello: LIVELLI[livelli.fat] ?? "" },
+    { nome: "Grassi saturi", valore: val("saturated-fat"), unita: "g", livello: LIVELLI[livelli["saturated-fat"]] ?? "" },
+    { nome: "Zuccheri", valore: val("sugars"), unita: "g", livello: LIVELLI[livelli.sugars] ?? "" },
+    { nome: "Sale", valore: val("salt"), unita: "g", livello: LIVELLI[livelli.salt] ?? "" },
+    { nome: "Fibre", valore: val("fiber"), unita: "g", livello: "" },
+    { nome: "Proteine", valore: val("proteins"), unita: "g", livello: "" },
+  ].filter((x) => x.valore !== null);
+  return {
+    trovato: true, codice: c, nome: p.product_name_it || p.product_name || "prodotto senza nome", marca: p.brands ?? "", quantita: p.quantity ?? "",
+    immagine: p.image_front_url ?? "", voto, giudizio, nutriscore: grado.toUpperCase(), nova: p.nova_group ?? null, eco: String(p.ecoscore_grade ?? "").toUpperCase(),
+    biologico: bio, additivi, nutrienti, ingredienti: String(p.ingredients_text_it || p.ingredients_text || "").slice(0, 2500),
+    allergeni: (p.allergens_tags ?? []).map((t: string) => t.replace(/^[a-z]{2}:/, "")),
+    nota: "voto calcolato da JARVIS su Nutri-Score, additivi e biologico; dati Open Food Facts",
+  };
+}
+
 // ───────── Credito Anthropic (stima): il signore dice quanto ha ricaricato, JARVIS sottrae ciò che spende ─────────
 // Nessun prelievo automatico: si ricarica a mano dalla Console. Qui si tiene solo il conto, per avvisare in tempo.
 const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -1850,7 +1918,7 @@ const STATI: Record<string, string> = {
   web_search: "cerco sul web", meteo: "guardo il meteo", serata_riepilogo: "faccio i conti della serata", dati_leggi: "consulto le serate",
   bar_magazzino: "controllo bar e magazzino", immagini_cerca: "cerco le immagini", diagnostica: "controllo tutti i collegamenti",
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
-  credito: "controllo il credito", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
+  credito: "controllo il credito", prodotto_scansiona: "leggo l'etichetta", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
   discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
 };
 
@@ -1881,6 +1949,7 @@ Deno.serve(async (req) => {
   }
   if (typeof corpo?.archivio_link === "string") return json(await archivioLink(corpo.archivio_link));
   if (typeof corpo?.archivio_elimina === "string") { try { return json(await archivioElimina(corpo.archivio_elimina)); } catch (e) { return json({ errore: (e as Error).message }); } }
+  if (typeof corpo?.prodotto === "string") { try { return json(await prodotto(corpo.prodotto)); } catch (e) { return json({ errore: (e as Error).message }); } }   // scheda Scanner
   if (corpo?.pulsazione === true) { try { return json(await pulsazione()); } catch (e) { return json({ errore: (e as Error).message }); } }
   if (corpo?.consumi === true) { try { return json(await consumi()); } catch (e) { return json({ errore: (e as Error).message }); } }   // scheda Supabase: spesa del mese
   if (corpo?.memoria === true) {                                                            // scheda Supabase: cosa sa JARVIS
