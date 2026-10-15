@@ -1724,7 +1724,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
 const XI = "https://api.elevenlabs.io/v1";
 const VOCE_PREDEFINITA = "onwK4e9ZLuTAKqWW03F9"; // «Daniel»: britannico, pacato, da maggiordomo (la voce di prima)
 // la voce di JARVIS scelta dal signore (creata con Voice Design, 15 ottobre 2026); per tornare a Daniel basta togliere questa riga
-const VOCE_JARVIS = "io3eLhWCO9ShwQa6IS3e";
+const VOCE_JARVIS = "";   // provata io3eLhWCO9ShwQa6IS3e (15 ottobre 2026): il signore preferisce Daniel
 const voceAttuale = () => VOCE_JARVIS || Deno.env.get("ELEVENLABS_VOICE_ID") || VOCE_PREDEFINITA;
 let modelloVoce: string | null = null;
 
