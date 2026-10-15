@@ -413,6 +413,25 @@ struct VistaSupabase: View {
                     Valore(titolo: "VOCE", valore: "\(c.n("caratteri_voce_mese") / 1000)k", sotto: "caratteri detti", tinta: tinta)
                 }
             }
+            if let cr = c.voce("credito"), cr.b("impostato") {
+                let residuo = Double(cr.s("residuo")) ?? 0, iniziale = Double(cr.s("saldo_iniziale")) ?? 0
+                let basso = cr.n("percento") < 20 || residuo < 2
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("CREDITO ANTHROPIC").font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(basso ? Color.red : tinta)
+                        Spacer()
+                        Text(String(format: "%.2f $ su %.2f $", residuo, iniziale)).font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(basso ? Color.red : .white)
+                    }
+                    GeometryReader { g in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(tinta.opacity(0.12))
+                            Capsule().fill(basso ? Color.red : tinta).frame(width: g.size.width * min(1, max(0, CGFloat(cr.n("percento")) / 100)))
+                        }
+                    }
+                    .frame(height: 5)
+                    Text("Stima dalla ricarica del \(cr.s("dal")). Dica a JARVIS «ho ricaricato…» dopo ogni ricarica.").font(.system(size: 9)).foregroundStyle(Color.tenue)
+                }
+            }
             ForEach(Array(c.lista("modelli").enumerated()), id: \.offset) { _, m in
                 HStack {
                     Text(m.s("modello").replacingOccurrences(of: "claude-", with: "")).font(.system(size: 11, design: .monospaced)).foregroundStyle(.white).lineLimit(1)

@@ -135,6 +135,7 @@ Messaggi e chiamate: per un nome di persona cerca prima il numero con contatti_c
 Musica: se il signore chiede che canzone è o cosa sta suonando, usa riconosci_musica se il dispositivo lo offre; prima di usarlo di' soltanto «Ascolto.». Poi di' titolo e artista e chiedi in una sola frase se vuole ascoltarla su Apple Music (solo se apri_apple_music è disponibile) e se deve cercarla anche su Discogs. Se vuole Apple Music usa musica_riproduci con artista e titolo (o apri_apple_music col link se musica_riproduci non c'è); se vuole Discogs usa discogs_cerca con artista e titolo.
 Email: per la posta del signore (iCloud) usa email_leggi; riassumi mittente e oggetto in parole semplici, metti prima le persone vere e salta pubblicità, newsletter e notifiche automatiche, a meno che non le chieda. Non leggi il testo completo delle email: se serve, dillo.
 Chat: se il signore chiede di cancellare o pulire la conversazione usa conversazione_pulisci (memoria e note restano) e conferma in poche parole.
+Credito: JARVIS funziona con il credito delle API di Anthropic, ricaricato a mano dal signore (mai automatico). «Ho ricaricato 50 dollari» → credito ricarica con importo 50; «il saldo nella Console è 42» → credito saldo; «quanto credito ho?», «quanto mi resta?» → credito stato, e rispondi con il residuo stimato in una frase («circa 31 dollari su 50, Sir; è una stima»). Se il signore parla di euro, usa il numero com'è e ricordagli che la Console conta in dollari. Se il contesto contiene [Avviso credito …], dillo in una frase all'inizio della risposta.
 Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti», «funziona tutto?» o lamenta che qualcosa non va senza sapere cosa, usa diagnostica. Riferisci in poche frasi: prima ciò che NON funziona o sta per finire (crediti voce quasi esauriti, chiave rifiutata, servizio che non risponde) con il rimedio in parole semplici; se è tutto a posto dillo in una frase e aggiungi i crediti voce rimasti. Non elencare i servizi che vanno bene uno per uno.
 Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando.
 Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa immagini_cerca; per dischi, copertine ed etichette preferisci discogs_cerca. Le immagini compaiono da sole in una galleria nell'app: non elencarle e non leggere indirizzi, di' solo in una frase cosa hai trovato.
@@ -207,6 +208,8 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { id: { type: "number" }, giorno: { type: "string" }, tutto: { type: "boolean" } } } },
   { name: "vitals", description: "I parametri vitali del signore: per ogni giorno umore, punteggio, energia, sonno, battito a riposo e passi dal diario, con medie, andamento e i temi più frequenti nei giorni migliori e peggiori. Default 30 giorni.",
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "7-180, default 30" } } } },
+  { name: "credito", description: "Il credito delle API di Anthropic che fa funzionare JARVIS (stima dai token consumati, in dollari). azione stato: quanto resta. azione ricarica: il signore ha appena ricaricato «importo» dollari (si somma al residuo). azione saldo: il signore legge dalla Console il saldo esatto «importo» (riparte da lì).",
+    input_schema: { type: "object", properties: { azione: { type: "string", enum: ["stato", "ricarica", "saldo"] }, importo: { type: "number" } }, required: ["azione"] } },
   { name: "diagnostica", description: "Controlla in pochi secondi tutti i collegamenti di JARVIS: voce ElevenLabs (crediti rimasti e scadenza), Gemini, Google Immagini (Serper), Discogs, posta iCloud, SMS e chiamate ClickSend (saldo), WhatsApp d'emergenza, database. Restituisce per ciascuno ok / problema / non configurato con il dettaglio.",
     input_schema: { type: "object", properties: {} } },
   { name: "meteo", description: "Meteo attuale e previsioni fino a 7 giorni per una località (default Milano).",
@@ -338,6 +341,7 @@ type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | 
 
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
+    case "credito": return await credito(i);
     case "memoria_salva": {
       const { error } = await db.from("jarvis_memoria").insert({ fatto: String(i.fatto).slice(0, 500), categoria: i.categoria || "generale" });
       if (error) throw error; return { ok: true };
@@ -1296,20 +1300,22 @@ const prezzoDi = (modello: string) => PREZZI[Object.keys(PREZZI).find((k) => mod
 async function consumi() {
   const inizioMese = new Date(); inizioMese.setUTCDate(1); inizioMese.setUTCHours(0, 0, 0, 0);
   const inizioOggi = new Date(`${oggiRoma()}T00:00:00+02:00`);
-  const { data } = await db.from("jarvis_consumi").select("creato, servizio, modello, token_in, token_cache, token_out, caratteri").gte("creato", inizioMese.toISOString()).limit(20000);
-  const righe = data ?? [];
+  // i token si sommano nel database (niente limite di righe); la voce si conta a parte
+  const [mese, oggiT, voceRighe, primo, statoCr] = await Promise.all([
+    db.rpc("jarvis_token_per_modello", { p_da: inizioMese.toISOString() }),
+    db.rpc("jarvis_token_per_modello", { p_da: inizioOggi.toISOString() }),
+    db.from("jarvis_consumi").select("creato, caratteri").eq("servizio", "voce").gte("creato", inizioMese.toISOString()).limit(5000),
+    db.from("jarvis_consumi").select("creato").gte("creato", inizioMese.toISOString()).order("creato").limit(1),
+    statoCredito().catch(() => ({ impostato: false })),
+  ]);
+  const costo = (r: any) => { const p = prezzoDi(String(r.modello)); return (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6; };
   const perModello: Record<string, { chiamate: number; token_in: number; token_cache: number; token_out: number; dollari: number }> = {};
-  let caratteriMese = 0, caratteriOggi = 0, dollariOggi = 0, chiamateOggi = 0;
-  for (const r of righe) {
-    const oggi = new Date(r.creato) >= inizioOggi;
-    if (r.servizio === "voce") { caratteriMese += num(r.caratteri); if (oggi) caratteriOggi += num(r.caratteri); continue; }
-    const m = String(r.modello ?? "?");
-    const p = prezzoDi(m);
-    const d = (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6;
-    const x = (perModello[m] ??= { chiamate: 0, token_in: 0, token_cache: 0, token_out: 0, dollari: 0 });
-    x.chiamate++; x.token_in += num(r.token_in); x.token_cache += num(r.token_cache); x.token_out += num(r.token_out); x.dollari += d;
-    if (oggi) { dollariOggi += d; chiamateOggi++; }
-  }
+  for (const r of (mese.data ?? []) as any[]) perModello[String(r.modello)] = { chiamate: num(r.chiamate), token_in: num(r.token_in), token_cache: num(r.token_cache), token_out: num(r.token_out), dollari: costo(r) };
+  let dollariOggi = 0, chiamateOggi = 0;
+  for (const r of (oggiT.data ?? []) as any[]) { dollariOggi += costo(r); chiamateOggi += num(r.chiamate); }
+  let caratteriMese = 0, caratteriOggi = 0;
+  for (const r of voceRighe.data ?? []) { caratteriMese += num(r.caratteri); if (new Date(r.creato) >= inizioOggi) caratteriOggi += num(r.caratteri); }
+  const righe = primo.data ?? [];
   const modelli = Object.entries(perModello).map(([modello, x]) => ({ modello, ...x, dollari: Math.round(x.dollari * 100) / 100 })).sort((a, b) => b.dollari - a.dollari);
   const totale = Math.round(modelli.reduce((a, m) => a + m.dollari, 0) * 100) / 100;
   // la voce: il piano ElevenLabs e quanto ne resta
@@ -1328,7 +1334,59 @@ async function consumi() {
   }
   return { mese: inizioMese.toISOString().slice(0, 7), stima: true, dollari_mese: totale, dollari_oggi: Math.round(dollariOggi * 100) / 100,
     chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: chiamateOggi, modelli, caratteri_voce_mese: caratteriMese, caratteri_voce_oggi: caratteriOggi, voce,
-    dal: righe.length ? quando(righe.reduce((a, r) => a < r.creato ? a : r.creato, righe[0].creato)) : "" };
+    dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr };
+}
+
+// ───────── Credito Anthropic (stima): il signore dice quanto ha ricaricato, JARVIS sottrae ciò che spende ─────────
+// Nessun prelievo automatico: si ricarica a mano dalla Console. Qui si tiene solo il conto, per avvisare in tempo.
+const r2 = (x: number) => Math.round(x * 100) / 100;
+async function spesaDal(da: string) {
+  const { data, error } = await db.rpc("jarvis_token_per_modello", { p_da: da });
+  if (error) throw error;
+  let dollari = 0;
+  for (const r of (data ?? []) as any[]) { const p = prezzoDi(String(r.modello)); dollari += (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6; }
+  return dollari;
+}
+async function statoCredito() {
+  const { data: b } = await db.from("jarvis_credito").select("id, creato, tipo, importo, saldo, avvisato").order("creato", { ascending: false }).limit(1).maybeSingle();
+  if (!b) return { impostato: false };
+  const saldo = Number(b.saldo) || 0, speso = await spesaDal(b.creato);
+  const residuo = Math.max(0, saldo - speso);
+  return { impostato: true, id: b.id, saldo_iniziale: r2(saldo), speso: r2(speso), residuo: r2(residuo),
+    percento: saldo > 0 ? Math.round(residuo / saldo * 100) : 0, dal: quando(b.creato), avvisato: !!b.avvisato, stima: true };
+}
+async function credito(i: Record<string, any>) {
+  const azione = String(i.azione ?? "stato");
+  if (azione === "ricarica" || azione === "saldo") {
+    const importo = Number(i.importo);
+    if (!(importo > 0)) return { errore: "manca l'importo in dollari" };
+    const prima: any = await statoCredito();
+    const saldo = azione === "saldo" ? importo : (prima.impostato ? prima.residuo : 0) + importo;
+    const { error } = await db.from("jarvis_credito").insert({ tipo: azione, importo, saldo });
+    if (error) throw error;
+    creditoMemo = null;
+    return { ok: true, saldo_stimato: r2(saldo), nota: "stima dai token: il saldo vero è nella Console di Anthropic" };
+  }
+  return await statoCredito();
+}
+// controllo leggero a inizio turno (al massimo ogni 5 minuti): se il credito stimato scende sotto il 20% (o sotto 2 $)
+// JARVIS lo dice una volta a voce e arriva una notifica sul telefono; poi tace fino alla prossima ricarica
+let creditoMemo: { t: number; testo: string } | null = null;
+async function avvisoCredito(): Promise<string> {
+  if (creditoMemo && Date.now() - creditoMemo.t < 5 * 60_000) return "";
+  creditoMemo = { t: Date.now(), testo: "" };
+  try {
+    const c: any = await statoCredito();
+    if (!c.impostato || c.avvisato) return "";
+    if (!(c.residuo < 2 || c.percento < 20)) return "";
+    await db.from("jarvis_credito").update({ avvisato: true }).eq("id", c.id);
+    const testo = `Sir, il credito Anthropic sta finendo: restano circa ${c.residuo.toFixed(2)} $ su ${c.saldo_iniziale.toFixed(2)} (stima). Quando vuole, ricarichi dalla Console.`;
+    inSottofondo(fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jarvis-briefing`, {
+      method: "POST", headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
+      body: JSON.stringify({ titolo: "Credito JARVIS", testo }),
+    }).then(() => {}, () => {}));
+    return `\n[Avviso credito: restano circa ${c.residuo.toFixed(2)} $ su ${c.saldo_iniziale.toFixed(2)} $ ricaricati (stima). Dillo al signore in una frase all'inizio della risposta, poi rispondi normalmente.]`;
+  } catch { return ""; }
 }
 
 // ───────── Pulsazione: le richieste al cervello nell'ultima ora, minuto per minuto ─────────
@@ -1792,7 +1850,7 @@ const STATI: Record<string, string> = {
   web_search: "cerco sul web", meteo: "guardo il meteo", serata_riepilogo: "faccio i conti della serata", dati_leggi: "consulto le serate",
   bar_magazzino: "controllo bar e magazzino", immagini_cerca: "cerco le immagini", diagnostica: "controllo tutti i collegamenti",
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
-  supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
+  credito: "controllo il credito", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
   discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
 };
 
@@ -1983,9 +2041,10 @@ Deno.serve(async (req) => {
             .map((m: any) => ({ role: m.role, content: m.content.slice(0, 4000) }));
           while (storia.length && storia[0].role !== "user") storia.shift();
           if (!storia.length || storia.at(-1).role !== "user") { invia({ t: "errore", d: "manca il messaggio" }); ctrl.close(); return; }
-          const [{ data: mem }, fatte] = await Promise.all([
+          const [{ data: mem }, fatte, avvisoCr] = await Promise.all([
             db.from("jarvis_memoria").select("fatto, categoria").order("categoria").order("creata").limit(80),
             azioniRecenti().catch(() => [] as string[]),
+            avvisoCredito(),
           ]);
           let ultimo = storia.at(-1).content;
           // Wiretap: la trascrizione arriva a parte e può essere lunga (fino a ~80.000 caratteri)
@@ -1993,7 +2052,7 @@ Deno.serve(async (req) => {
             ultimo = `${ultimo}\n\n[TRASCRIZIONE]\n${corpo.allegato.trim().slice(0, 80000)}\n[FINE TRASCRIZIONE]`;
           }
           const memOrdinata = [...(mem ?? [])].sort((a: any, b: any) => (a.categoria === "profilo" ? 0 : 1) - (b.categoria === "profilo" ? 0 : 1));
-          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${m.fatto}`), fatte, turno)}\n\n${ultimo}`;
+          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${m.fatto}`), fatte, turno)}${avvisoCr}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) turno.foto = imgs[0];
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
@@ -2041,7 +2100,9 @@ Deno.serve(async (req) => {
         invia({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
       } catch (e) {
         segnaEsito({ t: "errore" });
-        try { invia({ t: "errore", d: `Un intoppo tecnico, signore: ${(e as Error).message}` }); } catch { /* linea già chiusa */ }
+        const msg = (e as Error).message;
+        const finito = /credit balance|billing|purchase credits/i.test(msg);
+        try { invia({ t: "errore", d: finito ? "Sir, il credito Anthropic è finito: mi ricarichi dalla Console e torno subito al suo servizio." : `Un intoppo tecnico, signore: ${msg}` }); } catch { /* linea già chiusa */ }
       }
       ctrl.close();
     },
