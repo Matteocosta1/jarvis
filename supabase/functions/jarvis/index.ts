@@ -1722,7 +1722,10 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
 // Segreti: ELEVENLABS_API_KEY. Facoltativi: ELEVENLABS_VOICE_ID (voce predefinita), ELEVENLABS_MODELLO.
 // Senza modello indicato sceglie da solo il migliore disponibile sull'account (v4 → multilingual v2).
 const XI = "https://api.elevenlabs.io/v1";
-const VOCE_PREDEFINITA = "onwK4e9ZLuTAKqWW03F9"; // «Daniel»: britannico, pacato, da maggiordomo
+const VOCE_PREDEFINITA = "onwK4e9ZLuTAKqWW03F9"; // «Daniel»: britannico, pacato, da maggiordomo (la voce di prima)
+// la voce di JARVIS scelta dal signore (creata con Voice Design, 15 ottobre 2026); per tornare a Daniel basta togliere questa riga
+const VOCE_JARVIS = "io3eLhWCO9ShwQa6IS3e";
+const voceAttuale = () => VOCE_JARVIS || Deno.env.get("ELEVENLABS_VOICE_ID") || VOCE_PREDEFINITA;
 let modelloVoce: string | null = null;
 
 async function scegliModelloVoce(chiave: string) {
@@ -1781,7 +1784,7 @@ async function prendiPosto(limiteMs: number) {
 }
 
 async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
-  const voce = idValido(idVoce) ? idVoce : (Deno.env.get("ELEVENLABS_VOICE_ID") || VOCE_PREDEFINITA);
+  const voce = idValido(idVoce) ? idVoce : (voceAttuale());
   const modello = await scegliModelloVoce(chiave);
   let ultimo = "";
   for (let tentativo = 0; tentativo < 8; tentativo++) {
@@ -1903,7 +1906,7 @@ async function elencoVoci() {
     id: v.voice_id, nome: v.name,
     descrizione: [v.labels?.gender, v.labels?.accent, v.labels?.age, v.labels?.description || v.labels?.descriptive].filter(Boolean).join(" · "),
   }));
-  return json({ attiva: true, predefinita: Deno.env.get("ELEVENLABS_VOICE_ID") || VOCE_PREDEFINITA, modello: await scegliModelloVoce(chiave), voci });
+  return json({ attiva: true, predefinita: voceAttuale(), modello: await scegliModelloVoce(chiave), voci });
 }
 
 // ───────────────────────── HTTP ─────────────────────────
@@ -1963,7 +1966,7 @@ Deno.serve(async (req) => {
   if (corpo?.sveglia === true) {                                                            // l'app si è aperta: il cervello si scalda in silenzio
     const chiave = Deno.env.get("ELEVENLABS_API_KEY");
     if (chiave && !modelloVoce) inSottofondo(scegliModelloVoce(chiave).then(() => {}, () => {}));
-    return json({ sveglio: true });
+    return json({ sveglio: true, voce: voceAttuale() });   // l'app usa l'id della voce per la cache delle frasi
   }
   if (typeof corpo?.traduci === "string") return await traduci(corpo.traduci, String(corpo.da || "it"), String(corpo.a || "en"));   // interprete
   if (corpo?.vitals === true) {                                                             // pagina Vitals dell'app

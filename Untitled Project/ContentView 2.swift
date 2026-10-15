@@ -983,7 +983,7 @@ struct ImpostazioniView: View {
         statoCloud = "Cerco le voci…"
         if let elenco = await VoceCloud.elencoVoci() {
             vociCloud = elenco
-            statoCloud = elenco.isEmpty ? "Attiva, con la voce predefinita." : "Attiva · \(elenco.count) voci disponibili."
+            statoCloud = elenco.isEmpty ? "Attiva, con la voce scelta nel cervello. Le voci dell'account non si vedono: alla chiave ElevenLabs forse manca il permesso «Voices · Read»." : "Attiva · \(elenco.count) voci disponibili."
         } else {
             statoCloud = "Non ancora attiva: manca la chiave ElevenLabs nel cervello. Intanto parla la voce dell'iPhone."
         }

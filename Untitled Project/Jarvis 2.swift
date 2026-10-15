@@ -376,7 +376,11 @@ final class Jarvis: NSObject, ObservableObject {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["sveglia": true])
-        _ = try? await URLSession.shared.data(for: req)
+        // il cervello dice anche qual è la voce predefinita: se cambia, le frasi in cache si rifanno con la voce nuova
+        if let (d, _) = try? await URLSession.shared.data(for: req),
+           let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let voce = o["voce"] as? String, !voce.isEmpty {
+            UserDefaults.standard.set(voce, forKey: "vocePredefinitaCloud")
+        }
     }
 
     func nuovaConversazione() {
@@ -1039,7 +1043,8 @@ nonisolated enum CacheVoce {
     private static let massimoFile = 400
 
     private static func file(_ testo: String, id: String) -> URL? {
-        let chiave = "\(id)|\(testo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
+        let voce = id.isEmpty ? (UserDefaults.standard.string(forKey: "vocePredefinitaCloud") ?? "") : id
+        let chiave = "\(voce)|\(testo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
         let hash = SHA256.hash(data: Data(chiave.utf8)).map { String(format: "%02x", $0) }.joined()
         return cartella?.appendingPathComponent(hash + ".mp3")
     }
