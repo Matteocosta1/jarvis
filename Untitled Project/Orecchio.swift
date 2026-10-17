@@ -18,6 +18,9 @@ final class Orecchio {
     var testoDetto = ""
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
     private var ultimoTesto = ""
+    private var inizioSegmento = 0      // la trascrizione si accumula: conta solo ciò che è arrivato dopo l'ultima pausa
+    private var ultimaLunghezza = 0
+    private var ultimoParziale = Date.distantPast
     private var timerSilenzio: Timer?
 
     private let motore = AVAudioEngine()
@@ -61,6 +64,9 @@ final class Orecchio {
             motore.prepare()
             try motore.start()
             acceso = true
+            inizioSegmento = 0
+            ultimaLunghezza = 0
+            ultimoParziale = .distantPast
             turno += 1
             let mio = turno
             compito = Orecchio.riconosci(riconoscitore, r) { [weak self] testo, fine in
@@ -69,7 +75,10 @@ final class Orecchio {
             // Apple chiude ogni ascolto dopo circa un minuto: si riparte prima, senza che si noti.
             timerRiavvio?.invalidate()
             timerRiavvio = Timer.scheduledTimer(withTimeInterval: 50, repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.riavvia() }
+                Task { @MainActor [weak self] in
+                    guard let self, !self.inPresa else { return }   // il signore sta parlando: non gli taglio la frase
+                    self.riavvia()
+                }
             }
         } catch {
             spegni()
@@ -97,32 +106,61 @@ final class Orecchio {
         }
     }
 
+    /// Le parole di una frase, minuscole, senza punteggiatura.
+    nonisolated private static func parole(_ t: String) -> [String] {
+        t.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
+    }
+
+    /// La prima parola d'ordine detta come parola intera («basta», non «abbastanza») e che JARVIS non sta dicendo lui
+    /// («un attimo, Sir» è una sua frase: la sua eco non deve fermarlo). Restituisce la parola e ciò che segue.
+    private func paroladOrdine(in segmento: String) -> String? {
+        let sentite = " " + Orecchio.parole(segmento).joined(separator: " ") + " "
+        let dette = " " + Orecchio.parole(testoDetto).joined(separator: " ") + " "
+        for p in Orecchio.paroleStop {
+            let cercata = " " + p + " "
+            guard sentite.contains(cercata) else { continue }
+            if dette.contains(cercata) && !p.hasPrefix("jarvi") { continue }   // la sta dicendo JARVIS: è eco
+            if p.hasPrefix("jarvi") && dette.contains(cercata) && sentite.components(separatedBy: cercata).count <= dette.components(separatedBy: cercata).count { continue }
+            return p
+        }
+        return nil
+    }
+
     private func valuta(_ testo: String?, fine: Bool, turno mio: Int) {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
-            let basso = testo.lowercased()
-            if !inPresa, let parola = Orecchio.paroleStop.first(where: { basso.contains($0) }) {
+            // dopo una pausa comincia un pezzo nuovo: valuto solo quello, non tutta la trascrizione dall'inizio
+            // (prima l'eco accumulata «diluiva» le parole del signore e l'interruzione non scattava più)
+            let adesso = Date()
+            if !inPresa, adesso.timeIntervalSince(ultimoParziale) > 0.7 { inizioSegmento = min(ultimaLunghezza, testo.count) }
+            ultimoParziale = adesso
+            ultimaLunghezza = testo.count
+            let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+
+            if !inPresa, let parola = paroladOrdine(in: segmento) {
                 var resto = ""
-                if let r = basso.range(of: parola) {
-                    resto = String(testo[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+                if let r = segmento.range(of: parola, options: [.caseInsensitive, .backwards]) {
+                    var dopo = r.upperBound
+                    while dopo < segmento.endIndex, segmento[dopo].isLetter { dopo = segmento.index(after: dopo) }
+                    resto = String(segmento[dopo...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
                 }
                 ferma()
                 interrotto?(resto)
                 return
             }
-            let parole = basso.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+            let parole = Orecchio.parole(segmento)
             if !inPresa {
                 // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
-                let mie = Set(testoDetto.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
+                let mie = Set(Orecchio.parole(testoDetto))
                 let estranee = parole.filter { !mie.contains($0) }
                 guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
                 inPresa = true
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
-            ultimoTesto = testo
+            ultimoTesto = segmento                        // solo la frase del signore, senza l'eco di prima
             // la frase è finita quando il signore tace (più a lungo se si è fermato a metà: «…e», «…perché»)
             timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(testo), repeats: false) { [weak self] _ in
+            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(segmento), repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.consegna() }
             }
             if fine { consegna() }
