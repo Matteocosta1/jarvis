@@ -101,6 +101,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var compito: SFSpeechRecognitionTask?
     private var timerSilenzio: Timer?
+    private var timerTetto: Timer?         // la frase dura al massimo 20 secondi: poi è finita e JARVIS risponde subito
     private var turnoAscolto = 0           // ogni ascolto ha il suo numero: i callback di un ascolto vecchio vengono ignorati
 
     private let sintesi = AVSpeechSynthesizer()
@@ -848,6 +849,15 @@ final class Jarvis: NSObject, ObservableObject {
         if let testo, !testo.isEmpty {
             parziale = testo
             armaSilenzio(secondi: Jarvis.pausaFineFrase(testo))
+            if timerTetto == nil {                     // il signore ha iniziato a parlare: da qui ha 20 secondi
+                let mio = turnoAscolto
+                timerTetto = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.turnoAscolto == mio else { return }
+                        self.fermaAscolto(invia: true)
+                    }
+                }
+            }
         }
         if finale || errore { fermaAscolto(invia: true) }
     }
@@ -878,6 +888,8 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .ascolto || !invia else { return }
         timerSilenzio?.invalidate()
         timerSilenzio = nil
+        timerTetto?.invalidate()
+        timerTetto = nil
         if motore.isRunning { motore.stop() }
         motore.inputNode.removeTap(onBus: 0)
         richiesta?.endAudio()
