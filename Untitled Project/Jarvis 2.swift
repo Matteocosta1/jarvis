@@ -182,12 +182,12 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
         switch fase {
-        case .attesa: Task { await avviaAscolto() }
+        case .attesa: Task { await avviaAscolto(bip: true) }
         case .ascolto: fermaAscolto(invia: true)
         case .parlo, .elaboro:
             segnaInterruzione()
             interrompi()                    // lo zittisce e ascolta subito
-            Task { await avviaAscolto() }
+            Task { await avviaAscolto(bip: true) }
         }
     }
 
@@ -199,6 +199,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// Il signore ha iniziato a parlare mentre JARVIS parlava: JARVIS tace all'istante e resta in ascolto
     /// (l'orecchio continua a raccogliere la frase e la consegna a `interrottoAVoce` quando è finita).
     private func zittisciPerAscolto() {
+        segnaInterruzione()                 // prima di cambiare fase: serve per legare quello che sta per dire alla domanda di prima
+        compitoPonte?.cancel()
         compitoRete?.cancel()
         compitoRete = nil
         occhiChiusi([])
@@ -224,10 +226,12 @@ final class Jarvis: NSObject, ObservableObject {
         let (pulito, chiedeAggiunta) = Jarvis.togliRichiamo(resto)
         if chiedeAggiunta { aggiuntaInArrivo = true }
         if eseguiComando(pulito) { aggiuntaInArrivo = false; return }
-        if pulito.split(separator: " ").count >= 2 {
-            Task { await instrada(resto) }    // ha già detto cosa vuole, in un fiato: «Jarvis, che ore sono»
+        if !pulito.isEmpty {
+            Task { await instrada(resto) }    // ha detto cosa vuole: «Jarvis, che ore sono», «aspetta, e anche…»
+        } else if chiedeAggiunta {
+            Task { await avviaAscolto() }     // «aspetta, ascoltami» e poi silenzio: lo ascolto ancora, senza bip
         } else {
-            Task { await avviaAscolto() }     // solo «Jarvis» o «aspetta, ascoltami»: tace e lo ascolta
+            aggiuntaInArrivo = false          // «basta», «zitto», «stop»: tace e torna in attesa, come una persona
         }
     }
 
@@ -903,7 +907,8 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Ascolto
 
-    private func avviaAscolto() async {
+    /// `bip`: il suono di ascolto solo quando il signore tocca il reattore; a voce si ascolta in silenzio, come una persona.
+    private func avviaAscolto(bip: Bool = false) async {
         avviso = nil
         guard fase == .attesa else { return }
         guard await Jarvis.chiediPermessi() else {
@@ -936,7 +941,7 @@ final class Jarvis: NSObject, ObservableObject {
             precedenteAscolto = ""
             ultimoParzialeAscolto = .distantPast
             fase = .ascolto
-            Suoni.ascolto()
+            if bip { Suoni.ascolto() } else { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
             turnoAscolto += 1
             let mio = turnoAscolto
             compito = Jarvis.avviaRiconoscimento(riconoscitore, r) { [weak self] testo, finale, errore in

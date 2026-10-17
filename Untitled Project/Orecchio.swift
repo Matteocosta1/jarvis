@@ -147,18 +147,17 @@ final class Orecchio {
             } else if !inPresa, pausa > 0.7 { inizioSegmento = min(ultimaLunghezza, testo.count) }
             ultimoParziale = adesso
             ultimaLunghezza = testo.count
-            let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+            var segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
 
             if !inPresa, let parola = paroladOrdine(in: segmento) {
-                var resto = ""
+                // «Jarvis», «aspetta», «basta»…: JARVIS tace subito, ma io continuo ad ascoltare sullo stesso microfono
+                // dalla parola d'ordine in poi, così non si perde nulla e non serve riaprire l'ascolto (niente bip)
                 if let r = segmento.range(of: parola, options: [.caseInsensitive, .backwards]) {
-                    var dopo = r.upperBound
-                    while dopo < segmento.endIndex, segmento[dopo].isLetter { dopo = segmento.index(after: dopo) }
-                    resto = String(segmento[dopo...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+                    inizioSegmento = min(inizioSegmento + segmento.distance(from: segmento.startIndex, to: r.lowerBound), testo.count)
+                    segmento = String(testo.dropFirst(inizioSegmento))
                 }
-                ferma()
-                interrotto?(resto)
-                return
+                inPresa = true
+                zittisci?()
             }
             let parole = Orecchio.parole(segmento)
             if !inPresa {
@@ -173,7 +172,13 @@ final class Orecchio {
             ultimoTesto = [primaPresa, segmento].filter { !$0.isEmpty }.joined(separator: " ")
             // la frase è finita quando il signore tace (più a lungo se si è fermato a metà: «…e», «…perché»)
             timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(ultimoTesto), repeats: false) { [weak self] _ in
+            // solo la parola d'ordine («Jarvis…»): gli lascio qualche secondo per dire cosa vuole
+            // («basta», «zitto», «stop» da soli: tace e basta, quindi aspetto poco)
+            let (pulito, chiede) = Jarvis.togliRichiamo(ultimoTesto)
+            let basso = ultimoTesto.lowercased()
+            let chiama = chiede || ["jarvi", "giarvi", "jervis", "ehi", "hey", "bro", "fratello"].contains(where: { basso.contains($0) })
+            let attesa = pulito.isEmpty ? (chiama ? 4.0 : 1.2) : Jarvis.pausaFineFrase(ultimoTesto)
+            timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.consegna() }
             }
             if fine { riprendiPresa() }
