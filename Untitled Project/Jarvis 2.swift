@@ -17,11 +17,16 @@ struct Messaggio: Identifiable, Codable, Equatable {
     var conFoto = false
     var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
     var aggiunta: Bool? = nil         // il signore completa la richiesta precedente («Jarvis, aspetta, ascoltami…»)
+    var seguito: Bool? = nil          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
         let base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
-        return aggiunta == true ? "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" : base
+        if aggiunta == true { return "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" }
+        if seguito == true {
+            return "(riprendo il discorso: se questo completa o aggiunge qualcosa a quello che ti ho detto prima, rispondi tenendo conto di entrambe le cose; se è un argomento nuovo, rispondi solo a questo) \(base)"
+        }
+        return base
     }
 }
 
@@ -103,7 +108,10 @@ final class Jarvis: NSObject, ObservableObject {
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var compito: SFSpeechRecognitionTask?
     private var timerSilenzio: Timer?
-    private var timerTetto: Timer?         // la frase dura al massimo un minuto (limite del riconoscimento vocale di Apple)
+    private var timerTetto: Timer?
+    private var baseAscolto = ""           // quanto detto prima che il riconoscimento ripartisse da capo
+    private var precedenteAscolto = ""
+    private var ultimoParzialeAscolto = Date.distantPast         // la frase dura al massimo un minuto (limite del riconoscimento vocale di Apple)
     private var turnoAscolto = 0           // ogni ascolto ha il suo numero: i callback di un ascolto vecchio vengono ignorati
 
     private let sintesi = AVSpeechSynthesizer()
@@ -269,7 +277,14 @@ final class Jarvis: NSObject, ObservableObject {
         let aggiunta = (chiede || aggiuntaInArrivo || continua) && !pulito.isEmpty
         aggiuntaInArrivo = false
         defer { rispostaInterrotta = nil; quandoInterrotto = nil }
-        guard aggiunta else { await invia(frase); return }
+        guard aggiunta else {
+            // non ha detto «aspetta» ma riprende il discorso: dopo avermi interrotto, o entro un minuto dalla sua ultima frase.
+            // Non lo tronco e non lo forzo: lo segno come possibile seguito e il cervello capisce se completa il pensiero di prima.
+            let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
+            let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < 60 } ?? false
+            await invia(frase, comeSeguito: rispostaInterrotta != nil || vicino)
+            return
+        }
         // interrotta a metà: la domanda di prima e l'aggiunta diventano una sola richiesta, la risposta tagliata sparisce
         if recente, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
            iR > 0, messaggi[iR - 1].ruolo == "user", !messaggi[iR - 1].conFoto {
@@ -468,7 +483,7 @@ final class Jarvis: NSObject, ObservableObject {
         if fase != .ascolto { fase = .attesa }
     }
 
-    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false) async {
+    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
         let giroDaMandare = fotoGiro
@@ -487,7 +502,7 @@ final class Jarvis: NSObject, ObservableObject {
             messaggi.removeSubrange((i + 1)...)
         } else {
             var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty)
-            if comeAggiunta { m.aggiunta = true }
+            if comeAggiunta { m.aggiunta = true } else if comeSeguito { m.seguito = true }
             messaggi.append(m)
         }
         let storia: [[String: Any]] = messaggi.suffix(20)
@@ -900,6 +915,9 @@ final class Jarvis: NSObject, ObservableObject {
             try motore.start()
 
             parziale = ""
+            baseAscolto = ""
+            precedenteAscolto = ""
+            ultimoParzialeAscolto = .distantPast
             fase = .ascolto
             Suoni.ascolto()
             turnoAscolto += 1
@@ -917,8 +935,14 @@ final class Jarvis: NSObject, ObservableObject {
     private func aggiorna(testo: String?, finale: Bool, errore: Bool, ascolto: Int) {
         guard fase == .ascolto, ascolto == turnoAscolto else { return }
         if let testo, !testo.isEmpty {
-            parziale = testo
-            armaSilenzio(secondi: Jarvis.pausaFineFrase(testo))
+            let adesso = Date()
+            if Richiamo.pezzoNuovo(precedente: precedenteAscolto, nuovo: testo, pausa: adesso.timeIntervalSince(ultimoParzialeAscolto)) {
+                baseAscolto = parziale                 // il riconoscimento è ripartito da capo: non perdo l'inizio della frase
+            }
+            precedenteAscolto = testo
+            ultimoParzialeAscolto = adesso
+            parziale = [baseAscolto, testo].filter { !$0.isEmpty }.joined(separator: " ")
+            armaSilenzio(secondi: Jarvis.pausaFineFrase(parziale))
             if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a un minuto
                 let mio = turnoAscolto
                 timerTetto = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in

@@ -30,6 +30,10 @@ final class Richiamo {
     private var resto = ""
     /// Fino a quando basta parlare, senza «Jarvis»: subito dopo una richiesta il signore può aggiungere ancora qualcosa.
     var liberoFinoA = Date.distantPast
+    private var precedente = ""         // l'ultima trascrizione ricevuta
+    private var prima = ""              // ciò che ha già detto dopo il richiamo, prima che il riconoscimento ripartisse da capo
+    private var soloDopoNome = true      // vero: conta ciò che segue «Jarvis»; falso: conta tutta la frase (seguito senza nome)
+    private var corrente = ""
     private var inizioSegmento = 0       // dove comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
@@ -97,6 +101,10 @@ final class Richiamo {
             inizioSegmento = 0
             ultimaLunghezza = 0
             ultimoParziale = .distantPast
+            precedente = ""
+            prima = ""
+            corrente = ""
+            soloDopoNome = true
             turno += 1
             let mio = turno
             compito = Richiamo.riconosci(riconoscitore, r) { [weak self] testo, fine in
@@ -144,34 +152,65 @@ final class Richiamo {
         }
     }
 
+    /// Il riconoscimento sull'iPhone, dopo una pausa, a volte ricomincia la trascrizione da capo invece di allungarla.
+    /// Vero se il testo nuovo non è il seguito del precedente ma un pezzo nuovo.
+    nonisolated static func pezzoNuovo(precedente: String, nuovo: String, pausa: TimeInterval) -> Bool {
+        guard !precedente.isEmpty, !nuovo.isEmpty else { return false }
+        let p = precedente.lowercased(), n = nuovo.lowercased()
+        let k = min(4, p.count, n.count)
+        let stessoInizio = p.prefix(k) == n.prefix(k)
+        if n.count < p.count && !stessoInizio { return true }      // più corto e diverso: è ripartito
+        if n.count * 2 < p.count { return true }                   // si è dimezzato: è ripartito
+        return pausa > 0.8 && !stessoInizio                         // dopo una pausa, con un inizio diverso
+    }
+
     private func valuta(_ testo: String?, fine: Bool, turno mio: Int) {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
             let adesso = Date()
+            let pausa = adesso.timeIntervalSince(ultimoParziale)
+            let ripartito = Richiamo.pezzoNuovo(precedente: precedente, nuovo: testo, pausa: pausa)
+            precedente = testo
             if !sveglio {
                 // dopo una pausa comincia una frase nuova: i richiami «ascoltami», «ehi» valgono solo lì
-                if adesso.timeIntervalSince(ultimoParziale) > 1.0 { inizioSegmento = min(ultimaLunghezza, testo.count) }
+                if ripartito { inizioSegmento = 0 }
+                else if pausa > 1.0 { inizioSegmento = min(ultimaLunghezza, testo.count) }
                 ultimoParziale = adesso
                 ultimaLunghezza = testo.count
                 let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
                 var trovato = Richiamo.dopoRichiamo(segmento)
+                soloDopoNome = true
                 if trovato == nil, adesso < liberoFinoA {
                     // ha appena finito di parlare e riprende: è il seguito della frase, niente «Jarvis» necessario
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
-                    if !t.isEmpty { trovato = t }
+                    if !t.isEmpty { trovato = t; soloDopoNome = false }
                 }
                 guard let dopo = trovato else { if fine { riavvia() }; return }
                 sveglio = true
-                resto = dopo
+                prima = ""
+                corrente = dopo
                 sveglia?()
                 // da qui ha un minuto per dire tutto
                 timerTetto = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in
                     Task { @MainActor [weak self] in self?.chiudi() }
                 }
             } else {
+                ultimoParziale = adesso
+                if ripartito {
+                    // il riconoscimento è ripartito da capo: tengo ciò che aveva già detto e continuo ad aggiungere
+                    prima = resto
+                    corrente = ""
+                    inizioSegmento = 0
+                    soloDopoNome = false
+                }
                 let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
-                if let dopo = Richiamo.dopoRichiamo(segmento) { resto = dopo }
+                if soloDopoNome {
+                    if let dopo = Richiamo.dopoRichiamo(segmento) { corrente = dopo }
+                } else {
+                    corrente = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,;:"))
+                }
             }
+            resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
             self.testo?(resto)
             // solo «Jarvis»: gli lascio qualche secondo per iniziare la domanda; poi le solite pause
             let attesa = resto.isEmpty ? 5.0 : Jarvis.pausaFineFrase(resto)
@@ -179,10 +218,52 @@ final class Richiamo {
             timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.chiudi() }
             }
-            if fine { chiudi() }
+            // «fine» qui è il riconoscimento che chiude un pezzo: se la frase non è finita, riparto e continuo ad ascoltare
+            if fine { continuaDopoFine() }
             return
         }
-        if fine { if sveglio { chiudi() } else { riavvia() } }
+        if fine { if sveglio { continuaDopoFine() } else { riavvia() } }
+    }
+
+    /// Il riconoscimento ha chiuso il suo pezzo ma il signore potrebbe non aver finito: tengo quanto detto e riapro
+    /// l'ascolto senza perdere nulla; sarà il silenzio (timerSilenzio) a decidere quando la frase è davvero finita.
+    private func continuaDopoFine() {
+        guard sveglio else { return }
+        let detto = resto
+        let silenzio = timerSilenzio
+        let tetto = timerTetto
+        timerSilenzio = nil
+        timerTetto = nil
+        spegni()                         // azzera anche lo stato: lo ripristino subito dopo
+        sveglio = true
+        prima = detto
+        corrente = ""
+        resto = detto
+        soloDopoNome = false
+        timerSilenzio = silenzio
+        timerTetto = tetto
+        do {
+            let r = SFSpeechAudioBufferRecognitionRequest()
+            r.shouldReportPartialResults = true
+            r.addsPunctuation = true
+            if riconoscitore?.supportsOnDeviceRecognition == true { r.requiresOnDeviceRecognition = true }
+            richiesta = r
+            try Richiamo.collega(motore, a: r)
+            motore.prepare()
+            try motore.start()
+            acceso = true
+            precedente = ""
+            inizioSegmento = 0
+            turno += 1
+            let mio = turno
+            if let riconoscitore {
+                compito = Richiamo.riconosci(riconoscitore, r) { [weak self] testo, fine in
+                    Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
+                }
+            }
+        } catch {
+            chiudi()
+        }
     }
 
     /// La frase è finita: la consegno a JARVIS e mi spengo (JARVIS mi riaccende quando torna in attesa).

@@ -18,6 +18,8 @@ final class Orecchio {
     var testoDetto = ""
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
     private var ultimoTesto = ""
+    private var precedente = ""         // l'ultima trascrizione ricevuta
+    private var primaPresa = ""         // ciò che il signore ha già detto, se il riconoscimento è ripartito da capo
     private var inizioSegmento = 0      // la trascrizione si accumula: conta solo ciò che è arrivato dopo l'ultima pausa
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
@@ -45,6 +47,7 @@ final class Orecchio {
     func ferma() {
         voluto = false
         inPresa = false
+        primaPresa = ""
         timerSilenzio?.invalidate()
         timerSilenzio = nil
         spegni()
@@ -68,6 +71,7 @@ final class Orecchio {
             inizioSegmento = 0
             ultimaLunghezza = 0
             ultimoParziale = .distantPast
+            precedente = ""
             turno += 1
             let mio = turno
             compito = Orecchio.riconosci(riconoscitore, r) { [weak self] testo, fine in
@@ -133,7 +137,14 @@ final class Orecchio {
             // dopo una pausa comincia un pezzo nuovo: valuto solo quello, non tutta la trascrizione dall'inizio
             // (prima l'eco accumulata «diluiva» le parole del signore e l'interruzione non scattava più)
             let adesso = Date()
-            if !inPresa, adesso.timeIntervalSince(ultimoParziale) > 0.7 { inizioSegmento = min(ultimaLunghezza, testo.count) }
+            let pausa = adesso.timeIntervalSince(ultimoParziale)
+            // il riconoscimento sull'iPhone a volte ricomincia la trascrizione da capo dopo una pausa
+            let ripartito = Richiamo.pezzoNuovo(precedente: precedente, nuovo: testo, pausa: pausa)
+            precedente = testo
+            if ripartito {
+                if inPresa { primaPresa = ultimoTesto }   // tengo quanto ha già detto e continuo ad aggiungere
+                inizioSegmento = 0
+            } else if !inPresa, pausa > 0.7 { inizioSegmento = min(ultimaLunghezza, testo.count) }
             ultimoParziale = adesso
             ultimaLunghezza = testo.count
             let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
@@ -158,22 +169,34 @@ final class Orecchio {
                 inPresa = true
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
-            ultimoTesto = segmento                        // solo la frase del signore, senza l'eco di prima
+            // solo la frase del signore, senza l'eco di prima (più quanto detto prima di un'eventuale ripartenza)
+            ultimoTesto = [primaPresa, segmento].filter { !$0.isEmpty }.joined(separator: " ")
             // la frase è finita quando il signore tace (più a lungo se si è fermato a metà: «…e», «…perché»)
             timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(segmento), repeats: false) { [weak self] _ in
+            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(ultimoTesto), repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.consegna() }
             }
-            if fine { consegna() }
+            if fine { riprendiPresa() }
             return
         }
-        if fine { if inPresa { consegna() } else { riavvia() } }
+        if fine { if inPresa { riprendiPresa() } else { riavvia() } }
+    }
+
+    /// Il riconoscimento ha chiuso il suo pezzo mentre il signore parlava: riapro subito l'ascolto tenendo quanto detto.
+    /// Decide il silenzio (timerSilenzio) quando la frase è davvero finita, non il riconoscimento.
+    private func riprendiPresa() {
+        guard inPresa else { return }
+        primaPresa = ultimoTesto
+        spegni()
+        accendi()
+        if !acceso { consegna() }          // il microfono non riparte: consegno quello che ho
     }
 
     /// La frase del signore è completa: la passo a JARVIS.
     private func consegna() {
         guard inPresa else { return }
         let testo = ultimoTesto.trimmingCharacters(in: .whitespacesAndNewlines)
+        primaPresa = ""
         ferma()
         interrotto?(testo)
     }
