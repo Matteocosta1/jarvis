@@ -17,11 +17,13 @@ struct Messaggio: Identifiable, Codable, Equatable {
     var conFoto = false
     var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
     var aggiunta: Bool? = nil         // il signore completa la richiesta precedente («Jarvis, aspetta, ascoltami…»)
-    var seguito: Bool? = nil          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
+    var seguito: Bool? = nil
+    var fotoDiPrima: Bool? = nil      // con questo messaggio è ripartita la foto (o il giro) di poco fa          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
-        let base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
+        var base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
+        if fotoDiPrima == true { base = "(ti rimando la foto di prima, quella di cui stavamo parlando: è la stessa, guardala di nuovo) \(base)" }
         if aggiunta == true { return "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" }
         if seguito == true {
             return "(riprendo il discorso: se questo completa o aggiunge qualcosa a quello che ti ho detto prima, rispondi tenendo conto di entrambe le cose; se è un argomento nuovo, rispondi solo a questo) \(base)"
@@ -133,7 +135,11 @@ final class Jarvis: NSObject, ObservableObject {
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
     private var quandoInterrotto: Date?
-    private var ultimoInvio = Date.distantPast       // quando è partita l'ultima richiesta al cervello
+    private var ultimoInvio = Date.distantPast
+    /// L'ultima foto (o i fotogrammi del giro) guardata: la storia della conversazione tiene solo il testo, quindi
+    /// se il signore interrompe la descrizione e poi chiede altro, la foto riparte con la domanda e JARVIS non la «perde».
+    private var fotoRecenti: [Data] = []
+    private var quandoFotoRecenti = Date.distantPast       // quando è partita l'ultima richiesta al cervello
     private var aggiuntaInArrivo = false           // ha detto solo «aspetta, ascoltami»: la prossima frase completa la richiesta
 
     /// Frasi brevi dette subito se il cervello non ha ancora iniziato a parlare dopo un secondo: la risposta sembra istantanea.
@@ -495,9 +501,18 @@ final class Jarvis: NSObject, ObservableObject {
 
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fotoDaMandare = foto
-        let giroDaMandare = fotoGiro
+        var fotoDaMandare = foto
+        var giroDaMandare = fotoGiro
         if testo.isEmpty && fotoDaMandare == nil && giroDaMandare.isEmpty { fase = .attesa; return }
+        // foto nuova: diventa quella «di cui si parla»; nessuna foto ma una guardata da poco: la rimando
+        var rimandata = false
+        if let f = fotoDaMandare { fotoRecenti = [f]; quandoFotoRecenti = Date() }
+        else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; quandoFotoRecenti = Date() }
+        else if !fotoRecenti.isEmpty, Date().timeIntervalSince(quandoFotoRecenti) < 240 {
+            if fotoRecenti.count == 1 { fotoDaMandare = fotoRecenti[0] } else { giroDaMandare = fotoRecenti }
+            quandoFotoRecenti = Date()          // finché se ne parla, resta «quella di prima»
+            rimandata = true
+        }
         if testo.isEmpty { testo = "Che cos'è?" }
         foto = nil
         fotoGiro = []
@@ -511,7 +526,8 @@ final class Jarvis: NSObject, ObservableObject {
             messaggi[i].testo += " … " + testo
             messaggi.removeSubrange((i + 1)...)
         } else {
-            var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty)
+            var m = Messaggio(ruolo: "user", testo: testo, conFoto: !rimandata && (fotoDaMandare != nil || !giroDaMandare.isEmpty))
+            if rimandata { m.fotoDiPrima = true }
             if comeAggiunta { m.aggiunta = true } else if comeSeguito { m.seguito = true }
             messaggi.append(m)
         }
@@ -570,6 +586,7 @@ final class Jarvis: NSObject, ObservableObject {
     func nuovaConversazione() {
         interrompi()
         messaggi.removeAll()
+        fotoRecenti = []
         salva()
     }
 
@@ -613,6 +630,8 @@ final class Jarvis: NSObject, ObservableObject {
                         var esito: [String: Any] = ["tool_use_id": q["id"] as? String ?? "", "content": contenuto, "is_error": errore]
                         let viste = strumenti.prendiFotoOcchi()
                         if !viste.isEmpty {
+                            fotoRecenti = viste                 // la foto scattata con «guarda»: è quella di cui si parlerà
+                            quandoFotoRecenti = Date()
                             // il cervello riceve la foto (o i fotogrammi del giro) insieme al risultato di «guarda»
                             esito["immagini"] = viste.map { $0.base64EncodedString() }
                             segnaFoto(id: id)
