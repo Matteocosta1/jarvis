@@ -836,7 +836,7 @@ final class Jarvis: NSObject, ObservableObject {
             compito = Jarvis.avviaRiconoscimento(riconoscitore, r) { [weak self] testo, finale, errore in
                 Task { @MainActor [weak self] in self?.aggiorna(testo: testo, finale: finale, errore: errore, ascolto: mio) }
             }
-            armaSilenzio(secondi: aggiuntaInArrivo ? 12 : 10)   // tempo per iniziare a parlare
+            armaSilenzio(secondi: 20)   // tempo per iniziare a parlare
         } catch {
             avviso = "Microfono non disponibile: \(error.localizedDescription)"
             fermaAscolto(invia: false)
