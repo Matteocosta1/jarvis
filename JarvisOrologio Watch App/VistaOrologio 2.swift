@@ -174,7 +174,7 @@ struct VistaOrologio: View {
             withAnimation(.easeOut(duration: 0.3)) { titolo = "SISTEMI IN LINEA" }
             vibra(.click)
             try? await Task.sleep(for: .milliseconds(2200))
-            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK V" }
+            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VI" }
         }
     }
 
@@ -205,7 +205,7 @@ struct VistaOrologio: View {
                 Text(titolo)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .tracking(1.5)
-                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK V" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
+                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK VI" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
                     .id(titolo)
                     .transition(.opacity)
                     .opacity(acceso ? 1 : 0)
