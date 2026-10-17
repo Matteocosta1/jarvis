@@ -42,6 +42,8 @@ enum Impostazioni {
     static var idVoceCloud: String { UserDefaults.standard.string(forKey: "idVoceCloud") ?? "" }
     /// Mentre JARVIS parla, l'iPhone ascolta: «Jarvis», «basta», «aspetta» lo interrompono.
     static var interruzioneVocale: Bool { UserDefaults.standard.object(forKey: "interruzioneVocale") as? Bool ?? true }
+    /// In attesa, con l'app aperta, basta dire «Jarvis» per parlargli: niente tocco.
+    static var richiamo: Bool { UserDefaults.standard.object(forKey: "richiamo") as? Bool ?? true }
 }
 
 // MARK: - Portachiavi (la parola d'ordine non sta in chiaro)
@@ -80,7 +82,7 @@ enum ErroreJarvis: LocalizedError {
 @MainActor
 final class Jarvis: NSObject, ObservableObject {
     @Published var messaggi: [Messaggio] = []
-    @Published var fase: Fase = .attesa
+    @Published var fase: Fase = .attesa { didSet { if fase != oldValue { aggiornaRichiamo() } } }
     @Published var parziale = ""
     @Published var stato: String?          // es. «cerco sul web»
     @Published var avviso: String?
@@ -112,6 +114,10 @@ final class Jarvis: NSObject, ObservableObject {
     private var compitoRete: Task<Void, Never>?
     private let cloud = VoceCloud()
     private var vocePerCloud = false    // decisa a inizio discorso: tutte le frasi passano dalla stessa voce, in ordine
+    private let richiamo = Richiamo()   // in attesa: «Jarvis, …» e lui ascolta, senza toccare
+    private var avvioRichiamo: Task<Void, Never>?
+    /// La schermata principale è in primo piano, senza fotocamera, interprete o altre schede aperte (lo decide ContentView).
+    var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
@@ -141,6 +147,9 @@ final class Jarvis: NSObject, ObservableObject {
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave) }
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
+        richiamo.sveglia = { [weak self] in self?.richiamato() }
+        richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t } }
+        richiamo.consegna = { [weak self] frase in self?.fraseRichiamo(frase) }
         strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
             return await self.apriOcchi(automatico: automatico, video: video, zoom: CGFloat(zoom))
@@ -266,6 +275,44 @@ final class Jarvis: NSObject, ObservableObject {
         } else {
             await invia(pulito)
         }
+    }
+
+    // MARK: Richiamo («Jarvis» in attesa)
+
+    /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
+    private func aggiornaRichiamo() {
+        if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
+        let deve = Impostazioni.richiamo && richiamoConsentito && fase == .attesa
+        avvioRichiamo?.cancel()
+        guard deve else { richiamo.ferma(); return }
+        guard !richiamo.attivo else { return }
+        // un attimo di respiro: il segnale «pronto» finisce e l'audio torna alle altre app
+        avvioRichiamo = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard let self, !Task.isCancelled, Impostazioni.richiamo, self.richiamoConsentito, self.fase == .attesa else { return }
+            self.richiamo.avvia()
+        }
+    }
+
+    /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
+    private func richiamato() {
+        avviso = nil
+        parziale = ""
+        stato = nil
+        fase = .ascolto
+        Suoni.ascolto()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
+    private func fraseRichiamo(_ frase: String) {
+        guard fase == .ascolto else { return }
+        parziale = ""
+        fase = .attesa
+        let testo = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+        if testo.isEmpty { Task { await avviaAscolto() }; return }
+        if foto == nil, eseguiComando(testo) { return }
+        Task { await instrada(testo) }
     }
 
     // MARK: Comandi vocali
@@ -812,6 +859,8 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
+        avvioRichiamo?.cancel()
+        richiamo.ferma()                        // il microfono passa all'ascolto normale
         guard let riconoscitore, riconoscitore.isAvailable else {
             avviso = "Il riconoscimento vocale non è disponibile in questo momento."
             return
@@ -886,6 +935,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func fermaAscolto(invia: Bool) {
         guard fase == .ascolto || !invia else { return }
+        if richiamo.sveglio { richiamo.ferma() }       // toccato mentre il richiamo raccoglieva la frase: la mando così
         timerSilenzio?.invalidate()
         timerSilenzio = nil
         timerTetto?.invalidate()

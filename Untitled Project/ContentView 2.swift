@@ -33,6 +33,17 @@ struct ContentView: View {
     @State private var mostraSistemi = false        // il menu SISTEMI in alto: GitHub, Supabase, Archivio
     @State private var statoSistemi: [String: String] = [:]   // la riga di stato sotto ogni voce del menu
     @State private var scheda: SchedaApp?          // le schede delle icone: Diario, Sonno, Cuore, Meteo, Spesa…
+    @Environment(\.scenePhase) private var scena
+
+    /// Schermata principale in primo piano e niente aperto sopra: solo così il richiamo «Jarvis» resta in ascolto.
+    private var schermoLibero: Bool {
+        let inPrimoPiano: Bool = scena == .active
+        let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
+        let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
+        let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
+        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
+        return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
+    }
     @FocusState private var tastiera: Bool
 
     var body: some View {
@@ -173,6 +184,7 @@ struct ContentView: View {
         }
         .onChange(of: comandi.richiesta) { eseguiComando() }
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
+        .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
     }
 
     /// Sequenza di avvio alla Stark: suono, icone che si accendono in fila, «SISTEMI IN LINEA».
@@ -868,6 +880,7 @@ struct ImpostazioniView: View {
     @AppStorage("voceCloud") private var voceCloud = true
     @AppStorage("idVoceCloud") private var idVoceCloud = ""
     @AppStorage("interruzioneVocale") private var interruzioneVocale = true
+    @AppStorage("richiamo") private var richiamo = true
     @AppStorage("suoni") private var suoni = true
     @AppStorage("suonoAvvio") private var suonoAvvio = "hud"
     @State private var parola = Portachiavi.leggi()
@@ -921,6 +934,7 @@ struct ImpostazioniView: View {
 
                 Section {
                     Toggle("Interruzione a voce", isOn: $interruzioneVocale)
+                    Toggle("Richiamo «Jarvis» senza toccare", isOn: $richiamo)
                     Toggle("Suoni dell'interfaccia", isOn: $suoni)
                     if suoni {
                         Picker("Suono delle icone all'avvio", selection: $suonoAvvio) {
@@ -930,7 +944,7 @@ struct ImpostazioniView: View {
                         }
                     }
                 } header: { Text("Alla Stark") } footer: {
-                    Text("Con l'interruzione a voce, mentre JARVIS parla basta dire «Jarvis», «basta» o «aspetta» per zittirlo e prendere la parola. L'iPhone tiene acceso il microfono mentre lui parla; se la voce le sembra meno piena, la spenga.")
+                    Text("Con l'interruzione a voce, mentre JARVIS parla basta dire «Jarvis», «basta» o «aspetta» per zittirlo e prendere la parola. L'iPhone tiene acceso il microfono mentre lui parla; se la voce le sembra meno piena, la spenga. Con il richiamo, quando JARVIS è in attesa e l'app è aperta basta dire «Jarvis, …»: le altre voci vengono ignorate. Il microfono resta acceso, quindi consuma un po' più di batteria.")
                 }
 
                 Section {
