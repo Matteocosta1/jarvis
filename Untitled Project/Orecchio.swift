@@ -164,7 +164,9 @@ final class Orecchio {
                 // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
                 let mie = Set(Orecchio.parole(testoDetto))
                 let estranee = parole.filter { !mie.contains($0) }
-                guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
+                guard !AmbienteSonoro.condiviso.affollato,
+                      parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
                 inPresa = true
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
@@ -218,7 +220,11 @@ final class Orecchio {
         }
         input.removeTap(onBus: 0)
         nonisolated(unsafe) let richiesta = r
-        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, _ in richiesta.append(buffer) }
+        let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)   // folla, musica, TV intorno?
+        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
+            richiesta.append(buffer)
+            ambiente?.analizza(buffer, posizione: quando.sampleTime)
+        }
     }
 
     nonisolated private static func riconosci(_ ric: SFSpeechRecognizer, _ r: SFSpeechAudioBufferRecognitionRequest,

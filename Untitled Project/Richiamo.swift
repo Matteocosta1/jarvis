@@ -186,10 +186,11 @@ final class Richiamo {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
                     let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
                     let breve = parole.count == 1 && Richiamo.risposteBrevi.contains(String(parole[0]).lowercased())
-                    // ascolto sempre aperto: qualsiasi frase del signore lo sveglia, non solo «Jarvis» (una parola isolata
+                    // ascolto sempre aperto: qualsiasi frase del signore lo sveglia, non solo «Jarvis» (ma se intorno c'è folla,
+                    // musica o TV, solo «Jarvis» e le parole di richiamo; una parola isolata
                     // conta solo se è una risposta tipo «sì», «no», «grazie», così un rumore non lo accende);
                     // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola
-                    if !t.isEmpty, adesso < liberoFinoA || (Impostazioni.ascoltoSempre && (parole.count >= 2 || breve)) {
+                    if !t.isEmpty, adesso < liberoFinoA || (Impostazioni.ascoltoSempre && !AmbienteSonoro.condiviso.affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
                     }
                 }
@@ -293,7 +294,11 @@ final class Richiamo {
         }
         input.removeTap(onBus: 0)
         nonisolated(unsafe) let richiesta = r
-        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, _ in richiesta.append(buffer) }
+        let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)   // folla, musica, TV intorno?
+        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
+            richiesta.append(buffer)
+            ambiente?.analizza(buffer, posizione: quando.sampleTime)
+        }
     }
 
     nonisolated private static func riconosci(_ ric: SFSpeechRecognizer, _ r: SFSpeechAudioBufferRecognitionRequest,
