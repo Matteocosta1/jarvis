@@ -40,6 +40,11 @@ struct Occhi: View {
     @State private var mancano = 5
     @State private var davanti = false          // selfie: fotocamera frontale
     @State private var cambiando = false
+    /// Zoom come sulla Fotocamera dell'iPhone: 0,5× grandangolo, 1×, 2×, 3× teleobiettivo (dove c'è), più il pizzico.
+    @State private var zoom: CGFloat = 1
+    @State private var zoomInizioPizzico: CGFloat?
+    @State private var preselezioni: [CGFloat] = [1]
+    @State private var zoomMassimo: CGFloat = 1
     /// Cucina: 0 cosa cucino con quello che vedo, 1 che piatto è (e la ricetta), 2 valori nutrizionali.
     @AppStorage("cucinaModo") private var modoCucina = 0
     static let richiesteCucina = ["COSA CUCINO", "CHE PIATTO È", "VALORI"]
@@ -50,6 +55,16 @@ struct Occhi: View {
             Color.black.ignoresSafeArea()
             AnteprimaOcchi(sessione: motore.sessione)
                 .ignoresSafeArea()
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { g in
+                            guard !davanti, agganciato else { return }
+                            let inizio = zoomInizioPizzico ?? zoom
+                            if zoomInizioPizzico == nil { zoomInizioPizzico = zoom }
+                            imposta(inizio * g.magnification, animato: false)
+                        }
+                        .onEnded { _ in zoomInizioPizzico = nil }
+                )
                 .opacity(agganciato && !cambiando ? 1 : 0)
                 .animation(.easeOut(duration: 0.4), value: agganciato && !cambiando)
             MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
@@ -131,6 +146,9 @@ struct Occhi: View {
                         }
                     }
                 }
+                if !automatico && !video && !davanti && agganciato && (preselezioni.count > 1 || zoomMassimo > 1.05) {
+                    selettoreZoom
+                }
                 if !automatico && !video {
                     HStack(spacing: 34) {
                         // selfie: si vede lei e chi c'è dietro
@@ -199,6 +217,7 @@ struct Occhi: View {
             chiudi([])
             return
         }
+        leggiZoom()
         agganciato = true
         Suoni.ascolto()
         if video {
@@ -226,10 +245,61 @@ struct Occhi: View {
         }
         if ok {
             davanti = nuova
+            leggiZoom()
             stato = nuova ? "SELFIE · LEI E CHI LE STA DIETRO" : (cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI")
         }
         try? await Task.sleep(for: .milliseconds(250))
         cambiando = false
+    }
+
+    /// I tasti dello zoom, come nella Fotocamera: quello attivo è pieno e mostra lo zoom esatto mentre si pizzica.
+    private var selettoreZoom: some View {
+        HStack(spacing: 8) {
+            ForEach(preselezioni, id: \.self) { p in
+                let attivo = attivaPreselezione == p
+                Button { Suoni.tocco(); UISelectionFeedbackGenerator().selectionChanged(); imposta(p, animato: true) } label: {
+                    Text(attivo ? Occhi.etichetta(zoom) : Occhi.etichetta(p, corta: true))
+                        .font(.system(size: attivo ? 12 : 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(attivo ? Color.black : tinta)
+                        .frame(width: attivo ? 44 : 36, height: attivo ? 44 : 36)
+                        .background(attivo ? tinta : Color.black.opacity(0.5))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(tinta.opacity(0.6), lineWidth: 1))
+                        .shadow(color: tinta.opacity(attivo ? 0.6 : 0), radius: 6)
+                }
+                .buttonStyle(StileStark())
+                .animation(.spring(duration: 0.25), value: attivo)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(Color.black.opacity(0.35))
+        .clipShape(Capsule())
+    }
+
+    /// La preselezione «di competenza» dello zoom attuale (2,4× accende il 2×).
+    private var attivaPreselezione: CGFloat {
+        preselezioni.last(where: { zoom >= $0 - 0.05 }) ?? preselezioni.first ?? 1
+    }
+
+    static func etichetta(_ z: CGFloat, corta: Bool = false) -> String {
+        if z < 0.95 { return corta ? "0,5" : "0,5×" }
+        let tondo = (z * 10).rounded() / 10
+        let testo = tondo == tondo.rounded() ? String(Int(tondo)) : String(format: "%.1f", Double(tondo)).replacingOccurrences(of: ".", with: ",")
+        return corta ? testo : "\(testo)×"
+    }
+
+    private func leggiZoom() {
+        let info = motore.zoomDisponibile()
+        preselezioni = info.preselezioni
+        zoomMassimo = info.massimo
+        zoom = 1
+    }
+
+    private func imposta(_ valore: CGFloat, animato: Bool) {
+        let minimo = preselezioni.first ?? 1
+        let v = min(max(valore, minimo), zoomMassimo)
+        zoom = v
+        motore.zoom(v, animato: animato)
     }
 
     private func scatta() {
@@ -400,6 +470,38 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
     private var consegna: (@Sendable (Data?) -> Void)?
     /// Quale fotocamera è montata: quella dietro (di solito) o quella davanti (selfie nel Profiler).
     private var montata: AVCaptureDevice.Position = .back
+    private var camera: AVCaptureDevice?
+    /// Fattore del dispositivo che corrisponde a «1×» (con il grandangolo è 2: lo 0,5× è il fattore 1).
+    private var base: CGFloat = 1
+    private var passaggi: [CGFloat] = []
+
+    /// Le preselezioni da mostrare (0,5× se c'è il grandangolo, 1×, 2×, e il teleobiettivo vero) e lo zoom massimo sensato.
+    func zoomDisponibile() -> (preselezioni: [CGFloat], massimo: CGFloat) {
+        coda.sync {
+            guard let cam = camera, montata == .back else { return ([1], 1) }
+            var p: [CGFloat] = []
+            if base > 1 { p.append(0.5) }
+            p.append(1)
+            p.append(2)
+            for x in passaggi.dropFirst(base > 1 ? 1 : 0) {
+                let m = (x / base * 10).rounded() / 10
+                if m > 1.05 && !p.contains(m) { p.append(m) }
+            }
+            let massimo = min(cam.maxAvailableVideoZoomFactor / base, 15)
+            p = p.filter { $0 <= massimo + 0.01 }.sorted()
+            return (p, max(massimo, 1))
+        }
+    }
+
+    /// Zoom «mostrato» (0,5×, 1×, 3×…): lo traduce nel fattore del dispositivo. animato = scivola come nella Fotocamera.
+    func zoom(_ mostrato: CGFloat, animato: Bool) {
+        coda.async {
+            guard let cam = self.camera, (try? cam.lockForConfiguration()) != nil else { return }
+            let f = min(max(mostrato * self.base, cam.minAvailableVideoZoomFactor), cam.maxAvailableVideoZoomFactor)
+            if animato { cam.ramp(toVideoZoomFactor: f, withRate: 12) } else { cam.cancelVideoZoomRamp(); cam.videoZoomFactor = f }
+            cam.unlockForConfiguration()
+        }
+    }
 
     func avvia(posizione: AVCaptureDevice.Position = .back, pronto: @escaping @Sendable (Bool) -> Void) {
         coda.async {
@@ -407,7 +509,13 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
                 self.sessione.beginConfiguration()
                 self.sessione.sessionPreset = .photo
                 for vecchio in self.sessione.inputs { self.sessione.removeInput(vecchio) }
-                guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: posizione),
+                // dietro: la fotocamera «virtuale» che unisce grandangolo, principale e teleobiettivo (passa da sola tra le lenti)
+                let virtuale = posizione == .back
+                    ? (AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back)
+                       ?? AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back)
+                       ?? AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back))
+                    : nil
+                guard let cam = virtuale ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: posizione),
                       let ingresso = try? AVCaptureDeviceInput(device: cam),
                       self.sessione.canAddInput(ingresso) else {
                     self.sessione.commitConfiguration()
@@ -421,8 +529,14 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
                 }
                 self.sessione.commitConfiguration()
                 self.montata = posizione
-                if cam.isFocusModeSupported(.continuousAutoFocus), (try? cam.lockForConfiguration()) != nil {
-                    cam.focusMode = .continuousAutoFocus
+                self.camera = cam
+                // con la fotocamera virtuale lo zoom 1.0 è il grandangolo: la base «1×» è il primo punto di passaggio
+                let passaggi = cam.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
+                self.base = (cam.deviceType == .builtInTripleCamera || cam.deviceType == .builtInDualWideCamera) ? (passaggi.first ?? 1) : 1
+                self.passaggi = passaggi
+                if (try? cam.lockForConfiguration()) != nil {
+                    if cam.isFocusModeSupported(.continuousAutoFocus) { cam.focusMode = .continuousAutoFocus }
+                    cam.videoZoomFactor = min(max(self.base, cam.minAvailableVideoZoomFactor), cam.maxAvailableVideoZoomFactor)
                     cam.unlockForConfiguration()
                 }
                 self.configurata = true
