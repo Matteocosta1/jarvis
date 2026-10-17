@@ -33,7 +33,7 @@ final class Orecchio {
     private var acceso = false
 
     private static let paroleStop = ["jarvis", "giarvis", "jervis", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio",
-                                     "un attimo", "stop", "ehi", "hey"]
+                                     "un attimo", "stop", "ehi", "hey", "bro", "fratello"]
 
     var attivo: Bool { acceso }
 

@@ -131,6 +131,10 @@ final class Jarvis: NSObject, ObservableObject {
         "Un momento, Sir.", "Me ne occupo.", "Controllo subito.", "Lasci fare a me.", "Ci siamo quasi.",
         "Ricevuto, Sir.", "Ci guardo.", "Verifico, Sir.", "Con piacere.", "Mi metto all'opera.",
         "Sto raccogliendo i dati.", "Un istante soltanto.", "Lo trovo subito.", "Certamente, Sir.", "Ah, interessante.",
+        "Ottima domanda, Sir.", "Lasci che ci pensi.", "Consulto i miei archivi.", "Ho capito, un momento.", "Ci sto lavorando.",
+        "Interessante, vediamo.", "Faccio due conti.", "Arrivo, Sir.", "Elaboro, Sir.", "Un secondo e ci sono.",
+        "Sto incrociando i dati.", "Mmh, vediamo un po'.", "Giusto, verifico.", "Mi lasci controllare.", "Recupero le informazioni.",
+        "Ricevuto, ci penso io.", "Ah, bella questa.", "Subito, controllo.", "Un attimo che guardo.", "Bene, vediamo cosa trovo.",
     ]
     private static var ultimoPonte = ""
     /// Una frase a caso, mai la stessa due volte di fila.
@@ -224,7 +228,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Parole di richiamo all'inizio della frase: «Jarvis», «aspetta», «ascoltami»…
     /// Restituisce la frase senza richiamo e se il signore sta chiaramente completando la richiesta di prima.
     nonisolated static func togliRichiamo(_ frase: String) -> (String, Bool) {
-        let richiami = ["jarvis", "giarvis", "ehi", "hey", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
+        let richiami = ["jarvis", "giarvis", "ehi", "hey", "bro", "fratello", "frate", "socio", "amico", "capo", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
                         "un momento", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
         let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento"]
         let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "un'altra cosa", "e anche"]

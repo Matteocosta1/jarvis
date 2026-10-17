@@ -36,8 +36,8 @@ final class Richiamo {
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
-    /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «hey, …».
-    nonisolated static let aperture = ["ascoltami", "ehi", "hey", "ei"]
+    /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «bro, …», «fratello, …».
+    nonisolated static let aperture = ["ascoltami", "ascolta", "ehi", "hey", "ei", "bro", "fratello", "frate", "socio", "amico", "capo"]
 
     /// Se nella frase c'è un richiamo, restituisce ciò che viene dopo (anche vuoto); altrimenti nil.
     nonisolated static func dopoRichiamo(_ frase: String) -> String? {
