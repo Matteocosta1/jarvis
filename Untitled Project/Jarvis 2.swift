@@ -869,8 +869,8 @@ final class Jarvis: NSObject, ObservableObject {
         let sospese: Set<String> = ["e", "ed", "o", "ma", "che", "perché", "poi", "di", "del", "della", "a", "al", "alla", "da",
                                     "in", "con", "per", "su", "tra", "fra", "il", "lo", "la", "i", "gli", "le", "un", "una", "uno",
                                     "mi", "ti", "ci", "se", "quando", "dove", "come", "anche", "quindi", "cioè", "tipo", "ehm", "allora"]
-        if let ultima = parole.last, sospese.contains(String(ultima)) { return 1.8 }
-        return 1.3
+        if let ultima = parole.last, sospese.contains(String(ultima)) { return 1.3 }
+        return 0.8
     }
 
     private func armaSilenzio(secondi: Double) {
