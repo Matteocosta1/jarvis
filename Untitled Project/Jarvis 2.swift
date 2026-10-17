@@ -119,6 +119,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var inCoda: Set<ObjectIdentifier> = []   // frasi consegnate alla sintesi e non ancora finite
     private var frasiVive: [ObjectIdentifier: AVSpeechUtterance] = [:]   // tenute in vita finché il delegato risponde (id mai riciclati)
     private var flussoFinito = true
+    private var rispostaIniziata = false     // la voce ha già cominciato a dire la risposta in corso
     private var compitoRete: Task<Void, Never>?
     private let cloud = VoceCloud()
     private var vocePerCloud = false    // decisa a inizio discorso: tutte le frasi passano dalla stessa voce, in ordine
@@ -520,6 +521,7 @@ final class Jarvis: NSObject, ObservableObject {
         salva()
 
         ultimoInvio = Date()
+        rispostaIniziata = false
         richiamo.liberoFinoA = Date().addingTimeInterval(2)   // nei primi 2 secondi può continuare a parlare senza dire «Jarvis»
         fase = .elaboro
         flussoFinito = false
@@ -806,7 +808,13 @@ final class Jarvis: NSObject, ObservableObject {
         for k in caratteri.indices.dropLast() where ".!?…;:\n".contains(caratteri[k]) && caratteri[k + 1].isWhitespace {
             taglio = k + 1
         }
+        // inizio della risposta: se la prima frase è lunga, parto già alla prima virgola, così la voce attacca prima
+        if taglio == nil, !rispostaIniziata, caratteri.count >= 28,
+           let v = caratteri.indices.dropLast().last(where: { caratteri[$0] == "," && caratteri[$0 + 1].isWhitespace }), v >= 12 {
+            taglio = v + 1
+        }
         guard let t = taglio else { return }
+        rispostaIniziata = true
         let frase = String(caratteri[..<t]).trimmingCharacters(in: .whitespacesAndNewlines)
         bufferVoce = String(caratteri[t...])
         if !frase.isEmpty { dici(frase) }
