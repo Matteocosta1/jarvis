@@ -144,6 +144,7 @@ Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa imm
 Foto del signore: per cercare nella sua galleria usa foto_cerca, per data, luogo, album o contenuto (parole chiave in inglese). Le foto trovate compaiono nell'app.
 Pagine web: per mostrare una pagina al signore usa apri_pagina se il dispositivo lo offre.
 Occhi: se il signore ti chiede di guardare qualcosa che ha davanti («cosa sto guardando», «cos'è questo», «guarda qua», «quanto vale questo disco», «leggimi questo», «che pianta è») e il dispositivo offre guarda, di' soltanto «Guardo.» e usa guarda: la fotocamera scatta da sola e la foto ti arriva allegata al risultato. Poi rispondi in due o tre frasi a ciò che ha chiesto, come se vedessi con i tuoi occhi («Vedo…»): oggetti, piante, animali, cibo, luoghi, testi, marche, persone note. Se è un disco, segui le regole FOTO (chiedi prima: Apple Music o Discogs?). Se la foto è buia, mossa o non mostra niente di chiaro, dillo con garbo e chiedi di riprovare. Se il risultato dice che non c'è foto, il signore ha chiuso la fotocamera: non insistere. Se una foto è già allegata al messaggio del signore, non usare guarda: guarda quella.
+Memoria visiva: una foto o un giro che hai visto in questa conversazione resta davanti a te nel messaggio in cui è arrivato, anche se il signore ti ha interrotto mentre la descrivevi. Quando ti chiede altro su «la foto», «quello che hai visto», «il disco di prima», guarda quella immagine e rispondi: non dire mai che non l'hai ricevuta o che non la vedi più. Se ti eri interrotto a metà descrizione, riprendi da dove serve senza ricominciare da capo.
 Zoom degli occhi (scegli il livello dalle parole del signore): «guarda vicino», «qui davanti», «guarda» senza altro → nessuno zoom (1); «guarda lì», «lì più avanti», «un po' più in là», «a metà strada», «guarda là in fondo alla stanza» → zoom 2; «guarda lontano», «da lontano», «con lo zoom», «leggimi quel cartello», «cosa c'è scritto laggiù», «zoomma» → zoom 3; «ingrandisci al massimo», «lontanissimo», «zoom massimo» → zoom 8; «visione d'insieme», «dammi una visione d'insieme», «guarda tutta la stanza», «grandangolo», «allarga», «panoramica» → zoom 0.5. Il signore può comunque aggiustarlo con i tasti prima che scatti da solo.
 Giro con gli occhi: se il signore dice «fai un giro», «guarda in video», «riprendi», «scansiona lo scaffale», «guarda la stanza», o chiede di qualcosa che non sta in una foto sola (uno scaffale intero, una fila di dischi, il magazzino, una stanza), usa guarda con video: true. Prima di usarlo di' soltanto: «Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare.» Ti arrivano 4 fotogrammi in ordine di tempo della stessa scena vista muovendosi: mettili insieme in un'unica risposta (non descriverli uno per uno), senza contare due volte le cose che compaiono in più fotogrammi.
 
@@ -1604,6 +1605,10 @@ function immaginiValide(una: unknown, tante: unknown): string[] {
   return ok(una) ? [una as string] : [];
 }
 const bloccoImmagine = (data: string) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data } });
+// Le immagini di un messaggio, con la cache sull'ultima: se la foto torna nei turni dopo (la memoria visiva dell'app),
+// il cervello la rilegge dalla cache a circa un decimo del prezzo invece di pagarla intera ogni volta.
+const blocchiImmagine = (lista: string[]) =>
+  lista.map((d, k) => k === lista.length - 1 ? { ...bloccoImmagine(d), cache_control: { type: "ephemeral" } } : bloccoImmagine(d));
 
 function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone") {
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo
@@ -2111,9 +2116,20 @@ Deno.serve(async (req) => {
           if (ultimoAssistente?.role === "assistant" && Array.isArray(ultimoAssistente.content)) await registraAzioni(dispositivo, ultimoAssistente.content, risultati);
           lavoro.push({ role: "user", content: risultati });
         } else {
-          const storia = (Array.isArray(corpo.messaggi) ? corpo.messaggi : []).slice(-20)
-            .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string" && m.content.trim())
-            .map((m: any) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+          // la memoria visiva: la foto vista poco fa torna nel messaggio in cui era stata mandata (indice nella storia dell'app)
+          const fs = corpo.foto_storia;
+          const fotoPrima = fs && Number.isInteger(fs.indice) ? immaginiValide(null, fs.immagini) : [];
+          const grezzi: any[] = Array.isArray(corpo.messaggi) ? corpo.messaggi : [];
+          const scelti = grezzi.map((m: any, i: number) => ({ m, i })).slice(-20)
+            .filter(({ m }) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string" && m.content.trim());
+          const storia: any[] = scelti.map(({ m, i }) => {
+            const testo = m.content.slice(0, 4000);
+            if (fotoPrima.length && i === fs.indice && m.role === "user" && i !== grezzi.length - 1) {
+              return { role: "user", content: [...blocchiImmagine(fotoPrima), { type: "text", text: testo }] };
+            }
+            return { role: m.role, content: testo };
+          });
+          if (fotoPrima.length) turno.foto = fotoPrima[0];   // anche «ricorda questo» può usare la foto di prima
           while (storia.length && storia[0].role !== "user") storia.shift();
           if (!storia.length || storia.at(-1).role !== "user") { invia({ t: "errore", d: "manca il messaggio" }); ctrl.close(); return; }
           const [{ data: mem }, fatte, avvisoCr] = await Promise.all([
@@ -2132,9 +2148,9 @@ Deno.serve(async (req) => {
           if (imgs.length) turno.foto = imgs[0];
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
           storia[storia.length - 1] = imgs.length
-            ? { role: "user", content: [...imgs.map(bloccoImmagine), { type: "text", text: testoUtente + nota }] }
+            ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }
             : { role: "user", content: testoUtente };
-          lavoro = storia; modello = scegliModello(ultimo, imgs.length > 0, dispositivo); azioni = []; detto = "";
+          lavoro = storia; modello = scegliModello(ultimo, imgs.length > 0 || fotoPrima.length > 0, dispositivo); azioni = []; detto = "";
         }
 
         for (let giro = 0; giro < 10; giro++) {
