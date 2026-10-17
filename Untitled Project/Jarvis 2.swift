@@ -101,7 +101,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var compito: SFSpeechRecognitionTask?
     private var timerSilenzio: Timer?
-    private var timerTetto: Timer?         // la frase dura al massimo 20 secondi: poi è finita e JARVIS risponde subito
+    private var timerTetto: Timer?         // la frase dura al massimo un minuto (limite del riconoscimento vocale di Apple)
     private var turnoAscolto = 0           // ogni ascolto ha il suo numero: i callback di un ascolto vecchio vengono ignorati
 
     private let sintesi = AVSpeechSynthesizer()
@@ -837,7 +837,7 @@ final class Jarvis: NSObject, ObservableObject {
             compito = Jarvis.avviaRiconoscimento(riconoscitore, r) { [weak self] testo, finale, errore in
                 Task { @MainActor [weak self] in self?.aggiorna(testo: testo, finale: finale, errore: errore, ascolto: mio) }
             }
-            armaSilenzio(secondi: 20)   // tempo per iniziare a parlare
+            armaSilenzio(secondi: 5)   // tempo per iniziare a parlare
         } catch {
             avviso = "Microfono non disponibile: \(error.localizedDescription)"
             fermaAscolto(invia: false)
@@ -849,9 +849,9 @@ final class Jarvis: NSObject, ObservableObject {
         if let testo, !testo.isEmpty {
             parziale = testo
             armaSilenzio(secondi: Jarvis.pausaFineFrase(testo))
-            if timerTetto == nil {                     // il signore ha iniziato a parlare: da qui ha 20 secondi
+            if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a un minuto
                 let mio = turnoAscolto
-                timerTetto = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in
+                timerTetto = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.turnoAscolto == mio else { return }
                         self.fermaAscolto(invia: true)
@@ -869,7 +869,7 @@ final class Jarvis: NSObject, ObservableObject {
         let sospese: Set<String> = ["e", "ed", "o", "ma", "che", "perché", "poi", "di", "del", "della", "a", "al", "alla", "da",
                                     "in", "con", "per", "su", "tra", "fra", "il", "lo", "la", "i", "gli", "le", "un", "una", "uno",
                                     "mi", "ti", "ci", "se", "quando", "dove", "come", "anche", "quindi", "cioè", "tipo", "ehm", "allora"]
-        if let ultima = parole.last, sospese.contains(String(ultima)) { return 2.6 }
+        if let ultima = parole.last, sospese.contains(String(ultima)) { return 1.8 }
         return 0.8
     }
 
