@@ -180,7 +180,7 @@ final class Orecchio {
                             // voce sua e non la coda della mia; sopra la musica e la mia voce l'audio è più sporco,
                             // quindi se stiamo già parlando (fiducia di conversazione) la soglia è un po' più larga
                             try? await Task.sleep(for: .milliseconds(700))
-                            let lui = await VoceDelSignore.eLui(ultimi: 1.8, sconto: VoceDelSignore.inFiducia ? 0.08 : 0.03)
+                            let lui = await VoceDelSignore.eLui(ultimi: 1.8, sconto: VoceDelSignore.inFiducia ? 0.15 : 0.10)   // tarato dal vivo: signore 71, Matteo 59 → soglia 65
                             guard let self else { return }
                             self.controlloInCorso = false
                             guard lui == true, self.acceso, !self.inPresa, self.turno == mio else { return }
