@@ -121,7 +121,7 @@ final class Orecchio {
             ultimoTesto = testo
             // la frase è finita quando il signore tace (più a lungo se si è fermato a metà: «…e», «…perché»)
             timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(testo), repeats: false) { [weak self] _ in
+            timerSilenzio = Timer.scheduledTimer(withTimeInterval: max(1.5, Jarvis.pausaFineFrase(testo)), repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.consegna() }
             }
             if fine { consegna() }
