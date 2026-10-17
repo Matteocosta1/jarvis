@@ -1,5 +1,5 @@
 #if os(iOS)
-import AVFoundation
+@preconcurrency import AVFoundation
 import SoundAnalysis
 
 /// Capisce che aria tira intorno al signore: con il classificatore di suoni dell'iPhone (sul telefono, senza rete)
