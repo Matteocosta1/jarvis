@@ -135,6 +135,8 @@ final class Jarvis: NSObject, ObservableObject {
         "Interessante, vediamo.", "Faccio due conti.", "Arrivo, Sir.", "Elaboro, Sir.", "Un secondo e ci sono.",
         "Sto incrociando i dati.", "Mmh, vediamo un po'.", "Giusto, verifico.", "Mi lasci controllare.", "Recupero le informazioni.",
         "Ricevuto, ci penso io.", "Ah, bella questa.", "Subito, controllo.", "Un attimo che guardo.", "Bene, vediamo cosa trovo.",
+        "Ci rifletto un istante.", "Lo metto subito a fuoco.", "Dunque, vediamo.", "Sto mettendo insieme i pezzi.",
+        "Ho quasi tutto, Sir.", "Un istante, sto verificando.", "Bella domanda, ci arrivo.", "Analizzo, Sir.",
     ]
     private static var ultimoPonte = ""
     /// Una frase a caso, mai la stessa due volte di fila.
