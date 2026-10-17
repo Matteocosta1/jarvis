@@ -176,7 +176,11 @@ final class Orecchio {
                         controlloInCorso = true
                         let mio = turno
                         Task { @MainActor [weak self] in
-                            let lui = await VoceDelSignore.eLui(ultimi: 1.6)
+                            // aspetto che abbia detto qualche parola in più, così il pezzo controllato è quasi tutto
+                            // voce sua e non la coda della mia; sopra la musica e la mia voce l'audio è più sporco,
+                            // quindi se stiamo già parlando (fiducia di conversazione) la soglia è un po' più larga
+                            try? await Task.sleep(for: .milliseconds(700))
+                            let lui = await VoceDelSignore.eLui(ultimi: 1.8, sconto: VoceDelSignore.inFiducia ? 0.08 : 0.03)
                             guard let self else { return }
                             self.controlloInCorso = false
                             guard lui == true, self.acceso, !self.inPresa, self.turno == mio else { return }

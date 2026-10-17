@@ -224,14 +224,19 @@ enum VoceDelSignore {
     /// Il signore ha appena parlato con JARVIS: la conversazione è sua per i prossimi 45 secondi.
     static func rinnovaFiducia() { fiduciaFino = Date().addingTimeInterval(45) }
 
-    /// È lui? Usa gli ultimi `secondi` di microfono. Nil se non si può dire (niente impronta, pezzo troppo corto).
-    static func eLui(ultimi secondi: Double = 1.6) async -> Bool? {
+    /// È lui? Usa gli ultimi `secondi` di microfono, con uno `sconto` sulla soglia quando l'audio è sporco
+    /// (lui che parla sopra JARVIS e la musica). Nil se non si può dire (niente impronta, pezzo troppo corto).
+    static func eLui(ultimi secondi: Double = 1.6, sconto: Float = 0) async -> Bool? {
         guard let mia = impronta else { return nil }
         let pezzo = RegistroMicrofono.condiviso.ultimi(secondi)
-        let soglia = self.soglia
+        let soglia = self.soglia - sconto
         let e = await Task.detached(priority: .userInitiated) { ModelloVoce.condiviso.impronta(pezzo) }.value
         guard let e else { return nil }
-        let ok = ModelloVoce.somiglianza(e, mia) >= soglia
+        let punteggio = ModelloVoce.somiglianza(e, mia)
+        // l'ultimo controllo fatto dal vivo, per la taratura (si vede in Impostazioni › La mia voce)
+        UserDefaults.standard.set(Double(punteggio), forKey: "ultimoControlloVoce")
+        UserDefaults.standard.set(Date(), forKey: "ultimoControlloVoceQuando")
+        let ok = punteggio >= soglia
         if ok { rinnovaFiducia() }
         return ok
     }

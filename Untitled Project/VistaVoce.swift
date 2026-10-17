@@ -57,6 +57,11 @@ struct VistaLaMiaVoce: View {
                         Button("Prova: parlo io") { avvia(prova: true) }
                     }
                     if let esitoProva { Text(esitoProva).font(.callout) }
+                    if let ultimo = UserDefaults.standard.object(forKey: "ultimoControlloVoce") as? Double,
+                       let quando = UserDefaults.standard.object(forKey: "ultimoControlloVoceQuando") as? Date {
+                        Text("Ultimo controllo dal vivo: \(Int(ultimo * 100)) · \(quando.formatted(date: .omitted, time: .shortened))")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     VStack(alignment: .leading) {
                         Text("Severità: \(Int(soglia * 100))").font(.callout)
                         Slider(value: $soglia, in: 0.60...0.85, step: 0.01)
