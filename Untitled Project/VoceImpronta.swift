@@ -213,7 +213,7 @@ enum VoceDelSignore {
     static var registrata: Bool { impronta != nil }
     static var attiva: Bool { registrata && (UserDefaults.standard.object(forKey: "riconosciVoce") as? Bool ?? true) }
     /// Quanto deve somigliare per essere lui (0,60 largo … 0,85 severo).
-    static var soglia: Float { Float(UserDefaults.standard.object(forKey: "sogliaVoce") as? Double ?? 0.79) }
+    static var soglia: Float { Float(UserDefaults.standard.object(forKey: "sogliaVoce") as? Double ?? 0.80) }
 
     static var impronta: [Float]? {
         get { (UserDefaults.standard.array(forKey: chiave) as? [NSNumber])?.map { $0.floatValue } }

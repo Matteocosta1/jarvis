@@ -6,7 +6,7 @@ import AVFoundation
 /// Serve in mezzo alla confusione: JARVIS risponde alla sua voce e non a quella degli altri.
 struct VistaLaMiaVoce: View {
     @AppStorage("riconosciVoce") private var riconosci = true
-    @AppStorage("sogliaVoce") private var soglia = 0.79
+    @AppStorage("sogliaVoce") private var soglia = 0.80
     @State private var registrata = VoceDelSignore.registrata
     @State private var fase: FaseVoce = .ferma
     @State private var secondi = 0.0
