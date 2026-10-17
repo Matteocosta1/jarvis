@@ -122,6 +122,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
     private var quandoInterrotto: Date?
+    private var ultimoInvio = Date.distantPast       // quando è partita l'ultima richiesta al cervello
     private var aggiuntaInArrivo = false           // ha detto solo «aspetta, ascoltami»: la prossima frase completa la richiesta
 
     /// Frasi brevi dette subito se il cervello non ha ancora iniziato a parlare dopo un secondo: la risposta sembra istantanea.
@@ -257,7 +258,9 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         let recente = (quandoInterrotto.map { Date().timeIntervalSince($0) < 120 } ?? false)
-        let aggiunta = (chiede || aggiuntaInArrivo) && !pulito.isEmpty
+        // l'ha fermato pochi secondi dopo aver finito di parlare: non aveva finito il pensiero, è il seguito
+        let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 4
+        let aggiunta = (chiede || aggiuntaInArrivo || continua) && !pulito.isEmpty
         aggiuntaInArrivo = false
         defer { rispostaInterrotta = nil; quandoInterrotto = nil }
         guard aggiunta else { await invia(frase); return }
@@ -488,6 +491,8 @@ final class Jarvis: NSObject, ObservableObject {
         messaggi.append(risposta)
         salva()
 
+        ultimoInvio = Date()
+        richiamo.liberoFinoA = Date().addingTimeInterval(3)   // nei primi secondi può continuare a parlare senza dire «Jarvis»
         fase = .elaboro
         flussoFinito = false
         compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare, id: risposta.id) }
@@ -881,6 +886,7 @@ final class Jarvis: NSObject, ObservableObject {
 
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
+            r.addsPunctuation = true                 // il «?» aiuta a capire quando la domanda è finita
             r.contextualStrings = ["Discosizer", "Jarvis", "Discogs", "Resident Advisor", "SumUp"]
             richiesta = r
             try Jarvis.collegaMicrofono(motore.inputNode, a: r)
@@ -920,15 +926,53 @@ final class Jarvis: NSObject, ObservableObject {
         if finale || errore { fermaAscolto(invia: true) }
     }
 
-    /// Quanto silenzio aspettare prima di considerare finita la frase: di più se è appena iniziata
-    /// o se finisce a metà («…e», «…perché», «…di»), così il signore ha il tempo di pensare.
+    /// Quanto silenzio aspettare prima di considerare finita la frase, come farebbe una persona che ascolta:
+    /// non conta solo il silenzio ma cosa è stato detto.
+    /// - «che tempo fa oggi?», «sì», «apri la Sentinella»: la frase è chiusa, si risponde quasi subito;
+    /// - «oggi ero a Bari…», «allora, ti racconto…»: è un racconto, chi parla di solito continua; si aspetta di più;
+    /// - «…e», «…perché», «…ehm»: si è fermato a metà, sta pensando; si aspetta ancora di più.
     nonisolated static func pausaFineFrase(_ testo: String) -> Double {
-        let parole = testo.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
-        let sospese: Set<String> = ["e", "ed", "o", "ma", "che", "perché", "poi", "di", "del", "della", "a", "al", "alla", "da",
-                                    "in", "con", "per", "su", "tra", "fra", "il", "lo", "la", "i", "gli", "le", "un", "una", "uno",
-                                    "mi", "ti", "ci", "se", "quando", "dove", "come", "anche", "quindi", "cioè", "tipo", "ehm", "allora"]
-        if let ultima = parole.last, sospese.contains(String(ultima)) { return 1.3 }
-        return 0.8
+        let pulito = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        let basso = pulito.lowercased()
+        let parole = basso.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
+        guard let ultima = parole.last else { return 1.2 }
+        let frase = parole.joined(separator: " ")
+
+        // si è fermato a metà o sta pensando ad alta voce
+        let sospese: Set<String> = ["e", "ed", "o", "ma", "che", "perché", "poi", "di", "del", "della", "dei", "delle", "a", "al",
+                                    "alla", "ai", "da", "dal", "dalla", "in", "nel", "nella", "con", "per", "su", "sul", "tra", "fra",
+                                    "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "mi", "ti", "ci", "si", "se", "quando",
+                                    "dove", "come", "anche", "quindi", "cioè", "tipo", "ehm", "eh", "mmm", "allora", "praticamente",
+                                    "comunque", "però", "mentre", "oppure", "magari", "sono", "è", "ho", "hai", "abbiamo", "volevo",
+                                    "vorrei", "devo", "dobbiamo", "questo", "questa", "quel", "quella", "mio", "mia", "tuo", "tua"]
+        if sospese.contains(ultima) { return 2.4 }
+        if basso.hasSuffix(",") || basso.hasSuffix("…") || basso.hasSuffix("...") { return 2.0 }
+
+        // risposte brevi: «sì», «no», «ok», «va bene», «grazie»
+        let brevi: Set<String> = ["sì", "si", "no", "ok", "okay", "certo", "esatto", "grazie", "perfetto", "va bene", "giusto",
+                                  "bravo", "basta", "stop", "ferma", "avanti", "pausa", "dai", "fatto", "procedi", "vai", "confermo"]
+        if parole.count <= 3 && brevi.contains(where: { frase == $0 || frase.hasPrefix($0 + " ") }) { return 0.6 }
+
+        // domanda chiusa: il punto di domanda del riconoscimento, o una domanda breve che non resta in sospeso
+        if basso.hasSuffix("?") { return 0.7 }
+        let interrogative: Set<String> = ["che", "cosa", "cos'è", "quanto", "quanti", "quanta", "quante", "come", "dove", "quando",
+                                          "chi", "perché", "qual", "quale", "quali", "c'è", "ci", "hai", "sai", "puoi", "mi"]
+        if let prima = parole.first, interrogative.contains(prima), parole.count >= 2, parole.count <= 10 { return 0.8 }
+
+        // comandi: «apri…», «metti…», «chiama…»
+        let comandi: Set<String> = ["apri", "chiudi", "metti", "chiama", "manda", "scrivi", "accendi", "spegni", "ferma", "avvia",
+                                    "leggi", "cerca", "dimmi", "fammi", "ricordami", "imposta", "alza", "abbassa", "guarda",
+                                    "scansiona", "traduci", "attiva", "disattiva", "riproduci", "salta", "segna", "aggiungi",
+                                    "togli", "cancella", "mostrami", "trova", "calcola", "prenota", "fai"]
+        if let prima = parole.first, comandi.contains(prima), parole.count <= 10 { return 0.9 }
+
+        // racconto: chi parla sta esponendo un pensiero, di solito continua
+        let racconto = ["oggi", "ieri", "stamattina", "stasera", "allora", "ascolta", "senti", "praticamente", "sai", "comunque",
+                        "quindi", "ti volevo", "volevo", "ti racconto", "ti devo", "devo dirti", "pensavo", "secondo me", "io", "noi",
+                        "l'altro giorno", "prima"]
+        if racconto.contains(where: { frase == $0 || frase.hasPrefix($0 + " ") }) { return 1.8 }
+        if parole.count >= 15 { return 1.6 }                    // discorso lungo: pause di pensiero più probabili
+        return 1.2
     }
 
     private func armaSilenzio(secondi: Double) {

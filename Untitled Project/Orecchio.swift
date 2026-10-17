@@ -57,6 +57,7 @@ final class Orecchio {
         do {
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
+            r.addsPunctuation = true
             r.contextualStrings = ["Jarvis"]
             if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }   // niente quota Apple, niente rete
             richiesta = r

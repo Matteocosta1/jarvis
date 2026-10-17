@@ -28,6 +28,8 @@ final class Richiamo {
     private var acceso = false
     private(set) var sveglio = false     // ha sentito «Jarvis»: sta raccogliendo la frase
     private var resto = ""
+    /// Fino a quando basta parlare, senza «Jarvis»: subito dopo una richiesta il signore può aggiungere ancora qualcosa.
+    var liberoFinoA = Date.distantPast
     private var inizioSegmento = 0       // dove comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
@@ -82,6 +84,7 @@ final class Richiamo {
             try sessione.setActive(true)
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
+            r.addsPunctuation = true
             r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
             if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
             richiesta = r
@@ -151,7 +154,13 @@ final class Richiamo {
                 ultimoParziale = adesso
                 ultimaLunghezza = testo.count
                 let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
-                guard let dopo = Richiamo.dopoRichiamo(segmento) else { if fine { riavvia() }; return }
+                var trovato = Richiamo.dopoRichiamo(segmento)
+                if trovato == nil, adesso < liberoFinoA {
+                    // ha appena finito di parlare e riprende: è il seguito della frase, niente «Jarvis» necessario
+                    let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+                    if !t.isEmpty { trovato = t }
+                }
+                guard let dopo = trovato else { if fine { riavvia() }; return }
                 sveglio = true
                 resto = dopo
                 sveglia?()
