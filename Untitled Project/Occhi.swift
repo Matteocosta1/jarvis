@@ -16,6 +16,8 @@ struct Occhiata: Identifiable {
     let automatico: Bool
     var video = false
     var cucina = false
+    /// Lo zoom con cui si aprono gli Occhi: «guarda da lontano» → 3×, «guarda tutta la stanza» → 0,5×.
+    var zoom: CGFloat = 1
 }
 
 struct Occhi: View {
@@ -23,6 +25,8 @@ struct Occhi: View {
     var video = false
     /// Cucina (icona forchetta): stessa fotocamera, ma con la sua veste calda e tre richieste da scegliere.
     var cucina = false
+    /// Lo zoom di partenza (lo sceglie JARVIS dalla richiesta a voce).
+    var zoomIniziale: CGFloat = 1
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -45,6 +49,8 @@ struct Occhi: View {
     @State private var zoomInizioPizzico: CGFloat?
     @State private var preselezioni: [CGFloat] = [1]
     @State private var zoomMassimo: CGFloat = 1
+    /// L'ultimo tocco sullo zoom: in automatico lo scatto aspetta che il signore abbia finito di aggiustare.
+    @State private var ultimoTocco = Date()
     /// Cucina: 0 cosa cucino con quello che vedo, 1 che piatto è (e la ricetta), 2 valori nutrizionali.
     @AppStorage("cucinaModo") private var modoCucina = 0
     static let richiesteCucina = ["COSA CUCINO", "CHE PIATTO È", "VALORI"]
@@ -146,7 +152,7 @@ struct Occhi: View {
                         }
                     }
                 }
-                if !automatico && !video && !davanti && agganciato && (preselezioni.count > 1 || zoomMassimo > 1.05) {
+                if !video && !davanti && agganciato && (preselezioni.count > 1 || zoomMassimo > 1.05) {
                     selettoreZoom
                 }
                 if !automatico && !video {
@@ -218,6 +224,7 @@ struct Occhi: View {
             return
         }
         leggiZoom()
+        if !davanti && abs(zoomIniziale - 1) > 0.05 { imposta(zoomIniziale, animato: true) }
         agganciato = true
         Suoni.ascolto()
         if video {
@@ -225,8 +232,14 @@ struct Occhi: View {
             try? await Task.sleep(for: .milliseconds(700))     // il tempo di mettere a fuoco
             await giro()
         } else if automatico {
-            stato = "ANALISI OTTICA"
-            try? await Task.sleep(for: .milliseconds(1300))   // il tempo di mettere a fuoco
+            stato = zoom > 1.05 || zoom < 0.95 ? "ANALISI OTTICA · \(Occhi.etichetta(zoom))" : "ANALISI OTTICA"
+            ultimoTocco = Date()
+            // scatta da solo appena nessuno tocca lo zoom per un attimo (col teleobiettivo un po' di più: deve mettere a fuoco)
+            while !chiuso && !scattando {
+                try? await Task.sleep(for: .milliseconds(100))
+                let attesa = zoom > 1.5 ? 1.8 : 1.3
+                if Date().timeIntervalSince(ultimoTocco) >= attesa { break }
+            }
             scatta()
         } else {
             stato = cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI"
@@ -299,6 +312,8 @@ struct Occhi: View {
         let minimo = preselezioni.first ?? 1
         let v = min(max(valore, minimo), zoomMassimo)
         zoom = v
+        ultimoTocco = Date()
+        if automatico && !scattando { stato = "ANALISI OTTICA · \(Occhi.etichetta(v))" }
         motore.zoom(v, animato: animato)
     }
 

@@ -79,7 +79,7 @@ struct ContentView: View {
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
-            Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina) { dati in jarvis.occhiChiusi(dati) }
+            Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom) { dati in jarvis.occhiChiusi(dati) }
         }
         .fullScreenCover(item: $jarvis.interprete) { l in
             Interprete(lingua: l) { jarvis.interprete = nil }

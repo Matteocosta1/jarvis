@@ -58,7 +58,7 @@ final class Strumenti {
     /// «Jarvis, cancella la conversazione»: la chat si pulisce appena JARVIS ha finito di rispondere.
     var pulireChat = false
     /// Gli occhi di JARVIS: apre la fotocamera (automatica o manuale; foto o giro) e restituisce le foto, vuoto se chiusa.
-    var apriOcchi: ((Bool, Bool) async -> [Data])?
+    var apriOcchi: ((Bool, Bool, Double) async -> [Data])?
     /// Le foto scattate da «guarda» (una, o i fotogrammi del giro): Jarvis le allega al risultato, così il cervello le vede.
     private var fotoOcchi: [Data] = []
     /// «Jarvis, traduci in spagnolo»: la lingua dell'interprete da aprire appena JARVIS ha finito di parlare.
@@ -120,7 +120,7 @@ final class Strumenti {
             case "conversazione_pulisci":
                 pulireChat = true
                 return (json(["ok": true, "nota": "la chat sullo schermo si pulisce appena hai finito di rispondere; memoria e note restano"]), false)
-            case "guarda": return await guarda(video: (i["video"] as? Bool) ?? false)
+            case "guarda": return await guarda(video: (i["video"] as? Bool) ?? false, zoom: (i["zoom"] as? NSNumber)?.doubleValue ?? 1)
             case "interprete_avvia":
                 guard let l = Lingua.trova(i["lingua"] as? String ?? "") else {
                     return (json(["errore": "lingua non disponibile; scegli tra: \(Lingua.tutte.map(\.codice).joined(separator: ", "))"]), true)
@@ -365,9 +365,9 @@ final class Strumenti {
 
     // MARK: Occhi (fotocamera)
 
-    private func guarda(video: Bool) async -> (String, Bool) {
+    private func guarda(video: Bool, zoom: Double = 1) async -> (String, Bool) {
         guard let apri = apriOcchi else { return (json(["errore": "fotocamera non disponibile"]), true) }
-        let foto = await apri(true, video)
+        let foto = await apri(true, video, min(max(zoom, 0.5), 15))
         guard !foto.isEmpty else {
             return (json(["visto": false, "nota": "il signore ha chiuso la fotocamera o non ha dato il permesso: nessuna foto"]), false)
         }

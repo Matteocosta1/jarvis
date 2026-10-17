@@ -133,9 +133,9 @@ final class Jarvis: NSObject, ObservableObject {
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave) }
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
-        strumenti.apriOcchi = { [weak self] automatico, video in
+        strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
-            return await self.apriOcchi(automatico: automatico, video: video)
+            return await self.apriOcchi(automatico: automatico, video: video, zoom: CGFloat(zoom))
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         carica()
@@ -221,11 +221,11 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Occhi
 
     /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
-    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false) async -> [Data] {
+    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1) async -> [Data] {
         occhiChiusi([])                        // se ne era rimasta aperta una, si chiude
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c
-            occhi = Occhiata(automatico: automatico, video: video, cucina: cucina)
+            occhi = Occhiata(automatico: automatico, video: video, cucina: cucina, zoom: zoom)
         }
     }
 
