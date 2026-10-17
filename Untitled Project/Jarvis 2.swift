@@ -263,7 +263,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         let recente = (quandoInterrotto.map { Date().timeIntervalSince($0) < 120 } ?? false)
         // l'ha fermato pochi secondi dopo aver finito di parlare: non aveva finito il pensiero, è il seguito
-        let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 4
+        let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 2.5   // 2 s + il tempo che il riconoscimento impiega a sentirlo
         let aggiunta = (chiede || aggiuntaInArrivo || continua) && !pulito.isEmpty
         aggiuntaInArrivo = false
         defer { rispostaInterrotta = nil; quandoInterrotto = nil }
@@ -496,7 +496,7 @@ final class Jarvis: NSObject, ObservableObject {
         salva()
 
         ultimoInvio = Date()
-        richiamo.liberoFinoA = Date().addingTimeInterval(3)   // nei primi secondi può continuare a parlare senza dire «Jarvis»
+        richiamo.liberoFinoA = Date().addingTimeInterval(2)   // nei primi 2 secondi può continuare a parlare senza dire «Jarvis»
         fase = .elaboro
         flussoFinito = false
         compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare, id: risposta.id) }
