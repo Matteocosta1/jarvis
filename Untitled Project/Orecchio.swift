@@ -19,7 +19,9 @@ final class Orecchio {
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
     private var ultimoTesto = ""
     private var precedente = ""         // l'ultima trascrizione ricevuta
-    private var primaPresa = ""         // ciò che il signore ha già detto, se il riconoscimento è ripartito da capo
+    private var primaPresa = ""
+    private var voceConfermata = false
+    private var controlloInCorso = false         // ciò che il signore ha già detto, se il riconoscimento è ripartito da capo
     private var inizioSegmento = 0      // la trascrizione si accumula: conta solo ciò che è arrivato dopo l'ultima pausa
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
@@ -47,6 +49,7 @@ final class Orecchio {
     func ferma() {
         voluto = false
         inPresa = false
+        voceConfermata = false
         primaPresa = ""
         timerSilenzio?.invalidate()
         timerSilenzio = nil
@@ -165,8 +168,26 @@ final class Orecchio {
                 let mie = Set(Orecchio.parole(testoDetto))
                 let estranee = parole.filter { !mie.contains($0) }
                 // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
-                guard !AmbienteSonoro.condiviso.affollato,
-                      parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                if AmbienteSonoro.condiviso.affollato && !voceConfermata {
+                    // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
+                    // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
+                    if VoceDelSignore.attiva && !controlloInCorso {
+                        controlloInCorso = true
+                        let mio = turno
+                        Task { @MainActor [weak self] in
+                            let lui = await VoceDelSignore.eLui(ultimi: 1.6)
+                            guard let self else { return }
+                            self.controlloInCorso = false
+                            guard lui == true, self.acceso, !self.inPresa, self.turno == mio else { return }
+                            self.voceConfermata = true
+                            self.ultimoParziale = Date()          // nessuna «pausa» finta: la frase continua da dove era
+                            self.valuta(self.precedente, fine: false, turno: mio)
+                        }
+                    }
+                    if fine { riavvia() }
+                    return
+                }
                 inPresa = true
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
@@ -224,6 +245,7 @@ final class Orecchio {
         input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
             richiesta.append(buffer)
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
+            RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
         }
     }
 

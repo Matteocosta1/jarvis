@@ -937,6 +937,7 @@ struct ImpostazioniView: View {
                     Toggle("Interruzione a voce", isOn: $interruzioneVocale)
                     Toggle("Richiamo «Jarvis» senza toccare", isOn: $richiamo)
                     if richiamo { Toggle("Risponde a qualsiasi frase (non solo «Jarvis»)", isOn: $ascoltoSempre) }
+                    NavigationLink("La mia voce") { VistaLaMiaVoce() }
                     Toggle("Suoni dell'interfaccia", isOn: $suoni)
                     if suoni {
                         Picker("Suono delle icone all'avvio", selection: $suonoAvvio) {

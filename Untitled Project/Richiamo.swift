@@ -34,6 +34,8 @@ final class Richiamo {
     private var prima = ""              // ciò che ha già detto dopo il richiamo, prima che il riconoscimento ripartisse da capo
     private var soloDopoNome = true      // vero: conta ciò che segue «Jarvis»; falso: conta tutta la frase (seguito senza nome)
     private var corrente = ""
+    private var voceConfermata = false     // in mezzo alla confusione: l'impronta ha riconosciuto il signore
+    private var controlloInCorso = false
     private var inizioSegmento = 0       // dove comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
@@ -142,6 +144,7 @@ final class Richiamo {
         compito = nil
         acceso = false
         sveglio = false
+        voceConfermata = false
         resto = ""
     }
 
@@ -190,11 +193,22 @@ final class Richiamo {
                     // musica o TV, solo «Jarvis» e le parole di richiamo; una parola isolata
                     // conta solo se è una risposta tipo «sì», «no», «grazie», così un rumore non lo accende);
                     // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola
-                    if !t.isEmpty, adesso < liberoFinoA || (Impostazioni.ascoltoSempre && !AmbienteSonoro.condiviso.affollato && (parole.count >= 2 || breve)) {
+                    let affollato = AmbienteSonoro.condiviso.affollato
+                    if !t.isEmpty, adesso < liberoFinoA || voceConfermata
+                        || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
+                    } else if !t.isEmpty, Impostazioni.ascoltoSempre, affollato, VoceDelSignore.attiva {
+                        // in mezzo alla gente: risponde solo alla voce del signore. Se stiamo già parlando (fiducia di
+                        // conversazione) passa anche un «sì»; altrimenti si controlla l'impronta su una frase vera.
+                        if VoceDelSignore.inFiducia && (parole.count >= 2 || breve) {
+                            trovato = t; soloDopoNome = false
+                        } else if parole.count >= 2 && !controlloInCorso {
+                            controllaVoce(turno: mio)
+                        }
                     }
                 }
                 guard let dopo = trovato else { if fine { riavvia() }; return }
+                if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 sveglio = true
                 prima = ""
                 corrente = dopo
@@ -232,6 +246,20 @@ final class Richiamo {
             return
         }
         if fine { if sveglio { continuaDopoFine() } else { riavvia() } }
+    }
+
+    /// Controlla con l'impronta se chi sta parlando è il signore; se sì, lo sveglia con la frase che sta dicendo.
+    private func controllaVoce(turno mio: Int) {
+        controlloInCorso = true
+        Task { @MainActor [weak self] in
+            let lui = await VoceDelSignore.eLui(ultimi: 1.6)
+            guard let self else { return }
+            self.controlloInCorso = false
+            guard lui == true, self.acceso, !self.sveglio, self.turno == mio else { return }
+            self.voceConfermata = true
+            self.ultimoParziale = Date()          // nessuna «pausa» finta: la frase continua da dove era
+            self.valuta(self.precedente, fine: false, turno: mio)
+        }
     }
 
     /// Il riconoscimento ha chiuso il suo pezzo ma il signore potrebbe non aver finito: tengo quanto detto e riapro
@@ -298,6 +326,7 @@ final class Richiamo {
         input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
             richiesta.append(buffer)
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
+            RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
         }
     }
 
