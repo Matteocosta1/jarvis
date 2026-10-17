@@ -223,8 +223,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// Parole di richiamo all'inizio della frase: «Jarvis», «aspetta», «ascoltami»…
     /// Restituisce la frase senza richiamo e se il signore sta chiaramente completando la richiesta di prima.
     nonisolated static func togliRichiamo(_ frase: String) -> (String, Bool) {
-        let richiami = ["jarvis", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento",
-                        "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
+        let richiami = ["jarvis", "giarvis", "ehi", "hey", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
+                        "un momento", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
         let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento"]
         let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "un'altra cosa", "e anche"]
         var t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -280,22 +280,31 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Richiamo («Jarvis» in attesa)
 
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
+    /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
+    private var richiamoServe: Bool {
+        Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+    }
+
     private func aggiornaRichiamo() {
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
-        let deve = Impostazioni.richiamo && richiamoConsentito && fase == .attesa
         avvioRichiamo?.cancel()
-        guard deve else { richiamo.ferma(); return }
+        guard richiamoServe else { richiamo.ferma(); return }
         guard !richiamo.attivo else { return }
-        // un attimo di respiro: il segnale «pronto» finisce e l'audio torna alle altre app
+        // in attesa un attimo di respiro (il segnale «pronto» finisce); mentre pensa, subito
+        let ritardo = fase == .attesa ? 450 : 100
         avvioRichiamo = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(700))
-            guard let self, !Task.isCancelled, Impostazioni.richiamo, self.richiamoConsentito, self.fase == .attesa else { return }
+            try? await Task.sleep(for: .milliseconds(ritardo))
+            guard let self, !Task.isCancelled, self.richiamoServe else { return }
             self.richiamo.avvia()
         }
     }
 
     /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
     private func richiamato() {
+        if fase == .elaboro {                            // stava pensando: lo fermo, come un'interruzione
+            segnaInterruzione()
+            interrompi()
+        }
         avviso = nil
         parziale = ""
         stato = nil
@@ -310,7 +319,7 @@ final class Jarvis: NSObject, ObservableObject {
         parziale = ""
         fase = .attesa
         let testo = frase.trimmingCharacters(in: .whitespacesAndNewlines)
-        if testo.isEmpty { Task { await avviaAscolto() }; return }
+        if testo.isEmpty { return }                     // ha detto solo «Jarvis» e poi nulla: torno in attesa
         if foto == nil, eseguiComando(testo) { return }
         Task { await instrada(testo) }
     }
@@ -980,8 +989,6 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     nonisolated private static func collegaMicrofono(_ input: AVAudioInputNode, a r: SFSpeechAudioBufferRecognitionRequest) throws {
-        // elaborazione voce di iOS: toglie eco e rumore di fondo, privilegia la voce vicina al microfono
-        if !input.isVoiceProcessingEnabled { try? input.setVoiceProcessingEnabled(true) }
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])

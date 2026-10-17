@@ -28,6 +28,35 @@ final class Richiamo {
     private var acceso = false
     private(set) var sveglio = false     // ha sentito «Jarvis»: sta raccogliendo la frase
     private var resto = ""
+    private var inizioSegmento = 0       // dove comincia l'ultima frase (dopo una pausa) nella trascrizione
+    private var ultimaLunghezza = 0
+    private var ultimoParziale = Date.distantPast
+
+    /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
+    nonisolated static let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+    /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «hey, …».
+    nonisolated static let aperture = ["ascoltami", "ehi", "hey", "ei"]
+
+    /// Se nella frase c'è un richiamo, restituisce ciò che viene dopo (anche vuoto); altrimenti nil.
+    nonisolated static func dopoRichiamo(_ frase: String) -> String? {
+        let basso = frase.lowercased()
+        var migliore: Range<String.Index>?
+        for n in nomi {
+            if let r = basso.range(of: n, options: .backwards), migliore == nil || r.lowerBound > migliore!.lowerBound { migliore = r }
+        }
+        if let r = migliore {
+            // fine della parola che contiene il nome («jarvis,» → dopo la virgola)
+            var fine = r.upperBound
+            while fine < basso.endIndex, basso[fine].isLetter { fine = basso.index(after: fine) }
+            return String(basso[fine...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+        }
+        let parole = basso.split(whereSeparator: { !$0.isLetter && $0 != "'" })
+        if let prima = parole.first, aperture.contains(String(prima)) {
+            let dopo = basso[prima.endIndex...]
+            return String(dopo).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+        }
+        return nil
+    }
 
     var attivo: Bool { voluto }
 
@@ -53,7 +82,7 @@ final class Richiamo {
             try sessione.setActive(true)
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
-            r.contextualStrings = ["Jarvis"]
+            r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
             if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
             richiesta = r
             try Richiamo.collega(motore, a: r)
@@ -62,6 +91,9 @@ final class Richiamo {
             acceso = true
             sveglio = false
             resto = ""
+            inizioSegmento = 0
+            ultimaLunghezza = 0
+            ultimoParziale = .distantPast
             turno += 1
             let mio = turno
             compito = Richiamo.riconosci(riconoscitore, r) { [weak self] testo, fine in
@@ -112,23 +144,30 @@ final class Richiamo {
     private func valuta(_ testo: String?, fine: Bool, turno mio: Int) {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
-            let basso = testo.lowercased()
+            let adesso = Date()
             if !sveglio {
-                guard basso.contains("jarvis") else { if fine { riavvia() }; return }
+                // dopo una pausa comincia una frase nuova: i richiami «ascoltami», «ehi» valgono solo lì
+                if adesso.timeIntervalSince(ultimoParziale) > 1.0 { inizioSegmento = min(ultimaLunghezza, testo.count) }
+                ultimoParziale = adesso
+                ultimaLunghezza = testo.count
+                let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+                guard let dopo = Richiamo.dopoRichiamo(segmento) else { if fine { riavvia() }; return }
                 sveglio = true
+                resto = dopo
                 sveglia?()
                 // da qui ha un minuto per dire tutto
                 timerTetto = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in
                     Task { @MainActor [weak self] in self?.chiudi() }
                 }
-            }
-            // la frase dopo l'ultimo «Jarvis»
-            if let r = testo.range(of: "jarvis", options: [.caseInsensitive, .backwards]) {
-                resto = String(testo[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+            } else {
+                let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+                if let dopo = Richiamo.dopoRichiamo(segmento) { resto = dopo }
             }
             self.testo?(resto)
+            // solo «Jarvis»: gli lascio qualche secondo per iniziare la domanda; poi le solite pause
+            let attesa = resto.isEmpty ? 5.0 : Jarvis.pausaFineFrase(resto)
             timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(resto.isEmpty ? "jarvis" : resto), repeats: false) { [weak self] _ in
+            timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.chiudi() }
             }
             if fine { chiudi() }
