@@ -146,6 +146,17 @@ final class Jarvis: NSObject, ObservableObject {
         "Ci rifletto un istante.", "Lo metto subito a fuoco.", "Dunque, vediamo.", "Sto mettendo insieme i pezzi.",
         "Ho quasi tutto, Sir.", "Un istante, sto verificando.", "Bella domanda, ci arrivo.", "Analizzo, Sir.",
     ]
+    /// Le risposte brevi da persona che ha capito e sta per rispondere: dette dopo 0,4 s se il cervello di solito è veloce.
+    static let brevi = ["Mh.", "Sì.", "Allora…", "Dunque…", "Ok.", "Vediamo…", "Certo.", "Ah, sì.", "Mh, sì."]
+    private static var ultimoBreve = ""
+    static func breveCasuale() -> String {
+        let scelta = brevi.filter { $0 != ultimoBreve }.randomElement() ?? "Mh."
+        ultimoBreve = scelta
+        return scelta
+    }
+    /// Quanto ci mette di solito il cervello a dire la prima parola (media mobile, in secondi): decide quale riempitivo usare.
+    private var latenzaMedia: Double = UserDefaults.standard.object(forKey: "latenzaMedia") as? Double ?? 1.5
+    private var inizioTurno: Date?
     private static var ultimoPonte = ""
     /// Una frase a caso, mai la stessa due volte di fila.
     static func ponteCasuale() -> String {
@@ -158,7 +169,7 @@ final class Jarvis: NSObject, ObservableObject {
         super.init()
         sintesi.delegate = self
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
-        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti) }       // le frasi ponte sono già pronte in cache, a costo zero
+        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + Jarvis.brevi) }       // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave) }
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
@@ -333,8 +344,8 @@ final class Jarvis: NSObject, ObservableObject {
         parziale = ""
         stato = nil
         fase = .ascolto
-        Suoni.ascolto()
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // chiamato a voce: niente bip, come una persona che si gira ad ascoltare (vibrazione leggera e reattore acceso)
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
@@ -523,13 +534,25 @@ final class Jarvis: NSObject, ObservableObject {
     /// Se dopo un secondo il cervello non ha ancora detto nulla, JARVIS riempie l'attesa con una frase breve.
     private func armaPonte(id: UUID, testo: String) {
         compitoPonte?.cancel()
-        guard !Impostazioni.muto, testo.count > 12 else { return }     // i comandi secchi («pausa», «avanti») rispondono già in un lampo
+        inizioTurno = Date()
+        guard !Impostazioni.muto, testo.count > 6 else { return }      // «pausa», «avanti»: rispondono già in un lampo
+        // Come una persona: se di solito la risposta arriva presto, dopo 0,4 s basta un «mh», «allora…»;
+        // se il cervello è lento (o lo diventa), si riempie l'attesa con una delle frasi intere.
         compitoPonte = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(1000))
-            guard let self, !Task.isCancelled, self.fase == .elaboro, self.inCoda.isEmpty, self.bufferVoce.isEmpty,
-                  self.messaggi.first(where: { $0.id == id })?.testo.isEmpty ?? false else { return }
+            try? await Task.sleep(for: .milliseconds(400))
+            guard let self, !Task.isCancelled, self.attesaVuota(id) else { return }
+            if self.latenzaMedia < 1.6 {
+                self.dici(Jarvis.breveCasuale())
+                try? await Task.sleep(for: .milliseconds(1800))       // la risposta tarda più del solito: frase intera
+                guard !Task.isCancelled, self.attesaVuota(id) else { return }
+            }
             self.dici(Jarvis.ponteCasuale())
         }
+    }
+
+    /// Il cervello non ha ancora detto nulla e JARVIS sta zitto: c'è un vuoto da riempire.
+    private func attesaVuota(_ id: UUID) -> Bool {
+        fase == .elaboro && inCoda.isEmpty && bufferVoce.isEmpty && (messaggi.first(where: { $0.id == id })?.testo.isEmpty ?? false)
     }
 
     /// Una chiamata leggera al cervello all'avvio: Supabase si sveglia ora e la prima domanda non paga l'avvio a freddo.
@@ -746,6 +769,12 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func aggiungi(_ pezzo: String, id: UUID) {
         compitoPonte?.cancel()
+        if let t0 = inizioTurno {                       // prima parola arrivata: aggiorno la media dei tempi del cervello
+            let dt = Date().timeIntervalSince(t0)
+            latenzaMedia = latenzaMedia * 0.7 + min(dt, 8) * 0.3
+            UserDefaults.standard.set(latenzaMedia, forKey: "latenzaMedia")
+            inizioTurno = nil
+        }
         if let i = messaggi.firstIndex(where: { $0.id == id }) { messaggi[i].testo += pezzo }
         stato = nil
         accodaVoce(pezzo)
@@ -840,7 +869,7 @@ final class Jarvis: NSObject, ObservableObject {
         orecchio.testoDetto = ""
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
         fase = .attesa
-        Suoni.pronto()
+        if !Impostazioni.richiamo { Suoni.pronto() }   // col richiamo a voce si chiude come una persona: in silenzio
         Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
             try? await Task.sleep(for: .milliseconds(400))
             guard let self, self.fase == .attesa, self.inCoda.isEmpty else { return }
