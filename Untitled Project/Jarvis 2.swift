@@ -146,14 +146,6 @@ final class Jarvis: NSObject, ObservableObject {
         "Ci rifletto un istante.", "Lo metto subito a fuoco.", "Dunque, vediamo.", "Sto mettendo insieme i pezzi.",
         "Ho quasi tutto, Sir.", "Un istante, sto verificando.", "Bella domanda, ci arrivo.", "Analizzo, Sir.",
     ]
-    /// Le risposte brevi da persona che ha capito e sta per rispondere: dette dopo 0,4 s se il cervello di solito è veloce.
-    static let brevi = ["Mh.", "Sì.", "Allora…", "Dunque…", "Ok.", "Vediamo…", "Certo.", "Ah, sì.", "Mh, sì."]
-    private static var ultimoBreve = ""
-    static func breveCasuale() -> String {
-        let scelta = brevi.filter { $0 != ultimoBreve }.randomElement() ?? "Mh."
-        ultimoBreve = scelta
-        return scelta
-    }
     /// Quanto ci mette di solito il cervello a dire la prima parola (media mobile, in secondi): decide quale riempitivo usare.
     private var latenzaMedia: Double = UserDefaults.standard.object(forKey: "latenzaMedia") as? Double ?? 1.5
     private var inizioTurno: Date?
@@ -169,7 +161,7 @@ final class Jarvis: NSObject, ObservableObject {
         super.init()
         sintesi.delegate = self
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
-        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + Jarvis.brevi) }       // le frasi ponte sono già pronte in cache, a costo zero
+        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti) }       // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave) }
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
@@ -536,16 +528,12 @@ final class Jarvis: NSObject, ObservableObject {
         compitoPonte?.cancel()
         inizioTurno = Date()
         guard !Impostazioni.muto, testo.count > 6 else { return }      // «pausa», «avanti»: rispondono già in un lampo
-        // Come una persona: se di solito la risposta arriva presto, dopo 0,4 s basta un «mh», «allora…»;
-        // se il cervello è lento (o lo diventa), si riempie l'attesa con una delle frasi intere.
         compitoPonte = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(400))
+            // niente «mh» o mezze parole (suonano come un balbettio): solo frasi intere, e solo se serve davvero.
+            // Cervello di solito veloce: aspetto 1 s, spesso la risposta arriva prima. Cervello lento: parto dopo 0,4 s.
+            let ritardo = (self?.latenzaMedia ?? 1.5) < 1.6 ? 1000 : 400
+            try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.attesaVuota(id) else { return }
-            if self.latenzaMedia < 1.6 {
-                self.dici(Jarvis.breveCasuale())
-                try? await Task.sleep(for: .milliseconds(1800))       // la risposta tarda più del solito: frase intera
-                guard !Task.isCancelled, self.attesaVuota(id) else { return }
-            }
             self.dici(Jarvis.ponteCasuale())
         }
     }
