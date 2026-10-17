@@ -24,8 +24,9 @@ nonisolated final class ModelloVoce: @unchecked Sendable {
     private func carica() {
         guard let url = Bundle.main.url(forResource: "VoceModello", withExtension: "bin"),
               let dati = try? Data(contentsOf: url), dati.count > 4, dati.prefix(4) == Data("JVX1".utf8) else { return }
-        var tutti = [Float](repeating: 0, count: (dati.count - 4) / 4)
-        _ = tutti.withUnsafeMutableBytes { dati.copyBytes(to: $0, from: 4..<(4 + tutti.count * 4)) }
+        let quanti = (dati.count - 4) / 4
+        var tutti = [Float](repeating: 0, count: quanti)
+        _ = tutti.withUnsafeMutableBytes { dati.copyBytes(to: $0, from: 4..<(4 + quanti * 4)) }
         var i = 0
         func prendi(_ n: Int) -> [Float] { defer { i += n }; return Array(tutti[i..<(i + n)]) }
         mel = prendi(Self.nMel * Self.bins)
