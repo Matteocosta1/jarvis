@@ -881,6 +881,7 @@ struct ImpostazioniView: View {
     @AppStorage("idVoceCloud") private var idVoceCloud = ""
     @AppStorage("interruzioneVocale") private var interruzioneVocale = true
     @AppStorage("richiamo") private var richiamo = true
+    @AppStorage("ascoltoSempre") private var ascoltoSempre = true
     @AppStorage("suoni") private var suoni = true
     @AppStorage("suonoAvvio") private var suonoAvvio = "hud"
     @State private var parola = Portachiavi.leggi()
@@ -935,6 +936,7 @@ struct ImpostazioniView: View {
                 Section {
                     Toggle("Interruzione a voce", isOn: $interruzioneVocale)
                     Toggle("Richiamo «Jarvis» senza toccare", isOn: $richiamo)
+                    if richiamo { Toggle("Risponde a qualsiasi frase (non solo «Jarvis»)", isOn: $ascoltoSempre) }
                     Toggle("Suoni dell'interfaccia", isOn: $suoni)
                     if suoni {
                         Picker("Suono delle icone all'avvio", selection: $suonoAvvio) {

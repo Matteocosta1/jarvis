@@ -49,6 +49,8 @@ enum Impostazioni {
     static var interruzioneVocale: Bool { UserDefaults.standard.object(forKey: "interruzioneVocale") as? Bool ?? true }
     /// In attesa, con l'app aperta, basta dire «Jarvis» per parlargli: niente tocco.
     static var richiamo: Bool { UserDefaults.standard.object(forKey: "richiamo") as? Bool ?? true }
+    /// In attesa risponde a qualsiasi frase del signore, senza bisogno di «Jarvis» (spento: solo «Jarvis», «ehi», «bro»…).
+    static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? true }
 }
 
 // MARK: - Portachiavi (la parola d'ordine non sta in chiaro)

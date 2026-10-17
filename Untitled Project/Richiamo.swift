@@ -41,6 +41,8 @@ final class Richiamo {
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
     /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «bro, …», «fratello, …».
+    nonisolated static let risposteBrevi: Set<String> = ["sì", "si", "no", "ok", "okay", "grazie", "perfetto", "certo", "esatto",
+                                                         "bravo", "basta", "avanti", "pausa", "stop", "dimmi", "allora", "senti"]
     nonisolated static let aperture = ["ascoltami", "ascolta", "ehi", "hey", "ei", "bro", "fratello", "frate", "socio", "amico", "capo"]
 
     /// Se nella frase c'è un richiamo, restituisce ciò che viene dopo (anche vuoto); altrimenti nil.
@@ -180,10 +182,16 @@ final class Richiamo {
                 let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
                 var trovato = Richiamo.dopoRichiamo(segmento)
                 soloDopoNome = true
-                if trovato == nil, adesso < liberoFinoA {
-                    // ha appena finito di parlare e riprende: è il seguito della frase, niente «Jarvis» necessario
+                if trovato == nil {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
-                    if !t.isEmpty { trovato = t; soloDopoNome = false }
+                    let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
+                    let breve = parole.count == 1 && Richiamo.risposteBrevi.contains(String(parole[0]).lowercased())
+                    // ascolto sempre aperto: qualsiasi frase del signore lo sveglia, non solo «Jarvis» (una parola isolata
+                    // conta solo se è una risposta tipo «sì», «no», «grazie», così un rumore non lo accende);
+                    // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola
+                    if !t.isEmpty, adesso < liberoFinoA || (Impostazioni.ascoltoSempre && (parole.count >= 2 || breve)) {
+                        trovato = t; soloDopoNome = false
+                    }
                 }
                 guard let dopo = trovato else { if fine { riavvia() }; return }
                 sveglio = true

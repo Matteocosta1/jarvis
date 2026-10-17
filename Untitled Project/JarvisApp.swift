@@ -7,7 +7,7 @@ struct JarvisApp: App {
     @Environment(\.scenePhase) private var fase
 
     init() {
-        UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true])
+        UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true, "ascoltoSempre": true])
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
     }
 
