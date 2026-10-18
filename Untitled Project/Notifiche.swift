@@ -48,7 +48,17 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
 
     /// App aperta: la notifica si mostra lo stesso, in alto.
     func userNotificationCenter(_ centro: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        // il Tocco d'aiuto di Bea con l'app aperta: la schermata d'allarme parte subito, senza dover toccare la notifica
+        if let s = Notifiche.sos(n.request.content.userInfo) {
+            await MainActor.run { Comandi.condiviso.richiesta = .beaSOS(lat: s.lat, lon: s.lon, prova: s.prova) }
+        }
+        return [.banner, .sound]
+    }
+
+    /// La richiesta d'aiuto di Bea, se la notifica è quella.
+    nonisolated static func sos(_ info: [AnyHashable: Any]) -> (lat: Double?, lon: Double?, prova: Bool)? {
+        guard info["jarvis_azione"] as? String == "bea_sos" else { return nil }
+        return ((info["lat"] as? NSNumber)?.doubleValue, (info["lon"] as? NSNumber)?.doubleValue, (info["prova"] as? Bool) ?? false)
     }
 
     /// Tocco sulla notifica: per il briefing JARVIS lo prepara completo (con calendario e sonno); per il resto legge il testo.
@@ -56,7 +66,9 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
         let contenuto = risposta.notification.request.content
         let azione = contenuto.userInfo["jarvis_azione"] as? String
         let testo = contenuto.userInfo["jarvis_testo"] as? String ?? contenuto.body
+        let sos = Notifiche.sos(contenuto.userInfo)
         await MainActor.run {
+            if let sos { Comandi.condiviso.richiesta = .beaSOS(lat: sos.lat, lon: sos.lon, prova: sos.prova); return }
             switch azione {
             case "briefing": Comandi.condiviso.richiesta = .briefing
             case "diario": Comandi.condiviso.richiesta = .diario(testo)     // la domanda della sera: JARVIS la legge e ascolta

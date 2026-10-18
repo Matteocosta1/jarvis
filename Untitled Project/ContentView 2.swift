@@ -33,6 +33,7 @@ struct ContentView: View {
     @State private var mostraSistemi = false        // il menu SISTEMI in alto: GitHub, Supabase, Archivio
     @State private var statoSistemi: [String: String] = [:]   // la riga di stato sotto ogni voce del menu
     @State private var scheda: SchedaApp?          // le schede delle icone: Diario, Sonno, Cuore, Meteo, Spesa…
+    @State private var aiutoBea: AiutoBea?          // il Tocco d'aiuto di Bea: schermata a tutto schermo
     @Environment(\.scenePhase) private var scena
 
     /// Schermata principale in primo piano e niente aperto sopra: solo così il richiamo «Jarvis» resta in ascolto.
@@ -184,6 +185,7 @@ struct ContentView: View {
             eseguiComando()
         }
         .onChange(of: comandi.richiesta) { eseguiComando() }
+        .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
     }
@@ -229,6 +231,11 @@ struct ContentView: View {
         case .guarda:
             jarvis.interrompi()
             jarvis.guardaAutomatico()
+        case .beaSOS(let lat, let lon, let prova):
+            jarvis.interrompi()
+            scheda = nil
+            aiutoBea = AiutoBea(lat: lat, lon: lon, prova: prova)
+            jarvis.leggi(prova ? "Prova del Tocco d'aiuto di Bea, Sir: funziona." : "Sir, Bea ha chiesto aiuto. La chiami subito.")
         }
     }
 

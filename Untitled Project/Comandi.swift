@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class Comandi: ObservableObject {
     static let condiviso = Comandi()
-    enum Richiesta: Equatable { case ascolta, briefing, leggi(String), guarda, diario(String) }   // leggi: notifica da dire; guarda: occhi; diario: domanda della sera
+    enum Richiesta: Equatable { case ascolta, briefing, leggi(String), guarda, diario(String), beaSOS(lat: Double?, lon: Double?, prova: Bool) }   // beaSOS: il Tocco d'aiuto di Bea   // leggi: notifica da dire; guarda: occhi; diario: domanda della sera
     @Published var richiesta: Richiesta?
 }
 

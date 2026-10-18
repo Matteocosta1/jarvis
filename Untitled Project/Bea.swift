@@ -503,6 +503,77 @@ struct TiPenso: View {
     }
 }
 
+/// Il Tocco d'aiuto di Bea: la richiesta arrivata dal suo iPhone.
+struct AiutoBea: Identifiable {
+    let id = UUID()
+    let lat: Double?
+    let lon: Double?
+    let prova: Bool
+}
+
+/// «Bea ha bisogno di lei»: a tutto schermo, due tasti grandi. Chiamarla, e andare da lei.
+struct VistaAiutoBea: View {
+    let aiuto: AiutoBea
+    let chiudi: () -> Void
+    @AppStorage("numeroBea") private var numero = ""
+    @Environment(\.openURL) private var apriURL
+    @State private var pulsa = false
+    private let rosso = Color(red: 1.0, green: 0.27, blue: 0.32)
+
+    var body: some View {
+        ZStack {
+            Color.fondo.ignoresSafeArea()
+            RadialGradient(colors: [rosso.opacity(pulsa ? 0.35 : 0.15), .clear], center: .center, startRadius: 0, endRadius: 480)
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsa)
+            VStack(spacing: 22) {
+                Spacer()
+                Image(systemName: "link").font(.system(size: 54, weight: .medium)).foregroundStyle(rosso)
+                    .scaleEffect(pulsa ? 1.08 : 0.94)
+                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsa)
+                Text(aiuto.prova ? "PROVA" : "BEA HA BISOGNO DI LEI")
+                    .font(.system(size: 22, weight: .bold, design: .monospaced)).tracking(2)
+                    .multilineTextAlignment(.center).foregroundStyle(.white)
+                Text(aiuto.lat == nil ? "La posizione non è arrivata: la chiami subito." : "Ha chiesto aiuto adesso, da qui sotto vede dov'è.")
+                    .font(.system(size: 14)).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95)).multilineTextAlignment(.center)
+                Spacer()
+                grande("CHIAMA BEA", "phone.fill", pieno: true) {
+                    if let u = URL(string: "tel:\(Rubrica.pulisci(numero))"), !numero.isEmpty { apriURL(u) }
+                }
+                .disabled(numero.isEmpty)
+                if let lat = aiuto.lat, let lon = aiuto.lon {
+                    grande("PORTAMI DA LEI", "location.fill", pieno: false) {
+                        if let u = URL(string: "https://maps.apple.com/?daddr=\(lat),\(lon)&dirflg=d") { apriURL(u) }
+                    }
+                }
+                if numero.isEmpty {
+                    Text("Colleghi il contatto di Bea nel reparto Bea per chiamarla da qui.").font(.footnote).foregroundStyle(Color.tenue)
+                }
+                Button("Chiudi") { chiudi() }.font(.system(size: 14, design: .monospaced)).foregroundStyle(Color.tenue).padding(.top, 6)
+            }
+            .padding(24)
+        }
+        .preferredColorScheme(.dark)
+        .onAppear {
+            pulsa = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+    }
+
+    private func grande(_ titolo: String, _ icona: String, pieno: Bool, _ azione: @escaping () -> Void) -> some View {
+        Button(action: azione) {
+            Label(titolo, systemImage: icona)
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .frame(maxWidth: .infinity).frame(height: 60)
+                .foregroundStyle(pieno ? Color.fondo : rosso)
+                .background(pieno ? rosso : Color.clear)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(rosso, lineWidth: 1.2))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(StileStark())
+    }
+}
+
 /// Cosa si può segnare su Bea.
 enum TipoBea: String, CaseIterable, Identifiable {
     case gusto, non_piace, data, promessa, idea, regalo, nota
