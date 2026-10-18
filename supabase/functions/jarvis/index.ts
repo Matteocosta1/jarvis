@@ -1760,13 +1760,13 @@ const idValido = (x: unknown) => typeof x === "string" && /^[A-Za-z0-9]{10,40}$/
 // Se ElevenLabs non risponde (credito finito, chiave assente) si passa a Google Gemini, con la stessa personalità.
 let elevenSospesaFino = 0;
 
-async function voceTts(testo: string, idVoce: unknown) {
+async function voceTts(testo: string, idVoce: unknown, flusso = false) {
   const t = testo.trim().slice(0, 1500);
   if (!t) return json({ errore: "testo vuoto" }, 400);
   const errori: string[] = [];
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
   if (chiave && Date.now() >= elevenSospesaFino) {
-    const r = await voceEleven(t, idVoce, chiave);
+    const r = flusso ? await voceElevenFlusso(t, idVoce, chiave) : await voceEleven(t, idVoce, chiave);
     if (r instanceof Response) return r;
     errori.push(r.errore);
   }
@@ -1830,6 +1830,56 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
     }
     if (r.status === 400 || r.status === 422) modelloVoce = null; // modello non accettato: al prossimo giro si riprova la scelta
     // credito finito o chiave rifiutata: per 10 minuti si va dritti alla riserva, senza perdere tempo
+    if ([401, 402, 403].includes(r.status) || /quota_exceeded|credits/i.test(d)) elevenSospesaFino = Date.now() + 10 * 60_000;
+    break;
+  }
+  return { errore: ultimo };
+}
+
+// La stessa voce, ma in streaming: l'audio grezzo (PCM 16 bit, 24 kHz, mono) passa all'iPhone mentre ElevenLabs lo genera,
+// così JARVIS comincia a parlare prima che la frase sia finita di generare. Stesso modello, stesso costo per carattere.
+async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
+  const voce = idValido(idVoce) ? idVoce : (voceAttuale());
+  const modello = await scegliModelloVoce(chiave);
+  let ultimo = "";
+  for (let tentativo = 0; tentativo < 8; tentativo++) {
+    await prendiPosto(6000);
+    let r: Response;
+    try {
+      r = await fetch(`${XI}/text-to-speech/${voce}/stream?output_format=pcm_24000`, {
+        method: "POST",
+        headers: { "xi-api-key": chiave, "content-type": "application/json" },
+        body: JSON.stringify({
+          text: t, model_id: modello,
+          ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}),
+          voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 },
+        }),
+      });
+    } catch (e) {
+      inCorsoEleven--;
+      ultimo = `ElevenLabs: ${(e as Error).message}`;
+      continue;
+    }
+    if (r.ok && r.body) {
+      inSottofondo(db.from("jarvis_consumi").insert({ servizio: "voce", modello, caratteri: t.length }).then(() => {}, () => {}));
+      // il posto in fila si libera quando lo streaming è finito (o l'iPhone lo interrompe)
+      let liberato = false;
+      const libera = () => { if (!liberato) { liberato = true; inCorsoEleven--; } };
+      const passa = new TransformStream<Uint8Array, Uint8Array>({ flush() { libera(); } });
+      r.body.pipeTo(passa.writable).catch(() => {}).finally(libera);
+      return new Response(passa.readable, {
+        headers: { "content-type": "audio/pcm;rate=24000", "cache-control": "no-store", "x-modello-voce": modello },
+      });
+    }
+    inCorsoEleven--;
+    const d = await r.text().catch(() => "");
+    ultimo = `ElevenLabs ${r.status}: ${d.slice(0, 200)}`;
+    console.log(`voce ElevenLabs (streaming) non riuscita: ${r.status} ${d.slice(0, 300)}`);
+    if (r.status === 429 && /concurrent/i.test(d)) {
+      await new Promise((ok) => setTimeout(ok, 300 + tentativo * 350 + Math.random() * 600));
+      continue;
+    }
+    if (r.status === 400 || r.status === 422) modelloVoce = null;
     if ([401, 402, 403].includes(r.status) || /quota_exceeded|credits/i.test(d)) elevenSospesaFino = Date.now() + 10 * 60_000;
     break;
   }
@@ -1940,7 +1990,7 @@ Deno.serve(async (req) => {
 
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
-  if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce);   // una frase da dire con la voce di JARVIS
+  if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true);   // una frase da dire con la voce di JARVIS
   if (corpo?.voci === true) return await elencoVoci();                                      // voci disponibili sull'account ElevenLabs
   if (corpo?.github === true) {                                                             // scheda GitHub
     try { return json(await paginaGithub(corpo.repo)); } catch (e) { return json({ errore: (e as Error).message }); }
