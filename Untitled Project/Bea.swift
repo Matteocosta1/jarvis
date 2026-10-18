@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import UserNotifications
+import MapKit
 
 /// BEA: il reparto dedicato a Beatrice. Le cose che ama e quelle che non sopporta, le date che contano,
 /// le promesse che il signore le ha fatto, le idee per sorprenderla, il suo lavoro di oggi al pilates,
@@ -355,6 +356,21 @@ struct VistaBea: View {
                     Label("Ne parlo con lei", systemImage: "message").foregroundStyle(tinta)
                 }
             }
+            // il Tocco d'aiuto: il comando «Aiuto Ale» sul tasto Azione del suo iPhone
+            VStack(alignment: .leading, spacing: 6) {
+                Label("TOCCO D'AIUTO", systemImage: "bolt.fill")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
+                    .foregroundStyle(Color(red: 1.0, green: 0.27, blue: 0.32))
+                Text("Sul suo iPhone: tasto Azione › «Aiuto Ale», oppure «Ehi Siri, Aiuto Ale». Le arriva l'allarme con la sua posizione e un messaggio. Parte solo se lo fa lei.")
+                    .font(.footnote).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                if let u = dati?.ultimoAiuto {
+                    Text("Ultima richiesta d'aiuto: \(u)").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+                }
+            }
+            .padding(12)
+            .background(Color(red: 1.0, green: 0.27, blue: 0.32).opacity(0.06))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 1.0, green: 0.27, blue: 0.32).opacity(0.45), lineWidth: 0.8))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         } header: { intestazione("shield", "LA SUA SICUREZZA") }
         .listRowBackground(Color.clear)
     }
@@ -536,7 +552,18 @@ struct VistaAiutoBea: View {
                     .multilineTextAlignment(.center).foregroundStyle(.white)
                 Text(aiuto.lat == nil ? "La posizione non è arrivata: la chiami subito." : "Ha chiesto aiuto adesso, da qui sotto vede dov'è.")
                     .font(.system(size: 14)).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95)).multilineTextAlignment(.center)
-                Spacer()
+                if let lat = aiuto.lat, let lon = aiuto.lon {
+                    // dov'è adesso: la mappa con il suo punto, senza dover aprire nient'altro
+                    let punto = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                    Map(initialPosition: .region(MKCoordinateRegion(center: punto, latitudinalMeters: 700, longitudinalMeters: 700))) {
+                        Marker("Bea", systemImage: "link", coordinate: punto).tint(rosso)
+                    }
+                    .frame(maxHeight: 230)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(rosso.opacity(0.5), lineWidth: 1))
+                } else {
+                    Spacer()
+                }
                 grande("CHIAMA BEA", "phone.fill", pieno: true) {
                     if let u = URL(string: "tel:\(Rubrica.pulisci(numero))"), !numero.isEmpty { apriURL(u) }
                 }
@@ -640,6 +667,7 @@ struct DatiBea {
     let note: [Voce]
     let fatte: [Voce]
     let lavoro: Lavoro
+    let ultimoAiuto: String?        // quando Bea ha chiesto aiuto l'ultima volta (le prove non contano)
 
     private static let leggiGiorno: DateFormatter = {
         let f = DateFormatter()
@@ -686,6 +714,7 @@ struct DatiBea {
             }
         }
         lavoro = l
+        ultimoAiuto = o["ultimo_aiuto"] as? String
     }
 }
 

@@ -1633,7 +1633,10 @@ async function beaScheda() {
     .map(({ id, tipo, testo }) => ({ id, tipo, testo }));
   let lavoro: any = { collegato: false };
   try { lavoro = await beaLavoro(); } catch (e) { lavoro = { collegato: true, errore: (e as Error).message }; }
-  return { date, gusti: per("gusto"), non_piace: per("non_piace"), promesse: per("promessa"), idee: per("idea"), regali: per("regalo"),
+  // l'ultima volta che Bea ha chiesto aiuto davvero (Tocco d'aiuto), per la sezione sicurezza
+  const { data: sos } = await db.from("jarvis_bea_sos").select("creato").eq("prova", false).order("creato", { ascending: false }).limit(1);
+  const ultimo_aiuto = sos?.[0]?.creato ? fmtQuando.format(new Date(sos[0].creato)) : null;
+  return { ultimo_aiuto, date, gusti: per("gusto"), non_piace: per("non_piace"), promesse: per("promessa"), idee: per("idea"), regali: per("regalo"),
     note: per("nota"), fatte: mantenute, lavoro };
 }
 
