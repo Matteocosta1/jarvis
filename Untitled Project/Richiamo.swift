@@ -7,6 +7,8 @@ import Speech
 /// Solo «Jarvis» e poi silenzio: JARVIS apre l'ascolto normale e aspetta la domanda.
 /// Le altre voci, la musica, la TV vengono ignorate: senza «Jarvis» non succede nulla.
 /// Il riconoscimento è sull'iPhone (niente rete, niente quota Apple) e riparte da solo ogni 50 secondi.
+/// Il microfono resta sempre acceso: quando il riconoscimento riparte cambia solo il «trascrittore», senza buchi,
+/// e gli ultimi istanti di audio vengono riletti dal nuovo, così nessuna parola cade nel passaggio.
 @MainActor
 final class Richiamo {
     /// Ha sentito «Jarvis»: suono e reattore in ascolto.
@@ -19,6 +21,7 @@ final class Richiamo {
     private let motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
+    private let condotto = Condotto()
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
     private var timerSilenzio: Timer?
@@ -36,8 +39,8 @@ final class Richiamo {
     private var corrente = ""
     private var voceConfermata = false     // in mezzo alla confusione: l'impronta ha riconosciuto il signore
     private var controlloInCorso = false
-    private var inizioSegmento = 0       // dove comincia l'ultima frase (dopo una pausa) nella trascrizione
-    private var ultimaLunghezza = 0
+    private var inizioSegmento = 0       // da quale parola comincia l'ultima frase (dopo una pausa) nella trascrizione
+    private var ultimeParole = 0
     private var ultimoParziale = Date.distantPast
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
@@ -86,42 +89,18 @@ final class Richiamo {
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
         do {
-            let sessione = AVAudioSession.sharedInstance()
-            // mixWithOthers: la musica di Spotify continua; A2DP: le cuffie restano in alta qualità
-            try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
-            try sessione.setActive(true)
-            let r = SFSpeechAudioBufferRecognitionRequest()
-            r.shouldReportPartialResults = true
-            r.addsPunctuation = true
-            r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
-            if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
-            richiesta = r
-            try Richiamo.collega(motore, a: r)
-            motore.prepare()
-            try motore.start()
-            acceso = true
-            sveglio = false
-            resto = ""
-            inizioSegmento = 0
-            ultimaLunghezza = 0
-            ultimoParziale = .distantPast
-            precedente = ""
-            prima = ""
-            corrente = ""
-            soloDopoNome = true
-            turno += 1
-            let mio = turno
-            compito = Richiamo.riconosci(riconoscitore, r) { [weak self] testo, fine in
-                Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
+            if !motore.isRunning {
+                let sessione = AVAudioSession.sharedInstance()
+                // mixWithOthers: la musica di Spotify continua; A2DP: le cuffie restano in alta qualità
+                try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+                try sessione.setActive(true)
+                try Richiamo.collega(motore, condotto)
+                motore.prepare()
+                try motore.start()
             }
-            // Apple chiude ogni ascolto dopo circa un minuto: si riparte prima (ma non mentre il signore sta parlando)
-            timerRiavvio?.invalidate()
-            timerRiavvio = Timer.scheduledTimer(withTimeInterval: 50, repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    guard let self, !self.sveglio else { return }
-                    self.riavvia()
-                }
-            }
+            azzera()
+            nuovoRiconoscimento(riconoscitore, recentiDa: nil)
+            programmaRiavvio()
         } catch {
             spegni()
             // microfono occupato (un'altra app, una chiamata): riprovo fra poco
@@ -132,10 +111,56 @@ final class Richiamo {
         }
     }
 
+    /// Un trascrittore nuovo sullo stesso microfono acceso. `recentiDa`: rilegge l'audio arrivato da quel momento.
+    private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?) {
+        richiesta?.endAudio()
+        compito?.cancel()
+        let r = SFSpeechAudioBufferRecognitionRequest()
+        r.shouldReportPartialResults = true
+        r.addsPunctuation = true
+        r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
+        if ric.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
+        richiesta = r
+        turno += 1
+        let mio = turno
+        let condotto = condotto
+        compito = Richiamo.riconosci(ric, r) { [weak self] testo, fine in
+            if fine { condotto.segnaFine() }
+            Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
+        }
+        condotto.usa(r, recentiDa: recentiDa)
+        acceso = true
+    }
+
+    private func programmaRiavvio() {
+        // Apple chiude ogni ascolto dopo circa un minuto: si riparte prima (ma non mentre il signore sta parlando)
+        timerRiavvio?.invalidate()
+        timerRiavvio = Timer.scheduledTimer(withTimeInterval: 50, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.sveglio else { return }
+                self.riavvia(recentiDa: Date().addingTimeInterval(-0.8))
+            }
+        }
+    }
+
+    private func azzera() {
+        sveglio = false
+        voceConfermata = false
+        resto = ""
+        inizioSegmento = 0
+        ultimeParole = 0
+        ultimoParziale = .distantPast
+        precedente = ""
+        prima = ""
+        corrente = ""
+        soloDopoNome = true
+    }
+
     private func spegni() {
         timerRiavvio?.invalidate(); timerRiavvio = nil
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
+        condotto.usa(nil, recentiDa: nil)
         if motore.isRunning { motore.stop() }
         motore.inputNode.removeTap(onBus: 0)
         richiesta?.endAudio()
@@ -143,18 +168,49 @@ final class Richiamo {
         richiesta = nil
         compito = nil
         acceso = false
-        sveglio = false
-        voceConfermata = false
-        resto = ""
+        azzera()
     }
 
-    private func riavvia() {
+    /// Ricomincia la trascrizione senza spegnere il microfono.
+    private func riavvia(recentiDa: Date? = nil) {
         guard voluto else { return }
-        spegni()
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            self?.accendi()
+        timerRiavvio?.invalidate(); timerRiavvio = nil
+        timerSilenzio?.invalidate(); timerSilenzio = nil
+        timerTetto?.invalidate(); timerTetto = nil
+        guard motore.isRunning, let riconoscitore else {
+            spegni()
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(250))
+                self?.accendi()
+            }
+            return
         }
+        azzera()
+        nuovoRiconoscimento(riconoscitore, recentiDa: recentiDa)
+        programmaRiavvio()
+    }
+
+    /// Le parole di una trascrizione (la punteggiatura non conta).
+    nonisolated static func contaParole(_ t: String) -> Int {
+        t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).count
+    }
+
+    /// La trascrizione a partire dalla parola numero `n` (0 = tutta). Conta le parole e non le lettere:
+    /// il riconoscimento ritocca virgole e maiuscole del già detto, e un taglio a caratteri mangerebbe pezzi di parola.
+    nonisolated static func dallaParola(_ n: Int, _ testo: String) -> String {
+        guard n > 0 else { return testo }
+        var conta = 0
+        var dentro = false
+        for i in testo.indices {
+            let c = testo[i]
+            let lettera = c.isLetter || c.isNumber || c == "'"
+            if lettera && !dentro {
+                if conta == n { return String(testo[i...]) }
+                conta += 1
+            }
+            dentro = lettera
+        }
+        return ""
     }
 
     /// Il riconoscimento sull'iPhone, dopo una pausa, a volte ricomincia la trascrizione da capo invece di allungarla.
@@ -178,11 +234,12 @@ final class Richiamo {
             precedente = testo
             if !sveglio {
                 // dopo una pausa comincia una frase nuova: i richiami «ascoltami», «ehi» valgono solo lì
+                let parole = Richiamo.contaParole(testo)
                 if ripartito { inizioSegmento = 0 }
-                else if pausa > 1.0 { inizioSegmento = min(ultimaLunghezza, testo.count) }
+                else if pausa > 1.0 { inizioSegmento = min(ultimeParole, parole) }
                 ultimoParziale = adesso
-                ultimaLunghezza = testo.count
-                let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+                ultimeParole = parole
+                let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 var trovato = Richiamo.dopoRichiamo(segmento)
                 soloDopoNome = true
                 if trovato == nil {
@@ -207,7 +264,7 @@ final class Richiamo {
                         }
                     }
                 }
-                guard let dopo = trovato else { if fine { riavvia() }; return }
+                guard let dopo = trovato else { if fine { riavvia(recentiDa: condotto.ultimaFine) }; return }
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 sveglio = true
                 prima = ""
@@ -226,7 +283,7 @@ final class Richiamo {
                     inizioSegmento = 0
                     soloDopoNome = false
                 }
-                let segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
+                let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 if soloDopoNome {
                     if let dopo = Richiamo.dopoRichiamo(segmento) { corrente = dopo }
                 } else {
@@ -245,7 +302,7 @@ final class Richiamo {
             if fine { continuaDopoFine() }
             return
         }
-        if fine { if sveglio { continuaDopoFine() } else { riavvia() } }
+        if fine { if sveglio { continuaDopoFine() } else { riavvia(recentiDa: condotto.ultimaFine) } }
     }
 
     /// Controlla con l'impronta se chi sta parlando è il signore; se sì, lo sveglia con la frase che sta dicendo.
@@ -266,65 +323,49 @@ final class Richiamo {
     /// l'ascolto senza perdere nulla; sarà il silenzio (timerSilenzio) a decidere quando la frase è davvero finita.
     private func continuaDopoFine() {
         guard sveglio else { return }
+        guard motore.isRunning, let riconoscitore else { chiudi(); return }
         let detto = resto
-        let silenzio = timerSilenzio
-        let tetto = timerTetto
-        timerSilenzio = nil
-        timerTetto = nil
-        spegni()                         // azzera anche lo stato: lo ripristino subito dopo
-        sveglio = true
+        // il microfono non si ferma: cambio solo il trascrittore, e gli rileggo l'audio arrivato dopo la sua chiusura
+        nuovoRiconoscimento(riconoscitore, recentiDa: condotto.ultimaFine)
         prima = detto
         corrente = ""
         resto = detto
         soloDopoNome = false
-        timerSilenzio = silenzio
-        timerTetto = tetto
-        do {
-            let r = SFSpeechAudioBufferRecognitionRequest()
-            r.shouldReportPartialResults = true
-            r.addsPunctuation = true
-            if riconoscitore?.supportsOnDeviceRecognition == true { r.requiresOnDeviceRecognition = true }
-            richiesta = r
-            try Richiamo.collega(motore, a: r)
-            motore.prepare()
-            try motore.start()
-            acceso = true
-            precedente = ""
-            inizioSegmento = 0
-            turno += 1
-            let mio = turno
-            if let riconoscitore {
-                compito = Richiamo.riconosci(riconoscitore, r) { [weak self] testo, fine in
-                    Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
-                }
-            }
-        } catch {
-            chiudi()
-        }
+        precedente = ""
+        inizioSegmento = 0
+        ultimeParole = 0
     }
 
-    /// La frase è finita: la consegno a JARVIS e mi spengo (JARVIS mi riaccende quando torna in attesa).
+    /// La frase è finita: la consegno a JARVIS e continuo ad ascoltare con il microfono acceso, così se il signore
+    /// riprende subito a parlare («…e anche un'altra cosa») l'attacco non si perde. Se a JARVIS non servo, mi spegne lui.
     private func chiudi() {
         guard sveglio else { return }
         let frase = resto
-        voluto = false
-        spegni()
+        timerSilenzio?.invalidate(); timerSilenzio = nil
+        timerTetto?.invalidate(); timerTetto = nil
+        if voluto, motore.isRunning, let riconoscitore {
+            azzera()
+            nuovoRiconoscimento(riconoscitore, recentiDa: nil)
+            programmaRiavvio()
+        } else {
+            voluto = false
+            spegni()
+        }
         consegna?(frase)
     }
 
     // MARK: Ponti fuori dal thread principale
 
-    nonisolated private static func collega(_ motore: AVAudioEngine, a r: SFSpeechAudioBufferRecognitionRequest) throws {
+    nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto) throws {
         let input = motore.inputNode
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Richiamo", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
         }
         input.removeTap(onBus: 0)
-        nonisolated(unsafe) let richiesta = r
         let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)   // folla, musica, TV intorno?
         input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
-            richiesta.append(buffer)
+            condotto.scrivi(buffer)
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
         }
@@ -335,6 +376,49 @@ final class Richiamo {
         ric.recognitionTask(with: r) { ris, err in
             esito(ris?.bestTranscription.formattedString, (ris?.isFinal ?? false) || err != nil)
         }
+    }
+}
+
+/// Il tubo fra il microfono e il trascrittore di turno. Il microfono scrive sempre qui; il trascrittore si può cambiare
+/// in un istante, e il nuovo può rileggere l'ultimo secondo e mezzo di audio (le parole dette durante il cambio).
+nonisolated final class Condotto: @unchecked Sendable {
+    private let lock = NSLock()
+    private var richiesta: SFSpeechAudioBufferRecognitionRequest?
+    private var recenti: [(buffer: AVAudioPCMBuffer, quando: Date)] = []
+    private var fine = Date.distantPast
+
+    func scrivi(_ b: AVAudioPCMBuffer) {
+        let copia = Condotto.copia(b)
+        let adesso = Date()
+        lock.lock()
+        richiesta?.append(b)
+        if let copia { recenti.append((copia, adesso)) }
+        while let p = recenti.first, adesso.timeIntervalSince(p.quando) > 1.5 { recenti.removeFirst() }
+        lock.unlock()
+    }
+
+    /// Il trascrittore ha chiuso il suo pezzo adesso.
+    func segnaFine() { lock.lock(); fine = Date(); lock.unlock() }
+    var ultimaFine: Date { lock.lock(); defer { lock.unlock() }; return fine }
+
+    func usa(_ r: SFSpeechAudioBufferRecognitionRequest?, recentiDa: Date?) {
+        lock.lock()
+        if let r, let da = recentiDa {
+            for p in recenti where p.quando >= da { r.append(p.buffer) }
+        }
+        richiesta = r
+        lock.unlock()
+    }
+
+    private static func copia(_ b: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let sorgente = b.floatChannelData,
+              let c = AVAudioPCMBuffer(pcmFormat: b.format, frameCapacity: b.frameLength),
+              let destinazione = c.floatChannelData else { return nil }
+        c.frameLength = b.frameLength
+        for k in 0..<Int(b.format.channelCount) {
+            destinazione[k].update(from: sorgente[k], count: Int(b.frameLength))
+        }
+        return c
     }
 }
 #endif

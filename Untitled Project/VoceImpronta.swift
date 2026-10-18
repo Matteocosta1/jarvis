@@ -220,6 +220,19 @@ enum VoceDelSignore {
         set { UserDefaults.standard.set(newValue?.map { NSNumber(value: $0) }, forKey: chiave) }
     }
 
+    /// La seconda impronta, a voce bassa (quasi sussurrata): così lo riconosce anche quando parla piano.
+    static var improntaBassa: [Float]? {
+        get { (UserDefaults.standard.array(forKey: chiave + "Bassa") as? [NSNumber])?.map { $0.floatValue } }
+        set { UserDefaults.standard.set(newValue?.map { NSNumber(value: $0) }, forKey: chiave + "Bassa") }
+    }
+
+    /// Quanto somiglia alla sua voce: vale la migliore fra l'impronta normale e quella a voce bassa.
+    nonisolated static func punteggio(_ e: [Float], mia: [Float], bassa: [Float]?) -> Float {
+        let normale = ModelloVoce.somiglianza(e, mia)
+        guard let bassa else { return normale }
+        return max(normale, ModelloVoce.somiglianza(e, bassa))
+    }
+
     static var inFiducia: Bool { Date() < fiduciaFino }
     /// Il signore ha appena parlato con JARVIS: la conversazione è sua per i prossimi 45 secondi.
     static func rinnovaFiducia() { fiduciaFino = Date().addingTimeInterval(45) }
@@ -232,7 +245,7 @@ enum VoceDelSignore {
         let soglia = self.soglia - sconto
         let e = await Task.detached(priority: .userInitiated) { ModelloVoce.condiviso.impronta(pezzo) }.value
         guard let e else { return nil }
-        let punteggio = ModelloVoce.somiglianza(e, mia)
+        let punteggio = VoceDelSignore.punteggio(e, mia: mia, bassa: improntaBassa)
         // l'ultimo controllo fatto dal vivo, per la taratura (si vede in Impostazioni › La mia voce)
         UserDefaults.standard.set(Double(punteggio), forKey: "ultimoControlloVoce")
         UserDefaults.standard.set(Date(), forKey: "ultimoControlloVoceQuando")

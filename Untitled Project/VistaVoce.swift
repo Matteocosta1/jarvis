@@ -8,12 +8,21 @@ struct VistaLaMiaVoce: View {
     @AppStorage("riconosciVoce") private var riconosci = true
     @AppStorage("sogliaVoce") private var soglia = 0.80
     @State private var registrata = VoceDelSignore.registrata
+    @State private var bassaRegistrata = VoceDelSignore.improntaBassa != nil
+    @State private var aVoceBassa = false          // la registrazione in corso è quella a voce bassa
     @State private var fase: FaseVoce = .ferma
     @State private var secondi = 0.0
     @State private var esitoProva: String?
     @State private var registratore = Registratore()
 
     enum FaseVoce { case ferma, registro, calcolo, prova }
+
+    private static let frasiBasse = [
+        "Jarvis, parlo piano perché c'è gente intorno. Mi senti lo stesso?",
+        "Ricordami di richiamare Matteo appena esco da qui.",
+        "Abbassa la musica e dimmi che ore sono, per favore.",
+        "Uno, due, tre, quattro, cinque. Questa è la mia voce quando parlo piano.",
+    ]
 
     private static let frasi = [
         "Buonasera Jarvis, sono io. Oggi è stata una giornata lunga, ma il lavoro è andato bene.",
@@ -36,20 +45,39 @@ struct VistaLaMiaVoce: View {
             }
 
             Section {
-                if fase == .registro {
+                if fase == .registro && !aVoceBassa {
                     ForEach(Self.frasi, id: \.self) { Text($0).font(.callout) }
                     ProgressView(value: min(secondi, 20), total: 20) { Text("Legga ad alta voce, con calma · \(Int(secondi)) s") }
                     Button("Ho finito") { Task { await fine() } }.disabled(secondi < 8)
-                } else if fase == .calcolo {
+                } else if fase == .calcolo && !aVoceBassa {
                     HStack { ProgressView(); Text("Calcolo l'impronta…") }
                 } else {
-                    Button(registrata ? "Registra di nuovo" : "Registra la mia voce") { avvia(prova: false) }
+                    Button(registrata ? "Registra di nuovo" : "Registra la mia voce") { aVoceBassa = false; avvia(prova: false) }
+                        .disabled(fase != .ferma)
                 }
             } header: { Text("Registrazione") } footer: {
                 Text("Circa 20 secondi: legga le frasi che compaiono, con la voce di sempre, in un posto tranquillo.")
             }
 
             if registrata {
+                Section {
+                    Label(bassaRegistrata ? "Voce bassa registrata" : "Voce bassa non ancora registrata",
+                          systemImage: bassaRegistrata ? "checkmark.seal.fill" : "speaker.wave.1")
+                        .foregroundStyle(bassaRegistrata ? Color.ciano : Color.secondary)
+                    if fase == .registro && aVoceBassa {
+                        ForEach(Self.frasiBasse, id: \.self) { Text($0).font(.callout) }
+                        ProgressView(value: min(secondi, 20), total: 20) { Text("Legga a voce bassa, quasi sussurrando · \(Int(secondi)) s") }
+                        Button("Ho finito") { Task { await fine() } }.disabled(secondi < 8)
+                    } else if fase == .calcolo && aVoceBassa {
+                        HStack { ProgressView(); Text("Calcolo l'impronta…") }
+                    } else {
+                        Button(bassaRegistrata ? "Registra di nuovo la voce bassa" : "Registra la voce bassa") { aVoceBassa = true; avvia(prova: false) }
+                            .disabled(fase != .ferma)
+                    }
+                } header: { Text("Voce bassa") } footer: {
+                    Text("Facoltativa: le stesse frasi di sempre, ma a voce bassa, come quando parla piano in mezzo alla gente. Così la riconosce anche lì.")
+                }
+
                 Section {
                     if fase == .prova {
                         HStack { ProgressView(); Text("Parli per 3 secondi…") }
@@ -72,7 +100,9 @@ struct VistaLaMiaVoce: View {
                 Section {
                     Button("Cancella l'impronta", role: .destructive) {
                         VoceDelSignore.impronta = nil
+                        VoceDelSignore.improntaBassa = nil
                         registrata = false
+                        bassaRegistrata = false
                         esitoProva = nil
                     }
                 }
@@ -102,7 +132,11 @@ struct VistaLaMiaVoce: View {
         fase = .calcolo
         let audio = registratore.ferma()
         let e = await Task.detached(priority: .userInitiated) { ModelloVoce.condiviso.impronta(audio) }.value
-        if let e {
+        if let e, aVoceBassa {
+            VoceDelSignore.improntaBassa = e
+            bassaRegistrata = true
+            esitoProva = "Fatto: anche la sua voce bassa è registrata."
+        } else if let e {
             VoceDelSignore.impronta = e
             registrata = true
             esitoProva = "Fatto: la sua voce è registrata."
@@ -116,9 +150,10 @@ struct VistaLaMiaVoce: View {
         fase = .calcolo
         let audio = registratore.ferma()
         let mia = VoceDelSignore.impronta
+        let bassa = VoceDelSignore.improntaBassa
         let e = await Task.detached(priority: .userInitiated) { ModelloVoce.condiviso.impronta(audio) }.value
         if let e, let mia {
-            let s = ModelloVoce.somiglianza(e, mia)
+            let s = VoceDelSignore.punteggio(e, mia: mia, bassa: bassa)
             esitoProva = "Somiglianza \(Int(s * 100)) su 100 (soglia \(Int(soglia * 100))): " + (Double(s) >= soglia ? "è lei." : "non la riconosco.")
         } else {
             esitoProva = "Troppo corto o troppo silenzioso: riprovi."

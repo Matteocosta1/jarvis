@@ -1181,7 +1181,14 @@ nonisolated struct VoceRemota: Identifiable, Decodable, Hashable, Sendable {
 final class VoceCloud: NSObject {
     var finita: ((ObjectIdentifier) -> Void)?
 
-    private struct Pezzo { let frase: AVSpeechUtterance; let audio: Task<Data?, Never> }
+    /// L'audio di una frase: intero (dalla cache, o mp3 della voce di riserva) oppure in arrivo a pezzi (streaming).
+    private enum Sorgente { case intero(Data), flusso(AudioInArrivo) }
+    private struct Pezzo { let frase: AVSpeechUtterance; let audio: Task<Sorgente?, Never> }
+    private var flussi: [AudioInArrivo] = []      // gli streaming ancora in corso (da fermare se il signore interrompe)
+    private var motore: AVAudioEngine?             // la voce in streaming suona da qui
+    private var nodo: AVAudioPlayerNode?
+    private var formatoNodo: AVAudioFormat?
+    private var spegniMotore: Task<Void, Never>?
     private var coda: [Pezzo] = []
     private var generazione = 0              // cambia a ogni interruzione: i lavori vecchi si fermano da soli
     private var inCorso = false
@@ -1210,20 +1217,33 @@ final class VoceCloud: NSObject {
         let token = Portachiavi.leggi()
         let id = Impostazioni.idVoceCloud
         let url = URL(string: Impostazioni.indirizzo)
-        let audio = Task { [weak self] () async -> Data? in
+        let audio = Task { [weak self] () async -> Sorgente? in
             guard let url, let self else { return nil }
             // le frasi già dette una volta sono in cache: partono subito, senza rete e senza consumare credito
-            if let pronta = CacheVoce.leggi(testo, id: id) { return pronta }
+            if let pronta = CacheVoce.leggi(testo, id: id) { return .intero(pronta) }
             // al massimo 2 frasi scaricate insieme: ElevenLabs ne accetta poche in parallelo,
             // e se si esagera alcune frasi tornano con la voce dell'iPhone (voce che cambia a metà)
             while self.inDownload >= 2 && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(60)) }
             if Task.isCancelled { return nil }
             self.inDownload += 1
-            let (dati, codice) = await VoceCloud.scarica(testo, id: id, url: url, token: token)
-            self.inDownload -= 1
-            if codice == 503 || codice == 401 { self.sospesaFino = Date().addingTimeInterval(300) }
-            if let dati { CacheVoce.salva(dati, testo: testo, id: id) }
-            return dati
+            // in streaming: la voce comincia mentre ElevenLabs sta ancora generando il resto della frase
+            let a = VoceCloud.avviaFlusso(testo, id: id, url: url, token: token)
+            self.flussi.append(a)
+            Task { @MainActor [weak self] in
+                await a.attendiFine()
+                guard let self else { return }
+                self.inDownload -= 1
+                self.flussi.removeAll { $0 === a }
+                if let codice = a.codiceErrore, codice == 503 || codice == 401 { self.sospesaFino = Date().addingTimeInterval(300) }
+                if let d = a.perCache() { CacheVoce.salva(d, testo: testo, id: id) }   // la prossima volta parte dalla cache
+            }
+            switch await a.attendiInizio() {
+            case .pcm: return .flusso(a)
+            case .intero:
+                await a.attendiFine()
+                return a.riuscito ? .intero(a.tutto) : nil
+            default: return nil
+            }
         }
         coda.append(Pezzo(frase: u, audio: audio))
         if !inCorso {
@@ -1253,6 +1273,8 @@ final class VoceCloud: NSObject {
         generazione += 1
         coda.forEach { $0.audio.cancel() }
         coda.removeAll()
+        flussi.forEach { $0.annulla() }
+        nodo?.stop()
         lettore?.stop()
         lettore = nil
         riserva.stopSpeaking(at: .immediate)
@@ -1263,13 +1285,17 @@ final class VoceCloud: NSObject {
     private func ciclo(_ g: Int) async {
         while g == generazione, !coda.isEmpty {
             let p = coda.removeFirst()
-            let dati = await p.audio.value
+            let sorgente = await p.audio.value
             guard g == generazione else { return }
             let manca = prontoDa.timeIntervalSinceNow
             if manca > 0 { try? await Task.sleep(for: .milliseconds(Int(manca * 1000))) }
             guard g == generazione else { return }
             var detta = false
-            if let dati { detta = await suona(dati) }
+            switch sorgente {
+            case .intero(let dati)?: detta = await suona(dati)
+            case .flusso(let a)?: detta = await suonaFlusso(a, g)
+            case nil: break
+            }
             guard g == generazione else { return }
             if !detta {
                 _ = await leggiConRiserva(p.frase)
@@ -1277,7 +1303,140 @@ final class VoceCloud: NSObject {
             }
             finita?(ObjectIdentifier(p.frase))
         }
-        if g == generazione { inCorso = false }
+        if g == generazione {
+            inCorso = false
+            // finito di parlare: fra poco si spegne anche il motore dello streaming (l'audio torna libero)
+            spegniMotore?.cancel()
+            spegniMotore = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, !Task.isCancelled, !self.inCorso else { return }
+                self.nodo?.stop()
+                self.motore?.stop()
+            }
+        }
+    }
+
+    /// Prepara (o riprende) il motore che suona l'audio in streaming.
+    private func preparaMotore(_ frequenza: Double) -> (AVAudioEngine, AVAudioPlayerNode, AVAudioFormat)? {
+        spegniMotore?.cancel()
+        guard let formato = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: frequenza, channels: 1, interleaved: false) else { return nil }
+        if motore == nil || formatoNodo?.sampleRate != frequenza {
+            motore?.stop()
+            let m = AVAudioEngine()
+            let n = AVAudioPlayerNode()
+            m.attach(n)
+            m.connect(n, to: m.mainMixerNode, format: formato)
+            VoceCloud.seguiVolume(m)
+            motore = m; nodo = n; formatoNodo = formato
+        }
+        guard let m = motore, let n = nodo else { return nil }
+        if !m.isRunning {
+            m.prepare()
+            guard (try? m.start()) != nil else { return nil }
+        }
+        if !n.isPlaying { n.play() }
+        return (m, n, formato)
+    }
+
+    /// Suona una frase mentre arriva: parte appena c'è un filo di anticipo (0,2 s) e continua finché ElevenLabs la finisce.
+    private func suonaFlusso(_ a: AudioInArrivo, _ g: Int) async -> Bool {
+        guard case .pcm(let frequenza) = a.stato else { return false }
+        let anticipo = Int(frequenza * 2 * 0.2)               // byte: 16 bit per campione
+        let limite = Date().addingTimeInterval(10)
+        while g == generazione, !a.finito, a.quanti < anticipo, Date() < limite {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard g == generazione else { return true }
+        guard a.quanti >= 2, let pronto = preparaMotore(frequenza) else { return false }
+        let (m, n, formato) = pronto
+        let suonati = Contatore()
+        var letti = 0, programmati = 0
+        var campioni = 0
+        let inizio = Date()
+        while g == generazione {
+            let (nuovi, finito) = a.leggi(da: letti)
+            let utili = nuovi.count & ~1
+            if utili > 0, let b = VoceCloud.buffer(nuovi.prefix(utili), formato) {
+                VoceCloud.programma(n, b, suonati)
+                programmati += 1
+                campioni += Int(b.frameLength)
+                letti += utili
+            }
+            if !m.isRunning {                                   // l'audio dell'iPhone si è riassestato: riparto
+                m.prepare()
+                try? m.start()
+                n.play()
+            }
+            if finito && a.quanti - letti < 2 {
+                // tutto programmato: aspetto che finisca di suonare (con un tetto, se l'audio si fosse inceppato)
+                let durata = Double(campioni) / frequenza
+                if suonati.valore >= programmati || Date().timeIntervalSince(inizio) > durata + 1.5 { break }
+            }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return true
+    }
+
+    nonisolated private static func seguiVolume(_ m: AVAudioEngine) {
+        m.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { b, _ in Volume.voce.misura(b) }   // il reattore segue la voce
+    }
+
+    nonisolated private static func programma(_ n: AVAudioPlayerNode, _ b: AVAudioPCMBuffer, _ c: Contatore) {
+        n.scheduleBuffer(b, completionCallbackType: .dataPlayedBack) { _ in c.aggiungi() }
+    }
+
+    /// PCM 16 bit little-endian → campioni float per il motore audio.
+    nonisolated private static func buffer(_ d: Data, _ formato: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let quanti = d.count / 2
+        guard quanti > 0, let b = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: AVAudioFrameCount(quanti)),
+              let dst = b.floatChannelData?[0] else { return nil }
+        b.frameLength = AVAudioFrameCount(quanti)
+        d.withUnsafeBytes { raw in
+            for i in 0..<quanti { dst[i] = Float(Int16(littleEndian: raw.loadUnaligned(fromByteOffset: i * 2, as: Int16.self))) / 32768 }
+        }
+        return b
+    }
+
+    /// Avvia lo streaming di una frase: la richiesta parte subito, l'audio si accumula in `AudioInArrivo` mentre arriva.
+    nonisolated static func avviaFlusso(_ testo: String, id: String, url: URL, token: String) -> AudioInArrivo {
+        let a = AudioInArrivo()
+        let lavoro = Task.detached(priority: .userInitiated) {
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 15
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+            var corpo: [String: Any] = ["voce": testo, "flusso": true]
+            if !id.isEmpty { corpo["id_voce"] = id }
+            req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
+            do {
+                let (byte, r) = try await URLSession.shared.bytes(for: req)
+                let http = r as? HTTPURLResponse
+                let codice = http?.statusCode ?? 0
+                let tipo = http?.value(forHTTPHeaderField: "Content-Type") ?? ""
+                guard codice == 200, tipo.contains("audio") else { a.inizia(.errore(codice)); a.chiudi(ok: false); return }
+                if tipo.contains("pcm") {
+                    let frequenza = tipo.range(of: #"rate=(\d+)"#, options: .regularExpression)
+                        .flatMap { Double(tipo[$0].dropFirst(5)) } ?? 24_000
+                    a.inizia(.pcm(frequenza))
+                } else {
+                    a.inizia(.intero)                        // voce di riserva (mp3): arriva intera
+                }
+                var pezzo = Data()
+                pezzo.reserveCapacity(4800)
+                for try await x in byte {
+                    pezzo.append(x)
+                    if pezzo.count >= 4800 { a.aggiungi(pezzo); pezzo.removeAll(keepingCapacity: true) }   // 0,1 s di voce
+                }
+                if !pezzo.isEmpty { a.aggiungi(pezzo) }
+                a.chiudi(ok: true)
+            } catch {
+                a.inizia(.errore(0))
+                a.chiudi(ok: false)
+            }
+        }
+        a.lavoro = lavoro
+        return a
     }
 
     private func suona(_ dati: Data) async -> Bool {
@@ -1347,6 +1506,92 @@ final class VoceCloud: NSObject {
               let r = try? JSONDecoder().decode(Risposta.self, from: d), r.attiva else { return nil }
         return r.voci
     }
+}
+
+/// L'audio di una frase in streaming: cresce mentre arriva; chi suona lo legge a pezzi.
+nonisolated final class AudioInArrivo: @unchecked Sendable {
+    enum Stato { case attesa, pcm(Double), intero, errore(Int) }
+    private let lock = NSLock()
+    private var _stato = Stato.attesa
+    private var dati = Data()
+    private var _finito = false
+    private var _riuscito = false
+    private var _lavoro: Task<Void, Never>?
+
+    var lavoro: Task<Void, Never>? {
+        get { lock.lock(); defer { lock.unlock() }; return _lavoro }
+        set { lock.lock(); _lavoro = newValue; lock.unlock() }
+    }
+    var stato: Stato { lock.lock(); defer { lock.unlock() }; return _stato }
+    var finito: Bool { lock.lock(); defer { lock.unlock() }; return _finito }
+    var riuscito: Bool { lock.lock(); defer { lock.unlock() }; return _riuscito }
+    var quanti: Int { lock.lock(); defer { lock.unlock() }; return dati.count }
+    var tutto: Data { lock.lock(); defer { lock.unlock() }; return dati }
+    var codiceErrore: Int? { if case .errore(let c) = stato { return c }; return nil }
+
+    func inizia(_ s: Stato) {
+        lock.lock()
+        if case .attesa = _stato { _stato = s }
+        lock.unlock()
+    }
+    func aggiungi(_ d: Data) { lock.lock(); dati.append(d); lock.unlock() }
+    func chiudi(ok: Bool) {
+        lock.lock()
+        if case .attesa = _stato { _stato = .errore(0) }
+        _riuscito = ok && !dati.isEmpty
+        _finito = true
+        lock.unlock()
+    }
+    func annulla() { lavoro?.cancel() }
+
+    /// I byte arrivati dopo `da`, e se la frase è finita.
+    func leggi(da: Int) -> (Data, Bool) {
+        lock.lock(); defer { lock.unlock() }
+        return (da < dati.count ? dati.subdata(in: da..<dati.count) : Data(), _finito)
+    }
+
+    func attendiInizio() async -> Stato {
+        while true {
+            let s = stato
+            if case .attesa = s, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(15)); continue }
+            return s
+        }
+    }
+
+    func attendiFine() async {
+        while !finito { try? await Task.sleep(for: .milliseconds(50)) }
+    }
+
+    /// Da salvare in cache, se è arrivata tutta: il PCM diventa un WAV (lo legge AVAudioPlayer come gli mp3).
+    func perCache() -> Data? {
+        guard riuscito else { return nil }
+        switch stato {
+        case .intero: return tutto
+        case .pcm(let f): return AudioInArrivo.wav(tutto, frequenza: Int(f))
+        default: return nil
+        }
+    }
+
+    static func wav(_ pcm: Data, frequenza: Int) -> Data {
+        var d = Data()
+        func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+        func u16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+        d.append(contentsOf: Array("RIFF".utf8)); u32(UInt32(36 + pcm.count))
+        d.append(contentsOf: Array("WAVE".utf8))
+        d.append(contentsOf: Array("fmt ".utf8)); u32(16); u16(1); u16(1)
+        u32(UInt32(frequenza)); u32(UInt32(frequenza * 2)); u16(2); u16(16)
+        d.append(contentsOf: Array("data".utf8)); u32(UInt32(pcm.count))
+        d.append(pcm)
+        return d
+    }
+}
+
+/// Un contatore da usare dal thread audio.
+nonisolated final class Contatore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func aggiungi() { lock.lock(); n += 1; lock.unlock() }
+    var valore: Int { lock.lock(); defer { lock.unlock() }; return n }
 }
 
 /// La cache delle frasi già pronunciate: un file audio per frase (e per voce), nella cartella Caches dell'app.
