@@ -43,11 +43,20 @@ Deno.serve(async (req) => {
   const segreto = Deno.env.get("BEA_SOS_CHIAVE") ?? "";
   if (!segreto || !uguali(req.headers.get("x-bea-chiave") ?? "", segreto)) return json({ errore: "non autorizzato" }, 401);
 
-  let c: any = {};
-  try { c = await req.json(); } catch { /* corpo vuoto: l'aiuto parte lo stesso, senza posizione */ }
+  let grezzo: any = {};
+  try { grezzo = await req.json(); } catch { /* corpo vuoto: l'aiuto parte lo stesso, senza posizione */ }
+  // il Comando rapido lo scrive una persona dal telefono: la tastiera mette maiuscole, spazi, «Ion» al posto di «lon».
+  // Le chiavi si leggono senza badare a maiuscole e spazi.
+  const c: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(grezzo ?? {})) {
+    let chiave = k.trim().toLowerCase().replace(/\s+/g, "");
+    if (chiave === "ion" || chiave === "long" || chiave === "lng" || chiave.startsWith("longit")) chiave = "lon";
+    if (chiave.startsWith("latit")) chiave = "lat";
+    c[chiave] = v;
+  }
   const numero = (x: unknown) => { const v = Number(String(x ?? "").replace(",", ".")); return Number.isFinite(v) && v !== 0 ? v : null; };
   const lat = numero(c.lat), lon = numero(c.lon);
-  const prova = c.prova === true || c.prova === "true";
+  const prova = c.prova === true || c.prova === 1 || /^(true|vero|s[iì]|1)$/i.test(String(c.prova ?? "").trim());
 
   const titolo = prova ? "Prova · Bea ha bisogno di lei" : "Bea ha bisogno di lei";
   const testo = prova
