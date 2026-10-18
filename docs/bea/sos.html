@@ -1,0 +1,106 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--c:#4fe3ff;--c2:#0aa6ca;--f:#05080a;--t:#4d666f;--r:#ff4552;--p:#cfe8f2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0b0f12;font-family:-apple-system,"SF Pro Text",Helvetica,Arial,sans-serif;color:#fff;width:1720px;padding:36px 30px}
+.mono{font-family:"SF Mono",Menlo,monospace}
+.row{display:flex;gap:30px;align-items:flex-start;justify-content:center}
+.step{display:flex;flex-direction:column;align-items:center;gap:14px;width:300px}
+.n{font-size:11px;letter-spacing:3px;color:var(--c)}
+.lab{font-size:11.5px;color:#7f97a0;text-align:center;line-height:1.5;max-width:290px}
+.phone{width:290px;height:610px;border-radius:44px;border:9px solid #1b2226;overflow:hidden;position:relative;background:var(--f)}
+.arrow{color:var(--c);font-size:26px;margin-top:290px;opacity:.6}
+/* 1 Bea phone */
+.lock{background:linear-gradient(160deg,#2a2f45,#141824);height:100%;display:flex;flex-direction:column;align-items:center;padding-top:60px}
+.time{font-size:62px;font-weight:300}
+.date{font-size:14px;opacity:.8}
+.sc{margin-top:auto;margin-bottom:40px;width:240px;border-radius:22px;background:rgba(40,40,48,.85);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.sc .ico{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#ff5f8a,#7a5cff);display:flex;align-items:center;justify-content:center}
+.btn{position:absolute;left:-13px;top:118px;width:5px;height:34px;background:#ff8a3d;border-radius:2px;box-shadow:0 0 14px #ff8a3d}
+.hold{position:absolute;left:4px;top:105px;font-size:9px;color:#ff8a3d;letter-spacing:1px}
+/* 2 notification */
+.lock2{background:linear-gradient(160deg,#0d1a22,#05080a);height:100%;display:flex;flex-direction:column;align-items:center;padding-top:60px}
+.notif{width:262px;margin-top:40px;border-radius:20px;background:rgba(30,36,40,.92);padding:12px 14px;border:1px solid rgba(255,69,82,.5);box-shadow:0 0 22px rgba(255,69,82,.25)}
+.nh{display:flex;align-items:center;gap:8px;font-size:11px;opacity:.75}
+.nh .a{width:20px;height:20px;border-radius:5px;background:#05080a;border:1px solid var(--c);display:flex;align-items:center;justify-content:center}
+.nt{font-weight:600;font-size:14px;margin-top:6px}
+.nb{font-size:12.5px;opacity:.85;margin-top:2px}
+.ts{font-size:9px;color:#ffb0b6;margin-top:6px;letter-spacing:1px}
+/* 3 alert */
+.alert{height:100%;background:radial-gradient(circle at 50% 40%,rgba(255,69,82,.35),transparent 60%),var(--f);display:flex;flex-direction:column;align-items:center;padding:70px 20px 26px;gap:14px}
+.alert h2{font-size:18px;letter-spacing:2px;text-align:center}
+.alert p{font-size:12px;color:var(--p);text-align:center}
+.map{width:100%;height:150px;border-radius:14px;margin-top:6px;background:
+ linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px) 0 0/22px 22px,
+ linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px) 0 0/22px 22px,#0f171c;position:relative;border:1px solid rgba(255,69,82,.35)}
+.map .road{position:absolute;height:6px;background:#26333a;border-radius:3px}
+.pin{position:absolute;left:62%;top:38%;width:16px;height:16px;border-radius:50%;background:var(--r);box-shadow:0 0 0 8px rgba(255,69,82,.25),0 0 0 18px rgba(255,69,82,.12)}
+.big{width:100%;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:1px}
+.full{background:var(--r);color:var(--f)}.out{border:1.2px solid var(--r);color:var(--r)}
+.close{font-size:12px;color:var(--t);margin-top:2px}
+/* 4 watch */
+.watch{width:184px;height:224px;border-radius:46px;border:9px solid #1b2226;background:#000;padding:22px 14px;margin-top:70px;box-shadow:0 0 0 2px #2a3236}
+.watch .w1{font-size:10px;color:var(--c);letter-spacing:1px}
+.watch .w2{font-size:15px;font-weight:600;margin-top:8px;color:#fff}
+.watch .w3{font-size:11px;color:#c9d6db;margin-top:6px}
+.watch .w4{margin-top:14px;height:34px;border-radius:17px;background:#2a2a2e;display:flex;align-items:center;justify-content:center;font-size:12px}
+/* 5 section */
+.sec{width:290px;border-radius:44px;border:9px solid #1b2226;background:var(--f);padding:58px 16px 20px;height:610px}
+.h{font-size:10px;letter-spacing:1.5px;color:var(--c);font-weight:600;margin:4px 4px 10px}
+.txt{font-size:12px;color:var(--p);line-height:1.5;margin-bottom:12px}
+.it{display:flex;gap:10px;font-size:12px;line-height:1.45;margin-bottom:12px}
+.it .i{color:var(--c);width:20px;flex:none;font-size:15px}
+.cta{color:var(--c);font-size:13px;margin-top:6px}
+.sos{margin-top:16px;border:1px solid rgba(255,69,82,.45);border-radius:14px;padding:12px;background:rgba(255,69,82,.06)}
+.sos .t{font-size:10px;letter-spacing:1.5px;color:var(--r);font-weight:600}
+.sos .d{font-size:11.5px;color:var(--p);margin-top:6px;line-height:1.45}
+.title{text-align:center;font-size:13px;letter-spacing:5px;color:var(--c);margin-bottom:26px}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M10.6 13.4a4 4 0 0 0 5.66 0l3.18-3.18a4 4 0 0 0-5.66-5.66l-1.4 1.4"/><path d="M13.4 10.6a4 4 0 0 0-5.66 0l-3.18 3.18a4 4 0 0 0 5.66 5.66l1.4-1.4"/></g></symbol></defs></svg>
+<div class="title mono">REPARTO BEA · PROTEZIONE</div>
+<div class="row">
+ <div class="step"><div class="n mono">1 · IPHONE DI BEA</div>
+  <div class="phone"><div class="btn"></div><div class="hold mono">TIENI<br>PREMUTO</div>
+   <div class="lock"><div class="time">23:41</div><div class="date">sabato 24 ottobre</div>
+    <div class="sc"><div class="ico">⚡</div><div><div style="font-size:13px;font-weight:600">Aiuto Ale</div><div style="font-size:11px;opacity:.7">Invio in corso…</div></div></div></div></div>
+  <div class="lab">Bea tiene premuto il tasto Azione (o «Ehi Siri, Aiuto Ale»). Parte solo se lo fa lei.</div></div>
+ <div class="arrow">→</div>
+ <div class="step"><div class="n mono">2 · IL SUO IPHONE</div>
+  <div class="phone"><div class="lock2"><div class="time">23:41</div><div class="date">sabato 24 ottobre</div>
+   <div class="notif"><div class="nh"><div class="a" style="color:var(--c)"><svg width="12" height="12"><use href="#link"/></svg></div><span class="mono">JARVIS</span><span style="margin-left:auto">ora</span></div>
+    <div class="nt">Bea ha bisogno di lei</div><div class="nb">Bea ha chiesto aiuto adesso: tocchi per vedere dov'è e chiamarla.</div><div class="ts mono">⚑ SENSIBILE AL TEMPO</div></div>
+   <div class="notif" style="border-color:rgba(255,255,255,.1);box-shadow:none;margin-top:10px"><div class="nh"><span>💬 Messaggi</span><span style="margin-left:auto">ora</span></div><div class="nt">Bea</div><div class="nb">Ho bisogno di te 📍 Posizione</div></div>
+  </div></div>
+  <div class="lab">Arriva anche con «Non disturbare». In più, il messaggio di riserva con la posizione.</div></div>
+ <div class="arrow">→</div>
+ <div class="step"><div class="n mono">3 · JARVIS, A TUTTO SCHERMO</div>
+  <div class="phone"><div class="alert">
+   <div style="color:var(--r)"><svg width="46" height="46"><use href="#link"/></svg></div>
+   <h2 class="mono">BEA HA BISOGNO<br>DI LEI</h2><p>Ha chiesto aiuto adesso, da qui sotto vede dov'è.</p>
+   <div class="map"><div class="road" style="left:0;right:0;top:60px"></div><div class="road" style="top:0;bottom:0;left:120px;width:6px;height:auto"></div><div class="road" style="left:40px;right:0;top:110px"></div><div class="pin"></div></div>
+   <div class="big full mono">📞 CHIAMA BEA</div><div class="big out mono">➤ PORTAMI DA LEI</div><div class="close mono">Chiudi</div>
+  </div></div>
+  <div class="lab">JARVIS lo dice anche a voce: «Sir, Bea ha chiesto aiuto. La chiami subito.»</div></div>
+ <div class="step" style="width:200px"><div class="n mono">4 · AL POLSO</div>
+  <div class="watch"><div class="w1 mono">JARVIS · ORA</div><div class="w2">Bea ha bisogno di lei</div><div class="w3">Ha chiesto aiuto adesso: la chiami subito.</div><div class="w4">Ignora</div></div>
+  <div class="lab" style="margin-top:20px">L'orologio vibra con la stessa notifica.</div></div>
+</div>
+<div class="row" style="margin-top:40px">
+ <div class="step" style="width:300px"><div class="n mono">5 · NEL REPARTO BEA</div>
+  <div class="sec"><div class="h mono">🛡 LA SUA SICUREZZA</div>
+   <div class="txt">Proteggerla vuol dire esserci, non controllarla. Sul telefono di Bea ci sono tre strumenti che sceglie lei:</div>
+   <div class="it"><span class="i">✓</span><span><b>Check In</b> — in Messaggi, nella vostra chat › + › Check In. Quando torna a casa la sera.</span></div>
+   <div class="it"><span class="i">◎</span><span><b>Dov'è</b> — condivide la posizione solo se lo decide lei.</span></div>
+   <div class="it"><span class="i">⚕</span><span><b>SOS emergenze</b> — lei come contatto: il 112 e un SMS con la posizione a lei.</span></div>
+   <div class="cta">💬 Ne parlo con lei</div>
+   <div class="sos"><div class="t mono">⚡ TOCCO D'AIUTO</div><div class="d">Da configurare insieme sul suo iPhone: tasto Azione → «Aiuto Ale». Ogni richiesta resta registrata.</div></div>
+  </div></div>
+ <div class="step" style="width:620px;align-items:flex-start;margin-top:40px">
+  <div class="n mono">LE TRE PROTEZIONI, IN BREVE</div>
+  <div class="lab" style="text-align:left;max-width:600px;font-size:13px;color:#c3d3d9;line-height:1.8">
+   <b style="color:var(--r)">Tocco d'aiuto</b> · lei tiene premuto il tasto Azione → a lei arriva l'allarme JARVIS con la posizione, la chiamata a un tocco e la strada per raggiungerla, più un messaggio di riserva.<br><br>
+   <b style="color:var(--c)">Check In</b> · quando torna a casa la sera: se non arriva, a lei arriva un avviso con la posizione.<br><br>
+   <b style="color:var(--c)">SOS emergenze</b> · tasto laterale + volume: chiama il 112 e manda a lei la posizione.<br><br>
+   <span style="color:var(--t)">Tutto si attiva dal telefono di Bea e lo sceglie lei: JARVIS non la segue e non legge il suo telefono.</span></div></div>
+</div>
+</body></html>
