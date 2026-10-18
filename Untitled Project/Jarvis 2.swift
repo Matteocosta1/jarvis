@@ -1241,6 +1241,7 @@ final class VoceCloud: NSObject {
             case .pcm: return .flusso(a)
             case .intero:
                 await a.attendiFine()
+                if Task.isCancelled { return nil }
                 return a.riuscito ? .intero(a.tutto) : nil
             default: return nil
             }
@@ -1364,8 +1365,7 @@ final class VoceCloud: NSObject {
             }
             if !m.isRunning {                                   // l'audio dell'iPhone si è riassestato: riparto
                 m.prepare()
-                try? m.start()
-                n.play()
+                if (try? m.start()) != nil { n.play() }
             }
             if finito && a.quanti - letti < 2 {
                 // tutto programmato: aspetto che finisca di suonare (con un tetto, se l'audio si fosse inceppato)
@@ -1559,7 +1559,7 @@ nonisolated final class AudioInArrivo: @unchecked Sendable {
     }
 
     func attendiFine() async {
-        while !finito { try? await Task.sleep(for: .milliseconds(50)) }
+        while !finito && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(50)) }
     }
 
     /// Da salvare in cache, se è arrivata tutta: il PCM diventa un WAV (lo legge AVAudioPlayer come gli mp3).

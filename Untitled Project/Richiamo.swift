@@ -22,6 +22,7 @@ final class Richiamo {
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private let condotto = Condotto()
+    private var ultimoAvvio = Date.distantPast
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
     private var timerSilenzio: Timer?
@@ -113,8 +114,8 @@ final class Richiamo {
 
     /// Un trascrittore nuovo sullo stesso microfono acceso. `recentiDa`: rilegge l'audio arrivato da quel momento.
     private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?) {
-        richiesta?.endAudio()
-        compito?.cancel()
+        let vecchia = richiesta, vecchio = compito
+        ultimoAvvio = Date()
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
@@ -128,7 +129,9 @@ final class Richiamo {
             if fine { condotto.segnaFine() }
             Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
         }
-        condotto.usa(r, recentiDa: recentiDa)
+        condotto.usa(r, recentiDa: recentiDa)       // prima il nuovo trascrittore, poi chiudo il vecchio: nessun buco
+        vecchia?.endAudio()
+        vecchio?.cancel()
         acceso = true
     }
 
@@ -182,6 +185,15 @@ final class Richiamo {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
                 self?.accendi()
+            }
+            return
+        }
+        // il riconoscimento si è chiuso appena partito (un errore): non riparto a raffica, aspetto un attimo
+        if Date().timeIntervalSince(ultimoAvvio) < 0.5 {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard let self, self.voluto, !self.sveglio else { return }
+                self.riavvia(recentiDa: recentiDa)
             }
             return
         }
