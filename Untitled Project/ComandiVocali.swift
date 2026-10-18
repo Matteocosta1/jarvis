@@ -9,7 +9,7 @@ enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi
     case sentinella, occhi, giro, profiler, wiretap, cucina, scanner
     // le schede della corona
-    case diario, sonno, cuore, vitals, confidente, allenatore
+    case diario, sonno, cuore, vitals, confidente, allenatore, bea
     case briefing, meteo, email, spesa
     case shazam, foto
     case ricordi, interprete, browser, serata, messaggi, telefono
@@ -33,6 +33,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .vitals: return "Vitals, Sir."
         case .confidente: return "Confidente. La ascolto, Sir."
         case .allenatore: return "Allenatore pronto, Sir."
+        case .bea: return "Bea, Sir."
         case .briefing: return "Il briefing, Sir."
         case .meteo: return "Il meteo, Sir."
         case .email: return "La posta, Sir."
@@ -94,7 +95,7 @@ enum ComandoVocale: Equatable {
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [
             (.diario, [" diario "]), (.sonno, [" sonno ", " dormito "]), (.cuore, [" cuore ", " battito "]), (.vitals, [" vitals ", " vitali ", " parametri "]),
-            (.confidente, [" confidente "]), (.allenatore, [" allenatore ", " allenamento "]), (.briefing, [" briefing ", " brifing "]),
+            (.confidente, [" confidente "]), (.bea, [" reparto bea ", " scheda di bea ", " sezione bea "]), (.allenatore, [" allenatore ", " allenamento "]), (.briefing, [" briefing ", " brifing "]),
             (.meteo, [" meteo ", " tempo "]), (.email, [" email ", " mail ", " posta "]), (.spesa, [" spesa "]),
             (.shazam, [" shazam "]), (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi "]),
             (.interprete, [" interprete ", " traduttore "]), (.browser, [" browser ", " internet ", " navigatore "]), (.serata, [" serata "]),
@@ -102,6 +103,10 @@ enum ComandoVocale: Equatable {
             (.github, [" github ", " git hub ", " ghitab ", " repository ", " cantiere "]), (.supabase, [" supabase ", " supa base ", " sala macchine ", " database "]),
             (.archivio, [" archivio ", " cloud ", " disco rigido "]),
         ]
+        // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
+        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra"].contains($0) }) {
+            return .apri(.bea)
+        }
         let mostra = comanda || t.contains(where: { ["mostra", "mostrami", "vedere", "vediamo", "guardiamo", "controlla", "controlliamo"].contains($0) })
         if mostra {
             for (reparto, chiavi) in schede where chiavi.contains(where: c) { return .apri(reparto) }

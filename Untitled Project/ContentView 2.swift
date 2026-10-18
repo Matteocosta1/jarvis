@@ -3,7 +3,7 @@ import AVFoundation
 
 /// Le schede delle icone della corona.
 enum SchedaApp: String, Identifiable {
-    case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono
+    case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
     case github, supabase, archivio
     case scanner
     var id: String { rawValue }
@@ -145,6 +145,7 @@ struct ContentView: View {
             case .supabase: VistaSupabase(chiedi: daScheda)
             case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
             case .scanner: VistaScanner(chiedi: daScheda)
+            case .bea: VistaBea(chiedi: daScheda)
             }
         }
         .fullScreenCover(isPresented: $jarvis.allenatore) {
@@ -309,6 +310,7 @@ struct ContentView: View {
             ("SIGNORE", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
             ("SIGNORE", "heart", "Cuore", { tastiera = false; scheda = .cuore }),
             ("SIGNORE", "figure.pilates", "Allenatore", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
+            ("SIGNORE", "heart.circle", "Bea", { tastiera = false; scheda = .bea }),
 
             ("DAILY", "sun.horizon", "Briefing", { tastiera = false; scheda = .briefing }),
             ("DAILY", "cloud.sun", "Meteo", { tastiera = false; scheda = .meteo }),
@@ -507,6 +509,7 @@ struct ContentView: View {
             case .vitals: mostraVitals = true
             case .confidente: mostraConfidente = true
             case .allenatore: jarvis.allenatore = true
+            case .bea: scheda = .bea
             case .ricordi: mostraRicordi = .ricordi
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true

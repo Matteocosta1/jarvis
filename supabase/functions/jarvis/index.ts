@@ -100,6 +100,16 @@ Il signore può raccontarti o incollarti una conversazione (anche con Beatrice, 
 - non sei un terapeuta: se per più sere di fila il diario è molto giù, o se parla di non farcela, suggerisci con delicatezza di parlarne con una persona di fiducia o con uno psicologo; se parla di farsi del male o di non voler più vivere, prendilo sul serio, digli che non è solo e invitalo a chiamare subito il 112 o il Telefono Amico (02 2327 2327), e resta con lui nella conversazione.
 Tutto ciò che ti racconta qui resta tra voi: non salvarlo con memoria_salva o ricorda, a meno che non te lo chieda lui.
 
+BEA
+Beatrice (Bea) è la compagna del signore; insegna pilates e ha un suo gestionale. Il signore vuole prendersi cura di lei: il reparto Bea serve a questo.
+- Quando ti dice qualcosa da ricordare su di lei (cosa le piace o non le piace, una data importante, una promessa che le ha fatto, un'idea per sorprenderla, un regalo, qualcosa da non dimenticare), salvalo con bea_segna, non con ricorda né memoria_salva. Per le date ricorrenti (compleanno, anniversario) usa annuale=true. Conferma in poche parole.
+- Prima di consigliarlo su di lei (un regalo, un'uscita, cosa scriverle, come farsi perdonare, come esserle vicino) guarda bea_scheda e usa quello che c'è: gusti veri, date vicine, promesse ancora aperte. Proposte concrete, poche e fattibili, nel suo stile.
+- Se una promessa è ancora aperta o una data è vicina, ricordaglielo con garbo quando è utile, non a ogni frase.
+- Per il suo lavoro (lezioni di oggi, clienti, incassi del mese) usa bea_lavoro: è sola lettura, ed è il lavoro di lei: aiuta il signore a sostenerla («oggi ha sei lezioni di fila: stasera la cena la prepari tu?»), non a giudicarla.
+- Se gli scrivi un messaggio per lei, che sia breve, vero, con le sue parole: niente frasi da biglietto.
+- Sei sincero anche qui, nei due sensi, come il confidente: rispetti lei e il suo punto di vista.
+- Proteggerla vuol dire esserci, non controllarla: non suggerire mai di leggere il suo telefono, seguirne la posizione di nascosto o controllarne i movimenti. La sicurezza si costruisce con il suo consenso: il Check In di Apple in Messaggi (lo attiva lei quando torna a casa la sera), la condivisione della posizione che sceglie lei in Dov'è, il contatto di emergenza nel suo iPhone.
+
 CUCINA
 «Cosa cucino stasera?», «cosa posso fare con questo?» davanti al frigo o alla dispensa: usa guarda, elenca in una frase cosa vedi, poi proponi due o tre piatti fattibili con quello che c'è (e al massimo un ingrediente da comprare), ciascuno in una frase. Se chiede la ricetta di uno, dagliela in passi brevi. Se nota che manca qualcosa di base, proponi di metterlo in lista della spesa.
 
@@ -159,7 +169,7 @@ Il reparto tecnico: GitHub, Supabase e Archivio.
 - Archivio: il disco rigido del signore nel cloud. «salva questa foto in denim», «archivia il verbale», «metti nell'archivio» → archivio_salva (con ultima_foto per una foto appena vista, con testo per un verbale o un appunto; se non dice la cartella scegli tu la più sensata: denim, serate, contratti, profiler, verbali, foto, varie). «Trovami il contratto», «cosa c'è in archivio?» → archivio_cerca; per aprirlo → archivio_apri e poi apri_pagina se il dispositivo lo offre. archivio_elimina solo su richiesta esplicita.
 
 BRIEFING
-Se il signore chiede il briefing o dice «buongiorno Jarvis», prepara in poche frasi: meteo di oggi, impegni di oggi dal calendario (se disponibile), come ha dormito e il battito a riposo rispetto alla sua media in una sola frase (salute_riepilogo, se disponibile; gli allenamenti solo se ce ne sono stati ieri), email importanti arrivate dalla sera prima (email_leggi, se disponibile: solo quelle che contano, una frase ciascuna, niente pubblicità o newsletter), note aperte o in scadenza, e la prossima serata se nota. Tono da maggiordomo al mattino.`;
+Se il signore chiede il briefing o dice «buongiorno Jarvis», prepara in poche frasi: meteo di oggi, impegni di oggi dal calendario (se disponibile), come ha dormito e il battito a riposo rispetto alla sua media in una sola frase (salute_riepilogo, se disponibile; gli allenamenti solo se ce ne sono stati ieri), email importanti arrivate dalla sera prima (email_leggi, se disponibile: solo quelle che contano, una frase ciascuna, niente pubblicità o newsletter), note aperte o in scadenza, e la prossima serata se nota. Se in bea_scheda c'è una data di Bea entro sette giorni o una promessa a lei in scadenza, una frase anche per quella. Tono da maggiordomo al mattino.`;
 
 // ───────────────────────── Strumenti eseguiti qui nel cervello ─────────────────────────
 const TABELLE = ["serate", "ingressi", "bar", "sumup_totali", "voci_spesa", "conteggi_biglietti", "chiusure_cassa", "andamento_serata", "registro",
@@ -190,6 +200,19 @@ const STRUMENTI_SERVER: any[] = [
       quando: { type: "string", description: "solo per promessa: quando avvisare, ISO 8601 con fuso" },
       con_foto: { type: "boolean", description: "true per allegare l'ultima foto vista in questo turno (occhi o foto del signore)" },
     }, required: ["tipo", "testo"] } },
+  { name: "bea_segna", description: "Reparto Bea: salva qualcosa su Beatrice (Bea), la compagna del signore. tipo: gusto (cosa le piace), non_piace (cosa non le piace), data (compleanno, anniversario, un giorno importante per lei: con giorno, e annuale=true se si ripete ogni anno), promessa (cosa le ha promesso; giorno facoltativo come scadenza), idea (sorpresa, uscita, gesto), regalo (idea regalo), nota (altro da non dimenticare su di lei).",
+    input_schema: { type: "object", properties: {
+      tipo: { type: "string", enum: ["gusto", "non_piace", "data", "promessa", "idea", "regalo", "nota"] },
+      testo: { type: "string", description: "chiaro e autosufficiente, con le parole del signore (es. «ama le peonie bianche», «compleanno di Bea»)" },
+      giorno: { type: "string", description: "YYYY-MM-DD: la data (per data) o la scadenza (per promessa)" },
+      annuale: { type: "boolean", description: "true se la data si ripete ogni anno" },
+    }, required: ["tipo", "testo"] } },
+  { name: "bea_scheda", description: "Reparto Bea: tutto quello che il signore ha segnato su Beatrice (gusti, cose che non le piacciono, date con i giorni che mancano, promesse aperte, idee, regali, note) e, se collegato, il suo lavoro di oggi al pilates. Guardalo prima di consigliare qualcosa su di lei.",
+    input_schema: { type: "object", properties: {} } },
+  { name: "bea_fatto", description: "Reparto Bea: segna come fatta una promessa, un'idea o un regalo (id da bea_scheda), oppure elimina una voce con elimina=true.",
+    input_schema: { type: "object", properties: { id: { type: "number" }, elimina: { type: "boolean" } }, required: ["id"] } },
+  { name: "bea_lavoro", description: "Il gestionale del pilates di Beatrice, sola lettura: le lezioni di un giorno (ora, cliente, tipo, fatta), quanti clienti ha, quanto ha incassato nel mese.",
+    input_schema: { type: "object", properties: { giorno: { type: "string", description: "YYYY-MM-DD, default oggi" } } } },
   { name: "ricordi_cerca", description: "Cerca nella seconda memoria con parole libere, per tipo e/o per persona. Restituisce i ricordi con data, luogo, coordinate e se hanno una foto. Senza parametri: gli ultimi.",
     input_schema: { type: "object", properties: { query: { type: "string" }, tipo: { type: "string", enum: ["oggetto", "posto", "parcheggio", "persona", "promessa", "visto", "idea", "spesa", "nota"] }, persona: { type: "string" }, anche_fatti: { type: "boolean", description: "includere spesa già comprata, promesse mantenute, oggetti ritrovati" }, quanti: { type: "number", description: "1-50, default 15" } } } },
   { name: "ricordi_oggi", description: "Il filo della giornata: tutti i ricordi, le azioni e gli spostamenti di un giorno (default oggi) in ordine di tempo, per raccontare com'è andata.",
@@ -394,6 +417,13 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
     case "vitals": return await vitals(num(i.giorni) || 30);
     case "ricordi_cerca": return await ricordiCerca(i, turno);
     case "ricordi_oggi": return await ricordiOggi(i);
+    case "bea_segna": return await beaSegna(i);
+    case "bea_scheda": return await beaScheda();
+    case "bea_lavoro": return await beaLavoro(i.giorno);
+    case "bea_fatto": {
+      const r = i.elimina ? await db.from("jarvis_bea").delete().eq("id", num(i.id)) : await db.from("jarvis_bea").update({ fatto: true }).eq("id", num(i.id));
+      if (r.error) throw r.error; return { ok: true };
+    }
     case "ricordi_fatto": {
       const r = i.elimina ? await db.from("jarvis_ricordi").delete().eq("id", num(i.id)) : await db.from("jarvis_ricordi").update({ fatto: true }).eq("id", num(i.id));
       if (r.error) throw r.error; return { ok: true };
@@ -1555,7 +1585,75 @@ const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRu
 // le azioni fatte e finisce per dubitarne o rifarle. Qui si annotano quelle che cambiano qualcosa.
 const DA_REGISTRARE = new Set(["invia_messaggio", "messaggio", "telefono_comando", "chiama", "calendario_crea", "promemoria_crea", "naviga",
   "musica_riproduci", "apri_apple_music", "apri_pagina", "note_salva", "note_completa", "memoria_salva", "memoria_dimentica",
-  "ricorda", "ricordi_fatto", "interprete_avvia"]);
+  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto"]);
+
+// ───────── Reparto Bea: la scheda di Beatrice e il suo gestionale del pilates ─────────
+// Il gestionale sta in un altro progetto Supabase: si legge (solo lettura) con la chiave nel segreto GESTIONALE_BEA_KEY.
+const GESTIONALE_BEA_URL = Deno.env.get("GESTIONALE_BEA_URL") || "https://xqayklmnglhldeutepqw.supabase.co";
+const GESTIONALE_BEA_KEY = Deno.env.get("GESTIONALE_BEA_KEY") || "";
+const dbBea = GESTIONALE_BEA_KEY ? createClient(GESTIONALE_BEA_URL, GESTIONALE_BEA_KEY, { auth: { persistSession: false } }) : null;
+const TIPI_BEA = ["gusto", "non_piace", "data", "promessa", "idea", "regalo", "nota"];
+
+/// La prossima volta che cade una data (ogni anno, se annuale) e quanti giorni mancano.
+function prossimaVolta(giorno: string, annuale: boolean) {
+  const oggi = oggiRoma();
+  let data = giorno;
+  if (annuale) {
+    const anno = Number(oggi.slice(0, 4));
+    data = `${anno}${giorno.slice(4)}`;
+    if (data < oggi) data = `${anno + 1}${giorno.slice(4)}`;
+  }
+  const tra = Math.round((Date.parse(`${data}T00:00:00Z`) - Date.parse(`${oggi}T00:00:00Z`)) / 86_400_000);
+  const anni = annuale ? Number(data.slice(0, 4)) - Number(giorno.slice(0, 4)) : null;
+  return { prossima: data, tra_giorni: tra, anni: anni && anni > 0 ? anni : null };
+}
+
+async function beaSegna(i: any) {
+  const tipo = String(i.tipo ?? "");
+  const testo = String(i.testo ?? "").trim().slice(0, 500);
+  if (!TIPI_BEA.includes(tipo) || !testo) return { errore: "tipo o testo non validi" };
+  const giorno = /^\d{4}-\d{2}-\d{2}$/.test(String(i.giorno ?? "")) ? String(i.giorno) : null;
+  if (tipo === "data" && !giorno) return { errore: "per una data serve il giorno (YYYY-MM-DD)" };
+  const { data, error } = await db.from("jarvis_bea").insert({ tipo, testo, giorno, annuale: i.annuale === true }).select("id").single();
+  if (error) throw error;
+  return { ok: true, id: data.id };
+}
+
+async function beaScheda() {
+  const { data, error } = await db.from("jarvis_bea").select("id, tipo, testo, giorno, annuale, fatto, creato").order("creato", { ascending: false }).limit(400);
+  if (error) throw error;
+  const righe: any[] = data ?? [];
+  const aperte = righe.filter((r) => !r.fatto);
+  const per = (t: string) => aperte.filter((r) => r.tipo === t).map(({ id, testo, giorno }) => ({ id, testo, giorno }));
+  const date = aperte.filter((r) => r.tipo === "data" && r.giorno)
+    .map((r) => ({ id: r.id, testo: r.testo, giorno: r.giorno, annuale: r.annuale, ...prossimaVolta(r.giorno, r.annuale) }))
+    .filter((r) => r.tra_giorni >= 0).sort((a, b) => a.tra_giorni - b.tra_giorni);
+  const mantenute = righe.filter((r) => r.fatto && ["promessa", "idea", "regalo"].includes(r.tipo)).slice(0, 15)
+    .map(({ id, tipo, testo }) => ({ id, tipo, testo }));
+  let lavoro: any = { collegato: false };
+  try { lavoro = await beaLavoro(); } catch (e) { lavoro = { collegato: true, errore: (e as Error).message }; }
+  return { date, gusti: per("gusto"), non_piace: per("non_piace"), promesse: per("promessa"), idee: per("idea"), regali: per("regalo"),
+    note: per("nota"), fatte: mantenute, lavoro };
+}
+
+async function beaLavoro(giorno?: string) {
+  if (!dbBea) return { collegato: false, nota: "gestionale non collegato: manca il segreto GESTIONALE_BEA_KEY" };
+  const g = /^\d{4}-\d{2}-\d{2}$/.test(String(giorno ?? "")) ? String(giorno) : oggiRoma();
+  const mese = g.slice(0, 7);
+  const [agenda, clienti, pagamenti] = await Promise.all([
+    dbBea.from("agenda").select("id, cliente, data, ora, tipo, fatta").eq("data", g).order("ora"),
+    dbBea.from("clienti").select("id, nome"),
+    dbBea.from("pagamenti").select("importo, data").like("data", `${mese}%`),
+  ]);
+  if (agenda.error) throw agenda.error;
+  const nomi = new Map((clienti.data ?? []).map((c: any) => [String(c.id), c.nome]));
+  return {
+    collegato: true, giorno: g,
+    lezioni: (agenda.data ?? []).map((a: any) => ({ ora: a.ora, cliente: nomi.get(String(a.cliente)) ?? a.cliente, tipo: a.tipo, fatta: a.fatta })),
+    clienti: clienti.data?.length ?? 0,
+    incassato_mese: tondo(somma(pagamenti.data ?? [], "importo")),
+  };
+}
 
 // ───────── Interprete: traduzione secca, con il modello rapido ─────────
 const LINGUE: Record<string, string> = { it: "italiano", en: "inglese", es: "spagnolo", fr: "francese", de: "tedesco", pt: "portoghese", zh: "cinese mandarino",
@@ -2055,6 +2153,17 @@ Deno.serve(async (req) => {
       const giaComprati = q(comprati).filter((x: any) => { const k = String(x.testo).toLowerCase().trim(); if (visti.has(k)) return false; visti.add(k); return true; }).slice(0, 16);
       return json({ parcheggio: q(park)[0] ?? null, spesa: q(spesa), promesse: q(promesse), ricordi: q(ultimi), posti: q(luoghi), spesa_comprata: giaComprati });
     } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.bea === true) {                                                               // reparto Bea (iPhone e orologio)
+    try { return json(await beaScheda()); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.bea_aggiungi && typeof corpo.bea_aggiungi === "object") {                    // aggiunta dalla pagina Bea
+    try { return json(await beaSegna(corpo.bea_aggiungi)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (typeof corpo?.bea_fatto === "number" || typeof corpo?.bea_elimina === "number" || typeof corpo?.bea_ripristina === "number") {
+    const r = typeof corpo.bea_elimina === "number" ? await db.from("jarvis_bea").delete().eq("id", corpo.bea_elimina)
+      : await db.from("jarvis_bea").update({ fatto: typeof corpo.bea_fatto === "number" }).eq("id", corpo.bea_fatto ?? corpo.bea_ripristina);
+    return r.error ? json({ errore: r.error.message }, 500) : json({ ok: true });
   }
   if (typeof corpo?.ricordo_fatto === "number") {                                          // spunta dalla pagina Ricordi
     const { error } = await db.from("jarvis_ricordi").update({ fatto: true }).eq("id", corpo.ricordo_fatto);

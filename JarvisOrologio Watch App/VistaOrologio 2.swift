@@ -123,7 +123,7 @@ struct VistaOrologio: View {
             case .sentinella: mostraSentinella = true
             case .confidente: jarvis.chiedi("Modalità confidente. Ho bisogno di parlarti di una cosa.")
             case .interprete: jarvis.chiedi("Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce.")
-            case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio: scheda = r
+            case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea: scheda = r
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
             }
         }
@@ -144,6 +144,7 @@ struct VistaOrologio: View {
         case .github: VistaGitHubOrologio()
         case .supabase: VistaSupabaseOrologio()
         case .archivio: VistaArchivioOrologio()
+        case .bea: VistaBeaOrologio().aperturaOrologio("Bea")
         default: EmptyView()
         }
     }
@@ -319,6 +320,7 @@ struct VistaOrologio: View {
             ("SIGNORE", "waveform.path.ecg", "#vitals"),
             ("SIGNORE", "bed.double", "#sonno"),
             ("SIGNORE", "heart", "#cuore"),
+            ("SIGNORE", "heart.circle", "#bea"),
 
             ("SENSI", "shazam.logo", "#shazam"),
 
