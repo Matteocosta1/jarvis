@@ -101,6 +101,7 @@ final class PonteOrologio: NSObject {
         if let indirizzo = d["indirizzo"], !indirizzo.isEmpty {
             UserDefaults.standard.set(indirizzo, forKey: "indirizzo")
         }
+        if let bea = d["numeroBea"] { UserDefaults.standard.set(bea, forKey: "numeroBea") }
         guard let token = d["token"], !token.isEmpty else { return false }
         PortachiaviOrologio.salva(token)
         return true

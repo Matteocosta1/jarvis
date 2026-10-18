@@ -23,6 +23,8 @@ struct VistaBea: View {
     @State private var annualeNuovo = true
     @State private var conGiorno = false
     @State private var sceltaContatto = false
+    @State private var pensiero: String?          // «Ti penso»: il messaggio pronto, da ritoccare e mandare
+    @State private var scrivePensiero = false
     @FocusState private var scrivendo: Bool
 
     var body: some View {
@@ -32,7 +34,7 @@ struct VistaBea: View {
                 RadialGradient(colors: [calda.opacity(0.10), .clear], center: .top, startRadius: 0, endRadius: 420).ignoresSafeArea()
                 List {
                     Section {
-                        TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "heart", tinta: tinta)
+                        TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "link", tinta: tinta)
                             .listRowBackground(Color.clear)
                         contatto.listRowBackground(Color.clear)
                     }
@@ -66,7 +68,13 @@ struct VistaBea: View {
                     nomeContatto = c.nome
                     numero = n
                     sceltaContatto = false
+                    PonteTelefono.condiviso.invia()          // anche l'orologio conosce il numero, per il «Ti penso»
                 }
+            }
+            .sheet(isPresented: Binding(get: { pensiero != nil }, set: { if !$0 { pensiero = nil } })) {
+                TiPenso(testo: pensiero ?? "", numero: numero) { pensiero = nil } altro: { Task { await nuovoPensiero() } }
+                    .id(pensiero)                                   // «Scrivine un altro»: il testo nuovo rimpiazza il vecchio
+                    .presentationDetents([.medium])
             }
         }
         .preferredColorScheme(.dark)
@@ -103,6 +111,18 @@ struct VistaBea: View {
                 tasto("Messaggio", "message.fill") { apri("sms:\(Rubrica.pulisci(numero))") }
                 tasto("WhatsApp", "bubble.left.and.text.bubble.right.fill") { apri("https://wa.me/\(Rubrica.internazionale(numero))") }
             }
+            Button { Task { await nuovoPensiero() } } label: {
+                HStack(spacing: 8) {
+                    if scrivePensiero { ProgressView().tint(Color.fondo) } else { Image(systemName: "sparkles") }
+                    Text(scrivePensiero ? "JARVIS scrive…" : "Ti penso")
+                }
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .frame(maxWidth: .infinity).frame(height: 46)
+                .foregroundStyle(Color.fondo).background(Color.ciano2)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(StileStark())
+            .disabled(scrivePensiero)
             Button { sceltaContatto = true } label: {
                 Text("\(nomeContatto) · \(numero) · cambia").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
             }
@@ -353,6 +373,16 @@ struct VistaBea: View {
         await VistaBea.programmaAvvisi(d)
     }
 
+    /// «Ti penso»: JARVIS scrive due righe nel suo stile (diverse dalle ultime mandate); le manda sempre lui.
+    private func nuovoPensiero() async {
+        scrivePensiero = true
+        defer { scrivePensiero = false }
+        Suoni.tocco()
+        let ultimi = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
+        guard let o = await VistaVitals.chiama(["bea_pensiero": true, "evita": ultimi]), let t = o["testo"] as? String, !t.isEmpty else { return }
+        pensiero = t
+    }
+
     private func azione(_ corpo: [String: Any]) async {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         _ = await VistaVitals.chiama(corpo)
@@ -403,6 +433,73 @@ struct VistaBea: View {
                 try? await centro.add(richiesta)
             }
         }
+    }
+}
+
+/// «Ti penso»: il messaggio scritto da JARVIS, da ritoccare se vuole; parte da WhatsApp o Messaggi, dove lo invia lui.
+struct TiPenso: View {
+    @State var testo: String
+    let numero: String
+    let chiudi: () -> Void
+    let altro: () -> Void
+    @Environment(\.openURL) private var apriURL
+
+    init(testo: String, numero: String, chiudi: @escaping () -> Void, altro: @escaping () -> Void) {
+        _testo = State(initialValue: testo)
+        self.numero = numero
+        self.chiudi = chiudi
+        self.altro = altro
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("TI PENSO").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
+            TextField("", text: $testo, axis: .vertical)
+                .lineLimit(2...6)
+                .font(.system(size: 17))
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(Color.ciano.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.4), lineWidth: 0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack(spacing: 10) {
+                invio("WhatsApp", "https://wa.me/\(Rubrica.internazionale(numero))?text=\(codifica(testo))")
+                invio("Messaggio", "sms:\(Rubrica.pulisci(numero))&body=\(codifica(testo))")
+            }
+            Button { altro() } label: {
+                Label("Scrivine un altro", systemImage: "arrow.clockwise").font(.system(size: 13, design: .monospaced)).foregroundStyle(Color.ciano)
+            }
+            .buttonStyle(.plain)
+            Text("Parte quando tocca Invia nell'app: è sempre lei a mandarlo.").font(.footnote).foregroundStyle(Color.tenue)
+        }
+        .padding(20)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.fondo.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+    }
+
+    private func invio(_ titolo: String, _ indirizzo: String) -> some View {
+        Button {
+            var mandati = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
+            mandati.insert(testo, at: 0)
+            UserDefaults.standard.set(Array(mandati.prefix(12)), forKey: "pensieriBea")
+            if let url = URL(string: indirizzo) { apriURL(url) }
+            chiudi()
+        } label: {
+            Text(titolo.uppercased())
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .frame(maxWidth: .infinity).frame(height: 46)
+                .foregroundStyle(Color.fondo).background(Color.ciano2)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(StileStark())
+        .disabled(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    private func codifica(_ t: String) -> String {
+        var ammessi = CharacterSet.urlQueryAllowed
+        ammessi.remove(charactersIn: "&=?+#")
+        return t.addingPercentEncoding(withAllowedCharacters: ammessi) ?? ""
     }
 }
 

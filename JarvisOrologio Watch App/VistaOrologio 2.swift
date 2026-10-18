@@ -320,13 +320,13 @@ struct VistaOrologio: View {
             ("SIGNORE", "waveform.path.ecg", "#vitals"),
             ("SIGNORE", "bed.double", "#sonno"),
             ("SIGNORE", "heart", "#cuore"),
-            ("SIGNORE", "heart.circle", "#bea"),
 
             ("SENSI", "shazam.logo", "#shazam"),
 
             ("STRUMENTI", "brain.head.profile", "#ricordi"),
             ("STRUMENTI", "globe.europe.africa", "Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce."),
             ("STRUMENTI", "music.note.list", "#serata"),
+            ("STRUMENTI", "link", "#bea"),
             ("STRUMENTI", "trash", nil),                       // pulisce la conversazione
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»

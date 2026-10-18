@@ -8,11 +8,26 @@ struct VistaBeaOrologio: View {
     @Environment(\.dismiss) private var chiudi
     @State private var dati: [String: Any]?
     @State private var errore = false
+    @State private var pensiero: String?
+    @State private var scrive = false
     private let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
     private let calda = Color(red: 1.0, green: 0.62, blue: 0.72)
 
     var body: some View {
         List {
+            Section {
+                if let p = pensiero {
+                    Text(p).font(.footnote)
+                    Button { manda(p) } label: { Label("Manda", systemImage: "paperplane.fill") }.tint(ciano)
+                    Button { Task { await scrivi() } } label: { Label("Un altro", systemImage: "arrow.clockwise") }
+                } else {
+                    Button { Task { await scrivi() } } label: {
+                        if scrive { ProgressView() } else { Label("Ti penso", systemImage: "sparkles") }
+                    }
+                    .disabled(scrive)
+                }
+            }
+
             Section {
                 Button { jarvis.chiedi("Reparto Bea: aiutami a scrivere adesso un messaggio per Bea, breve e vero, con le mie parole. Guarda la sua scheda."); chiudi() } label: {
                     Label("Cosa le scrivo?", systemImage: "text.bubble")
@@ -78,6 +93,30 @@ struct VistaBeaOrologio: View {
         let o = await VistaVitalsOrologio.chiama(["bea": true])
         errore = o == nil
         withAnimation { dati = o }
+    }
+
+    /// «Ti penso» dal polso: JARVIS scrive, il signore lo vede e lo manda da Messaggi dell'orologio.
+    private func scrivi() async {
+        scrive = true
+        defer { scrive = false }
+        let ultimi = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
+        if let o = await VistaVitalsOrologio.chiama(["bea_pensiero": true, "evita": ultimi]), let t = o["testo"] as? String, !t.isEmpty {
+            WKInterfaceDevice.current().play(.click)
+            pensiero = t
+        }
+    }
+
+    private func manda(_ testo: String) {
+        let numero = (UserDefaults.standard.string(forKey: "numeroBea") ?? "").filter { "+0123456789".contains($0) }
+        guard !numero.isEmpty else { jarvis.stato = "Colleghi il contatto di Bea sull'iPhone, Sir."; return }
+        var mandati = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
+        mandati.insert(testo, at: 0)
+        UserDefaults.standard.set(Array(mandati.prefix(12)), forKey: "pensieriBea")
+        var ammessi = CharacterSet.urlQueryAllowed
+        ammessi.remove(charactersIn: "&=?+#")
+        let corpo = testo.addingPercentEncoding(withAllowedCharacters: ammessi) ?? ""
+        if let url = URL(string: "sms:\(numero)&body=\(corpo)") { WKExtension.shared().openSystemURL(url) }
+        pensiero = nil
     }
 
     private func fatto(_ r: [String: Any]) async {

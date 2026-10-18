@@ -32,7 +32,8 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
 
     nonisolated static func datiDaConsegnare() -> [String: String] {
         let indirizzo = UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito
-        return ["token": leggiToken(), "indirizzo": indirizzo]
+        // il numero di Bea: per il «Ti penso» dal polso
+        return ["token": leggiToken(), "indirizzo": indirizzo, "numeroBea": UserDefaults.standard.string(forKey: "numeroBea") ?? ""]
     }
 
     nonisolated static func leggiToken() -> String {

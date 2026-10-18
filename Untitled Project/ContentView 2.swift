@@ -310,7 +310,6 @@ struct ContentView: View {
             ("SIGNORE", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
             ("SIGNORE", "heart", "Cuore", { tastiera = false; scheda = .cuore }),
             ("SIGNORE", "figure.pilates", "Allenatore", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
-            ("SIGNORE", "heart.circle", "Bea", { tastiera = false; scheda = .bea }),
 
             ("DAILY", "sun.horizon", "Briefing", { tastiera = false; scheda = .briefing }),
             ("DAILY", "cloud.sun", "Meteo", { tastiera = false; scheda = .meteo }),
@@ -329,6 +328,7 @@ struct ContentView: View {
             ("STRUMENTI", "globe", "Browser", { mostraBrowser = true }),
             ("STRUMENTI", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
             ("STRUMENTI", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
+            ("STRUMENTI", "link", "Bea", { tastiera = false; scheda = .bea }),
         ]
     }
 

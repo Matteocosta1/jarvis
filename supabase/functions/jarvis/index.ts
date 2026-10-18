@@ -103,6 +103,7 @@ Tutto ciò che ti racconta qui resta tra voi: non salvarlo con memoria_salva o r
 BEA
 Beatrice (Bea) è la compagna del signore; insegna pilates e ha un suo gestionale. Il signore vuole prendersi cura di lei: il reparto Bea serve a questo.
 - Quando ti dice qualcosa da ricordare su di lei (cosa le piace o non le piace, una data importante, una promessa che le ha fatto, un'idea per sorprenderla, un regalo, qualcosa da non dimenticare), salvalo con bea_segna, non con ricorda né memoria_salva. Per le date ricorrenti (compleanno, anniversario) usa annuale=true. Conferma in poche parole.
+- Orecchie aperte: quando nella conversazione il signore racconta qualcosa di Bea che vale la pena ricordare (le servirebbe qualcosa, ha visto qualcosa che le piace, una cosa che non sopporta, un giorno importante, un impegno che lui si è preso con lei), alla fine della risposta chiedigli in poche parole «La segno nella sua scheda?»; se dice sì, salvala con bea_segna. Non chiederlo per le cose già nella scheda, per i fatti banali o quando sei in modalità confidente.
 - Prima di consigliarlo su di lei (un regalo, un'uscita, cosa scriverle, come farsi perdonare, come esserle vicino) guarda bea_scheda e usa quello che c'è: gusti veri, date vicine, promesse ancora aperte. Proposte concrete, poche e fattibili, nel suo stile.
 - Se una promessa è ancora aperta o una data è vicina, ricordaglielo con garbo quando è utile, non a ogni frase.
 - Per il suo lavoro (lezioni di oggi, clienti, incassi del mese) usa bea_lavoro: è sola lettura, ed è il lavoro di lei: aiuta il signore a sostenerla («oggi ha sei lezioni di fila: stasera la cena la prepari tu?»), non a giudicarla.
@@ -1636,6 +1637,30 @@ async function beaScheda() {
     note: per("nota"), fatte: mantenute, lavoro };
 }
 
+/// «Ti penso»: due righe per Bea, scritte come le scriverebbe il signore (le manda sempre lui, con un tocco).
+async function beaPensiero(evita: string[]) {
+  const s: any = await beaScheda();
+  const contesto = [
+    s.gusti.length ? `Le piace: ${s.gusti.map((x: any) => x.testo).join("; ")}` : "",
+    s.date[0] && s.date[0].tra_giorni <= 7 ? `Data vicina: ${s.date[0].testo} tra ${s.date[0].tra_giorni} giorni` : "",
+    s.lavoro?.collegato && s.lavoro.lezioni?.length ? `Oggi ha ${s.lavoro.lezioni.length} lezioni di pilates` : "",
+    `Ora a Milano: ${new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", hour: "2-digit", minute: "2-digit" }).format(new Date())}`,
+    evita.length ? `Messaggi già mandati di recente, da non ripetere:\n${evita.map((x) => `- ${x}`).join("\n")}` : "",
+  ].filter(Boolean).join("\n");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", signal: AbortSignal.timeout(15000),
+    headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: MODELLO_RAPIDO, max_tokens: 200,
+      system: `Scrivi un messaggio breve che ${NOME} manda a Bea, la sua compagna, per dirle che la pensa. In prima persona, italiano parlato, affettuoso ma semplice e vero: una o due frasi, al massimo 25 parole, niente frasi da biglietto né paroloni, al massimo un'emoji. Se aiuta, usa un dettaglio vero (la sua giornata, l'ora, una cosa che le piace), senza forzarlo. Rispondi SOLO con il testo del messaggio, senza virgolette.`,
+      messages: [{ role: "user", content: contesto || "Nessun dettaglio particolare." }],
+    }),
+  });
+  if (!r.ok) throw new Error(`non riesco a scriverlo (${r.status})`);
+  const d = await r.json();
+  return { testo: (d.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim().replace(/^["«]|["»]$/g, "") };
+}
+
 async function beaLavoro(giorno?: string) {
   if (!dbBea) return { collegato: false, nota: "gestionale non collegato: manca il segreto GESTIONALE_BEA_KEY" };
   const g = /^\d{4}-\d{2}-\d{2}$/.test(String(giorno ?? "")) ? String(giorno) : oggiRoma();
@@ -2156,6 +2181,10 @@ Deno.serve(async (req) => {
   }
   if (corpo?.bea === true) {                                                               // reparto Bea (iPhone e orologio)
     try { return json(await beaScheda()); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.bea_pensiero === true) {                                                      // «Ti penso»: un messaggio breve per Bea
+    try { return json(await beaPensiero(Array.isArray(corpo.evita) ? corpo.evita.map(String).slice(0, 12) : [])); }
+    catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
   if (corpo?.bea_aggiungi && typeof corpo.bea_aggiungi === "object") {                    // aggiunta dalla pagina Bea
     try { return json(await beaSegna(corpo.bea_aggiungi)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
