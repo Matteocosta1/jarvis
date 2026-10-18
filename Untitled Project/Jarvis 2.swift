@@ -131,6 +131,7 @@ final class Jarvis: NSObject, ObservableObject {
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
+    private var ultimoPonte = Date.distantPast     // quando ha detto l'ultima frase ponte
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
     private var quandoInterrotto: Date?
     private var ultimoInvio = Date.distantPast
@@ -547,7 +548,10 @@ final class Jarvis: NSObject, ObservableObject {
         let fotoDaRimettere = fotoStoria
         compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare,
                                               fotoStoria: fotoDaRimettere, id: risposta.id) }
-        armaPonte(id: risposta.id, testo: testo)
+        // interrotto e subito un'aggiunta: una persona risponde e basta, non riempie di nuovo il vuoto
+        let appenaRiempito = Date().timeIntervalSince(ultimoPonte) < 20
+        if unisciA == nil && !comeAggiunta && !appenaRiempito { armaPonte(id: risposta.id, testo: testo) }
+        else { compitoPonte?.cancel(); inizioTurno = Date() }
     }
 
     /// Se dopo un secondo il cervello non ha ancora detto nulla, JARVIS riempie l'attesa con una frase breve.
@@ -561,6 +565,7 @@ final class Jarvis: NSObject, ObservableObject {
             let ritardo = (self?.latenzaMedia ?? 1.5) < 1.6 ? 1000 : 400
             try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.attesaVuota(id) else { return }
+            self.ultimoPonte = Date()
             self.dici(Jarvis.ponteCasuale())
         }
     }
@@ -866,6 +871,9 @@ final class Jarvis: NSObject, ObservableObject {
             try? sessione.setActive(true)
             // la scelta si fa solo qui, quando nessuna delle due voci sta parlando: così non si accavallano
             vocePerCloud = Impostazioni.voceCloud && cloud.disponibile
+            // l'orecchio sta per accendere il microfono con la cancellazione d'eco: l'audio dell'iPhone si riassesta
+            // per un istante e le prime sillabe andrebbero perse (succede con le frasi già pronte in cache, che partono subito)
+            if conOrecchio && !orecchio.attivo { cloud.partiDopo(0.3) }
         }
         let u = AVSpeechUtterance(string: frase)
         u.voice = Jarvis.voceScelta()
@@ -1184,6 +1192,11 @@ final class VoceCloud: NSObject {
     private var attuale: ObjectIdentifier?   // il suono (mp3 o frase di riserva) che sta andando adesso
     private var inDownload = 0               // frasi in scaricamento in questo momento
 
+    private var prontoDa = Date.distantPast   // prima di allora non parte nessun suono (l'audio si sta riassestando)
+
+    /// La prossima frase parte non prima di fra `secondi`.
+    func partiDopo(_ secondi: TimeInterval) { prontoDa = Date().addingTimeInterval(secondi) }
+
     /// Falso per qualche minuto se il cervello dice che la voce cloud non è configurata.
     var disponibile: Bool { Date() >= sospesaFino }
 
@@ -1251,6 +1264,9 @@ final class VoceCloud: NSObject {
         while g == generazione, !coda.isEmpty {
             let p = coda.removeFirst()
             let dati = await p.audio.value
+            guard g == generazione else { return }
+            let manca = prontoDa.timeIntervalSinceNow
+            if manca > 0 { try? await Task.sleep(for: .milliseconds(Int(manca * 1000))) }
             guard g == generazione else { return }
             var detta = false
             if let dati { detta = await suona(dati) }
