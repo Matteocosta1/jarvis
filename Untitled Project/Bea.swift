@@ -26,6 +26,7 @@ struct VistaBea: View {
     @State private var sceltaContatto = false
     @State private var pensiero: String?          // «Ti penso»: il messaggio pronto, da ritoccare e mandare
     @State private var scrivePensiero = false
+    @State private var chiama112 = false
     @FocusState private var scrivendo: Bool
 
     var body: some View {
@@ -356,6 +357,32 @@ struct VistaBea: View {
                     Label("Ne parlo con lei", systemImage: "message").foregroundStyle(tinta)
                 }
             }
+            // 112: per Bea gli strumenti ufficiali (SOS dell'iPhone e l'app del 112), per il signore la chiamata con conferma
+            VStack(alignment: .leading, spacing: 8) {
+                Label("EMERGENZA · 112", systemImage: "sos")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
+                    .foregroundStyle(Color(red: 1.0, green: 0.27, blue: 0.32))
+                Text("Bea: tasto laterale + volume tenuti premuti chiama il 112 e manda la sua posizione ai contatti di emergenza. Con l'app «112 Where ARE U» la centrale riceve la posizione esatta e si può scrivere in silenzio, se non si può parlare.")
+                    .font(.footnote).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                if let app = URL(string: "https://apps.apple.com/app/id888964800") {
+                    ShareLink(item: app, message: Text("Amore, installa questa: è l'app ufficiale del 112, manda la tua posizione e puoi scrivere in silenzio se non puoi parlare ❤️")) {
+                        Label("Manda a Bea l'app del 112", systemImage: "square.and.arrow.up").font(.footnote).foregroundStyle(tinta)
+                    }
+                }
+                Button { chiama112 = true } label: {
+                    Label("Chiama il 112", systemImage: "phone.fill").font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.27, blue: 0.32))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(12)
+            .background(Color(red: 1.0, green: 0.27, blue: 0.32).opacity(0.06))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 1.0, green: 0.27, blue: 0.32).opacity(0.45), lineWidth: 0.8))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .confirmationDialog("Chiamare il 112?", isPresented: $chiama112, titleVisibility: .visible) {
+                Button("Chiama il 112", role: .destructive) { apri("tel:112") }
+                Button("Annulla", role: .cancel) {}
+            } message: { Text("Il numero unico di emergenza.") }
             // il Tocco d'aiuto: il comando «Aiuto Ale» sul tasto Azione del suo iPhone
             VStack(alignment: .leading, spacing: 6) {
                 Label("TOCCO D'AIUTO", systemImage: "bolt.fill")
@@ -534,6 +561,8 @@ struct VistaAiutoBea: View {
     @AppStorage("numeroBea") private var numero = ""
     @Environment(\.openURL) private var apriURL
     @State private var pulsa = false
+    @State private var indirizzo: String?          // la via dove si trova, da dire al 112 se serve
+    @State private var chiama112 = false
     private let rosso = Color(red: 1.0, green: 0.27, blue: 0.32)
 
     var body: some View {
@@ -561,6 +590,11 @@ struct VistaAiutoBea: View {
                     .frame(maxHeight: 230)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(rosso.opacity(0.5), lineWidth: 1))
+                    if let indirizzo {
+                        Label(indirizzo, systemImage: "mappin.and.ellipse")
+                            .font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                    }
                 } else {
                     Spacer()
                 }
@@ -576,6 +610,13 @@ struct VistaAiutoBea: View {
                 if numero.isEmpty {
                     Text("Colleghi il contatto di Bea nel reparto Bea per chiamarla da qui.").font(.footnote).foregroundStyle(Color.tenue)
                 }
+                Button { chiama112 = true } label: {
+                    Label("Non risponde? Chiama il 112", systemImage: "sos").font(.system(size: 13, weight: .semibold, design: .monospaced)).foregroundStyle(rosso)
+                }
+                .confirmationDialog("Chiamare il 112?", isPresented: $chiama112, titleVisibility: .visible) {
+                    Button("Chiama il 112", role: .destructive) { if let u = URL(string: "tel:112") { apriURL(u) } }
+                    Button("Annulla", role: .cancel) {}
+                } message: { Text(indirizzo.map { "Bea è qui: \($0)" } ?? "Il numero unico di emergenza.") }
                 Button("Chiudi") { chiudi() }.font(.system(size: 14, design: .monospaced)).foregroundStyle(Color.tenue).padding(.top, 6)
             }
             .padding(24)
@@ -584,6 +625,13 @@ struct VistaAiutoBea: View {
         .onAppear {
             pulsa = true
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+        .task {
+            // la via, per dirla al 112 o per orientarsi subito
+            guard let lat = aiuto.lat, let lon = aiuto.lon,
+                  let p = try? await CLGeocoder().reverseGeocodeLocation(CLLocation(latitude: lat, longitude: lon)).first else { return }
+            indirizzo = [[p.thoroughfare, p.subThoroughfare].compactMap { $0 }.joined(separator: " "), p.locality]
+                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
         }
     }
 
