@@ -114,6 +114,9 @@ final class Jarvis: NSObject, ObservableObject {
     }()
     /// Sul Mac, subito dopo una risposta: per qualche secondo si può continuare a parlare senza dire «Jarvis».
     private var liberoMacFinoA = Date.distantPast
+    /// Mac: ciò che JARVIS ha appena detto, per riconoscere la propria voce che rientra dal microfono (l'eco).
+    private var dettoMac = ""
+    private var dettoMacFino = Date.distantPast
     private var ascoltoCloud = false       // sta registrando una frase da trascrivere in cloud
     private var ultimaFraseAVoce = ""      // la frase della domanda in corso (vuota se scritta)
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
@@ -354,11 +357,13 @@ final class Jarvis: NSObject, ObservableObject {
     private func aggiornaRichiamo() {
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
-            guard richiamoServe else { attesaMac.ferma(); return }
+            // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
+            let serve = !inBenvenuto && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
+            guard serve else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
             avvioRichiamo = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(500))       // dopo che la voce di JARVIS ha liberato l'audio
-                guard let self, !Task.isCancelled, self.richiamoServe else { return }
+                guard let self, !Task.isCancelled, !self.inBenvenuto, self.fase != .ascolto else { return }
                 self.attesaMac.avvia()
             }
             return
@@ -644,6 +649,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
         ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
+        dettoMac = ""                                  // una domanda nuova: l'eco da riconoscere è quella della prossima risposta
         fraseAVoce = ""
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
@@ -1007,7 +1013,10 @@ final class Jarvis: NSObject, ObservableObject {
         let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud
         if inCoda.isEmpty {
             let sessione = AVAudioSession.sharedInstance()
-            if conOrecchio {
+            if Jarvis.usaAscoltoCloud {
+                // Mac: stessa impostazione dell'attesa, così il microfono resta acceso e gli si può parlare sopra
+                try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+            } else if conOrecchio {
                 // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
                 try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
             } else {
@@ -1028,6 +1037,7 @@ final class Jarvis: NSObject, ObservableObject {
         frasiVive[chiave] = u
         fase = .parlo
         orecchio.testoDetto += " " + frase          // così l'orecchio riconosce la propria eco
+        if Jarvis.usaAscoltoCloud { dettoMac += " " + frase; dettoMacFino = Date().addingTimeInterval(30) }
         if conOrecchio, !orecchio.attivo { orecchio.avvia() }
         if vocePerCloud {
             cloud.accoda(u)                 // voce di JARVIS dal cloud; se fallisce, legge questa stessa frase con la voce dell'iPhone
@@ -1173,10 +1183,29 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Ascolto in cloud (Mac)
 
+    /// La frase sentita è quasi tutta fatta di parole che JARVIS ha appena detto? Allora è la sua voce (eco), non il signore.
+    nonisolated static func eEco(_ sentito: String, detto: String) -> Bool {
+        func parole(_ t: String) -> [String] {
+            t.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        }
+        let s = parole(sentito), d = Set(parole(detto))
+        guard !s.isEmpty, !d.isEmpty else { return false }
+        if s.contains(where: { parola in Richiamo.nomi.contains(where: { parola.hasPrefix($0) }) }) { return false }   // «Jarvis…» è sempre il signore
+        let comuni = s.filter { d.contains($0) }.count
+        return Double(comuni) / Double(s.count) >= 0.6
+    }
+
     /// Mac: una frase sentita in attesa (già trascritta). La prende se c'è «Jarvis», se è la frase di Tony,
     /// o se arriva subito dopo una risposta (il seguito del discorso); il resto della stanza non è per lui.
     private func fraseSentitaMac(_ testo: String, inizio: Date) {
-        guard fase == .attesa || fase == .elaboro else { return }
+        guard fase == .attesa || fase == .elaboro || fase == .parlo else { return }
+        if Date() > dettoMacFino { dettoMac = "" }
+        if Jarvis.eEco(testo, detto: dettoMac) { return }                 // è la sua stessa voce: non è il signore
+        if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
+            interrottoAVoce(testo)
+            return
+        }
         let basso = testo.lowercased()
         let conNome = Richiamo.nomi.contains { basso.contains($0) }
         // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto (vuoto = si mette in ascolto)

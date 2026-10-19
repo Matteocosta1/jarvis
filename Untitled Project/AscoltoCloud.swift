@@ -342,9 +342,9 @@ final class AttesaMac {
         riprova?.cancel()
         riprova = Task { [weak self] in
             while true {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(1.5))
                 guard let self, !Task.isCancelled, self.voluto else { return }
-                if !self.motore.isRunning || self.segmenti.secondiSenzaAudio > 3 {
+                if !self.motore.isRunning || self.segmenti.secondiSenzaAudio > 2 {
                     self.errore = "il microfono si era fermato, lo riaccendo"
                     self.spegni()
                     self.acceso = false
@@ -371,7 +371,7 @@ final class AttesaMac {
         if inViaggio { inCoda = (audio, inizio); return }        // non si perde: parte appena torna la precedente
         let adesso = Date()
         invii.removeAll { adesso.timeIntervalSince($0) > 600 }
-        guard invii.count < 30 else { return }
+        guard invii.count < 40 else { return }
         invii.append(adesso)
         inViaggio = true
         frasiMandate += 1
