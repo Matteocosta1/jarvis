@@ -1836,8 +1836,9 @@ async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[
 // Per ogni chiamata a Claude: modello, token, tempi, strumenti usati. Niente contenuto delle conversazioni (resta privato).
 // Segreti: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY; facoltativo LANGFUSE_HOST (default cloud europeo).
 function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: any, stop: string, blocchi: any[], errore?: string) {
-  const pub = Deno.env.get("LANGFUSE_PUBLIC_KEY") ?? "", sec = Deno.env.get("LANGFUSE_SECRET_KEY") ?? "";
-  if (!pub || !sec) return;
+  const pub = (Deno.env.get("LANGFUSE_PUBLIC_KEY") ?? "").trim(), sec = (Deno.env.get("LANGFUSE_SECRET_KEY") ?? "").trim();
+  if (!pub || !sec) { console.log(`langfuse: chiavi mancanti (pubblica ${pub ? "sì" : "no"}, segreta ${sec ? "sì" : "no"})`); return; }
+  if (!pub.startsWith("pk-lf-") || !sec.startsWith("sk-lf-")) console.log(`langfuse: chiavi forse scambiate o incomplete (pubblica inizia pk-lf-: ${pub.startsWith("pk-lf-")}, segreta inizia sk-lf-: ${sec.startsWith("sk-lf-")})`);
   const host = (Deno.env.get("LANGFUSE_HOST") || "https://cloud.langfuse.com").replace(/\/$/, "");
   const id = crypto.randomUUID(), fine = new Date();
   const strumenti = blocchi.filter((b) => b?.type === "tool_use" || b?.type === "server_tool_use").map((b) => b.name);
@@ -1860,6 +1861,7 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
   }).then(async (r) => {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d?.errors?.length) console.log(`langfuse non riuscito: ${r.status} ${JSON.stringify(d?.errors ?? d).slice(0, 300)}`);
+    else console.log(`langfuse ok: ${r.status} (${d?.successes?.length ?? 0} eventi)`);
   }, (e) => console.log(`langfuse non raggiungibile: ${(e as Error).message}`)));
 }
 
