@@ -215,7 +215,7 @@ struct ContentView: View {
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
             try? await Task.sleep(for: .milliseconds(2400))
-            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VI-4.0" }
+            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
         }
     }
 
@@ -265,7 +265,7 @@ struct ContentView: View {
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)
-                    .foregroundStyle(sottotitolo == "MARK VI-4.0" ? Color.tenue : Color.ciano)
+                    .foregroundStyle(sottotitolo == "MARK VII-5.0" ? Color.tenue : Color.ciano)
                     .contentTransition(.numericText())
                     .id(sottotitolo)
                     .transition(.opacity)
@@ -818,7 +818,7 @@ struct TelemetriaHUD: View {
             let k = Int(ctx.date.timeIntervalSinceReferenceDate / 2.5)
             let ora = Date().formatted(.dateTime.hour().minute().second())
             let voci = ["SISTEMI NOMINALI", "VOCE \(Impostazioni.voceCloud ? "CLOUD" : "LOCALE")", "ORECCHIO \(Impostazioni.interruzioneVocale ? "ATTIVO" : "SPENTO")",
-                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VI-4.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
+                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VII-5.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
             let riga = fase == .elaboro ? "ELABORAZIONE IN CORSO" : (fase == .ascolto ? "CANALE AUDIO APERTO" : voci[k % voci.count])
             Text(riga)
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
