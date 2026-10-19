@@ -9,7 +9,9 @@ import AVFoundation
 /// Ogni strumento restituisce un testo (di solito JSON) per il cervello e un flag di errore.
 @MainActor
 final class Strumenti {
-    static let nomi = ["calendario_crea", "calendario_leggi", "promemoria_crea", "contatti_cerca", "chiama", "messaggio", "naviga",
+    /// Gli strumenti di questo dispositivo; sul Mac in più «mac_comando» (il Comando rapido «JARVIS Mac»).
+    static var nomi: [String] { ProcessInfo.processInfo.isiOSAppOnMac ? nomiBase + ["mac_comando"] : nomiBase }
+    private static let nomiBase = ["calendario_crea", "calendario_leggi", "promemoria_crea", "contatti_cerca", "chiama", "messaggio", "naviga",
                        "invia_messaggio", "riconosci_musica", "apri_apple_music", "foto_cerca", "apri_pagina",
                        "musica_riproduci", "musica_controllo", "meteo_qui", "salute_riepilogo", "conversazione_pulisci", "guarda", "interprete_avvia",
                        "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando", "comando_app"]
@@ -43,6 +45,7 @@ final class Strumenti {
         case "telefono_batteria": return "controllo la batteria"
         case "telefono_comando": return "comando il telefono"
         case "comando_app": return "subito"
+        case "mac_comando": return "comando il Mac"
         default: return "un attimo"
         }
     }
@@ -136,6 +139,7 @@ final class Strumenti {
             case "telefono_luminosita": return (try luminosita(i), false)
             case "telefono_batteria": return (batteria(), false)
             case "telefono_comando": return (try comandoTelefono(i), false)
+            case "mac_comando": return (try comandoMac(i), false)
             case "comando_app":
                 let c = i["comando"] as? String ?? ""
                 guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }
@@ -321,6 +325,24 @@ final class Strumenti {
         guard let url else { throw Problema("Non riesco a preparare il comando.") }
         daAprire.append(url)
         return json(["ok": true, "nota": "il Comando rapido «\(nome)» parte appena hai finito di parlare; se il signore non l'ha ancora creato, iOS glielo dirà"])
+    }
+
+    /// Sul Mac: il Comando rapido «JARVIS Mac» (uno solo, con uno script che conosce solo questi comandi).
+    /// Al comando passa un testo tipo «volume 60» o «apri Spotify»; il valore viene ripulito qui e controllato di nuovo nello script.
+    private func comandoMac(_ i: [String: Any]) throws -> String {
+        guard ProcessInfo.processInfo.isiOSAppOnMac else { throw Problema("Questo comando funziona solo sul Mac.") }
+        let comando = (i["comando"] as? String ?? "").lowercased()
+        let ammessi: Set<String> = ["volume", "muto", "musica", "apri", "cartella", "scura", "blocca", "screenshot",
+                                    "riordina_scrivania", "ordina_download", "svuota_cestino"]
+        guard ammessi.contains(comando) else { throw Problema("Comando sconosciuto: \(comando).") }
+        let grezzo = String(describing: i["valore"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let valore = String(grezzo.filter { $0.isLetter || $0.isNumber || " .-_".contains($0) }.prefix(40))
+        let testo = valore.isEmpty ? comando : "\(comando) \(valore)"
+        guard let url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica("JARVIS Mac"))&input=text&text=\(Strumenti.codifica(testo))") else {
+            throw Problema("Non riesco a preparare il comando.")
+        }
+        daAprire.append(url)
+        return json(["ok": true, "nota": "il Comando rapido «JARVIS Mac» (\(testo)) parte appena hai finito di parlare: rispondi con una frase brevissima"])
     }
 
     // MARK: Musica (ShazamKit)
