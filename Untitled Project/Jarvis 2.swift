@@ -1047,7 +1047,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Ascolto
 
     /// `bip`: il suono di ascolto solo quando il signore tocca il reattore; a voce si ascolta in silenzio, come una persona.
-    private func avviaAscolto(bip: Bool = false) async {
+    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0) async {
         avviso = nil
         guard fase == .attesa else { return }
         guard await Jarvis.chiediPermessi() else {
@@ -1058,6 +1058,7 @@ final class Jarvis: NSObject, ObservableObject {
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         guard let riconoscitore, riconoscitore.isAvailable else {
+            if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
             avviso = "Il riconoscimento vocale non è disponibile in questo momento."
             return
         }
@@ -1092,9 +1093,22 @@ final class Jarvis: NSObject, ObservableObject {
             }
             armaSilenzio(secondi: 5)   // tempo per iniziare a parlare
         } catch {
-            avviso = "Microfono non disponibile: \(error.localizedDescription)"
             fermaAscolto(invia: false)
+            if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
+            avviso = "Microfono non disponibile: \(error.localizedDescription)"
         }
+    }
+
+    /// Aperto da Siri («Ehi Siri, parla con Jarvis»): per un paio di secondi il microfono è ancora di Siri.
+    /// Invece di arrendersi subito, JARVIS aspetta un attimo e riprova (fino a circa 4 secondi), poi ascolta.
+    private func riprovaAscolto(bip: Bool, tentativo: Int) async -> Bool {
+        guard tentativo < 7, fase == .attesa else { return false }
+        stato = "Un attimo, Sir"
+        try? await Task.sleep(for: .milliseconds(600))
+        guard fase == .attesa, !Task.isCancelled else { return true }   // nel frattempo è successo altro: niente avviso
+        if stato == "Un attimo, Sir" { stato = nil }
+        await avviaAscolto(bip: bip, tentativo: tentativo + 1)
+        return true
     }
 
     private func aggiorna(testo: String?, finale: Bool, errore: Bool, ascolto: Int) {
