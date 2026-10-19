@@ -99,7 +99,8 @@ final class Richiamo {
                 do {
                     try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
                 } catch {
-                    try sessione.setCategory(.playAndRecord)       // sul Mac alcune opzioni dell'iPhone non valgono: si va sul semplice
+                    // sul Mac alcune opzioni dell'iPhone non valgono: si va sul semplice (tenendo la musica degli altri)
+                    try sessione.setCategory(.playAndRecord, options: [.mixWithOthers])
                 }
                 try sessione.setActive(true)
                 mani.quandoSente = { [weak self] in

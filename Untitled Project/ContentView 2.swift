@@ -54,27 +54,31 @@ struct ContentView: View {
             let alto = g.size.height + g.safeAreaInsets.bottom      // l'altezza vera, anche con la tastiera aperta
             let grande = g.size.width >= 900 && g.size.width > alto * 1.15
             let altezzaChat = max(150, alto * 0.24)
-            let scala = min(2.2, max(1, (alto - altezzaChat - 140) / 500))
+            let altezzaHUD: CGFloat = ContentView.latoCorona / 2 + ContentView.raggioCorona + 40 + 26 + 80   // corona + testi sotto
+            let scala = min(2.2, max(0.6, (alto - altezzaChat - 60 - 84) / altezzaHUD))           // 84: intestazione e margini
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
                 if mostraSistemi { menuSistemi.zIndex(10) }
                 if grande {
-                    VStack(spacing: 0) {
-                        intestazione
-                        Spacer(minLength: 0)
-                        centroHUD
-                            .frame(width: 430)
-                            .scaleEffect(scala)
-                            .frame(height: 500 * scala)                    // lo spazio vero che occupa ingrandito
-                        Spacer(minLength: 0)
+                    ZStack(alignment: .bottom) {
+                        VStack(spacing: 0) {
+                            intestazione
+                            Spacer(minLength: 0)
+                            centroHUD
+                                .frame(width: 430)
+                                .scaleEffect(scala, anchor: .top)
+                                .frame(height: altezzaHUD * scala, alignment: .top)   // lo spazio vero che occupa ingrandito
+                            Spacer(minLength: 0)
+                            Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
+                        }
+                        .ignoresSafeArea(.keyboard, edges: .bottom)                // il reattore resta fermo
                         VStack(spacing: 0) {
                             registro
                             barraTesto
                         }
                         .frame(maxWidth: 820)
-                        .frame(height: altezzaChat + 60)
+                        .frame(height: altezzaChat + 60)                          // questa sale con la tastiera
                     }
-                    .ignoresSafeArea(.keyboard, edges: .bottom)
                 } else {
                     VStack(spacing: 0) {
                         intestazione
