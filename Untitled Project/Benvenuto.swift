@@ -17,8 +17,9 @@ enum Benvenuto {
         guard f.count <= 32 else { return false }        // solo la frase di Tony, non un discorso che la contiene
         if f.contains("papà è a casa") || f.contains("papà è tornato") { return true }
         // «daddy» da solo non basta (una canzone, un nome): serve anche «home» o «wake up»
-        let papa = ["daddy", "daddi", "deddy", "deddi", "dedi", "dady", "dadi", "dad's", "dads"].contains { f.contains($0) }
-        let resto = ["home", "hom", " om", "wake", "weak", "uek", "week", "uei", "ueik", "ap "].contains { f.contains($0) }
+        let papa = ["daddy", "daddi", "deddy", "deddi", "dady", "dad's", "dads"]   // niente «dedi», «dadi»: dedica, dadi….contains { f.contains($0) }
+        // il Mac capisce anche «backup daddy», «wake up daddy», «daddy's back»…
+        let resto = ["home", "hom", " om", "wake", "weak", "uek", "week", "uei", "ueik", "ap ", "up", "back", "bac", "bek"].contains { f.contains($0) }
         return papa && resto
     }
 
