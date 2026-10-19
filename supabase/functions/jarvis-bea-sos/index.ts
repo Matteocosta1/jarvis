@@ -86,8 +86,14 @@ Deno.serve(async (req) => {
     c[chiave] = v;
   }
   const numero = (x: unknown) => { const v = Number(String(x ?? "").replace(",", ".")); return Number.isFinite(v) && v !== 0 ? v : null; };
-  const lat = numero(c.lat), lon = numero(c.lon);
+  let lat = numero(c.lat), lon = numero(c.lon);
+  if (lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180) { lat = null; lon = null; }   // coordinate impossibili: si va senza posizione
   const prova = c.prova === true || c.prova === 1 || /^(true|vero|s[iì]|1)$/i.test(String(c.prova ?? "").trim());
+
+  // freno contro la raffica: un allarme vero al minuto (il primo è già partito), al massimo 5 prove all'ora
+  const finestra = new Date(Date.now() - (prova ? 3600_000 : 60_000)).toISOString();
+  const { count: recenti } = await db.from("jarvis_bea_sos").select("id", { count: "exact", head: true }).eq("prova", prova).gte("creato", finestra);
+  if ((recenti ?? 0) >= (prova ? 5 : 1)) return json({ ok: true, gia_inviato: true });
 
   const titolo = prova ? "Prova · Bea ha bisogno di lei" : "Bea ha bisogno di lei";
   const testo = prova

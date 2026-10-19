@@ -74,7 +74,7 @@ enum Portachiavi {
         guard !valore.isEmpty else { return }
         var nuovo = base
         nuovo[kSecValueData as String] = Data(valore.utf8)
-        nuovo[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        nuovo[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly   // resta su questo dispositivo: non viaggia nei backup
         SecItemAdd(nuovo as CFDictionary, nil)
     }
 }

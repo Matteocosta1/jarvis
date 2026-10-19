@@ -73,6 +73,10 @@ Deno.serve(async (req) => {
     const { data } = await db.from("jarvis_allarmi").select("creato").eq("prova", false).order("creato", { ascending: false }).limit(1);
     const ultimo = data?.[0]?.creato ? new Date(data[0].creato).getTime() : 0;
     if (Date.now() - ultimo < 5 * 60_000) return json({ ok: true, ripetuto: true, nota: "allarme già inviato da meno di 5 minuti" });
+  } else {
+    // anche le prove hanno un freno: al massimo 5 all'ora (ogni prova manda SMS o WhatsApp veri)
+    const { count } = await db.from("jarvis_allarmi").select("id", { count: "exact", head: true }).eq("prova", true).gte("creato", new Date(Date.now() - 3600_000).toISOString());
+    if ((count ?? 0) >= 5) return json({ ok: true, ripetuto: true, nota: "troppe prove nell'ultima ora: riprovi più tardi" });
   }
 
   const ora = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" }).format(new Date());
