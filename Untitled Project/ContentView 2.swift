@@ -49,33 +49,32 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { g in
-            // schermo largo (il Mac, un iPad in orizzontale): reattore grande a sinistra, conversazione a destra
+            // schermo grande (il Mac, un iPad in orizzontale): la stessa interfaccia dell'iPhone, centrata,
+            // con il reattore che cresce con la finestra e la conversazione sotto, più stretta e al centro
             let alto = g.size.height + g.safeAreaInsets.bottom      // l'altezza vera, anche con la tastiera aperta
-            let largo = g.size.width >= 900 && g.size.width > alto * 1.15
+            let grande = g.size.width >= 900 && g.size.width > alto * 1.15
+            let altezzaChat = max(150, alto * 0.24)
+            let scala = min(2.2, max(1, (alto - altezzaChat - 140) / 500))
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
                 if mostraSistemi { menuSistemi.zIndex(10) }
-                if largo {
+                if grande {
                     VStack(spacing: 0) {
                         intestazione
-                        HStack(spacing: 0) {
-                            VStack(spacing: 0) {
-                                Spacer(minLength: 0)
-                                centroHUD
-                                    .scaleEffect(min(1.6, max(1, (alto - 120) / 700)))   // cresce con lo schermo
-                                Spacer(minLength: 0)
-                            }
-                            .frame(width: g.size.width * 0.55)
-                            .ignoresSafeArea(.keyboard, edges: .bottom)     // la tastiera non schiaccia il reattore
-                            VStack(spacing: 0) {
-                                registro
-                                barraTesto
-                            }
-                            .frame(maxWidth: .infinity)
-                            .background(Color.fondo.opacity(0.35))
-                            .overlay(alignment: .leading) { Rectangle().fill(Color.ciano.opacity(0.15)).frame(width: 1) }
+                        Spacer(minLength: 0)
+                        centroHUD
+                            .frame(width: 430)
+                            .scaleEffect(scala)
+                            .frame(height: 500 * scala)                    // lo spazio vero che occupa ingrandito
+                        Spacer(minLength: 0)
+                        VStack(spacing: 0) {
+                            registro
+                            barraTesto
                         }
+                        .frame(maxWidth: 820)
+                        .frame(height: altezzaChat + 60)
                     }
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
                 } else {
                     VStack(spacing: 0) {
                         intestazione

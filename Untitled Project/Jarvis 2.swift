@@ -1046,7 +1046,11 @@ final class Jarvis: NSObject, ObservableObject {
         }
         do {
             let sessione = AVAudioSession.sharedInstance()
-            try sessione.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .duckOthers])
+            do {
+                try sessione.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .duckOthers])
+            } catch {
+                try sessione.setCategory(.playAndRecord)           // sul Mac alcune opzioni dell'iPhone non valgono: si va sul semplice
+            }
             try sessione.setActive(true, options: .notifyOthersOnDeactivation)
 
             let r = SFSpeechAudioBufferRecognitionRequest()

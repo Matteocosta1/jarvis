@@ -96,7 +96,11 @@ final class Richiamo {
             if !motore.isRunning {
                 let sessione = AVAudioSession.sharedInstance()
                 // mixWithOthers: la musica di Spotify continua; A2DP: le cuffie restano in alta qualità
-                try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+                do {
+                    try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+                } catch {
+                    try sessione.setCategory(.playAndRecord)       // sul Mac alcune opzioni dell'iPhone non valgono: si va sul semplice
+                }
                 try sessione.setActive(true)
                 mani.quandoSente = { [weak self] in
                     guard let richiamo = self else { return }
