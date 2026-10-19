@@ -106,7 +106,7 @@ final class Jarvis: NSObject, ObservableObject {
     private let registratore = RegistratoreVoce()
     /// Sul Mac, in attesa: battiti di mani e frasi trascritte in cloud, al posto del richiamo di Apple.
     private lazy var attesaMac: AttesaMac = {
-        let a = AttesaMac()
+        let a = AttesaMac(motore: motore)          // un solo motore audio sul Mac, quello che funziona già per il tocco
         a.applauso = { [weak self, weak a] in a?.segnaBattiti(); self?.applaudito() }
         a.diagnosi = { [weak self] riga in self?.diagnosiMac = riga }
         a.frase = { [weak self] testo, inizio in self?.fraseSentitaMac(testo, inizio: inizio) }

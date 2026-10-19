@@ -231,9 +231,13 @@ final class AttesaMac {
     var applauso: (() -> Void)?
     /// Il testo trascritto e il momento in cui il signore ha cominciato a dirlo.
     var frase: ((String, Date) -> Void)?
-    private let motore = AVAudioEngine()
+    private let motore: AVAudioEngine          // lo stesso motore dell'ascolto (sul Mac funziona già quello: niente secondo motore)
     private let mani = BattitoMani()
     private let segmenti = Segmentatore()
+    private var errore = ""                    // perché il microfono non è partito (si vede nella riga di controllo)
+    private var mio = false                    // il motore in questo momento lo sta usando l'attesa
+
+    init(motore: AVAudioEngine) { self.motore = motore }
     private var voluto = false
     private var acceso = false
     private var inViaggio = false
@@ -271,7 +275,7 @@ final class AttesaMac {
         controllo = Task { [weak self] in
             while let self, !Task.isCancelled, self.voluto {
                 let l = self.segmenti.livelli
-                let mic = self.attivo ? (l.parla ? "◉ sento" : "● in ascolto") : "○ microfono spento"
+                let mic = self.attivo ? (l.parla ? "◉ sento" : "● in ascolto") : "○ microfono spento" + (self.errore.isEmpty ? "" : " (\(self.errore.prefix(60)))")
                 var riga = "\(mic) · livello \(Int(l.voce * 1000)) / silenzio \(Int(l.fondo * 1000)) · frasi \(self.frasiMandate)"
                 if !self.ultimaSentita.isEmpty { riga += " · «\(self.ultimaSentita.prefix(40))»" }
                 self.diagnosi?(riga)
@@ -302,25 +306,46 @@ final class AttesaMac {
             }
             mani.azzera()
             segmenti.azzera()
+            if motore.isRunning { motore.stop() }   // qui si arriva solo in attesa: l'ascolto vero è già chiuso
+            mio = true
             try AttesaMac.collega(motore, mani, segmenti)
             motore.prepare()
             try motore.start()
             acceso = true
-            // cuffie collegate, microfono cambiato: il motore si ferma da solo; qui si riaccende
-            osservatore = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: motore, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.riaccendiFraPoco() }
-            }
+            errore = ""
+            sorveglia()
         } catch {
+            errore = error.localizedDescription
             spegni()
             riaccendiFraPoco()
         }
     }
 
+    /// Spegne il microfono solo se in questo momento è dell'attesa: il motore è condiviso con l'ascolto vero e proprio.
     private func spegni() {
         if let o = osservatore { NotificationCenter.default.removeObserver(o); osservatore = nil }
+        guard mio else { acceso = false; return }
+        mio = false
         if motore.isRunning { motore.stop() }
         motore.inputNode.removeTap(onBus: 0)
         acceso = false
+    }
+
+    /// Ogni 3 secondi: se il microfono si è fermato da solo (cuffie collegate, microfono cambiato) lo riaccende.
+    private func sorveglia() {
+        riprova?.cancel()
+        riprova = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(3))
+                guard let self, !Task.isCancelled, self.voluto else { return }
+                if !self.motore.isRunning {
+                    self.errore = "il microfono si è fermato, lo riaccendo"
+                    self.acceso = false
+                    self.accendi()
+                    return
+                }
+            }
+        }
     }
 
     private func riaccendiFraPoco() {
