@@ -17,8 +17,9 @@ enum Benvenuto {
         guard f.count <= 32 else { return false }        // solo la frase di Tony, non un discorso che la contiene
         if f.contains("papà è a casa") || f.contains("papà è tornato") { return true }
         // «daddy» da solo non basta (una canzone, un nome): serve anche «home» o «wake up»
-        let papa = ["daddy", "daddi", "deddy", "dedi's", "dady"].contains { f.contains($0) }
-        return papa && ["home", "hom", "wake", "weak", "uek", "week"].contains { f.contains($0) }
+        let papa = ["daddy", "daddi", "deddy", "deddi", "dedi", "dady", "dadi", "dad's", "dads"].contains { f.contains($0) }
+        let resto = ["home", "hom", " om", "wake", "weak", "uek", "week", "uei", "ueik", "ap "].contains { f.contains($0) }
+        return papa && resto
     }
 
     /// Qualche secondo di Clash, poi sfuma. Restituisce falso se non è riuscito a farlo partire.

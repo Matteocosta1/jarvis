@@ -132,7 +132,7 @@ final class Richiamo {
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
-        r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
+        r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis", "wake up", "daddy's home", "wake up daddy's home"]
         if ric.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         richiesta = r
         turno += 1
@@ -456,7 +456,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
                 else if dopo > hz * 130 / 1000 {
                     let media = c.finestre > 0 ? c.coda / Float(c.finestre) : 0
                     candidato = nil
-                    if media < c.energia * 0.3 {                  // si è spento subito: è un battito
+                    if media < c.energia * 0.4 {                  // si è spento subito: è un battito
                         if primoBattito >= 0, c.inizio - primoBattito >= hz * 150 / 1000, c.inizio - primoBattito <= hz * 800 / 1000 {
                             primoBattito = -1
                             pausaFino = ora + hz * 2
@@ -468,10 +468,10 @@ nonisolated final class BattitoMani: @unchecked Sendable {
                         primoBattito = -1                         // suono lungo (voce, musica): non conta
                     }
                 }
-            } else if ora >= pausaFino, picco > max(0.12, fondo * 14), energia > fondo * 7 {
+            } else if ora >= pausaFino, picco > max(0.08, fondo * 10), energia > fondo * 5 {
                 if BattitoMani.daIgnorare {
                     primoBattito = -1                             // un suono dell'app: non conta
-                } else if primoBattito < 0 && AmbienteSonoro.condiviso.affollato {
+                } else if primoBattito < 0 && AmbienteSonoro.condiviso.affollato && picco < 0.3 {
                     // musica o folla intorno: nessun primo battito
                 } else {
                     candidato = (ora, energia, 0, 0)

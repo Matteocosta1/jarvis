@@ -377,6 +377,22 @@ final class Jarvis: NSObject, ObservableObject {
         ultimiBattiti = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.pronto()                               // «pronto»: ora la frase
+        mostraRito("👏👏  Sì, Sir?")
+        attesaBattiti?.cancel()
+        attesaBattiti = Task { [weak self] in       // se la frase non arriva (o il riconoscimento non la capisce) parte lo stesso
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled, let self, self.ultimiBattiti != .distantPast else { return }
+            self.benvenuto()
+        }
+    }
+
+    /// Una riga sullo schermo per qualche secondo: così si vede che JARVIS ha sentito (battiti o frase).
+    private func mostraRito(_ testo: String) {
+        stato = testo
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            if self?.stato == testo { self?.stato = nil }
+        }
     }
 
     /// «Wake up, daddy's home».
@@ -388,9 +404,10 @@ final class Jarvis: NSObject, ObservableObject {
         ultimaFraseTony = Date()                     // aspetto i battiti…
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         Suoni.pronto()
+        mostraRito("Daddy's home… 👏👏?")
         attesaBattiti?.cancel()
         attesaBattiti = Task { [weak self] in       // …ma se non arrivano, il rito parte lo stesso: la frase non va mai persa
-            try? await Task.sleep(for: .seconds(Jarvis.finestraRito))
+            try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled, let self, self.ultimaFraseTony != .distantPast else { return }
             self.benvenuto()
         }
