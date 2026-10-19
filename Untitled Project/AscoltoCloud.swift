@@ -110,6 +110,11 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         lock.unlock()
         let x = fr == 16_000 ? grezzi : RegistroMicrofono.a16k(grezzi, da: fr)
         let hz = UInt32(fr >= 16_000 ? 16_000 : fr)          // un microfono Bluetooth a 8 kHz resta a 8 kHz (a16k non lo alza)
+        return RegistratoreVoce.creaWAV(x, hz: hz)
+    }
+
+    /// Campioni (−1…1) → file WAV mono a 16 bit.
+    static func creaWAV(_ x: [Float], hz: UInt32) -> Data {
         var pcm = Data(capacity: x.count * 2)
         for v in x {
             let s = Int16(v.isFinite ? max(-1, min(1, v)) * 32_767 : 0)
@@ -143,5 +148,149 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         if codice == 200 { return ((json?["testo"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), nil) }
         if codice == 401 { return (nil, "La parola d'ordine non coincide, Sir.") }
         return (nil, "Non ho capito, Sir. Riprovi.")
+    }
+}
+
+/// Il Mac in attesa: le frasi dette nella stanza, una alla volta. Quando la voce parte e poi si ferma (0,8 s di silenzio)
+/// consegna la frase come WAV a 16 kHz, con un attimo di audio prima (così la prima sillaba non si perde).
+nonisolated final class Segmentatore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fondo: Float = 0.004
+    private var inVoce = false
+    private var voceDi: Double = 0
+    private var silenzioDi: Double = 0
+    private var durata: Double = 0
+    private var prima: [Float] = []             // gli ultimi 0,4 s prima che parlasse
+    private var campioni: [Float] = []
+    private var avviso: (@Sendable (Data) -> Void)?
+
+    var quandoFrase: (@Sendable (Data) -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return avviso }
+        set { lock.lock(); avviso = newValue; lock.unlock() }
+    }
+
+    func azzera() {
+        lock.lock()
+        fondo = 0.004; inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
+        lock.unlock()
+    }
+
+    func analizza(_ b: AVAudioPCMBuffer) {
+        guard let dati = b.floatChannelData?[0] else { return }
+        let n = Int(b.frameLength), fr = b.format.sampleRate
+        guard n > 0, fr > 0 else { return }
+        var somma: Float = 0
+        for k in 0..<n { somma += dati[k] * dati[k] }
+        let energia = (somma / Float(n)).squareRoot()
+        let secondi = Double(n) / fr
+        let pezzo = RegistroMicrofono.a16k(Array(UnsafeBufferPointer(start: dati, count: n)), da: fr)
+        var pronta: [Float]?
+        lock.lock()
+        let soglia = max(fondo * 3.5, 0.015)
+        if !inVoce {
+            prima.append(contentsOf: pezzo)
+            if prima.count > 6_400 { prima.removeFirst(prima.count - 6_400) }
+            if energia > soglia {
+                voceDi += secondi
+                if voceDi >= 0.15 { inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0 }
+            } else {
+                voceDi = 0
+                fondo = fondo * 0.95 + energia * 0.05
+            }
+        } else {
+            campioni.append(contentsOf: pezzo)
+            durata += secondi
+            silenzioDi = energia > soglia ? 0 : silenzioDi + secondi
+            if silenzioDi >= 0.8 || durata >= 10 {
+                if durata - silenzioDi >= 0.5 { pronta = campioni }      // un colpo o un «bip» non sono una frase
+                inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
+            }
+        }
+        let chiama = pronta != nil ? avviso : nil
+        lock.unlock()
+        if let pronta, let chiama { chiama(RegistratoreVoce.creaWAV(pronta, hz: 16_000)) }
+    }
+}
+
+/// Sul Mac, al posto del richiamo di Apple (che lì spesso non parte, e con lui i battiti di mani):
+/// un solo microfono acceso in attesa che sente i due battiti (tutto locale) e manda alle orecchie in cloud
+/// le frasi dette nella stanza. Chi lo usa decide cosa farne: «Jarvis, …», la frase di Tony, o il seguito subito dopo una risposta.
+/// Freno: al massimo 20 frasi ogni 10 minuti, e niente con folla, musica o TV intorno (i battiti restano).
+@MainActor
+final class AttesaMac {
+    var applauso: (() -> Void)?
+    var frase: ((String) -> Void)?
+    private let motore = AVAudioEngine()
+    private let mani = BattitoMani()
+    private let segmenti = Segmentatore()
+    private(set) var attivo = false
+    private var inViaggio = false
+    private var invii: [Date] = []
+
+    func avvia() {
+        guard !attivo, AVAudioApplication.shared.recordPermission == .granted else { return }
+        do {
+            let sessione = AVAudioSession.sharedInstance()
+            do {
+                try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+            } catch {
+                try sessione.setCategory(.playAndRecord, options: [.mixWithOthers])
+            }
+            try sessione.setActive(true)
+            mani.quandoSente = { [weak self] in
+                Task { @MainActor [weak self] in self?.applauso?() }
+            }
+            segmenti.quandoFrase = { [weak self] audio in
+                Task { @MainActor [weak self] in self?.trascrivi(audio) }
+            }
+            mani.azzera()
+            segmenti.azzera()
+            try AttesaMac.collega(motore, mani, segmenti)
+            motore.prepare()
+            try motore.start()
+            attivo = true
+        } catch {
+            motore.inputNode.removeTap(onBus: 0)
+            attivo = false
+        }
+    }
+
+    func ferma() {
+        guard attivo else { return }
+        attivo = false
+        if motore.isRunning { motore.stop() }
+        motore.inputNode.removeTap(onBus: 0)
+    }
+
+    private func trascrivi(_ audio: Data) {
+        guard attivo, !inViaggio, !AmbienteSonoro.condiviso.affollato else { return }
+        let adesso = Date()
+        invii.removeAll { adesso.timeIntervalSince($0) > 600 }
+        guard invii.count < 20 else { return }
+        invii.append(adesso)
+        inViaggio = true
+        Task { [weak self] in
+            let (testo, _) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
+            guard let self else { return }
+            self.inViaggio = false
+            guard self.attivo, let testo, !testo.isEmpty else { return }
+            self.frase?(testo)
+        }
+    }
+
+    nonisolated private static func collega(_ motore: AVAudioEngine, _ mani: BattitoMani, _ segmenti: Segmentatore) throws {
+        let input = motore.inputNode
+        let formato = input.outputFormat(forBus: 0)
+        guard formato.sampleRate > 0, formato.channelCount > 0 else {
+            throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
+        }
+        input.removeTap(onBus: 0)
+        let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)
+        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
+            mani.analizza(buffer)
+            segmenti.analizza(buffer)
+            ambiente?.analizza(buffer, posizione: quando.sampleTime)
+            RegistroMicrofono.condiviso.scrivi(buffer)
+        }
     }
 }

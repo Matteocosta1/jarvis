@@ -103,6 +103,15 @@ final class Jarvis: NSObject, ObservableObject {
     /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
     nonisolated static var usaAscoltoCloud: Bool { ProcessInfo.processInfo.isiOSAppOnMac }
     private let registratore = RegistratoreVoce()
+    /// Sul Mac, in attesa: battiti di mani e frasi trascritte in cloud, al posto del richiamo di Apple.
+    private lazy var attesaMac: AttesaMac = {
+        let a = AttesaMac()
+        a.applauso = { [weak self] in self?.applaudito() }
+        a.frase = { [weak self] testo in self?.fraseSentitaMac(testo) }
+        return a
+    }()
+    /// Sul Mac, subito dopo una risposta: per qualche secondo si può continuare a parlare senza dire «Jarvis».
+    private var liberoMacFinoA = Date.distantPast
     private var ascoltoCloud = false       // sta registrando una frase da trascrivere in cloud
     private var ultimaFraseAVoce = ""      // la frase della domanda in corso (vuota se scritta)
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
@@ -341,6 +350,17 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func aggiornaRichiamo() {
+        if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
+            avvioRichiamo?.cancel()
+            guard richiamoServe else { attesaMac.ferma(); return }
+            guard !attesaMac.attivo else { return }
+            avvioRichiamo = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let self, !Task.isCancelled, self.richiamoServe else { return }
+                self.attesaMac.avvia()
+            }
+            return
+        }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
         avvioRichiamo?.cancel()
         guard richiamoServe else { richiamo.ferma(); return }
@@ -1035,6 +1055,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto else { return }   // i Clash non si spengono
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
+        if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»
         strumenti.apriInSospeso()    // WhatsApp, Mappe, telefono: si aprono quando JARVIS ha finito di parlare
         if let l = strumenti.interpreteDaAprire {   // «traduci in spagnolo»: l'interprete parte appena ha finito la frase
             strumenti.interpreteDaAprire = nil
@@ -1092,6 +1113,7 @@ final class Jarvis: NSObject, ObservableObject {
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         if Jarvis.usaAscoltoCloud {
+            attesaMac.ferma()
             // chiamato per nome: gli ultimi 3 secondi già sentiti (dentro c'è «Jarvis» e l'inizio della domanda), presi solo adesso
             // che il richiamo è spento, così non si perde niente di ciò che ha detto nel frattempo
             avviaAscoltoCloud(bip: bip, precarica: dalNome ? RegistroMicrofono.condiviso.ultimi(3) : [])
@@ -1143,6 +1165,25 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     // MARK: Ascolto in cloud (Mac)
+
+    /// Mac: una frase sentita in attesa (già trascritta). La prende se c'è «Jarvis», se è la frase di Tony,
+    /// o se arriva subito dopo una risposta (il seguito del discorso); il resto della stanza non è per lui.
+    private func fraseSentitaMac(_ testo: String) {
+        guard fase == .attesa || fase == .elaboro else { return }
+        let basso = testo.lowercased()
+        let conNome = Richiamo.nomi.contains { basso.contains($0) }
+        let dopo = conNome ? (Richiamo.dopoRichiamo(testo) ?? "") : testo
+        let tony = Benvenuto.eFraseDiTony(testo) || Benvenuto.eFraseDiTony(dopo)
+        guard conNome || tony || Date() < liberoMacFinoA else { return }
+        liberoMacFinoA = .distantPast
+        if fase == .elaboro { segnaInterruzione(); interrompi() }   // stava pensando: lo fermo, come sull'iPhone
+        avviso = nil
+        parziale = ""
+        if tony { fraseDiTony(); return }
+        if dopo.isEmpty { Task { await avviaAscolto(bip: true) }; return }   // solo «Jarvis»: ora la domanda
+        if foto == nil, eseguiComando(dopo) { return }
+        Task { await instrada(dopo) }
+    }
 
     /// Registra la frase; quando il signore ha finito (o tocca il reattore) la trascrive in cloud e la manda come sull'iPhone.
     private func avviaAscoltoCloud(bip: Bool, precarica: [Float]) {
