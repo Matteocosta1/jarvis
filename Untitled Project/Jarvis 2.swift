@@ -358,10 +358,38 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 
-    /// Due battiti di mani (o «wake up, daddy's home»): i Clash per qualche secondo, poi il saluto. Solo quando è in attesa.
+    /// Il rito di Tony: due battiti di mani + «Wake up, daddy's home», in qualsiasi ordine, a meno di 8 secondi l'uno dall'altra.
+    /// Arrivati tutti e due: i Clash per qualche secondo, poi il saluto. Da soli: i battiti danno il segnale «pronto»
+    /// (e aprono 8 secondi in cui basta parlare), la frase aspetta i battiti. Con i battiti spenti nelle impostazioni basta la frase.
     private var inBenvenuto = false
+    private var ultimiBattiti = Date.distantPast
+    private var ultimaFraseTony = Date.distantPast
+    private static let finestraRito: TimeInterval = 8
+
+    /// Due battiti di mani.
     private func applaudito() {
         guard fase == .attesa, !inBenvenuto else { return }
+        if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
+        ultimiBattiti = Date()
+        richiamo.liberoFinoA = Date().addingTimeInterval(Jarvis.finestraRito)   // per la frase non serve dire «Jarvis»
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Suoni.pronto()
+    }
+
+    /// «Wake up, daddy's home».
+    private func fraseDiTony() {
+        guard !inBenvenuto else { return }
+        let maniAccese = UserDefaults.standard.object(forKey: "battitoMani") as? Bool ?? true
+        if !maniAccese || Date().timeIntervalSince(ultimiBattiti) < Jarvis.finestraRito { benvenuto(); return }
+        ultimaFraseTony = Date()                     // aspetto i battiti
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    /// Il rito è completo: i Clash, poi il saluto.
+    private func benvenuto() {
+        guard fase == .attesa, !inBenvenuto else { return }
+        ultimiBattiti = .distantPast
+        ultimaFraseTony = .distantPast
         inBenvenuto = true
         aggiornaRichiamo()                           // mentre suona la musica non ascolta: le parole del pezzo non sono domande
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -390,7 +418,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
     @discardableResult
     func eseguiComando(_ frase: String) -> Bool {
-        if Benvenuto.eFraseDiTony(frase) { applaudito(); return true }
+        if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
         guard case .apri(let reparto)? = ComandoVocale.riconosci(frase) else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if let a = reparto.annuncio {
