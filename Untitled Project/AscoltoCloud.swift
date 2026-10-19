@@ -19,7 +19,7 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
     private var avviso: (@Sendable () -> Void)?
 
     /// Silenzio dopo la voce che chiude la frase.
-    private let silenzioFine: Double = 1.3
+    private let silenzioFine: Double = 0.9
     /// Tetto: una domanda non dura più di così.
     private let massimo: Double = 30
     /// Se non dice niente entro questo tempo, si chiude.
@@ -133,15 +133,14 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
 
     /// Manda l'audio alle orecchie in cloud e restituisce il testo (o un messaggio d'errore da mostrare).
     static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (testo: String?, errore: String?) {
-        let base = indirizzo
-        let url = base.hasSuffix("/jarvis") ? base + "-ascolto" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-ascolto")
-        guard !token.isEmpty, let u = URL(string: url) else { return (nil, "Manca la parola d'ordine nelle impostazioni, Sir.") }
+        // dritto al cervello (già sveglio) che la passa a ElevenLabs: mezzo secondo invece di 7-8
+        guard !token.isEmpty, let u = URL(string: indirizzo) else { return (nil, "Manca la parola d'ordine nelle impostazioni, Sir.") }
         var req = URLRequest(url: u)
         req.httpMethod = "POST"
-        req.timeoutInterval = 30
+        req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["audio": audio.base64EncodedString(), "formato": "wav"])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["trascrivi": audio.base64EncodedString()])
         guard let (d, r) = try? await URLSession.shared.data(for: req) else { return (nil, "Non raggiungo le mie orecchie in cloud, Sir.") }
         let codice = (r as? HTTPURLResponse)?.statusCode ?? 0
         let json = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
@@ -211,7 +210,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
                 // e il livello del silenzio sale fin lì, così non continua a mandare rumore in cloud
                 fondo = max(fondo, energia / 3)
                 inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
-            } else if silenzioDi >= 0.8 || durata >= 10 {
+            } else if silenzioDi >= 0.7 || durata >= 10 {
                 if durata - silenzioDi >= 0.5 { pronta = campioni }      // un colpo o un «bip» non sono una frase
                 inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
             }

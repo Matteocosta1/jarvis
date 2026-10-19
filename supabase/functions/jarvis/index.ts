@@ -2212,6 +2212,35 @@ async function elencoVoci() {
   return json({ attiva: true, predefinita: voceAttuale(), modello: await scegliModelloVoce(chiave), voci });
 }
 
+// ───────────────────────── Orecchie veloci (Mac) ─────────────────────────
+// Il Mac registra la frase (WAV 16 kHz) e la manda qui: ElevenLabs Scribe la trascrive in circa mezzo secondo.
+// Il cervello è quasi sempre già acceso, quindi niente attesa d'avvio. Dentro il piano ElevenLabs (ore di trascrizione incluse).
+async function trascriviVeloce(b64: string) {
+  const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
+  if (!chiave) return json({ errore: "manca ELEVENLABS_API_KEY" }, 503);
+  if (b64.length < 100 || b64.length > 3_000_000) return json({ errore: "audio mancante o troppo lungo" }, 400);
+  let audio: Uint8Array;
+  try { audio = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); } catch { return json({ errore: "audio non leggibile" }, 400); }
+  let ultimo = "";
+  for (const modello of ["scribe_v2", "scribe_v1"]) {
+    const f = new FormData();
+    f.append("model_id", modello);
+    f.append("language_code", "ita");
+    f.append("tag_audio_events", "false");
+    f.append("file", new Blob([audio], { type: "audio/wav" }), "voce.wav");
+    try {
+      const r = await fetch(`${XI}/speech-to-text`, { method: "POST", headers: { "xi-api-key": chiave }, body: f, signal: AbortSignal.timeout(8000) });
+      if (r.ok) {
+        const d = await r.json();
+        return json({ testo: String(d.text ?? "").trim(), fonte: modello });
+      }
+      ultimo = `ElevenLabs ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`;
+      if (r.status === 401 || r.status === 402 || r.status === 403 || r.status === 429) break;
+    } catch (e) { ultimo = `ElevenLabs: ${(e as Error).message}`; }
+  }
+  return json({ errore: ultimo }, 502);
+}
+
 // ───────────────────────── HTTP ─────────────────────────
 function uguali(a: string, b: string) {
   if (!a || a.length !== b.length) return false;
@@ -2236,6 +2265,7 @@ Deno.serve(async (req) => {
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
   if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true);   // una frase da dire con la voce di JARVIS
+  if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
   if (corpo?.voci === true) return await elencoVoci();                                      // voci disponibili sull'account ElevenLabs
   if (corpo?.github === true) {                                                             // scheda GitHub
     try { return json(await paginaGithub(corpo.repo)); } catch (e) { return json({ errore: (e as Error).message }); }
