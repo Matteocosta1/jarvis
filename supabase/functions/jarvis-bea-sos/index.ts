@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
   // freno contro la raffica: un allarme vero al minuto (il primo è già partito), al massimo 5 prove all'ora
   const finestra = new Date(Date.now() - (prova ? 3600_000 : 60_000)).toISOString();
-  const { count: recenti } = await db.from("jarvis_bea_sos").select("id", { count: "exact", head: true }).eq("prova", prova).gte("creato", finestra);
+  const { count: recenti } = await db.from("jarvis_bea_sos").select("id", { count: "exact", head: true }).eq("prova", prova).gt("inviate", 0).gte("creato", finestra);   // conta solo gli avvisi arrivati davvero: se il primo è fallito, il secondo passa
   if ((recenti ?? 0) >= (prova ? 5 : 1)) return json({ ok: true, gia_inviato: true });
 
   const titolo = prova ? "Prova · Bea ha bisogno di lei" : "Bea ha bisogno di lei";
