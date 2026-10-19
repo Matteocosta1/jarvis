@@ -358,10 +358,20 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
     }
 
-    /// Due battiti di mani: come toccare il reattore, ma da lontano. Solo quando JARVIS è in attesa.
+    /// Due battiti di mani (o «wake up, daddy's home»): i Clash per qualche secondo, poi il saluto. Solo quando è in attesa.
+    private var inBenvenuto = false
     private func applaudito() {
-        guard fase == .attesa else { return }
-        Task { await avviaAscolto(bip: true) }
+        guard fase == .attesa, !inBenvenuto else { return }
+        inBenvenuto = true
+        richiamo.ferma()                             // mentre suona la musica non ascolta: le parole del pezzo non sono domande
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        Task {
+            _ = await Benvenuto.suona()
+            inBenvenuto = false
+            leggi(Benvenuto.saluto())                // finito il saluto torna in attesa e il richiamo riparte da solo
+            try? await Task.sleep(for: .seconds(1))
+            if fase == .attesa { aggiornaRichiamo() } // modalità silenziosa: nessuna voce, il richiamo va riacceso a mano
+        }
     }
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
@@ -380,6 +390,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
     @discardableResult
     func eseguiComando(_ frase: String) -> Bool {
+        if Benvenuto.eFraseDiTony(frase) { applaudito(); return true }
         guard case .apri(let reparto)? = ComandoVocale.riconosci(frase) else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if let a = reparto.annuncio {
