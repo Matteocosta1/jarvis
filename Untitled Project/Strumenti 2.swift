@@ -12,7 +12,7 @@ final class Strumenti {
     static let nomi = ["calendario_crea", "calendario_leggi", "promemoria_crea", "contatti_cerca", "chiama", "messaggio", "naviga",
                        "invia_messaggio", "riconosci_musica", "apri_apple_music", "foto_cerca", "apri_pagina",
                        "musica_riproduci", "musica_controllo", "meteo_qui", "salute_riepilogo", "conversazione_pulisci", "guarda", "interprete_avvia",
-                       "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando"]
+                       "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando", "comando_app"]
 
     /// Nome del Comando rapido che invia SMS e iMessage senza conferma.
     static let comandoInvio = "JARVIS invia"
@@ -42,6 +42,7 @@ final class Strumenti {
         case "telefono_luminosita": return "regolo lo schermo"
         case "telefono_batteria": return "controllo la batteria"
         case "telefono_comando": return "comando il telefono"
+        case "comando_app": return "subito"
         default: return "un attimo"
         }
     }
@@ -63,6 +64,8 @@ final class Strumenti {
     private var fotoOcchi: [Data] = []
     /// «Jarvis, traduci in spagnolo»: la lingua dell'interprete da aprire appena JARVIS ha finito di parlare.
     var interpreteDaAprire: Lingua?
+    /// Un comando dell'app capito dal cervello in una frase storpiata («rito» o un reparto): parte appena JARVIS ha finito di parlare.
+    var comandoDaEseguire: String?
 
     func prendiFotoOcchi() -> [Data] {
         defer { fotoOcchi = [] }
@@ -80,7 +83,7 @@ final class Strumenti {
         UIApplication.shared.open(url)
     }
 
-    func annullaInSospeso() { daAprire.removeAll() }
+    func annullaInSospeso() { daAprire.removeAll(); comandoDaEseguire = nil }
 
     // MARK: Permessi
     // Versioni a callback con chiusura @Sendable: i callback arrivano su un thread qualsiasi e non devono
@@ -133,6 +136,13 @@ final class Strumenti {
             case "telefono_luminosita": return (try luminosita(i), false)
             case "telefono_batteria": return (batteria(), false)
             case "telefono_comando": return (try comandoTelefono(i), false)
+            case "comando_app":
+                let c = i["comando"] as? String ?? ""
+                guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }
+                comandoDaEseguire = c
+                return (json(["ok": true, "nota": c == "rito"
+                    ? "il rito parte appena hai finito di parlare (i Clash e poi il saluto): rispondi soltanto «Subito, Sir.»"
+                    : "la sezione si apre appena hai finito di parlare: rispondi con una frase brevissima"]), false)
             default: return (json(["errore": "strumento \(nome) non disponibile sull'iPhone"]), true)
             }
         } catch {

@@ -344,6 +344,8 @@ const STRUMENTI_CLIENT: Record<string, any> = {
     input_schema: { type: "object", properties: { comando: { type: "string", enum: ["timer", "sveglia", "non_disturbare", "wifi", "bluetooth"] }, valore: { type: "string" } }, required: ["comando", "valore"] } },
   salute_battito: { description: "Legge dall'app Salute i battiti cardiaci: ultimo valore con l'ora, media, minimo e massimo nelle ultime ore, battito a riposo di oggi.",
     input_schema: { type: "object", properties: { ore: { type: "number", description: "finestra in ore, default 3" } } } },
+  comando_app: { description: "Esegue un comando dell'app JARVIS quando la frase del signore, storpiata dal riconoscimento vocale, era chiaramente quel comando e non una domanda. «rito»: il rito di Tony Stark, cioè «Wake up, daddy's home» (il riconoscimento italiano lo scrive anche «backup daddy», «wake up dady», «uei cap daddy», «daddy's home»…): partono i Clash e poi il saluto, quindi tu rispondi soltanto «Subito, Sir.». Gli altri valori aprono quella sezione dell'app («attiva la sentinella», «apri il diario», «fammi vedere il sonno»…), con una frase brevissima. Il dispositivo impara la frase così come l'ha sentita: la volta dopo il comando parte da solo, senza passare da te. Nel dubbio non usarlo: una domanda vera resta una domanda.",
+    input_schema: { type: "object", properties: { comando: { type: "string", enum: ["rito", "sentinella", "occhi", "giro", "profiler", "wiretap", "cucina", "scanner", "diario", "sonno", "cuore", "vitals", "confidente", "allenatore", "bea", "briefing", "meteo", "email", "spesa", "shazam", "foto", "ricordi", "interprete", "browser", "serata", "messaggi", "telefono", "github", "supabase", "archivio"] } }, required: ["comando"] } },
 };
 
 // Strumenti che un dispositivo descrive da sé (per funzioni nuove senza ripubblicare il cervello).
@@ -376,7 +378,7 @@ const NON_FIDATI = new Set(["web_search", "web_fetch", "email_leggi", "calendari
   "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "supabase_log"]);
 // Azioni che escono verso il mondo o cancellano: dopo aver letto testo altrui, servono una conferma del signore.
 const SEMPRE_PERICOLOSI = new Set(["invia_messaggio", "messaggio", "chiama", "apri_pagina", "telefono_comando", "github_scrivi", "archivio_apri", "archivio_elimina",
-  "diario_cancella", "memoria_dimentica", "memoria_salva"]);
+  "diario_cancella", "memoria_dimentica", "memoria_salva", "comando_app"]);
 const FERMATO = "fermato per sicurezza: in questo turno ho letto contenuti esterni. Chieda al signore di confermare questa azione; nel prossimo messaggio, se conferma, si può fare.";
 function pericoloso(nome: string, i: Record<string, any>) {
   if (SEMPRE_PERICOLOSI.has(nome)) return true;

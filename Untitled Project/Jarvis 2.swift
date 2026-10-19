@@ -99,6 +99,8 @@ final class Jarvis: NSObject, ObservableObject {
     private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
+    private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
+    private var ultimaFraseAVoce = ""      // la frase della domanda in corso (vuota se scritta)
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
     @Published var occhi: Occhiata?        // fotocamera aperta (occhi di JARVIS)
     @Published var interprete: Lingua?     // modalità interprete aperta
@@ -287,6 +289,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Decide se la frase è una domanda nuova o il completamento della precedente, e la manda al cervello.
     private func instrada(_ frase: String) async {
+        fraseAVoce = frase                            // se il cervello capisce che era un comando, questa frase si impara
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
             aggiuntaInArrivo = true
@@ -461,14 +464,24 @@ final class Jarvis: NSObject, ObservableObject {
     @discardableResult
     func eseguiComando(_ frase: String) -> Bool {
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
+        // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
+        if let imparato = Storpiature.cerca(frase) {
+            if imparato == "rito" { fraseDiTony(); return true }
+            if let r = Reparto(rawValue: imparato) { apriReparto(r); return true }
+        }
         guard case .apri(let reparto)? = ComandoVocale.riconosci(frase) else { return false }
+        apriReparto(reparto)
+        return true
+    }
+
+    /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
+    private func apriReparto(_ reparto: Reparto, annuncia: Bool = true) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        if let a = reparto.annuncio {
+        if annuncia, let a = reparto.annuncio {
             flussoFinito = true                     // una frase sola: finita quella, JARVIS torna in attesa
             accodaVoce(a, forza: true)
         }
         repartoRichiesto = reparto
-        return true
     }
 
     /// Il giro con gli occhi chiesto a voce: 5 secondi, 4 fotogrammi, poi JARVIS dice cosa ha visto.
@@ -593,6 +606,8 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
+        ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
+        fraseAVoce = ""
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
         let giroDaMandare = fotoGiro
@@ -1003,7 +1018,7 @@ final class Jarvis: NSObject, ObservableObject {
         if !Impostazioni.richiamo { Suoni.pronto() }   // col richiamo a voce si chiude come una persona: in silenzio
         Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
             try? await Task.sleep(for: .milliseconds(400))
-            guard let self, self.fase == .attesa, self.inCoda.isEmpty else { return }
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto else { return }   // i Clash non si spengono
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         strumenti.apriInSospeso()    // WhatsApp, Mappe, telefono: si aprono quando JARVIS ha finito di parlare
@@ -1018,6 +1033,11 @@ final class Jarvis: NSObject, ObservableObject {
         if strumenti.pulireChat {    // «cancella la conversazione»: dopo aver risposto, schermo pulito
             strumenti.pulireChat = false
             nuovaConversazione()
+        }
+        if let c = strumenti.comandoDaEseguire {   // il cervello ha capito un comando storpiato: lo eseguo e lo imparo
+            strumenti.comandoDaEseguire = nil
+            if !ultimaFraseAVoce.isEmpty { Storpiature.impara(ultimaFraseAVoce, comando: c) }
+            if c == "rito" { benvenuto() } else if let r = Reparto(rawValue: c) { apriReparto(r, annuncia: false) }
         }
     }
 
