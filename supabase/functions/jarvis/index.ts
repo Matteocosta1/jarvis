@@ -1851,11 +1851,16 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
       ...(errore ? { level: "ERROR", statusMessage: errore.slice(0, 300) } : {}),
     },
   };
+  const traccia = { id: crypto.randomUUID(), timestamp: inizio.toISOString(), type: "trace-create",
+    body: { id, timestamp: inizio.toISOString(), name: "jarvis", metadata: { modello: modello, strumenti } } };
   inSottofondo(fetch(`${host}/api/public/ingestion`, {
     method: "POST", signal: AbortSignal.timeout(8000),
     headers: { authorization: "Basic " + btoa(`${pub}:${sec}`), "content-type": "application/json" },
-    body: JSON.stringify({ batch: [evento] }),
-  }).then(() => {}, () => {}));
+    body: JSON.stringify({ batch: [traccia, evento] }),
+  }).then(async (r) => {
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d?.errors?.length) console.log(`langfuse non riuscito: ${r.status} ${JSON.stringify(d?.errors ?? d).slice(0, 300)}`);
+  }, (e) => console.log(`langfuse non raggiungibile: ${(e as Error).message}`)));
 }
 
 async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void) {
