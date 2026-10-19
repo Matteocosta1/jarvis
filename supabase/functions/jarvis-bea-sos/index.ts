@@ -3,9 +3,6 @@
 // POST, header x-bea-chiave = segreto BEA_SOS_CHIAVE (una chiave sola per questo: non apre nient'altro di JARVIS).
 // Corpo (JSON): { lat?: number, lon?: number, prova?: boolean }
 // Segreti: BEA_SOS_CHIAVE, JARVIS_BUNDLE_ID, APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID.
-// Chiamata di riserva (Twilio): se dopo un minuto il signore non ha aperto l'avviso, lo chiama al telefono.
-//   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_NUMERO (il numero Twilio da cui chiamare), SIGNORE_TELEFONO (+39…)
-//   Facoltativo: SOS_ATTESA_SECONDI (default 60).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
@@ -39,34 +36,6 @@ async function push(host: string, jwt: string, token: string, corpo: Record<stri
   let motivo = "";
   if (!r.ok) { try { motivo = (await r.json()).reason ?? ""; } catch { /* vuoto */ } }
   return { ok: r.ok, stato: r.status, motivo };
-}
-
-const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch { /* si lascia correre */ } };
-
-/// La chiamata di riserva: aspetta che il signore apra l'avviso; se non lo fa, Twilio lo chiama e una voce gli dice cosa succede.
-async function chiamataDiRiserva(id: number, prova: boolean, posizione: boolean) {
-  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "", token = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
-  const da = Deno.env.get("TWILIO_NUMERO") ?? "", a = Deno.env.get("SIGNORE_TELEFONO") ?? "";
-  if (!sid || !token || !da || !a) return;
-  const attesa = Math.min(Math.max(Number(Deno.env.get("SOS_ATTESA_SECONDI") || 60), 15), 120);
-  await new Promise((ok) => setTimeout(ok, attesa * 1000));
-  const { data } = await db.from("jarvis_bea_sos").select("visto_il").eq("id", id).maybeSingle();
-  if (data?.visto_il) { await db.from("jarvis_bea_sos").update({ chiamata: "non serve: avviso aperto" }).eq("id", id); return; }
-  const frase = prova
-    ? "Prova del Tocco d'aiuto. Questa è la chiamata di riserva di Jarvis. Funziona."
-    : `Attenzione. Bea ha bisogno di te. Ha chiesto aiuto ${posizione ? "e la sua posizione è nell'app Jarvis" : "ma la posizione non è arrivata"}. Chiamala subito.`;
-  const twiml = `<Response><Say language="it-IT" voice="Polly.Bianca">${frase}</Say><Pause length="1"/><Say language="it-IT" voice="Polly.Bianca">${frase}</Say></Response>`;
-  try {
-    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, {
-      method: "POST",
-      headers: { authorization: "Basic " + btoa(`${sid}:${token}`), "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: a, From: da, Twiml: twiml }),
-    });
-    const d = await r.json().catch(() => ({}));
-    await db.from("jarvis_bea_sos").update({ chiamata: r.ok ? `partita ${d.sid ?? ""}`.trim() : `errore ${r.status} ${d.message ?? ""}`.slice(0, 200) }).eq("id", id);
-  } catch (e) {
-    await db.from("jarvis_bea_sos").update({ chiamata: `errore ${(e as Error).message}`.slice(0, 200) }).eq("id", id);
-  }
 }
 
 Deno.serve(async (req) => {
@@ -104,7 +73,7 @@ Deno.serve(async (req) => {
   if (!jwt || !Deno.env.get("JARVIS_BUNDLE_ID")) return json({ errore: "notifiche Apple non configurate" }, 500);
   const { data } = await db.from("jarvis_dispositivi").select("token");
   const tokens = (data ?? []).map((d: any) => String(d.token));
-  // la riga c'è prima della notifica: l'app, aprendo l'avviso, la segna come vista (e la chiamata di riserva non parte)
+  // la riga c'è prima della notifica: l'app, aprendo l'avviso, la segna come vista
   const { data: riga } = await db.from("jarvis_bea_sos").insert({ lat, lon, prova, inviate: 0 }).select("id").single();
   const sosId = riga?.id ?? 0;
   const payload = {
@@ -117,9 +86,6 @@ Deno.serve(async (req) => {
     if (!e.ok && e.motivo === "BadDeviceToken") e = await push("https://api.sandbox.push.apple.com", jwt, t, payload);   // build da Xcode
     if (e.ok) inviate++;
   }
-  if (sosId) {
-    await db.from("jarvis_bea_sos").update({ inviate }).eq("id", sosId);
-    inSottofondo(chiamataDiRiserva(sosId, prova, !!(lat && lon)));
-  }
+  if (sosId) await db.from("jarvis_bea_sos").update({ inviate }).eq("id", sosId);
   return json({ ok: inviate > 0, inviate });
 });
