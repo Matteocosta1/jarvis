@@ -1,4 +1,4 @@
-// JARVIS — la Ronda. Ogni ora (pg_cron) controlla che i sistemi di JARVIS siano vivi.
+// JARVIS — Systems Check. Ogni ora (pg_cron) controlla che i sistemi di JARVIS siano vivi.
 // Notifica al signore SOLO quando qualcosa non va (e quando torna a posto); alle 21 un riepilogo della giornata.
 // Non usa l'intelligenza artificiale: costo zero. Chiamata da pg_cron con x-chiave-interna, o a mano con x-jarvis-token.
 // Corpo facoltativo: { riepilogo: true } forza il riepilogo serale; { prova: true } manda comunque una notifica di prova.
@@ -113,46 +113,46 @@ Deno.serve(async (req) => {
 
   const esiti = await controlla();
   const guasti = esiti.filter((e) => !e.ok);
-  const { data: ultimi } = await db.from("jarvis_ronda").select("ok, avvisato, creato").order("creato", { ascending: false }).limit(1);
+  const { data: ultimi } = await db.from("jarvis_systems").select("ok, avvisato, creato").order("creato", { ascending: false }).limit(1);
   const prima = ultimi?.[0];
   let avvisato = false;
 
   if (guasti.length) {
     // si avvisa al primo guasto, e poi ogni 6 ore finché non torna a posto (non ogni ora)
-    const ultimoAvviso = (await db.from("jarvis_ronda").select("creato").eq("avvisato", true).order("creato", { ascending: false }).limit(1)).data?.[0]?.creato;
+    const ultimoAvviso = (await db.from("jarvis_systems").select("creato").eq("avvisato", true).order("creato", { ascending: false }).limit(1)).data?.[0]?.creato;
     const daRipetere = !ultimoAvviso || Date.now() - new Date(ultimoAvviso).getTime() > 6 * 3600_000;
     if (!prima || prima.ok || daRipetere) {
       const testo = guasti.map((g) => `${g.nome}: ${g.dettaglio}`).join(" · ");
-      await avvisa("⚠️ JARVIS: qualcosa non va", testo, true);
+      await avvisa("⚠️ JARVIS · Systems Check", testo, true);
       avvisato = true;
     }
   } else if (prima && !prima.ok) {
-    await avvisa("JARVIS: tutto a posto", "I sistemi che non andavano sono tornati a funzionare, Sir.", false);
+    await avvisa("JARVIS · Systems Check", "I sistemi che non andavano sono tornati a funzionare, Sir.", false);
     avvisato = true;
   }
 
-  await db.from("jarvis_ronda").insert({ ok: guasti.length === 0, esiti, avvisato });
+  await db.from("jarvis_systems").insert({ ok: guasti.length === 0, esiti, avvisato });
 
   // riepilogo serale (alle 21, una volta sola) — o forzato
   let riepilogo: string | null = null;
   if (corpo?.riepilogo === true || oraRoma() === 21) {
     const oggi = giornoRoma();
-    const { data: fatto } = await db.from("jarvis_ronda").select("id").eq("riepilogo", oggi).limit(1);
+    const { data: fatto } = await db.from("jarvis_systems").select("id").eq("riepilogo", oggi).limit(1);
     if (corpo?.riepilogo === true || !fatto?.length) {
       const da = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const { data: giro } = await db.from("jarvis_ronda").select("ok, esiti, creato").is("riepilogo", null).gte("creato", da);
+      const { data: giro } = await db.from("jarvis_systems").select("ok, esiti, creato").is("riepilogo", null).gte("creato", da);
       const brutti = (giro ?? []).filter((r: any) => !r.ok);
       const nomi = [...new Set(brutti.flatMap((r: any) => (r.esiti ?? []).filter((e: any) => !e.ok).map((e: any) => e.nome)))];
       riepilogo = !brutti.length
         ? `Oggi tutti i sistemi sono andati, Sir. ${giro?.length ?? 0} controlli, nessun problema.`
         : `Oggi ${brutti.length} controll${brutti.length === 1 ? "o" : "i"} su ${giro?.length ?? 0} con problemi (${nomi.join(", ")}). ${guasti.length ? "Ancora da sistemare." : "Adesso è tutto a posto."}`;
-      await avvisa("JARVIS · giornata", riepilogo, false);
-      await db.from("jarvis_ronda").insert({ ok: guasti.length === 0, esiti: [], avvisato: true, riepilogo: oggi });
+      await avvisa("JARVIS · Systems Check · report", riepilogo, false);
+      await db.from("jarvis_systems").insert({ ok: guasti.length === 0, esiti: [], avvisato: true, riepilogo: oggi });
     }
   }
-  if (corpo?.prova === true) await avvisa("JARVIS · ronda di prova", guasti.length ? `Guasti: ${guasti.map((g) => g.nome).join(", ")}` : "Tutti i sistemi rispondono, Sir.", false);
+  if (corpo?.prova === true) await avvisa("JARVIS · Systems Check (prova)", guasti.length ? `Guasti: ${guasti.map((g) => g.nome).join(", ")}` : "Tutti i sistemi rispondono, Sir.", false);
 
   // pulizia: si tiene un mese di storia
-  await db.from("jarvis_ronda").delete().lt("creato", new Date(Date.now() - 30 * 86400_000).toISOString());
+  await db.from("jarvis_systems").delete().lt("creato", new Date(Date.now() - 30 * 86400_000).toISOString());
   return json({ ok: guasti.length === 0, esiti, avvisato, riepilogo });
 });
