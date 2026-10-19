@@ -30,6 +30,12 @@ Deno.serve(async (req) => {
   const token = Deno.env.get("JARVIS_SUPABASE_TOKEN") ?? "";
   if (!token) return json({ errore: "manca JARVIS_SUPABASE_TOKEN" }, 500);
 
+  // pulizia: ?elimina=<funzione> toglie una funzione di JARVIS non più usata (mai quelle vive)
+  const elimina = (url.searchParams.get("elimina") ?? "").replace(/[^a-z0-9\-]/g, "");
+  if (elimina) {
+    if (!elimina.startsWith("jarvis-") || PROTETTE.has(elimina)) return json({ errore: `«${elimina}» non si può eliminare da qui` }, 400);
+    return json(await togli(elimina, token));
+  }
   const funzione = (url.searchParams.get("funzione") || "jarvis").replace(/[^a-z0-9\-]/g, "");
   const verifica = url.searchParams.get("verifica") === "1";
   const files: Record<string, string> = {};
@@ -67,12 +73,21 @@ Deno.serve(async (req) => {
     const copia = await pubblica(`${funzione}-prova`, files, token);
     if (!copia.ok) return json({ errore: `la copia di prova non si pubblica: ${copia.errore}`, file: riassunto }, 502);
     const esito = funzione === "jarvis" ? await provaCervello(`${funzione}-prova`) : await provaAccensione(`${funzione}-prova`);
+    await togli(`${funzione}-prova`, token);   // la copia di prova non resta in giro, comunque sia andata
     if (!esito.ok) return json({ errore: "prova generale NON superata: la funzione vera resta quella di prima", prova: esito.dettagli, file: riassunto }, 409);
   }
   const vera = await pubblica(funzione, files, token);
   if (!vera.ok) return json({ errore: `deploy ${vera.errore}` }, 502);
   return json({ ok: true, funzione, versione: vera.versione, stato: vera.stato, file: riassunto, prova: url.searchParams.get("salta_prova") === "1" ? "saltata" : "superata" });
 });
+
+const PROTETTE = new Set(["jarvis", "jarvis-deploy", "jarvis-bea-sos", "jarvis-allarme", "jarvis-briefing", "jarvis-ascolto", "jarvis-systems"]);
+
+async function togli(slug: string, token: string) {
+  const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/functions/${slug}`, { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
+  const t = await r.text();
+  return r.ok || r.status === 404 ? { ok: true, eliminata: slug } : { ok: false, errore: `${r.status}: ${t.slice(0, 200)}` };
+}
 
 async function pubblica(slug: string, files: Record<string, string>, token: string) {
   const form = new FormData();
