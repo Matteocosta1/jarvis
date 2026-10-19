@@ -115,7 +115,7 @@ struct VistaBeaOrologio: View {
         var ammessi = CharacterSet.urlQueryAllowed
         ammessi.remove(charactersIn: "&=?+#")
         let corpo = testo.addingPercentEncoding(withAllowedCharacters: ammessi) ?? ""
-        if let url = URL(string: "sms:\(numero)&body=\(corpo)") { WKExtension.shared().openSystemURL(url) }
+        if let url = URL(string: "sms:\(numero)&body=\(corpo)") { WKApplication.shared().openSystemURL(url) }
         pensiero = nil
     }
 
