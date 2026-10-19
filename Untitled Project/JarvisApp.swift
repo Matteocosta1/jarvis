@@ -8,7 +8,6 @@ struct JarvisApp: App {
 
     init() {
         UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true, "ascoltoSempre": true])
-        RegistroCrash.avvia()                  // crash e blocchi su Sentry (se configurato)
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
     }
 

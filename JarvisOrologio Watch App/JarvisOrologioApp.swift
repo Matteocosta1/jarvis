@@ -5,7 +5,6 @@ struct JarvisOrologioApp: App {
     @StateObject private var jarvis = JarvisOrologio()
 
     init() {
-        RegistroCrashOrologio.avvia()       // crash su Sentry (se configurato)
         PonteOrologio.condiviso.avvia()     // riceve la parola d'ordine dall'iPhone
         Cuore.condiviso.avvia()             // battiti e allarme
     }
