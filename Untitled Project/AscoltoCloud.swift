@@ -361,6 +361,9 @@ final class AttesaMac {
             throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
         }
         input.removeTap(onBus: 0)
+        // niente «modalità chiamata»: con l'elaborazione vocale accesa il Mac abbassa l'audio di tutte le altre app
+        // (Claude, Apple Music…) finché il microfono resta aperto
+        try? input.setVoiceProcessingEnabled(false)
         let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)
         input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
             mani.analizza(buffer)

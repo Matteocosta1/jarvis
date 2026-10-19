@@ -1196,9 +1196,10 @@ final class Jarvis: NSObject, ObservableObject {
         do {
             let sessione = AVAudioSession.sharedInstance()
             do {
-                try sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+                // mixWithOthers: la musica e le altre app restano al loro volume mentre JARVIS ascolta
+                try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
             } catch {
-                try sessione.setCategory(.playAndRecord)
+                try sessione.setCategory(.playAndRecord, options: [.mixWithOthers])
             }
             try sessione.setActive(true, options: .notifyOthersOnDeactivation)
             registratore.azzera()
@@ -1262,6 +1263,7 @@ final class Jarvis: NSObject, ObservableObject {
             throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
         }
         input.removeTap(onBus: 0)
+        try? input.setVoiceProcessingEnabled(false)          // niente «modalità chiamata»: non abbassa le altre app
         input.installTap(onBus: 0, bufferSize: 1024, format: formato) { buffer, _ in
             registratore.analizza(buffer)
             Volume.voce.misura(buffer)          // il reattore si gonfia con la voce
