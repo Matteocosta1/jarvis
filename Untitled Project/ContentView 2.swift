@@ -58,9 +58,9 @@ struct ContentView: View {
             let zc: CGFloat = mac ? 1.25 : 1
             let altezzaChat = max(140, alto * 0.18)
             let altezzaCorona: CGFloat = ContentView.latoCorona / 2 + ContentView.raggioCorona + 40
-            let altezzaTesti: CGFloat = 125                        // stato, telemetria e la frase sotto il reattore
+            let altezzaTesti: CGFloat = mac ? 125 * 1.25 : 125      // stato, telemetria e la frase sotto il reattore
             // sotto le icone c'è un margine di 40 punti (il nome INTELLIGENCE): i testi ci salgono un po' sopra
-            let scala = min(3, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona - 20)))
+            let scala = max(0.3, min(3, (g.size.width - 32) / 430, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona - 20))))   // anche la larghezza conta
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
                 if mostraSistemi { menuSistemi.zIndex(10) }
@@ -74,7 +74,7 @@ struct ContentView: View {
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
                                 .frame(width: g.size.width, height: (altezzaCorona - 20) * scala, alignment: .top)
                             testiHUD
-                                .frame(maxWidth: 640)
+                                .frame(maxWidth: max(0, min(640, (g.size.width - 32) / 1.25)))
                                 .scaleEffect(mac ? 1.25 : 1, anchor: .top)
                                 .frame(height: altezzaTesti, alignment: .top)
                             Spacer(minLength: 0)
@@ -85,7 +85,7 @@ struct ContentView: View {
                             registro
                             barraTesto
                         }
-                        .frame(width: min(860, g.size.width - 32) / zc, height: (altezzaChat + 60) / zc)
+                        .frame(width: max(0, min(860, g.size.width - 32)) / zc, height: (altezzaChat + 60) / zc)
                         .scaleEffect(zc, anchor: .bottom)                          // sul Mac la chat è più grande, stessa forma
                         .frame(width: g.size.width, height: altezzaChat + 60, alignment: .bottom)
                     }

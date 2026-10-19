@@ -162,9 +162,10 @@ nonisolated final class Segmentatore: @unchecked Sendable {
     private var durata: Double = 0
     private var prima: [Float] = []             // gli ultimi 0,4 s prima che parlasse
     private var campioni: [Float] = []
-    private var avviso: (@Sendable (Data) -> Void)?
+    private var inizio = Date.distantPast       // quando ha cominciato a parlare (per la finestra del seguito)
+    private var avviso: (@Sendable (Data, Date) -> Void)?
 
-    var quandoFrase: (@Sendable (Data) -> Void)? {
+    var quandoFrase: (@Sendable (Data, Date) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return avviso }
         set { lock.lock(); avviso = newValue; lock.unlock() }
     }
@@ -192,7 +193,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
             if prima.count > 6_400 { prima.removeFirst(prima.count - 6_400) }
             if energia > soglia {
                 voceDi += secondi
-                if voceDi >= 0.15 { inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0 }
+                if voceDi >= 0.15 { inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0; inizio = Date().addingTimeInterval(-voceDi) }
             } else {
                 voceDi = 0
                 fondo = fondo * 0.95 + energia * 0.05
@@ -201,14 +202,20 @@ nonisolated final class Segmentatore: @unchecked Sendable {
             campioni.append(contentsOf: pezzo)
             durata += secondi
             silenzioDi = energia > soglia ? 0 : silenzioDi + secondi
-            if silenzioDi >= 0.8 || durata >= 10 {
+            if durata >= 10 && silenzioDi < 0.3 {
+                // 10 secondi senza una pausa: non è una frase, è un rumore continuo (ventola, condizionatore). Si butta
+                // e il livello del silenzio sale fin lì, così non continua a mandare rumore in cloud
+                fondo = max(fondo, energia / 3)
+                inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
+            } else if silenzioDi >= 0.8 || durata >= 10 {
                 if durata - silenzioDi >= 0.5 { pronta = campioni }      // un colpo o un «bip» non sono una frase
                 inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
             }
         }
         let chiama = pronta != nil ? avviso : nil
+        let quando = inizio
         lock.unlock()
-        if let pronta, let chiama { chiama(RegistratoreVoce.creaWAV(pronta, hz: 16_000)) }
+        if let pronta, let chiama { chiama(RegistratoreVoce.creaWAV(pronta, hz: 16_000), quando) }
     }
 }
 
@@ -219,16 +226,38 @@ nonisolated final class Segmentatore: @unchecked Sendable {
 @MainActor
 final class AttesaMac {
     var applauso: (() -> Void)?
-    var frase: ((String) -> Void)?
+    /// Il testo trascritto e il momento in cui il signore ha cominciato a dirlo.
+    var frase: ((String, Date) -> Void)?
     private let motore = AVAudioEngine()
     private let mani = BattitoMani()
     private let segmenti = Segmentatore()
-    private(set) var attivo = false
+    private var voluto = false
+    private var acceso = false
     private var inViaggio = false
+    private var inCoda: (Data, Date)?          // una frase arrivata mentre la precedente era in viaggio: si manda subito dopo
     private var invii: [Date] = []
+    private var osservatore: NSObjectProtocol?
+    private var riprova: Task<Void, Never>?
+
+    /// Acceso e con il microfono che gira davvero.
+    var attivo: Bool { voluto && acceso && motore.isRunning }
 
     func avvia() {
-        guard !attivo, AVAudioApplication.shared.recordPermission == .granted else { return }
+        voluto = true
+        accendi()
+    }
+
+    func ferma() {
+        voluto = false
+        riprova?.cancel()
+        spegni()
+        inCoda = nil
+    }
+
+    private func accendi() {
+        guard voluto, !(acceso && motore.isRunning) else { return }
+        spegni()
+        guard AVAudioApplication.shared.recordPermission == .granted else { return }
         do {
             let sessione = AVAudioSession.sharedInstance()
             do {
@@ -240,41 +269,57 @@ final class AttesaMac {
             mani.quandoSente = { [weak self] in
                 Task { @MainActor [weak self] in self?.applauso?() }
             }
-            segmenti.quandoFrase = { [weak self] audio in
-                Task { @MainActor [weak self] in self?.trascrivi(audio) }
+            segmenti.quandoFrase = { [weak self] audio, inizio in
+                Task { @MainActor [weak self] in self?.trascrivi(audio, inizio) }
             }
             mani.azzera()
             segmenti.azzera()
             try AttesaMac.collega(motore, mani, segmenti)
             motore.prepare()
             try motore.start()
-            attivo = true
+            acceso = true
+            // cuffie collegate, microfono cambiato: il motore si ferma da solo; qui si riaccende
+            osservatore = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: motore, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.riaccendiFraPoco() }
+            }
         } catch {
-            motore.inputNode.removeTap(onBus: 0)
-            attivo = false
+            spegni()
+            riaccendiFraPoco()
         }
     }
 
-    func ferma() {
-        guard attivo else { return }
-        attivo = false
+    private func spegni() {
+        if let o = osservatore { NotificationCenter.default.removeObserver(o); osservatore = nil }
         if motore.isRunning { motore.stop() }
         motore.inputNode.removeTap(onBus: 0)
+        acceso = false
     }
 
-    private func trascrivi(_ audio: Data) {
-        guard attivo, !inViaggio, !AmbienteSonoro.condiviso.affollato else { return }
+    private func riaccendiFraPoco() {
+        riprova?.cancel()
+        guard voluto else { return }
+        riprova = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard let self, !Task.isCancelled, self.voluto else { return }
+            self.acceso = false
+            self.accendi()
+        }
+    }
+
+    private func trascrivi(_ audio: Data, _ inizio: Date) {
+        guard voluto, !AmbienteSonoro.condiviso.affollato else { return }
+        if inViaggio { inCoda = (audio, inizio); return }        // non si perde: parte appena torna la precedente
         let adesso = Date()
         invii.removeAll { adesso.timeIntervalSince($0) > 600 }
-        guard invii.count < 20 else { return }
+        guard invii.count < 30 else { return }
         invii.append(adesso)
         inViaggio = true
         Task { [weak self] in
             let (testo, _) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
             guard let self else { return }
             self.inViaggio = false
-            guard self.attivo, let testo, !testo.isEmpty else { return }
-            self.frase?(testo)
+            if self.voluto, let testo, !testo.isEmpty { self.frase?(testo, inizio) }
+            if let coda = self.inCoda { self.inCoda = nil; self.trascrivi(coda.0, coda.1) }
         }
     }
 

@@ -107,7 +107,7 @@ final class Jarvis: NSObject, ObservableObject {
     private lazy var attesaMac: AttesaMac = {
         let a = AttesaMac()
         a.applauso = { [weak self] in self?.applaudito() }
-        a.frase = { [weak self] testo in self?.fraseSentitaMac(testo) }
+        a.frase = { [weak self] testo, inizio in self?.fraseSentitaMac(testo, inizio: inizio) }
         return a
     }()
     /// Sul Mac, subito dopo una risposta: per qualche secondo si può continuare a parlare senza dire «Jarvis».
@@ -355,7 +355,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard richiamoServe else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
             avvioRichiamo = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(300))
+                try? await Task.sleep(for: .milliseconds(500))       // dopo che la voce di JARVIS ha liberato l'audio
                 guard let self, !Task.isCancelled, self.richiamoServe else { return }
                 self.attesaMac.avvia()
             }
@@ -622,6 +622,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     func interrompi() {
         fermaBenvenuto()
+        liberoMacFinoA = .distantPast
         compitoRete?.cancel()
         compitoRete = nil
         compitoPonte?.cancel()
@@ -1052,7 +1053,8 @@ final class Jarvis: NSObject, ObservableObject {
         if !Impostazioni.richiamo { Suoni.pronto() }   // col richiamo a voce si chiude come una persona: in silenzio
         Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
             try? await Task.sleep(for: .milliseconds(400))
-            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto else { return }   // i Clash non si spengono
+            // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»
@@ -1114,6 +1116,7 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         if Jarvis.usaAscoltoCloud {
             attesaMac.ferma()
+            liberoMacFinoA = .distantPast
             // chiamato per nome: gli ultimi 3 secondi già sentiti (dentro c'è «Jarvis» e l'inizio della domanda), presi solo adesso
             // che il richiamo è spento, così non si perde niente di ciò che ha detto nel frattempo
             avviaAscoltoCloud(bip: bip, precarica: dalNome ? RegistroMicrofono.condiviso.ultimi(3) : [])
@@ -1168,13 +1171,14 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Mac: una frase sentita in attesa (già trascritta). La prende se c'è «Jarvis», se è la frase di Tony,
     /// o se arriva subito dopo una risposta (il seguito del discorso); il resto della stanza non è per lui.
-    private func fraseSentitaMac(_ testo: String) {
+    private func fraseSentitaMac(_ testo: String, inizio: Date) {
         guard fase == .attesa || fase == .elaboro else { return }
         let basso = testo.lowercased()
         let conNome = Richiamo.nomi.contains { basso.contains($0) }
         let dopo = conNome ? (Richiamo.dopoRichiamo(testo) ?? "") : testo
         let tony = Benvenuto.eFraseDiTony(testo) || Benvenuto.eFraseDiTony(dopo)
-        guard conNome || tony || Date() < liberoMacFinoA else { return }
+        // il seguito senza nome vale se ha COMINCIATO a parlare entro la finestra, e solo in attesa (mentre pensa ci vuole «Jarvis»)
+        guard conNome || tony || (fase == .attesa && inizio < liberoMacFinoA) else { return }
         liberoMacFinoA = .distantPast
         if fase == .elaboro { segnaInterruzione(); interrompi() }   // stava pensando: lo fermo, come sull'iPhone
         avviso = nil
