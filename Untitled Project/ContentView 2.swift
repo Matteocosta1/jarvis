@@ -48,44 +48,44 @@ struct ContentView: View {
     @FocusState private var tastiera: Bool
 
     var body: some View {
-        ZStack {
-            SfondoHUD(fase: jarvis.fase)
-            if mostraSistemi { menuSistemi.zIndex(10) }
-
-            VStack(spacing: 0) {
-                intestazione
-                corona
-                    .padding(.top, 26)        // il reattore più verso il centro dello schermo
-
-                Text(jarvis.fase.rawValue)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .tracking(4)
-                    .foregroundStyle(Color.ciano)
-                    .contentTransition(.numericText())
-                    .animation(.easeOut(duration: 0.3), value: jarvis.fase)
-                    .padding(.top, 8)
-                TelemetriaHUD(fase: jarvis.fase)
-                    .padding(.top, 4)
-                    .opacity(acceso ? 1 : 0)
-
-                Text(!jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? suggerimento))
-                    .font(.system(size: 15))
-                    .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .frame(minHeight: 44)
-
-                if let avviso = jarvis.avviso {
-                    Text(avviso)
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+        GeometryReader { g in
+            // schermo largo (il Mac, un iPad in orizzontale): reattore grande a sinistra, conversazione a destra
+            let alto = g.size.height + g.safeAreaInsets.bottom      // l'altezza vera, anche con la tastiera aperta
+            let largo = g.size.width >= 900 && g.size.width > alto * 1.15
+            ZStack {
+                SfondoHUD(fase: jarvis.fase)
+                if mostraSistemi { menuSistemi.zIndex(10) }
+                if largo {
+                    VStack(spacing: 0) {
+                        intestazione
+                        HStack(spacing: 0) {
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                centroHUD
+                                    .scaleEffect(min(1.6, max(1, (alto - 120) / 700)))   // cresce con lo schermo
+                                Spacer(minLength: 0)
+                            }
+                            .frame(width: g.size.width * 0.55)
+                            .ignoresSafeArea(.keyboard, edges: .bottom)     // la tastiera non schiaccia il reattore
+                            VStack(spacing: 0) {
+                                registro
+                                barraTesto
+                            }
+                            .frame(maxWidth: .infinity)
+                            .background(Color.fondo.opacity(0.35))
+                            .overlay(alignment: .leading) { Rectangle().fill(Color.ciano.opacity(0.15)).frame(width: 1) }
+                        }
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        intestazione
+                        centroHUD
+                        registro
+                        barraTesto
+                    }
                 }
-
-                registro
-                barraTesto
             }
+            .frame(width: g.size.width, height: g.size.height)
         }
         .sheet(isPresented: $mostraImpostazioni, onDismiss: eseguiComando) { ImpostazioniView().environmentObject(jarvis) }
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
@@ -380,6 +380,40 @@ struct ContentView: View {
     /// La corona più INTELLIGENCE, nell'ordine di accensione.
     private var tutteLeIcone: [(gruppo: String, icona: String, nome: String, azione: () -> Void)] {
         scorciatoie + intelligence.map { (gruppo: "INTELLIGENCE", icona: $0.icona, nome: $0.nome, azione: $0.azione) }
+    }
+
+    /// Il centro del HUD: la corona col reattore, lo stato, la telemetria, la frase in corso e gli avvisi.
+    private var centroHUD: some View {
+        VStack(spacing: 0) {
+            corona
+                .padding(.top, 26)        // il reattore più verso il centro dello schermo
+
+            Text(jarvis.fase.rawValue)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .tracking(4)
+                .foregroundStyle(Color.ciano)
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.3), value: jarvis.fase)
+                .padding(.top, 8)
+            TelemetriaHUD(fase: jarvis.fase)
+                .padding(.top, 4)
+                .opacity(acceso ? 1 : 0)
+
+            Text(!jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? suggerimento))
+                .font(.system(size: 15))
+                .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(minHeight: 44)
+
+            if let avviso = jarvis.avviso {
+                Text(avviso)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+        }
     }
 
     private var corona: some View {
