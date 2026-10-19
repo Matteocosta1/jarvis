@@ -1413,7 +1413,7 @@ async function costiFra(da: Date, a: Date = new Date()) {
   return ((data ?? []) as any[]).map((r) => ({ modello: String(r.modello), chiamate: num(r.chiamate), token_in: num(r.token_in), token_cache: num(r.token_cache),
     token_scrittura: num(r.token_scrittura), token_out: num(r.token_out), dollari: costoRiga(r) }));
 }
-const somma = (righe: { dollari: number }[]) => righe.reduce((t, r) => t + r.dollari, 0);
+const sommaDollari = (righe: { dollari: number }[]) => righe.reduce((t, r) => t + r.dollari, 0);
 async function voceFra(da: Date, a: Date = new Date()) {
   const { data } = await db.rpc("jarvis_voce_caratteri", { p_da: da.toISOString(), p_a: a.toISOString() });
   const r = ((data ?? []) as any[])[0] ?? {};
@@ -1425,7 +1425,7 @@ async function costiPeriodo(i: Record<string, any>) {
   if (isNaN(da.getTime()) || isNaN(a.getTime()) || a <= da) return { errore: "periodo non valido: servono «da» (e facoltativo «a») in ISO 8601" };
   const [righe, voce] = await Promise.all([costiFra(da, a), voceFra(da, a)]);
   const elenco = righe.map((m) => ({ modello: m.modello.replace("claude-", ""), chiamate: m.chiamate, dollari: r2(m.dollari) })).sort((x, y) => y.dollari - x.dollari);
-  return { da: quando(da), a: quando(a), cervello_dollari: r2(somma(righe)), modelli: elenco,
+  return { da: quando(da), a: quando(a), cervello_dollari: r2(sommaDollari(righe)), modelli: elenco,
     voce, nota: "stima dai token con i listini pubblici; la voce è nel piano mensile ElevenLabs" };
 }
 async function consumi() {
@@ -1452,8 +1452,8 @@ async function consumi() {
       }
     } catch { /* senza piano */ }
   }
-  return { mese: oggiRoma().slice(0, 7), stima: true, dollari_mese: r2(somma(mese)), dollari_oggi: r2(somma(oggi)),
-    dollari_ieri: r2(somma(ieri)), dollari_7_giorni: r2(somma(sette)),
+  return { mese: oggiRoma().slice(0, 7), stima: true, dollari_mese: r2(sommaDollari(mese)), dollari_oggi: r2(sommaDollari(oggi)),
+    dollari_ieri: r2(sommaDollari(ieri)), dollari_7_giorni: r2(sommaDollari(sette)),
     fissi: [{ nome: "Supabase Pro", costo: "25 $/mese" }, { nome: "Apple Developer", costo: "99 €/anno" }],
     chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: oggi.reduce((a, m) => a + m.chiamate, 0), modelli,
     caratteri_voce_mese: voceMese.caratteri, caratteri_voce_oggi: voceOggi.caratteri, voce,
@@ -1528,7 +1528,7 @@ async function prodotto(codice: string) {
 // Nessun prelievo automatico: si ricarica a mano dalla Console. Qui si tiene solo il conto, per avvisare in tempo.
 const r2 = (x: number) => Math.round(x * 100) / 100;
 async function spesaDal(da: string) {
-  return somma(await costiFra(new Date(da)));
+  return sommaDollari(await costiFra(new Date(da)));
 }
 async function statoCredito() {
   const { data: b } = await db.from("jarvis_credito").select("id, creato, tipo, importo, saldo, avvisato").order("creato", { ascending: false }).limit(1).maybeSingle();
