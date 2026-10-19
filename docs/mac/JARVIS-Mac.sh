@@ -32,7 +32,7 @@ case $cmd in
       indietro) osascript -e "tell application \"$app\" to previous track" ;;
     esac ;;
   apri)     [[ $arg =~ '^[A-Za-z0-9 ._-]+$' ]] && open -a "$arg" ;;
-  cartella) [[ $arg =~ '^[A-Za-z0-9 ._-]+$' ]] && open "$HOME/Desktop/$arg" ;;
+  cartella) [[ $arg =~ '^[A-Za-z0-9 ._-]+$' && $arg != *..* ]] && open "$HOME/Desktop/$arg" ;;
   scura)    [[ $arg == on ]] && v=true || v=false
             osascript -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $v" ;;
   blocca)   pmset displaysleepnow ;;
