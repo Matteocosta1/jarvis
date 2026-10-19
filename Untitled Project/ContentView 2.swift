@@ -52,10 +52,15 @@ struct ContentView: View {
             // schermo grande (il Mac, un iPad in orizzontale): la stessa interfaccia dell'iPhone, centrata,
             // con il reattore che cresce con la finestra e la conversazione sotto, più stretta e al centro
             let alto = g.size.height + g.safeAreaInsets.bottom      // l'altezza vera, anche con la tastiera aperta
-            let grande = g.size.width >= 900 && g.size.width > alto * 1.15
-            let altezzaChat = max(150, alto * 0.24)
-            let altezzaHUD: CGFloat = ContentView.latoCorona / 2 + ContentView.raggioCorona + 40 + 26 + 80   // corona + testi sotto
-            let scala = min(2.2, max(0.6, (alto - altezzaChat - 60 - 84) / altezzaHUD))           // 84: intestazione e margini
+            let mac = ProcessInfo.processInfo.isiOSAppOnMac
+            let grande = mac || (g.size.width >= 900 && g.size.width > alto * 1.15)
+            // la conversazione: più bassa, così il reattore prende quasi tutto lo schermo; sul Mac anche il testo è più grande
+            let zc: CGFloat = mac ? 1.25 : 1
+            let altezzaChat = max(140, alto * 0.18)
+            let altezzaCorona: CGFloat = ContentView.latoCorona / 2 + ContentView.raggioCorona + 40
+            let altezzaTesti: CGFloat = 125                        // stato, telemetria e la frase sotto il reattore
+            // sotto le icone c'è un margine di 40 punti (il nome INTELLIGENCE): i testi ci salgono un po' sopra
+            let scala = min(3, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona - 20)))
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
                 if mostraSistemi { menuSistemi.zIndex(10) }
@@ -64,10 +69,14 @@ struct ContentView: View {
                         VStack(spacing: 0) {
                             intestazione
                             Spacer(minLength: 0)
-                            centroHUD
+                            corona
                                 .frame(width: 430)
-                                .scaleEffect(scala, anchor: .top)
-                                .frame(height: altezzaHUD * scala, alignment: .top)   // lo spazio vero che occupa ingrandito
+                                .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
+                                .frame(width: g.size.width, height: (altezzaCorona - 20) * scala, alignment: .top)
+                            testiHUD
+                                .frame(maxWidth: 640)
+                                .scaleEffect(mac ? 1.25 : 1, anchor: .top)
+                                .frame(height: altezzaTesti, alignment: .top)
                             Spacer(minLength: 0)
                             Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
                         }
@@ -76,8 +85,9 @@ struct ContentView: View {
                             registro
                             barraTesto
                         }
-                        .frame(maxWidth: 820)
-                        .frame(height: altezzaChat + 60)                          // questa sale con la tastiera
+                        .frame(width: min(860, g.size.width - 32) / zc, height: (altezzaChat + 60) / zc)
+                        .scaleEffect(zc, anchor: .bottom)                          // sul Mac la chat è più grande, stessa forma
+                        .frame(width: g.size.width, height: altezzaChat + 60, alignment: .bottom)
                     }
                 } else {
                     VStack(spacing: 0) {
@@ -390,7 +400,13 @@ struct ContentView: View {
         VStack(spacing: 0) {
             corona
                 .padding(.top, 26)        // il reattore più verso il centro dello schermo
+            testiHUD
+        }
+    }
 
+    /// Sotto il reattore: lo stato, la telemetria, la frase che sta dicendo (o il suggerimento) e gli avvisi.
+    private var testiHUD: some View {
+        VStack(spacing: 0) {
             Text(jarvis.fase.rawValue)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .tracking(4)
