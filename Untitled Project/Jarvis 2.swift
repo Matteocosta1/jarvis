@@ -1211,8 +1211,8 @@ final class Jarvis: NSObject, ObservableObject {
         // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto (vuoto = si mette in ascolto)
         let dopo = Richiamo.dopoRichiamo(testo) ?? testo
         let tony = Benvenuto.eFraseDiTony(testo) || Benvenuto.eFraseDiTony(dopo)
-        // in attesa basta parlare, qualsiasi frase, senza «Jarvis» (come sull'iPhone); mentre pensa invece ci vuole «Jarvis»
-        guard conNome || tony || fase == .attesa else { return }
+        // in attesa e mentre pensa basta parlare: qualsiasi frase, senza «Jarvis»
+        _ = conNome
         liberoMacFinoA = .distantPast
         if fase == .elaboro { segnaInterruzione(); interrompi() }   // stava pensando: lo fermo, come sull'iPhone
         avviso = nil
