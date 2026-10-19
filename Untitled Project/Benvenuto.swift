@@ -24,7 +24,9 @@ enum Benvenuto {
     /// Qualche secondo di Clash, poi sfuma. Restituisce falso se non è riuscito a farlo partire.
     static func suona(secondi: Double = 7) async -> Bool {
         if Impostazioni.muto { return false }                 // modalità silenziosa: niente musica
-        guard let url = await anteprimaEntro(secondi: 3) else {
+        let trovato = await anteprimaEntro(secondi: 3)
+        if Task.isCancelled { return false }                  // interrotto mentre cercava: niente musica né suono d'avvio
+        guard let url = trovato else {
             Suoni.avvio()
             try? await Task.sleep(for: .seconds(1.5))      // il suono d'avvio finisce prima del saluto
             return false

@@ -271,7 +271,7 @@ final class Richiamo {
                     // conta solo se è una risposta tipo «sì», «no», «grazie», così un rumore non lo accende);
                     // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola
                     let affollato = AmbienteSonoro.condiviso.affollato
-                    if !t.isEmpty, adesso < liberoFinoA || voceConfermata
+                    if !t.isEmpty, adesso < liberoFinoA || voceConfermata || Benvenuto.eFraseDiTony(t)
                         || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
                     } else if !t.isEmpty, Impostazioni.ascoltoSempre, affollato, VoceDelSignore.attiva {

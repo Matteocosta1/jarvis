@@ -360,8 +360,8 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// Il rito di Tony: due battiti di mani + «Wake up, daddy's home», in qualsiasi ordine, a meno di 8 secondi l'uno dall'altra.
-    /// Arrivati tutti e due: i Clash per qualche secondo, poi il saluto. Da soli: i battiti danno il segnale «pronto»
-    /// (e aprono 8 secondi in cui basta parlare), la frase aspetta i battiti. Con i battiti spenti nelle impostazioni basta la frase.
+    /// Arrivati tutti e due: i Clash per qualche secondo, poi il saluto. Da soli: i battiti danno il segnale «pronto» e aspettano
+    /// la frase (che passa anche senza «Jarvis»); la frase aspetta i battiti e, se non arrivano, il rito parte lo stesso.
     private var inBenvenuto = false
     private var ultimiBattiti = Date.distantPast
     private var ultimaFraseTony = Date.distantPast
