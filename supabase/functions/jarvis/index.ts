@@ -239,6 +239,8 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "7-180, default 30" } } } },
   { name: "prodotto_scansiona", description: "Scheda di un prodotto alimentare dal codice a barre (EAN), con i dati aperti di Open Food Facts: nome, marca, voto 0-100 calcolato da JARVIS (eccellente/buono/mediocre/scarso), Nutri-Score, NOVA, additivi con il loro rischio, nutrienti per 100 g, ingredienti, allergeni.",
     input_schema: { type: "object", properties: { codice: { type: "string", description: "il numero del codice a barre" } }, required: ["codice"] } },
+  { name: "costi", description: "Quanto è costato JARVIS in un periodo: il cervello (Claude, per modello, in dollari stimati dai token) e la voce (caratteri letti con ElevenLabs). Per «stamattina», «ieri», «da lunedì», «questo mese»… calcola tu «da» e «a» in ISO 8601 con fuso di Roma partendo dall'ora attuale. Fissi: Supabase Pro 25 $/mese, Apple Developer 99 €/anno.",
+    input_schema: { type: "object", properties: { da: { type: "string", description: "inizio del periodo, ISO 8601 (es. 2026-10-19T06:00:00+02:00)" }, a: { type: "string", description: "fine del periodo, ISO 8601; se manca, adesso" } }, required: ["da"] } },
   { name: "credito", description: "Il credito delle API di Anthropic che fa funzionare JARVIS (stima dai token consumati, in dollari). azione stato: quanto resta. azione ricarica: il signore ha appena ricaricato «importo» dollari (si somma al residuo). azione saldo: il signore legge dalla Console il saldo esatto «importo» (riparte da lì).",
     input_schema: { type: "object", properties: { azione: { type: "string", enum: ["stato", "ricarica", "saldo"] }, importo: { type: "number" } }, required: ["azione"] } },
   { name: "diagnostica", description: "Controlla in pochi secondi tutti i collegamenti di JARVIS: voce ElevenLabs (crediti rimasti e scadenza), Gemini, Google Immagini (Serper), Discogs, posta iCloud, SMS e chiamate ClickSend (saldo), WhatsApp d'emergenza, database. Restituisce per ciascuno ok / problema / non configurato con il dettaglio.",
@@ -403,6 +405,7 @@ type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | 
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
     case "credito": return await credito(i);
+    case "costi": return await costiPeriodo(i);
     case "prodotto_scansiona": return await prodotto(String(i.codice ?? ""));
     case "memoria_salva": {
       const { error } = await db.from("jarvis_memoria").insert({ fatto: String(i.fatto).slice(0, 500), categoria: i.categoria || "generale" });
@@ -1376,13 +1379,44 @@ async function archivioElimina(percorso: string) {
 // ───────── Consumi del mese: token per modello, caratteri voce, stima di spesa ─────────
 // Prezzi in dollari per milione di token (ingresso, cache letta, uscita); si possono fissare con PREZZI_JSON nei segreti.
 const PREZZI: Record<string, [number, number, number]> = (() => {
-  const base: Record<string, [number, number, number]> = { opus: [15, 1.5, 75], sonnet: [3, 0.3, 15], haiku: [0.8, 0.08, 4] };
+  // $ per milione di token: [ingresso, cache, uscita] — listini dei modelli 5.5 (ottobre 2026)
+  const base: Record<string, [number, number, number]> = { opus: [4, 0.2, 20], sonnet: [2, 0.1, 10], haiku: [0.1, 0.01, 0.5] };
   try { return { ...base, ...JSON.parse(Deno.env.get("PREZZI_JSON") || "{}") }; } catch { return base; }
 })();
 const prezzoDi = (modello: string) => PREZZI[Object.keys(PREZZI).find((k) => modello.includes(k)) ?? ""] ?? [0, 0, 0];
+/// La mezzanotte di Roma di «giorni» fa (giusta sia con l'ora legale sia con quella solare).
+function mezzanotteRoma(giorni = 0, primoDelMese = false) {
+  let g = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() - giorni * 86400_000));
+  if (primoDelMese) g = `${g.slice(0, 7)}-01`;
+  for (const off of ["+01:00", "+02:00"]) {
+    const t = new Date(`${g}T00:00:00${off}`);
+    if (new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" }).format(t) === "00") return t;
+  }
+  return new Date(`${g}T00:00:00+01:00`);
+}
+/// I costi di un periodo qualsiasi, per la domanda a voce («quanto abbiamo speso stamattina?»).
+async function costiPeriodo(i: Record<string, any>) {
+  const da = new Date(String(i.da ?? "")), a = i.a ? new Date(String(i.a)) : new Date();
+  if (isNaN(da.getTime()) || isNaN(a.getTime()) || a <= da) return { errore: "periodo non valido: servono «da» (e facoltativo «a») in ISO 8601" };
+  const { data, error } = await db.from("jarvis_consumi").select("servizio, modello, token_in, token_cache, token_out, caratteri")
+    .gte("creato", da.toISOString()).lt("creato", a.toISOString()).limit(20000);
+  if (error) throw error;
+  const modelli: Record<string, { chiamate: number; dollari: number }> = {};
+  let caratteri = 0, frasi = 0;
+  for (const r of (data ?? []) as any[]) {
+    if (r.servizio === "voce") { caratteri += num(r.caratteri); frasi++; continue; }
+    const p = prezzoDi(String(r.modello));
+    const m = (modelli[String(r.modello).replace("claude-", "")] ??= { chiamate: 0, dollari: 0 });
+    m.chiamate++; m.dollari += (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6;
+  }
+  const elenco = Object.entries(modelli).map(([modello, x]) => ({ modello, chiamate: x.chiamate, dollari: Math.round(x.dollari * 100) / 100 })).sort((x, y) => y.dollari - x.dollari);
+  return { da: quando(da), a: quando(a), cervello_dollari: Math.round(elenco.reduce((t, m) => t + m.dollari, 0) * 100) / 100, modelli: elenco,
+    voce: { frasi, caratteri }, nota: "stima dai token con i listini pubblici; la voce è nel piano mensile ElevenLabs" };
+}
 async function consumi() {
-  const inizioMese = new Date(); inizioMese.setUTCDate(1); inizioMese.setUTCHours(0, 0, 0, 0);
-  const inizioOggi = new Date(`${oggiRoma()}T00:00:00+02:00`);
+  const inizioMese = mezzanotteRoma(0, true);
+  const inizioOggi = mezzanotteRoma(0);
+  const [ieriDa, settimanaDa] = await Promise.all([spesaDal(mezzanotteRoma(1).toISOString()).catch(() => 0), spesaDal(mezzanotteRoma(6).toISOString()).catch(() => 0)]);
   // i token si sommano nel database (niente limite di righe); la voce si conta a parte
   const [mese, oggiT, voceRighe, primo, statoCr] = await Promise.all([
     db.rpc("jarvis_token_per_modello", { p_da: inizioMese.toISOString() }),
@@ -1416,6 +1450,8 @@ async function consumi() {
     } catch { /* senza piano */ }
   }
   return { mese: inizioMese.toISOString().slice(0, 7), stima: true, dollari_mese: totale, dollari_oggi: Math.round(dollariOggi * 100) / 100,
+    dollari_ieri: Math.round((ieriDa - dollariOggi) * 100) / 100, dollari_7_giorni: Math.round(settimanaDa * 100) / 100,
+    fissi: [{ nome: "Supabase Pro", costo: "25 $/mese" }, { nome: "Apple Developer", costo: "99 €/anno" }],
     chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: chiamateOggi, modelli, caratteri_voce_mese: caratteriMese, caratteri_voce_oggi: caratteriOggi, voce,
     dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr };
 }

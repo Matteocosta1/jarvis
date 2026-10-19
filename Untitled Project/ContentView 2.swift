@@ -4,7 +4,7 @@ import AVFoundation
 /// Le schede delle icone della corona.
 enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
-    case github, supabase, archivio
+    case github, supabase, archivio, costi
     case scanner
     var id: String { rawValue }
 }
@@ -145,6 +145,7 @@ struct ContentView: View {
             case .github: VistaGitHub(chiedi: daScheda, apri: apriPagina)
             case .supabase: VistaSupabase(chiedi: daScheda)
             case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
+            case .costi: VistaCosti(chiedi: daScheda)
             case .scanner: VistaScanner(chiedi: daScheda)
             case .bea: VistaBea(chiedi: daScheda)
             }
@@ -568,6 +569,7 @@ struct ContentView: View {
                 voceSistemi(logo: "github-logo", simbolo: nil, nome: "GitHub", stato: statoSistemi["github"] ?? "…") { scheda = .github }
                 voceSistemi(logo: "supabase-logo", simbolo: nil, nome: "Supabase", stato: statoSistemi["supabase"] ?? "…") { scheda = .supabase }
                 voceSistemi(logo: nil, simbolo: "archivio", nome: "Archivio", stato: statoSistemi["archivio"] ?? "…") { scheda = .archivio }
+                voceSistemi(logo: UIImage(named: "langfuse-logo") != nil ? "langfuse-logo" : nil, simbolo: "costi", nome: "Costi", stato: statoSistemi["costi"] ?? "…") { scheda = .costi }
             }
             .padding(6)
             .frame(width: 262)
@@ -593,6 +595,8 @@ struct ContentView: View {
                 Group {
                     if let logo {
                         Image(logo).resizable().renderingMode(.template).scaledToFit()
+                    } else if simbolo == "costi" {
+                        Image(systemName: "gauge.with.dots.needle.33percent").resizable().scaledToFit()
                     } else {
                         IconaArchivio()
                     }
@@ -611,8 +615,12 @@ struct ContentView: View {
         .buttonStyle(StileStark())
     }
 
-    /// Le righe di stato del menu: tre chiamate leggere al cervello, in parallelo.
+    /// Le righe di stato del menu: chiamate leggere al cervello.
     private func caricaStatoSistemi() async {
+        if let c = await VistaVitals.chiama(["consumi": true]), c["errore"] == nil {
+            let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
+            statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
+        } else { statoSistemi["costi"] = "non raggiungibile" }
         if let ra = await VistaVitals.chiama(["archivio": true]), ra["errore"] == nil {
             let file = ra["file"] as? [[String: Any]] ?? [], cartelle = ra["cartelle"] as? [[String: Any]] ?? []
             statoSistemi["archivio"] = "\(file.count) file · \(cartelle.count) cartelle"

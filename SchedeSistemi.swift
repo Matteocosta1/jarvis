@@ -723,4 +723,122 @@ struct VistaArchivio: View {
         await carica()
     }
 }
+
+// MARK: - COSTI
+
+/// Quanto costa JARVIS: il mese, oggi, ieri, 7 giorni; il cervello per modello, la voce e i costi fissi.
+/// I numeri sono una stima dai token registrati dal cervello (con i listini pubblici).
+struct VistaCosti: View {
+    let chiedi: (String) -> Void
+    private let tinta = Color.ciano
+
+    @State private var dati: Voce?
+    @State private var errore: String?
+
+    var body: some View {
+        CorniceScheda(titolo: "Costi", sottotitolo: dati.map { "mese \($0.s("mese")) · stima dai token" } ?? "conto la spesa",
+                      icona: "gauge.with.dots.needle.33percent", tinta: tinta, pronto: dati != nil || errore != nil) {
+            if let errore {
+                Pannello(tinta: tinta) { Text(errore).font(.footnote).foregroundStyle(.orange) }
+            } else if let c = dati {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(Self.soldi(c.s("dollari_mese"))).font(.system(size: 46, weight: .thin, design: .rounded)).foregroundStyle(.white)
+                        Text("$ questo mese").font(.footnote).foregroundStyle(Color.tenue)
+                    }
+                    Text("\(c.n("chiamate_mese")) risposte · stima dai token").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+                }
+                HStack(spacing: 10) {
+                    Valore(titolo: "OGGI", valore: Self.soldi(c.s("dollari_oggi")), sotto: "\(c.n("chiamate_oggi")) risposte", tinta: tinta)
+                    Valore(titolo: "IERI", valore: Self.soldi(c.s("dollari_ieri")), tinta: tinta)
+                    Valore(titolo: "7 GIORNI", valore: Self.soldi(c.s("dollari_7_giorni")), tinta: tinta)
+                }
+                pannelloCervello(c)
+                pannelloVoce(c)
+                Pannello(titolo: "FISSI", tinta: tinta) {
+                    ForEach(Array(c.lista("fissi").enumerated()), id: \.offset) { _, f in
+                        HStack {
+                            Text(f.s("nome")).font(.system(size: 14)).foregroundStyle(.white)
+                            Spacer()
+                            Text(f.s("costo")).font(.system(size: 12, design: .monospaced)).foregroundStyle(tinta)
+                        }
+                    }
+                }
+                HStack(spacing: 10) {
+                    TastoJarvis(testo: "Stamattina?", icona: "sunrise", tinta: tinta) { chiedi("Quanto abbiamo speso stamattina con JARVIS? Cervello e voce, in due frasi.") }
+                    TastoJarvis(testo: "Dove spendo?", icona: "chart.bar", tinta: tinta) { chiedi("Guarda i costi di JARVIS di questa settimana: dove spendo di più e come potrei spendere meno senza peggiorare? In poche frasi.") }
+                }
+                Text("Stima dai token con i listini pubblici; il conto vero è quello di Anthropic ed ElevenLabs.").font(.system(size: 9)).foregroundStyle(Color.tenue)
+            }
+        }
+        .task { await carica() }
+    }
+
+    @ViewBuilder private func pannelloCervello(_ c: Voce) -> some View {
+        let modelli = c.lista("modelli")
+        let massimo = max(0.01, modelli.map { Double($0.s("dollari")) ?? 0 }.max() ?? 0.01)
+        Pannello(titolo: "CERVELLO · CLAUDE", tinta: tinta) {
+            if modelli.isEmpty { Text("Nessuna risposta questo mese.").font(.footnote).foregroundStyle(Color.tenue) }
+            ForEach(Array(modelli.enumerated()), id: \.offset) { _, m in
+                let dollari = Double(m.s("dollari")) ?? 0
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text(Self.nomeModello(m.s("modello"))).font(.system(size: 14)).foregroundStyle(.white)
+                        Text("\(m.n("chiamate")) risposte").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+                        Spacer()
+                        Text("\(Self.soldi(m.s("dollari"))) $").font(.system(size: 12, design: .monospaced)).foregroundStyle(tinta)
+                    }
+                    Self.barra(dollari / massimo, tinta: tinta)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func pannelloVoce(_ c: Voce) -> some View {
+        Pannello(titolo: "VOCE · ELEVENLABS", tinta: tinta) {
+            if let v = c.voce("voce") {
+                HStack {
+                    Text("Piano \(v.s("piano"))").font(.system(size: 14)).foregroundStyle(.white)
+                    Spacer()
+                    Text("\(v.n("percento"))% usato").font(.system(size: 12, design: .monospaced)).foregroundStyle(v.n("percento") >= 90 ? .red : tinta)
+                }
+                Self.barra(Double(v.n("percento")) / 100, tinta: v.n("percento") >= 90 ? .red : tinta)
+                Text("\(v.n("usati")) di \(v.n("limite")) caratteri · rinnovo \(v.s("rinnovo"))").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+            } else {
+                HStack {
+                    Text("Caratteri letti").font(.system(size: 14)).foregroundStyle(.white)
+                    Spacer()
+                    Text("\(c.n("caratteri_voce_mese"))").font(.system(size: 12, design: .monospaced)).foregroundStyle(tinta)
+                }
+            }
+        }
+    }
+
+    private func carica() async {
+        guard let o = await VistaVitals.chiama(["consumi": true]) else { errore = "Non raggiungo il cervello, Sir."; return }
+        if let e = o["errore"] as? String { errore = e; return }
+        dati = Voce(o)
+    }
+
+    nonisolated static func soldi(_ s: String) -> String {
+        String(format: "%.2f", Double(s) ?? 0).replacingOccurrences(of: ".", with: ",")
+    }
+
+    nonisolated static func nomeModello(_ m: String) -> String {
+        if m.contains("opus") { return "Opus" }
+        if m.contains("sonnet") { return "Sonnet" }
+        if m.contains("haiku") { return "Haiku" }
+        return m.replacingOccurrences(of: "claude-", with: "")
+    }
+
+    static func barra(_ frazione: Double, tinta: Color) -> some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(tinta.opacity(0.12))
+                Capsule().fill(tinta).frame(width: g.size.width * min(1, max(0, frazione)))
+            }
+        }
+        .frame(height: 4)
+    }
+}
 #endif
