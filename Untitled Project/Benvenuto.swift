@@ -13,7 +13,8 @@ enum Benvenuto {
 
     /// La frase di Tony, anche come la storpia il riconoscimento italiano.
     nonisolated static func eFraseDiTony(_ frase: String) -> Bool {
-        let f = frase.lowercased()
+        let f = frase.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        guard f.count <= 32 else { return false }        // solo la frase di Tony, non un discorso che la contiene
         if f.contains("papà è a casa") || f.contains("papà è tornato") { return true }
         // «daddy» da solo non basta (una canzone, un nome): serve anche «home» o «wake up»
         let papa = ["daddy", "daddi", "deddy", "dedi's", "dady"].contains { f.contains($0) }
@@ -22,7 +23,11 @@ enum Benvenuto {
 
     /// Qualche secondo di Clash, poi sfuma. Restituisce falso se non è riuscito a farlo partire.
     static func suona(secondi: Double = 7) async -> Bool {
-        guard let url = await trovaAnteprima() else { Suoni.avvio(); return false }
+        guard let url = await trovaAnteprima() else {
+            Suoni.avvio()
+            try? await Task.sleep(for: .seconds(1.5))      // il suono d'avvio finisce prima del saluto
+            return false
+        }
         let sessione = AVAudioSession.sharedInstance()
         try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
         try? sessione.setActive(true)

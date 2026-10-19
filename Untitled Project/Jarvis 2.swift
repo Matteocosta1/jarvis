@@ -327,7 +327,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+        !inBenvenuto && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
     }
 
     private func aggiornaRichiamo() {
@@ -363,7 +363,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func applaudito() {
         guard fase == .attesa, !inBenvenuto else { return }
         inBenvenuto = true
-        richiamo.ferma()                             // mentre suona la musica non ascolta: le parole del pezzo non sono domande
+        aggiornaRichiamo()                           // mentre suona la musica non ascolta: le parole del pezzo non sono domande
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         Task {
             _ = await Benvenuto.suona()
