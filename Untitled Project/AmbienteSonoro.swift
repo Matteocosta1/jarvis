@@ -14,7 +14,7 @@ nonisolated final class AmbienteSonoro: NSObject, SNResultsObserving, @unchecked
 
     /// Le etichette del classificatore di Apple che indicano altre voci o suoni con parole intorno.
     private static let segnali = ["crowd", "chatter", "babble", "hubbub", "speech_synthesizer", "music", "singing",
-                                  "television", "radio", "applause", "cheering", "laughter", "choir", "children_shouting"]
+                                  "television", "radio", "cheering", "laughter", "choir", "children_shouting"]
 
     /// Vero se negli ultimi secondi intorno c'era confusione.
     var affollato: Bool {

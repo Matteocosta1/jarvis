@@ -40,7 +40,7 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(parola, forHTTPHeaderField: "x-jarvis-token")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["registra_push": token, "dispositivo": "iphone"])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["registra_push": token, "dispositivo": Impostazioni.dispositivo])
         guard let (_, r) = try? await URLSession.shared.data(for: req), (r as? HTTPURLResponse)?.statusCode == 200 else { return }
         difese.set(token, forKey: "pushToken")
         difese.set(Date(), forKey: "pushRegistrato")

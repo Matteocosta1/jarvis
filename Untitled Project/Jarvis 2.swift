@@ -51,6 +51,8 @@ enum Impostazioni {
     static var richiamo: Bool { UserDefaults.standard.object(forKey: "richiamo") as? Bool ?? true }
     /// In attesa risponde a qualsiasi frase del signore, senza bisogno di «Jarvis» (spento: solo «Jarvis», «ehi», «bro»…).
     static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? true }
+    /// La stessa app gira anche sul Mac (chip Apple): il cervello lo sa e risponde da Mac.
+    nonisolated static var dispositivo: String { ProcessInfo.processInfo.isiOSAppOnMac ? "mac" : "iphone" }
 }
 
 // MARK: - Portachiavi (la parola d'ordine non sta in chiaro)
@@ -179,6 +181,7 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.sveglia = { [weak self] in self?.richiamato() }
         richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t } }
         richiamo.consegna = { [weak self] frase in self?.fraseRichiamo(frase) }
+        richiamo.applauso = { [weak self] in self?.applaudito() }
         strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
             return await self.apriOcchi(automatico: automatico, video: video, zoom: CGFloat(zoom))
@@ -353,6 +356,12 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .ascolto
         // chiamato a voce: niente bip, come una persona che si gira ad ascoltare (vibrazione leggera e reattore acceso)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+    }
+
+    /// Due battiti di mani: come toccare il reattore, ma da lontano. Solo quando JARVIS è in attesa.
+    private func applaudito() {
+        guard fase == .attesa else { return }
+        Task { await avviaAscolto(bip: true) }
     }
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
@@ -605,7 +614,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], allegato: String? = nil,
                        fotoStoria: (Int, [Data])? = nil, id: UUID) async {
-        var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "iphone", "strumenti_client": Strumenti.nomi]
+        var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi]
         if let fs = fotoStoria {      // la foto di poco fa, rimessa al suo posto nella conversazione
             corpo["foto_storia"] = ["indice": fs.0, "immagini": fs.1.map { $0.base64EncodedString() }] as [String: Any]
         }
@@ -661,7 +670,7 @@ final class Jarvis: NSObject, ObservableObject {
                     let detto: Any = e["detto"] ?? ""
                     let continua: [String: Any] = ["lavoro": lavoro, "risultati": risultati,
                                                    "modello": modello, "azioni": azioniFatte, "detto": detto]
-                    corpo = ["messaggi": [Any](), "dispositivo": "iphone", "strumenti_client": Strumenti.nomi,
+                    corpo = ["messaggi": [Any](), "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                              "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
                 }

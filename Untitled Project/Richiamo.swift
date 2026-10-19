@@ -17,11 +17,14 @@ final class Richiamo {
     var consegna: ((String) -> Void)?
     /// La frase mentre la dice, per mostrarla sullo schermo.
     var testo: ((String) -> Void)?
+    /// Due battiti di mani (come Tony Stark): JARVIS si mette in ascolto.
+    var applauso: (() -> Void)?
 
     private let motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private let condotto = Condotto()
+    private let mani = BattitoMani()
     private var ultimoAvvio = Date.distantPast
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
@@ -95,7 +98,9 @@ final class Richiamo {
                 // mixWithOthers: la musica di Spotify continua; A2DP: le cuffie restano in alta qualità
                 try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
                 try sessione.setActive(true)
-                try Richiamo.collega(motore, condotto)
+                mani.quandoSente = { [weak self] in Task { @MainActor in self?.applauso?() } }
+                mani.azzera()
+                try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
                 try motore.start()
             }
@@ -368,7 +373,7 @@ final class Richiamo {
 
     // MARK: Ponti fuori dal thread principale
 
-    nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto) throws {
+    nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto, _ mani: BattitoMani) throws {
         let input = motore.inputNode
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
@@ -378,6 +383,7 @@ final class Richiamo {
         let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)   // folla, musica, TV intorno?
         input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
             condotto.scrivi(buffer)
+            mani.analizza(buffer)                                // due battiti di mani: JARVIS si sveglia
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
         }
@@ -388,6 +394,79 @@ final class Richiamo {
         ric.recognitionTask(with: r) { ris, err in
             esito(ris?.bestTranscription.formattedString, (ris?.isFinal ?? false) || err != nil)
         }
+    }
+}
+
+/// Due battiti di mani, come Tony Stark. Gira sul thread audio, tutto sul telefono (o sul Mac), senza rete.
+/// Un battito è un colpo secco: sale di colpo molto sopra il rumore di fondo e si spegne entro un decimo di secondo
+/// (la voce e la musica invece restano accese). Ne servono due, a distanza di 0,15–0,8 secondi; poi due secondi di pausa.
+/// Con musica, folla o TV intorno (l'analisi dell'ambiente) non scatta: un colpo di batteria non deve svegliare JARVIS.
+nonisolated final class BattitoMani: @unchecked Sendable {
+    private let lock = NSLock()
+    private var avviso: (@Sendable () -> Void)?
+    /// Chi avvisare quando sente i due battiti (si può cambiare anche mentre il microfono è acceso).
+    var quandoSente: (@Sendable () -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return avviso }
+        set { lock.lock(); avviso = newValue; lock.unlock() }
+    }
+    private var fondo: Float = 0.01          // il rumore di fondo (media lenta)
+    private var campioni: Int64 = 0          // il tempo, in campioni dall'accensione
+    private var candidato: (inizio: Int64, energia: Float, coda: Float, finestre: Int)?
+    private var primoBattito: Int64 = -1
+    private var pausaFino: Int64 = 0
+    private let finestra = 256
+
+    /// Microfono appena riacceso: si riparte puliti (niente colpi a metà rimasti dalla volta prima).
+    func azzera() { lock.lock(); candidato = nil; primoBattito = -1; pausaFino = 0; lock.unlock() }
+
+    func analizza(_ b: AVAudioPCMBuffer) {
+        guard UserDefaults.standard.object(forKey: "battitoMani") as? Bool ?? true,
+              let dati = b.floatChannelData?[0] else { return }
+        let n = Int(b.frameLength), hz = Int64(b.format.sampleRate)
+        guard n > 0, hz > 0 else { return }
+        var sentito = false
+        lock.lock()
+        var i = 0
+        while i + finestra <= n {
+            var picco: Float = 0, somma: Float = 0
+            for k in i..<(i + finestra) { let v = abs(dati[k]); picco = max(picco, v); somma += v * v }
+            let energia = (somma / Float(finestra)).squareRoot()
+            let ora = campioni + Int64(i)
+            if var c = candidato {
+                // dopo il colpo: quanto resta acceso fra 50 e 130 millisecondi
+                let dopo = ora - c.inizio
+                if dopo < hz * 50 / 1000 { c.energia = max(c.energia, energia); candidato = c }      // il colpo vero, al suo massimo
+                else if dopo <= hz * 130 / 1000 { c.coda += energia; c.finestre += 1; candidato = c }
+                else if dopo > hz * 130 / 1000 {
+                    let media = c.finestre > 0 ? c.coda / Float(c.finestre) : 0
+                    candidato = nil
+                    if media < c.energia * 0.3 {                  // si è spento subito: è un battito
+                        if primoBattito >= 0, c.inizio - primoBattito >= hz * 150 / 1000, c.inizio - primoBattito <= hz * 800 / 1000 {
+                            primoBattito = -1
+                            pausaFino = ora + hz * 2
+                            sentito = true
+                        } else {
+                            primoBattito = c.inizio
+                        }
+                    } else {
+                        primoBattito = -1                         // suono lungo (voce, musica): non conta
+                    }
+                }
+            } else if ora >= pausaFino, picco > max(0.12, fondo * 14), energia > fondo * 7 {
+                if primoBattito < 0 && AmbienteSonoro.condiviso.affollato {
+                    // musica o folla intorno: nessun primo battito
+                } else {
+                    candidato = (ora, energia, 0, 0)
+                }
+            }
+            if candidato == nil { fondo = fondo * 0.995 + energia * 0.005 }
+            if primoBattito >= 0, ora - primoBattito > hz { primoBattito = -1 }   // il secondo non è arrivato
+            i += finestra
+        }
+        campioni += Int64(n)
+        let avvisa = sentito ? avviso : nil
+        lock.unlock()
+        avvisa?()
     }
 }
 
