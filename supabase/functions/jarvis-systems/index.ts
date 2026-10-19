@@ -26,8 +26,9 @@ async function bussa(nome: string, slug: string, metodo = "POST"): Promise<Esito
       method: metodo, signal: AbortSignal.timeout(20_000),
       ...(metodo === "POST" ? { headers: { "content-type": "application/json" }, body: "{}" } : {}),
     });
-    await r.body?.cancel();
-    return r.status === 401 ? { nome, ok: true } : { nome, ok: false, dettaglio: `risponde ${r.status}` };
+    const corpo = await r.text().catch(() => "");
+    // 401 con il nostro messaggio d'errore: la funzione è accesa e si difende (non il cancello di Supabase davanti)
+    return r.status === 401 && /"errore"/.test(corpo) ? { nome, ok: true } : { nome, ok: false, dettaglio: `risponde ${r.status}` };
   } catch (e) {
     return { nome, ok: false, dettaglio: `non risponde (${(e as Error).message.slice(0, 80)})` };
   }
@@ -119,16 +120,14 @@ Deno.serve(async (req) => {
 
   if (guasti.length) {
     // si avvisa al primo guasto, e poi ogni 6 ore finché non torna a posto (non ogni ora)
-    const ultimoAvviso = (await db.from("jarvis_systems").select("creato").eq("avvisato", true).order("creato", { ascending: false }).limit(1)).data?.[0]?.creato;
+    const ultimoAvviso = (await db.from("jarvis_systems").select("creato").eq("avvisato", true).is("riepilogo", null).order("creato", { ascending: false }).limit(1)).data?.[0]?.creato;
     const daRipetere = !ultimoAvviso || Date.now() - new Date(ultimoAvviso).getTime() > 6 * 3600_000;
     if (!prima || prima.ok || daRipetere) {
       const testo = guasti.map((g) => `${g.nome}: ${g.dettaglio}`).join(" · ");
-      await avvisa("⚠️ JARVIS · Systems Check", testo, true);
-      avvisato = true;
+      avvisato = (await avvisa("⚠️ JARVIS · Systems Check", testo, true).catch(() => 0)) > 0;
     }
   } else if (prima && !prima.ok) {
-    await avvisa("JARVIS · Systems Check", "I sistemi che non andavano sono tornati a funzionare, Sir.", false);
-    avvisato = true;
+    avvisato = (await avvisa("JARVIS · Systems Check", "I sistemi che non andavano sono tornati a funzionare, Sir.", false).catch(() => 0)) > 0;
   }
 
   await db.from("jarvis_systems").insert({ ok: guasti.length === 0, esiti, avvisato });

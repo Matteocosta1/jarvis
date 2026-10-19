@@ -615,17 +615,16 @@ struct ContentView: View {
         .buttonStyle(StileStark())
     }
 
-    /// Le righe di stato del menu: chiamate leggere al cervello.
+    /// Le righe di stato del menu: chiamate leggere al cervello, una dopo l'altra (i costi per ultimi: sono i più lenti).
     private func caricaStatoSistemi() async {
-        if let c = await VistaVitals.chiama(["consumi": true]), c["errore"] == nil {
-            let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
-            statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
-        } else { statoSistemi["costi"] = "non raggiungibile" }
-        if let ra = await VistaVitals.chiama(["archivio": true]), ra["errore"] == nil {
+        let ra = await VistaVitals.chiama(["archivio": true])
+        let rs = await VistaVitals.chiama(["supabase": true, "ore": 24])
+        let rg = await VistaVitals.chiama(["github": true])
+        if let ra, ra["errore"] == nil {
             let file = ra["file"] as? [[String: Any]] ?? [], cartelle = ra["cartelle"] as? [[String: Any]] ?? []
             statoSistemi["archivio"] = "\(file.count) file · \(cartelle.count) cartelle"
         } else { statoSistemi["archivio"] = "non raggiungibile" }
-        if let rs = await VistaVitals.chiama(["supabase": true, "ore": 24]) {
+        if let rs {
             if let e = rs["errore"] as? String { statoSistemi["supabase"] = e.contains("manca") ? "non collegato" : "non raggiungibile" }
             else {
                 let log = rs["log"] as? [String: Any]
@@ -634,7 +633,7 @@ struct ContentView: View {
                 statoSistemi["supabase"] = "\(errori == 0 ? "nessun errore" : "\(errori) errori") · \(Int(mb)) MB"
             }
         } else { statoSistemi["supabase"] = "cervello non raggiungibile" }
-        if let rg = await VistaVitals.chiama(["github": true]) {
+        if let rg {
             if let e = rg["errore"] as? String { statoSistemi["github"] = e.contains("manca") ? "non collegato" : "non raggiungibile" }
             else {
                 let repo = rg["repository"] as? [[String: Any]] ?? []
@@ -642,6 +641,10 @@ struct ContentView: View {
                 statoSistemi["github"] = "\(repo.count) repository · \(issue) issue aperte"
             }
         } else { statoSistemi["github"] = "cervello non raggiungibile" }
+        if let c = await VistaVitals.chiama(["consumi": true]), c["errore"] == nil {
+            let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
+            statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
+        } else { statoSistemi["costi"] = "non raggiungibile" }
     }
 
     private var registro: some View {

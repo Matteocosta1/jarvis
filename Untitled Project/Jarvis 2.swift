@@ -50,7 +50,7 @@ enum Impostazioni {
     /// In attesa, con l'app aperta, basta dire «Jarvis» per parlargli: niente tocco.
     static var richiamo: Bool { UserDefaults.standard.object(forKey: "richiamo") as? Bool ?? true }
     /// In attesa risponde a qualsiasi frase del signore, senza bisogno di «Jarvis» (spento: solo «Jarvis», «ehi», «bro»…).
-    static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? true }
+    static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? !ProcessInfo.processInfo.isiOSAppOnMac }
     /// La stessa app gira anche sul Mac (chip Apple): il cervello lo sa e risponde da Mac.
     nonisolated static var dispositivo: String { ProcessInfo.processInfo.isiOSAppOnMac ? "mac" : "iphone" }
 }
@@ -193,6 +193,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Interazione
 
     func toccaReattore() {
+        fermaBenvenuto()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
         switch fase {
@@ -366,40 +367,64 @@ final class Jarvis: NSObject, ObservableObject {
     private var ultimaFraseTony = Date.distantPast
     private static let finestraRito: TimeInterval = 8
 
+    private var compitoBenvenuto: Task<Void, Never>?
+    private var attesaBattiti: Task<Void, Never>?
+
     /// Due battiti di mani.
     private func applaudito() {
         guard fase == .attesa, !inBenvenuto else { return }
         if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
         ultimiBattiti = Date()
-        richiamo.liberoFinoA = Date().addingTimeInterval(Jarvis.finestraRito)   // per la frase non serve dire «Jarvis»
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        Suoni.pronto()
+        Suoni.pronto()                               // «pronto»: ora la frase
     }
 
     /// «Wake up, daddy's home».
     private func fraseDiTony() {
         guard !inBenvenuto else { return }
-        let maniAccese = UserDefaults.standard.object(forKey: "battitoMani") as? Bool ?? true
+        // i battiti si sentono solo con il richiamo acceso: senza, basta la frase
+        let maniAccese = Impostazioni.richiamo && (UserDefaults.standard.object(forKey: "battitoMani") as? Bool ?? true)
         if !maniAccese || Date().timeIntervalSince(ultimiBattiti) < Jarvis.finestraRito { benvenuto(); return }
-        ultimaFraseTony = Date()                     // aspetto i battiti
+        ultimaFraseTony = Date()                     // aspetto i battiti…
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Suoni.pronto()
+        attesaBattiti?.cancel()
+        attesaBattiti = Task { [weak self] in       // …ma se non arrivano, il rito parte lo stesso: la frase non va mai persa
+            try? await Task.sleep(for: .seconds(Jarvis.finestraRito))
+            guard !Task.isCancelled, let self, self.ultimaFraseTony != .distantPast else { return }
+            self.benvenuto()
+        }
     }
 
     /// Il rito è completo: i Clash, poi il saluto.
     private func benvenuto() {
         guard fase == .attesa, !inBenvenuto else { return }
+        attesaBattiti?.cancel()
         ultimiBattiti = .distantPast
         ultimaFraseTony = .distantPast
         inBenvenuto = true
         aggiornaRichiamo()                           // mentre suona la musica non ascolta: le parole del pezzo non sono domande
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        Task {
+        compitoBenvenuto = Task {
             _ = await Benvenuto.suona()
+            guard !Task.isCancelled, inBenvenuto else { return }   // interrotto: ci ha già pensato fermaBenvenuto()
             inBenvenuto = false
-            leggi(Benvenuto.saluto())                // finito il saluto torna in attesa e il richiamo riparte da solo
+            compitoBenvenuto = nil
+            if fase == .attesa { leggi(Benvenuto.saluto()) }        // finito il saluto torna in attesa e il richiamo riparte da solo
             try? await Task.sleep(for: .seconds(1))
             if fase == .attesa { aggiornaRichiamo() } // modalità silenziosa: nessuna voce, il richiamo va riacceso a mano
         }
+    }
+
+    /// Il rito si ferma subito (tocco sul reattore, una domanda, un avviso): musica spenta, niente saluto.
+    private func fermaBenvenuto() {
+        attesaBattiti?.cancel()
+        guard inBenvenuto else { return }
+        compitoBenvenuto?.cancel()
+        compitoBenvenuto = nil
+        Benvenuto.ferma()
+        inBenvenuto = false
+        aggiornaRichiamo()
     }
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
@@ -532,6 +557,7 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     func interrompi() {
+        fermaBenvenuto()
         compitoRete?.cancel()
         compitoRete = nil
         compitoPonte?.cancel()

@@ -31,6 +31,7 @@ enum Suoni {
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
+        BattitoMani.ignora(per: 0.5)          // un «tick» dell'app non è un battito di mani
     }
     /// La sezione ha i dati e si stampa sullo schermo. File: «schedapronta». Se manca, il suono di «pronto».
     /// Il suono del caricamento sfuma in quel momento, così i due non si accavallano.
@@ -59,6 +60,7 @@ enum Suoni {
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
+        BattitoMani.ignora(per: 0.5)          // un «tick» dell'app non è un battito di mani
     }
 
     /// Chiusura della sequenza: «sistemi in linea», un doppio ping discendente, morbido.
@@ -73,6 +75,7 @@ enum Suoni {
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
+        BattitoMani.ignora(per: 0.5)          // un «tick» dell'app non è un battito di mani
     }
 
     private static var cachePlim: [String: Data] = [:]
@@ -91,6 +94,7 @@ enum Suoni {
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
+        BattitoMani.ignora(per: 0.5)          // un «tick» dell'app non è un battito di mani
     }
 
     /// Tick da HUD: 8 ms di rumore filtrato (il «click» elettronico) + ping 2400→1500 Hz che muore in 45 ms.
@@ -171,6 +175,7 @@ enum Suoni {
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
+        BattitoMani.ignora(per: 0.5)          // un «tick» dell'app non è un battito di mani
     }
 
     // MARK: Sintesi: ogni suono è una o più note con inviluppo morbido, scritte come WAV in memoria

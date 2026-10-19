@@ -419,6 +419,14 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     private var pausaFino: Int64 = 0
     private let finestra = 256
 
+    /// I suoni dell'app (tick, plim, avvio) non devono sembrare battiti: per un attimo si ignora tutto.
+    private nonisolated(unsafe) static var ignoraFino = Date.distantPast
+    private static let lockIgnora = NSLock()
+    static func ignora(per secondi: TimeInterval) {
+        lockIgnora.lock(); ignoraFino = max(ignoraFino, Date().addingTimeInterval(secondi)); lockIgnora.unlock()
+    }
+    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino }
+
     /// Microfono appena riacceso: si riparte puliti (niente colpi a metà rimasti dalla volta prima).
     func azzera() { lock.lock(); candidato = nil; primoBattito = -1; pausaFino = 0; lock.unlock() }
 
@@ -456,7 +464,9 @@ nonisolated final class BattitoMani: @unchecked Sendable {
                     }
                 }
             } else if ora >= pausaFino, picco > max(0.12, fondo * 14), energia > fondo * 7 {
-                if primoBattito < 0 && AmbienteSonoro.condiviso.affollato {
+                if BattitoMani.daIgnorare {
+                    primoBattito = -1                             // un suono dell'app: non conta
+                } else if primoBattito < 0 && AmbienteSonoro.condiviso.affollato {
                     // musica o folla intorno: nessun primo battito
                 } else {
                     candidato = (ora, energia, 0, 0)

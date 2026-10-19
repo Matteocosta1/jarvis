@@ -23,7 +23,8 @@ enum Benvenuto {
 
     /// Qualche secondo di Clash, poi sfuma. Restituisce falso se non è riuscito a farlo partire.
     static func suona(secondi: Double = 7) async -> Bool {
-        guard let url = await trovaAnteprima() else {
+        if Impostazioni.muto { return false }                 // modalità silenziosa: niente musica
+        guard let url = await anteprimaEntro(secondi: 3) else {
             Suoni.avvio()
             try? await Task.sleep(for: .seconds(1.5))      // il suono d'avvio finisce prima del saluto
             return false
@@ -37,13 +38,32 @@ enum Benvenuto {
         p.play()
         try? await Task.sleep(for: .seconds(secondi))
         for passo in stride(from: 0.85, through: 0.0, by: -0.085) {          // sfuma in poco meno di un secondo
+            if Task.isCancelled || lettore !== p { break }
             p.volume = Float(max(0, passo))
             try? await Task.sleep(for: .milliseconds(90))
         }
         p.pause()
-        lettore = nil
-        return true
+        if lettore === p { lettore = nil }
+        return !Task.isCancelled
     }
+
+    /// Ferma subito la musica (il signore ha toccato il reattore, è arrivato un avviso…).
+    static func ferma() {
+        lettore?.pause()
+        lettore = nil
+    }
+
+    /// L'anteprima, ma senza far aspettare: se Apple Music non risponde entro pochi secondi si va avanti senza
+    /// (la ricerca continua per conto suo e il risultato resta in memoria per la volta dopo).
+    private static func anteprimaEntro(secondi: Double) async -> URL? {
+        if let anteprima { return anteprima }
+        let fatto = Fatto()
+        return await withCheckedContinuation { (c: CheckedContinuation<URL?, Never>) in
+            Task { @MainActor in let u = await trovaAnteprima(); if !fatto.si { fatto.si = true; c.resume(returning: u) } }
+            Task { @MainActor in try? await Task.sleep(for: .seconds(secondi)); if !fatto.si { fatto.si = true; c.resume(returning: nil) } }
+        }
+    }
+    private final class Fatto { var si = false }
 
     /// Il saluto, secondo l'ora.
     static func saluto() -> String {

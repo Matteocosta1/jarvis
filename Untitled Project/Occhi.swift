@@ -530,7 +530,8 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
                        ?? AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back)
                        ?? AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back))
                     : nil
-                guard let cam = virtuale ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: posizione),
+                guard let cam = virtuale ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: posizione)
+                        ?? AVCaptureDevice.default(for: .video),          // sul Mac: la webcam, qualunque sia
                       let ingresso = try? AVCaptureDeviceInput(device: cam),
                       self.sessione.canAddInput(ingresso) else {
                     self.sessione.commitConfiguration()

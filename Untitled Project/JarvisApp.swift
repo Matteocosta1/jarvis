@@ -7,7 +7,9 @@ struct JarvisApp: App {
     @Environment(\.scenePhase) private var fase
 
     init() {
-        UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true, "ascoltoSempre": true])
+        // sul Mac (app dell'iPhone) «risponde a qualsiasi frase» parte spento: lì intorno ci sono riunioni e video
+        UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true,
+                                                  "ascoltoSempre": !ProcessInfo.processInfo.isiOSAppOnMac])
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
     }
 

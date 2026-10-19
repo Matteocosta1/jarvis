@@ -372,10 +372,10 @@ const METEO_CODICI: Record<number, string> = { 0: "sereno", 1: "quasi sereno", 2
 
 // ───────── Difesa dalle istruzioni nascoste ─────────
 // Strumenti che portano dentro testo scritto da altri (web, email, GitHub, prodotti, log, foto, trascrizioni).
-const NON_FIDATI = new Set(["web_search", "web_fetch", "email_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
+const NON_FIDATI = new Set(["web_search", "web_fetch", "email_leggi", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
   "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "supabase_log"]);
 // Azioni che escono verso il mondo o cancellano: dopo aver letto testo altrui, servono una conferma del signore.
-const SEMPRE_PERICOLOSI = new Set(["invia_messaggio", "messaggio", "chiama", "apri_pagina", "github_scrivi", "archivio_apri", "archivio_elimina",
+const SEMPRE_PERICOLOSI = new Set(["invia_messaggio", "messaggio", "chiama", "apri_pagina", "telefono_comando", "github_scrivi", "archivio_apri", "archivio_elimina",
   "diario_cancella", "memoria_dimentica", "memoria_salva"]);
 const FERMATO = "fermato per sicurezza: in questo turno ho letto contenuti esterni. Chieda al signore di confermare questa azione; nel prossimo messaggio, se conferma, si può fare.";
 function pericoloso(nome: string, i: Record<string, any>) {
@@ -662,7 +662,8 @@ async function ricordiCerca(i: Record<string, any>, turno: Turno) {
 async function ricordiOggi(i: Record<string, any>) {
   const giorno = /^\d{4}-\d{2}-\d{2}$/.test(String(i.giorno ?? "")) ? String(i.giorno)
     : new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
-  const inizio = new Date(`${giorno}T00:00:00+02:00`), fine = new Date(inizio.getTime() + 86400_000);   // l'ora legale sposta di poco, va bene
+  const dopo = new Date(`${giorno}T12:00:00Z`); dopo.setUTCDate(dopo.getUTCDate() + 1);
+  const inizio = mezzanotteDi(giorno), fine = mezzanotteDi(dopo.toISOString().slice(0, 10));   // 23, 24 o 25 ore: dipende dall'ora legale
   const [r, a] = await Promise.all([
     db.from("jarvis_ricordi").select("id, tipo, testo, persona, luogo, creato").gte("creato", inizio.toISOString()).lt("creato", fine.toISOString()).order("creato"),
     db.from("jarvis_azioni").select("strumento, dettagli, creato, errore").gte("creato", inizio.toISOString()).lt("creato", fine.toISOString()).order("creato").limit(40),
@@ -1384,57 +1385,59 @@ const PREZZI: Record<string, [number, number, number]> = (() => {
   try { return { ...base, ...JSON.parse(Deno.env.get("PREZZI_JSON") || "{}") }; } catch { return base; }
 })();
 const prezzoDi = (modello: string) => PREZZI[Object.keys(PREZZI).find((k) => modello.includes(k)) ?? ""] ?? [0, 0, 0];
-/// La mezzanotte di Roma di «giorni» fa (giusta sia con l'ora legale sia con quella solare).
+/// La mezzanotte di Roma di «giorni» di calendario fa (giusta con l'ora legale e con quella solare, anche il giorno del cambio).
 function mezzanotteRoma(giorni = 0, primoDelMese = false) {
-  let g = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() - giorni * 86400_000));
+  const base = new Date(`${oggiRoma()}T12:00:00Z`);
+  base.setUTCDate(base.getUTCDate() - giorni);
+  let g = base.toISOString().slice(0, 10);
   if (primoDelMese) g = `${g.slice(0, 7)}-01`;
+  return mezzanotteDi(g);
+}
+/// La mezzanotte di Roma di un giorno «AAAA-MM-GG».
+function mezzanotteDi(g: string) {
   for (const off of ["+01:00", "+02:00"]) {
     const t = new Date(`${g}T00:00:00${off}`);
     if (new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" }).format(t) === "00") return t;
   }
   return new Date(`${g}T00:00:00+01:00`);
 }
+/// Dollari di una riga di consumi: ingresso, cache letta (5%), cache scritta (125% dell'ingresso), uscita.
+function costoRiga(r: any) {
+  const p = prezzoDi(String(r.modello));
+  return (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_scrittura) * p[0] * 1.25 + num(r.token_out) * p[2]) / 1e6;
+}
+/// Per modello, in un periodo: tutto sommato nel database (nessun limite di righe).
+async function costiFra(da: Date, a: Date = new Date()) {
+  const { data, error } = await db.rpc("jarvis_costi", { p_da: da.toISOString(), p_a: a.toISOString() });
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({ modello: String(r.modello), chiamate: num(r.chiamate), token_in: num(r.token_in), token_cache: num(r.token_cache),
+    token_scrittura: num(r.token_scrittura), token_out: num(r.token_out), dollari: costoRiga(r) }));
+}
+const somma = (righe: { dollari: number }[]) => righe.reduce((t, r) => t + r.dollari, 0);
+async function voceFra(da: Date, a: Date = new Date()) {
+  const { data } = await db.rpc("jarvis_voce_caratteri", { p_da: da.toISOString(), p_a: a.toISOString() });
+  const r = ((data ?? []) as any[])[0] ?? {};
+  return { frasi: num(r.frasi), caratteri: num(r.caratteri) };
+}
 /// I costi di un periodo qualsiasi, per la domanda a voce («quanto abbiamo speso stamattina?»).
 async function costiPeriodo(i: Record<string, any>) {
   const da = new Date(String(i.da ?? "")), a = i.a ? new Date(String(i.a)) : new Date();
   if (isNaN(da.getTime()) || isNaN(a.getTime()) || a <= da) return { errore: "periodo non valido: servono «da» (e facoltativo «a») in ISO 8601" };
-  const { data, error } = await db.from("jarvis_consumi").select("servizio, modello, token_in, token_cache, token_out, caratteri")
-    .gte("creato", da.toISOString()).lt("creato", a.toISOString()).limit(20000);
-  if (error) throw error;
-  const modelli: Record<string, { chiamate: number; dollari: number }> = {};
-  let caratteri = 0, frasi = 0;
-  for (const r of (data ?? []) as any[]) {
-    if (r.servizio === "voce") { caratteri += num(r.caratteri); frasi++; continue; }
-    const p = prezzoDi(String(r.modello));
-    const m = (modelli[String(r.modello).replace("claude-", "")] ??= { chiamate: 0, dollari: 0 });
-    m.chiamate++; m.dollari += (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6;
-  }
-  const elenco = Object.entries(modelli).map(([modello, x]) => ({ modello, chiamate: x.chiamate, dollari: Math.round(x.dollari * 100) / 100 })).sort((x, y) => y.dollari - x.dollari);
-  return { da: quando(da), a: quando(a), cervello_dollari: Math.round(elenco.reduce((t, m) => t + m.dollari, 0) * 100) / 100, modelli: elenco,
-    voce: { frasi, caratteri }, nota: "stima dai token con i listini pubblici; la voce è nel piano mensile ElevenLabs" };
+  const [righe, voce] = await Promise.all([costiFra(da, a), voceFra(da, a)]);
+  const elenco = righe.map((m) => ({ modello: m.modello.replace("claude-", ""), chiamate: m.chiamate, dollari: r2(m.dollari) })).sort((x, y) => y.dollari - x.dollari);
+  return { da: quando(da), a: quando(a), cervello_dollari: r2(somma(righe)), modelli: elenco,
+    voce, nota: "stima dai token con i listini pubblici; la voce è nel piano mensile ElevenLabs" };
 }
 async function consumi() {
-  const inizioMese = mezzanotteRoma(0, true);
-  const inizioOggi = mezzanotteRoma(0);
-  const [ieriDa, settimanaDa] = await Promise.all([spesaDal(mezzanotteRoma(1).toISOString()).catch(() => 0), spesaDal(mezzanotteRoma(6).toISOString()).catch(() => 0)]);
-  // i token si sommano nel database (niente limite di righe); la voce si conta a parte
-  const [mese, oggiT, voceRighe, primo, statoCr] = await Promise.all([
-    db.rpc("jarvis_token_per_modello", { p_da: inizioMese.toISOString() }),
-    db.rpc("jarvis_token_per_modello", { p_da: inizioOggi.toISOString() }),
-    db.from("jarvis_consumi").select("creato, caratteri").eq("servizio", "voce").gte("creato", inizioMese.toISOString()).limit(5000),
+  const inizioMese = mezzanotteRoma(0, true), inizioOggi = mezzanotteRoma(0), inizioIeri = mezzanotteRoma(1), inizio7 = mezzanotteRoma(6);
+  const [mese, oggi, ieri, sette, voceMese, voceOggi, primo, statoCr] = await Promise.all([
+    costiFra(inizioMese), costiFra(inizioOggi), costiFra(inizioIeri, inizioOggi), costiFra(inizio7),
+    voceFra(inizioMese), voceFra(inizioOggi),
     db.from("jarvis_consumi").select("creato").gte("creato", inizioMese.toISOString()).order("creato").limit(1),
     statoCredito().catch(() => ({ impostato: false })),
   ]);
-  const costo = (r: any) => { const p = prezzoDi(String(r.modello)); return (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6; };
-  const perModello: Record<string, { chiamate: number; token_in: number; token_cache: number; token_out: number; dollari: number }> = {};
-  for (const r of (mese.data ?? []) as any[]) perModello[String(r.modello)] = { chiamate: num(r.chiamate), token_in: num(r.token_in), token_cache: num(r.token_cache), token_out: num(r.token_out), dollari: costo(r) };
-  let dollariOggi = 0, chiamateOggi = 0;
-  for (const r of (oggiT.data ?? []) as any[]) { dollariOggi += costo(r); chiamateOggi += num(r.chiamate); }
-  let caratteriMese = 0, caratteriOggi = 0;
-  for (const r of voceRighe.data ?? []) { caratteriMese += num(r.caratteri); if (new Date(r.creato) >= inizioOggi) caratteriOggi += num(r.caratteri); }
+  const modelli = mese.map((m) => ({ ...m, dollari: r2(m.dollari) })).sort((a, b) => b.dollari - a.dollari);
   const righe = primo.data ?? [];
-  const modelli = Object.entries(perModello).map(([modello, x]) => ({ modello, ...x, dollari: Math.round(x.dollari * 100) / 100 })).sort((a, b) => b.dollari - a.dollari);
-  const totale = Math.round(modelli.reduce((a, m) => a + m.dollari, 0) * 100) / 100;
   // la voce: il piano ElevenLabs e quanto ne resta
   let voce: any = null;
   const chiave = Deno.env.get("ELEVENLABS_API_KEY");
@@ -1449,10 +1452,11 @@ async function consumi() {
       }
     } catch { /* senza piano */ }
   }
-  return { mese: inizioMese.toISOString().slice(0, 7), stima: true, dollari_mese: totale, dollari_oggi: Math.round(dollariOggi * 100) / 100,
-    dollari_ieri: Math.round((ieriDa - dollariOggi) * 100) / 100, dollari_7_giorni: Math.round(settimanaDa * 100) / 100,
+  return { mese: oggiRoma().slice(0, 7), stima: true, dollari_mese: r2(somma(mese)), dollari_oggi: r2(somma(oggi)),
+    dollari_ieri: r2(somma(ieri)), dollari_7_giorni: r2(somma(sette)),
     fissi: [{ nome: "Supabase Pro", costo: "25 $/mese" }, { nome: "Apple Developer", costo: "99 €/anno" }],
-    chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: chiamateOggi, modelli, caratteri_voce_mese: caratteriMese, caratteri_voce_oggi: caratteriOggi, voce,
+    chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: oggi.reduce((a, m) => a + m.chiamate, 0), modelli,
+    caratteri_voce_mese: voceMese.caratteri, caratteri_voce_oggi: voceOggi.caratteri, voce,
     dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr };
 }
 
@@ -1524,11 +1528,7 @@ async function prodotto(codice: string) {
 // Nessun prelievo automatico: si ricarica a mano dalla Console. Qui si tiene solo il conto, per avvisare in tempo.
 const r2 = (x: number) => Math.round(x * 100) / 100;
 async function spesaDal(da: string) {
-  const { data, error } = await db.rpc("jarvis_token_per_modello", { p_da: da });
-  if (error) throw error;
-  let dollari = 0;
-  for (const r of (data ?? []) as any[]) { const p = prezzoDi(String(r.modello)); dollari += (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_out) * p[2]) / 1e6; }
-  return dollari;
+  return somma(await costiFra(new Date(da)));
 }
 async function statoCredito() {
   const { data: b } = await db.from("jarvis_credito").select("id, creato, tipo, importo, saldo, avvisato").order("creato", { ascending: false }).limit(1).maybeSingle();
@@ -1884,7 +1884,7 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
     body: {
       id, traceId: id, name: "jarvis", model: modello, startTime: inizio.toISOString(), endTime: fine.toISOString(),
       ...(primaParola ? { completionStartTime: primaParola.toISOString() } : {}),
-      usage: { input: uso.token_in + uso.token_cache, output: uso.token_out, unit: "TOKENS" },
+      usage: { input: uso.token_in + uso.token_cache + num(uso.token_cache_scrittura), output: uso.token_out, unit: "TOKENS" },
       metadata: { stop, strumenti, token_cache: uso.token_cache },
       ...(errore ? { level: "ERROR", statusMessage: errore.slice(0, 300) } : {}),
     },
@@ -1916,13 +1916,13 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
     const d = await r.json().catch(() => ({}));
     const err: any = new Error(`${d?.error?.type ?? ""} ${d?.error?.message || `Errore API ${r.status}`} (${r.status})`.trim());
     err.primaDiParlare = true;
-    langfuse(modello, inizio, null, { token_in: 0, token_cache: 0, token_out: 0 }, "errore", [], err.message);
+    langfuse(modello, inizio, null, { token_in: 0, token_cache: 0, token_cache_scrittura: 0, token_out: 0 }, "errore", [], err.message);
     throw err;
   }
   const blocchi: any[] = [];
   const jsonParziale: Record<number, string> = {};
   let stop = "end_turn";
-  const uso = { token_in: 0, token_cache: 0, token_out: 0 };
+  const uso = { token_in: 0, token_cache: 0, token_cache_scrittura: 0, token_out: 0 };
   const lettore = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
   for (;;) {
@@ -1937,7 +1937,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
       let e: any; try { e = JSON.parse(riga.slice(5).trim()); } catch { continue; }
       if (e.type === "message_start") {
         const u = e.message?.usage ?? {};
-        uso.token_in = num(u.input_tokens); uso.token_cache = num(u.cache_read_input_tokens) + num(u.cache_creation_input_tokens);
+        uso.token_in = num(u.input_tokens); uso.token_cache = num(u.cache_read_input_tokens); uso.token_cache_scrittura = num(u.cache_creation_input_tokens);
       } else if (e.type === "content_block_start") {
         blocchi[e.index] = structuredClone(e.content_block);
         if (e.content_block.type === "tool_use" || e.content_block.type === "server_tool_use") jsonParziale[e.index] = "";
@@ -2426,7 +2426,7 @@ Deno.serve(async (req) => {
             }
           }
           const ultimoAssistente = lavoro.at(-1);
-          if (ultimoAssistente?.role === "assistant" && Array.isArray(ultimoAssistente.content)) await registraAzioni(dispositivo, ultimoAssistente.content, risultati);
+          if (!provaGenerale && ultimoAssistente?.role === "assistant" && Array.isArray(ultimoAssistente.content)) await registraAzioni(dispositivo, ultimoAssistente.content, risultati);
           lavoro.push({ role: "user", content: risultati });
         } else {
           // la memoria visiva: la foto vista poco fa torna nel messaggio in cui era stata mandata (indice nella storia dell'app)
@@ -2480,7 +2480,8 @@ Deno.serve(async (req) => {
               : "Signore, ho elaborato ma non ho trovato nulla da dire. Riformuli pure.";
             segnaEsito({ t: "fine", testo, azioni });
             invia({ t: "fine", testo, azioni });
-            if (!provaGenerale) inSottofondo(memoriaAutomatica(lavoro, testo));   // la prova generale non lascia ricordi
+            // la prova generale non lascia ricordi; un turno che ha letto testo altrui (web, email, trascrizioni) nemmeno
+            if (!provaGenerale && !contaminato) inSottofondo(memoriaAutomatica(lavoro, testo));
             ctrl.close(); return;
           }
           const usi = r.content.filter((b: any) => b.type === "tool_use");
