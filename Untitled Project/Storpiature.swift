@@ -7,6 +7,7 @@ import Foundation
 enum Storpiature {
     private static let chiave = "storpiature"
     private static let richiami: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok"]
+    private static let domande: Set<String> = ["come", "cosa", "che", "quanto", "quanti", "quante", "quando", "dove", "perche", "chi", "qual", "quale", "quali", "ma"]
 
     /// Minuscole, senza accenti né punteggiatura, senza «Jarvis» davanti: così «Jarvis, backup Daddy!» e «backup daddy» sono la stessa frase.
     static func normalizza(_ frase: String) -> String {
@@ -24,8 +25,12 @@ enum Storpiature {
 
     /// Segna la frase sentita come quel comando (solo frasi brevi: un comando, non un discorso).
     static func impara(_ frase: String, comando: String) {
+        // una domanda («come ho dormito?») non diventa mai una scorciatoia: la volta dopo deve avere la sua risposta
+        if frase.contains("?") { return }
         let f = normalizza(frase)
-        guard f.count >= 3, f.count <= 40 else { return }
+        let parole = f.split(separator: " ")
+        guard f.count >= 3, f.count <= 40, parole.count <= 6 else { return }
+        if let prima = parole.first, domande.contains(String(prima)) { return }
         var d = tutte
         d[f] = comando
         while d.count > 300, let via = d.keys.first { d[via] = nil }    // un tetto, per non crescere all'infinito
@@ -41,7 +46,7 @@ enum Storpiature {
         var migliore: (comando: String, scarto: Double)?
         for (nota, comando) in d {
             let lunga = max(nota.count, f.count)
-            guard lunga >= 6, abs(nota.count - f.count) * 4 <= lunga else { continue }
+            guard lunga >= 10, abs(nota.count - f.count) * 4 <= lunga else { continue }   // frasi corte: solo uguali
             let scarto = Double(distanza(Array(nota), Array(f))) / Double(lunga)
             if scarto <= 0.2, scarto < (migliore?.scarto ?? 1) { migliore = (comando, scarto) }
         }

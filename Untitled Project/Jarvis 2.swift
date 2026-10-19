@@ -289,7 +289,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Decide se la frase è una domanda nuova o il completamento della precedente, e la manda al cervello.
     private func instrada(_ frase: String) async {
-        fraseAVoce = frase                            // se il cervello capisce che era un comando, questa frase si impara
+        fraseAVoce = ""
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
             aggiuntaInArrivo = true
@@ -307,6 +307,7 @@ final class Jarvis: NSObject, ObservableObject {
             // Non lo tronco e non lo forzo: lo segno come possibile seguito e il cervello capisce se completa il pensiero di prima.
             let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
             let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < 60 } ?? false
+            fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
             await invia(frase, comeSeguito: rispostaInterrotta != nil || vicino)
             return
         }
@@ -1078,7 +1079,9 @@ final class Jarvis: NSObject, ObservableObject {
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         guard let riconoscitore, riconoscitore.isAvailable else {
-            if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
+            // pochi tentativi: senza rete sul Mac il riconoscimento non torna da solo, inutile far aspettare
+            if tentativo < 3, await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
+            aggiornaRichiamo()                  // il «Jarvis» in attesa torna acceso
             avviso = "Il riconoscimento vocale non è disponibile in questo momento."
             return
         }
@@ -1115,6 +1118,7 @@ final class Jarvis: NSObject, ObservableObject {
         } catch {
             fermaAscolto(invia: false)
             if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
+            aggiornaRichiamo()                  // il «Jarvis» in attesa torna acceso
             avviso = "Microfono non disponibile: \(error.localizedDescription)"
         }
     }
