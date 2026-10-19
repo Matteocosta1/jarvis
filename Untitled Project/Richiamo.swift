@@ -423,6 +423,8 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     private var primoBattito: Int64 = -1
     private var pausaFino: Int64 = 0
     private let finestra = 256
+    /// Il colpo minimo per un battito. Sull'iPhone resta 0,08; il Mac (microfono più lontano e più basso) lo abbassa.
+    var minimoPicco: Float = 0.08
 
     /// I suoni dell'app (tick, plim, avvio) non devono sembrare battiti: per un attimo si ignora tutto.
     private nonisolated(unsafe) static var ignoraFino = Date.distantPast
@@ -468,7 +470,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
                         primoBattito = -1                         // suono lungo (voce, musica): non conta
                     }
                 }
-            } else if ora >= pausaFino, picco > max(0.08, fondo * 10), energia > fondo * 5 {
+            } else if ora >= pausaFino, picco > max(minimoPicco, fondo * 10), energia > fondo * 5 {
                 if BattitoMani.daIgnorare {
                     primoBattito = -1                             // un suono dell'app: non conta
                 } else if primoBattito < 0 && AmbienteSonoro.condiviso.affollato && picco < 0.3 {

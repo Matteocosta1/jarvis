@@ -417,6 +417,13 @@ struct ContentView: View {
             TelemetriaHUD(fase: jarvis.fase)
                 .padding(.top, 4)
                 .opacity(acceso ? 1 : 0)
+            if !jarvis.diagnosiMac.isEmpty {         // solo sul Mac: cosa sente il microfono in attesa
+                Text(jarvis.diagnosiMac)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.tenue)
+                    .lineLimit(1)
+                    .padding(.top, 2)
+            }
 
             Text(!jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? suggerimento))
                 .font(.system(size: 15))

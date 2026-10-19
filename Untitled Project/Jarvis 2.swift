@@ -99,6 +99,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
+    @Published var diagnosiMac = ""             // Mac: la riga di controllo del microfono in attesa
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
     /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
     nonisolated static var usaAscoltoCloud: Bool { ProcessInfo.processInfo.isiOSAppOnMac }
@@ -106,7 +107,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// Sul Mac, in attesa: battiti di mani e frasi trascritte in cloud, al posto del richiamo di Apple.
     private lazy var attesaMac: AttesaMac = {
         let a = AttesaMac()
-        a.applauso = { [weak self] in self?.applaudito() }
+        a.applauso = { [weak self, weak a] in a?.segnaBattiti(); self?.applaudito() }
+        a.diagnosi = { [weak self] riga in self?.diagnosiMac = riga }
         a.frase = { [weak self] testo, inizio in self?.fraseSentitaMac(testo, inizio: inizio) }
         return a
     }()

@@ -163,6 +163,9 @@ nonisolated final class Segmentatore: @unchecked Sendable {
     private var prima: [Float] = []             // gli ultimi 0,4 s prima che parlasse
     private var campioni: [Float] = []
     private var inizio = Date.distantPast       // quando ha cominciato a parlare (per la finestra del seguito)
+    private var ultimoLivello: Float = 0
+    /// Il livello del microfono adesso e quello del silenzio (per la riga di controllo sullo schermo del Mac).
+    var livelli: (voce: Float, fondo: Float, parla: Bool) { lock.lock(); defer { lock.unlock() }; return (ultimoLivello, fondo, inVoce) }
     private var avviso: (@Sendable (Data, Date) -> Void)?
 
     var quandoFrase: (@Sendable (Data, Date) -> Void)? {
@@ -187,7 +190,8 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         let pezzo = RegistroMicrofono.a16k(Array(UnsafeBufferPointer(start: dati, count: n)), da: fr)
         var pronta: [Float]?
         lock.lock()
-        let soglia = max(fondo * 3.5, 0.015)
+        ultimoLivello = energia
+        let soglia = max(fondo * 3, 0.006)          // il microfono del Mac è più basso di quello dell'iPhone
         if !inVoce {
             prima.append(contentsOf: pezzo)
             if prima.count > 6_400 { prima.removeFirst(prima.count - 6_400) }
@@ -238,6 +242,11 @@ final class AttesaMac {
     private var invii: [Date] = []
     private var osservatore: NSObjectProtocol?
     private var riprova: Task<Void, Never>?
+    private var controllo: Task<Void, Never>?
+    private var frasiMandate = 0
+    private var ultimaSentita = ""
+    /// Una riga che dice cosa sta succedendo (microfono, livello, ultima frase sentita): si vede sotto il reattore sul Mac.
+    var diagnosi: ((String) -> Void)?
 
     /// Acceso e con il microfono che gira davvero.
     var attivo: Bool { voluto && acceso && motore.isRunning }
@@ -247,17 +256,37 @@ final class AttesaMac {
         accendi()
     }
 
+    /// Battiti di mani sentiti dal microfono dell'attesa (per la riga di controllo).
+    func segnaBattiti() { ultimaSentita = "👏👏" }
+
     func ferma() {
         voluto = false
         riprova?.cancel()
         spegni()
         inCoda = nil
+        diagnosi?("")
+    }
+
+    private func aggiornaDiagnosi() {
+        controllo?.cancel()
+        controllo = Task { [weak self] in
+            while let self, !Task.isCancelled, self.voluto {
+                let l = self.segmenti.livelli
+                let mic = self.attivo ? (l.parla ? "◉ sento" : "● in ascolto") : "○ microfono spento"
+                var riga = "\(mic) · livello \(Int(l.voce * 1000)) / silenzio \(Int(l.fondo * 1000)) · frasi \(self.frasiMandate)"
+                if !self.ultimaSentita.isEmpty { riga += " · «\(self.ultimaSentita.prefix(40))»" }
+                self.diagnosi?(riga)
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+        }
     }
 
     private func accendi() {
         guard voluto, !(acceso && motore.isRunning) else { return }
         spegni()
-        guard AVAudioApplication.shared.recordPermission == .granted else { return }
+        aggiornaDiagnosi()
+        guard AVAudioApplication.shared.recordPermission != .denied else { diagnosi?("○ microfono non permesso: Impostazioni di Sistema › Privacy › Microfono"); return }
+        mani.minimoPicco = 0.04                    // sul Mac il battito arriva più piano
         do {
             let sessione = AVAudioSession.sharedInstance()
             do {
@@ -314,10 +343,12 @@ final class AttesaMac {
         guard invii.count < 30 else { return }
         invii.append(adesso)
         inViaggio = true
+        frasiMandate += 1
         Task { [weak self] in
-            let (testo, _) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
+            let (testo, errore) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
             guard let self else { return }
             self.inViaggio = false
+            self.ultimaSentita = testo.map { $0.isEmpty ? "(niente)" : $0 } ?? (errore ?? "errore")
             if self.voluto, let testo, !testo.isEmpty { self.frase?(testo, inizio) }
             if let coda = self.inCoda { self.inCoda = nil; self.trascrivi(coda.0, coda.1) }
         }
