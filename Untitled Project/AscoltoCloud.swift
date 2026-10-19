@@ -163,6 +163,9 @@ nonisolated final class Segmentatore: @unchecked Sendable {
     private var campioni: [Float] = []
     private var inizio = Date.distantPast       // quando ha cominciato a parlare (per la finestra del seguito)
     private var ultimoLivello: Float = 0
+    private var ultimoBuffer = Date()
+    /// Da quanti secondi il microfono non manda audio (se il motore «gira» ma è muto, va riacceso).
+    var secondiSenzaAudio: Double { lock.lock(); defer { lock.unlock() }; return Date().timeIntervalSince(ultimoBuffer) }
     /// Il livello del microfono adesso e quello del silenzio (per la riga di controllo sullo schermo del Mac).
     var livelli: (voce: Float, fondo: Float, parla: Bool) { lock.lock(); defer { lock.unlock() }; return (ultimoLivello, fondo, inVoce) }
     private var avviso: (@Sendable (Data, Date) -> Void)?
@@ -175,6 +178,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
     func azzera() {
         lock.lock()
         fondo = 0.004; inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
+        ultimoBuffer = Date()
         lock.unlock()
     }
 
@@ -190,6 +194,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         var pronta: [Float]?
         lock.lock()
         ultimoLivello = energia
+        ultimoBuffer = Date()
         let soglia = max(fondo * 3, 0.006)          // il microfono del Mac è più basso di quello dell'iPhone
         if !inVoce {
             prima.append(contentsOf: pezzo)
@@ -307,6 +312,7 @@ final class AttesaMac {
             mani.azzera()
             segmenti.azzera()
             if motore.isRunning { motore.stop() }   // qui si arriva solo in attesa: l'ascolto vero è già chiuso
+            motore.reset()                          // riparte pulito dopo la voce di JARVIS o i Clash
             mio = true
             try AttesaMac.collega(motore, mani, segmenti)
             motore.prepare()
@@ -338,8 +344,9 @@ final class AttesaMac {
             while true {
                 try? await Task.sleep(for: .seconds(3))
                 guard let self, !Task.isCancelled, self.voluto else { return }
-                if !self.motore.isRunning {
-                    self.errore = "il microfono si è fermato, lo riaccendo"
+                if !self.motore.isRunning || self.segmenti.secondiSenzaAudio > 3 {
+                    self.errore = "il microfono si era fermato, lo riaccendo"
+                    self.spegni()
                     self.acceso = false
                     self.accendi()
                     return

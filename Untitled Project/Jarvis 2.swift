@@ -1002,7 +1002,9 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func dici(_ frase: String) {
         guard fase != .ascolto else { return }   // mai prendersi l'audio mentre il signore parla
-        let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto
+        // sul Mac niente orecchio mentre parla: è un secondo microfono (con il riconoscimento di Apple) che lascia muto quello
+        // dell'attesa; lì per fermarlo basta toccare il reattore
+        let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud
         if inCoda.isEmpty {
             let sessione = AVAudioSession.sharedInstance()
             if conOrecchio {
