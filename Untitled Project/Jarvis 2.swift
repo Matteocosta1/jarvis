@@ -1100,9 +1100,9 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// Aperto da Siri («Ehi Siri, parla con Jarvis»): per un paio di secondi il microfono è ancora di Siri.
-    /// Invece di arrendersi subito, JARVIS aspetta un attimo e riprova (fino a circa 4 secondi), poi ascolta.
+    /// Invece di arrendersi subito, JARVIS aspetta un attimo e riprova (fino a circa 6 secondi), poi ascolta.
     private func riprovaAscolto(bip: Bool, tentativo: Int) async -> Bool {
-        guard tentativo < 7, fase == .attesa else { return false }
+        guard tentativo < 10, fase == .attesa else { return false }
         stato = "Un attimo, Sir"
         try? await Task.sleep(for: .milliseconds(600))
         guard fase == .attesa, !Task.isCancelled else { return true }   // nel frattempo è successo altro: niente avviso
