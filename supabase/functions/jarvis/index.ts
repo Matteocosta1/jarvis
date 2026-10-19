@@ -1861,7 +1861,6 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
   }).then(async (r) => {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d?.errors?.length) console.log(`langfuse non riuscito: ${r.status} ${JSON.stringify(d?.errors ?? d).slice(0, 300)}`);
-    else console.log(`langfuse ok: ${r.status} (${d?.successes?.length ?? 0} eventi)`);
   }, (e) => console.log(`langfuse non raggiungibile: ${(e as Error).message}`)));
 }
 
