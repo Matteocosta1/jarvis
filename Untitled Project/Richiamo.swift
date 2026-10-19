@@ -98,7 +98,10 @@ final class Richiamo {
                 // mixWithOthers: la musica di Spotify continua; A2DP: le cuffie restano in alta qualità
                 try sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
                 try sessione.setActive(true)
-                mani.quandoSente = { [weak self] in Task { @MainActor in self?.applauso?() } }
+                mani.quandoSente = { [weak self] in
+                    guard let richiamo = self else { return }
+                    Task { @MainActor in richiamo.applauso?() }
+                }
                 mani.azzera()
                 try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
