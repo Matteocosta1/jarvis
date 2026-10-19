@@ -65,7 +65,7 @@ final class Orecchio {
             r.shouldReportPartialResults = true
             r.addsPunctuation = true
             r.contextualStrings = ["Jarvis"]
-            if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }   // niente quota Apple, niente rete
+            if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // niente quota Apple, niente rete
             richiesta = r
             try Orecchio.collega(motore, a: r)
             motore.prepare()

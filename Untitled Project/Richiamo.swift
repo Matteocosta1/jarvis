@@ -128,7 +128,7 @@ final class Richiamo {
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
         r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis"]
-        if ric.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
+        if ric.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         richiesta = r
         turno += 1
         let mio = turno

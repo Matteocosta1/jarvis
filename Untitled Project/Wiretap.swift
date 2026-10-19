@@ -76,7 +76,7 @@ final class Wiretap: ObservableObject {
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
         r.contextualStrings = ["Discosizer", "Jarvis", "Matteo", "Pier", "Cristina", "Beatrice"]
-        if riconoscitore.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }   // tutto sul telefono
+        if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // tutto sul telefono
         presa.metti(r)
         turno += 1
         let mio = turno
