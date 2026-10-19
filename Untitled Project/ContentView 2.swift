@@ -231,10 +231,12 @@ struct ContentView: View {
         case .guarda:
             jarvis.interrompi()
             jarvis.guardaAutomatico()
-        case .beaSOS(let lat, let lon, let prova):
+        case .beaSOS(let lat, let lon, let prova, let id):
             jarvis.interrompi()
             scheda = nil
             aiutoBea = AiutoBea(lat: lat, lon: lon, prova: prova)
+            // visto: la chiamata di riserva (Twilio) non parte
+            if id > 0 { Task { _ = await VistaVitals.chiama(["bea_sos_visto": id]) } }
             jarvis.leggi(prova ? "Prova del Tocco d'aiuto di Bea, Sir: funziona." : "Sir, Bea ha chiesto aiuto. La chiami subito.")
         }
     }

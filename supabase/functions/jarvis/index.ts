@@ -1788,7 +1788,35 @@ async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[
   throw ultimoErrore;
 }
 
+// ───────── Langfuse: la «scatola nera» del cervello ─────────
+// Per ogni chiamata a Claude: modello, token, tempi, strumenti usati. Niente contenuto delle conversazioni (resta privato).
+// Segreti: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY; facoltativo LANGFUSE_HOST (default cloud europeo).
+function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: any, stop: string, blocchi: any[], errore?: string) {
+  const pub = Deno.env.get("LANGFUSE_PUBLIC_KEY") ?? "", sec = Deno.env.get("LANGFUSE_SECRET_KEY") ?? "";
+  if (!pub || !sec) return;
+  const host = (Deno.env.get("LANGFUSE_HOST") || "https://cloud.langfuse.com").replace(/\/$/, "");
+  const id = crypto.randomUUID(), fine = new Date();
+  const strumenti = blocchi.filter((b) => b?.type === "tool_use" || b?.type === "server_tool_use").map((b) => b.name);
+  const evento = {
+    id: crypto.randomUUID(), timestamp: fine.toISOString(), type: "generation-create",
+    body: {
+      id, traceId: id, name: "jarvis", model: modello, startTime: inizio.toISOString(), endTime: fine.toISOString(),
+      ...(primaParola ? { completionStartTime: primaParola.toISOString() } : {}),
+      usage: { input: uso.token_in + uso.token_cache, output: uso.token_out, unit: "TOKENS" },
+      metadata: { stop, strumenti, token_cache: uso.token_cache },
+      ...(errore ? { level: "ERROR", statusMessage: errore.slice(0, 300) } : {}),
+    },
+  };
+  inSottofondo(fetch(`${host}/api/public/ingestion`, {
+    method: "POST", signal: AbortSignal.timeout(8000),
+    headers: { authorization: "Basic " + btoa(`${pub}:${sec}`), "content-type": "application/json" },
+    body: JSON.stringify({ batch: [evento] }),
+  }).then(() => {}, () => {}));
+}
+
 async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void) {
+  const inizio = new Date();
+  let primaParola: Date | null = null;
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
@@ -1801,6 +1829,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
     const d = await r.json().catch(() => ({}));
     const err: any = new Error(`${d?.error?.type ?? ""} ${d?.error?.message || `Errore API ${r.status}`} (${r.status})`.trim());
     err.primaDiParlare = true;
+    langfuse(modello, inizio, null, { token_in: 0, token_cache: 0, token_out: 0 }, "errore", [], err.message);
     throw err;
   }
   const blocchi: any[] = [];
@@ -1828,7 +1857,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
       } else if (e.type === "content_block_delta") {
         const b = blocchi[e.index], d = e.delta;
         if (!b || !d) continue;
-        if (d.type === "text_delta") { b.text = (b.text ?? "") + d.text; suTesto(d.text); }
+        if (d.type === "text_delta") { primaParola ??= new Date(); b.text = (b.text ?? "") + d.text; suTesto(d.text); }
         else if (d.type === "input_json_delta") jsonParziale[e.index] = (jsonParziale[e.index] ?? "") + d.partial_json;
         else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
         else if (d.type === "signature_delta") b.signature = d.signature;
@@ -1849,6 +1878,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   }
   // il contatore dei consumi: una riga per chiamata, letta dalla scheda Supabase
   inSottofondo(db.from("jarvis_consumi").insert({ servizio: "claude", modello, ...uso }).then(() => {}, () => {}));
+  langfuse(modello, inizio, primaParola, uso, stop, blocchi);
   return { content: blocchi.filter(Boolean), stop_reason: stop };
 }
 
@@ -2188,6 +2218,10 @@ Deno.serve(async (req) => {
   if (corpo?.bea_pensiero === true) {                                                      // «Ti penso»: un messaggio breve per Bea
     try { return json(await beaPensiero(Array.isArray(corpo.evita) ? corpo.evita.map(String).slice(0, 12) : [])); }
     catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (typeof corpo?.bea_sos_visto === "number") {                                         // l'avviso d'aiuto è stato aperto: niente chiamata di riserva
+    const { error } = await db.from("jarvis_bea_sos").update({ visto_il: new Date().toISOString() }).eq("id", corpo.bea_sos_visto).is("visto_il", null);
+    return error ? json({ errore: error.message }, 500) : json({ ok: true });
   }
   if (corpo?.bea_aggiungi && typeof corpo.bea_aggiungi === "object") {                    // aggiunta dalla pagina Bea
     try { return json(await beaSegna(corpo.bea_aggiungi)); } catch (e) { return json({ errore: (e as Error).message }, 500); }

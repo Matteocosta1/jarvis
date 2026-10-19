@@ -50,15 +50,16 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
     func userNotificationCenter(_ centro: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions {
         // il Tocco d'aiuto di Bea con l'app aperta: la schermata d'allarme parte subito, senza dover toccare la notifica
         if let s = Notifiche.sos(n.request.content.userInfo) {
-            await MainActor.run { Comandi.condiviso.richiesta = .beaSOS(lat: s.lat, lon: s.lon, prova: s.prova) }
+            await MainActor.run { Comandi.condiviso.richiesta = .beaSOS(lat: s.lat, lon: s.lon, prova: s.prova, id: s.id) }
         }
         return [.banner, .sound]
     }
 
     /// La richiesta d'aiuto di Bea, se la notifica è quella.
-    nonisolated static func sos(_ info: [AnyHashable: Any]) -> (lat: Double?, lon: Double?, prova: Bool)? {
+    nonisolated static func sos(_ info: [AnyHashable: Any]) -> (lat: Double?, lon: Double?, prova: Bool, id: Int)? {
         guard info["jarvis_azione"] as? String == "bea_sos" else { return nil }
-        return ((info["lat"] as? NSNumber)?.doubleValue, (info["lon"] as? NSNumber)?.doubleValue, (info["prova"] as? Bool) ?? false)
+        return ((info["lat"] as? NSNumber)?.doubleValue, (info["lon"] as? NSNumber)?.doubleValue, (info["prova"] as? Bool) ?? false,
+                (info["sos_id"] as? NSNumber)?.intValue ?? 0)
     }
 
     /// Tocco sulla notifica: per il briefing JARVIS lo prepara completo (con calendario e sonno); per il resto legge il testo.
@@ -68,7 +69,7 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
         let testo = contenuto.userInfo["jarvis_testo"] as? String ?? contenuto.body
         let sos = Notifiche.sos(contenuto.userInfo)
         await MainActor.run {
-            if let sos { Comandi.condiviso.richiesta = .beaSOS(lat: sos.lat, lon: sos.lon, prova: sos.prova); return }
+            if let sos { Comandi.condiviso.richiesta = .beaSOS(lat: sos.lat, lon: sos.lon, prova: sos.prova, id: sos.id); return }
             switch azione {
             case "briefing": Comandi.condiviso.richiesta = .briefing
             case "diario": Comandi.condiviso.richiesta = .diario(testo)     // la domanda della sera: JARVIS la legge e ascolta
