@@ -61,16 +61,75 @@ Deno.serve(async (req) => {
   const attesa = url.searchParams.get("sha") ?? "";
   if (attesa && riassunto["index.ts"]?.sha256 !== attesa) return json({ errore: "impronta diversa da quella attesa: non pubblico", file: riassunto }, 409);
 
-  // pubblica con l'API di gestione (multipart: metadata + un campo file per ogni sorgente)
+  // Prova generale: prima si pubblica una copia («<funzione>-prova») e la si mette alla prova; solo se passa si sostituisce quella vera.
+  // Il cervello risponde anche a tre domande vere (pochi centesimi); le altre funzioni devono solo accendersi e difendersi.
+  if (url.searchParams.get("salta_prova") !== "1") {
+    const copia = await pubblica(`${funzione}-prova`, files, token);
+    if (!copia.ok) return json({ errore: `la copia di prova non si pubblica: ${copia.errore}`, file: riassunto }, 502);
+    const esito = funzione === "jarvis" ? await provaCervello(`${funzione}-prova`) : await provaAccensione(`${funzione}-prova`);
+    if (!esito.ok) return json({ errore: "prova generale NON superata: la funzione vera resta quella di prima", prova: esito.dettagli, file: riassunto }, 409);
+  }
+  const vera = await pubblica(funzione, files, token);
+  if (!vera.ok) return json({ errore: `deploy ${vera.errore}` }, 502);
+  return json({ ok: true, funzione, versione: vera.versione, stato: vera.stato, file: riassunto, prova: url.searchParams.get("salta_prova") === "1" ? "saltata" : "superata" });
+});
+
+async function pubblica(slug: string, files: Record<string, string>, token: string) {
   const form = new FormData();
-  form.append("metadata", JSON.stringify({ name: funzione, entrypoint_path: "index.ts", verify_jwt: false }));
+  form.append("metadata", JSON.stringify({ name: slug, entrypoint_path: "index.ts", verify_jwt: false }));
   for (const [nome, testo] of Object.entries(files)) form.append("file", new Blob([testo], { type: "text/typescript" }), nome);
-  const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/functions/deploy?slug=${funzione}`, {
+  const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/functions/deploy?slug=${slug}`, {
     method: "POST", headers: { authorization: `Bearer ${token}` }, body: form,
   });
   const testo = await r.text();
-  if (!r.ok) return json({ errore: `deploy ${r.status}: ${testo.slice(0, 500)}` }, 502);
+  if (!r.ok) return { ok: false, errore: `${r.status}: ${testo.slice(0, 400)}` };
   let esito: any = {}; try { esito = JSON.parse(testo); } catch { /* testo semplice */ }
-  // le parti restano nel database: sono il sorgente di riferimento, le prossime modifiche toccano solo i pezzi cambiati
-  return json({ ok: true, funzione, versione: esito.version ?? null, stato: esito.status ?? null, file: riassunto });
-});
+  return { ok: true, versione: esito.version ?? null, stato: esito.status ?? null };
+}
+
+const BASE = Deno.env.get("SUPABASE_URL") ?? "";
+
+/// La funzione appena pubblicata si accende e respinge chi non ha la chiave (401/405): non è andata in crash.
+async function provaAccensione(slug: string) {
+  let ultimo = "";
+  for (let i = 0; i < 6; i++) {   // la copia nuova può metterci qualche secondo ad arrivare
+    try {
+      const r = await fetch(`${BASE}/functions/v1/${slug}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(20_000) });
+      await r.body?.cancel();
+      if (r.status === 401 || r.status === 405) return { ok: true, dettagli: [`risponde ${r.status}`] };
+      ultimo = `risponde ${r.status}`;
+    } catch (e) { ultimo = (e as Error).message; }
+    await new Promise((ok) => setTimeout(ok, 3000));
+  }
+  return { ok: false, dettagli: [ultimo] };
+}
+
+/// Tre domande vere al cervello di prova: una semplice, una con uno strumento (meteo), una che legge il database (Bea).
+async function provaCervello(slug: string) {
+  const acceso = await provaAccensione(slug);
+  if (!acceso.ok) return acceso;
+  const domande = [
+    "Prova generale del sistema: rispondi soltanto «Tutto in ordine».",
+    "Prova generale: che tempo farà domani a Milano? Una frase sola.",
+    "Prova generale: guarda la scheda di Bea e dimmi solo quante date ci sono segnate.",
+  ];
+  const esiti = await Promise.all(domande.map(async (q) => {
+    try {
+      const r = await fetch(`${BASE}/functions/v1/${slug}`, {
+        method: "POST", signal: AbortSignal.timeout(70_000),
+        headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
+        body: JSON.stringify({ messaggi: [{ role: "user", content: q }], dispositivo: "iphone", prova_generale: true }),
+      });
+      if (!r.ok) return { ok: false, d: `${q.slice(16, 50)}… → HTTP ${r.status}` };
+      const righe = (await r.text()).split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } });
+      const errore = righe.find((x) => x?.t === "errore");
+      const fine = righe.find((x) => x?.t === "fine");
+      const testo = String(fine?.testo ?? "").trim();
+      const ok = !errore && !!testo && !/mi sono perso|non ho trovato nulla da dire|fiato che ho/i.test(testo);
+      return { ok, d: `${q.slice(16, 50)}… → ${errore ? `errore: ${String(errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
+    } catch (e) {
+      return { ok: false, d: `${q.slice(16, 50)}… → ${(e as Error).message.slice(0, 120)}` };
+    }
+  }));
+  return { ok: esiti.every((e) => e.ok), dettagli: esiti.map((e) => `${e.ok ? "✓" : "✗"} ${e.d}`) };
+}

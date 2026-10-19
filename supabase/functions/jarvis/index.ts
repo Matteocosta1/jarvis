@@ -2324,6 +2324,7 @@ Deno.serve(async (req) => {
     return error ? json({ errore: error.message }, 500) : json({ ok: true });
   }
   const dispositivo = ["mac", "orologio"].includes(corpo.dispositivo) ? corpo.dispositivo : "iphone";
+  const provaGenerale = corpo.prova_generale === true;   // domande di prova prima di una pubblicazione (jarvis-deploy)
   // Richiesta ripetuta (la linea è caduta e l'app riprova con lo stesso numero): se la risposta era già pronta la rimando
   // senza rifare nulla; se è ancora in lavorazione aspetto un po'; altrimenti la rifaccio da capo.
   const numeroRichiesta = (req.headers.get("x-richiesta") ?? "").trim();
@@ -2443,7 +2444,7 @@ Deno.serve(async (req) => {
               : "Signore, ho elaborato ma non ho trovato nulla da dire. Riformuli pure.";
             segnaEsito({ t: "fine", testo, azioni });
             invia({ t: "fine", testo, azioni });
-            inSottofondo(memoriaAutomatica(lavoro, testo));
+            if (!provaGenerale) inSottofondo(memoriaAutomatica(lavoro, testo));   // la prova generale non lascia ricordi
             ctrl.close(); return;
           }
           const usi = r.content.filter((b: any) => b.type === "tool_use");
@@ -2466,7 +2467,7 @@ Deno.serve(async (req) => {
             invia({ t: "client", lavoro, richieste, risultati_server: risultatiServer.map((x) => ({ tool_use_id: x.tool_use_id, content: x.content })), modello, azioni, detto });
             ctrl.close(); return;
           }
-          await registraAzioni(dispositivo, usi, risultatiServer);
+          if (!provaGenerale) await registraAzioni(dispositivo, usi, risultatiServer);
           lavoro.push({ role: "user", content: risultatiServer });
         }
         segnaEsito({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
