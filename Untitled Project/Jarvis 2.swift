@@ -649,7 +649,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
         ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
-        dettoMac = ""                                  // una domanda nuova: l'eco da riconoscere è quella della prossima risposta
         fraseAVoce = ""
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
@@ -1015,7 +1014,10 @@ final class Jarvis: NSObject, ObservableObject {
             let sessione = AVAudioSession.sharedInstance()
             if Jarvis.usaAscoltoCloud {
                 // Mac: stessa impostazione dell'attesa, così il microfono resta acceso e gli si può parlare sopra
-                try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+                // (si tocca solo se è diversa: ogni cambio fermerebbe il microfono per un attimo)
+                if sessione.category != .playAndRecord || !sessione.categoryOptions.contains(.mixWithOthers) {
+                    try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+                }
             } else if conOrecchio {
                 // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
                 try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
