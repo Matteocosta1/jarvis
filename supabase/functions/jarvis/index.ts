@@ -2269,7 +2269,7 @@ Deno.serve(async (req) => {
     try { return json(await beaPensiero(Array.isArray(corpo.evita) ? corpo.evita.map(String).slice(0, 12) : [])); }
     catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
-  if (typeof corpo?.bea_sos_visto === "number") {                                         // l'avviso d'aiuto è stato aperto: niente chiamata di riserva
+  if (typeof corpo?.bea_sos_visto === "number") {                                         // l'avviso d'aiuto è stato aperto: si segna come visto
     const { error } = await db.from("jarvis_bea_sos").update({ visto_il: new Date().toISOString() }).eq("id", corpo.bea_sos_visto).is("visto_il", null);
     return error ? json({ errore: error.message }, 500) : json({ ok: true });
   }
