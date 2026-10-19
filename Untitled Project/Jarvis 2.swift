@@ -365,8 +365,7 @@ final class Jarvis: NSObject, ObservableObject {
             // già sentiti (dentro c'è «Jarvis» e l'inizio della domanda; il nome poi si toglie da solo)
             avviso = nil
             parziale = ""
-            let inizio = RegistroMicrofono.condiviso.ultimi(2)
-            Task { await avviaAscolto(precarica: inizio) }
+            Task { await avviaAscolto(dalNome: true) }
             return
         }
         avviso = nil
@@ -1082,7 +1081,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Ascolto
 
     /// `bip`: il suono di ascolto solo quando il signore tocca il reattore; a voce si ascolta in silenzio, come una persona.
-    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, precarica: [Float] = []) async {
+    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, dalNome: Bool = false) async {
         avviso = nil
         guard fase == .attesa else { return }
         guard await Jarvis.chiediPermessi() else {
@@ -1092,7 +1091,12 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
-        if Jarvis.usaAscoltoCloud { avviaAscoltoCloud(bip: bip, precarica: precarica); return }
+        if Jarvis.usaAscoltoCloud {
+            // chiamato per nome: gli ultimi 3 secondi già sentiti (dentro c'è «Jarvis» e l'inizio della domanda), presi solo adesso
+            // che il richiamo è spento, così non si perde niente di ciò che ha detto nel frattempo
+            avviaAscoltoCloud(bip: bip, precarica: dalNome ? RegistroMicrofono.condiviso.ultimi(3) : [])
+            return
+        }
         guard let riconoscitore, riconoscitore.isAvailable else {
             // pochi tentativi: senza rete sul Mac il riconoscimento non torna da solo, inutile far aspettare
             if tentativo < 3, await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
@@ -1164,6 +1168,10 @@ final class Jarvis: NSObject, ObservableObject {
             ascoltoCloud = true
             fase = .ascolto
             stato = "La ascolto, Sir"
+            Task { [weak self] in                     // paracadute: se il Mac smette di mandare audio (cuffie collegate…) non resta appeso
+                try? await Task.sleep(for: .seconds(32))
+                self?.chiudiAscoltoCloud(turno: mio)
+            }
             if bip { Suoni.ascolto() } else { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
         } catch {
             fermaAscolto(invia: false)
@@ -1183,10 +1191,11 @@ final class Jarvis: NSObject, ObservableObject {
             fase = .attesa
             return
         }
-        let audio = registratore.wav()
+        let registratore = self.registratore
         stato = "Un attimo, Sir"
         fase = .elaboro
         Task { [weak self] in
+            let audio = await Task.detached { registratore.wav() }.value      // il file si prepara fuori dal thread principale
             let (testo, errore) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
             guard let self, self.fase == .elaboro, !self.ascoltoCloud, self.turnoAscolto == turno else { return }   // interrotto nel frattempo
             if self.stato == "Un attimo, Sir" { self.stato = nil }
@@ -1352,7 +1361,7 @@ final class Jarvis: NSObject, ObservableObject {
             SFSpeechRecognizer.requestAuthorization { @Sendable stato in c.resume(returning: stato == .authorized) }
         }
         let microfono = await AVAudioApplication.requestRecordPermission()
-        return parlato && microfono
+        return (parlato || usaAscoltoCloud) && microfono   // sul Mac si trascrive in cloud: basta il microfono
     }
 
     nonisolated private static func collegaMicrofono(_ input: AVAudioInputNode, a r: SFSpeechAudioBufferRecognitionRequest) throws {

@@ -15,6 +15,7 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
     private var parlato = false
     private var ultimaVoce: Double = 0
     private var avvisato = false
+    private var piccoVoce: Float = 0            // la voce più forte sentita: la fine si misura anche rispetto a lei
     private var avviso: (@Sendable () -> Void)?
 
     /// Silenzio dopo la voce che chiude la frase.
@@ -35,7 +36,7 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
     func azzera() {
         lock.lock()
         campioni.removeAll(keepingCapacity: true)
-        durata = 0; fondo = 0.004; voceDi = 0; parlato = false; ultimaVoce = 0; avvisato = false
+        durata = 0; fondo = 0.004; voceDi = 0; parlato = false; ultimaVoce = 0; avvisato = false; piccoVoce = 0
         lock.unlock()
     }
 
@@ -49,6 +50,18 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         durata = Double(pezzo.count) / 16_000
         parlato = true
         ultimaVoce = durata
+        // il rumore della stanza: il pezzo più silenzioso (100 ms) di ciò che è già stato sentito; la voce: il più forte
+        var minimo: Float = .greatestFiniteMagnitude, massimo: Float = 0
+        var i = 0
+        while i + 1_600 <= pezzo.count {
+            var q: Float = 0
+            for k in i..<(i + 1_600) { q += pezzo[k] * pezzo[k] }
+            let e = (q / 1_600).squareRoot()
+            minimo = min(minimo, e); massimo = max(massimo, e)
+            i += 1_600
+        }
+        if minimo < .greatestFiniteMagnitude { fondo = max(0.002, minimo) }
+        piccoVoce = massimo
         lock.unlock()
     }
 
@@ -71,13 +84,16 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         }
         durata += secondi
         let soglia = max(fondo * 3.5, 0.012)
-        if energia > soglia, durata > 0.3 {                  // i primi istanti: il «bip» di JARVIS, non conta
-            voceDi += secondi
-            if voceDi >= 0.18 { parlato = true }
-            if parlato { ultimaVoce = durata }
-        } else {
-            voceDi = 0
-            if !parlato { fondo = fondo * 0.9 + energia * 0.1 }
+        if parlato || durata > 0.4 {                         // i primi istanti (il «bip» di JARVIS) non contano per niente
+            // è voce se supera il rumore della stanza e non è troppo più bassa della sua voce (musica o ventola sotto)
+            if energia > soglia && energia > piccoVoce * 0.25 {
+                voceDi += secondi
+                if voceDi >= 0.18 { parlato = true }
+                if parlato { ultimaVoce = durata; piccoVoce = max(piccoVoce, energia) }
+            } else {
+                voceDi = 0
+                if !parlato && energia < soglia { fondo = fondo * 0.9 + energia * 0.1 }
+            }
         }
         let fine = (parlato && durata - ultimaVoce >= silenzioFine) || durata >= massimo || (!parlato && durata >= attesaMassima)
         var chiama: (@Sendable () -> Void)?
@@ -93,9 +109,10 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         let grezzi = campioni
         lock.unlock()
         let x = fr == 16_000 ? grezzi : RegistroMicrofono.a16k(grezzi, da: fr)
+        let hz = UInt32(fr >= 16_000 ? 16_000 : fr)          // un microfono Bluetooth a 8 kHz resta a 8 kHz (a16k non lo alza)
         var pcm = Data(capacity: x.count * 2)
         for v in x {
-            let s = Int16(max(-1, min(1, v)) * 32_767)
+            let s = Int16(v.isFinite ? max(-1, min(1, v)) * 32_767 : 0)
             withUnsafeBytes(of: s.littleEndian) { pcm.append(contentsOf: $0) }
         }
         var d = Data()
@@ -103,7 +120,7 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         d.append(contentsOf: Array("RIFF".utf8)); scrivi(UInt32(36 + pcm.count))
         d.append(contentsOf: Array("WAVE".utf8))
         d.append(contentsOf: Array("fmt ".utf8)); scrivi(UInt32(16)); scrivi(UInt16(1)); scrivi(UInt16(1))
-        scrivi(UInt32(16_000)); scrivi(UInt32(32_000)); scrivi(UInt16(2)); scrivi(UInt16(16))
+        scrivi(hz); scrivi(hz * 2); scrivi(UInt16(2)); scrivi(UInt16(16))
         d.append(contentsOf: Array("data".utf8)); scrivi(UInt32(pcm.count))
         d.append(pcm)
         return d
