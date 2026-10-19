@@ -100,6 +100,10 @@ final class Jarvis: NSObject, ObservableObject {
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
+    /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
+    nonisolated static var usaAscoltoCloud: Bool { ProcessInfo.processInfo.isiOSAppOnMac }
+    private let registratore = RegistratoreVoce()
+    private var ascoltoCloud = false       // sta registrando una frase da trascrivere in cloud
     private var ultimaFraseAVoce = ""      // la frase della domanda in corso (vuota se scritta)
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
     @Published var occhi: Occhiata?        // fotocamera aperta (occhi di JARVIS)
@@ -200,7 +204,8 @@ final class Jarvis: NSObject, ObservableObject {
         Suoni.tocco()
         switch fase {
         case .attesa: Task { await avviaAscolto(bip: true) }
-        case .ascolto: fermaAscolto(invia: true)
+        case .ascolto:
+            if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true) }   // Mac: toccato = ho finito
         case .parlo, .elaboro:
             segnaInterruzione()
             interrompi()                    // lo zittisce e ascolta subito
@@ -355,6 +360,15 @@ final class Jarvis: NSObject, ObservableObject {
             segnaInterruzione()
             interrompi()
         }
+        if Jarvis.usaAscoltoCloud {
+            // sul Mac la frase dopo «Jarvis» la registra JARVIS e la trascrive in cloud: si parte dagli ultimi 2 secondi
+            // già sentiti (dentro c'è «Jarvis» e l'inizio della domanda; il nome poi si toglie da solo)
+            avviso = nil
+            parziale = ""
+            let inizio = RegistroMicrofono.condiviso.ultimi(2)
+            Task { await avviaAscolto(precarica: inizio) }
+            return
+        }
         avviso = nil
         parziale = ""
         stato = nil
@@ -450,7 +464,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
     private func fraseRichiamo(_ frase: String) {
-        guard fase == .ascolto else { return }
+        guard fase == .ascolto, !ascoltoCloud else { return }   // sul Mac la frase la sta già registrando l'ascolto in cloud
         parziale = ""
         fase = .attesa
         let testo = frase.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1068,7 +1082,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Ascolto
 
     /// `bip`: il suono di ascolto solo quando il signore tocca il reattore; a voce si ascolta in silenzio, come una persona.
-    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0) async {
+    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, precarica: [Float] = []) async {
         avviso = nil
         guard fase == .attesa else { return }
         guard await Jarvis.chiediPermessi() else {
@@ -1078,6 +1092,7 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
+        if Jarvis.usaAscoltoCloud { avviaAscoltoCloud(bip: bip, precarica: precarica); return }
         guard let riconoscitore, riconoscitore.isAvailable else {
             // pochi tentativi: senza rete sul Mac il riconoscimento non torna da solo, inutile far aspettare
             if tentativo < 3, await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
@@ -1120,6 +1135,80 @@ final class Jarvis: NSObject, ObservableObject {
             if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
             aggiornaRichiamo()                  // il «Jarvis» in attesa torna acceso
             avviso = "Microfono non disponibile: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: Ascolto in cloud (Mac)
+
+    /// Registra la frase; quando il signore ha finito (o tocca il reattore) la trascrive in cloud e la manda come sull'iPhone.
+    private func avviaAscoltoCloud(bip: Bool, precarica: [Float]) {
+        do {
+            let sessione = AVAudioSession.sharedInstance()
+            do {
+                try sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            } catch {
+                try sessione.setCategory(.playAndRecord)
+            }
+            try sessione.setActive(true, options: .notifyOthersOnDeactivation)
+            registratore.azzera()
+            registratore.precarica(precarica)
+            turnoAscolto += 1
+            let mio = turnoAscolto
+            registratore.quandoFinito = { [weak self] in
+                Task { @MainActor [weak self] in self?.chiudiAscoltoCloud(turno: mio) }
+            }
+            try Jarvis.collegaRegistratore(motore.inputNode, registratore)
+            motore.prepare()
+            try motore.start()
+            parziale = ""
+            ascoltoCloud = true
+            fase = .ascolto
+            stato = "La ascolto, Sir"
+            if bip { Suoni.ascolto() } else { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
+        } catch {
+            fermaAscolto(invia: false)
+            aggiornaRichiamo()
+            avviso = "Microfono non disponibile: \(error.localizedDescription)"
+        }
+    }
+
+    /// La frase è finita: microfono spento, trascrizione in cloud, poi comando o domanda come sempre.
+    private func chiudiAscoltoCloud(turno: Int) {
+        guard ascoltoCloud, fase == .ascolto, turno == turnoAscolto else { return }
+        ascoltoCloud = false
+        if motore.isRunning { motore.stop() }
+        motore.inputNode.removeTap(onBus: 0)
+        guard registratore.haParlato else {            // non ha detto niente: torna in attesa, in silenzio
+            stato = nil
+            fase = .attesa
+            return
+        }
+        let audio = registratore.wav()
+        stato = "Un attimo, Sir"
+        fase = .elaboro
+        Task { [weak self] in
+            let (testo, errore) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
+            guard let self, self.fase == .elaboro, !self.ascoltoCloud, self.turnoAscolto == turno else { return }   // interrotto nel frattempo
+            if self.stato == "Un attimo, Sir" { self.stato = nil }
+            self.fase = .attesa
+            guard let testo, !testo.isEmpty else {
+                self.avviso = errore ?? "Non ho capito, Sir. Riprovi."
+                return
+            }
+            if self.foto == nil, self.eseguiComando(testo) { return }
+            if self.foto == nil { await self.instrada(testo) } else { await self.invia(testo) }
+        }
+    }
+
+    nonisolated private static func collegaRegistratore(_ input: AVAudioInputNode, _ registratore: RegistratoreVoce) throws {
+        let formato = input.outputFormat(forBus: 0)
+        guard formato.sampleRate > 0, formato.channelCount > 0 else {
+            throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
+        }
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 1024, format: formato) { buffer, _ in
+            registratore.analizza(buffer)
+            Volume.voce.misura(buffer)          // il reattore si gonfia con la voce
         }
     }
 
@@ -1221,6 +1310,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func fermaAscolto(invia: Bool) {
         guard fase == .ascolto || !invia else { return }
+        ascoltoCloud = false
         if richiamo.sveglio { richiamo.ferma() }       // toccato mentre il richiamo raccoglieva la frase: la mando così
         timerSilenzio?.invalidate()
         timerSilenzio = nil
