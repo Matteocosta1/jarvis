@@ -17,7 +17,11 @@ enum Suoni {
     /// JARVIS inizia ad ascoltare.
     static func ascolto() { suona(.ascolto) }
     /// JARVIS ha finito e torna in attesa.
-    static func pronto() { suona(.pronto) }
+    /// File: «pronto» (conferma); se manca, il bip generato.
+    static func pronto() {
+        if attivi, let url = file("pronto") { riproduci(url, volume: 0.6); return }
+        suona(.pronto)
+    }
     /// Qualcosa non è andato.
     static func errore() { suona(.errore) }
     /// Sistemi in linea, all'apertura.
