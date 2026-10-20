@@ -1063,16 +1063,16 @@ enum AvvioOrologio {
     static let attesaApertura = 0.6
     /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
     /// Le prime 11 (passo 150 ms) 0,32 s come sull'iPhone; le 4 dopo 0,20; le ultime 4 (GIORNATA, passo 120) 0,14.
-    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 8 ? 0.10 : 0.32) / velocita }   // ÷ velocità, come tutto
+    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 8 ? 0.14 : 0.32) / velocita }   // ÷ velocità, come tutto
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
-    /// Nello scarico (le ultime 8) niente anticipo: un'icona per colpo, la molla da 0,10 s si chiude prima del colpo dopo.
-    static func anticipo(_ posto: Int, _ n: Int) -> Double { posto >= n - 8 ? 0 : 0.445 * molla(posto, n) }
+    static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) }
     /// La partitura del polso (secondi a velocità normale, nell'ordine d'accensione, da Archivio a Briefing): è quella con cui
-    /// è montata «avvioorologio». Le prime 11 al passo di sempre (150 ms, 110 tra i gruppi); le ultime 8 sui colpi dello
-    /// scarico della musica di sottofondo (uno ogni ~61 ms), con Briefing sul colpo forte finale (2,487 s).
-    static let colpi: [Double] = [0, 0.15, 0.30, 0.56, 0.71, 0.97, 1.12, 1.27, 1.42, 1.68, 1.94,
-                                  2.057, 2.115, 2.176, 2.237, 2.295, 2.356, 2.420, 2.487]
+    /// è montata «avvioorologio». Segue la musica (misurata): le prime 11 da 0 al colpo forte di 2,499 s (passo 250 ms),
+    /// poi la pausa (2,6–2,8 s, il respiro), poi le ultime 8 su tutto lo SCARICO (2,885 → 3,724 s, una ogni 120 ms):
+    /// Briefing si accende sull'ultimo colpo dello scarico, poi la musica sfuma.
+    static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499,
+                                  2.885, 3.005, 3.125, 3.245, 3.364, 3.484, 3.604, 3.724]
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
