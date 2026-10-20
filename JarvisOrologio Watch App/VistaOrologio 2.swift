@@ -1064,7 +1064,8 @@ enum AvvioOrologio {
     static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 4 ? 0.14 : (posto >= n - 8 ? 0.20 : 0.32)) / velocita }   // ÷ velocità, come tutto
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
-    static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) }
+    /// Nello scarico finale (le ultime 4) niente anticipo: partite prima, arrivavano già ferme prima dei colpi (provato dal signore).
+    static func anticipo(_ posto: Int, _ n: Int) -> Double { posto >= n - 4 ? 0 : 0.445 * molla(posto, n) }
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
