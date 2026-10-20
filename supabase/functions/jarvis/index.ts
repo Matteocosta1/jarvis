@@ -412,7 +412,7 @@ function turnoContaminato(lavoro: any[]) {
 }
 
 /// Ciò che il cervello sa del turno in corso: posizione dell'iPhone e ultima foto vista (occhi o foto del signore).
-type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null };
+type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; ip?: string };
 
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
@@ -460,7 +460,7 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
       const { data, error } = await q; if (error) throw error; return data;
     }
     case "meteo": return await meteo(i.luogo || "Milano", Math.min(Math.max(num(i.giorni) || 2, 1), 7));
-    case "edith_porte": return await edithPorte(String(i.ip ?? ""));
+    case "edith_porte": return await edithPorte(String(i.ip ?? ""), turno.ip ?? "");
     case "edith_fughe": return await edithFughe(String(i.email ?? ""));
     case "edith_link": return await edithLink(String(i.testo ?? ""));
     case "edith_dominio": return await edithDominio(String(i.dominio ?? ""));
@@ -2243,7 +2243,6 @@ async function elencoVoci() {
 // ───────────────────────── EDITH: hacking positivo ─────────────────────────
 // Solo difesa, solo cose del signore: cosa si vede da internet della sua rete, mail rubate, link truffa, domini simili.
 // Tutti servizi gratuiti e senza chiave: Shodan InternetDB, XposedOrNot, RDAP, DNS di Google, crt.sh.
-let ipChiamante = "";       // l'IP pubblico da cui arriva la richiesta (la rete attuale del signore)
 
 const PORTE_RISCHIOSE: Record<number, string> = {
   21: "FTP (file senza cifratura)", 22: "SSH (accesso remoto)", 23: "Telnet (accesso remoto senza cifratura)", 445: "condivisione file Windows",
@@ -2254,7 +2253,7 @@ const PORTE_RISCHIOSE: Record<number, string> = {
 const ipv4 = (s: string) => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s);
 const ipPrivato = (s: string) => /^(10\.|127\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(s);
 
-async function edithPorte(ip: string) {
+async function edithPorte(ip: string, ipChiamante = "") {
   const bersaglio = (ip.trim() || ipChiamante).trim();
   if (!ipv4(bersaglio)) return { errore: "mi serve un indirizzo IPv4 pubblico valido" };
   if (ipPrivato(bersaglio)) return { errore: "è un indirizzo interno: da internet non si vede, serve quello pubblico del router" };
@@ -2364,7 +2363,10 @@ async function edithDominio(dominio: string) {
     }
   } catch { /* crt.sh lento: si va avanti senza */ }
   // domini quasi uguali: una lettera in meno, doppia, scambiata, 0/o 1/l/i, altre estensioni
-  const [nome, ...resto] = d.split("."); const est = resto.join(".");
+  const parti = d.split(".");
+  const doppia = parti.length > 2 && ["co", "com", "org", "net", "gov", "ac"].includes(parti[parti.length - 2]);   // es. .co.uk
+  const base = parti.slice(doppia ? -3 : -2);
+  const [nome, ...resto] = base; const est = resto.join(".");
   const varianti = new Set<string>();
   for (let k = 0; k < nome.length; k++) {
     varianti.add(nome.slice(0, k) + nome.slice(k + 1) + "." + est);
@@ -2373,7 +2375,7 @@ async function edithDominio(dominio: string) {
   }
   for (const [x, y] of [["o", "0"], ["i", "1"], ["l", "1"], ["e", "3"], ["a", "4"], ["s", "5"]]) if (nome.includes(x)) varianti.add(nome.replace(x, y) + "." + est);
   for (const altra of ["com", "it", "net", "org", "eu", "shop", "app", "info"]) if (altra !== est) varianti.add(`${nome}.${altra}`);
-  varianti.delete(d);
+  varianti.delete(base.join("."));
   const prova = [...varianti].filter((v) => v.split(".")[0].length > 2).slice(0, 40);
   const registrati: string[] = [];
   for (let k = 0; k < prova.length; k += 10) {
@@ -2385,9 +2387,9 @@ async function edithDominio(dominio: string) {
 }
 
 /// La scheda EDITH nell'app: le stesse funzioni, chiamate dirette.
-async function paginaEdith(c: any) {
+async function paginaEdith(c: any, ipChiamante: string) {
   switch (c.edith) {
-    case "porte": return await edithPorte(String(c.ip ?? ""));
+    case "porte": return await edithPorte(String(c.ip ?? ""), ipChiamante);
     case "fughe": return await edithFughe(String(c.email ?? ""));
     case "link": return await edithLink(String(c.testo ?? ""));
     case "dominio": return await edithDominio(String(c.dominio ?? ""));
@@ -2446,13 +2448,13 @@ Deno.serve(async (req) => {
   const segreto = Deno.env.get("JARVIS_TOKEN") ?? "";
   if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) return json({ errore: "parola d'ordine errata" }, 401);
 
-  ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+  const ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
   if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true);   // una frase da dire con la voce di JARVIS
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
   if (typeof corpo?.edith === "string") {                                                    // la scheda EDITH (sicurezza)
-    try { return json(await paginaEdith(corpo)); } catch (e) { return json({ errore: (e as Error).message }); }
+    try { return json(await paginaEdith(corpo, ipChiamante)); } catch (e) { return json({ errore: (e as Error).message }); }
   }
   if (corpo?.voci === true) return await elencoVoci();                                      // voci disponibili sull'account ElevenLabs
   if (corpo?.github === true) {                                                             // scheda GitHub
@@ -2604,7 +2606,7 @@ Deno.serve(async (req) => {
   const segnaEsito = (esito: unknown) => { if (richiestaValida) db.from("jarvis_richieste").update({ esito }).eq("id", numeroRichiesta).then(() => {}, () => {}); };
   const { tools, client } = strumentiPer(Array.isArray(corpo.strumenti_client) ? corpo.strumenti_client.map(String) : [], strumentiDescritti(corpo.strumenti_client_def));
   // posizione dell'iPhone (se l'app la manda) e ultima foto del turno: servono alla seconda memoria
-  const turno: Turno = {};
+  const turno: Turno = { ip: ipChiamante };
   const p = corpo.posizione;
   if (p && typeof p.lat === "number" && typeof p.lon === "number" && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180) {
     turno.lat = p.lat; turno.lon = p.lon; if (typeof p.precisione === "number") turno.precisione = p.precisione;
