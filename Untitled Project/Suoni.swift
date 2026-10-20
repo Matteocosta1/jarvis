@@ -226,7 +226,7 @@ enum Suoni {
         let dati = cache[t] ?? genera(t)
         cache[t] = dati
         guard let p = try? AVAudioPlayer(data: dati) else { return }
-        p.volume = t == .avvio ? 0.35 : 0.28
+        p.volume = 1.0                                               // bip generati («parli adesso», errore): Pieno+, 100%
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
