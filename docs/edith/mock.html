@@ -1,0 +1,103 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EDITH mockup</title><style>
+:root{--c:#4fe3ff;--f:#05080a;--t:#5f7a83}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;font-family:-apple-system,"SF Pro Text",Helvetica,Arial,sans-serif;color:#fff;min-height:100vh;padding:32px 16px;display:flex;flex-wrap:wrap;gap:48px;justify-content:center;align-items:flex-start}
+.mono{font-family:"SF Mono",Menlo,monospace}
+.col{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:100%}
+.cap{font-size:12px;letter-spacing:3px;color:var(--c)}
+.lab{font-size:12px;color:var(--t);max-width:340px;text-align:center;line-height:1.5}
+.phone{width:min(390px,92vw);aspect-ratio:390/844;border-radius:52px;background:var(--f);border:10px solid #1b2226;overflow:hidden;position:relative}
+.top{display:flex;justify-content:space-between;align-items:center;padding:56px 22px 0;color:var(--c)}
+.top .t{font-size:11px;letter-spacing:3px}
+.btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(79,227,255,.5);display:flex;align-items:center;justify-content:center;background:rgba(79,227,255,.08)}
+.reactor{position:absolute;left:50%;top:36%;width:140px;height:140px;margin-left:-70px;border-radius:50%;border:2px solid rgba(79,227,255,.45);box-shadow:0 0 60px rgba(79,227,255,.35),inset 0 0 40px rgba(79,227,255,.25);opacity:.45}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.4)}
+.menu{position:absolute;right:16px;top:100px;width:72%;background:rgba(5,8,10,.97);border:1px solid rgba(79,227,255,.35);border-radius:16px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.6)}
+.mt{font-size:8px;letter-spacing:2px;color:var(--c);font-weight:700;padding:8px 12px 4px}
+.v{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:10px}
+.v.on{background:rgba(79,227,255,.10);box-shadow:inset 0 0 0 1px rgba(79,227,255,.45)}
+.v svg{width:22px;height:22px;color:var(--c);flex:none}
+.v b{font-size:15px;font-weight:500;display:block}
+.v small{font-size:10px;color:var(--t)}
+.sheet{position:absolute;left:0;right:0;bottom:0;top:110px;background:#070b0d;border-top-left-radius:22px;border-top-right-radius:22px;border-top:1px solid rgba(79,227,255,.35);padding:10px 16px;overflow:hidden}
+.sheet:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0,rgba(79,227,255,.16),transparent 60%);pointer-events:none}
+.grab{width:38px;height:5px;border-radius:3px;background:#2a3439;margin:0 auto 12px}
+.hdr{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.hdr svg{width:30px;height:30px;color:var(--c)}
+.hdr .n{font-size:13px;letter-spacing:4px;color:var(--c);font-weight:700}
+.hdr .x{margin-left:auto;color:var(--t);font-size:20px}
+.sub{font-size:10px;color:var(--t);margin:0 0 12px 40px}
+.p{background:rgba(79,227,255,.06);border:1px solid rgba(79,227,255,.22);border-radius:16px;padding:12px;margin-bottom:10px}
+.p h4{font-size:9px;letter-spacing:2px;color:var(--c);margin-bottom:6px}
+.p .d{font-size:11px;color:var(--t);margin-bottom:8px}
+.f{background:rgba(255,255,255,.06);border-radius:10px;padding:9px 10px;font-size:12px;color:#7f9aa3;margin-bottom:8px}
+.go{background:var(--c);color:var(--f);border-radius:10px;height:36px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.r{display:flex;align-items:center;justify-content:space-between;margin-top:9px;font-size:12px}
+.pill{font-size:9px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;border-radius:99px;color:#000}
+.ok{background:#3ddc84}.warn{background:#ffb020}.bad{background:#ff4d4d}
+.w{font-size:11px;color:#ffb020;margin-top:5px}
+.big{display:flex;align-items:center;justify-content:center;gap:36px;flex-wrap:wrap;margin-top:6px}
+.ico{width:120px;height:120px;border-radius:50%;border:1px solid rgba(79,227,255,.5);background:rgba(79,227,255,.08);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(79,227,255,.25)}
+.ico svg{width:70px;height:70px;color:var(--c)}
+.ico.s{width:52px;height:52px}.ico.s svg{width:28px;height:28px}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<!-- occhiali generici disegnati a mano (montatura stile EDITH, nessun marchio) -->
+<symbol id="occhiali" viewBox="0 0 48 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+<path d="M3 7h16l-1.5 9.5a3 3 0 0 1-3 2.5H8a3 3 0 0 1-3-2.5z"/><path d="M29 7h16l-1.5 9.5a3 3 0 0 1-3 2.5H34a3 3 0 0 1-3-2.5z"/>
+<path d="M19 9.5c2-1.6 8-1.6 10 0"/><path d="M3 7 1 5M45 7l2-2"/></g></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></g></symbol>
+<symbol id="gen" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></g></symbol>
+</defs></svg>
+
+<div class="col">
+  <div class="cap">ICONA</div>
+  <div class="big">
+    <div class="ico"><svg><use href="#occhiali"/></svg></div>
+    <div class="ico s"><svg><use href="#occhiali"/></svg></div>
+  </div>
+  <div class="lab">Gli occhiali di EDITH, nello stesso stile delle altre voci: tratto ciano, niente colori in più. Nell'app è il simbolo Apple «eyeglasses», questo è un disegno per farle vedere l'effetto.</div>
+</div>
+
+<div class="col">
+  <div class="cap">1 · SISTEMI</div>
+  <div class="phone">
+    <div class="top"><span class="t mono">J.A.R.V.I.S.</span><div class="btn"><svg width="18" height="18" style="color:var(--c)"><use href="#grid"/></svg></div></div>
+    <div class="reactor"></div><div class="dim"></div>
+    <div class="menu">
+      <div class="mt mono">SISTEMI</div>
+      <div class="v"><svg><use href="#gen"/></svg><div><b>GitHub</b><small class="mono">stato dal vivo</small></div></div>
+      <div class="v"><svg><use href="#gen"/></svg><div><b>Supabase</b><small class="mono">stato dal vivo</small></div></div>
+      <div class="v"><svg><use href="#gen"/></svg><div><b>Archivio</b><small class="mono">stato dal vivo</small></div></div>
+      <div class="v"><svg><use href="#gen"/></svg><div><b>Costi</b><small class="mono">oggi 0,67 · mese 29,51 $</small></div></div>
+      <div class="v on"><svg><use href="#occhiali"/></svg><div><b>EDITH</b><small class="mono">porte · fughe · link · domini</small></div></div>
+    </div>
+  </div>
+  <div class="lab">Stesso menu di sempre: EDITH è la quinta riga, sotto Costi. L'interfaccia principale non cambia. (GitHub e Supabase nell'app tengono i loro loghi: qui sono segnaposto.)</div>
+</div>
+
+<div class="col">
+  <div class="cap">2 · LA SCHEDA EDITH</div>
+  <div class="phone">
+    <div class="top"><span class="t mono">J.A.R.V.I.S.</span><div class="btn"><svg width="18" height="18" style="color:var(--c)"><use href="#grid"/></svg></div></div>
+    <div class="reactor"></div><div class="dim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="hdr"><svg><use href="#occhiali"/></svg><span class="n mono">EDITH</span><span class="x">×</span></div>
+      <div class="sub mono">difesa · solo cose sue</div>
+      <div class="p"><h4 class="mono">PORTE</h4><div class="d">Cosa si vede da internet della sua rete.</div>
+        <div class="f mono">IP pubblico (vuoto = la rete di adesso)</div><div class="go mono">Controlla</div>
+        <div class="r"><span class="mono">93.41.x.x</span><span class="pill warn mono">DA SISTEMARE</span></div>
+        <div class="w">⚠️ 37777: DVR Dahua · ⚠️ 554: flusso video telecamere</div></div>
+      <div class="p"><h4 class="mono">FUGHE</h4><div class="d">La sua mail è finita in un furto di dati?</div>
+        <div class="r"><span>info@discosizer.it</span><span class="pill ok mono">PULITA</span></div></div>
+      <div class="p"><h4 class="mono">LINK</h4><div class="d">Incolli un SMS, una mail o un link strano.</div>
+        <div class="r"><span class="mono">poste-it-verifica.xyz</span><span class="pill bad mono">PERICOLOSO</span></div>
+        <div class="w" style="color:var(--t)">• usa il nome «poste» ma non è il sito ufficiale · dominio di 3 giorni</div></div>
+      <div class="p"><h4 class="mono">DOMINI · PASSWORD · RETE</h4><div class="d">Scorrendo: certificato e siti simili, password rubate (controllo sul telefono), chi è sul Wi-Fi.</div></div>
+    </div>
+  </div>
+  <div class="lab">Una scheda come Costi e GitHub: sei pannelli con nomi di una parola, un campo e un tasto ciascuno, e l'esito colorato (verde / arancio / rosso). I dati qui sono di esempio.</div>
+</div>
+</body></html>
