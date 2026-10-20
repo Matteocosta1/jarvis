@@ -993,9 +993,9 @@ struct TestoChatOrologio: View {
 }
 
 
-/// I numeri dell'avvio al polso: gli stessi dell'iPhone (+40%, la raffica finale in anticipo di 110 ms con la molla svelta).
+/// I numeri dell'avvio al polso: gli stessi dell'iPhone (+60%, la raffica finale in anticipo di 110 ms con la molla svelta).
 enum AvvioOrologio {
-    static let velocita = 1.4
+    static let velocita = 1.6
     static let anticipoCoda = 0.110
     static let mollaCoda = 0.12
     /// La coda parte dalla seconda icona di STRUMENTI, come sull'iPhone (da Interprete): le ultime otto icone.

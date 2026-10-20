@@ -28,10 +28,10 @@ extension EnvironmentValues {
     }
 }
 
-/// I numeri dell'avvio, in un posto solo (20 ott: +40%, SINCRO 110 ms, scelti dal signore sul mock).
+/// I numeri dell'avvio, in un posto solo (20 ott: +60%, SINCRO 110 ms, scelti dal signore sul mock).
 enum Avvio {
     /// Quanto è più svelto l'avvio rispetto all'originale: la traccia «avvio» è rimontata a questa velocità.
-    static let velocita = 1.4
+    static let velocita = 1.6
     /// Da Interprete in poi (la raffica finale) ogni icona parte prima del suo colpo, così la molla arriva sul beep.
     static let anticipoCoda = 0.110
     /// La molla delle icone della coda: la stessa, più svelta.
@@ -41,7 +41,7 @@ enum Avvio {
 }
 
 enum TempiChat {
-    // il caricamento all'avvio va alla velocità dell'avvio (+40%): tutto in proporzione, suono «chatcarica» compreso
+    // il caricamento all'avvio va alla velocità dell'avvio (+60%): tutto in proporzione, suono «chatcarica» compreso
     static let carica = 1.0 / Avvio.velocita           // il caricamento HUD (un secondo a velocità normale)
     static let stampa = 1.1 / Avvio.velocita           // la riga che scende
     static let decodifica = 0.42 / Avvio.velocita      // ogni riga torna leggibile
