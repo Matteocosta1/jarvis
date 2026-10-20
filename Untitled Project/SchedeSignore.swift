@@ -74,15 +74,7 @@ struct CorniceScheda<Contenuto: View>: View {
             // il caricamento si vede almeno per un attimo, anche se i dati arrivano subito
             let resta = 0.9 - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
-            if fotocamera {
-                Suoni.schedaPronta(soloSfuma: true)
-                mostrato = true
-                try? await Task.sleep(for: .milliseconds(300))      // un attimo di silenzio, poi il lettore è pronto
-                Suoni.aperturaCamera()
-                withAnimation(.easeOut(duration: 0.9)) { stampa = 1 }
-                return
-            }
-            Suoni.schedaPronta()
+            if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
             mostrato = true
             withAnimation(.easeOut(duration: 0.9)) { stampa = 1 }
         }

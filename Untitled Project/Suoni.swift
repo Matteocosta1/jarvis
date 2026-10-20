@@ -10,29 +10,16 @@ import UIKit
 ///   «scheda» → una sezione si apre (caricamento)      «schedapronta» → la sezione è pronta
 /// Si spengono con «Suoni dell'interfaccia» nelle impostazioni.
 @MainActor
-/// L'aptica che accompagna i suoni, una famiglia per vibrazione: click → leggera, fotocamera pronta → media, conferma → «successo».
-/// Un solo tocco ogni 80 ms: se chi chiama ha già vibrato, non si raddoppia.
-enum Aptica {
-    private static var ultimo = Date.distantPast
-    private static func libero() -> Bool { let ora = Date(); defer { ultimo = ora }; return ora.timeIntervalSince(ultimo) > 0.08 }
-    static func leggera() { guard libero() else { return }; UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func media() { guard libero() else { return }; UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-    static func morbida() { guard libero() else { return }; UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6) }
-    static func successo() { guard libero() else { return }; UINotificationFeedbackGenerator().notificationOccurred(.success) }
-}
-
-/// Tutti i file sono alla stessa loudness (-18 LUFS momentanea): le percentuali qui sotto sono vere differenze di volume percepito.
 enum Suoni {
     static var attivi: Bool { UserDefaults.standard.object(forKey: "suoni") as? Bool ?? true }
 
     /// Tocco su un'icona o sul reattore.
-    static func tocco() { Aptica.leggera(); suona(.tocco) }
+    static func tocco() { suona(.tocco) }
     /// JARVIS inizia ad ascoltare.
     static func ascolto() { suona(.ascolto) }
     /// JARVIS ha finito e torna in attesa.
     /// File: «pronto» (conferma); se manca, il bip generato.
     static func pronto() {
-        Aptica.successo()
         if attivi, let url = file("pronto") { riproduci(url, volume: 0.6); return }
         suona(.pronto)
     }
@@ -56,8 +43,7 @@ enum Suoni {
     static func schedaPronta(soloSfuma: Bool = false) {
         guard attivi else { return }
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
-        if soloSfuma { return }                                      // il suono d'apertura sfuma, nessun altro suono
-        Aptica.morbida()
+        if soloSfuma { return }                                      // Bea e Spesa: il suono d'apertura sfuma, nessun altro suono
         if let url = file("schedapronta") { riproduci(url, volume: 0.7); return }
         suona(.pronto)
     }
@@ -76,7 +62,6 @@ enum Suoni {
     /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler, Scanner), quando la fotocamera è pronta.
     /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura».
     static func aperturaCamera() {
-        Aptica.media()
         guard attivi else { return }
         if let url = file("aperturacamera") { riproduci(url, volume: 0.7); return }
         apertura()
@@ -102,7 +87,6 @@ enum Suoni {
     }
     /// Click delle tre icone in alto (SISTEMI, cestino, impostazioni). File: «clicktesta»; se manca, il tick normale.
     static func clickTesta() {
-        Aptica.leggera()
         guard attivi else { return }
         if let url = file("clicktesta") { riproduci(url, volume: 0.5); return }
         tocco()
