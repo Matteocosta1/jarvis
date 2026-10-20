@@ -22,6 +22,11 @@ enum Suoni {
     static func pronto() {
         Aptica.pronto()
     }
+    /// Spunte verdi «Fatto» (promesse, spesa, ricordi) e SOS: qui il suono «pronto» resta (20 ott). Pieno+, 100%.
+    static func fatto() {
+        Aptica.pronto()
+        if attivi, let url = file("pronto") { riproduci(url, volume: 1.0) }
+    }
     /// Qualcosa non è andato.
     static func errore() { suona(.errore) }
     /// Sistemi in linea, all'apertura.

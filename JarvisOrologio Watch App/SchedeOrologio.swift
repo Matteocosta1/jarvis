@@ -441,7 +441,7 @@ struct VistaSpesaOrologio: View {
     private func spunta(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
-        SuoniOrologio.pronto()
+        SuoniOrologio.fatto()
         _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id]); await carica()
     }
     private func elimina(_ r: [String: Any]) async {

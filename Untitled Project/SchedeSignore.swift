@@ -716,7 +716,7 @@ struct VistaCuoreTelefono: View {
         }
         inviando = false
         esitoSOS = esito
-        Suoni.pronto()
+        Suoni.fatto()                                 // SOS: il suono resta
     }
 
     private var oggiGrafico: some View {

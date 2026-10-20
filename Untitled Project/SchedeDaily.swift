@@ -625,7 +625,7 @@ struct VistaSpesa: View {
 
     private func spunta(_ v: Voce) async {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        Suoni.pronto()
+        Suoni.fatto()
         withAnimation(.spring(duration: 0.35)) {
             daComprare.removeAll { $0.id == v.id }
             nelCarrello.insert(v, at: 0)

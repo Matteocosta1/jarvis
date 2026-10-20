@@ -218,7 +218,7 @@ struct VistaBea: View {
                     .listRowBackground(Color.clear)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { Task { await azione(["bea_elimina": r.id]) } } label: { Label("Elimina", systemImage: "trash") }
-                        Button { Task { await azione(["bea_fatto": r.id]); Suoni.pronto() } } label: { Label("Mantenuta", systemImage: "checkmark") }.tint(.green)
+                        Button { Task { await azione(["bea_fatto": r.id]); Suoni.fatto() } } label: { Label("Mantenuta", systemImage: "checkmark") }.tint(.green)
                     }
                 }
                 if !d.fatte.isEmpty {
@@ -273,7 +273,7 @@ struct VistaBea: View {
             .listRowBackground(Color.clear)
             .swipeActions(edge: .trailing) {
                 Button(role: .destructive) { Task { await azione(["bea_elimina": r.id]) } } label: { Label("Elimina", systemImage: "trash") }
-                Button { Task { await azione(["bea_fatto": r.id]); Suoni.pronto() } } label: { Label("Fatto", systemImage: "checkmark") }.tint(.green)
+                Button { Task { await azione(["bea_fatto": r.id]); Suoni.fatto() } } label: { Label("Fatto", systemImage: "checkmark") }.tint(.green)
             }
     }
 

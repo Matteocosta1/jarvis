@@ -123,7 +123,7 @@ struct VistaBeaOrologio: View {
     private func fatto(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
-        SuoniOrologio.pronto()
+        SuoniOrologio.fatto()
         _ = await VistaVitalsOrologio.chiama(["bea_fatto": id])
         await carica()
     }

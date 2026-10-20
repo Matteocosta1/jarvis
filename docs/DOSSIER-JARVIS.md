@@ -74,7 +74,7 @@ Volumi (dal 20 ott sera, «Pieno+»): **tutto 100%** con file alzati di +4 dB co
 | Apertura di **tutte le schede** (Bea e Spesa comprese) | `scheda` | 70%; sfuma quando pronta |
 | Scheda stampata | `schedapronta` | 70% |
 | **Fotocamera pronta** (Occhi, Cucina, Allenatore, Profiler, **Scanner**) | `aperturacamera` | 70%, Mixkit «sci-fi interface robot click». Lo Scanner prima fa anche il caricamento da scheda |
-| **Conferme** (Fatto, spunte, foto scattata, Shazam, ricordi, SOS, messaggi, prodotto trovato, applauso) | — | **suono `pronto` TOLTO** il 20 ott (non piace ad Alessandro): solo vibrazione. Da cercarne un altro solo se lo chiede |
+| **Conferme** (Fatto, spunte, foto scattata, Shazam, ricordi, SOS, messaggi, prodotto trovato, applauso) | `pronto` solo su spunte verdi «Fatto» (promesse, spesa, ricordi) e **SOS** (`Suoni.fatto()`, 100%) | Tolto il 20 ott da applauso, Shazam, foto, messaggi, chiamate, dettature, prodotto trovato, fine risposta: lì solo vibrazione |
 | Caricamento chat | `chatcarica` | 70% |
 | Svuotamento chat | `chatsvuota` | 70% |
 | `apertura` (Mixkit «interface hint») | nel progetto, **non usato** | |

@@ -20,8 +20,10 @@ enum SuoniOrologio {
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
     /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
     static func avvio() { suona(file("avvioorologio") ?? file("avvio"), volume: 1.0) }   // 100%
-    /// Conferme (spesa, promesse, ricordi, Shazam): solo la vibrazione. Il suono «pronto» è tolto (20 ott, su richiesta).
+    /// Conferme (Shazam e le altre): solo la vibrazione. Il suono «pronto» è tolto (20 ott, su richiesta).
     static func pronto() {}
+    /// Spunte verdi «Fatto» (promesse, spesa, ricordi): il suono «pronto» resta, 100%.
+    static func fatto() { suona(file("pronto"), volume: 1.0) }
     /// Click delle icone in alto (Ricordi, Cronologia): «clicktesta», 50%.
     static func clickTesta() { suona(file("clicktesta") ?? file("tick"), volume: 1.0) }
     /// La conversazione si svuota: «chatsvuota», 70%.
@@ -817,7 +819,7 @@ struct VistaRicordiOrologio: View {
     private func spunta(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
-        SuoniOrologio.pronto()
+        SuoniOrologio.fatto()
         _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id])
         await carica()
     }

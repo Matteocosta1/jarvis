@@ -197,7 +197,7 @@ struct VistaRicordi: View {
     }
 
     private func fatto(_ id: Int) async {
-        Suoni.pronto()
+        Suoni.fatto()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         _ = await VistaVitals.chiama(["ricordo_fatto": id])
         await carica()
