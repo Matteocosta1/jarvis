@@ -39,9 +39,10 @@ enum Suoni {
     }
     /// La sezione ha i dati e si stampa sullo schermo. File: «schedapronta». Se manca, il suono di «pronto».
     /// Il suono del caricamento sfuma in quel momento, così i due non si accavallano.
-    static func schedaPronta() {
+    static func schedaPronta(soloSfuma: Bool = false) {
         guard attivi else { return }
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
+        if soloSfuma { return }                                      // Bea e Spesa: il suono d'apertura sfuma, nessun altro suono
         if let url = file("schedapronta") { riproduci(url, volume: 0.7); return }
         suona(.pronto)
     }

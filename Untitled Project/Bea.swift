@@ -64,7 +64,7 @@ struct VistaBea: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) } }
             .onAppear { Suoni.apertura() }
-            .task { await carica(); if dati != nil { Suoni.pronto() } }
+            .task { await carica(); if dati != nil { Suoni.schedaPronta(soloSfuma: true) } }   // niente suono: il suono d'apertura sfuma e basta
             .sheet(isPresented: $sceltaContatto) {
                 SceltaContattoBea { c, n in
                     nomeContatto = c.nome
