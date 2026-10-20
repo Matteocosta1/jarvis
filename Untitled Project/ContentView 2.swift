@@ -59,8 +59,9 @@ struct ContentView: View {
             let altezzaChat = max(140, alto * 0.18)
             let altezzaCorona: CGFloat = ContentView.latoCorona / 2 + ContentView.raggioCorona + 40
             let altezzaTesti: CGFloat = mac ? 125 * 1.25 : 125      // stato, telemetria e la frase sotto il reattore
-            // sotto le icone c'è un margine di 40 punti (il nome INTELLIGENCE): i testi ci salgono un po' sopra
-            let scala = max(0.3, min(3, (g.size.width - 32) / 430, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona - 20))))   // anche la larghezza conta
+            // la corona con sotto il nome INTELLIGENCE, poi i testi: nessuna sovrapposizione
+            // la corona tiene tutto il suo spazio (anche il nome INTELLIGENCE in basso) più un respiro: niente scritte sopra
+            let scala = max(0.3, min(3, (g.size.width - 32) / 430, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona + 12))))   // anche la larghezza conta
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
                 if mostraSistemi { menuSistemi.zIndex(10) }
@@ -72,7 +73,7 @@ struct ContentView: View {
                             corona
                                 .frame(width: 430)
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
-                                .frame(width: g.size.width, height: (altezzaCorona - 20) * scala, alignment: .top)
+                                .frame(width: g.size.width, height: (altezzaCorona + 12) * scala, alignment: .top)
                             testiHUD
                                 .frame(maxWidth: max(0, min(640, (g.size.width - 32) / 1.25)))
                                 .scaleEffect(mac ? 1.25 : 1, anchor: .top)
@@ -473,6 +474,8 @@ struct ContentView: View {
                     k = fine + 1
                 }
             }
+            // più alto della corona (stesso centro): il nome INTELLIGENCE, sotto le icone in basso, non viene più tagliato
+            .frame(height: ContentView.latoCorona + 80)
             .allowsHitTesting(false)
 
             // il reattore al centro, della misura di sempre
