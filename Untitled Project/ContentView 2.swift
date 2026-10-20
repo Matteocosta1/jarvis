@@ -230,12 +230,16 @@ struct ContentView: View {
                 withAnimation(.spring(duration: 0.4, bounce: 0.55)) { accese = k + 1 }
                 Suoni.plim(k)
                 UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.5)
-                try? await Task.sleep(for: .milliseconds(150))
+                // INTELLIGENCE un filo più svelta (120 ms): l'ultima icona cade prima della fine della musica, che chiude da sola
+                try? await Task.sleep(for: .milliseconds(elenco[k].gruppo == "INTELLIGENCE" ? 120 : 150))
             }
-            try? await Task.sleep(for: .milliseconds(120))
+            try? await Task.sleep(for: .milliseconds(370))        // la coda della musica
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
-            if chatDaCaricare { await caricaChat() }
+            if chatDaCaricare {
+                try? await Task.sleep(for: .milliseconds(900))    // un respiro prima che la chat si carichi
+                await caricaChat()
+            }
             try? await Task.sleep(for: .milliseconds(2400))
             withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
         }
@@ -245,7 +249,6 @@ struct ContentView: View {
     private func caricaChat() async {
         guard regiaChat.fase == .nascosta else { return }
         if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return }
-        try? await Task.sleep(for: .milliseconds(300))
         withAnimation(.easeOut(duration: 0.2)) { regiaChat.fase = .carica }
         try? await Task.sleep(for: .seconds(TempiChat.carica))
         Suoni.chatCarica()                    // il suono dei caratteri parte con la stampa: dura quanto la decodifica

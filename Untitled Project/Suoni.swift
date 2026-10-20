@@ -5,6 +5,7 @@ import UIKit
 /// I suoni dell'interfaccia, alla Stark. Se nel progetto c'è un file audio con il nome giusto, si usa quello;
 /// altrimenti l'app genera un piccolo segnale sintetico. File riconosciuti (m4a, mp3, wav o caf):
 ///   «tick» (o «tocco») → tocco su un'icona      «avvio» → suono di fondo mentre le icone si accendono
+///   «avvio» ha già dentro una pulsazione per ogni icona, al passo dell'avvio (150 ms, 110 tra i gruppi, INTELLIGENCE 120)
 ///   «plim» → accensione di ogni singola icona (se manca, silenzio)      «inlinea» → fine sequenza
 ///   «scheda» → una sezione si apre (caricamento)      «schedapronta» → la sezione è pronta
 /// Si spengono con «Suoni dell'interfaccia» nelle impostazioni.
