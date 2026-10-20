@@ -251,6 +251,14 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] } },
   { name: "edith_link", description: "EDITH, sicurezza: controlla link sospetti (da un SMS, una mail, un QR) senza aprirli davvero: dove portano dopo i reindirizzamenti, età del dominio, segnali di truffa (dominio nuovo, nome simile a marchi noti, IP al posto del nome, caratteri strani, niente https). Passa il testo del messaggio o il link.",
     input_schema: { type: "object", properties: { testo: { type: "string" } }, required: ["testo"] } },
+  { name: "edith_azienda", description: "EDITH, difesa: verifica una partita IVA europea nel registro ufficiale (VIES): se è valida e attiva, e a che azienda e indirizzo è intestata. Prima di fidarsi di un fornitore o di un cliente. Partita IVA italiana (11 cifre) o con prefisso del Paese (DE…, FR…).",
+    input_schema: { type: "object", properties: { piva: { type: "string" } }, required: ["piva"] } },
+  { name: "edith_iban", description: "EDITH, difesa: controlla un IBAN (forma e cifra di controllo) e, per l'Italia, dice di che banca è. Prima di pagare una fattura: se la cifra di controllo è sbagliata il numero è un errore o un falso. Non dice chi è l'intestatario.",
+    input_schema: { type: "object", properties: { iban: { type: "string" } }, required: ["iban"] } },
+  { name: "edith_numero", description: "EDITH, difesa: che numero di telefono è (Paese, cellulare o fisso) e se la forma è giusta. Per un numero sconosciuto o sospetto. Dallo con il prefisso (+39…).",
+    input_schema: { type: "object", properties: { numero: { type: "string" } }, required: ["numero"] } },
+  { name: "edith_reputazione", description: "EDITH, difesa: cosa si trova pubblicamente in giro su un'azienda, una persona pubblica, un sito o un marchio (solo risultati pubblici del web). Per farsi un'idea prima di trattare con qualcuno, o per vedere cosa dicono di Discosizer. Usa un nome, un'azienda o un dominio.",
+    input_schema: { type: "object", properties: { nome: { type: "string" } }, required: ["nome"] } },
   { name: "edith_dominio", description: "EDITH, sicurezza: sentinella di un dominio (es. discosizer.it): DNS, scadenza dell'ultimo certificato, e domini truffa con nomi quasi uguali già registrati.",
     input_schema: { type: "object", properties: { dominio: { type: "string" } }, required: ["dominio"] } },
   { name: "meteo", description: "Meteo attuale e previsioni fino a 7 giorni per una località (default Milano).",
@@ -384,7 +392,7 @@ const METEO_CODICI: Record<number, string> = { 0: "sereno", 1: "quasi sereno", 2
 
 // ───────── Difesa dalle istruzioni nascoste ─────────
 // Strumenti che portano dentro testo scritto da altri (web, email, GitHub, prodotti, log, foto, trascrizioni).
-const NON_FIDATI = new Set(["edith_link", "edith_dominio", "web_search", "web_fetch", "email_leggi", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
+const NON_FIDATI = new Set(["edith_link", "edith_dominio", "edith_reputazione", "web_search", "web_fetch", "email_leggi", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
   "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "supabase_log"]);
 // Azioni che escono verso il mondo o cancellano: dopo aver letto testo altrui, servono una conferma del signore.
 const SEMPRE_PERICOLOSI = new Set(["invia_messaggio", "messaggio", "chiama", "apri_pagina", "telefono_comando", "github_scrivi", "archivio_apri", "archivio_elimina",
@@ -464,6 +472,10 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
     case "edith_fughe": return await edithFughe(String(i.email ?? ""));
     case "edith_link": return await edithLink(String(i.testo ?? ""));
     case "edith_dominio": return await edithDominio(String(i.dominio ?? ""));
+    case "edith_azienda": return await edithAzienda(String(i.piva ?? ""));
+    case "edith_iban": return edithIban(String(i.iban ?? ""));
+    case "edith_numero": return edithNumero(String(i.numero ?? ""));
+    case "edith_reputazione": return await edithReputazione(String(i.nome ?? ""));
     case "diagnostica": return await diagnostica();
     case "ricorda": return await ricorda(i, turno);
     case "diario_scrivi": return await diarioScrivi(i);
@@ -2386,6 +2398,89 @@ async function edithDominio(dominio: string) {
     nota: registrati.length ? "alcuni sono solo altre estensioni legittime (vanno valutati): quelli con lettere cambiate sono i più sospetti" : "nessun dominio simile registrato" };
 }
 
+
+// ───── EDITH difesa: chi è davvero, prima di pagare, cosa si trova in giro, che numero è ─────
+
+// AZIENDA: una partita IVA europea è vera e di chi è (VIES della Commissione UE, gratuito, senza chiave).
+async function edithAzienda(piva: string) {
+  const g = piva.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const m = g.match(/^([A-Z]{2})?(\d{8,12})$/);
+  if (!m) return { errore: "partita IVA non valida: 11 cifre per l'Italia, o con il prefisso del Paese (es. DE123456789)" };
+  const paese = m[1] || "IT", numero = m[2];
+  try {
+    const r = await fetch(`https://ec.europa.eu/taxation_customs/vies/rest-api/ms/${paese}/vat/${numero}`, { signal: AbortSignal.timeout(9000) });
+    if (!r.ok) return { errore: `il registro europeo non risponde (${r.status}), riprova tra poco` };
+    const d = await r.json();
+    if (!d.isValid) return { partita_iva: `${paese}${numero}`, esito: "non valida", nota: "questa partita IVA non risulta attiva: attenzione" };
+    return { partita_iva: `${paese}${numero}`, esito: "valida", nome: (d.name ?? "").trim() || "(non comunicato)",
+      indirizzo: (d.address ?? "").replace(/\n+/g, ", ").trim() || "(non comunicato)", paese };
+  } catch { return { errore: "il registro europeo non risponde, riprova tra poco" }; }
+}
+
+// IBAN: struttura e cifra di controllo (tutto in locale, niente rete). Per l'Italia riconosce l'ABI della banca.
+const ABI_BANCHE: Record<string, string> = {
+  "01005": "Banca Nazionale del Lavoro (BNL)", "02008": "UniCredit", "03069": "Intesa Sanpaolo", "03268": "Banca Sella",
+  "05428": "Banca Popolare dell'Emilia (BPER)", "08327": "una Banca di Credito Cooperativo (BCC)", "03359": "Banca Mediolanum",
+  "36081": "Banca Fineco", "05034": "Banco BPM", "03104": "Deutsche Bank Italia", "07601": "BancoPosta (Poste Italiane)",
+  "36000": "N26", "32430": "SumUp", "04000": "pagamenti Mooney/Nexi",
+};
+function edithIban(iban: string) {
+  const g = iban.toUpperCase().replace(/\s/g, "");
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(g)) return { errore: "IBAN non valido come forma" };
+  const riordinato = g.slice(4) + g.slice(0, 4);
+  const numerico = riordinato.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  let resto = 0;
+  for (const c of numerico) resto = (resto * 10 + Number(c)) % 97;
+  const valido = resto === 1;
+  const paese = g.slice(0, 2);
+  const out: any = { iban: g, paese, esito: valido ? "cifra di controllo corretta" : "cifra di controllo SBAGLIATA: non digitarlo, è un errore o un falso" };
+  if (valido && paese === "IT" && g.length === 27) {
+    const abi = g.slice(5, 10);
+    out.banca = ABI_BANCHE[abi] ?? `ABI ${abi} (banca non in elenco)`;
+  }
+  out.nota = valido ? "la forma è giusta: significa che il numero è ben scritto, NON che il conto o l'intestatario siano affidabili" : undefined;
+  return out;
+}
+
+// NUMERO: che numero è (Paese, fisso/mobile) e se la forma è giusta. Solo prefissi, niente rete né rubrica.
+const PREFISSI: [string, string][] = [["39", "Italia"], ["1", "USA/Canada"], ["44", "Regno Unito"], ["33", "Francia"], ["49", "Germania"],
+  ["34", "Spagna"], ["41", "Svizzera"], ["43", "Austria"], ["31", "Paesi Bassi"], ["32", "Belgio"], ["351", "Portogallo"], ["30", "Grecia"],
+  ["7", "Russia/Kazakistan"], ["212", "Marocco"], ["216", "Tunisia"], ["20", "Egitto"], ["91", "India"], ["86", "Cina"], ["380", "Ucraina"],
+  ["355", "Albania"], ["40", "Romania"], ["48", "Polonia"], ["90", "Turchia"], ["971", "Emirati Arabi"], ["234", "Nigeria"]];
+function edithNumero(numero: string) {
+  let n = numero.replace(/[^\d+]/g, "");
+  if (n.startsWith("00")) n = "+" + n.slice(2);
+  if (!n.startsWith("+") && n.length >= 9 && n.length <= 10) n = "+39" + n;   // numero italiano scritto senza prefisso
+  const m = n.match(/^\+(\d{6,15})$/);
+  if (!m) return { errore: "numero non valido: me lo dia con il prefisso internazionale (es. +39 349…)" };
+  const cifre = m[1];
+  const pref = PREFISSI.find(([p]) => cifre.startsWith(p));
+  const paese = pref ? pref[1] : "prefisso non riconosciuto";
+  let tipo = "non so dire";
+  if (pref?.[0] === "39") {
+    const resto = cifre.slice(2);
+    tipo = resto.startsWith("3") ? "cellulare" : resto.startsWith("0") ? "numero fisso" : "forma insolita per l'Italia";
+  }
+  return { numero: "+" + cifre, paese, tipo,
+    nota: "dice solo da dove viene e che tipo è. Un numero valido NON vuol dire mittente affidabile: i truffatori usano numeri veri" };
+}
+
+// REPUTAZIONE: i risultati pubblici del web (Google via Serper). Solo lettura, nessuna azione.
+async function edithReputazione(nome: string) {
+  const q = nome.trim().slice(0, 120);
+  if (q.length < 2) return { errore: "mi dia un nome, un'azienda o un sito" };
+  if (!SERPER) return { nota: "per questo mi serve la ricerca web: lo chieda a voce a JARVIS («cosa si trova su …»), che usa la ricerca del web." };
+  try {
+    const r = await fetch("https://google.serper.dev/search", { method: "POST", signal: AbortSignal.timeout(9000),
+      headers: { "X-API-KEY": SERPER, "Content-Type": "application/json" }, body: JSON.stringify({ q, gl: "it", hl: "it", num: 10 }) });
+    if (!r.ok) return { errore: `la ricerca non risponde (${r.status})` };
+    const d = await r.json();
+    const risultati = (d.organic ?? []).slice(0, 8).map((x: any) => ({ titolo: String(x.title ?? "").slice(0, 140), sito: x.link, testo: String(x.snippet ?? "").slice(0, 200) }));
+    const kg = d.knowledgeGraph ? { nome: d.knowledgeGraph.title, tipo: d.knowledgeGraph.type, sito: d.knowledgeGraph.website } : undefined;
+    return { cercato: q, scheda: kg, risultati, nota: risultati.length ? "sono risultati pubblici del web, da valutare" : "non si trova granché di pubblico" };
+  } catch { return { errore: "la ricerca non risponde, riprova tra poco" }; }
+}
+
 /// La scheda EDITH nell'app: le stesse funzioni, chiamate dirette.
 async function paginaEdith(c: any, ipChiamante: string) {
   switch (c.edith) {
@@ -2393,6 +2488,10 @@ async function paginaEdith(c: any, ipChiamante: string) {
     case "fughe": return await edithFughe(String(c.email ?? ""));
     case "link": return await edithLink(String(c.testo ?? ""));
     case "dominio": return await edithDominio(String(c.dominio ?? ""));
+    case "azienda": return await edithAzienda(String(c.piva ?? ""));
+    case "iban": return edithIban(String(c.iban ?? ""));
+    case "numero": return edithNumero(String(c.numero ?? ""));
+    case "reputazione": return await edithReputazione(String(c.nome ?? ""));
     default: return { errore: "voce EDITH sconosciuta" };
   }
 }
