@@ -131,6 +131,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     func chiedi(_ grezzo: String) {
         let testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !testo.isEmpty else { stato = Date() < sottovoceFino ? "🤫 Sottovoce" : nil; return }
+        if Self.eSoloSilenzio(testo) { ferma(); return }       // «muto», «stop», «basta», «zitto», «Jarvis, basta»: tace e resta in attesa
         ferma()
         domanda = testo
         risposta = ""
@@ -142,6 +143,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
         storia = Array(storia.suffix(12))
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
         compito = Task { await self.turno(nuovoTentativo: true) }
+    }
+
+    /// Come sull'iPhone: la frase è solo un ordine di silenzio.
+    nonisolated static func eSoloSilenzio(_ frase: String) -> Bool {
+        let parole = frase.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        guard !parole.isEmpty, parole.count <= 6 else { return false }
+        let silenzio: Set<String> = ["muto", "muta", "zitto", "zitta", "basta", "stop", "fermati", "fermo", "silenzio", "taci", "shh", "sst"]
+        let contorno: Set<String> = ["ok", "okay", "ehi", "hey", "dai", "adesso", "ora", "per", "favore", "stai", "sta", "fai", "e", "ho", "detto",
+                                     "grazie", "va", "bene", "così", "cosi", "un", "attimo", "aspetta", "mettiti", "in", "attesa", "please"]
+        let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+        guard parole.contains(where: { silenzio.contains($0) }) else { return false }
+        return parole.allSatisfy { p in silenzio.contains(p) || contorno.contains(p) || nomi.contains(where: { p.hasPrefix($0) }) }
     }
 
     func ferma() {

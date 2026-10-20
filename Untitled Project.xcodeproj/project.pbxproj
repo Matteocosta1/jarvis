@@ -73,8 +73,13 @@
 		630306B73079C18A005C3D6F /* Exceptions for "Untitled Project" folder in "JarvisOrologio Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				apertura.m4a,
 				avvio.m4a,
 				Benessere.swift,
+				chatcarica.m4a,
+				chatsvuota.m4a,
+				clicktesta.m4a,
+				pronto.m4a,
 				ComandiVocali.swift,
 				SaluteStorica.swift,
 				scheda.m4a,

@@ -86,7 +86,8 @@ struct VistaBeaOrologio: View {
             }
         }
         .navigationTitle("Bea")
-        .task { await carica() }
+        .onAppear { SuoniOrologio.apertura() }                         // come sull'iPhone: il suono d'apertura di Bea e Spesa
+        .task { await carica(); if dati != nil { SuoniOrologio.schedaPronta() } }
     }
 
     private func carica() async {
@@ -122,6 +123,7 @@ struct VistaBeaOrologio: View {
     private func fatto(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
+        SuoniOrologio.pronto()
         _ = await VistaVitalsOrologio.chiama(["bea_fatto": id])
         await carica()
     }

@@ -14,6 +14,7 @@ enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 struct CorniceOrologio<Contenuto: View>: View {
     let titolo: String
     var pronto = true
+    var apertura = false            // Bea e Spesa: il suono «apertura» invece di quello delle schede
     @ViewBuilder let contenuto: () -> Contenuto
     @State private var mostrato = false
     @State private var stampa: CGFloat = 0
@@ -39,7 +40,7 @@ struct CorniceOrologio<Contenuto: View>: View {
             }
         }
         .navigationTitle(titolo)
-        .onAppear { apertaDa = Date(); WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }
+        .onAppear { apertaDa = Date(); WKInterfaceDevice.current().play(.start); if apertura { SuoniOrologio.apertura() } else { SuoniOrologio.schedaApre() } }
         .task(id: pronto) {
             guard pronto, !mostrato else { return }
             let resta = 0.9 - Date().timeIntervalSince(apertaDa)
@@ -411,7 +412,7 @@ struct VistaSpesaOrologio: View {
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
-        CorniceOrologio(titolo: "Spesa", pronto: voci != nil || errore) {
+        CorniceOrologio(titolo: "Spesa", pronto: voci != nil || errore, apertura: true) {
             if let voci {
                 Text(voci.isEmpty ? "Lista vuota, Sir." : "\(voci.count) da comprare · tocchi per spuntare")
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
@@ -440,6 +441,7 @@ struct VistaSpesaOrologio: View {
     private func spunta(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
+        SuoniOrologio.pronto()
         _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id]); await carica()
     }
     private func elimina(_ r: [String: Any]) async {
@@ -496,7 +498,7 @@ struct VistaShazamOrologio: View {
         stato = .ascolto; brano = nil; onda = false
         try? await Task.sleep(for: .milliseconds(50)); onda = true
         switch await Musica.riconosci(secondi: 12) {
-        case .trovato(let b): brano = b; stato = .trovata; WKInterfaceDevice.current().play(.success)
+        case .trovato(let b): brano = b; stato = .trovata; WKInterfaceDevice.current().play(.success); SuoniOrologio.pronto()
         case .nessuno: stato = .niente("Non la riconosco, Sir. Avvicini il polso alla musica.")
         case .errore(let e): stato = .niente("Shazam non risponde: \(e)")
         }

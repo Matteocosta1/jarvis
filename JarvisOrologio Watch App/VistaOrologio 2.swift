@@ -17,20 +17,37 @@ enum SuoniOrologio {
         cache[nome] = u
         return u
     }
-    static func tick() { suona(file("tick") ?? file("tocco"), volume: 0.6) }
-    static func avvio() { suona(file("avvio"), volume: 0.7) }
+    static func tick() { suona(file("tick") ?? file("tocco"), volume: 0.5) }          // click: 50%
+    static func avvio() { suona(file("avvio"), volume: 0.8) }                          // musica d'avvio: 80%
+    /// Conferme (spesa, promesse, ricordi, Shazam): «pronto», 60%. Se manca, solo la vibrazione.
+    static func pronto() { suona(file("pronto"), volume: 0.6) }
+    /// Click delle icone in alto (Ricordi, Cronologia): «clicktesta», 50%.
+    static func clickTesta() { suona(file("clicktesta") ?? file("tick"), volume: 0.5) }
+    /// La conversazione si svuota: «chatsvuota», 70%.
+    static func chatSvuota() { suona(file("chatsvuota"), volume: 0.7) }
+    /// La conversazione si ricarica all'avvio: «chatcarica», 70%.
+    static func chatCarica() { suona(file("chatcarica"), volume: 0.7) }
+    /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
+    static func apertura() {
+        guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        p.volume = 0.7
+        lettoreScheda?.stop()
+        lettoreScheda = p
+        p.play()
+    }
     /// Una sezione si apre (caricamento) e quando è pronta: «scheda» e «schedapronta», come sull'iPhone.
     static func schedaApre() {
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        p.volume = 0.8
+        p.volume = 0.7                                                    // schede: 70%
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
     }
     static func schedaPronta() {
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
-        suona(file("schedapronta"), volume: 0.8)
+        suona(file("schedapronta"), volume: 0.7)
     }
     private static var lettoreScheda: AVAudioPlayer?
     private static func suona(_ url: URL?, volume: Float) {
@@ -58,6 +75,8 @@ struct VistaOrologio: View {
     @State private var acceso = false                    // sequenza di avvio: reattore e icone si accendono in fila
     @State private var titolo = "AVVIO SISTEMI"
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
+    @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
+    @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
     @AppStorage("vibrazioni") private var vibrazioni = true   // al posto dei suoni dell'iPhone: tocchi sul polso
 
     private let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
@@ -74,11 +93,13 @@ struct VistaOrologio: View {
                         NavigationLink { VistaRicordiOrologio() } label: {
                             Image(systemName: "brain.head.profile").foregroundStyle(ciano)
                         }
+                        .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink { VistaCronologia() } label: {
                             Image(systemName: "text.bubble")
                         }
+                        .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
                     }
                 }
         }
@@ -86,7 +107,7 @@ struct VistaOrologio: View {
         // Sentinella: «Perimetro violato, Sir» a tutto schermo, ovunque si trovi nell'app
         .fullScreenCover(item: $sentinella.allarme) { a in VistaAllarmeOrologio(allarme: a) }
         .confirmationDialog("Pulire la conversazione? Memoria e note restano.", isPresented: $chiediPulizia) {
-            Button("Pulisci", role: .destructive) { jarvis.cancellaConversazione() }
+            Button("Pulisci", role: .destructive) { svuotaChat() }
             Button("Annulla", role: .cancel) {}
         }
         .onAppear {
@@ -155,6 +176,21 @@ struct VistaOrologio: View {
     }
 
     /// Sequenza di avvio: vibrazione, reattore che sboccia, icone in fila, «SISTEMI IN LINEA».
+    /// Pulisci: domanda e risposta si ritirano verso sinistra, poi la conversazione si cancella (come il cestino dell'iPhone).
+    private func svuotaChat() {
+        guard !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty else { jarvis.cancellaConversazione(); return }
+        jarvis.ferma()
+        SuoniOrologio.chatSvuota()
+        vibra(.click)
+        chatDa = nil
+        svuotaDa = Date()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.8))
+            jarvis.cancellaConversazione()
+            svuotaDa = nil
+        }
+    }
+
     private func accendi() {
         guard !acceso else { return }
         vibra(.start)
@@ -174,6 +210,11 @@ struct VistaOrologio: View {
             }
             withAnimation(.easeOut(duration: 0.3)) { titolo = "SISTEMI IN LINEA" }
             vibra(.click)
+            if !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty {     // c'è la conversazione di prima: si ricarica decodificandosi
+                SuoniOrologio.chatCarica()
+                chatDa = Date()
+                Task { @MainActor in try? await Task.sleep(for: .seconds(1.3)); chatDa = nil }
+            }
             try? await Task.sleep(for: .milliseconds(2200))
             withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VII" }
         }
@@ -241,14 +282,14 @@ struct VistaOrologio: View {
                 }
 
                 if !jarvis.domanda.isEmpty {
-                    Text(jarvis.domanda)
+                    TestoChatOrologio(testo: jarvis.domanda, stampaDa: chatDa, svuotaDa: svuotaDa, ordine: 0)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if !jarvis.risposta.isEmpty {
-                    Text(jarvis.risposta)
+                    TestoChatOrologio(testo: jarvis.risposta, stampaDa: chatDa, svuotaDa: svuotaDa, ordine: 1)
                         .font(.body)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -740,6 +781,7 @@ struct VistaRicordiOrologio: View {
     private func spunta(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
+        SuoniOrologio.pronto()
         _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id])
         await carica()
     }
@@ -875,5 +917,39 @@ struct IconaArchivioOrologio: View {
                 .position(x: 15, y: 3.5)
         }
         .frame(width: 21, height: 19)
+    }
+}
+
+
+/// Domanda e risposta sull'orologio: si decodificano all'avvio e si ritirano verso sinistra quando si pulisce.
+struct TestoChatOrologio: View {
+    let testo: String
+    let stampaDa: Date?
+    let svuotaDa: Date?
+    let ordine: Double            // 0 = domanda (sopra), 1 = risposta (sotto)
+
+    private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
+    private static func rimescola(_ s: String, _ q: Double) -> String {
+        guard q > 0 else { return s }
+        return String(s.map { c in (c == " " || c == "\n" || Double.random(in: 0..<1) > q) ? c : (glifi.randomElement() ?? c) })
+    }
+
+    var body: some View {
+        if let s = svuotaDa {
+            TimelineView(.animation) { ctx in
+                let p = min(1, max(0, (ctx.date.timeIntervalSince(s) - (1 - ordine) * 0.25) / 0.38))   // prima la risposta, poi la domanda
+                let e = p * p * (3 - 2 * p)
+                Text(Self.rimescola(testo, min(1, p * 2.2)))
+                    .mask(alignment: .leading) { GeometryReader { g in Rectangle().frame(width: g.size.width * (1 - e)) } }
+            }
+        } else if let s = stampaDa {
+            TimelineView(.animation) { ctx in
+                let t = ctx.date.timeIntervalSince(s) - ordine * 0.35                                  // prima la domanda, poi la risposta
+                Text(Self.rimescola(testo, t < 0 ? 1 : max(0, 1 - t / 0.42)))
+                    .opacity(t < 0 ? 0 : 1)
+            }
+        } else {
+            Text(testo)
+        }
     }
 }
