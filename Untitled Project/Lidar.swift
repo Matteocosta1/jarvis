@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import Combine
 import SceneKit
 import UIKit
 import simd
@@ -552,6 +553,7 @@ struct CatturaStanza: UIViewRepresentable {
     }
 
     /// Riceve gli aggiornamenti della sessione e il risultato della vista. NSCoding lo chiede il protocollo di Apple.
+    @objc(JarvisRegistaLidar)                   // nome stabile: RoomCaptureViewDelegate passa da NSCoding
     nonisolated final class Regista: NSObject, RoomCaptureViewDelegate, RoomCaptureSessionDelegate, @unchecked Sendable {
         let aggiorna: (MisureDalVivo) -> Void
         let finita: (ScansioneLidar) -> Void
