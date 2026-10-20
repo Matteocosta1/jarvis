@@ -17,22 +17,22 @@ enum SuoniOrologio {
         cache[nome] = u
         return u
     }
-    static func tick() { suona(file("tick") ?? file("tocco"), volume: 0.5) }          // click: 50%
+    static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
     /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
-    static func avvio() { suona(file("avvioorologio") ?? file("avvio"), volume: 0.8) }   // 80%
-    /// Conferme (spesa, promesse, ricordi, Shazam): «pronto», 60%. Se manca, solo la vibrazione.
-    static func pronto() { suona(file("pronto"), volume: 0.6) }
+    static func avvio() { suona(file("avvioorologio") ?? file("avvio"), volume: 1.0) }   // 100%
+    /// Conferme (spesa, promesse, ricordi, Shazam): solo la vibrazione. Il suono «pronto» è tolto (20 ott, su richiesta).
+    static func pronto() {}
     /// Click delle icone in alto (Ricordi, Cronologia): «clicktesta», 50%.
-    static func clickTesta() { suona(file("clicktesta") ?? file("tick"), volume: 0.5) }
+    static func clickTesta() { suona(file("clicktesta") ?? file("tick"), volume: 1.0) }
     /// La conversazione si svuota: «chatsvuota», 70%.
-    static func chatSvuota() { suona(file("chatsvuota"), volume: 0.7) }
+    static func chatSvuota() { suona(file("chatsvuota"), volume: 1.0) }
     /// La conversazione si ricarica all'avvio: «chatcarica», 70%.
     static func chatCarica() { suona(file("chatcarica"), volume: 0.7) }
     /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
     static func apertura() {
         guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        p.volume = 0.7
+        p.volume = 1.0
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
@@ -41,14 +41,14 @@ enum SuoniOrologio {
     static func schedaApre() {
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        p.volume = 0.7                                                    // schede: 70%
+        p.volume = 1.0                                                    // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
     }
     static func schedaPronta() {
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
-        suona(file("schedapronta"), volume: 0.7)
+        suona(file("schedapronta"), volume: 1.0)
     }
     private static var lettoreScheda: AVAudioPlayer?
     private static func suona(_ url: URL?, volume: Float) {
@@ -197,7 +197,7 @@ struct VistaOrologio: View {
         chatDa = nil
         svuotaDa = Date()
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(0.8))
+            try? await Task.sleep(for: .seconds(1.38))                 // come sull'iPhone: righe che si ritirano, barra da 100 a 0, poi pulito
             jarvis.cancellaConversazione()
             svuotaDa = nil
         }
@@ -208,29 +208,53 @@ struct VistaOrologio: View {
         vibra(.start)
         withAnimation(.spring(duration: 0.6, bounce: 0.35)) { acceso = true }
         Task { @MainActor in
-            // un tocco leggero sul polso per ogni icona che si accende
-            try? await Task.sleep(for: .milliseconds(400))
-            SuoniOrologio.avvio()
+            let v = AvvioOrologio.velocita
+            try? await Task.sleep(for: .seconds(0.4 / v))
             let elenco = scorciatoie
+            // la partitura (150 ms, 110 tra i gruppi, l'ultimo gruppo 120, tutto ÷ velocità): è quella con cui è montata «avvioorologio»
+            var colpi: [Double] = []; var t = 0.0
             for k in 0..<elenco.count {
-                if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo {
-                    try? await Task.sleep(for: .milliseconds(110))      // un respiro tra un gruppo e l'altro
-                }
-                withAnimation(.spring(duration: 0.4, bounce: 0.55)) { accese = k + 1 }
-                vibra(k == elenco.count - 1 ? .success : .click)     // l'ultima chiude la sequenza
-                // l'ultimo gruppo un filo più svelto (120 ms), come INTELLIGENCE sull'iPhone; le pulsazioni della musica seguono questo passo
-                try? await Task.sleep(for: .milliseconds(elenco[k].gruppo == elenco.last?.gruppo ? 120 : 150))
+                if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo { t += 0.110 }
+                colpi.append(t / v)
+                t += elenco[k].gruppo == elenco.last?.gruppo ? 0.120 : 0.150
             }
-            try? await Task.sleep(for: .milliseconds(370))            // la coda della musica
+            let coda = AvvioOrologio.inizioCoda(elenco.map { $0.gruppo })
+            SuoniOrologio.avvio()
+            let zero = Date()                                          // un solo orologio: niente pause in fila che sommano i ritardi
+            var prima = 0.0, kv = 0
+            for k in 0..<elenco.count {
+                // la raffica finale parte un attimo prima del colpo (come sull'iPhone): la molla svelta arriva sul beep
+                let quando = max(prima, colpi[k] - (k >= coda ? AvvioOrologio.anticipoCoda : 0))
+                prima = quando
+                // i tocchi sul polso restano sul colpo: quelli già scaduti partono adesso
+                while kv < elenco.count && colpi[kv] <= quando {
+                    let fineGruppo = kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo
+                    let tocco: WKHapticType = kv == elenco.count - 1 ? .success : (fineGruppo ? .directionUp : .click)   // forte a fine gruppo
+                    let fra = colpi[kv] - Date().timeIntervalSince(zero)
+                    if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                    kv += 1
+                }
+                let manca = quando - Date().timeIntervalSince(zero)
+                if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
+                accese = k + 1                                         // la molla la dà ogni icona (svelta nella coda)
+            }
+            while kv < elenco.count {                                  // i tocchi rimasti (la raffica finale è partita in anticipo)
+                let tocco: WKHapticType = kv == elenco.count - 1 ? .success : (elenco[kv + 1].gruppo != elenco[kv].gruppo ? .directionUp : .click)
+                let fra = colpi[kv] - Date().timeIntervalSince(zero)
+                if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                kv += 1
+            }
+            let resta = (colpi.last ?? 0) + 0.370 / v - Date().timeIntervalSince(zero)   // la coda della musica
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             withAnimation(.easeOut(duration: 0.3)) { titolo = "SISTEMI IN LINEA" }
             vibra(.click)
             if !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty {     // c'è la conversazione di prima: si ricarica decodificandosi
-                try? await Task.sleep(for: .milliseconds(900))        // un respiro, come sull'iPhone
+                try? await Task.sleep(for: .seconds(0.9 / v))         // un respiro, come sull'iPhone
                 SuoniOrologio.chatCarica()
                 chatDa = Date()
-                Task { @MainActor in try? await Task.sleep(for: .seconds(1.3)); chatDa = nil }
+                Task { @MainActor in try? await Task.sleep(for: .seconds(1.3 / v)); chatDa = nil }
             }
-            try? await Task.sleep(for: .milliseconds(2200))
+            try? await Task.sleep(for: .seconds(2.2 / v))
             withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VII" }
         }
     }
@@ -308,6 +332,8 @@ struct VistaOrologio: View {
                         .font(.body)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                if let s = svuotaDa { BarraSvuotaOrologio(inizio: s, colore: ciano) }   // la barra della pulizia, come sull'iPhone
 
                 if !jarvis.immagini.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -437,7 +463,7 @@ struct VistaOrologio: View {
                     .opacity(k < accese ? 1 : 0)
                     .scaleEffect(k < accese ? 1 : 0.3)
                     .brightness(k == accese - 1 ? 0.35 : 0)          // l'ultima accesa ha un lampo
-                    .animation(.spring(duration: 0.4, bounce: 0.55), value: accese)
+                    .animation(.spring(duration: k >= AvvioOrologio.inizioCoda(scorciatoie.map { $0.gruppo }) ? AvvioOrologio.mollaCoda : 0.4 / AvvioOrologio.velocita, bounce: 0.55), value: accese)
                 }
             }
             .padding(.horizontal, 2)
@@ -947,19 +973,62 @@ struct TestoChatOrologio: View {
     var body: some View {
         if let s = svuotaDa {
             TimelineView(.animation) { ctx in
-                let p = min(1, max(0, (ctx.date.timeIntervalSince(s) - (1 - ordine) * 0.25) / 0.38))   // prima la risposta, poi la domanda
+                let p = min(1, max(0, (ctx.date.timeIntervalSince(s) - (1 - ordine) * 0.75) / 0.38))   // prima la risposta, poi la domanda (tempi dell'iPhone)
                 let e = p * p * (3 - 2 * p)
                 Text(Self.rimescola(testo, min(1, p * 2.2)))
                     .mask(alignment: .leading) { GeometryReader { g in Rectangle().frame(width: g.size.width * (1 - e)) } }
             }
         } else if let s = stampaDa {
             TimelineView(.animation) { ctx in
-                let t = ctx.date.timeIntervalSince(s) - ordine * 0.35                                  // prima la domanda, poi la risposta
-                Text(Self.rimescola(testo, t < 0 ? 1 : max(0, 1 - t / 0.42)))
+                let t = ctx.date.timeIntervalSince(s) - ordine * 0.35 / AvvioOrologio.velocita         // prima la domanda, poi la risposta
+                Text(Self.rimescola(testo, t < 0 ? 1 : max(0, 1 - t / (0.42 / AvvioOrologio.velocita))))
                     .opacity(t < 0 ? 0 : 1)
             }
         } else {
             Text(testo)
         }
+    }
+}
+
+
+/// I numeri dell'avvio al polso: gli stessi dell'iPhone (+40%, la raffica finale in anticipo di 110 ms con la molla svelta).
+enum AvvioOrologio {
+    static let velocita = 1.4
+    static let anticipoCoda = 0.110
+    static let mollaCoda = 0.12
+    /// La coda parte dalla seconda icona di STRUMENTI, come sull'iPhone (da Interprete): le ultime otto icone.
+    static func inizioCoda(_ gruppi: [String]) -> Int {
+        guard let s = gruppi.firstIndex(of: "STRUMENTI") else { return gruppi.count }
+        return s + 1
+    }
+}
+
+/// La barra in fondo mentre la conversazione si svuota: da 100% a 0%, con le voci della pulizia (come sull'iPhone).
+struct BarraSvuotaOrologio: View {
+    let inizio: Date
+    let colore: Color
+    private let voci = ["ARCHIVIO", "PULIZIA", "MEMORIA LIBERA"]
+
+    var body: some View {
+        TimelineView(.animation) { ctx in
+            let q = min(1, ctx.date.timeIntervalSince(inizio) / 1.13)          // 0,75 + 0,38 s, gli stessi tempi dell'iPhone
+            VStack(spacing: 4) {
+                HStack {
+                    Text(voci[min(2, Int(q * 3))])
+                    Spacer()
+                    Text("\(Int(((1 - q) * 100).rounded()))%").monospacedDigit()
+                }
+                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .foregroundStyle(colore)
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(colore.opacity(0.15))
+                        Capsule().fill(colore).frame(width: g.size.width * (1 - q)).shadow(color: colore, radius: 3)
+                    }
+                }
+                .frame(height: 3)
+            }
+        }
+        .allowsHitTesting(false)
     }
 }

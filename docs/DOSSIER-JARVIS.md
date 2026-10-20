@@ -49,7 +49,9 @@ Mark I (Mac/Chrome) → II/III (cervello su Supabase, app Swift) → IV (HUD, in
 ## 6. Avvio (20 ott)
 
 - Musica d'avvio `avvio.m4a`: la musica di sempre **con una pulsazione mixata per ogni icona** (dal file «sci-fi device pulsations» di Mixkit: 4 colpi puliti, passa-alto 350 Hz, picco al 70% della musica, prima icona di ogni gruppo +1,5 dB, nessun accento finale). Volume app 80%.
-- Passo: 150 ms per icona, 110 ms tra i gruppi, **INTELLIGENCE 120 ms**; dopo l'ultima icona **370 ms** (coda della musica) → «SISTEMI IN LINEA» → se la chat ha messaggi, **900 ms** di respiro → caricamento chat.
+- Passo base: 150 ms per icona, 110 ms tra i gruppi, **INTELLIGENCE 120 ms**; dopo l'ultima icona **370 ms** (coda della musica) → «SISTEMI IN LINEA» → se la chat ha messaggi, **900 ms** di respiro → caricamento chat.
+- **Dal 20 ott sera: tutto +40%** (`Avvio.velocita = 1.4` in `ChatAnimata.swift`, `AvvioOrologio` sul Watch): ogni tempo ÷1,4, caricamento chat compreso. `avvio.m4a`/`avvioorologio.m4a` **rimissati**: musica accelerata intera (rubberband, tono invariato) + le pulsazioni originali posate su ogni icona (scarto ≤2 ms). Icone, musica e aptica su **un solo orologio** (`CACurrentMediaTime` + latenza audio), niente pause in fila.
+- **SINCRO**: da **Interprete** in poi (Watch: dalla 2ª icona di STRUMENTI) l'icona parte **110 ms prima** del colpo con la stessa molla più svelta (0,12 s), così arriva sul beep. Valore scelto da Alessandro sul mock.
 - Watch: traccia propria `avvioorologio.m4a` con 19 pulsazioni al passo delle sue icone; stesso schema (ultimo gruppo 120 ms, 370, 900).
 - I «plim» sintetici e il suono «inlinea» restano **spenti** di default (`suonoAvvio` = off).
 - **Aptica** all'avvio (Core Haptics, `Aptica.swift`): **5 tocchi**, uno sull'ultima icona di ogni gruppo, in crescendo, l'ultimo (Wiretap) più pieno. Idea di Alessandro. Niente tocco per icona (sarebbe ronzio).
@@ -63,7 +65,7 @@ Mark I (Mac/Chrome) → II/III (cervello su Supabase, app Swift) → IV (HUD, in
 
 ## 8. Suoni (stato definitivo 20 ott)
 
-Volumi: **avvio 80%, schede 70%, click 50%, pronto 60%**. File in `Untitled Project/` (il Watch li prende via membership exceptions nel pbxproj).
+Volumi (dal 20 ott sera, «Pieno+»): **tutto 100%** con file alzati di +4 dB col limitatore, tranne **chatcarica 70%** (invariato). File in `Untitled Project/` (il Watch li prende via membership exceptions nel pbxproj).
 
 | Momento | File | Note |
 |---|---|---|
@@ -72,7 +74,7 @@ Volumi: **avvio 80%, schede 70%, click 50%, pronto 60%**. File in `Untitled Proj
 | Apertura di **tutte le schede** (Bea e Spesa comprese) | `scheda` | 70%; sfuma quando pronta |
 | Scheda stampata | `schedapronta` | 70% |
 | **Fotocamera pronta** (Occhi, Cucina, Allenatore, Profiler, **Scanner**) | `aperturacamera` | 70%, Mixkit «sci-fi interface robot click». Lo Scanner prima fa anche il caricamento da scheda |
-| **Conferme** (Fatto, spunte, foto scattata, Shazam, ricordi, SOS, messaggi, prodotto trovato, fine risposta se richiamo spento) | `pronto` | 60%, Universfield «positive notification» |
+| **Conferme** (Fatto, spunte, foto scattata, Shazam, ricordi, SOS, messaggi, prodotto trovato, applauso) | — | **suono `pronto` TOLTO** il 20 ott (non piace ad Alessandro): solo vibrazione. Da cercarne un altro solo se lo chiede |
 | Caricamento chat | `chatcarica` | 70% |
 | Svuotamento chat | `chatsvuota` | 70% |
 | `apertura` (Mixkit «interface hint») | nel progetto, **non usato** | |
@@ -82,7 +84,7 @@ Tentativi **scartati** da Alessandro: normalizzazione loudness a -18 LUFS (senti
 
 ## 9. Aptica (`Aptica.swift`, iPhone)
 
-Click → selezione fine · Fotocamera pronta → clack medio secco · Pronto → notifica successo · Svuotamento → continuo morbido in calo + punto fermo · Avvio → i 5 tocchi. Un transitorio ogni 100 ms al massimo; motore scaldato all'`onAppear`; sul Mac tace; Watch con i suoi `WKHaptic` di sempre.
+Click → selezione fine · Fotocamera pronta → clack medio secco · Pronto → notifica successo · Svuotamento → continuo morbido in calo + punto fermo · Avvio → i 5 tocchi **forti** (0,9; l'ultimo 1,0 + coda di 120 ms). Vibrazioni permesse anche col microfono aperto (`setAllowHapticsAndSystemSoundsDuringRecording`). Watch: click per icona, `.directionUp` a fine gruppo, `.success` finale. Un transitorio ogni 100 ms al massimo; motore scaldato all'`onAppear`; sul Mac tace; Watch con i suoi `WKHaptic` di sempre.
 
 ## 10. Voce: silenzio
 

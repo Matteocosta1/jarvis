@@ -18,11 +18,9 @@ enum Suoni {
     /// JARVIS inizia ad ascoltare.
     static func ascolto() { suona(.ascolto) }
     /// JARVIS ha finito e torna in attesa.
-    /// File: «pronto» (conferma); se manca, il bip generato.
+    /// Conferma: solo la vibrazione. Il suono «pronto» è tolto (20 ott, su richiesta): niente suono finché non se ne sceglie un altro.
     static func pronto() {
         Aptica.pronto()
-        if attivi, let url = file("pronto") { riproduci(url, volume: 0.6); return }
-        suona(.pronto)
     }
     /// Qualcosa non è andato.
     static func errore() { suona(.errore) }
@@ -33,7 +31,7 @@ enum Suoni {
     static func schedaApre() {
         guard attivi else { return }
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { suona(.ascolto); return }
-        p.volume = 0.7                                               // schede: 70%
+        p.volume = 1.0                                               // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
@@ -45,8 +43,8 @@ enum Suoni {
         guard attivi else { return }
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
         if soloSfuma { return }                                      // Bea e Spesa: il suono d'apertura sfuma, nessun altro suono
-        if let url = file("schedapronta") { riproduci(url, volume: 0.7); return }
-        suona(.pronto)
+        if let url = file("schedapronta") { riproduci(url, volume: 1.0); return }
+        return                                                       // niente bip «pronto» di riserva
     }
     private static var lettoreScheda: AVAudioPlayer?
     /// L'apertura delle sezioni dal vivo e personali: Bea, Spesa, Occhi, Allenatore, Profiler. File: «apertura»;
@@ -54,7 +52,7 @@ enum Suoni {
     static func apertura() {
         guard attivi else { return }
         guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
-        p.volume = 0.7                                               // come le schede: 70%
+        p.volume = 1.0                                               // come le schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
@@ -65,7 +63,7 @@ enum Suoni {
     static func aperturaCamera() {
         Aptica.fotocamera()
         guard attivi else { return }
-        if let url = file("aperturacamera") { riproduci(url, volume: 0.7); return }
+        if let url = file("aperturacamera") { riproduci(url, volume: 1.0); return }
         apertura()
     }
     private static var lettoreChat: AVAudioPlayer?
@@ -85,13 +83,13 @@ enum Suoni {
     /// La chat si svuota (cestino › Pulisci). File: «chatsvuota».
     static func chatSvuota() {
         guard attivi, let url = file("chatsvuota") else { return }
-        riproduci(url, volume: 0.7)
+        riproduci(url, volume: 1.0)
     }
     /// Click delle tre icone in alto (SISTEMI, cestino, impostazioni). File: «clicktesta»; se manca, il tick normale.
     static func clickTesta() {
         Aptica.click()
         guard attivi else { return }
-        if let url = file("clicktesta") { riproduci(url, volume: 0.5); return }
+        if let url = file("clicktesta") { riproduci(url, volume: 1.0); return }
         tocco()
     }
     /// Il tick di un'icona che si accende all'avvio: un segnale digitale da HUD, non una nota.
@@ -99,7 +97,7 @@ enum Suoni {
     /// variazione da un'icona all'altra. Stile: «hud» (predefinito), «note» (la scala di prima) o «off».
     static func plim(_ indice: Int) {
         guard attivi else { return }
-        if indice == 0, let url = file("avvio") { riproduci(url, volume: 0.8) }   // musica d'avvio: 80%
+        if indice == 0, let url = file("avvio") { riproduci(url, volume: 1.0) }   // musica d'avvio: 100%
         if let url = file("plim") { riproduci(url, volume: 0.6); return }   // pim delle icone: 60%
         let stile = UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off"   // sintesi solo se scelta apposta
         guard stile != "off" else { return }
@@ -219,7 +217,7 @@ enum Suoni {
 
     private static func suona(_ t: Tipo) {
         guard attivi else { return }
-        if t == .tocco, let url = file("tick") ?? file("tocco") { riproduci(url, volume: 0.5); return }   // click su icone e SISTEMI: 50%
+        if t == .tocco, let url = file("tick") ?? file("tocco") { riproduci(url, volume: 1.0); return }   // click su icone e SISTEMI: 100%
         let dati = cache[t] ?? genera(t)
         cache[t] = dati
         guard let p = try? AVAudioPlayer(data: dati) else { return }

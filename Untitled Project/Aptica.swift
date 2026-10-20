@@ -1,6 +1,7 @@
 #if os(iOS)
 import UIKit
 import CoreHaptics
+import AVFoundation
 
 // MARK: - L'aptica di JARVIS
 // Il Taptic Engine suonato come uno strumento: ogni evento ha un istante, un'intensità (quanto forte) e una nitidezza
@@ -29,6 +30,8 @@ enum Aptica {
     /// Da chiamare all'apertura dell'app: il motore si scalda, così il primo tocco non arriva in ritardo.
     static func prepara() {
         guard disponibile else { return }
+        // con il microfono aperto (ascolto all'apertura, richiamo) iOS spegne le vibrazioni dell'app: qui si lasciano passare
+        try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
         selezione.prepare(); notifica.prepare(); medio.prepare(); morbido.prepare()
         _ = accendi()
     }
@@ -109,16 +112,25 @@ enum Aptica {
 
     /// L'avvio: un tocco a ogni gruppo di icone completato, sull'istante dell'ultima icona del gruppo.
     /// Cinque tocchi in tutto: la mano sente il caricamento che avanza a reparti, non il ritmo delle icone.
-    /// Crescono piano (0,45 → 0,6) e l'ultimo, INTELLIGENCE, chiude con un tocco più deciso.
+    /// Forti (0,9) e l'ultimo, INTELLIGENCE, al massimo (1,0) con una coda piena: il colpo finale (20 ott, «aptica forte»).
     static func avvio(tempi: [Double]) {
         guard disponibile, let m = accendi(), !tempi.isEmpty else { return }
-        var eventi: [(Double, Float, Float)] = []
+        try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
+        var eventi: [CHHapticEvent] = []
         for (k, t) in tempi.enumerated() {
             let ultimo = k == tempi.count - 1
-            let intensita: Float = ultimo ? 0.8 : 0.45 + 0.15 * Float(k) / Float(max(1, tempi.count - 1))
-            eventi.append((t, intensita, ultimo ? 0.6 : 0.75))                        // secchi; l'ultimo un filo più pieno
+            eventi.append(CHHapticEvent(eventType: .hapticTransient,
+                                        parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: ultimo ? 1.0 : 0.9),
+                                                     CHHapticEventParameter(parameterID: .hapticSharpness, value: ultimo ? 1.0 : 0.8)],
+                                        relativeTime: t))
+            if ultimo {                                                                // la coda: 120 ms pieni sotto l'ultimo colpo
+                eventi.append(CHHapticEvent(eventType: .hapticContinuous,
+                                            parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                                         CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)],
+                                            relativeTime: t, duration: 0.12))
+            }
         }
-        guard let p = try? m.makePlayer(with: pattern(transitori: eventi)) else { return }
+        guard let pat = try? CHHapticPattern(events: eventi, parameters: []), let p = try? m.makePlayer(with: pat) else { return }
         try? p.start(atTime: CHHapticTimeImmediate)
         ultimoTransitorio = Date().addingTimeInterval(tempi.last ?? 0)                 // per tutta la sequenza niente altri tocchi sopra
     }

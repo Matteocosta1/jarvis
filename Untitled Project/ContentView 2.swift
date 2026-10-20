@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import QuartzCore
 
 /// Le schede delle icone della corona.
 enum SchedaApp: String, Identifiable {
@@ -226,31 +227,43 @@ struct ContentView: View {
         let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
         if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
         Task { @MainActor in
-            // le icone si accendono una alla volta, ognuna con il suo «plim»
-            try? await Task.sleep(for: .milliseconds(650))
+            let v = Avvio.velocita
+            try? await Task.sleep(for: .seconds(0.65 / v))
             let elenco = tutteLeIcone
-            // la partitura aptica: un tocco sull'ULTIMA icona di ogni gruppo (cinque in tutto), agli istanti esatti del ciclo
-            var tempi: [Double] = []; var t = 0.0
+            // la partitura: l'istante di ogni icona dall'inizio della musica (150 ms, 110 tra i gruppi, INTELLIGENCE 120, tutto ÷ velocità).
+            // È la stessa partitura con cui è montata la traccia «avvio»: ogni pulsazione cade sulla sua icona.
+            var colpi: [Double] = []; var t = 0.0
             for k in 0..<elenco.count {
                 if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo { t += 0.110 }
-                if k == elenco.count - 1 || elenco[k + 1].gruppo != elenco[k].gruppo { tempi.append(t) }   // chiude il gruppo
+                colpi.append(t / v)
                 t += elenco[k].gruppo == "INTELLIGENCE" ? 0.120 : 0.150
             }
+            let fineMusica = colpi.last ?? 0
+            // l'aptica: un tocco sull'ULTIMA icona di ogni gruppo (cinque in tutto)
+            let tempiAptica = (0..<elenco.count).filter { $0 == elenco.count - 1 || elenco[$0 + 1].gruppo != elenco[$0].gruppo }.map { colpi[$0] }
+            let coda = Avvio.inizioCoda(elenco.map { $0.nome })
+            // un solo orologio per musica, icone e aptica: niente pause in fila che sommano i ritardi
+            Suoni.plim(0)                                                  // parte la musica d'avvio
+            let ritardoAudio = AVAudioSession.sharedInstance().outputLatency   // il suono arriva all'altoparlante un attimo dopo
+            let zero = CACurrentMediaTime() + ritardoAudio
+            Aptica.avvio(tempi: tempiAptica.map { $0 + ritardoAudio })
+            var prima = 0.0
             for k in 0..<elenco.count {                             // la corona e, in fondo, INTELLIGENCE sulla curva
-                if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo {
-                    try? await Task.sleep(for: .milliseconds(110))      // un respiro tra un gruppo e l'altro
-                }
-                withAnimation(.spring(duration: 0.4, bounce: 0.55)) { accese = k + 1 }
-                if k == 0 { Aptica.avvio(tempi: tempi) }                 // parte con la musica, poi va da sola al millesimo
-                Suoni.plim(k)
-                // INTELLIGENCE un filo più svelta (120 ms): l'ultima icona cade prima della fine della musica, che chiude da sola
-                try? await Task.sleep(for: .milliseconds(elenco[k].gruppo == "INTELLIGENCE" ? 120 : 150))
+                // da Interprete in poi l'icona parte 110 ms prima del colpo (SINCRO): la molla svelta arriva sul beep
+                let quando = max(prima, colpi[k] - (k >= coda ? Avvio.anticipoCoda : 0))
+                prima = quando
+                let manca = zero + quando - CACurrentMediaTime()
+                if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
+                accese = k + 1                                       // la molla la dà ogni icona (svelta nella coda)
+                if k > 0 { Suoni.plim(k) }
             }
-            try? await Task.sleep(for: .milliseconds(370))        // la coda della musica
+            // la coda della musica: 370 ms (÷ velocità) dopo l'ultima icona
+            let resta = zero + fineMusica + 0.370 / v - CACurrentMediaTime()
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
             if chatDaCaricare {
-                try? await Task.sleep(for: .milliseconds(900))    // un respiro prima che la chat si carichi
+                try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
             if ascoltaDopoAvvio {                                  // Mac: ora che musica e chat hanno finito, in ascolto
@@ -258,7 +271,7 @@ struct ContentView: View {
                 try? await Task.sleep(for: .milliseconds(300))    // la coda dei suoni si spegne
                 jarvis.ascoltaSubito()
             }
-            try? await Task.sleep(for: .milliseconds(2400))
+            try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
             withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
         }
     }
@@ -512,6 +525,7 @@ struct ContentView: View {
     private var corona: some View {
         let elenco = tutteLeIcone
         let ang = angoli
+        let coda = Avvio.inizioCoda(elenco.map { $0.nome })
         let r = ContentView.raggioCorona
         // il cerchio ora è intero: in basso c'è INTELLIGENCE, con il suo nome sotto le icone
         let altezza = ContentView.latoCorona / 2 + r + 40
@@ -587,7 +601,7 @@ struct ContentView: View {
                 .opacity(accesa ? 1 : 0)
                 .scaleEffect(accesa ? 1 : 2.4)                      // grande e trasparente, poi si restringe e si accende
                 .brightness(k == accese - 1 && accese < elenco.count ? 0.35 : 0)   // lampo solo mentre si accende: l'ultima non resta chiara
-                .animation(.spring(duration: 0.32, bounce: 0.25), value: accese)
+                .animation(.spring(duration: k >= coda ? Avvio.mollaCoda : 0.32, bounce: 0.25), value: accese)   // da Interprete: la stessa molla, più svelta
                 .offset(x: r * CGFloat(cos(ang[k])), y: r * CGFloat(sin(ang[k])))
             }
         }

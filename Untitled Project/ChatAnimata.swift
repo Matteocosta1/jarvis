@@ -28,10 +28,23 @@ extension EnvironmentValues {
     }
 }
 
+/// I numeri dell'avvio, in un posto solo (20 ott: +40%, SINCRO 110 ms, scelti dal signore sul mock).
+enum Avvio {
+    /// Quanto è più svelto l'avvio rispetto all'originale: la traccia «avvio» è rimontata a questa velocità.
+    static let velocita = 1.4
+    /// Da Interprete in poi (la raffica finale) ogni icona parte prima del suo colpo, così la molla arriva sul beep.
+    static let anticipoCoda = 0.110
+    /// La molla delle icone della coda: la stessa, più svelta.
+    static let mollaCoda = 0.12
+    /// L'indice della prima icona della coda («Interprete»).
+    static func inizioCoda(_ nomi: [String]) -> Int { nomi.firstIndex(of: "Interprete") ?? nomi.count }
+}
+
 enum TempiChat {
-    static let carica = 1.0           // il caricamento HUD si vede per un secondo
-    static let stampa = 1.1           // la riga scende in poco più di un secondo
-    static let decodifica = 0.42      // ogni riga torna leggibile in mezzo secondo scarso
+    // il caricamento all'avvio va alla velocità dell'avvio (+40%): tutto in proporzione, suono «chatcarica» compreso
+    static let carica = 1.0 / Avvio.velocita           // il caricamento HUD (un secondo a velocità normale)
+    static let stampa = 1.1 / Avvio.velocita           // la riga che scende
+    static let decodifica = 0.42 / Avvio.velocita      // ogni riga torna leggibile
     static let svuotaRiga = 0.38      // quanto ci mette un messaggio a ritirarsi
     static let svuotaScala = 0.75     // ritardo fra il messaggio più in basso e quello più in alto
     static var totaleSvuota: Double { svuotaScala + svuotaRiga + 0.25 }
@@ -154,7 +167,7 @@ struct CaricamentoChat: View {
         TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let passato = ctx.date.timeIntervalSince(inizio)
-            let av = min(0.92, 1 - exp(-passato / 0.6))
+            let av = min(0.92, 1 - exp(-passato / (0.6 / Avvio.velocita)))   // in proporzione all'avvio
             let voce = min(voci.count - 1, Int(av * Double(voci.count) / 0.92))
             VStack(spacing: 14) {
                 ZStack {
