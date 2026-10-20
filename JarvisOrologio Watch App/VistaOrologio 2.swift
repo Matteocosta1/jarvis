@@ -19,8 +19,13 @@ enum SuoniOrologio {
     }
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
     /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
-    static func avvio() {                                                // 100%
-        if let p = lettoreAvvio { lettoreAvvio = nil; p.play(); lettori.append(p); return }
+    /// `fra`: la musica parte fra tanti secondi, al campione esatto (play(atTime:) sull'orologio dell'audio).
+    static func avvio(fra: TimeInterval = 0) {                           // 100%
+        if let p = lettoreAvvio {
+            lettoreAvvio = nil
+            if fra > 0 { p.play(atTime: p.deviceCurrentTime + fra) } else { p.play() }
+            lettori.append(p); return
+        }
         suona(file("avvioorologio") ?? file("avvio"), volume: 1.0)
     }
     /// L'avvio si carica prima: quando parte, parte all'istante (le icone sono agganciate alla musica).
@@ -240,14 +245,15 @@ struct VistaOrologio: View {
                 colpi.append(t / v)
                 t += elenco[k].gruppo == elenco.last?.gruppo ? 0.120 : 0.150
             }
-            let coda = AvvioOrologio.inizioCoda(elenco.count)
-            SuoniOrologio.avvio()
+            // la prima icona deve partire PRIMA della musica (la sua molla arriva sul primo colpo): la musica parte dopo l'anticipo
+            let pre = AvvioOrologio.anticipo(0, elenco.count)
+            SuoniOrologio.avvio(fra: pre)                                  // programmata al campione: niente ritardi del Task
             // un solo orologio: niente pause in fila che sommano i ritardi; il suono arriva all'altoparlante un attimo dopo
-            let zero = Date().addingTimeInterval(AVAudioSession.sharedInstance().outputLatency)
-            var prima = 0.0, kv = 0
+            let zero = Date().addingTimeInterval(pre + AVAudioSession.sharedInstance().outputLatency)
+            var prima = -10.0, kv = 0
             for k in 0..<elenco.count {
-                // la raffica finale parte un attimo prima del colpo (come sull'iPhone): la molla svelta arriva sul beep
-                let quando = max(prima, colpi[k] - (k >= coda ? AvvioOrologio.anticipoCoda : 0))
+                // ogni icona parte prima del suo colpo di quanto la sua molla ci mette ad «arrivare»: l'arrivo cade sul beep
+                let quando = max(prima, colpi[k] - AvvioOrologio.anticipo(k, elenco.count))
                 prima = quando
                 // i tocchi sul polso restano sul colpo: quelli già scaduti partono adesso
                 // l'aptica come sull'iPhone: un tocco solo quando si chiude un gruppo (marcato), l'ultimo pieno; sul colpo, non in anticipo
@@ -266,7 +272,8 @@ struct VistaOrologio: View {
                 // la barra segue: porta sul bordo sinistro la PROSSIMA icona, così compare già dentro lo schermo
                 // e la fila appena accesa resta visibile alla sua destra
                 let ordine = AvvioOrologio.ordine(scorciatoie.count)
-                passoBarra = max(0.08, k + 1 < colpi.count ? colpi[k + 1] - colpi[k] : 0.15 / v)
+                let prossima = k + 1 < colpi.count ? max(quando, colpi[k + 1] - AvvioOrologio.anticipo(k + 1, elenco.count)) : quando + 0.15 / v
+                passoBarra = max(0.06, prossima - quando)               // arriva in posizione prima che la prossima parta
                 scorriA = ordine[min(k + 1, ordine.count - 1)]
             }
             while kv < elenco.count {                                  // i tocchi rimasti (la raffica finale è partita in anticipo)
@@ -515,7 +522,7 @@ struct VistaOrologio: View {
                     .opacity(posto(k) < accese ? 1 : 0)
                     .scaleEffect(posto(k) < accese ? 1 : 2.4)               // come sull'iPhone: grande e trasparente, poi si restringe e si accende
                     .brightness(posto(k) == accese - 1 && accese < n ? 0.35 : 0)   // lampo solo mentre si accende
-                    .animation(.spring(duration: posto(k) >= AvvioOrologio.inizioCoda(n) ? AvvioOrologio.mollaCoda : 0.32, bounce: 0.25), value: accese)
+                    .animation(.spring(duration: AvvioOrologio.molla(posto(k), n), bounce: 0.25), value: accese)
                     .id(k)
                 }
             }
@@ -1052,12 +1059,15 @@ enum AvvioOrologio {
     static let velocita = 1.0           // il polso è piccolo: il caricamento deve vedersi, quindi velocità normale (l'iPhone resta a +60%)
     /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.
     static let attesaApertura = 0.6
-    static let anticipoCoda = 0.110
-    static let mollaCoda = 0.12
+    /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
+    /// Le prime 11 (passo 150 ms) 0,32 s come sull'iPhone; le 4 dopo 0,20; le ultime 4 (GIORNATA, passo 120) 0,14.
+    static func molla(_ posto: Int, _ n: Int) -> Double { posto >= n - 4 ? 0.14 : (posto >= n - 8 ? 0.20 : 0.32) }
+    /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
+    /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
+    static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) / velocita }
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
-    /// La coda (la raffica finale, in anticipo con la molla svelta): le ultime otto accese, come sull'iPhone.
-    static func inizioCoda(_ n: Int) -> Int { max(0, n - 8) }
+
 }
 
 /// La barra in fondo mentre la conversazione si svuota: da 100% a 0%, con le voci della pulizia (come sull'iPhone).
