@@ -1058,7 +1058,7 @@ struct TestoChatOrologio: View {
 
 /// I numeri dell'avvio al polso (+35%; la raffica finale in anticipo di 110 ms con la molla svelta).
 enum AvvioOrologio {
-    static let velocita = 1.25          // il polso è piccolo: +25%, scelto dal signore sul mock (l'iPhone resta a +60%)
+    static let velocita = 1.15          // il polso è piccolo: +15%, scelto dal signore sul mock (l'iPhone resta a +60%)
     /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.
     static let attesaApertura = 0.6
     /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
