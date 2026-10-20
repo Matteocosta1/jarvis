@@ -92,8 +92,9 @@ enum ComandoVocale: Equatable {
         if c(" occhi ") && comanda { return .apri(.occhi) }
         if c(" cucina ") && comanda { return .apri(.cucina) }
         // LiDAR: «scansiona la stanza», «misura la stanza», «planimetria»: prima dello Scanner, che prende «scansiona»
-        if c(" lidar ") || c(" laidar ") || c(" lai dar ") || c(" planimetria ") || c(" pianta della stanza ")
-            || ((c(" stanza ") || c(" sala ") || c(" locale ")) && (c(" scansiona ") || c(" misura ") || c(" scansione "))) {
+        let verboStanza = c(" scansiona ") || c(" misura ") || c(" scansione ")
+        if ((c(" lidar ") || c(" laidar ") || c(" lai dar ") || c(" planimetria ") || c(" pianta della stanza ")) && (comanda || verboStanza))
+            || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
             return .apri(.lidar)
         }
         if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && comanda { return .apri(.scanner) }

@@ -2,6 +2,7 @@
 import SwiftUI
 import SceneKit
 import UIKit
+import simd
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
@@ -95,7 +96,8 @@ struct VistaLidar: View {
     @State private var dalVivo = MisureDalVivo()
     @State private var fermaScansione = false
     @State private var avviso: String?
-    @State private var condivisi: [URL] = []                // pianta PNG + modello 3D, preparati quando si apre una scansione
+    @State private var condivisi: [URL] = []
+    @State private var tentativo = 0                         // «Riprova»: una sessione nuova                // pianta PNG + modello 3D, preparati quando si apre una scansione
 
     enum Fase { case scansione, elaboro, risultato, nonDisponibile }
     enum Vista: String, CaseIterable { case pianta = "PIANTA", tre = "3D", archivio = "ARCHIVIO" }
@@ -119,7 +121,7 @@ struct VistaLidar: View {
         VStack(spacing: 12) {
             HStack {
                 Spacer()
-                Button("Chiudi") { Suoni.tocco(); chiudi() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
+                Button("Chiudi") { Suoni.tocco(); esci() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
             }
             .padding(.horizontal, 20).padding(.top, 8)
             ZStack(alignment: .bottom) {
@@ -128,6 +130,7 @@ struct VistaLidar: View {
                               aggiorna: { dalVivo = $0 },
                               finita: { s in mostra(s) },
                               errore: { e in avviso = e; fase = .scansione })
+                .id(tentativo)
                 #endif
                 VStack(spacing: 10) {
                     Text(fase == .elaboro ? "ELABORAZIONE PIANTA…" : (avviso ?? "MUOVA L'IPHONE LUNGO LE PARETI"))
@@ -137,6 +140,13 @@ struct VistaLidar: View {
                     if fase == .scansione && avviso == nil {
                         Button { Suoni.tocco(); fase = .elaboro; fermaScansione = true } label: {
                             Text("Fine").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.fondo)
+                                .padding(.horizontal, 28).padding(.vertical, 10).background(Color.ciano).clipShape(Capsule())
+                        }
+                        .buttonStyle(StileStark())
+                    }
+                    if avviso != nil {
+                        Button { Suoni.tocco(); avviso = nil; fermaScansione = false; dalVivo = MisureDalVivo(); fase = .scansione; tentativo += 1 } label: {
+                            Text("Riprova").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.fondo)
                                 .padding(.horizontal, 28).padding(.vertical, 10).background(Color.ciano).clipShape(Capsule())
                         }
                         .buttonStyle(StileStark())
@@ -175,6 +185,11 @@ struct VistaLidar: View {
         withAnimation(.easeOut(duration: 0.3)) { fase = .risultato }
         Suoni.schedaPronta()
     }
+    /// Uscendo, il modello 3D di una scansione non salvata si cancella: non resta a occupare spazio.
+    private func esci() {
+        if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D) }
+        chiudi()
+    }
     private func apri(_ s: ScansioneLidar) {
         risultato = s
         vista = .pianta
@@ -187,7 +202,7 @@ struct VistaLidar: View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                Button("Chiudi") { Suoni.tocco(); chiudi() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
+                Button("Chiudi") { Suoni.tocco(); esci() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
             }
             .padding(.horizontal, 20).padding(.top, 8)
             ScrollView {
@@ -532,6 +547,7 @@ struct CatturaStanza: UIViewRepresentable {
         }
     }
     static func dismantleUIView(_ v: RoomCaptureView, coordinator: Regista) {
+        coordinator.annullata = true
         if !coordinator.fermata { v.captureSession.stop() }
     }
 
@@ -542,6 +558,7 @@ struct CatturaStanza: UIViewRepresentable {
         let errore: (String) -> Void
         weak var vista: RoomCaptureView?
         var fermata = false
+        var annullata = false                       // chiusa a metà: niente pianta, niente suono, niente file
 
         init(aggiorna: @escaping (MisureDalVivo) -> Void, finita: @escaping (ScansioneLidar) -> Void, errore: @escaping (String) -> Void) {
             self.aggiorna = aggiorna; self.finita = finita; self.errore = errore
@@ -557,6 +574,7 @@ struct CatturaStanza: UIViewRepresentable {
 
         // la scansione è finita: niente schermata finale di Apple, il risultato lo costruisce JARVIS
         nonisolated func captureView(shouldPresent roomDataForProcessing: CapturedRoomData, error: Error?) -> Bool {
+            if annullata { return false }
             if let error {
                 Task { @MainActor in self.errore("SCANSIONE INTERROTTA · \(error.localizedDescription.uppercased())") }
                 return false
@@ -564,11 +582,12 @@ struct CatturaStanza: UIViewRepresentable {
             Task {
                 do {
                     let stanza = try await RoomBuilder(options: [.beautifyObjects]).capturedRoom(from: roomDataForProcessing)
+                    if self.annullata { return }
                     let pronta = Misuratore.scansione(stanza)
                     try? stanza.export(to: pronta.file3D, exportOptions: .parametric)   // il modello 3D per l'ologramma e la condivisione
-                    await MainActor.run { self.finita(pronta) }
+                    await MainActor.run { if !self.annullata { self.finita(pronta) } }
                 } catch {
-                    await MainActor.run { self.errore("NON RIESCO A COSTRUIRE LA PIANTA · RIPROVI") }
+                    await MainActor.run { if !self.annullata { self.errore("NON RIESCO A COSTRUIRE LA PIANTA · RIPROVI") } }
                 }
             }
             return false

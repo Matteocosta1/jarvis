@@ -152,6 +152,8 @@ final class Jarvis: NSObject, ObservableObject {
     private var avvioRichiamo: Task<Void, Never>?
     /// La schermata principale è in primo piano, senza fotocamera, interprete o altre schede aperte (lo decide ContentView).
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
+    /// Durante la sequenza d'avvio il microfono resta spento: aprirlo cambia l'audio dell'iPhone e la musica uscirebbe bassa.
+    var avvioInCorso = true { didSet { if avvioInCorso != oldValue { aggiornaRichiamo() } } }
     private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var ultimoPonte = Date.distantPast     // quando ha detto l'ultima frase ponte
@@ -379,14 +381,14 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        !inBenvenuto && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+        !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
     }
 
     private func aggiornaRichiamo() {
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
             // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
-            let serve = !inBenvenuto && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
+            let serve = !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
             guard serve else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
             avvioRichiamo = Task { @MainActor [weak self] in

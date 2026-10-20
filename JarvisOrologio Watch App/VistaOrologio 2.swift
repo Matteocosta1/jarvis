@@ -19,7 +19,19 @@ enum SuoniOrologio {
     }
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
     /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
-    static func avvio() { suona(file("avvioorologio") ?? file("avvio"), volume: 1.0) }   // 100%
+    static func avvio() {                                                // 100%
+        if let p = lettoreAvvio { lettoreAvvio = nil; p.play(); lettori.append(p); return }
+        suona(file("avvioorologio") ?? file("avvio"), volume: 1.0)
+    }
+    /// L'avvio si carica prima: quando parte, parte all'istante (le icone sono agganciate alla musica).
+    static func preparaAvvio() {
+        guard let url = file("avvioorologio") ?? file("avvio"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        p.volume = 1.0
+        p.prepareToPlay()
+        lettoreAvvio = p
+    }
+    private static var lettoreAvvio: AVAudioPlayer?
     /// Conferme (Shazam e le altre): solo la vibrazione. Il suono «pronto» è tolto (20 ott, su richiesta).
     static func pronto() {}
     /// Spunte verdi «Fatto» (promesse, spesa, ricordi): il suono «pronto» resta, 100%.
@@ -211,6 +223,7 @@ struct VistaOrologio: View {
         withAnimation(.spring(duration: 0.6, bounce: 0.35)) { acceso = true }
         Task { @MainActor in
             let v = AvvioOrologio.velocita
+            SuoniOrologio.preparaAvvio()
             try? await Task.sleep(for: .seconds(0.4 / v))
             let elenco = scorciatoie
             // la partitura (150 ms, 110 tra i gruppi, l'ultimo gruppo 120, tutto ÷ velocità): è quella con cui è montata «avvioorologio»
@@ -222,18 +235,22 @@ struct VistaOrologio: View {
             }
             let coda = AvvioOrologio.inizioCoda(elenco.map { $0.gruppo })
             SuoniOrologio.avvio()
-            let zero = Date()                                          // un solo orologio: niente pause in fila che sommano i ritardi
+            // un solo orologio: niente pause in fila che sommano i ritardi; il suono arriva all'altoparlante un attimo dopo
+            let zero = Date().addingTimeInterval(AVAudioSession.sharedInstance().outputLatency)
             var prima = 0.0, kv = 0
             for k in 0..<elenco.count {
                 // la raffica finale parte un attimo prima del colpo (come sull'iPhone): la molla svelta arriva sul beep
                 let quando = max(prima, colpi[k] - (k >= coda ? AvvioOrologio.anticipoCoda : 0))
                 prima = quando
                 // i tocchi sul polso restano sul colpo: quelli già scaduti partono adesso
+                // l'aptica come sull'iPhone: un tocco solo quando si chiude un gruppo (marcato), l'ultimo pieno; sul colpo, non in anticipo
                 while kv < elenco.count && colpi[kv] <= quando {
                     let fineGruppo = kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo
-                    let tocco: WKHapticType = kv == elenco.count - 1 ? .success : (fineGruppo ? .directionUp : .click)   // forte a fine gruppo
-                    let fra = colpi[kv] - Date().timeIntervalSince(zero)
-                    if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                    if fineGruppo {
+                        let tocco: WKHapticType = kv == elenco.count - 1 ? .success : .directionUp
+                        let fra = colpi[kv] - Date().timeIntervalSince(zero)
+                        if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                    }
                     kv += 1
                 }
                 let manca = quando - Date().timeIntervalSince(zero)
@@ -241,9 +258,11 @@ struct VistaOrologio: View {
                 accese = k + 1                                         // la molla la dà ogni icona (svelta nella coda)
             }
             while kv < elenco.count {                                  // i tocchi rimasti (la raffica finale è partita in anticipo)
-                let tocco: WKHapticType = kv == elenco.count - 1 ? .success : (elenco[kv + 1].gruppo != elenco[kv].gruppo ? .directionUp : .click)
-                let fra = colpi[kv] - Date().timeIntervalSince(zero)
-                if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                if kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo {
+                    let tocco: WKHapticType = kv == elenco.count - 1 ? .success : .directionUp
+                    let fra = colpi[kv] - Date().timeIntervalSince(zero)
+                    if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
+                }
                 kv += 1
             }
             let resta = (colpi.last ?? 0) + 0.370 / v - Date().timeIntervalSince(zero)   // la coda della musica
@@ -463,9 +482,9 @@ struct VistaOrologio: View {
                     }
                     .buttonStyle(StileStarkOrologio())
                     .opacity(k < accese ? 1 : 0)
-                    .scaleEffect(k < accese ? 1 : 0.3)
-                    .brightness(k == accese - 1 ? 0.35 : 0)          // l'ultima accesa ha un lampo
-                    .animation(.spring(duration: k >= AvvioOrologio.inizioCoda(scorciatoie.map { $0.gruppo }) ? AvvioOrologio.mollaCoda : 0.4 / AvvioOrologio.velocita, bounce: 0.55), value: accese)
+                    .scaleEffect(k < accese ? 1 : 2.4)                     // come sull'iPhone: grande e trasparente, poi si restringe e si accende
+                    .brightness(k == accese - 1 && accese < scorciatoie.count ? 0.35 : 0)   // lampo solo mentre si accende
+                    .animation(.spring(duration: k >= AvvioOrologio.inizioCoda(scorciatoie.map { $0.gruppo }) ? AvvioOrologio.mollaCoda : 0.32, bounce: 0.25), value: accese)
                 }
             }
             .padding(.horizontal, 2)

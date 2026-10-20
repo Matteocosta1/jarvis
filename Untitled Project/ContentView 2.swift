@@ -20,7 +20,7 @@ struct ContentView: View {
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
-    @State private var ascoltaDopoAvvio = false      // Mac: l'ascolto all'apertura parte a sequenza finita (non deve registrare la musica d'avvio)
+    @State private var ascoltaDopoAvvio = false      // l'ascolto all'apertura parte a sequenza finita: col microfono aperto l'iPhone abbassa l'altoparlante (e il Mac registrerebbe la musica)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
     @State private var sottotitolo = "AVVIO SISTEMI"
@@ -213,7 +213,7 @@ struct ContentView: View {
                 if comandi.richiesta == nil && ascoltaApertura {
                     // sul Mac il microfono non cancella l'eco: aperto subito registrerebbe la musica d'avvio e la chat che si carica,
                     // e dalla trascrizione vuota verrebbe «Non ho capito, Sir». Lì si apre a sequenza finita.
-                    if Jarvis.usaAscoltoCloud { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
+                    ascoltaDopoAvvio = true                         // iPhone e Mac: dopo l'avvio, così musica e pulsazioni escono a pieno volume
                 }
             }
             eseguiComando()
@@ -270,7 +270,8 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
-            if ascoltaDopoAvvio {                                  // Mac: ora che musica e chat hanno finito, in ascolto
+            jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
+            if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
                 try? await Task.sleep(for: .milliseconds(300))    // la coda dei suoni si spegne
                 jarvis.ascoltaSubito()
@@ -601,7 +602,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(StileStark())
                 .accessibilityLabel(s.nome)
-                .disabled(jarvis.fase == .elaboro && s.nome != "Browser" && s.gruppo != "INTELLIGENCE")
+                .disabled(jarvis.fase == .elaboro && s.nome != "Browser" && (s.gruppo != "INTELLIGENCE" || s.nome == "Bea"))
                 .opacity(accesa ? 1 : 0)
                 .scaleEffect(accesa ? 1 : 2.4)                      // grande e trasparente, poi si restringe e si accende
                 .brightness(k == accese - 1 && accese < elenco.count ? 0.35 : 0)   // lampo solo mentre si accende: l'ultima non resta chiara
