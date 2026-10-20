@@ -113,12 +113,12 @@ enum Suoni {
     /// Chiusura della sequenza: «sistemi in linea», un doppio ping discendente, morbido.
     static func inLinea() {
         guard attivi else { return }
-        if let url = file("inlinea") { riproduci(url, volume: 0.6); return }   // chiude l'avvio insieme ai pim: 60%
+        if let url = file("inlinea") { riproduci(url, volume: 0.5); return }
         guard (UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off") != "off" else { return }
         let dati = cachePlim["inlinea"] ?? generaInLinea()
         cachePlim["inlinea"] = dati
         guard let p = try? AVAudioPlayer(data: dati) else { return }
-        p.volume = 0.6
+        p.volume = 0.3
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
