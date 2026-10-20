@@ -38,6 +38,8 @@ final class Sentinella: ObservableObject {
     @Published var problema: String?
 
     private let motore = MotoreSentinella()
+    /// Sul Mac: finché la Sentinella è accesa il Mac non va in stop e non spegne lo schermo (la webcam resta viva).
+    private var restaSveglio: NSObjectProtocol?
     private var ultimaFoto: Data?                          // l'ultimo fotogramma leggero, per «Guarda ora»
     private var presenzaPrima = false
     private var ultimoAllarme = Date.distantPast
@@ -68,6 +70,10 @@ final class Sentinella: ObservableObject {
         attiva = true
         presenzaPrima = false
         UIApplication.shared.isIdleTimerDisabled = true      // lo schermo non si spegne: la fotocamera resta viva
+        if ProcessInfo.processInfo.isiOSAppOnMac, restaSveglio == nil {   // sul Mac quel blocco non vale: si chiede al Mac di restare sveglio
+            restaSveglio = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
+                                                                 reason: "Sentinella di JARVIS accesa: la webcam sorveglia la stanza")
+        }
         if !ProcessInfo.processInfo.isiOSAppOnMac {          // sul Mac la luminosità non si tocca
             luminositaPrima = UIScreen.main.brightness
             UIScreen.main.brightness = 0.25                  // consuma meno e non illumina la stanza
@@ -84,6 +90,7 @@ final class Sentinella: ObservableObject {
         quadro = nil
         violato = false
         UIApplication.shared.isIdleTimerDisabled = false
+        if let a = restaSveglio { ProcessInfo.processInfo.endActivity(a); restaSveglio = nil }   // il Mac torna a fare come sempre
         if !ProcessInfo.processInfo.isiOSAppOnMac { UIScreen.main.brightness = luminositaPrima }
         PonteSentinella.inviaStato(attiva: false)
     }
@@ -384,7 +391,7 @@ struct VistaSentinella: View {
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.25), value: s.violato)
                 Text(ProcessInfo.processInfo.isiOSAppOnMac
-                     ? "Lasci il Mac acceso con la webcam sulla stanza. Gli allarmi arrivano come notifica sull'iPhone e sull'orologio."
+                     ? "Lasci il Mac con la webcam sulla stanza: finché la Sentinella è accesa non va in stop. Gli allarmi arrivano come notifica sull'iPhone e sull'orologio."
                      : "Lasci il telefono fermo, puntato sulla stanza. Gli allarmi arrivano all'orologio. «Jarvis, torna» per uscire.")
                     .font(.footnote).foregroundStyle(Color.tenue).multilineTextAlignment(.center)
                     .padding(.top, 6)
