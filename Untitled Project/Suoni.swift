@@ -42,6 +42,17 @@ enum Suoni {
         suona(.pronto)
     }
     private static var lettoreScheda: AVAudioPlayer?
+    /// L'apertura delle sezioni dal vivo e personali: Bea, Spesa, Occhi, Allenatore, Profiler. File: «apertura»;
+    /// se manca, il suono delle schede. Usa lo stesso lettore delle schede, così «schedaPronta» lo sfuma.
+    static func apertura() {
+        guard attivi else { return }
+        guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
+        p.volume = 0.7                                               // come le schede: 70%
+        lettoreScheda?.stop()
+        lettoreScheda = p
+        p.play()
+        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
+    }
     private static var lettoreChat: AVAudioPlayer?
     /// La chat si stampa all'avvio: i caratteri che si caricano. File: «chatcarica». Sfuma con `chatPronta()`.
     static func chatCarica() {
