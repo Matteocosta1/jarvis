@@ -240,9 +240,9 @@ struct ContentView: View {
         guard regiaChat.fase == .nascosta else { return }
         if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return }
         try? await Task.sleep(for: .milliseconds(300))
-        Suoni.chatCarica()
         withAnimation(.easeOut(duration: 0.2)) { regiaChat.fase = .carica }
         try? await Task.sleep(for: .seconds(TempiChat.carica))
+        Suoni.chatCarica()                    // il suono dei caratteri parte con la stampa: dura quanto la decodifica
         regiaChat.fase = .stampa(Date())
         try? await Task.sleep(for: .seconds(TempiChat.stampa + TempiChat.decodifica + 0.1))
         Suoni.chatPronta()

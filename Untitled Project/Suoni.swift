@@ -43,7 +43,7 @@ enum Suoni {
     }
     private static var lettoreScheda: AVAudioPlayer?
     private static var lettoreChat: AVAudioPlayer?
-    /// La chat si carica all'avvio (caricamento + stampa). File: «chatcarica». Sfuma con `chatPronta()`.
+    /// La chat si stampa all'avvio: i caratteri che si caricano. File: «chatcarica». Sfuma con `chatPronta()`.
     static func chatCarica() {
         guard attivi, let url = file("chatcarica"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
         p.volume = 0.7                                               // come le schede: 70%
