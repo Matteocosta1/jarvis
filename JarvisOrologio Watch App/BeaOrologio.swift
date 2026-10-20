@@ -87,7 +87,7 @@ struct VistaBeaOrologio: View {
         }
         .navigationTitle("Bea")
         .onAppear { SuoniOrologio.apertura() }                         // come sull'iPhone: il suono d'apertura di Bea e Spesa
-        .task { await carica(); if dati != nil { SuoniOrologio.schedaPronta() } }
+        .task { await carica() }
     }
 
     private func carica() async {
