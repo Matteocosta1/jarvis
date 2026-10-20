@@ -412,7 +412,7 @@ struct VistaSpesaOrologio: View {
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
-        CorniceOrologio(titolo: "Spesa", pronto: voci != nil || errore, apertura: true) {
+        CorniceOrologio(titolo: "Spesa", pronto: voci != nil || errore) {
             if let voci {
                 Text(voci.isEmpty ? "Lista vuota, Sir." : "\(voci.count) da comprare · tocchi per spuntare")
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)

@@ -86,8 +86,8 @@ struct VistaBeaOrologio: View {
             }
         }
         .navigationTitle("Bea")
-        .onAppear { SuoniOrologio.apertura() }                         // come sull'iPhone: il suono d'apertura di Bea e Spesa
-        .task { await carica() }
+        .onAppear { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }   // come tutte le altre schede
+        .task { await carica(); if dati != nil { WKInterfaceDevice.current().play(.success); SuoniOrologio.schedaPronta() } }
     }
 
     private func carica() async {
