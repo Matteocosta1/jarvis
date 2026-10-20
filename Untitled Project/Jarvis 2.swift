@@ -91,6 +91,7 @@ enum ErroreJarvis: LocalizedError {
 @MainActor
 final class Jarvis: NSObject, ObservableObject {
     @Published var messaggi: [Messaggio] = []
+    @Published var svuotaChiesto = false          // «Nuova conversazione» dalle Impostazioni: la schermata principale svuota la chat con l'animazione
     @Published var fase: Fase = .attesa { didSet { if fase != oldValue { aggiornaRichiamo() } } }
     @Published var parziale = ""
     @Published var stato: String?          // es. «cerco sul web»

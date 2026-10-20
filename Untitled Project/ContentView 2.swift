@@ -102,7 +102,13 @@ struct ContentView: View {
             }
             .frame(width: g.size.width, height: g.size.height)
         }
-        .sheet(isPresented: $mostraImpostazioni, onDismiss: eseguiComando) { ImpostazioniView().environmentObject(jarvis) }
+        .sheet(isPresented: $mostraImpostazioni, onDismiss: {
+            eseguiComando()
+            if jarvis.svuotaChiesto {                    // «Nuova conversazione»: a foglio chiuso, la stessa animazione del cestino
+                jarvis.svuotaChiesto = false
+                Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
+            }
+        }) { ImpostazioniView().environmentObject(jarvis) }
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
@@ -1110,7 +1116,7 @@ struct ImpostazioniView: View {
                 } header: { Text("Automazioni") }
 
                 Section {
-                    Button("Nuova conversazione", role: .destructive) { jarvis.nuovaConversazione() }
+                    Button("Nuova conversazione", role: .destructive) { jarvis.svuotaChiesto = true; chiudi() }   // si chiude e la chat si svuota con l'animazione del cestino
                 } footer: {
                     Text("Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.")
                 }
