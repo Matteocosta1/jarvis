@@ -242,6 +242,8 @@ struct ContentView: View {
                 colpi.append(t / v)
                 t += elenco[k].gruppo == "INTELLIGENCE" ? 0.120 : 0.150
             }
+            // la partitura vera (quella della traccia): STRUMENTI e INTELLIGENCE su tutto lo scarico della musica
+            if Avvio.colpi.count == elenco.count { colpi = Avvio.colpi.map { $0 / v } }
             let fineMusica = colpi.last ?? 0
             // l'aptica: un tocco sull'ULTIMA icona di ogni gruppo (cinque in tutto)
             let tempiAptica = (0..<elenco.count).filter { $0 == elenco.count - 1 || elenco[$0 + 1].gruppo != elenco[$0].gruppo }.map { colpi[$0] }
