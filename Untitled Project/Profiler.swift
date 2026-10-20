@@ -208,7 +208,7 @@ struct VistaProfiler: View {
             return
         }
         agganciato = true
-        Suoni.ascolto()
+        Suoni.schedaPronta()
         stato = "INQUADRI IL SOGGETTO"
     }
 

@@ -27,7 +27,7 @@ enum Suoni {
     static func schedaApre() {
         guard attivi else { return }
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { suona(.ascolto); return }
-        p.volume = 0.8
+        p.volume = 0.7                                               // schede: 70%
         lettoreScheda?.stop()
         lettoreScheda = p
         p.play()
@@ -38,7 +38,7 @@ enum Suoni {
     static func schedaPronta() {
         guard attivi else { return }
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
-        if let url = file("schedapronta") { riproduci(url, volume: 0.8); return }
+        if let url = file("schedapronta") { riproduci(url, volume: 0.7); return }
         suona(.pronto)
     }
     private static var lettoreScheda: AVAudioPlayer?
@@ -47,8 +47,8 @@ enum Suoni {
     /// variazione da un'icona all'altra. Stile: «hud» (predefinito), «note» (la scala di prima) o «off».
     static func plim(_ indice: Int) {
         guard attivi else { return }
-        if indice == 0, let url = file("avvio") { riproduci(url, volume: 1.0) }   // musica d'avvio al massimo: prima era più bassa dei suoni delle schede
-        if let url = file("plim") { riproduci(url, volume: 0.9); return }
+        if indice == 0, let url = file("avvio") { riproduci(url, volume: 0.8) }   // musica d'avvio: 80%
+        if let url = file("plim") { riproduci(url, volume: 0.6); return }   // pim delle icone: 60%
         let stile = UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off"   // sintesi solo se scelta apposta
         guard stile != "off" else { return }
         let k = min(max(indice, 0), 23)
@@ -56,7 +56,7 @@ enum Suoni {
         let dati = cachePlim[chiave] ?? (stile == "note" ? generaNota(k) : generaTick(k))
         cachePlim[chiave] = dati
         guard let p = try? AVAudioPlayer(data: dati) else { return }
-        p.volume = stile == "note" ? 0.45 : 0.6
+        p.volume = 0.6
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
         p.play()
@@ -66,7 +66,7 @@ enum Suoni {
     /// Chiusura della sequenza: «sistemi in linea», un doppio ping discendente, morbido.
     static func inLinea() {
         guard attivi else { return }
-        if let url = file("inlinea") { riproduci(url, volume: 0.9); return }
+        if let url = file("inlinea") { riproduci(url, volume: 0.6); return }   // chiude l'avvio insieme ai pim: 60%
         guard (UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off") != "off" else { return }
         let dati = cachePlim["inlinea"] ?? generaInLinea()
         cachePlim["inlinea"] = dati
@@ -167,7 +167,7 @@ enum Suoni {
 
     private static func suona(_ t: Tipo) {
         guard attivi else { return }
-        if t == .tocco, let url = file("tick") ?? file("tocco") { riproduci(url, volume: 0.6); return }
+        if t == .tocco, let url = file("tick") ?? file("tocco") { riproduci(url, volume: 0.5); return }   // click su icone e SISTEMI: 50%
         let dati = cache[t] ?? genera(t)
         cache[t] = dati
         guard let p = try? AVAudioPlayer(data: dati) else { return }

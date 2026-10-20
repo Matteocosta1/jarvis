@@ -509,8 +509,8 @@ struct VistaSpesa: View {
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) } }
-            .onAppear { Suoni.ascolto() }
-            .task { await carica(); if caricata { Suoni.pronto() } }
+            .onAppear { Suoni.schedaApre() }
+            .task { await carica(); if caricata { Suoni.schedaPronta() } }
         }
         .preferredColorScheme(.dark)
     }
