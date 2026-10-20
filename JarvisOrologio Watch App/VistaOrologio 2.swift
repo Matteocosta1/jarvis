@@ -245,6 +245,8 @@ struct VistaOrologio: View {
                 colpi.append(t / v)
                 t += elenco[k].gruppo == elenco.last?.gruppo ? 0.120 : 0.150
             }
+            // la partitura vera (quella della traccia): le ultime 8 icone sui colpi dello scarico della musica
+            if AvvioOrologio.colpi.count == elenco.count { colpi = AvvioOrologio.colpi.map { $0 / v } }
             // la prima icona deve partire PRIMA della musica (la sua molla arriva sul primo colpo): la musica parte dopo l'anticipo
             let pre = AvvioOrologio.anticipo(0, elenco.count)
             SuoniOrologio.avvio(fra: pre)                                  // programmata al campione: niente ritardi del Task
@@ -1061,11 +1063,16 @@ enum AvvioOrologio {
     static let attesaApertura = 0.6
     /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
     /// Le prime 11 (passo 150 ms) 0,32 s come sull'iPhone; le 4 dopo 0,20; le ultime 4 (GIORNATA, passo 120) 0,14.
-    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 4 ? 0.14 : (posto >= n - 8 ? 0.20 : 0.32)) / velocita }   // ÷ velocità, come tutto
+    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 8 ? 0.10 : 0.32) / velocita }   // ÷ velocità, come tutto
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
-    /// Nello scarico finale (le ultime 4) niente anticipo: partite prima, arrivavano già ferme prima dei colpi (provato dal signore).
-    static func anticipo(_ posto: Int, _ n: Int) -> Double { posto >= n - 4 ? 0 : 0.445 * molla(posto, n) }
+    /// Nello scarico (le ultime 8) niente anticipo: un'icona per colpo, la molla da 0,10 s si chiude prima del colpo dopo.
+    static func anticipo(_ posto: Int, _ n: Int) -> Double { posto >= n - 8 ? 0 : 0.445 * molla(posto, n) }
+    /// La partitura del polso (secondi a velocità normale, nell'ordine d'accensione, da Archivio a Briefing): è quella con cui
+    /// è montata «avvioorologio». Le prime 11 al passo di sempre (150 ms, 110 tra i gruppi); le ultime 8 sui colpi dello
+    /// scarico della musica di sottofondo (uno ogni ~61 ms), con Briefing sul colpo forte finale (2,487 s).
+    static let colpi: [Double] = [0, 0.15, 0.30, 0.56, 0.71, 0.97, 1.12, 1.27, 1.42, 1.68, 1.94,
+                                  2.057, 2.115, 2.176, 2.237, 2.295, 2.356, 2.420, 2.487]
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
