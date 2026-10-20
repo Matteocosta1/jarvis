@@ -220,7 +220,7 @@ struct VistaOrologio: View {
     private func accendi() {
         guard !acceso else { return }
         vibra(.start)
-        withAnimation(.spring(duration: 0.6, bounce: 0.35)) { acceso = true }
+        withAnimation(.spring(duration: 0.36 / AvvioOrologio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona (che parte a 0,4 ÷ velocità)
         Task { @MainActor in
             let v = AvvioOrologio.velocita
             SuoniOrologio.preparaAvvio()
