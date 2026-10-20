@@ -14,12 +14,13 @@ enum Suoni {
     static var attivi: Bool { UserDefaults.standard.object(forKey: "suoni") as? Bool ?? true }
 
     /// Tocco su un'icona o sul reattore.
-    static func tocco() { suona(.tocco) }
+    static func tocco() { Aptica.click(); suona(.tocco) }
     /// JARVIS inizia ad ascoltare.
     static func ascolto() { suona(.ascolto) }
     /// JARVIS ha finito e torna in attesa.
     /// File: «pronto» (conferma); se manca, il bip generato.
     static func pronto() {
+        Aptica.pronto()
         if attivi, let url = file("pronto") { riproduci(url, volume: 0.6); return }
         suona(.pronto)
     }
@@ -62,6 +63,7 @@ enum Suoni {
     /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler, Scanner), quando la fotocamera è pronta.
     /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura».
     static func aperturaCamera() {
+        Aptica.fotocamera()
         guard attivi else { return }
         if let url = file("aperturacamera") { riproduci(url, volume: 0.7); return }
         apertura()
@@ -87,6 +89,7 @@ enum Suoni {
     }
     /// Click delle tre icone in alto (SISTEMI, cestino, impostazioni). File: «clicktesta»; se manca, il tick normale.
     static func clickTesta() {
+        Aptica.click()
         guard attivi else { return }
         if let url = file("clicktesta") { riproduci(url, volume: 0.5); return }
         tocco()
