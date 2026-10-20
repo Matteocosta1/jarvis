@@ -307,7 +307,9 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// Decide se la frase è una domanda nuova o il completamento della precedente, e la manda al cervello.
-    private func instrada(_ frase: String) async {
+    private func instrada(_ fraseIntera: String) async {
+        let frase = sottovoce(fraseIntera)
+        if frase.isEmpty { return }
         fraseAVoce = ""
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
@@ -501,9 +503,38 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Comandi vocali
 
+    // MARK: Sottovoce («Jarvis, sbatti, …»)
+
+    /// «Sbatti» all'inizio della frase: JARVIS risponde sottovoce (in chiesa, in riunione…) per i prossimi 10 minuti,
+    /// e ogni «sbatti» li rinnova. «Voce normale» (o «parla normale», «alza la voce») torna come prima.
+    private static var sottovoceFino = Date.distantPast
+    static var volumeVoce: Float { Date() < sottovoceFino ? 0.12 : 1 }
+
+    /// Toglie «sbatti» dalla frase (e accende il sottovoce) o riconosce «voce normale»; restituisce il resto della frase.
+    private func sottovoce(_ frase: String) -> String {
+        let basso = frase.lowercased()
+        if ["voce normale", "parla normale", "alza la voce", "torna normale"].contains(where: { basso.contains($0) }), basso.count < 40 {
+            Jarvis.sottovoceFino = .distantPast
+            stato = nil
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            return ""
+        }
+        var parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let pulita: (String) -> String = { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+        guard let k = parole.prefix(3).firstIndex(where: { ["sbatti", "sbattì"].contains(pulita($0)) }) else { return frase }
+        parole.remove(at: k)
+        Jarvis.sottovoceFino = Date().addingTimeInterval(600)
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let resto = parole.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,.;:!"))
+        if resto.isEmpty { stato = "🤫 Sottovoce"; return "" }
+        return resto
+    }
+
     /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
     @discardableResult
-    func eseguiComando(_ frase: String) -> Bool {
+    func eseguiComando(_ fraseIntera: String) -> Bool {
+        let frase = sottovoce(fraseIntera)
+        if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
         // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
         if let imparato = Storpiature.cerca(frase) {
@@ -1034,6 +1065,7 @@ final class Jarvis: NSObject, ObservableObject {
         let u = AVSpeechUtterance(string: frase)
         u.voice = Jarvis.voceScelta()
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
+        u.volume = Jarvis.volumeVoce                   // «sbatti»: sottovoce
         let chiave = ObjectIdentifier(u)
         inCoda.insert(chiave)
         frasiVive[chiave] = u
@@ -1650,6 +1682,7 @@ final class VoceCloud: NSObject {
             m.prepare()
             guard (try? m.start()) != nil else { return nil }
         }
+        n.volume = Jarvis.volumeVoce                   // «sbatti»: sottovoce
         if !n.isPlaying { n.play() }
         return (m, n, formato)
     }
