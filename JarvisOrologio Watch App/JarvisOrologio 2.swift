@@ -111,9 +111,26 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
+    // MARK: Sottovoce («sbatti, …»): come sull'iPhone, risponde a voce bassissima per 10 minuti; «voce normale» torna come prima
+    private var sottovoceFino = Date.distantPast
+    private var volumeVoce: Float { Date() < sottovoceFino ? 0.12 : 1 }
+
+    private func togliSbatti(_ frase: String) -> String {
+        let basso = frase.lowercased()
+        if ["voce normale", "parla normale", "alza la voce", "torna normale"].contains(where: { basso.contains($0) }), basso.count < 40 {
+            sottovoceFino = .distantPast
+            return ""
+        }
+        var parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard let k = parole.prefix(3).firstIndex(where: { ["sbatti", "sbattì"].contains($0.lowercased().trimmingCharacters(in: .punctuationCharacters)) }) else { return frase }
+        parole.remove(at: k)
+        sottovoceFino = Date().addingTimeInterval(600)
+        return parole.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,.;:!"))
+    }
+
     func chiedi(_ grezzo: String) {
-        let testo = grezzo.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !testo.isEmpty else { return }
+        let testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !testo.isEmpty else { stato = Date() < sottovoceFino ? "🤫 Sottovoce" : nil; return }
         ferma()
         domanda = testo
         risposta = ""
@@ -466,6 +483,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let u = AVSpeechUtterance(string: testo)
         u.voice = AVSpeechSynthesisVoice(language: "it-IT")
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
+        u.volume = volumeVoce
         sintesi.speak(u)
     }
 
@@ -538,6 +556,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if let audio, let p = try? AVAudioPlayer(data: audio) {
                 p.delegate = self
                 lettore = p
+                p.volume = volumeVoce
                 Volume.segui(p)
                 if p.play() { avviaMonitor(); return }
                 lettore = nil
@@ -545,6 +564,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             let u = AVSpeechUtterance(string: testo)
             u.voice = AVSpeechSynthesisVoice(language: "it-IT")
             u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
+        u.volume = volumeVoce
             sintesi.speak(u)
             avviaMonitor()
         }
@@ -650,6 +670,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if let audio, let p = try? AVAudioPlayer(data: audio) {
                 p.delegate = self
                 lettore = p
+                p.volume = volumeVoce
                 Volume.segui(p)
                 partito = p.play()
             }
@@ -657,6 +678,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 let u = AVSpeechUtterance(string: frase)
                 u.voice = AVSpeechSynthesisVoice(language: "it-IT")
                 u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
+        u.volume = volumeVoce
                 sintesi.speak(u)
             }
             avviaMonitor()
