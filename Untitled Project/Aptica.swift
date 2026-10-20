@@ -11,7 +11,7 @@ import CoreHaptics
 //   fotocamera   → un tocco medio e secco: il «clack» dell'obiettivo (Occhi, Cucina, Allenatore, Profiler, Scanner)
 //   pronto       → la notifica di successo di Apple, che la mano conosce già come «fatto»
 //   svuota       → un tocco morbido che cala, in sincronia con la barra che scende
-//   avvio        → una partitura: 25 tocchi leggeri, uno per icona, sincronizzati con le pulsazioni della musica
+//   avvio        → una partitura: un tocco quando si chiude ogni gruppo di icone (cinque in tutto), sulla musica
 //
 // Sul Mac (app «Designed for iPad») non c'è motore aptico: tutto resta in silenzio, senza errori.
 @MainActor
@@ -107,14 +107,16 @@ enum Aptica {
         try? p.start(atTime: CHHapticTimeImmediate)
     }
 
-    /// L'avvio: un tocco leggero per ogni icona, agli stessi istanti delle pulsazioni della musica.
-    /// `tempi` sono i secondi di ogni icona dal via; `primi` le prime di ogni gruppo (un filo più marcate), l'ultima chiude.
-    static func avvio(tempi: [Double], primi: Set<Int>) {
+    /// L'avvio: un tocco a ogni gruppo di icone completato, sull'istante dell'ultima icona del gruppo.
+    /// Cinque tocchi in tutto: la mano sente il caricamento che avanza a reparti, non il ritmo delle icone.
+    /// Crescono piano (0,45 → 0,6) e l'ultimo, INTELLIGENCE, chiude con un tocco più deciso.
+    static func avvio(tempi: [Double]) {
         guard disponibile, let m = accendi(), !tempi.isEmpty else { return }
         var eventi: [(Double, Float, Float)] = []
         for (k, t) in tempi.enumerated() {
-            let intensita: Float = primi.contains(k) ? 0.55 : 0.4
-            eventi.append((t, k == tempi.count - 1 ? 0.6 : intensita, 0.75))         // secchi, come i colpi nella musica
+            let ultimo = k == tempi.count - 1
+            let intensita: Float = ultimo ? 0.8 : 0.45 + 0.15 * Float(k) / Float(max(1, tempi.count - 1))
+            eventi.append((t, intensita, ultimo ? 0.6 : 0.75))                        // secchi; l'ultimo un filo più pieno
         }
         guard let p = try? m.makePlayer(with: pattern(transitori: eventi)) else { return }
         try? p.start(atTime: CHHapticTimeImmediate)

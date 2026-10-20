@@ -224,12 +224,11 @@ struct ContentView: View {
             // le icone si accendono una alla volta, ognuna con il suo «plim»
             try? await Task.sleep(for: .milliseconds(650))
             let elenco = tutteLeIcone
-            // la partitura aptica: gli stessi istanti delle icone (150 ms, 110 tra i gruppi, INTELLIGENCE 120), uno per uno
-            var tempi: [Double] = []; var primi = Set<Int>(); var t = 0.0
+            // la partitura aptica: un tocco sull'ULTIMA icona di ogni gruppo (cinque in tutto), agli istanti esatti del ciclo
+            var tempi: [Double] = []; var t = 0.0
             for k in 0..<elenco.count {
-                if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo { t += 0.110; primi.insert(k) }
-                if k == 0 { primi.insert(0) }
-                tempi.append(t)
+                if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo { t += 0.110 }
+                if k == elenco.count - 1 || elenco[k + 1].gruppo != elenco[k].gruppo { tempi.append(t) }   // chiude il gruppo
                 t += elenco[k].gruppo == "INTELLIGENCE" ? 0.120 : 0.150
             }
             for k in 0..<elenco.count {                             // la corona e, in fondo, INTELLIGENCE sulla curva
@@ -237,7 +236,7 @@ struct ContentView: View {
                     try? await Task.sleep(for: .milliseconds(110))      // un respiro tra un gruppo e l'altro
                 }
                 withAnimation(.spring(duration: 0.4, bounce: 0.55)) { accese = k + 1 }
-                if k == 0 { Aptica.avvio(tempi: tempi, primi: primi) }  // parte con la musica, poi va da sola al millesimo
+                if k == 0 { Aptica.avvio(tempi: tempi) }                 // parte con la musica, poi va da sola al millesimo
                 Suoni.plim(k)
                 // INTELLIGENCE un filo più svelta (120 ms): l'ultima icona cade prima della fine della musica, che chiude da sola
                 try? await Task.sleep(for: .milliseconds(elenco[k].gruppo == "INTELLIGENCE" ? 120 : 150))
