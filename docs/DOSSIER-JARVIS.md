@@ -1,110 +1,117 @@
 # J.A.R.V.I.S. — Dossier di progetto
 
-> Documento di passaggio per una nuova chat. Dal primo Mark a oggi (20 ott 2026, notte).
-> Chi legge: sei l'assistente di **Alessandro** (socio di Matteo in Discosizer). Si parla **italiano**, tono **maggiordomo alla Tony Stark** ("Signore"), confronto maturo: dì apertamente quando non sei d'accordo.
+> Documento di passaggio per una nuova chat. Aggiornato al **20 ott 2026, ore 9:10**.
+> Chi legge: sei l'assistente di **Alessandro** (socio di Matteo in Discosizer). Si parla **italiano**, tono **maggiordomo alla Tony Stark** («Signore»), confronto maturo: dì apertamente quando non sei d'accordo.
+> **Regola ferrea**: nelle sue app **non prendere iniziative** che non ha chiesto, soprattutto su **suoni e grafica**. Le proposte si fanno; si applicano solo al suo sì. Ogni novità va **anche sul Watch**, nel possibile.
 
 ---
 
 ## 1. Cos'è JARVIS
 
-Assistente vocale personale di Alessandro, stile Iron Man. **App vera**, non una skill dentro Claude. Un **unico "cervello"** (Supabase Edge Function) servito a tre dispositivi:
+Assistente vocale personale di Alessandro, stile Iron Man. **App vera**, non una skill. Un **unico cervello** (Supabase Edge Function) servito a tre dispositivi:
 
-- **iPhone** 15 Pro — app nativa Swift (installata da TestFlight)
+- **iPhone** 15 Pro — app nativa Swift (TestFlight)
 - **Apple Watch** SE 2 — app watchOS
-- **Mac** (di Matteo) — la stessa app iPhone, via "Designed for iPad" / TestFlight
-
-Regola d'oro: ogni novità va **in parallelo su iPhone e Watch** (tranne ciò che l'orologio non può fare, es. fotocamera). Il Mac è una terza variante, da toccare **senza mai cambiare iPhone/Watch**.
+- **Mac** (di Matteo) — la stessa app iPhone, «Designed for iPad»
 
 ## 2. Architettura
 
-- **Cervello**: Edge Function `jarvis` su Supabase, progetto **"Discosizer Serate"** (Deno/TypeScript, file unico `supabase/functions/jarvis/index.ts`, ~235 KB). È il cervello condiviso delle app di Ale e Matteo; le app per clienti avranno progetti Supabase separati.
-- **Modello**: Claude (Anthropic), chiave API dedicata "JARVIS" (account King Rusto). Ricarica **solo a mano**, mai automatica; JARVIS avvisa quando il credito cala.
-- **Voce**: voce **ElevenLabs** creata da lui (via endpoint `voceTts` del cervello), spendendo il meno possibile. Trascrizione Mac via **ElevenLabs Scribe** (endpoint `trascrivi`, ~0,5 s); su iPhone c'è `SFSpeechRecognizer` on-device.
-- **Audio app**: `AVAudioEngine` + `SFSpeechRecognizer` (iPhone), trascrizione cloud (Mac). Un solo motore audio condiviso.
-- **Database serate**: Supabase "Discosizer Serate" (lettura). Org Supabase passata a **Pro** il 15 ott.
-- **Notifiche push**: APNs (briefing, SOS Bea).
+- **Cervello**: Edge Function `jarvis` su Supabase, progetto **«Discosizer Serate»** (`axalouhijcsizqgnneco`). File unico `supabase/functions/jarvis/index.ts` (~240 KB).
+- **Modello**: Claude (Anthropic), chiave API «JARVIS» (account King Rusto). Ricarica solo a mano. Tre modelli a seconda della domanda: **Haiku** per comandi secchi, **Sonnet** per le domande normali e per tutto il Watch, **Opus** per foto, richieste lunghe e ragionamenti. Non si tocca: vuole che resti intelligente com'è.
+- **Cache** delle istruzioni: **1 ora** (`ttl: "1h"`, dal 20 ott, cervello v104). Prima era 5 minuti e le ricariche costavano il grosso della spesa (~4,5 $/giorno di test). Controllare i costi dopo un giorno d'uso.
+- **Voce**: ElevenLabs (endpoint `voceTts`), trascrizione Mac via Scribe (`trascrivi`); su iPhone `SFSpeechRecognizer`.
+- **Database serate**: Supabase «Discosizer Serate» (lettura). Org su piano Pro dal 15 ott.
+- **Push**: APNs (briefing, SOS Bea).
 
 ## 3. Flusso di deploy (IMPORTANTE)
 
-Alessandro **non incolla più file**. Flusso fisso su tutte le sue app:
+Alessandro **non incolla file**. Flusso fisso:
 
-1. Codice del cervello → repository GitHub **Matteocosta1/jarvis** (account di Matteo).
-2. Deploy del cervello tramite la Edge Function `jarvis-deploy`: si inserisce un codice usa-e-getta in tabella `jarvis_deploy_codici`, poi `net.http_get` sull'URL di deploy con **sha256 del commit + codice**.
-3. Il deploy fa una **"prova generale"** (dress-rehearsal): se il codice non compila, **blocca** e non va in produzione. Va superata prima del "vai".
-4. App Swift: lui fa **Pull in Xcode** dal repo, poi build e upload su TestFlight.
+1. Codice → GitHub **Matteocosta1/jarvis**, ramo `main`.
+2. Cervello: Edge Function `jarvis-deploy`: si inserisce un codice usa-e-getta in `jarvis_deploy_codici` (sha256 hex, scadenza), poi `net.http_get` su `…/functions/v1/jarvis-deploy?funzione=jarvis&da=github&ref=<commit>&sha=<sha256 di index.ts>&codice=<codice>`; l'esito si legge in `net._http_response`. Fa una **prova generale** (copia `jarvis-prova`, 3 domande vere): se non passa, non va in produzione.
+3. App: lui fa **Pull in Xcode**, alza il numero di **Build** (uguale su tutti e tre i target: app, Watch, Complicazione), Archive, TestFlight.
 
-Versione corrente cervello: **v102** attiva. Etichetta app: **MARK VII — 5.0**.
+Versione cervello: **v104**. Etichetta app: **MARK VII — 5.0**. Ultima build in lavorazione: **16** (20 ott, mattina).
 
-## 4. Cronologia (Mark I → VII)
+**Punto di ritorno**: ramo `claude/mark-vii-suoni-ok` = versione approvata del 20 ott prima dell'aptica (suoni, avvio nuovo, chat animata, EDITH). Ramo `claude/mark-v` = Mark V 3.0.
 
-- **Mark I** — JARVIS sul Mac in Chrome, voce del Mac, note/progetti, Spotify, DB serate (sola lettura).
-- **Mark II/III** — cervello spostato su Supabase; app nativa Swift iPhone + Mac sullo stesso cervello. (Spotify non Premium → niente ricerca brani via API.)
-- **Mark IV (build 9)** — HUD, interruzione a voce, suoni, briefing push. Su TestFlight.
-- **"Occhi" (build 10)** — fotocamera iPhone che descrive ciò che inquadra (dischi → prezzo Discogs). Regola: **mai perdere una foto vista** se lui interrompe la descrizione.
-- **Vitals / Diario** — diario serale (notifica 23:30, una domanda diversa a sera), sezione "Vitals" (umore incrociato con sonno/battito del Watch), "confidente" su richiesta (legge una conversazione che incolla; dice ciò che pensa in entrambe le direzioni).
-- **Seconda memoria** — oggetti/posti (dov'è la Q3), persone, promesse, cose viste, idee al volo, filo della giornata. + traduttore/interprete a voce.
-- **SENSI** — Cucina (frigo → cosa cucinare + lista spesa), scanner alimentare stile Yuka (Open Food Facts), Allenatore (posa/Pilates con Vision in locale).
-- **build 16** — comandi telefono via Comandi Rapidi, rete a 4 tentativi con frasi d'attesa, interruzione a voce; JARVIS meno logorroico.
-- **Mark V (3.0, build 9)** → salvata nel branch `claude/mark-v` per eventuale downgrade.
-- **Reparto Bea** (gruppo STRUMENTI, icona due anelli) — scheda di Bea, "Ti penso", sicurezza **col suo consenso**; **Tocco d'aiuto** (Comando rapido "Aiuto Ale" sul tasto Azione dell'iPhone di Bea, segreto `BEA_SOS_CHIAVE`): creato e provato sul suo iPhone, link iCloud mandato a Bea; a lei resta da collegarlo al tasto Azione. Niente Twilio per ora (a pagamento; c'è già il 112).
-- **Mark VI → VII (5.0)** — vedi sotto (Mac, SISTEMI, EDITH, sottovoce).
+## 4. Cronologia breve
+
+Mark I (Mac/Chrome) → II/III (cervello su Supabase, app Swift) → IV (HUD, interruzione a voce, briefing push) → Occhi → Vitals/Diario → Seconda memoria → SENSI → Reparto Bea + Tocco d'aiuto → Mark VI/VII (Mac, SISTEMI, Costi, EDITH, sottovoce, Systems Check) → **20 ott: EDITH difesa, chat animata, suoni nuovi, avvio con pulsazioni, aptica, cache 1h**.
 
 ## 5. Interfaccia
 
-- Corona di icone principale: **definitiva**, "la più bella mai fatta". **Niente nuove sezioni lì.**
-- Le novità vanno nel menu **SISTEMI** in alto: GitHub, Supabase, Archivio, **Costi**, **EDITH**.
-- Header: icone (SISTEMI/cestino/rotella) allineate e più piccole sulla riga "MARK VII-5.0"; il punto finale attaccato alla **S** di J.A.R.V.I.S.
-- Titoli di sezione/scheda: **una sola parola** che faccia capire subito (odia i titoli lunghi).
-- Mockup/app: ottimizzati per **tutti i dispositivi** (regola fissa).
+- Corona di icone principale: **definitiva**, 22 icone in 4 gruppi (SIGNORE, DAILY, SENSI, STRUMENTI) + **INTELLIGENCE** (Sentinella, Profiler, Wiretap) sotto. **Niente nuove sezioni lì**: le novità vanno nel menu **SISTEMI** (GitHub, Supabase, Archivio, Costi, EDITH).
+- Header: le tre icone (SISTEMI, cestino, rotella) ravvicinate (padding orizzontale 5), sulla riga «MARK VII-5.0».
+- Titoli di una sola parola. Mock sempre ottimizzati per tutti i dispositivi.
+- Il Watch ha 19 icone in 6 gruppi (GIORNATA, SIGNORE, SENSI, STRUMENTI, INTELLIGENCE, SISTEMI).
 
-## 6. Novità recenti (Mark VII)
+## 6. Avvio (20 ott)
 
-- **Costi** (SISTEMI, logo Langfuse): mostra la spesa; anche a voce ("quanto ho speso"). Prezzi 5.5, token di cache, mezzanotte Roma (DST).
-- **Systems Check** (ex "Ronda", che odiava): controllo orario dei sistemi, nome "alla Tony Stark". Edge functions vecchie/scartate ripulite.
-- **Mac**:
-  - Attivazione "alla Tony Stark": **due battiti di mani** o frase **"Wake up, daddy's home"** → parte qualche secondo di *Should I Stay or Should I Go* dei Clash, poi saluto.
-  - Dialogo **identico all'iPhone**: gli parli sopra e si ferma; in attesa **qualsiasi parola** lo risblocca; microfono sempre aperto; veloce.
-  - Reattore **enorme** al centro, scalato per 15", chat sotto proporzionata (non due colonne).
-  - **Comandi vocali Mac** via un unico Comando Rapido "JARVIS Mac" (volume, musica, aprire app, ordinare desktop/cartelle, screenshot, dark mode, blocco).
-- **Sottovoce**: parola chiave **"piano"** (prima "sbatti") → risponde **molto piano** (volume 0,05) o per iscritto; esce con "voce normale"/"parla normale"/"alza la voce". (Bug risolto: entrando in sottovoce partiva la canzone dei Clash.)
-- Priorità vocale: **lui interrompe sempre** JARVIS, JARVIS non interrompe mai lui; se una spiegazione è interrotta, la **riprende** da dove si era fermata.
+- Musica d'avvio `avvio.m4a`: la musica di sempre **con una pulsazione mixata per ogni icona** (dal file «sci-fi device pulsations» di Mixkit: 4 colpi puliti, passa-alto 350 Hz, picco al 70% della musica, prima icona di ogni gruppo +1,5 dB, nessun accento finale). Volume app 80%.
+- Passo: 150 ms per icona, 110 ms tra i gruppi, **INTELLIGENCE 120 ms**; dopo l'ultima icona **370 ms** (coda della musica) → «SISTEMI IN LINEA» → se la chat ha messaggi, **900 ms** di respiro → caricamento chat.
+- Watch: traccia propria `avvioorologio.m4a` con 19 pulsazioni al passo delle sue icone; stesso schema (ultimo gruppo 120 ms, 370, 900).
+- I «plim» sintetici e il suono «inlinea» restano **spenti** di default (`suonoAvvio` = off).
+- **Aptica** all'avvio (Core Haptics, `Aptica.swift`): **5 tocchi**, uno sull'ultima icona di ogni gruppo, in crescendo, l'ultimo (Wiretap) più pieno. Idea di Alessandro. Niente tocco per icona (sarebbe ronzio).
 
-## 7. EDITH — "hacking positivo" (solo difesa)
+## 7. Chat animata (`ChatAnimata.swift`, 20 ott)
 
-Voce in SISTEMI, icona **occhiali** (come EDITH di Tony Stark). Solo **difensivo**, solo asset propri, **niente contro il consenso**. Servizi **gratuiti e senza chiave** (o chiavi già presenti).
+- All'avvio, se la chat ha messaggi: resta nascosta, poi **caricamento HUD con barra a linea unica** (voci: collegamento al cervello, recupero conversazione, decodifica), poi si **stampa dall'alto** con la riga ciano e i caratteri che si decodificano da simboli. Suono `chatcarica` (caratteri digitali) parte con la stampa. Chat vuota: niente.
+- **Cestino › Pulisci** e **Impostazioni › Nuova conversazione**: i messaggi si ritirano **verso sinistra uno alla volta dal basso**, barra in fondo da 100% a 0% (archivio conversazione, pulizia schermo, memoria libera). Suono `chatsvuota` = carta appallottolata (Mixkit «pile of paper trash»). Aptica: tocco morbido che cala.
+- Il caricamento **a tacche col mirino** resta per tutte le sezioni; la **barra a linea unica è solo della chat**.
+- Watch: domanda e risposta si decodificano all'avvio e si ritirano verso sinistra al Pulisci (`TestoChatOrologio`).
 
-**Strumenti base (5):**
-- **Porte** — porte/servizi esposti di un IP (Shodan InternetDB)
-- **Fughe** — email in data breach (XposedOrNot)
-- **Link** — link sospetti in un testo
-- **Domini** — info dominio (RDAP, Google DNS, crt.sh)
-- **Password** — se una password è trapelata (HaveIBeenPwned, k-anonymity, SHA-1 on-device)
+## 8. Suoni (stato definitivo 20 ott)
 
-**Strumenti difensivi (4) — codati stanotte, DA DEPLOYARE:**
-- **Azienda** (`edith_azienda`) — verifica una partita IVA europea nel registro **VIES** (valida/attiva, nome, indirizzo). Prima di fidarsi di un fornitore/cliente.
-- **Pagamenti/IBAN** (`edith_iban`) — forma + cifra di controllo MOD-97 (offline) + banca italiana da ABI. Prima di pagare una fattura.
-- **Numero** (`edith_numero`) — che numero è (Paese, fisso/mobile) e forma giusta. Offline, solo prefissi.
-- **Reputazione** (`edith_reputazione`) — risultati pubblici del web (Google via SERPER). Per farsi un'idea su azienda/persona pubblica/dominio.
+Volumi: **avvio 80%, schede 70%, click 50%, pronto 60%**. File in `Untitled Project/` (il Watch li prende via membership exceptions nel pbxproj).
 
-> **Stato preciso stanotte**: i 4 strumenti sono **scritti nel cervello** (`index.ts`: funzioni `edithAzienda/edithIban/edithNumero/edithReputazione`, definizioni tool, `esegui()`, `paginaEdith()`, `NON_FIDATI`). **Mancano**: le schede Swift in `Untitled Project/Edith.swift`, il commit su GitHub e il deploy del cervello (con prova generale). Vanno anche richiamabili a voce → funzionano anche su Watch "nel possibile".
+| Momento | File | Note |
+|---|---|---|
+| Click icone/reattore | `tick` | 50% |
+| Click SISTEMI, cestino, rotella (Watch: Ricordi, Cronologia) | `clicktesta` | 50%, Mixkit «click menu select small» |
+| Apertura di **tutte le schede** (Bea e Spesa comprese) | `scheda` | 70%; sfuma quando pronta |
+| Scheda stampata | `schedapronta` | 70% |
+| **Fotocamera pronta** (Occhi, Cucina, Allenatore, Profiler, **Scanner**) | `aperturacamera` | 70%, Mixkit «sci-fi interface robot click». Lo Scanner prima fa anche il caricamento da scheda |
+| **Conferme** (Fatto, spunte, foto scattata, Shazam, ricordi, SOS, messaggi, prodotto trovato, fine risposta se richiamo spento) | `pronto` | 60%, Universfield «positive notification» |
+| Caricamento chat | `chatcarica` | 70% |
+| Svuotamento chat | `chatsvuota` | 70% |
+| `apertura` (Mixkit «interface hint») | nel progetto, **non usato** | |
 
-## 8. Lavori in sospeso
+Bip generati (`ascolto`) restano solo per «parli adesso»: reattore, Interprete, dettature.
+Tentativi **scartati** da Alessandro: normalizzazione loudness a -18 LUFS (sentita peggio), pausa 300 ms nello Scanner, aptica UIKit per famiglia (sostituita da Core Haptics).
 
-1. **Finire EDITH difesa**: schede Swift dei 4 strumenti + commit + deploy cervello.
-2. **Idea dialogo** (non ancora fatta): mentre JARVIS è in ascolto e Ale parla con un'altra persona, dire **"Jarvis aspetta / zitto / fermati"** per fermarlo e mandarlo in attesa.
-3. Tocco d'aiuto di Bea: completare con lei quando avrà il suo telefono (mappa posizione nella schermata allarme + riquadro in sicurezza; mockup in `docs/bea`).
+## 9. Aptica (`Aptica.swift`, iPhone)
 
-## 9. Note operative
+Click → selezione fine · Fotocamera pronta → clack medio secco · Pronto → notifica successo · Svuotamento → continuo morbido in calo + punto fermo · Avvio → i 5 tocchi. Un transitorio ogni 100 ms al massimo; motore scaldato all'`onAppear`; sul Mac tace; Watch con i suoi `WKHaptic` di sempre.
 
-- **Modello**: su piano Max 20x può capitare l'auto-switch 5.5 → 4.8 vicino ai limiti; non è un bug del progetto.
-- **Diagnostica**: falsi allarmi sistemati (endpoint log Supabase migrato a `logs`; ElevenLabs "chiave rifiutata"; ClickSend che insisteva — serve solo per l'SMS se Ale si sentisse male, ~1,68 €).
-- **File chiave**:
-  - `supabase/functions/jarvis/index.ts` — cervello
-  - `supabase/functions/jarvis-systems/index.ts` — Systems Check
-  - `Untitled Project/Jarvis 2.swift`, `AscoltoCloud.swift`, `Strumenti 2.swift`, `ContentView 2.swift`, `Edith.swift`
-  - `JarvisOrologio Watch App/JarvisOrologio 2.swift`
-  - `docs/edith/mock.html`, `docs/costi/mock.html`, `docs/mac/JARVIS-Mac.sh`
+## 10. Voce: silenzio
+
+«**muto**, **stop**, **basta**, **zitto**, **Jarvis basta**» (+ taci, silenzio, fermati, stai zitto, basta così): JARVIS tace e torna in attesa **senza rispondere**, anche se lei sta parlando con un'altra persona. `Jarvis.eSoloSilenzio` (iPhone/Mac, in `interrottoAVoce`, `instrada`, `fraseSentitaMac`) e `JarvisOrologio.eSoloSilenzio` (Watch). Frasi brevi (≤6 parole) fatte solo di quelle parole; «basta con la musica» resta un comando.
+
+## 11. EDITH — solo difesa
+
+Voce in SISTEMI, icona occhiali. Servizi gratuiti/senza chiave. **9 strumenti**, tutti nel cervello e con scheda in `Edith.swift`:
+Porte · Fughe · Link · Domini · Password (SHA-1 on-device) · **Azienda** (VIES) · **IBAN** (MOD-97 + ABI) · **Numero** (prefissi) · **Reputazione** (Serper). A voce funzionano anche sul Watch.
+
+**Instant Kill** (idea di Alessandro, in standby): modalità difensiva «si tolgono le chiavi, non si attacca». Proposta a 3 livelli: Allerta (controllo completo), Blindatura (cervello risponde solo al suo iPhone, rotazione chiavi, avviso a Matteo), Protocollo (link diretti a Trova iPhone, ID Apple, Google, GitHub, Instagram, banca; salvataggio log). Attivazione voce + Face ID. Niente contrattacco (615-ter c.p.).
+
+## 12. Lavori in sospeso
+
+1. **Build 16**: in upload il 20 ott mattina. Avviso Xcode «CFBundleVersion 15 vs 16»: i tre target risultano a 16, probabilmente avviso vecchio; se l'upload fallisce, Clean Build Folder e ricontrollare Build Settings › Current Project Version.
+2. **Test della build**: «Jarvis, muto» mentre parla con qualcuno; avvio con pulsazioni e i 5 tocchi; chat che si carica/svuota; Scanner; Watch.
+3. **Costi**: verificare dopo un giorno quanto ha risparmiato la cache da 1 ora. Idee non applicate: strumenti a gruppi (rischio piccolo), meno Opus (**no**, vuole l'intelligenza intatta).
+4. **Instant Kill**: quando lo chiede lui.
+5. **Tocco d'aiuto di Bea**: completare con lei (tasto Azione, mappa nella schermata allarme; mockup in `docs/bea`).
+6. Mock completo pubblicato (artifact «JARVIS Mark VII») con avvio, chat, sezioni e tutti i suoni: ricostruirlo solo se serve, è fedele all'app.
+
+## 13. Note operative
+
+- Siti suoni: **Pixabay** (gratis), **Mixkit** (gratis), Zapsplat (registrazione), Freesound (licenze varie), ElevenLabs Sound Effects (crediti). Tutti i suoni scelti sono di Mixkit/Pixabay.
+- Suoni: li manda lui; io taglio silenzi, pareggio e converto in m4a. Non cambiare file o volumi senza che lo chieda.
+- Modello: su Max 20x può capitare l'auto-switch; non è un bug del progetto.
+- Chat lunghe rallentano: una chat per sessione/argomento, dossier aggiornato a fine sessione.
+- **File chiave**: `supabase/functions/jarvis/index.ts` (cervello) · `supabase/functions/jarvis-systems/index.ts` · `Untitled Project/`: `Jarvis 2.swift`, `ContentView 2.swift`, `Suoni.swift`, `Aptica.swift`, `ChatAnimata.swift`, `Edith.swift`, `Orecchio.swift`, `SchedeSignore.swift` (CorniceScheda), `SchedaScanner.swift`, `Bea.swift`, `SchedeDaily.swift`, `Occhi.swift` · `JarvisOrologio Watch App/`: `VistaOrologio 2.swift` (SuoniOrologio, avvio, TestoChatOrologio), `JarvisOrologio 2.swift`, `SchedeOrologio.swift`, `BeaOrologio.swift` · `docs/edith`, `docs/costi`, `docs/bea`, `docs/mac`.
 
 ---
 
-*Per ripartire in una nuova chat: allega questo file e di' "continuiamo JARVIS". Il resto (gusti, persone, decisioni) è già nella memoria dell'account.*
+*Per ripartire: allega questo file e di' «continuiamo JARVIS». Gusti, persone e decisioni sono nella memoria dell'account.*
