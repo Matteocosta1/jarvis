@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
+    @State private var ascoltaDopoAvvio = false      // Mac: l'ascolto all'apertura parte a sequenza finita (non deve registrare la musica d'avvio)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
     @State private var sottotitolo = "AVVIO SISTEMI"
@@ -204,7 +205,11 @@ struct ContentView: View {
             if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
             if primaApertura {
                 primaApertura = false
-                if comandi.richiesta == nil && ascoltaApertura { jarvis.ascoltaSubito() }
+                if comandi.richiesta == nil && ascoltaApertura {
+                    // sul Mac il microfono non cancella l'eco: aperto subito registrerebbe la musica d'avvio e la chat che si carica,
+                    // e dalla trascrizione vuota verrebbe «Non ho capito, Sir». Lì si apre a sequenza finita.
+                    if Jarvis.usaAscoltoCloud { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
+                }
             }
             eseguiComando()
         }
@@ -247,6 +252,11 @@ struct ContentView: View {
             if chatDaCaricare {
                 try? await Task.sleep(for: .milliseconds(900))    // un respiro prima che la chat si carichi
                 await caricaChat()
+            }
+            if ascoltaDopoAvvio {                                  // Mac: ora che musica e chat hanno finito, in ascolto
+                ascoltaDopoAvvio = false
+                try? await Task.sleep(for: .milliseconds(300))    // la coda dei suoni si spegne
+                jarvis.ascoltaSubito()
             }
             try? await Task.sleep(for: .milliseconds(2400))
             withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
