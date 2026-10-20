@@ -259,6 +259,7 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .attesa
         stato = nil
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if Jarvis.eSoloSilenzio(resto) { aggiuntaInArrivo = false; return }   // «muto», «basta», «Jarvis, zitto»: resta in attesa
         let (pulito, chiedeAggiunta) = Jarvis.togliRichiamo(resto)
         if chiedeAggiunta { aggiuntaInArrivo = true }
         if eseguiComando(pulito) { aggiuntaInArrivo = false; return }
@@ -276,6 +277,29 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant" else { return }
         rispostaInterrotta = ultimo.id
         quandoInterrotto = Date()
+    }
+
+    /// «Muto», «stop», «basta», «zitto», «Jarvis, basta», «stai zitto», «fermati»: la frase è solo un ordine di silenzio.
+    /// Serve quando il signore parla con qualcun altro: JARVIS tace, non risponde e torna in attesa.
+    nonisolated static func eSoloSilenzio(_ frase: String) -> Bool {
+        let parole = frase.lowercased().components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        guard !parole.isEmpty, parole.count <= 6 else { return false }
+        let silenzio: Set<String> = ["muto", "muta", "zitto", "zitta", "basta", "stop", "fermati", "fermo", "silenzio", "taci", "shh", "sst"]
+        let contorno: Set<String> = ["ok", "okay", "ehi", "hey", "dai", "adesso", "ora", "per", "favore", "stai", "sta", "fai", "e", "ho", "detto",
+                                     "grazie", "va", "bene", "così", "cosi", "un", "attimo", "aspetta", "mettiti", "in", "attesa", "the", "please"]
+        guard parole.contains(where: { silenzio.contains($0) }) else { return false }
+        return parole.allSatisfy { p in silenzio.contains(p) || contorno.contains(p) || Richiamo.nomi.contains(where: { p.hasPrefix($0) }) }
+    }
+
+    /// Tace, non risponde e torna in attesa (ordine di silenzio).
+    private func mettiInAttesa() {
+        segnaInterruzione()
+        interrompi()
+        fase = .attesa
+        stato = nil
+        parziale = ""
+        aggiuntaInArrivo = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     /// Parole di richiamo all'inizio della frase: «Jarvis», «aspetta», «ascoltami»…
@@ -310,6 +334,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func instrada(_ fraseIntera: String) async {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return }
+        if Jarvis.eSoloSilenzio(frase) { mettiInAttesa(); return }   // stava parlando con qualcun altro: «Jarvis, muto»
         fraseAVoce = ""
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
@@ -1236,6 +1261,10 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .attesa || fase == .elaboro || fase == .parlo else { return }
         if Date() > dettoMacFino { dettoMac = "" }
         if Jarvis.eEco(testo, detto: dettoMac) { return }                 // è la sua stessa voce: non è il signore
+        if Jarvis.eSoloSilenzio(testo) {                                   // «Jarvis, muto», «basta», «stop»: tace e resta in attesa
+            if fase != .attesa { mettiInAttesa() }
+            return
+        }
         if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
             interrottoAVoce(testo)
             return

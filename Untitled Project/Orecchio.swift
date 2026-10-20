@@ -36,7 +36,7 @@ final class Orecchio {
     private var voluto = false          // il signore vuole l'orecchio acceso (JARVIS sta parlando)
     private var acceso = false
 
-    private static let paroleStop = ["jarvis", "giarvis", "jervis", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio",
+    private static let paroleStop = ["jarvis", "giarvis", "jervis", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio", "muto", "muta", "taci",
                                      "un attimo", "stop", "ehi", "hey", "bro", "fratello"]
 
     var attivo: Bool { acceso }

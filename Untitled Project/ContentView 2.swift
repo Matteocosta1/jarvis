@@ -267,7 +267,7 @@ struct ContentView: View {
     }
 
     private var intestazione: some View {
-        HStack(alignment: .rigaMark) {          // le tre icone sulla stessa riga di «MARK VII-5.0»
+        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VII-5.0», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
                 (Text("J.A.R.V.I.").tracking(5) + Text("S."))
@@ -290,7 +290,7 @@ struct ContentView: View {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(8)
+                    .padding(.vertical, 8).padding(.horizontal, 5)
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -300,7 +300,7 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(8)
+                    .padding(.vertical, 8).padding(.horizontal, 5)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Pulisci la conversazione")
@@ -314,7 +314,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(8)
+                    .padding(.vertical, 8).padding(.horizontal, 5)
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
