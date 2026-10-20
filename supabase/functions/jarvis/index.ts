@@ -1443,10 +1443,10 @@ function mezzanotteDi(g: string) {
   }
   return new Date(`${g}T00:00:00+01:00`);
 }
-/// Dollari di una riga di consumi: ingresso, cache letta (5%), cache scritta (125% dell'ingresso), uscita.
+/// Dollari di una riga di consumi: ingresso, cache letta (5%), cache scritta (200% dell'ingresso: cache da 1 ora), uscita.
 function costoRiga(r: any) {
   const p = prezzoDi(String(r.modello));
-  return (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_scrittura) * p[0] * 1.25 + num(r.token_out) * p[2]) / 1e6;
+  return (num(r.token_in) * p[0] + num(r.token_cache) * p[1] + num(r.token_scrittura) * p[0] * 2 + num(r.token_out) * p[2]) / 1e6;
 }
 /// Per modello, in un periodo: tutto sommato nel database (nessun limite di righe).
 async function costiFra(da: Date, a: Date = new Date()) {
@@ -1951,7 +1951,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
     headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
-      system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
     }),
   });
   if (!r.ok || !r.body) {
