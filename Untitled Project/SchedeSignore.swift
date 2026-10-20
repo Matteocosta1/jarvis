@@ -195,6 +195,7 @@ struct CaricamentoHUD: View {
 struct AperturaHUD: ViewModifier {
     let titolo: String
     var durata = 1.1
+    var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
     @State private var coperto = true
 
     func body(content: Content) -> some View {
@@ -211,7 +212,7 @@ struct AperturaHUD: ViewModifier {
             .onAppear { Suoni.schedaApre() }
             .task {
                 try? await Task.sleep(for: .seconds(durata))
-                Suoni.schedaPronta()
+                if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
                 withAnimation(.easeOut(duration: 0.4)) { coperto = false }
             }
     }
@@ -219,7 +220,9 @@ struct AperturaHUD: ViewModifier {
 
 extension View {
     /// Apre la sezione con il caricamento HUD di JARVIS.
-    func aperturaHUD(_ titolo: String) -> some View { modifier(AperturaHUD(titolo: titolo)) }
+    func aperturaHUD(_ titolo: String, fotocamera: Bool = false) -> some View {
+        modifier(AperturaHUD(titolo: titolo, fotocamera: fotocamera))
+    }
 }
 
 /// Un riquadro con bordo sottile del colore della scheda.

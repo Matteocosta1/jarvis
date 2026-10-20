@@ -130,7 +130,7 @@ struct VistaConfidente: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
+                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
             }
         }
         .preferredColorScheme(.dark)

@@ -90,7 +90,7 @@ struct Allenatore: View {
         .statusBarHidden()
         .task { await motore.avvia() }
         .onDisappear { motore.ferma() }
-        .aperturaHUD("Allenatore")
+        .aperturaHUD("Allenatore", fotocamera: true)
     }
 
     private func dato(_ titolo: String, _ valore: String, caldo: Bool) -> some View {
@@ -206,7 +206,6 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         configura(frontale: false)
         inizioSerie = Date()
         commento = "Inquadri tutta la persona, Sir."
-        Suoni.aperturaCamera()
     }
 
     func ferma() {

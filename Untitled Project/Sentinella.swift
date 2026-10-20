@@ -404,6 +404,7 @@ struct VistaSentinella: View {
         }
         .statusBarHidden()
         .task {
+            let aperta = Date()
             if !(await s.avvia()) {
                 try? await Task.sleep(for: .seconds(3))
                 chiudi()
@@ -413,6 +414,11 @@ struct VistaSentinella: View {
                 if c == .torna { s.ferma() }
                 comando(c)
             }
+            // l'ascolto dei comandi cambia la sessione audio: si accende dopo il clic di fine caricamento (1,1 s + 0,7 s),
+            // altrimenti il suono si perde
+            let resta = 1.8 - Date().timeIntervalSince(aperta)
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard !Task.isCancelled else { return }
             orecchio.avvia()
         }
         .overlay(alignment: .center) {
@@ -422,7 +428,7 @@ struct VistaSentinella: View {
             }
         }
         .onDisappear { orecchio.ferma(); s.ferma() }
-        .aperturaHUD("Sentinella")
+        .aperturaHUD("Sentinella", fotocamera: true)
         .sheet(isPresented: $registro) { RegistroSentinella() }
     }
 

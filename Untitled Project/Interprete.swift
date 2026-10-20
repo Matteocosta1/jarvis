@@ -58,12 +58,9 @@ struct Interprete: View {
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer()
-                    Button { Suoni.tocco(); motore.ferma(); chiudi() } label: {
-                        Image(systemName: "xmark").font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-                    }
-                    .accessibilityLabel("Chiudi")
+                    Button("Chiudi") { Suoni.tocco(); motore.ferma(); chiudi() }
+                        .font(.body).tint(Color.ciano).foregroundStyle(Color.ciano)
+                        .frame(minHeight: 44)
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
 
