@@ -42,6 +42,31 @@ enum Suoni {
         suona(.pronto)
     }
     private static var lettoreScheda: AVAudioPlayer?
+    private static var lettoreChat: AVAudioPlayer?
+    /// La chat si carica all'avvio (caricamento + stampa). File: «chatcarica». Sfuma con `chatPronta()`.
+    static func chatCarica() {
+        guard attivi, let url = file("chatcarica"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
+        p.volume = 0.7                                               // come le schede: 70%
+        lettoreChat?.stop()
+        lettoreChat = p
+        p.play()
+        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
+    }
+    /// La chat è stampata: il suono del caricamento sfuma.
+    static func chatPronta() {
+        if let p = lettoreChat, p.isPlaying { p.setVolume(0, fadeDuration: 0.25) }
+    }
+    /// La chat si svuota (cestino › Pulisci). File: «chatsvuota».
+    static func chatSvuota() {
+        guard attivi, let url = file("chatsvuota") else { return }
+        riproduci(url, volume: 0.7)
+    }
+    /// Click delle tre icone in alto (SISTEMI, cestino, impostazioni). File: «clicktesta»; se manca, il tick normale.
+    static func clickTesta() {
+        guard attivi else { return }
+        if let url = file("clicktesta") { riproduci(url, volume: 0.5); return }
+        tocco()
+    }
     /// Il tick di un'icona che si accende all'avvio: un segnale digitale da HUD, non una nota.
     /// Un impulso di rumore elettronico brevissimo più un «ping» che scende di tono in 40 ms, con una minima
     /// variazione da un'icona all'altra. Stile: «hud» (predefinito), «note» (la scala di prima) o «off».

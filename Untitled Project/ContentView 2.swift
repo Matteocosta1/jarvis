@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
+    @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
     @State private var sottotitolo = "AVVIO SISTEMI"
     @State private var iconaAttiva: Int?         // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var scegliLingua = false       // icona Interprete: scelta della lingua
@@ -210,6 +211,8 @@ struct ContentView: View {
     private func accendi() {
         guard !acceso else { return }
         withAnimation(.spring(duration: 0.6, bounce: 0.35)) { acceso = true }
+        let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
+        if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
         Task { @MainActor in
             // le icone si accendono una alla volta, ognuna con il suo «plim»
             try? await Task.sleep(for: .milliseconds(650))
@@ -226,8 +229,38 @@ struct ContentView: View {
             try? await Task.sleep(for: .milliseconds(120))
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
+            if chatDaCaricare { await caricaChat() }
             try? await Task.sleep(for: .milliseconds(2400))
             withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
+        }
+    }
+
+    /// La chat si carica come una scheda: caricamento HUD, poi si stampa dall'alto e i caratteri si decodificano.
+    private func caricaChat() async {
+        guard regiaChat.fase == .nascosta else { return }
+        if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return }
+        try? await Task.sleep(for: .milliseconds(300))
+        Suoni.chatCarica()
+        withAnimation(.easeOut(duration: 0.2)) { regiaChat.fase = .carica }
+        try? await Task.sleep(for: .seconds(TempiChat.carica))
+        regiaChat.fase = .stampa(Date())
+        try? await Task.sleep(for: .seconds(TempiChat.stampa + TempiChat.decodifica + 0.1))
+        Suoni.chatPronta()
+        regiaChat.fase = .normale
+    }
+
+    /// Cestino › Pulisci: la chat si svuota settore per settore verso sinistra, poi si cancella davvero.
+    private func svuotaChat() {
+        guard !jarvis.messaggi.isEmpty, regiaChat.fase == .normale, !UIAccessibility.isReduceMotionEnabled else {
+            jarvis.nuovaConversazione(); return
+        }
+        jarvis.interrompi()
+        Suoni.chatSvuota()
+        regiaChat.fase = .svuota(Date())
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(TempiChat.totaleSvuota))
+            jarvis.nuovaConversazione()
+            regiaChat.fase = .normale
         }
     }
 
@@ -286,7 +319,7 @@ struct ContentView: View {
             .opacity(acceso ? 1 : 0)
             .offset(x: acceso ? 0 : -12)
             Spacer()
-            Button { Suoni.tocco(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
+            Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
@@ -296,7 +329,7 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Sistemi")
-            Button { Suoni.tocco(); chiediPulizia = true } label: {
+            Button { Suoni.clickTesta(); chiediPulizia = true } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
@@ -305,12 +338,12 @@ struct ContentView: View {
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
-                Button("Pulisci", role: .destructive) { jarvis.nuovaConversazione() }
+                Button("Pulisci", role: .destructive) { svuotaChat() }
                 Button("Annulla", role: .cancel) {}
             } message: {
                 Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
             }
-            Button { Suoni.tocco(); mostraImpostazioni = true } label: {
+            Button { Suoni.clickTesta(); mostraImpostazioni = true } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
@@ -723,7 +756,7 @@ struct ContentView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(jarvis.messaggi) { m in
-                        RigaMessaggio(m: m).id(m.id)
+                        RigaAnimata { q in RigaMessaggio(m: m, rimescola: q) }.id(m.id)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -739,6 +772,10 @@ struct ContentView: View {
                 if let ultimo = jarvis.messaggi.last { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
         }
+        .coordinateSpace(.named("chat"))
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { regiaChat.altezza = $0 }
+        .environment(\.regiaChat, regiaChat)
+        .modifier(EffettiChat(regia: regiaChat))
     }
 
     private var barraTesto: some View {
@@ -934,6 +971,7 @@ struct AnelloScansione: View {
 
 struct RigaMessaggio: View {
     let m: Messaggio
+    var rimescola: Double = 0          // 0 = testo vero, 1 = caratteri da computer (chat che carica o si svuota)
     var body: some View {
         let jarvis = m.ruolo == "assistant"
         HStack(alignment: .top, spacing: 10) {
@@ -941,11 +979,11 @@ struct RigaMessaggio: View {
                 .fill(jarvis ? Color.ciano : Color(red: 0.11, green: 0.21, blue: 0.25))
                 .frame(width: 2)
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(jarvis ? "JARVIS" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))")
+                Text(Glifi.rimescola("\(jarvis ? "JARVIS" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(jarvis ? Color.ciano : Color.tenue)
-                Text(m.testo.isEmpty ? "…" : (m.conFoto ? "📷 " + m.testo : m.testo))
+                Text(Glifi.rimescola(m.testo.isEmpty ? "…" : (m.conFoto ? "📷 " + m.testo : m.testo), rimescola))
                     .font(.system(size: 16))
                     .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
                     .textSelection(.enabled)
