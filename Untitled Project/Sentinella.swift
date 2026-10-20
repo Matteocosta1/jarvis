@@ -68,8 +68,10 @@ final class Sentinella: ObservableObject {
         attiva = true
         presenzaPrima = false
         UIApplication.shared.isIdleTimerDisabled = true      // lo schermo non si spegne: la fotocamera resta viva
-        luminositaPrima = UIScreen.main.brightness
-        UIScreen.main.brightness = 0.25                      // consuma meno e non illumina la stanza
+        if !ProcessInfo.processInfo.isiOSAppOnMac {          // sul Mac la luminosità non si tocca
+            luminositaPrima = UIScreen.main.brightness
+            UIScreen.main.brightness = 0.25                  // consuma meno e non illumina la stanza
+        }
         PonteSentinella.inviaStato(attiva: true)
         return true
     }
@@ -82,7 +84,7 @@ final class Sentinella: ObservableObject {
         quadro = nil
         violato = false
         UIApplication.shared.isIdleTimerDisabled = false
-        UIScreen.main.brightness = luminositaPrima
+        if !ProcessInfo.processInfo.isiOSAppOnMac { UIScreen.main.brightness = luminositaPrima }
         PonteSentinella.inviaStato(attiva: false)
     }
 
@@ -114,6 +116,24 @@ final class Sentinella: ObservableObject {
             withAnimation(.easeOut(duration: 0.6)) { self.violato = false }
         }
         PonteSentinella.inviaAllarme(cosa: cosa, foto: foto)
+        if ProcessInfo.processInfo.isiOSAppOnMac { Task { await Sentinella.avvisaIPhone(cosa: cosa) } }
+    }
+
+    /// Sul Mac non c'è l'orologio accanto: l'allarme arriva come notifica sull'iPhone (e da lì sull'Apple Watch),
+    /// tramite il briefing, che sa già mandare avvisi a tutti i dispositivi di JARVIS.
+    static func avvisaIPhone(cosa: String) async {
+        let base = Impostazioni.indirizzo
+        let indirizzo = base.hasSuffix("/jarvis") ? base + "-briefing" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-briefing")
+        guard let url = URL(string: indirizzo) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 15
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        let ora = Date().formatted(date: .omitted, time: .shortened)
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["titolo": "🚨 SENTINELLA · Mac",
+                                                                    "testo": "Alle \(ora): \(cosa) davanti al Mac, Sir."])
+        _ = try? await URLSession.shared.data(for: req)
     }
 
     /// «una persona», «2 persone e un gatto»…
@@ -194,8 +214,11 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
             self.suAnalisi = analisi
             if !self.configurata {
                 self.sessione.beginConfiguration()
-                self.sessione.sessionPreset = .vga640x480
-                guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                let mac = ProcessInfo.processInfo.isiOSAppOnMac
+                // sul Mac lo schermo è grande: immagine più definita (se la webcam la regge)
+                self.sessione.sessionPreset = mac && self.sessione.canSetSessionPreset(.hd1280x720) ? .hd1280x720 : .vga640x480
+                guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+                        ?? (mac ? AVCaptureDevice.default(for: .video) : nil),          // sul Mac: la webcam
                       let ingresso = try? AVCaptureDeviceInput(device: cam),
                       self.sessione.canAddInput(ingresso), self.sessione.canAddOutput(self.uscita) else {
                     self.sessione.commitConfiguration()
@@ -239,7 +262,9 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
             else if notte && luce > -0.5 { notte = false }
         }
 
-        let raddrizzata = CIImage(cvPixelBuffer: pixel).oriented(.right)   // telefono in verticale
+        // telefono in verticale: si raddrizza; sul Mac la webcam è già orizzontale e si guarda a specchio, come FaceTime
+        let mac = ProcessInfo.processInfo.isiOSAppOnMac
+        let raddrizzata = CIImage(cvPixelBuffer: pixel).oriented(mac ? .upMirrored : .right)
 
         // 1) l'immagine da mostrare, circa 12 al secondo
         if adesso.timeIntervalSince(ultimoQuadro) > 0.08, let f = suQuadro {
@@ -254,7 +279,7 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
         let persone = VNDetectHumanRectanglesRequest()
         persone.upperBodyOnly = false
         let animali = VNRecognizeAnimalsRequest()
-        let gestore = VNImageRequestHandler(cvPixelBuffer: pixel, orientation: .right)
+        let gestore = VNImageRequestHandler(cvPixelBuffer: pixel, orientation: mac ? .upMirrored : .right)
         try? gestore.perform([persone, animali])
         var trovati: [Sentinella.Bersaglio] = []
         for p in persone.results ?? [] where p.confidence > 0.5 {
@@ -358,7 +383,9 @@ struct VistaSentinella: View {
                     .clipShape(Capsule())
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.25), value: s.violato)
-                Text("Lasci il telefono fermo, puntato sulla stanza. Gli allarmi arrivano all'orologio. «Jarvis, torna» per uscire.")
+                Text(ProcessInfo.processInfo.isiOSAppOnMac
+                     ? "Lasci il Mac acceso con la webcam sulla stanza. Gli allarmi arrivano come notifica sull'iPhone e sull'orologio."
+                     : "Lasci il telefono fermo, puntato sulla stanza. Gli allarmi arrivano all'orologio. «Jarvis, torna» per uscire.")
                     .font(.footnote).foregroundStyle(Color.tenue).multilineTextAlignment(.center)
                     .padding(.top, 6)
             }
