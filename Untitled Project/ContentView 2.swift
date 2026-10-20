@@ -267,11 +267,11 @@ struct ContentView: View {
     }
 
     private var intestazione: some View {
-        HStack {
+        HStack(alignment: .rigaMark) {          // le tre icone sulla stessa riga di «MARK VII-5.0»
             VStack(alignment: .leading, spacing: 2) {
-                Text("J.A.R.V.I.S.")
+                // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
+                (Text("J.A.R.V.I.").tracking(5) + Text("S."))
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
-                    .tracking(5)
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
                 Text(sottotitolo)
@@ -281,25 +281,28 @@ struct ContentView: View {
                     .contentTransition(.numericText())
                     .id(sottotitolo)
                     .transition(.opacity)
+                    .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             }
             .opacity(acceso ? 1 : 0)
             .offset(x: acceso ? 0 : -12)
             Spacer()
             Button { Suoni.tocco(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 19))
+                    .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(10)
+                    .padding(8)
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Sistemi")
             Button { Suoni.tocco(); chiediPulizia = true } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 19))
+                    .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(10)
+                    .padding(8)
             }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
                 Button("Pulisci", role: .destructive) { jarvis.nuovaConversazione() }
@@ -309,12 +312,13 @@ struct ContentView: View {
             }
             Button { Suoni.tocco(); mostraImpostazioni = true } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 20))
+                    .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(10)
+                    .padding(8)
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Impostazioni")
         }
         .buttonStyle(StileStark())
@@ -1182,4 +1186,12 @@ struct Fotocamera: UIViewControllerRepresentable {
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { padre.chiudi() }
     }
+}
+
+/// La riga di «MARK VII-5.0»: le icone in alto a destra si allineano al centro di quella scritta.
+extension VerticalAlignment {
+    nonisolated private enum RigaMark: AlignmentID {
+        static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
+    }
+    nonisolated static let rigaMark = VerticalAlignment(RigaMark.self)
 }
