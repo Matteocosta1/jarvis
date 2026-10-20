@@ -12,7 +12,7 @@ enum Reparto: String, Identifiable, Equatable {
     case diario, sonno, cuore, vitals, confidente, allenatore, bea
     case briefing, meteo, email, spesa
     case shazam, foto
-    case ricordi, interprete, browser, serata, messaggi, telefono
+    case ricordi, interprete, browser, serata, messaggi, telefono, lidar
     // SISTEMI
     case github, supabase, archivio
     var id: String { rawValue }
@@ -46,6 +46,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .serata: return "I conti della serata, Sir."
         case .messaggi: return "Messaggi, Sir. A chi scriviamo?"
         case .telefono: return "Telefono, Sir."
+        case .lidar: return "LiDAR pronto. Muova l'iPhone lungo le pareti, Sir."
         case .github: return "Il cantiere su GitHub, Sir."
         case .supabase: return "Sala macchine, Sir."
         case .archivio: return "L'archivio, Sir."
@@ -90,6 +91,11 @@ enum ComandoVocale: Equatable {
         }
         if c(" occhi ") && comanda { return .apri(.occhi) }
         if c(" cucina ") && comanda { return .apri(.cucina) }
+        // LiDAR: «scansiona la stanza», «misura la stanza», «planimetria»: prima dello Scanner, che prende «scansiona»
+        if c(" lidar ") || c(" laidar ") || c(" lai dar ") || c(" planimetria ") || c(" pianta della stanza ")
+            || ((c(" stanza ") || c(" sala ") || c(" locale ")) && (c(" scansiona ") || c(" misura ") || c(" scansione "))) {
+            return .apri(.lidar)
+        }
         if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && comanda { return .apri(.scanner) }
 
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»

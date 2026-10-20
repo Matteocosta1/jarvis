@@ -41,7 +41,7 @@ Mark I (Mac/Chrome) → II/III (cervello su Supabase, app Swift) → IV (HUD, in
 
 ## 5. Interfaccia
 
-- Corona di icone principale: **definitiva**, 22 icone in 4 gruppi (SIGNORE, DAILY, SENSI, STRUMENTI) + **INTELLIGENCE** (Sentinella, Profiler, Wiretap) sotto. **Niente nuove sezioni lì**: le novità vanno nel menu **SISTEMI** (GitHub, Supabase, Archivio, Costi, EDITH).
+- Corona di icone principale: 22 icone in 4 gruppi (SIGNORE, DAILY, SENSI, STRUMENTI) + **INTELLIGENCE** sotto. **Dal 20 ott sera**: in STRUMENTI **LiDAR** al posto di Bea; INTELLIGENCE = Sentinella, Profiler, Wiretap, **Bea** (26 icone, traccia d'avvio con 26 pulsazioni; «SISTEMI IN LINEA» sulla chiusura della musica, 4,35 s base). Watch: Bea in INTELLIGENCE dopo Sentinella. **Niente nuove sezioni lì**: le novità vanno nel menu **SISTEMI** (GitHub, Supabase, Archivio, Costi, EDITH).
 - Header: le tre icone (SISTEMI, cestino, rotella) ravvicinate (padding orizzontale 5), sulla riga «MARK VII-5.0».
 - Titoli di una sola parola. Mock sempre ottimizzati per tutti i dispositivi.
 - Il Watch ha 19 icone in 6 gruppi (GIORNATA, SIGNORE, SENSI, STRUMENTI, INTELLIGENCE, SISTEMI).
@@ -50,7 +50,7 @@ Mark I (Mac/Chrome) → II/III (cervello su Supabase, app Swift) → IV (HUD, in
 
 - Musica d'avvio `avvio.m4a`: la musica di sempre **con una pulsazione mixata per ogni icona** (dal file «sci-fi device pulsations» di Mixkit: 4 colpi puliti, passa-alto 350 Hz, picco al 70% della musica, prima icona di ogni gruppo +1,5 dB, nessun accento finale). Volume app 80%.
 - Passo base: 150 ms per icona, 110 ms tra i gruppi, **INTELLIGENCE 120 ms**; dopo l'ultima icona **370 ms** (coda della musica) → «SISTEMI IN LINEA» → se la chat ha messaggi, **900 ms** di respiro → caricamento chat.
-- **Dal 20 ott sera: tutto +60%** (`Avvio.velocita = 1.6` in `ChatAnimata.swift`, `AvvioOrologio` sul Watch): ogni tempo ÷1,6, caricamento chat compreso. `avvio.m4a`/`avvioorologio.m4a` **rimissati**: musica accelerata intera (rubberband, tono invariato) + le pulsazioni originali posate su ogni icona (scarto ≤2 ms). Icone, musica e aptica su **un solo orologio** (`CACurrentMediaTime` + latenza audio), niente pause in fila.
+- **Dal 20 ott sera: iPhone/Mac +60%, Watch +35%** (`Avvio.velocita = 1.6`, `AvvioOrologio.velocita = 1.35` in `ChatAnimata.swift`, `AvvioOrologio` sul Watch): ogni tempo ÷1,6, caricamento chat compreso. `avvio.m4a`/`avvioorologio.m4a` **rimissati**: musica accelerata intera (rubberband, tono invariato) + le pulsazioni originali posate su ogni icona (scarto ≤2 ms). Icone, musica e aptica su **un solo orologio** (`CACurrentMediaTime` + latenza audio), niente pause in fila.
 - **SINCRO**: da **Interprete** in poi (Watch: dalla 2ª icona di STRUMENTI) l'icona parte **110 ms prima** del colpo con la stessa molla più svelta (0,12 s), così arriva sul beep. Valore scelto da Alessandro sul mock.
 - Watch: traccia propria `avvioorologio.m4a` con 19 pulsazioni al passo delle sue icone; stesso schema (ultimo gruppo 120 ms, 370, 900).
 - I «plim» sintetici e il suono «inlinea» restano **spenti** di default (`suonoAvvio` = off).
@@ -96,6 +96,10 @@ Voce in SISTEMI, icona occhiali. Servizi gratuiti/senza chiave. **9 strumenti**,
 Porte · Fughe · Link · Domini · Password (SHA-1 on-device) · **Azienda** (VIES) · **IBAN** (MOD-97 + ABI) · **Numero** (prefissi) · **Reputazione** (Serper). A voce funzionano anche sul Watch.
 
 **Instant Kill** (idea di Alessandro, in standby): modalità difensiva «si tolgono le chiavi, non si attacca». Proposta a 3 livelli: Allerta (controllo completo), Blindatura (cervello risponde solo al suo iPhone, rotazione chiavi, avviso a Matteo), Protocollo (link diretti a Trova iPhone, ID Apple, Google, GitHub, Instagram, banca; salvataggio log). Attivazione voce + Face ID. Niente contrattacco (615-ter c.p.).
+
+## 11b. LiDAR (`Lidar.swift`, 20 ott)
+
+RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi RoomBuilder e risultato di JARVIS: **Pianta** (Canvas ciano, misure per parete, porte arancio, finestre), **3D** (USDZ parametrico in SceneKit a fil di ferro che ruota), **Archivio** (Documenti › LiDAR, `archivio.json`). Misure, capienza indicativa 1,2 persone/m² (DM 19/08/1996, sale da ballo), Salva/Condividi (PNG + USDZ)/Chiedi. Voce: «scansiona la stanza», «LiDAR», «planimetria». Solo iPhone Pro; sul Mac mostra l'archivio.
 
 ## 12. Lavori in sospeso
 

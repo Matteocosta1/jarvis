@@ -32,6 +32,8 @@ extension EnvironmentValues {
 enum Avvio {
     /// Quanto è più svelto l'avvio rispetto all'originale: la traccia «avvio» è rimontata a questa velocità.
     static let velocita = 1.6
+    /// Quando la musica d'avvio chiude (secondi, tempo di base): lì arriva «SISTEMI IN LINEA».
+    static let chiusuraMusica = 4.35
     /// Da Interprete in poi (la raffica finale) ogni icona parte prima del suo colpo, così la molla arriva sul beep.
     static let anticipoCoda = 0.110
     /// La molla delle icone della coda: la stessa, più svelta.

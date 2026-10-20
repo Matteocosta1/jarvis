@@ -410,10 +410,10 @@ struct VistaOrologio: View {
             ("STRUMENTI", "brain.head.profile", "#ricordi"),
             ("STRUMENTI", "globe.europe.africa", "Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce."),
             ("STRUMENTI", "music.note.list", "#serata"),
-            ("STRUMENTI", "link", "#bea"),
             ("STRUMENTI", "trash", nil),                       // pulisce la conversazione
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»
+            ("INTELLIGENCE", "link", "#bea"),                                    // 20 ott: Bea passa in INTELLIGENCE, come sull'iPhone
 
             ("SISTEMI", "logo:github-logo", "#github"),          // i loghi veri, come sull'iPhone
             ("SISTEMI", "logo:supabase-logo", "#supabase"),
@@ -993,9 +993,9 @@ struct TestoChatOrologio: View {
 }
 
 
-/// I numeri dell'avvio al polso: gli stessi dell'iPhone (+60%, la raffica finale in anticipo di 110 ms con la molla svelta).
+/// I numeri dell'avvio al polso (+35%; la raffica finale in anticipo di 110 ms con la molla svelta).
 enum AvvioOrologio {
-    static let velocita = 1.6
+    static let velocita = 1.35          // il polso è piccolo: a +60% il caricamento non si vede; qui +35% (l'iPhone resta a +60%)
     static let anticipoCoda = 0.110
     static let mollaCoda = 0.12
     /// La coda parte dalla seconda icona di STRUMENTI, come sull'iPhone (da Interprete): le ultime otto icone.

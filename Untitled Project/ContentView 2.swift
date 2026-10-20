@@ -32,6 +32,7 @@ struct ContentView: View {
     @State private var mostraRicordi: VistaRicordi.Scheda?
     @State private var mostraSentinella = false
     @State private var mostraWiretap = false
+    @State private var mostraLidar = false            // STRUMENTI › LiDAR: la scansione della stanza
     @State private var mostraProfiler = false
     @State private var mostraSistemi = false        // il menu SISTEMI in alto: GitHub, Supabase, Archivio
     @State private var statoSistemi: [String: String] = [:]   // la riga di stato sotto ogni voce del menu
@@ -177,6 +178,9 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $jarvis.allenatore) {
             Allenatore { jarvis.allenatore = false }
         }
+        .fullScreenCover(isPresented: $mostraLidar) {
+            VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
+        }
         .sheet(isPresented: $mostraVitals) {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
@@ -257,8 +261,8 @@ struct ContentView: View {
                 accese = k + 1                                       // la molla la dà ogni icona (svelta nella coda)
                 if k > 0 { Suoni.plim(k) }
             }
-            // la coda della musica: 370 ms (÷ velocità) dopo l'ultima icona
-            let resta = zero + fineMusica + 0.370 / v - CACurrentMediaTime()
+            // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
+            let resta = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v) - CACurrentMediaTime()
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
@@ -431,7 +435,7 @@ struct ContentView: View {
             ("STRUMENTI", "globe", "Browser", { mostraBrowser = true }),
             ("STRUMENTI", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
             ("STRUMENTI", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
-            ("STRUMENTI", "link", "Bea", { tastiera = false; scheda = .bea }),
+            ("STRUMENTI", "cube.transparent", "LiDAR", { tastiera = false; jarvis.interrompi(); mostraLidar = true }),
         ]
     }
 
@@ -616,13 +620,14 @@ struct ContentView: View {
             ("dot.radiowaves.left.and.right", "Sentinella", { tastiera = false; jarvis.interrompi(); mostraSentinella = true }),
             ("profiler", "Profiler", { tastiera = false; jarvis.interrompi(); profiler() }),
             ("waveform.and.mic", "Wiretap", { tastiera = false; jarvis.interrompi(); mostraWiretap = true }),
+            ("link", "Bea", { tastiera = false; scheda = .bea }),                    // 20 ott: Bea passa in INTELLIGENCE
         ]
     }
 
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
     private func apriReparto(_ r: Reparto) {
         let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
-            || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore
+            || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore || mostraLidar
         mostraSentinella = false
         mostraWiretap = false
         mostraProfiler = false
@@ -633,6 +638,7 @@ struct ContentView: View {
         mostraBrowser = false
         mostraSistemi = false
         jarvis.allenatore = false
+        mostraLidar = false
         jarvis.occhiChiusi([])
         Task {
             if aperto { try? await Task.sleep(for: .milliseconds(700)) }     // il tempo che la schermata si chiuda
@@ -666,6 +672,7 @@ struct ContentView: View {
             case .ricordi: mostraRicordi = .ricordi
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true
+            case .lidar: mostraLidar = true
             }
         }
     }
