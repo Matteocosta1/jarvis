@@ -92,6 +92,9 @@ struct VistaOrologio: View {
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
     @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
+    @State private var barraInFondo = false                // avvio: la barra parte dall'ultima icona (Archivio)
+    @State private var scorriA: Int?                       // avvio: l'icona che sta per accendersi, che la barra porta sul bordo sinistro
+    @State private var passoBarra = 0.15                   // quanto dura ogni scorrimento (il tempo fino al colpo dopo)
     @AppStorage("vibrazioni") private var vibrazioni = true   // al posto dei suoni dell'iPhone: tocchi sul polso
 
     private let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
@@ -220,12 +223,16 @@ struct VistaOrologio: View {
     private func accendi() {
         guard !acceso else { return }
         vibra(.start)
-        withAnimation(.spring(duration: 0.36 / AvvioOrologio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona (che parte a 0,4 ÷ velocità)
         Task { @MainActor in
             let v = AvvioOrologio.velocita
             SuoniOrologio.preparaAvvio()
+            barraInFondo = true                                        // la barra parte dall'ultima icona
+            try? await Task.sleep(for: .seconds(AvvioOrologio.attesaApertura))   // finita l'animazione d'apertura del Watch
+            withAnimation(.spring(duration: 0.36 / v, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
             try? await Task.sleep(for: .seconds(0.4 / v))
-            let elenco = scorciatoie
+            // al polso le icone si accendono al contrario: da Archivio a Briefing, la barra scorre all'indietro con loro
+            // e la sequenza finisce sulle prime icone, cioè dove la barra resta a riposo
+            let elenco = AvvioOrologio.ordine(scorciatoie.count).map { scorciatoie[$0] }
             // la partitura (150 ms, 110 tra i gruppi, l'ultimo gruppo 120, tutto ÷ velocità): è quella con cui è montata «avvioorologio»
             var colpi: [Double] = []; var t = 0.0
             for k in 0..<elenco.count {
@@ -233,7 +240,7 @@ struct VistaOrologio: View {
                 colpi.append(t / v)
                 t += elenco[k].gruppo == elenco.last?.gruppo ? 0.120 : 0.150
             }
-            let coda = AvvioOrologio.inizioCoda(elenco.map { $0.gruppo })
+            let coda = AvvioOrologio.inizioCoda(elenco.count)
             SuoniOrologio.avvio()
             // un solo orologio: niente pause in fila che sommano i ritardi; il suono arriva all'altoparlante un attimo dopo
             let zero = Date().addingTimeInterval(AVAudioSession.sharedInstance().outputLatency)
@@ -256,6 +263,11 @@ struct VistaOrologio: View {
                 let manca = quando - Date().timeIntervalSince(zero)
                 if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
                 accese = k + 1                                         // la molla la dà ogni icona (svelta nella coda)
+                // la barra segue: porta sul bordo sinistro la PROSSIMA icona, così compare già dentro lo schermo
+                // e la fila appena accesa resta visibile alla sua destra
+                let ordine = AvvioOrologio.ordine(scorciatoie.count)
+                passoBarra = max(0.08, k + 1 < colpi.count ? colpi[k + 1] - colpi[k] : 0.15 / v)
+                scorriA = ordine[min(k + 1, ordine.count - 1)]
             }
             while kv < elenco.count {                                  // i tocchi rimasti (la raffica finale è partita in anticipo)
                 if kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo {
@@ -400,10 +412,26 @@ struct VistaOrologio: View {
 
     /// Sfondo: un bagliore azzurro o arancione secondo la fase.
     private var sfondo: some View {
-        RadialGradient(colors: [ReattoreOrologio.colore(caldo ? 1 : 0, 0.28, schiarisci: 0), .black],
-                       center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 160)
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.8), value: caldo)
+        ZStack {
+            RadialGradient(colors: [ReattoreOrologio.colore(caldo ? 1 : 0, 0.28, schiarisci: 0), .black],
+                           center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 160)
+            // la griglia HUD dell'iPhone (SfondoHUD), in scala col polso: passo 14 invece di 28, scorre piano
+            TimelineView(.animation(minimumInterval: 1 / 20)) { ctx in
+                let t = ctx.date.timeIntervalSinceReferenceDate
+                Canvas { gc, size in
+                    let passo: CGFloat = 14
+                    var g = Path()
+                    var x: CGFloat = 0
+                    while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
+                    var y: CGFloat = CGFloat(t * 3).truncatingRemainder(dividingBy: passo)
+                    while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
+                    gc.stroke(g, with: .color(ReattoreOrologio.colore(caldo ? 1 : 0, 0.07, schiarisci: 0)), lineWidth: 0.5)
+                }
+                .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.35), startRadius: 20, endRadius: 150))
+            }
+        }
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.8), value: caldo)
     }
 
     /// Scorciatoie: un tocco e JARVIS fa la domanda. Per aggiungerne una basta una riga.
@@ -452,6 +480,9 @@ struct VistaOrologio: View {
     }
 
     private var barraRapida: some View {
+        let n = scorciatoie.count
+        let posto: (Int) -> Int = { n - 1 - $0 }                  // il posto di un'icona nell'ordine d'accensione (al contrario)
+        return ScrollViewReader { lettore in
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(Array(scorciatoie.enumerated()), id: \.offset) { k, s in
@@ -460,7 +491,7 @@ struct VistaOrologio: View {
                         Rectangle()
                             .fill(LinearGradient(colors: [.clear, ReattoreOrologio.colore(caldo ? 1 : 0, 0.6, schiarisci: 0), .clear], startPoint: .top, endPoint: .bottom))
                             .frame(width: 1, height: 26)
-                            .opacity(k < accese ? 1 : 0)
+                            .opacity(posto(k) < accese ? 1 : 0)
                             .animation(.easeOut(duration: 0.3), value: accese)
                     }
                     Button {
@@ -481,13 +512,17 @@ struct VistaOrologio: View {
                             .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, 1, schiarisci: 0.2))
                     }
                     .buttonStyle(StileStarkOrologio())
-                    .opacity(k < accese ? 1 : 0)
-                    .scaleEffect(k < accese ? 1 : 2.4)                     // come sull'iPhone: grande e trasparente, poi si restringe e si accende
-                    .brightness(k == accese - 1 && accese < scorciatoie.count ? 0.35 : 0)   // lampo solo mentre si accende
-                    .animation(.spring(duration: k >= AvvioOrologio.inizioCoda(scorciatoie.map { $0.gruppo }) ? AvvioOrologio.mollaCoda : 0.32, bounce: 0.25), value: accese)
+                    .opacity(posto(k) < accese ? 1 : 0)
+                    .scaleEffect(posto(k) < accese ? 1 : 2.4)               // come sull'iPhone: grande e trasparente, poi si restringe e si accende
+                    .brightness(posto(k) == accese - 1 && accese < n ? 0.35 : 0)   // lampo solo mentre si accende
+                    .animation(.spring(duration: posto(k) >= AvvioOrologio.inizioCoda(n) ? AvvioOrologio.mollaCoda : 0.32, bounce: 0.25), value: accese)
+                    .id(k)
                 }
             }
             .padding(.horizontal, 2)
+        }
+        .onChange(of: barraInFondo) { _, si in if si { lettore.scrollTo(n - 1, anchor: .trailing) } }
+        .onChange(of: scorriA) { _, k in if let k { withAnimation(.easeOut(duration: passoBarra)) { lettore.scrollTo(k, anchor: .leading) } } }
         }
         .disabled(jarvis.fase == .elaboro)
     }
@@ -1014,14 +1049,15 @@ struct TestoChatOrologio: View {
 
 /// I numeri dell'avvio al polso (+35%; la raffica finale in anticipo di 110 ms con la molla svelta).
 enum AvvioOrologio {
-    static let velocita = 1.35          // il polso è piccolo: a +60% il caricamento non si vede; qui +35% (l'iPhone resta a +60%)
+    static let velocita = 1.0           // il polso è piccolo: il caricamento deve vedersi, quindi velocità normale (l'iPhone resta a +60%)
+    /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.
+    static let attesaApertura = 0.6
     static let anticipoCoda = 0.110
     static let mollaCoda = 0.12
-    /// La coda parte dalla seconda icona di STRUMENTI, come sull'iPhone (da Interprete): le ultime otto icone.
-    static func inizioCoda(_ gruppi: [String]) -> Int {
-        guard let s = gruppi.firstIndex(of: "STRUMENTI") else { return gruppi.count }
-        return s + 1
-    }
+    /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
+    static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
+    /// La coda (la raffica finale, in anticipo con la molla svelta): le ultime otto accese, come sull'iPhone.
+    static func inizioCoda(_ n: Int) -> Int { max(0, n - 8) }
 }
 
 /// La barra in fondo mentre la conversazione si svuota: da 100% a 0%, con le voci della pulizia (come sull'iPhone).
