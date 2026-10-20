@@ -29,7 +29,7 @@ struct VistaScanner: View {
     @State private var mostraIngredienti = false
 
     var body: some View {
-        CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "barcode.viewfinder", tinta: tinta) {
+        CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "barcode.viewfinder", tinta: tinta, fotocamera: true) {
             if leggo { lettore } else { Button { ricomincia() } label: { scansionaAncora }.buttonStyle(StileStark()) }
             if carico {
                 HStack(spacing: 10) {
@@ -248,7 +248,7 @@ struct VistaScanner: View {
                 withAnimation { errore = v.s("errore").isEmpty ? "Prodotto non trovato, Sir." : "\(v.s("errore").prefix(1).uppercased())\(v.s("errore").dropFirst()), Sir (codice \(codice))." }
                 return
             }
-            Suoni.schedaPronta()
+            Suoni.pronto()                                   // prodotto trovato: la conferma, come le altre
             withAnimation(.spring(duration: 0.4)) { prodotto = v }
             let nuovo = Passato(codice: v.s("codice"), nome: v.s("nome"), marca: v.s("marca"), voto: v.n("voto"), immagine: v.s("immagine"))
             storico = [nuovo] + storico.filter { $0.codice != nuovo.codice }.prefix(29)

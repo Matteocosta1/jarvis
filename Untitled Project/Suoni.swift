@@ -59,8 +59,8 @@ enum Suoni {
         p.play()
         BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
     }
-    /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler), quando la fotocamera è pronta.
-    /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura». Lo Scanner resta fuori.
+    /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler, Scanner), quando la fotocamera è pronta.
+    /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura».
     static func aperturaCamera() {
         guard attivi else { return }
         if let url = file("aperturacamera") { riproduci(url, volume: 0.7); return }

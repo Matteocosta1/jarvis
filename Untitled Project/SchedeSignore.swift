@@ -14,6 +14,7 @@ struct CorniceScheda<Contenuto: View>: View {
     let icona: String
     let tinta: Color
     var pronto = true
+    var fotocamera = false          // Scanner: quando è pronta, il suono delle sezioni con fotocamera al posto di «pronta»
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.dismiss) private var chiudi
     @State private var mostrato = false
@@ -73,7 +74,7 @@ struct CorniceScheda<Contenuto: View>: View {
             // il caricamento si vede almeno per un attimo, anche se i dati arrivano subito
             let resta = 0.9 - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
-            Suoni.schedaPronta()
+            if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
             mostrato = true
             withAnimation(.easeOut(duration: 0.9)) { stampa = 1 }
         }
