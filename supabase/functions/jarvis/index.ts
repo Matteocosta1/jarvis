@@ -2285,7 +2285,8 @@ async function etaDominio(dominio: string): Promise<number | null> {
 }
 
 async function edithLink(testo: string) {
-  const urls = [...new Set((testo.match(/\b(?:https?:\/\/|www\.)[^\s<>"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|it|net|org|info|xyz|top|link|click|online|site|app|io|me|ly|co|shop|live)\/[^\s<>"']*/gi) ?? [])]
+  const RE_LINK = new RegExp(String.raw`\b(?:https?://|www\.)[^\s<>"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|it|net|org|info|xyz|top|link|click|online|site|app|io|me|ly|co|shop|live)/[^\s<>"']*`, "gi");
+  const urls = [...new Set(testo.match(RE_LINK) ?? [])]
     .slice(0, 5).map((u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
   if (!urls.length) return { errore: "non trovo link nel testo" };
   const esiti = [];
