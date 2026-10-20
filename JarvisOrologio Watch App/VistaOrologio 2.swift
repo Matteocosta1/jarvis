@@ -1056,15 +1056,15 @@ struct TestoChatOrologio: View {
 
 /// I numeri dell'avvio al polso (+35%; la raffica finale in anticipo di 110 ms con la molla svelta).
 enum AvvioOrologio {
-    static let velocita = 1.0           // il polso è piccolo: il caricamento deve vedersi, quindi velocità normale (l'iPhone resta a +60%)
+    static let velocita = 1.25          // il polso è piccolo: +25%, scelto dal signore sul mock (l'iPhone resta a +60%)
     /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.
     static let attesaApertura = 0.6
     /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
     /// Le prime 11 (passo 150 ms) 0,32 s come sull'iPhone; le 4 dopo 0,20; le ultime 4 (GIORNATA, passo 120) 0,14.
-    static func molla(_ posto: Int, _ n: Int) -> Double { posto >= n - 4 ? 0.14 : (posto >= n - 8 ? 0.20 : 0.32) }
+    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 4 ? 0.14 : (posto >= n - 8 ? 0.20 : 0.32)) / velocita }   // ÷ velocità, come tutto
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
-    static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) / velocita }
+    static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) }
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
