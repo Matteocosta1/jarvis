@@ -208,7 +208,7 @@ struct VistaProfiler: View {
             return
         }
         agganciato = true
-        Suoni.apertura()
+        Suoni.aperturaCamera()
         stato = "INQUADRI IL SOGGETTO"
     }
 

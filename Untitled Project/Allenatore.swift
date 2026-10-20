@@ -206,7 +206,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         configura(frontale: false)
         inizioSerie = Date()
         commento = "Inquadri tutta la persona, Sir."
-        Suoni.apertura()
+        Suoni.aperturaCamera()
     }
 
     func ferma() {

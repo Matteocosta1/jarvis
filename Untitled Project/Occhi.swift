@@ -226,7 +226,7 @@ struct Occhi: View {
         leggiZoom()
         if !davanti && abs(zoomIniziale - 1) > 0.05 { imposta(zoomIniziale, animato: true) }
         agganciato = true
-        Suoni.apertura()
+        Suoni.aperturaCamera()
         if video {
             stato = "SISTEMI OTTICI ATTIVI"
             try? await Task.sleep(for: .milliseconds(700))     // il tempo di mettere a fuoco

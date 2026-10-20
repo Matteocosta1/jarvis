@@ -57,6 +57,13 @@ enum Suoni {
         p.play()
         BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
     }
+    /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler), quando la fotocamera è pronta.
+    /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura». Lo Scanner resta fuori.
+    static func aperturaCamera() {
+        guard attivi else { return }
+        if let url = file("aperturacamera") { riproduci(url, volume: 0.7); return }
+        apertura()
+    }
     private static var lettoreChat: AVAudioPlayer?
     /// La chat si stampa all'avvio: i caratteri che si caricano. File: «chatcarica». Sfuma con `chatPronta()`.
     static func chatCarica() {
