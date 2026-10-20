@@ -75,6 +75,7 @@
 			membershipExceptions = (
 				apertura.m4a,
 				avvio.m4a,
+				avvioorologio.m4a,
 				Benessere.swift,
 				chatcarica.m4a,
 				chatsvuota.m4a,

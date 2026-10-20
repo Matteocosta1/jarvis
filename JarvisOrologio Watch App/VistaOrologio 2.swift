@@ -18,7 +18,8 @@ enum SuoniOrologio {
         return u
     }
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 0.5) }          // click: 50%
-    static func avvio() { suona(file("avvio"), volume: 0.8) }                          // musica d'avvio: 80%
+    /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
+    static func avvio() { suona(file("avvioorologio") ?? file("avvio"), volume: 0.8) }   // 80%
     /// Conferme (spesa, promesse, ricordi, Shazam): «pronto», 60%. Se manca, solo la vibrazione.
     static func pronto() { suona(file("pronto"), volume: 0.6) }
     /// Click delle icone in alto (Ricordi, Cronologia): «clicktesta», 50%.
@@ -206,11 +207,14 @@ struct VistaOrologio: View {
                 }
                 withAnimation(.spring(duration: 0.4, bounce: 0.55)) { accese = k + 1 }
                 vibra(k == elenco.count - 1 ? .success : .click)     // l'ultima chiude la sequenza
-                try? await Task.sleep(for: .milliseconds(150))
+                // l'ultimo gruppo un filo più svelto (120 ms), come INTELLIGENCE sull'iPhone; le pulsazioni della musica seguono questo passo
+                try? await Task.sleep(for: .milliseconds(elenco[k].gruppo == elenco.last?.gruppo ? 120 : 150))
             }
+            try? await Task.sleep(for: .milliseconds(370))            // la coda della musica
             withAnimation(.easeOut(duration: 0.3)) { titolo = "SISTEMI IN LINEA" }
             vibra(.click)
             if !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty {     // c'è la conversazione di prima: si ricarica decodificandosi
+                try? await Task.sleep(for: .milliseconds(900))        // un respiro, come sull'iPhone
                 SuoniOrologio.chatCarica()
                 chatDa = Date()
                 Task { @MainActor in try? await Task.sleep(for: .seconds(1.3)); chatDa = nil }
