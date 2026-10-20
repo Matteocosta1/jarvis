@@ -900,7 +900,17 @@ async function diagnostica() {
   const voce = async (): Promise<Esito> => {
     if (!chiaveXI) return assente;
     const r = await fetch(`${XI}/user/subscription`, { headers: { "xi-api-key": chiaveXI }, signal: AbortSignal.timeout(6000) });
-    if (r.status === 401) return guasto("chiave ElevenLabs rifiutata: va sostituita nei segreti");
+    if (r.status === 401 || r.status === 403) {
+      // spesso non è la chiave sbagliata: è una chiave «ristretta» che può parlare ma non leggere i crediti dell'account.
+      // Se la voce ha parlato nelle ultime 24 ore, la chiave funziona: si dice così, senza allarmi.
+      const testo = await r.text().catch(() => "");
+      const { count } = await db.from("jarvis_consumi").select("id", { count: "exact", head: true }).eq("servizio", "voce")
+        .gte("creato", new Date(Date.now() - 86400_000).toISOString());
+      if ((count ?? 0) > 0 || /permission/i.test(testo)) {
+        return ok(`voce attiva (${count ?? 0} frasi lette nelle ultime 24 ore); la chiave non ha il permesso di leggere i crediti, quindi il saldo qui non si vede`);
+      }
+      return guasto("chiave ElevenLabs rifiutata e nessuna frase letta nelle ultime 24 ore: va controllata nei segreti");
+    }
     if (!r.ok) return guasto(`ElevenLabs risponde ${r.status}`);
     const d = await r.json();
     const usati = num(d.character_count), limite = num(d.character_limit), restano = Math.max(0, limite - usati);
@@ -959,7 +969,7 @@ async function diagnostica() {
     const saldo = num(d.balance);
     const testo = `saldo ${saldo.toFixed(2)} ${d.currency ?? d.currency_symbol ?? "€"}`;
     if (saldo <= 0) return guasto(`${testo}: senza credito SMS e chiamata d'emergenza non partono (clicksend.com → Billing)`);
-    return saldo < 2 ? { stato: "ok", dettaglio: `${testo} — quasi finito` } : ok(testo);
+    return ok(`${testo}: basta per gli SMS d'emergenza (scelta del signore: non va ricaricato, non ricordarglielo)`);
   };
   const dati = async (): Promise<Esito> => {
     const [m, n, a] = await Promise.all([
@@ -1278,7 +1288,8 @@ const sbSql = (query: string) => sb("/database/query", { method: "POST", body: J
 async function sbLog(sql: string, ore: number) {
   const fine = new Date(), inizio = new Date(Date.now() - ore * 3600_000);
   const q = new URLSearchParams({ iso_timestamp_start: inizio.toISOString(), iso_timestamp_end: fine.toISOString(), sql });
-  const d = await sb(`/analytics/endpoints/logs.all?${q}`);
+  // il vecchio «logs.all» è stato tolto da Supabase: ora c'è un solo flusso di log (tabella «logs», colonna source)
+  const d = await sb(`/analytics/endpoints/logs?${q}`);
   return (d?.result ?? []) as any[];
 }
 const mb = (b: unknown) => Math.round(num(b) / 1048576 * 10) / 10;
@@ -1303,13 +1314,16 @@ async function supabaseLog(i: Record<string, any>) {
   const ore = Math.min(Math.max(num(i.ore) || 6, 1), 168), quanti = Math.min(num(i.quanti) || 40, 100);
   const soloErrori = i.solo_errori !== false;
   const fn = i.funzione ? String(i.funzione).replace(/[^a-z0-9\-_]/gi, "") : "";
-  const edge = await sbLog(`select id, function_edge_logs.timestamp, event_message, response.status_code, request.method, request.url, m.function_id, m.execution_time_ms
-    from function_edge_logs cross join unnest(metadata) as m cross join unnest(m.response) as response cross join unnest(m.request) as request
-    ${soloErrori ? "where response.status_code >= 400" : ""} order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
-  const console_ = await sbLog(`select id, function_logs.timestamp, event_message, m.level, m.function_id
-    from function_logs cross join unnest(metadata) as m
-    ${soloErrori ? "where m.level in ('error','warning')" : ""} order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
-  const pulisci = (r: any) => ({ quando: r.timestamp ? quando(new Date(Number(String(r.timestamp).slice(0, 13)))) : "", funzione: r.function_id ?? "", livello: r.level ?? (r.status_code ? `HTTP ${r.status_code}` : ""),
+  const edge = await sbLog(`select timestamp, event_message, log_attributes['response.status_code'] as status_code, log_attributes['request.method'] as method,
+    log_attributes['request.url'] as url, log_attributes['function_id'] as function_id, log_attributes['execution_time_ms'] as execution_time_ms
+    from logs where source = 'function_edge_logs' ${soloErrori ? "and toInt32OrZero(log_attributes['response.status_code']) >= 400" : ""}
+    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
+  const console_ = await sbLog(`select timestamp, event_message, log_attributes['level'] as level, log_attributes['function_id'] as function_id
+    from logs where source = 'function_logs' ${soloErrori ? "and log_attributes['level'] in ('error', 'warning')" : ""}
+    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
+  // il tempo arriva come testo ISO (nuovo flusso) o come microsecondi (vecchio)
+  const tempo = (t: unknown) => /^\d{13,}$/.test(String(t)) ? new Date(Number(String(t).slice(0, 13))) : new Date(String(t).replace(" ", "T") + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(t)) ? "" : "Z"));
+  const pulisci = (r: any) => ({ quando: r.timestamp ? quando(tempo(r.timestamp)) : "", funzione: r.function_id ?? "", livello: r.level ?? (r.status_code ? `HTTP ${r.status_code}` : ""),
     ms: r.execution_time_ms ?? undefined, url: r.url ? String(r.url).replace(/^https?:\/\/[^/]+\/functions\/v1\//, "").replace(/\?.*$/, "") : undefined, messaggio: String(r.event_message ?? r.errore ?? "").slice(0, 300) });
   const filtra = (arr: any[]) => arr.map(pulisci).filter((x) => !fn || String(x.funzione).includes(fn) || String(x.url ?? "").startsWith(fn));
   return { ore, solo_errori: soloErrori, richieste: filtra(edge), console: filtra(console_) };
