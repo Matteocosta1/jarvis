@@ -111,6 +111,14 @@ struct VistaOrologio: View {
             Button("Pulisci", role: .destructive) { svuotaChat() }
             Button("Annulla", role: .cancel) {}
         }
+        .onChange(of: jarvis.svuotaRichiesto) { _, chiesto in
+            guard chiesto else { return }
+            jarvis.svuotaRichiesto = false
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.45))   // la Cronologia ha finito di chiudersi: la chat si vede mentre si ritira
+                chiediPulizia = true
+            }
+        }
         .onAppear {
             jarvis.controllaCollegamento()
             PosizioneOrologio.risveglia()            // il GPS si scalda subito: la domanda non lo aspetta
@@ -179,7 +187,10 @@ struct VistaOrologio: View {
     /// Sequenza di avvio: vibrazione, reattore che sboccia, icone in fila, «SISTEMI IN LINEA».
     /// Pulisci: domanda e risposta si ritirano verso sinistra, poi la conversazione si cancella (come il cestino dell'iPhone).
     private func svuotaChat() {
-        guard !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty else { jarvis.cancellaConversazione(); return }
+        guard !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty else {
+            if !jarvis.storia.isEmpty { SuoniOrologio.chatSvuota(); vibra(.click) }
+            jarvis.cancellaConversazione(); return
+        }
         jarvis.ferma()
         SuoniOrologio.chatSvuota()
         vibra(.click)
@@ -477,7 +488,6 @@ struct AnelloRotanteOrologio: View {
 struct VistaCronologia: View {
     @EnvironmentObject var jarvis: JarvisOrologio
     @Environment(\.dismiss) private var chiudi
-    @State private var conferma = false
 
     var body: some View {
         List {
@@ -495,17 +505,13 @@ struct VistaCronologia: View {
                 }
             }
             if !jarvis.storia.isEmpty {
-                Button("Cancella conversazione", role: .destructive) { conferma = true }
+                Button("Cancella conversazione", role: .destructive) {
+                    jarvis.svuotaRichiesto = true            // la conferma e la cancellazione le fa la schermata principale
+                    chiudi()
+                }
             }
         }
         .navigationTitle("Cronologia")
-        .confirmationDialog("Cancello la conversazione sull'orologio? Memoria e note di JARVIS restano.", isPresented: $conferma) {
-            Button("Cancella", role: .destructive) {
-                jarvis.cancellaConversazione()
-                chiudi()
-            }
-            Button("Annulla", role: .cancel) {}
-        }
     }
 }
 

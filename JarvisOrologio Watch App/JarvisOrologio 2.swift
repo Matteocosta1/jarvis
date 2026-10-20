@@ -48,6 +48,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     @Published var fase: Fase = .attesa
     @Published var domanda = ""
     @Published var risposta = ""
+    /// Cronologia › Cancella conversazione: la schermata principale chiede conferma e svuota con l'animazione e il suono.
+    @Published var svuotaRichiesto = false
     @Published var stato: String?
     @Published var immagini: [FotoOrologio] = []  // immagini della risposta (web, Discogs, Shazam, foto del signore)
     @Published var repartoRichiesto: Reparto?    // comando vocale: la schermata apre questa sezione
