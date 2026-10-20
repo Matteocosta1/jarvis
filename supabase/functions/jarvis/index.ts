@@ -245,6 +245,14 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { azione: { type: "string", enum: ["stato", "ricarica", "saldo"] }, importo: { type: "number" } }, required: ["azione"] } },
   { name: "diagnostica", description: "Controlla in pochi secondi tutti i collegamenti di JARVIS: voce ElevenLabs (crediti rimasti e scadenza), Gemini, Google Immagini (Serper), Discogs, posta iCloud, SMS e chiamate ClickSend (saldo), WhatsApp d'emergenza, database. Restituisce per ciascuno ok / problema / non configurato con il dettaglio.",
     input_schema: { type: "object", properties: {} } },
+  { name: "edith_porte", description: "EDITH, sicurezza: cosa si vede da internet di un indirizzo IP (porte aperte, servizi, vulnerabilità note, da Shodan InternetDB). Senza ip controlla la rete da cui il signore sta usando JARVIS adesso (casa, ufficio). Utile per router, DVR delle telecamere, NAS, PC esposti.",
+    input_schema: { type: "object", properties: { ip: { type: "string", description: "IPv4 pubblico; vuoto = la rete attuale del signore" } } } },
+  { name: "edith_fughe", description: "EDITH, sicurezza: una mail compare in furti di dati noti (XposedOrNot)? Restituisce i servizi violati. Solo mail del signore o delle sue aziende.",
+    input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] } },
+  { name: "edith_link", description: "EDITH, sicurezza: controlla link sospetti (da un SMS, una mail, un QR) senza aprirli davvero: dove portano dopo i reindirizzamenti, età del dominio, segnali di truffa (dominio nuovo, nome simile a marchi noti, IP al posto del nome, caratteri strani, niente https). Passa il testo del messaggio o il link.",
+    input_schema: { type: "object", properties: { testo: { type: "string" } }, required: ["testo"] } },
+  { name: "edith_dominio", description: "EDITH, sicurezza: sentinella di un dominio (es. discosizer.it): DNS, scadenza dell'ultimo certificato, e domini truffa con nomi quasi uguali già registrati.",
+    input_schema: { type: "object", properties: { dominio: { type: "string" } }, required: ["dominio"] } },
   { name: "meteo", description: "Meteo attuale e previsioni fino a 7 giorni per una località (default Milano).",
     input_schema: { type: "object", properties: { luogo: { type: "string" }, giorni: { type: "number", description: "1-7, default 2" } } } },
   { name: "immagini_cerca", description: SERPER || BRAVE
@@ -376,7 +384,7 @@ const METEO_CODICI: Record<number, string> = { 0: "sereno", 1: "quasi sereno", 2
 
 // ───────── Difesa dalle istruzioni nascoste ─────────
 // Strumenti che portano dentro testo scritto da altri (web, email, GitHub, prodotti, log, foto, trascrizioni).
-const NON_FIDATI = new Set(["web_search", "web_fetch", "email_leggi", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
+const NON_FIDATI = new Set(["edith_link", "edith_dominio", "web_search", "web_fetch", "email_leggi", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
   "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "supabase_log"]);
 // Azioni che escono verso il mondo o cancellano: dopo aver letto testo altrui, servono una conferma del signore.
 const SEMPRE_PERICOLOSI = new Set(["invia_messaggio", "messaggio", "chiama", "apri_pagina", "telefono_comando", "github_scrivi", "archivio_apri", "archivio_elimina",
@@ -452,6 +460,10 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
       const { data, error } = await q; if (error) throw error; return data;
     }
     case "meteo": return await meteo(i.luogo || "Milano", Math.min(Math.max(num(i.giorni) || 2, 1), 7));
+    case "edith_porte": return await edithPorte(String(i.ip ?? ""));
+    case "edith_fughe": return await edithFughe(String(i.email ?? ""));
+    case "edith_link": return await edithLink(String(i.testo ?? ""));
+    case "edith_dominio": return await edithDominio(String(i.dominio ?? ""));
     case "diagnostica": return await diagnostica();
     case "ricorda": return await ricorda(i, turno);
     case "diario_scrivi": return await diarioScrivi(i);
@@ -2214,6 +2226,161 @@ async function elencoVoci() {
   return json({ attiva: true, predefinita: voceAttuale(), modello: await scegliModelloVoce(chiave), voci });
 }
 
+// ───────────────────────── EDITH: hacking positivo ─────────────────────────
+// Solo difesa, solo cose del signore: cosa si vede da internet della sua rete, mail rubate, link truffa, domini simili.
+// Tutti servizi gratuiti e senza chiave: Shodan InternetDB, XposedOrNot, RDAP, DNS di Google, crt.sh.
+let ipChiamante = "";       // l'IP pubblico da cui arriva la richiesta (la rete attuale del signore)
+
+const PORTE_RISCHIOSE: Record<number, string> = {
+  21: "FTP (file senza cifratura)", 22: "SSH (accesso remoto)", 23: "Telnet (accesso remoto senza cifratura)", 445: "condivisione file Windows",
+  554: "flusso video RTSP (telecamere)", 3389: "desktop remoto Windows", 5900: "VNC (controllo dello schermo)", 8000: "pannello web (spesso DVR)",
+  8080: "pannello web", 8443: "pannello web", 37777: "DVR Dahua", 34567: "DVR XMeye", 9000: "pannello web / DVR", 1883: "MQTT (domotica)",
+  3306: "database MySQL", 5432: "database Postgres", 6379: "database Redis", 27017: "database MongoDB", 5000: "NAS Synology", 5001: "NAS Synology",
+};
+const ipv4 = (s: string) => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(s);
+const ipPrivato = (s: string) => /^(10\.|127\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(s);
+
+async function edithPorte(ip: string) {
+  const bersaglio = (ip.trim() || ipChiamante).trim();
+  if (!ipv4(bersaglio)) return { errore: "mi serve un indirizzo IPv4 pubblico valido" };
+  if (ipPrivato(bersaglio)) return { errore: "è un indirizzo interno: da internet non si vede, serve quello pubblico del router" };
+  const r = await fetch(`https://internetdb.shodan.io/${bersaglio}`, { signal: AbortSignal.timeout(8000) });
+  if (r.status === 404) return { ip: bersaglio, rete_attuale: !ip.trim(), esito: "pulito", nota: "Shodan non vede nessuna porta aperta su questo indirizzo" };
+  if (!r.ok) return { errore: `Shodan ${r.status}` };
+  const d = await r.json();
+  const porte: number[] = d.ports ?? [];
+  const rischi = porte.filter((p) => PORTE_RISCHIOSE[p]).map((p) => `${p}: ${PORTE_RISCHIOSE[p]}`);
+  const vuln: string[] = (d.vulns ?? []).slice(0, 15);
+  return {
+    ip: bersaglio, rete_attuale: !ip.trim(), porte_aperte: porte, porte_a_rischio: rischi, vulnerabilita_note: vuln,
+    servizi: (d.cpes ?? []).slice(0, 10), nomi: (d.hostnames ?? []).slice(0, 5),
+    esito: vuln.length ? "pericoloso" : rischi.length ? "da sistemare" : porte.length ? "da tenere d'occhio" : "pulito",
+  };
+}
+
+async function edithFughe(email: string) {
+  const e = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e)) return { errore: "mail non valida" };
+  const r = await fetch(`https://api.xposedornot.com/v1/check-email/${encodeURIComponent(e)}`, { signal: AbortSignal.timeout(8000) });
+  if (r.status === 404) return { email: e, esito: "pulita", furti: [] };
+  const d: any = await r.json().catch(() => ({}));
+  if (d?.Error) return { email: e, esito: "pulita", furti: [] };
+  if (!r.ok) return { errore: `XposedOrNot ${r.status}` };
+  const furti: string[] = (d.breaches ?? []).flat().map(String).slice(0, 40);
+  return { email: e, esito: furti.length ? "compromessa" : "pulita", furti, consiglio: furti.length ? "cambiare la password di quei servizi e di quelli che usano la stessa, e attivare l'autenticazione a due fattori" : undefined };
+}
+
+const MARCHI = ["paypal", "poste", "posteitaliane", "intesa", "unicredit", "bancoposta", "amazon", "apple", "icloud", "netflix", "spotify", "instagram", "facebook", "whatsapp", "google", "microsoft", "dhl", "bartolini", "brt", "gls", "sda", "inps", "agenziaentrate", "sumup", "discogs", "satispay", "nexi", "mooney"];
+const ACCORCIATORI = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "rb.gy", "ow.ly", "shorturl.at", "tiny.cc"];
+const radice = (h: string) => h.split(".").slice(-2).join(".");
+
+async function etaDominio(dominio: string): Promise<number | null> {
+  try {
+    const r = await fetch(`https://rdap.org/domain/${dominio}`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const reg = (d.events ?? []).find((e: any) => e.eventAction === "registration")?.eventDate;
+    return reg ? Math.floor((Date.now() - new Date(reg).getTime()) / 86400000) : null;
+  } catch { return null; }
+}
+
+async function edithLink(testo: string) {
+  const urls = [...new Set((testo.match(/\b(?:https?:\/\/|www\.)[^\s<>"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|it|net|org|info|xyz|top|link|click|online|site|app|io|me|ly|co|shop|live)\/[^\s<>"']*/gi) ?? [])]
+    .slice(0, 5).map((u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
+  if (!urls.length) return { errore: "non trovo link nel testo" };
+  const esiti = [];
+  for (const iniziale of urls) {
+    const segnali: string[] = [];
+    let attuale = iniziale; const catena: string[] = [];
+    for (let salto = 0; salto < 5; salto++) {
+      let u: URL; try { u = new URL(attuale); } catch { segnali.push("indirizzo non valido"); break; }
+      if (!/^https?:$/.test(u.protocol)) { segnali.push("protocollo strano"); break; }
+      if (u.hostname === "localhost" || (ipv4(u.hostname) && ipPrivato(u.hostname))) { segnali.push("punta a una rete interna"); break; }
+      catena.push(u.hostname);
+      try {
+        const r = await fetch(u.toString(), { method: "GET", redirect: "manual", signal: AbortSignal.timeout(5000), headers: { "user-agent": "Mozilla/5.0" } });
+        await r.body?.cancel();
+        const dove = r.headers.get("location");
+        if (r.status >= 300 && r.status < 400 && dove) { attuale = new URL(dove, u).toString(); continue; }
+      } catch { segnali.push("il sito non risponde"); }
+      break;
+    }
+    const finale = new URL(attuale);
+    const host = finale.hostname.toLowerCase();
+    if (finale.protocol === "http:") segnali.push("senza https");
+    if (ipv4(host)) segnali.push("usa un numero IP al posto del nome");
+    if (host.startsWith("xn--") || host.includes(".xn--")) segnali.push("caratteri camuffati nel nome (punycode)");
+    if (catena.length > 1) segnali.push(`reindirizza ${catena.length - 1} volte`);
+    if (ACCORCIATORI.includes(radice(catena[0] ?? ""))) segnali.push("link accorciato: nasconde la destinazione");
+    const r2 = radice(host).split(".")[0];
+    const marchio = MARCHI.find((m) => host.includes(m) && r2 !== m);
+    if (marchio) segnali.push(`usa il nome «${marchio}» ma non è il sito ufficiale`);
+    const giorni = ipv4(host) ? null : await etaDominio(radice(host));
+    if (giorni !== null && giorni < 60) segnali.push(`dominio registrato da appena ${giorni} giorni`);
+    const gravi = segnali.filter((x) => /marchio|nome «|camuffati|giorni|rete interna|IP al posto/.test(x)).length;
+    esiti.push({ link: iniziale, destinazione: finale.toString().slice(0, 200), dominio: host, eta_dominio_giorni: giorni, segnali,
+      esito: gravi ? "pericoloso" : segnali.length ? "sospetto" : "sembra a posto" });
+  }
+  return { link: esiti };
+}
+
+async function dnsDi(nome: string, tipo: string): Promise<string[]> {
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(nome)}&type=${tipo}`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    return (d.Answer ?? []).map((a: any) => String(a.data));
+  } catch { return []; }
+}
+
+async function edithDominio(dominio: string) {
+  const d = dominio.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return { errore: "dominio non valido" };
+  const [a, mx, ns] = await Promise.all([dnsDi(d, "A"), dnsDi(d, "MX"), dnsDi(d, "NS")]);
+  let certificato: any = null;
+  try {
+    const r = await fetch(`https://crt.sh/?q=${encodeURIComponent(d)}&output=json&exclude=expired`, { signal: AbortSignal.timeout(9000) });
+    if (r.ok) {
+      const lista: any[] = await r.json();
+      const ultimo = lista.sort((x, y) => String(y.not_after).localeCompare(String(x.not_after)))[0];
+      if (ultimo) {
+        const giorni = Math.floor((new Date(ultimo.not_after + "Z").getTime() - Date.now()) / 86400000);
+        certificato = { scade: ultimo.not_after, giorni_rimasti: giorni, emesso_da: String(ultimo.issuer_name ?? "").replace(/.*O=([^,]+).*/, "$1") };
+      }
+    }
+  } catch { /* crt.sh lento: si va avanti senza */ }
+  // domini quasi uguali: una lettera in meno, doppia, scambiata, 0/o 1/l/i, altre estensioni
+  const [nome, ...resto] = d.split("."); const est = resto.join(".");
+  const varianti = new Set<string>();
+  for (let k = 0; k < nome.length; k++) {
+    varianti.add(nome.slice(0, k) + nome.slice(k + 1) + "." + est);
+    varianti.add(nome.slice(0, k) + nome[k] + nome.slice(k) + "." + est);
+    if (k < nome.length - 1) varianti.add(nome.slice(0, k) + nome[k + 1] + nome[k] + nome.slice(k + 2) + "." + est);
+  }
+  for (const [x, y] of [["o", "0"], ["i", "1"], ["l", "1"], ["e", "3"], ["a", "4"], ["s", "5"]]) if (nome.includes(x)) varianti.add(nome.replace(x, y) + "." + est);
+  for (const altra of ["com", "it", "net", "org", "eu", "shop", "app", "info"]) if (altra !== est) varianti.add(`${nome}.${altra}`);
+  varianti.delete(d);
+  const prova = [...varianti].filter((v) => v.split(".")[0].length > 2).slice(0, 40);
+  const registrati: string[] = [];
+  for (let k = 0; k < prova.length; k += 10) {
+    const blocco = await Promise.all(prova.slice(k, k + 10).map(async (v) => ((await dnsDi(v, "A")).length || (await dnsDi(v, "NS")).length ? v : null)));
+    registrati.push(...blocco.filter((x): x is string => !!x));
+  }
+  return { dominio: d, dns: { a, mx: mx.slice(0, 5), ns: ns.slice(0, 4) }, certificato, simili_registrati: registrati.slice(0, 20),
+    nota: registrati.length ? "alcuni sono solo altre estensioni legittime (vanno valutati): quelli con lettere cambiate sono i più sospetti" : "nessun dominio simile registrato" };
+}
+
+/// La scheda EDITH nell'app: le stesse funzioni, chiamate dirette.
+async function paginaEdith(c: any) {
+  switch (c.edith) {
+    case "porte": return await edithPorte(String(c.ip ?? ""));
+    case "fughe": return await edithFughe(String(c.email ?? ""));
+    case "link": return await edithLink(String(c.testo ?? ""));
+    case "dominio": return await edithDominio(String(c.dominio ?? ""));
+    default: return { errore: "voce EDITH sconosciuta" };
+  }
+}
+
+
 // ───────────────────────── Orecchie veloci (Mac) ─────────────────────────
 // Il Mac registra la frase (WAV 16 kHz) e la manda qui: ElevenLabs Scribe la trascrive in circa mezzo secondo.
 // Il cervello è quasi sempre già acceso, quindi niente attesa d'avvio. Dentro il piano ElevenLabs (ore di trascrizione incluse).
@@ -2264,10 +2431,14 @@ Deno.serve(async (req) => {
   const segreto = Deno.env.get("JARVIS_TOKEN") ?? "";
   if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) return json({ errore: "parola d'ordine errata" }, 401);
 
+  ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
   if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true);   // una frase da dire con la voce di JARVIS
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
+  if (typeof corpo?.edith === "string") {                                                    // la scheda EDITH (sicurezza)
+    try { return json(await paginaEdith(corpo)); } catch (e) { return json({ errore: (e as Error).message }); }
+  }
   if (corpo?.voci === true) return await elencoVoci();                                      // voci disponibili sull'account ElevenLabs
   if (corpo?.github === true) {                                                             // scheda GitHub
     try { return json(await paginaGithub(corpo.repo)); } catch (e) { return json({ errore: (e as Error).message }); }

@@ -4,7 +4,7 @@ import AVFoundation
 /// Le schede delle icone della corona.
 enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
-    case github, supabase, archivio, costi
+    case github, supabase, archivio, costi, edith
     case scanner
     var id: String { rawValue }
 }
@@ -160,6 +160,7 @@ struct ContentView: View {
             case .supabase: VistaSupabase(chiedi: daScheda)
             case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
             case .costi: VistaCosti(chiedi: daScheda)
+            case .edith: VistaEdith(chiedi: daScheda)
             case .scanner: VistaScanner(chiedi: daScheda)
             case .bea: VistaBea(chiedi: daScheda)
             }
@@ -633,6 +634,7 @@ struct ContentView: View {
                 voceSistemi(logo: "supabase-logo", simbolo: nil, nome: "Supabase", stato: statoSistemi["supabase"] ?? "…") { scheda = .supabase }
                 voceSistemi(logo: nil, simbolo: "archivio", nome: "Archivio", stato: statoSistemi["archivio"] ?? "…") { scheda = .archivio }
                 voceSistemi(logo: UIImage(named: "langfuse-logo") != nil ? "langfuse-logo" : nil, simbolo: "costi", nome: "Costi", stato: statoSistemi["costi"] ?? "…") { scheda = .costi }
+                voceSistemi(logo: nil, simbolo: "edith", nome: "EDITH", stato: "porte · fughe · link · domini") { scheda = .edith }
             }
             .padding(6)
             .frame(width: 262)
@@ -660,6 +662,8 @@ struct ContentView: View {
                         Image(logo).resizable().renderingMode(.template).scaledToFit()
                     } else if simbolo == "costi" {
                         Image(systemName: "gauge.with.dots.needle.33percent").resizable().scaledToFit()
+                    } else if simbolo == "edith" {
+                        Image(systemName: "eyeglasses").resizable().scaledToFit()       // gli occhiali di EDITH
                     } else {
                         IconaArchivio()
                     }
