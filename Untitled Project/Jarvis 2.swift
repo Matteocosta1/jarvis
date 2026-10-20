@@ -503,14 +503,14 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Comandi vocali
 
-    // MARK: Sottovoce («Jarvis, sbatti, …»)
+    // MARK: Sottovoce («Jarvis, piano, …»)
 
-    /// «Sbatti» all'inizio della frase: JARVIS risponde sottovoce (in chiesa, in riunione…) per i prossimi 10 minuti,
-    /// e ogni «sbatti» li rinnova. «Voce normale» (o «parla normale», «alza la voce») torna come prima.
+    /// «Piano» all'inizio della frase: JARVIS risponde sottovoce (in chiesa, in riunione, con qualcuno che dorme…) per 10 minuti,
+    /// e ogni «piano» li rinnova. «Voce normale» (o «parla normale», «alza la voce») torna come prima.
     private static var sottovoceFino = Date.distantPast
-    static var volumeVoce: Float { Date() < sottovoceFino ? 0.12 : 1 }
+    static var volumeVoce: Float { Date() < sottovoceFino ? 0.05 : 1 }   // sottovoce: appena udibile, da vicino
 
-    /// Toglie «sbatti» dalla frase (e accende il sottovoce) o riconosce «voce normale»; restituisce il resto della frase.
+    /// Toglie «piano» dalla frase (e accende il sottovoce) o riconosce «voce normale»; restituisce il resto della frase.
     private func sottovoce(_ frase: String) -> String {
         let basso = frase.lowercased()
         if ["voce normale", "parla normale", "alza la voce", "torna normale"].contains(where: { basso.contains($0) }), basso.count < 40 {
@@ -521,7 +521,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         var parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         let pulita: (String) -> String = { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
-        guard let k = parole.prefix(3).firstIndex(where: { ["sbatti", "sbattì"].contains(pulita($0)) }) else { return frase }
+        guard let k = parole.prefix(3).firstIndex(where: { ["piano", "sottovoce"].contains(pulita($0)) }) else { return frase }
         parole.remove(at: k)
         Jarvis.sottovoceFino = Date().addingTimeInterval(600)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -1240,21 +1240,20 @@ final class Jarvis: NSObject, ObservableObject {
             interrottoAVoce(testo)
             return
         }
-        let basso = testo.lowercased()
-        let conNome = Richiamo.nomi.contains { basso.contains($0) }
-        // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto (vuoto = si mette in ascolto)
+        // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto
+        let conNome = Richiamo.dopoRichiamo(testo) != nil
         let dopo = Richiamo.dopoRichiamo(testo) ?? testo
-        let tony = Benvenuto.eFraseDiTony(testo) || Benvenuto.eFraseDiTony(dopo)
-        // in attesa e mentre pensa basta parlare: qualsiasi frase, senza «Jarvis»
-        _ = conNome
         liberoMacFinoA = .distantPast
         if fase == .elaboro { segnaInterruzione(); interrompi() }   // stava pensando: lo fermo, come sull'iPhone
         avviso = nil
         parziale = ""
-        if tony { fraseDiTony(); return }
-        if dopo.isEmpty { Task { await avviaAscolto(bip: true) }; return }   // solo «Jarvis»: ora la domanda
-        if foto == nil, eseguiComando(dopo) { return }
-        Task { await instrada(dopo) }
+        if conNome && dopo.isEmpty { Task { await avviaAscolto(bip: true) }; return }   // solo «Jarvis»: apro il microfono
+        // «piano»/«voce normale» per primo: cambia solo il volume, non è né il rito né una domanda
+        let senzaSottovoce = sottovoce(dopo)
+        if senzaSottovoce.isEmpty { return }                              // solo «piano» o «voce normale»: fatto, niente rito
+        if Benvenuto.eFraseDiTony(senzaSottovoce) { fraseDiTony(); return }
+        if foto == nil, eseguiComando(senzaSottovoce) { return }
+        Task { await instrada(senzaSottovoce) }
     }
 
     /// Registra la frase; quando il signore ha finito (o tocca il reattore) la trascrive in cloud e la manda come sull'iPhone.

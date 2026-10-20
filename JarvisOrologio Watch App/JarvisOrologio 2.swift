@@ -113,7 +113,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Sottovoce («sbatti, …»): come sull'iPhone, risponde a voce bassissima per 10 minuti; «voce normale» torna come prima
     private var sottovoceFino = Date.distantPast
-    private var volumeVoce: Float { Date() < sottovoceFino ? 0.12 : 1 }
+    private var volumeVoce: Float { Date() < sottovoceFino ? 0.05 : 1 }   // sottovoce: appena udibile
 
     private func togliSbatti(_ frase: String) -> String {
         let basso = frase.lowercased()
@@ -122,7 +122,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             return ""
         }
         var parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-        guard let k = parole.prefix(3).firstIndex(where: { ["sbatti", "sbattì"].contains($0.lowercased().trimmingCharacters(in: .punctuationCharacters)) }) else { return frase }
+        guard let k = parole.prefix(3).firstIndex(where: { ["piano", "sottovoce"].contains($0.lowercased().trimmingCharacters(in: .punctuationCharacters)) }) else { return frase }
         parole.remove(at: k)
         sottovoceFino = Date().addingTimeInterval(600)
         return parole.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,.;:!"))
