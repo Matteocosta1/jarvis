@@ -32,6 +32,7 @@ enum SuoniOrologio {
     static func preparaAvvio() {
         guard let url = file("avvioorologio") ?? file("avvio"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)            // l'audio è dell'app prima che suoni: la corona lo regola
         p.volume = 1.0
         p.prepareToPlay()
         lettoreAvvio = p
@@ -296,6 +297,12 @@ struct VistaOrologio: View {
                 SuoniOrologio.chatCarica()
                 chatDa = Date()
                 Task { @MainActor in try? await Task.sleep(for: .seconds(1.3 / v)); chatDa = nil }
+            }
+            // sistemi in linea: JARVIS ascolta subito, senza toccare il reattore (finito il suono della chat, che non deve sentire)
+            let ricarica = chatDa != nil
+            Task { @MainActor in
+                if ricarica { try? await Task.sleep(for: .seconds(1.4 / v)) }
+                jarvis.ascoltaDopoAvvio()
             }
             try? await Task.sleep(for: .seconds(2.2 / v))
             withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VIII" }

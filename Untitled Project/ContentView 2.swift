@@ -234,6 +234,7 @@ struct ContentView: View {
         }
         .onAppear {
             Aptica.prepara()
+            Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano
             accendi()
             if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
             if primaApertura {

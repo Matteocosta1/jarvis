@@ -12,6 +12,8 @@ enum ImpostazioniOrologio {
     static var indirizzo: String { UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito }
     /// Mentre JARVIS parla, il microfono resta in ascolto: se il signore inizia a parlare, JARVIS tace e lo ascolta.
     static var interruzioneVocale: Bool { UserDefaults.standard.object(forKey: "interruzioneVocaleOrologio") as? Bool ?? true }
+    /// Dialogo: ascolta da solo all'avvio e dopo ogni risposta, senza toccare il reattore.
+    static var dialogo: Bool { UserDefaults.standard.object(forKey: "dialogoOrologio") as? Bool ?? true }
 }
 
 /// La parola d'ordine arriva dall'iPhone e resta nel portachiavi dell'orologio.
@@ -66,6 +68,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var livello: Float?                       // livello del microfono, smussato
     private var fondo: Float?                         // rumore di fondo della stanza
     private var inizioAscolto = Date()
+    private var automatico = false                    // ascolto partito da solo (avvio, dopo una risposta): se tace, torna zitto in attesa
+    private var riascolta = false                     // finita di dire la risposta, riascolta da solo
+    private var posizioneInArrivo: Task<[String: Any]?, Never>?   // il GPS si legge mentre trascrive, non dopo
     // Orecchio mentre JARVIS parla: un secondo registratore che misura solo il volume, per capire se il signore sta parlando
     private var monitor: AVAudioRecorder?
     private var timerMonitor: Timer?
@@ -160,6 +165,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     func ferma() {
+        riascolta = false
         compito?.cancel()
         compito = nil
         chiudiMicrofono()
@@ -194,7 +200,24 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
-    private func ascolta() async {
+    /// Fine dell'avvio: JARVIS ascolta subito, come dopo una risposta.
+    func ascoltaDopoAvvio() {
+        guard ImpostazioniOrologio.dialogo, fase == .attesa else { return }
+        Task { await ascolta(automatico: true) }
+    }
+
+    /// Finita la risposta: si riascolta da solo (se il signore tace, torna in attesa in silenzio).
+    private func dopoRisposta() {
+        guard riascolta else { return }
+        riascolta = false
+        Task {
+            try? await Task.sleep(for: .milliseconds(250))     // la coda della voce non entra nel microfono
+            guard fase == .attesa, WKApplication.shared().applicationState == .active else { return }
+            await ascolta(automatico: true)
+        }
+    }
+
+    private func ascolta(automatico auto: Bool = false) async {
         guard await AVAudioApplication.requestRecordPermission() else {
             stato = "Mi serve il microfono, Sir: lo attivi in Impostazioni › Privacy e sicurezza › Microfono."
             return
@@ -219,6 +242,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return
             }
             registratore = r
+            automatico = auto
             parlatoRilevato = false
             silenzioDa = nil
             livello = nil
@@ -228,7 +252,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             stato = "La ascolto, Sir…"
             fase = .ascolto
             WKInterfaceDevice.current().play(.start)
-            timerAscolto = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            timerAscolto = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in   // ogni 0,1 s: la fine si sente prima
                 Task { @MainActor [weak self] in self?.controllaSilenzio() }
             }
         } catch {
@@ -244,22 +268,26 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let ora = Date()
         let avviato = ora.timeIntervalSince(inizioAscolto) > 0.5   // il primo mezzo secondo contiene il "tic" dell'aptica
         // soglie che si adattano al rumore della stanza: il fondo è il livello più basso sentito (che risale piano)
-        livello = livello == nil ? grezzo : (livello! * 0.6 + grezzo * 0.4)
+        livello = livello == nil ? grezzo : (livello! * 0.5 + grezzo * 0.5)
         let l = livello!
-        fondo = min(l, (fondo ?? l) + 0.08)
+        fondo = min(l, (fondo ?? l) + 0.04)                 // misurato ogni 0,1 s: risale piano come prima
         let voce = l > max(fondo! + 9, -50)
         if voce && avviato {
             parlatoRilevato = true
             silenzioDa = nil
         } else if parlatoRilevato {
             if let da = silenzioDa {
-                if ora.timeIntervalSince(da) > 0.8 { fermaEInvia(); return }   // 0,8 s di silenzio: ha finito
+                if ora.timeIntervalSince(da) > 0.8 { fermaEInvia(); return }    // 0,8 s di silenzio: ha finito (controllato ogni 0,1 s, non più 0,2: niente ritardo in più)
             } else {
                 silenzioDa = ora
             }
         }
         let durata = ora.timeIntervalSince(inizioAscolto)
-        if !parlatoRilevato && durata > 7 {
+        if !parlatoRilevato && automatico && durata > 6 {      // ascolto da solo e nessuno parla: torna in attesa senza dire nulla
+            chiudiMicrofono()
+            fase = .attesa
+            stato = nil
+        } else if !parlatoRilevato && durata > 7 {
             chiudiMicrofono()
             fase = .attesa
             stato = "Non ho sentito nulla, Sir. Tocchi il reattore e parli."
@@ -270,24 +298,26 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     private func fermaEInvia() {
         guard fase == .ascolto, let url = registratore?.url else { return }
-        chiudiMicrofono()
+        chiudiMicrofono(spegniAudio: false)                     // l'audio resta acceso: la voce della risposta parte senza riaccenderlo
+        posizioneInArrivo = Task { await PosizioneOrologio.attuale() }
         WKInterfaceDevice.current().play(.stop)
         fase = .elaboro
         stato = "Trascrivo…"
         compito = Task { await self.trascriviEChiedi(url) }
     }
 
-    private func chiudiMicrofono() {
+    private func chiudiMicrofono(spegniAudio: Bool = true) {
         timerAscolto?.invalidate()
         timerAscolto = nil
         guard let r = registratore else { return }
         r.stop()
         registratore = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)   // spegne il microfono
+        if spegniAudio { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }   // spegne il microfono
     }
 
     private func trascriviEChiedi(_ url: URL) async {
         guard let audio = try? Data(contentsOf: url), audio.count > 1_000 else {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             fase = .attesa
             stato = "Non ho sentito nulla, Sir."
             return
@@ -323,8 +353,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
             chiedi(testo)
         } else {
             compito = nil
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             fase = .attesa
-            stato = errore ?? "Non ho capito, Sir. Riprovi."
+            stato = errore ?? (automatico ? nil : "Non ho capito, Sir. Riprovi.")   // ascolto da solo: un rumore non merita un avviso
         }
     }
 
@@ -413,7 +444,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         do {
             var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti]
-            let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
+            let posizione: [String: Any]?                          // dove si trova il signore: serve alla seconda memoria
+            if let p = posizioneInArrivo { posizione = await p.value } else { posizione = await PosizioneOrologio.attuale() }
+            posizioneInArrivo = nil
             if let posizione { corpo["posizione"] = posizione }
             iniziaFlussoVoce()
             for _ in 0..<5 {
@@ -424,6 +457,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     stato = nil
                     storia.append(["role": "assistant", "content": testo])
                     compito = nil
+                    riascolta = ImpostazioniOrologio.dialogo                     // detta la risposta, riascolta da solo
                     if giaParlato { chiudiFlussoVoce() } else { parla(testo) }   // già partito a frasi: dice solo il resto
                     return
                 case .nonAutorizzato:
@@ -625,6 +659,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         lettore = nil
         fase = .attesa
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        dopoRisposta()
     }
 
     // MARK: Voce a frasi
@@ -721,6 +756,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             fermaMonitor()
             fase = .attesa
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            dopoRisposta()
         }
     }
 
