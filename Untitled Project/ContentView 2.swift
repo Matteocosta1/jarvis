@@ -301,8 +301,12 @@ struct ContentView: View {
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
-                try? await Task.sleep(for: .milliseconds(300))    // la coda dei suoni si spegne
-                jarvis.ascoltaSubito()
+                // col richiamo acceso parte già lui (avvioInCorso = false): sente le frasi, il battito di mani e «Wake up, daddy's home».
+                // L'ascolto del reattore solo se il richiamo è spento (lì il battito non c'è).
+                if !Impostazioni.richiamo {
+                    try? await Task.sleep(for: .milliseconds(300))    // la coda dei suoni si spegne
+                    jarvis.ascoltaSubito()
+                }
             }
             try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
             withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
