@@ -771,11 +771,16 @@ struct ContentView: View {
         .buttonStyle(StileStark())
     }
 
-    /// Le righe di stato del menu: chiamate leggere al cervello, una dopo l'altra (i costi per ultimi: sono i più lenti).
+    /// Le righe di stato del menu: chiamate leggere al cervello, tutte insieme.
     private func caricaStatoSistemi() async {
-        let ra = await VistaVitals.chiama(["archivio": true])
-        let rs = await VistaVitals.chiama(["supabase": true, "ore": 24])
-        let rg = await VistaVitals.chiama(["github": true])
+        // le quattro richieste partono insieme (Supabase da sola può metterci 8 secondi)
+        async let a = VistaVitals.chiama(["archivio": true])
+        async let s = VistaVitals.chiama(["supabase": true, "ore": 24])
+        async let g = VistaVitals.chiama(["github": true])
+        async let k = VistaVitals.chiama(["consumi": true])
+        let (ra, rs, rg, rc) = await (a, s, g, k)
+        // menu chiuso prima della fine: le richieste sono state interrotte, non è un guasto. Restano le scritte di prima.
+        if Task.isCancelled { return }
         if let ra, ra["errore"] == nil {
             let file = ra["file"] as? [[String: Any]] ?? [], cartelle = ra["cartelle"] as? [[String: Any]] ?? []
             statoSistemi["archivio"] = "\(file.count) file · \(cartelle.count) cartelle"
@@ -797,7 +802,7 @@ struct ContentView: View {
                 statoSistemi["github"] = "\(repo.count) repository · \(issue) issue aperte"
             }
         } else { statoSistemi["github"] = "cervello non raggiungibile" }
-        if let c = await VistaVitals.chiama(["consumi": true]), c["errore"] == nil {
+        if let c = rc, c["errore"] == nil {
             let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
             statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
         } else { statoSistemi["costi"] = "non raggiungibile" }
