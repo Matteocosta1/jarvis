@@ -367,7 +367,7 @@ final class AttesaMac {
     }
 
     private func trascrivi(_ audio: Data, _ inizio: Date) {
-        guard voluto, !AmbienteSonoro.condiviso.affollato else { return }
+        guard voluto else { return }   // anche con musica o TV intorno: lì però vale solo «Jarvis, …» (lo decide chi riceve la frase)
         if inViaggio { inCoda = (audio, inizio); return }        // non si perde: parte appena torna la precedente
         let adesso = Date()
         invii.removeAll { adesso.timeIntervalSince($0) > 600 }

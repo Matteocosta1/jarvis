@@ -96,7 +96,13 @@ final class Jarvis: NSObject, ObservableObject {
     /// La frase detta dentro Occhi o Cucina: parte con la foto scattata a voce.
     private var domandaOcchi: String?
     @Published var svuotaChiesto = false          // «Nuova conversazione» dalle Impostazioni: la schermata principale svuota la chat con l'animazione
-    @Published var fase: Fase = .attesa { didSet { if fase != oldValue { aggiornaRichiamo() } } }
+    @Published var fase: Fase = .attesa {
+        didSet {
+            guard fase != oldValue else { return }
+            if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(fase == .parlo || avvioInCorso) }   // Mac: la sua voce non è «confusione»
+            aggiornaRichiamo()
+        }
+    }
     @Published var parziale = ""
     @Published var stato: String?          // es. «cerco sul web»
     @Published var avviso: String?
@@ -164,7 +170,13 @@ final class Jarvis: NSObject, ObservableObject {
     var soccorsoAperto = false
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     /// Durante la sequenza d'avvio il microfono resta spento: aprirlo cambia l'audio dell'iPhone e la musica uscirebbe bassa.
-    var avvioInCorso = true { didSet { if avvioInCorso != oldValue { aggiornaRichiamo() } } }
+    var avvioInCorso = true {
+        didSet {
+            guard avvioInCorso != oldValue else { return }
+            if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(fase == .parlo || avvioInCorso) }   // Mac: la musica d'avvio non è «confusione»
+            aggiornaRichiamo()
+        }
+    }
     private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var ultimoPonte = Date.distantPast     // quando ha detto l'ultima frase ponte
@@ -206,6 +218,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(true) }   // Mac: si apre con la musica d'avvio
         sintesi.delegate = self
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti) }       // le frasi ponte sono già pronte in cache, a costo zero
@@ -1389,6 +1402,8 @@ final class Jarvis: NSObject, ObservableObject {
             if fase != .attesa { mettiInAttesa() }
             return
         }
+        // musica, TV o gente intorno: vale solo «Jarvis, …» (o la frase di Tony), il resto della stanza non è per lui
+        if AmbienteSonoro.condiviso.affollato && Richiamo.dopoRichiamo(testo) == nil && !Benvenuto.eFraseDiTony(testo) { return }
         if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
             interrottoAVoce(testo)
             return

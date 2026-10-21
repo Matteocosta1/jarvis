@@ -11,6 +11,18 @@ nonisolated final class AmbienteSonoro: NSObject, SNResultsObserving, @unchecked
 
     private let lock = NSLock()
     private var confusioneFino = Date.distantPast
+    private var suonaJarvis = false                    // Mac: JARVIS sta parlando o suona l'avvio (stesso altoparlante, stesso microfono)
+    private var suonaJarvisFino = Date.distantPast     // e la coda del suono, che il microfono sente ancora un attimo
+
+    /// Mac: la musica d'avvio e la voce di JARVIS escono dall'altoparlante del Mac e rientrano dal suo microfono.
+    /// Il classificatore le prenderebbe per «musica» o «voce sintetica» e renderebbe JARVIS sordo per 12 secondi
+    /// proprio dopo l'avvio e dopo ogni risposta: mentre suona lui (e per un secondo e mezzo dopo) non si giudica.
+    func jarvisSuona(_ attivo: Bool) {
+        lock.lock()
+        if suonaJarvis && !attivo { suonaJarvisFino = Date().addingTimeInterval(1.5) }
+        suonaJarvis = attivo
+        lock.unlock()
+    }
 
     /// Le etichette del classificatore di Apple che indicano altre voci o suoni con parole intorno.
     private static let segnali = ["crowd", "chatter", "babble", "hubbub", "speech_synthesizer", "music", "singing",
@@ -39,7 +51,8 @@ nonisolated final class AmbienteSonoro: NSObject, SNResultsObserving, @unchecked
         }
         guard rumoroso else { return }
         lock.lock()
-        confusioneFino = Date().addingTimeInterval(12)
+        let suoNoMio = !(ProcessInfo.processInfo.isiOSAppOnMac && (suonaJarvis || Date() < suonaJarvisFino))
+        if suoNoMio { confusioneFino = Date().addingTimeInterval(12) }
         lock.unlock()
     }
 
