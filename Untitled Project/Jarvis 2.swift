@@ -588,6 +588,11 @@ final class Jarvis: NSObject, ObservableObject {
             if let r = Reparto(rawValue: imparato) { apriReparto(r); return true }
         }
         if BrowserVoce.aperto, BrowserVoce.comando(Jarvis.togliRichiamo(frase).0) { return true }   // nel Browser: «scrivi …», «invia»
+        if LidarAperta.aperta, LidarAperta.eRifai(frase) {                // in LiDAR: «rifai la scansione»
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            NotificationCenter.default.post(name: .jarvisRifaiLidar, object: nil)
+            return true
+        }
         switch ComandoVocale.riconosci(frase) {
         case .apri(let reparto)?:
             apriReparto(reparto)
@@ -604,6 +609,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
     private func apriReparto(_ reparto: Reparto, annuncia: Bool = true) {
+        if reparto == .scanner && LidarAperta.aperta { return }      // dentro LiDAR «scansione» è la stanza, mai lo Scanner
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if annuncia, let a = reparto.annuncio {
             flussoFinito = true                     // una frase sola: finita quella, JARVIS torna in attesa

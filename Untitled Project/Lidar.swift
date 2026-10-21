@@ -18,6 +18,26 @@ enum OcchiLidar {
     static var scatta: (() -> Data?)?
 }
 
+/// LiDAR aperto: «rifai la scansione» la fa ripartire, e «scansione» non apre lo Scanner dei codici a barre.
+enum LidarAperta {
+    static var aperta = false
+
+    /// «Jarvis, rifai la scansione», «riprova la scansione», «nuova scansione», «ricomincia».
+    static func eRifai(_ frase: String) -> Bool {
+        let t = frase.lowercased().folding(options: .diacriticInsensitive, locale: Locale(identifier: "it_IT"))
+            .replacingOccurrences(of: "[^a-z ]", with: " ", options: .regularExpression)
+            .split(separator: " ").map(String.init).filter { !["jarvis", "giarvis", "jervis"].contains($0) }
+        guard !t.isEmpty, t.count <= 6 else { return false }
+        let verbi = ["rifai", "rifacciamo", "riprova", "riproviamo", "ricomincia", "ricominciamo", "riparti", "ripartiamo", "ripeti", "nuova", "rifare"]
+        if t.count == 1 { return ["ricomincia", "riprova", "riparti", "rifai", "ricominciamo", "riproviamo"].contains(t[0]) }
+        return t.contains(where: { verbi.contains($0) }) && t.contains(where: { $0.hasPrefix("scansion") || $0 == "scansiona" || $0 == "da" || $0 == "capo" })
+    }
+}
+
+extension Notification.Name {
+    static let jarvisRifaiLidar = Notification.Name("jarvisRifaiLidar")
+}
+
 // MARK: - LiDAR (STRUMENTI)
 // La scansione di una stanza con il LiDAR dell'iPhone (RoomPlan di Apple): pareti, porte, finestre, aperture e mobili.
 // Durante la scansione il disegno dal vivo è quello di Apple; il risultato è di JARVIS: pianta ciano con le misure,
@@ -123,6 +143,14 @@ struct VistaLidar: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(fase == .scansione || fase == .elaboro)
+        .onAppear { LidarAperta.aperta = true }
+        .onDisappear { LidarAperta.aperta = false }
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRifaiLidar)) { _ in   // a voce: come «Riprova», da capo
+            guard LidarSupporto.disponibile else { return }
+            Suoni.tocco()
+            avviso = nil; fermaScansione = false; dalVivo = MisureDalVivo()
+            fase = .scansione; tentativo += 1
+        }
         .aperturaHUD("LiDAR", fotocamera: LidarSupporto.disponibile)
     }
 
