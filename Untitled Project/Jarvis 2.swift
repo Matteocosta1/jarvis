@@ -1129,8 +1129,11 @@ final class Jarvis: NSObject, ObservableObject {
         if !Impostazioni.richiamo { Suoni.pronto() }   // col richiamo a voce si chiude come una persona: in silenzio
         Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
             try? await Task.sleep(for: .milliseconds(400))
-            // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso
-            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud else { return }
+            // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso.
+            // Lo stesso sull'iPhone con l'ascolto continuo: il microfono dell'attesa riparte fra un attimo e gli serve
+            // l'audio acceso (spegnerlo qui lo lasciava sordo finché non si toccava il reattore)
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
+                  !self.richiamoServe, !self.richiamo.attivo else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»

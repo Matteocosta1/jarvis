@@ -46,7 +46,7 @@ struct ContentView: View {
         let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
         let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
         let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
-        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
+        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente && !mostraLidar
         return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
     }
     @FocusState private var tastiera: Bool

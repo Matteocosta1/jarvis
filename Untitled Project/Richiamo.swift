@@ -111,6 +111,8 @@ final class Richiamo {
                 try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
                 try motore.start()
+            } else {
+                try? AVAudioSession.sharedInstance().setActive(true)    // il motore gira: l'audio dev'essere acceso anche lui
             }
             azzera()
             nuovoRiconoscimento(riconoscitore, recentiDa: nil)
