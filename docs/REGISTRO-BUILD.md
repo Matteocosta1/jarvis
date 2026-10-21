@@ -12,7 +12,7 @@ Per ogni build: cosa contiene, se è stata provata, com'è andata.
 | 8.0 (5) | e5a8f48 | **tutta l'app come il 20 ott alle 20:57** (b0ebe03), subito prima della modifica del volume all'avvio; solo nome MARK VIII e numeri | | |
 | 8.0 (6) | 1b75d6d | 8.0 (5) + musica d'avvio +2 dB (solo il file, nessuna modifica all'audio dell'iPhone) + comandi vocali di stamattina: LiDAR (microfono acceso, fine/misure/capienza/salva/3D), Sentinella, Wiretap, «traduci in inglese» (anche Watch), Allenatore, Interprete, comandi rapidi. Microfono e conversazione: come 8.0 (5) | da provare | |
 | 8.0 (7) | 2ed4221 | **identica a ieri sera, Build 20 con LiDAR (b0ebe03, 20 ott 20:57)**, scritta MARK VII-5.0 compresa: cambia solo il numero di build. Annulla tutto quello fatto oggi (comandi, volume, microfono) | da provare | |
-| 8.0 (8) | (questo) | 8.0 (7) + **solo** menu SISTEMI: le 4 richieste partono insieme; se il menu si chiude prima della fine non scrive più «non raggiungibile». Nient'altro | da provare | |
+| 8.0 (8) | 0cc3062 | 8.0 (7) + **solo** menu SISTEMI: le 4 richieste partono insieme; se il menu si chiude prima della fine non scrive più «non raggiungibile». Nient'altro | da provare | |
 
 Nota 21 ott pomeriggio: fotocamere bloccate in tutte le build (anche la 6.0 (20) di ieri) → era l'iPhone; risolto col riavvio.
 
