@@ -89,6 +89,17 @@ enum ComandoVocale: Equatable {
         if t.count == 1, ["torna", "indietro", "chiudi", "esci", "basta"].contains(t[0]) { return .torna }
         if [" torna indietro ", " chiudi tutto ", " torna alla home ", " torna alla schermata principale ", " chiudi la scheda ",
             " chiudi questa scheda ", " esci da qui "].contains(where: { s == $0 }) { return .torna }
+        // «chiudi l'app», «chiudi la sezione», «chiudi qui», oppure «chiudi» + il nome di una sezione di JARVIS («chiudi LiDAR», «chiudi il meteo»).
+        // «chiudi Spotify», «chiudi la porta», «chiudi la musica» restano a JARVIS.
+        if t[0] == "chiudi" || t[0] == "esci", t.count <= 4 {
+            let resto = Array(t.dropFirst()).filter { !["l", "la", "il", "lo", "le", "i", "gli", "da", "dal", "dalla", "dallo", "questa", "questo"].contains($0) }
+            let generiche: Set<String> = ["app", "applicazione", "sezione", "scheda", "schermata", "pagina", "qui", "tutto", "scansione"]
+            let sezioni: Set<String> = ["lidar", "laidar", "planimetria", "occhi", "fotocamera", "camera", "cucina", "meteo", "tempo", "browser", "internet",
+                                        "impostazioni", "sistemi", "costi", "edith", "edit", "diario", "sonno", "cuore", "vitals", "briefing", "posta",
+                                        "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
+                                        "confidente", "github", "supabase", "archivio", "scanner", "profiler"]
+            if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) { return .torna }
+        }
 
         let verbi = ["attiva", "apri", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
@@ -122,7 +133,9 @@ enum ComandoVocale: Equatable {
         ]
         // le sezioni nuove solo con un verbo: «apri i costi», «mostrami EDITH», «vai alle impostazioni» («che costi?» resta a JARVIS)
         let nuove: [(Reparto, [String])] = [
-            (.costi, [" costi ", " consumi "]), (.edith, [" edith ", " editt "]),
+            (.costi, [" costi ", " consumi "]),
+            (.edith, [" edith ", " editt ", " edit ", " edid ", " edyth ", " editth ", " editte ", " editti ", " eddith ", " edite ",
+                      " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
             (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
         let conVerbo = t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra", "fammi"].contains($0) })
