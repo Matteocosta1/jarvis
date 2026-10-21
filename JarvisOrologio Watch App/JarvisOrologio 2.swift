@@ -225,6 +225,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// L'attesa col microfono acceso: si accende se serve (app in primo piano, nessun ascolto in corso).
     func riprendiAscolto() {
+        // l'attesa in ascolto si era fermata da sola (polso abbassato, una chiamata, Siri): si butta e si ricomincia
+        if passivo, let r = registratore, !r.isRecording { passivo = false; chiudiMicrofono(spegniAudio: false) }
         guard avvioFatto, ImpostazioniOrologio.dialogo, fase == .attesa, registratore == nil,
               WKApplication.shared().applicationState != .background else { return }
         Task { await ascolta(automatico: true) }
