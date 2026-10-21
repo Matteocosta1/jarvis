@@ -283,7 +283,7 @@ struct ContentView: View {
                 jarvis.ascoltaSubito()
             }
             try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
-            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
+            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VIII-1.0" }
         }
     }
 
@@ -352,7 +352,7 @@ struct ContentView: View {
     }
 
     private var intestazione: some View {
-        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VII-5.0», strette tra loro
+        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VIII-1.0», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
                 (Text("J.A.R.V.I.").tracking(5) + Text("S."))
@@ -362,7 +362,7 @@ struct ContentView: View {
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)
-                    .foregroundStyle(sottotitolo == "MARK VII-5.0" ? Color.tenue : Color.ciano)
+                    .foregroundStyle(sottotitolo == "MARK VIII-1.0" ? Color.tenue : Color.ciano)
                     .contentTransition(.numericText())
                     .id(sottotitolo)
                     .transition(.opacity)
@@ -951,7 +951,7 @@ struct TelemetriaHUD: View {
             let k = Int(ctx.date.timeIntervalSinceReferenceDate / 2.5)
             let ora = Date().formatted(.dateTime.hour().minute().second())
             let voci = ["SISTEMI NOMINALI", "VOCE \(Impostazioni.voceCloud ? "CLOUD" : "LOCALE")", "ORECCHIO \(Impostazioni.interruzioneVocale ? "ATTIVO" : "SPENTO")",
-                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VII-5.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
+                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VIII-1.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
             let riga = fase == .elaboro ? "ELABORAZIONE IN CORSO" : (fase == .ascolto ? "CANALE AUDIO APERTO" : voci[k % voci.count])
             Text(riga)
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
@@ -1288,7 +1288,7 @@ struct Fotocamera: UIViewControllerRepresentable {
     }
 }
 
-/// La riga di «MARK VII-5.0»: le icone in alto a destra si allineano al centro di quella scritta.
+/// La riga di «MARK VIII-1.0»: le icone in alto a destra si allineano al centro di quella scritta.
 extension VerticalAlignment {
     nonisolated private enum RigaMark: AlignmentID {
         static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }

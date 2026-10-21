@@ -298,7 +298,7 @@ struct VistaOrologio: View {
                 Task { @MainActor in try? await Task.sleep(for: .seconds(1.3 / v)); chatDa = nil }
             }
             try? await Task.sleep(for: .seconds(2.2 / v))
-            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VII" }
+            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK VIII" }
         }
     }
 
@@ -329,7 +329,7 @@ struct VistaOrologio: View {
                 Text(titolo)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .tracking(1.5)
-                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK VII" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
+                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK VIII" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
                     .id(titolo)
                     .transition(.opacity)
                     .opacity(acceso ? 1 : 0)
