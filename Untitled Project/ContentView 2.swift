@@ -46,7 +46,7 @@ struct ContentView: View {
         let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
         let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
         let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
-        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
+        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente   // LiDAR: il microfono resta acceso, si parla con JARVIS mentre scansiona
         return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
     }
     @FocusState private var tastiera: Bool
@@ -127,8 +127,9 @@ struct ContentView: View {
             VistaWiretap(verbale: { testo, minuti in
                 mostraWiretap = false
                 jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
         }
+        .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
         // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
@@ -180,7 +181,9 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $mostraLidar) {
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
+                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
+        .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
         .sheet(isPresented: $mostraVitals) {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
@@ -690,6 +693,12 @@ struct ContentView: View {
             scheda = nil
         case .apri(let r):
             apriReparto(r)
+        case .interprete(let codice):
+            mostraSentinella = false
+            mostraWiretap = false
+            Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
+        default:
+            break                                   // gli altri li gestisce il reparto stesso
         }
     }
 

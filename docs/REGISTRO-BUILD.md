@@ -9,7 +9,8 @@ Per ogni build: cosa contiene, se è stata provata, com'è andata.
 | 8.0 (2) | 0a77723 | + guardia sul microfono | no (mai caricata) | — |
 | 8.0 (3) | 0485044 | microfono dell'attesa come il 20 ott mattina | sì | ✗ stesso problema |
 | 8.0 (4) | aa10955 | + audio normale a fine avvio | no | — |
-| 8.0 (5) | e5a8f48 | **tutta l'app come il 20 ott alle 20:57** (b0ebe03), subito prima della modifica del volume all'avvio; solo nome MARK VIII e numeri | da provare | |
+| 8.0 (5) | e5a8f48 | **tutta l'app come il 20 ott alle 20:57** (b0ebe03), subito prima della modifica del volume all'avvio; solo nome MARK VIII e numeri | | |
+| 8.0 (6) | (questo) | 8.0 (5) + musica d'avvio +2 dB (solo il file, nessuna modifica all'audio dell'iPhone) + comandi vocali di stamattina: LiDAR (microfono acceso, fine/misure/capienza/salva/3D), Sentinella, Wiretap, «traduci in inglese» (anche Watch), Allenatore, Interprete, comandi rapidi. Microfono e conversazione: come 8.0 (5) | da provare | |
 
 Punto fermo: la conversazione era perfetta prima della modifica del volume (403ce34, 20 ott 21:40).
 Dopo la 8.0 (5), se il dialogo va, si rimettono uno alla volta: volume all'avvio, comandi LiDAR/Sentinella/Wiretap,

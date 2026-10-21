@@ -90,6 +90,7 @@ final class ArchivioLidar: ObservableObject {
 struct VistaLidar: View {
     let chiudi: () -> Void
     let chiedi: (String) -> Void
+    @EnvironmentObject var jarvis: Jarvis
     @StateObject private var archivio = ArchivioLidar.condiviso
     @State private var fase: Fase = LidarSupporto.disponibile ? .scansione : .nonDisponibile
     @State private var risultato: ScansioneLidar?
@@ -114,6 +115,47 @@ struct VistaLidar: View {
         .preferredColorScheme(.dark)
         .statusBarHidden(fase == .scansione || fase == .elaboro)
         .aperturaHUD("LiDAR", fotocamera: LidarSupporto.disponibile)
+        .onChange(of: jarvis.azioneLidar) { _, a in
+            guard let a else { return }
+            jarvis.azioneLidar = nil
+            aVoce(a)
+        }
+    }
+
+    // MARK: Comandi a voce
+
+    /// «Fine scansione», «quanto è grande?», «quante persone ci stanno?», «salva», «mostrami il 3D»: come i tasti.
+    private func aVoce(_ a: ComandoVocale.AzioneLidar) {
+        let inScansione = fase == .scansione || fase == .elaboro
+        switch a {
+        case .fine:
+            if fase == .scansione && avviso == nil {
+                fase = .elaboro
+                fermaScansione = true
+                jarvis.annuncia("Elaboro la pianta, Sir.")
+            } else if !inScansione, risultato != nil {
+                vista = .pianta
+            }
+        case .misure:
+            let area = risultato?.area ?? (inScansione ? dalVivo.area : 0)
+            guard area > 0 else { jarvis.annuncia(inScansione ? "Il pavimento non l'ho ancora preso, Sir: continui lungo le pareti." : "Non ho una scansione aperta, Sir."); return }
+            var frase = "Circa \(LidarFormato.n(area)) metri quadri"
+            if let s = risultato, s.altezza > 0 { frase += ", alta \(LidarFormato.n(s.altezza, 2)) metri" }
+            jarvis.annuncia(frase + ", Sir.")
+        case .capienza:
+            let area = risultato?.area ?? (inScansione ? dalVivo.area : 0)
+            guard area > 0 else { jarvis.annuncia(inScansione ? "Mi serve ancora il pavimento, Sir." : "Non ho una scansione aperta, Sir."); return }
+            jarvis.annuncia("Circa \(Int(area * 1.2)) persone, Sir, a 1,2 per metro quadro. Quella vera la fissano uscite e commissione.")
+        case .salva:
+            guard let s = risultato, !inScansione else { jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir."); return }
+            if archivio.contiene(s) { jarvis.annuncia("È già nell'archivio, Sir."); return }
+            archivio.salva(s)
+            jarvis.annuncia("Salvata nell'archivio, Sir.")
+        case .tre:
+            guard let s = risultato, !inScansione else { jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir."); return }
+            guard FileManager.default.fileExists(atPath: s.file3D.path) else { jarvis.annuncia("Il modello 3D non c'è per questa scansione, Sir."); return }
+            vista = .tre
+        }
     }
 
     // MARK: Scansione
