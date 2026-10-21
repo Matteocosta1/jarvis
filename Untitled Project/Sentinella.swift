@@ -417,13 +417,7 @@ struct VistaSentinella: View {
                 chiudi()
                 return
             }
-            orecchio.dentro = .sentinella
             orecchio.comando = { c in
-                switch c {
-                case .sentinella(.registro): oscurato = false; registro = true; return   // «Jarvis, chi è passato?»
-                case .sentinella(.schermoNero): registro = false; oscurato = true; return  // «Jarvis, schermo nero»
-                default: break
-                }
                 if c == .torna { s.ferma() }
                 comando(c)
             }

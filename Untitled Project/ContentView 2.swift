@@ -46,7 +46,7 @@ struct ContentView: View {
         let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
         let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
         let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
-        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente   // LiDAR: il microfono resta acceso, si parla con JARVIS mentre scansiona
+        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
         return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
     }
     @FocusState private var tastiera: Bool
@@ -127,9 +127,8 @@ struct ContentView: View {
             VistaWiretap(verbale: { testo, minuti in
                 mostraWiretap = false
                 jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto)
         }
-        .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
         // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
@@ -181,9 +180,7 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $mostraLidar) {
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
-                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
-        .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
         .sheet(isPresented: $mostraVitals) {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
@@ -282,7 +279,7 @@ struct ContentView: View {
                 jarvis.ascoltaSubito()
             }
             try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
-            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VIII-1.0" }
+            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK VII-5.0" }
         }
     }
 
@@ -351,7 +348,7 @@ struct ContentView: View {
     }
 
     private var intestazione: some View {
-        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VIII-1.0», strette tra loro
+        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VII-5.0», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
                 (Text("J.A.R.V.I.").tracking(5) + Text("S."))
@@ -361,7 +358,7 @@ struct ContentView: View {
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)
-                    .foregroundStyle(sottotitolo == "MARK VIII-1.0" ? Color.tenue : Color.ciano)
+                    .foregroundStyle(sottotitolo == "MARK VII-5.0" ? Color.tenue : Color.ciano)
                     .contentTransition(.numericText())
                     .id(sottotitolo)
                     .transition(.opacity)
@@ -693,12 +690,6 @@ struct ContentView: View {
             scheda = nil
         case .apri(let r):
             apriReparto(r)
-        case .interprete(let codice):
-            mostraSentinella = false
-            mostraWiretap = false
-            Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
-        default:
-            break                                   // gli altri li gestisce il reparto stesso
         }
     }
 
@@ -950,7 +941,7 @@ struct TelemetriaHUD: View {
             let k = Int(ctx.date.timeIntervalSinceReferenceDate / 2.5)
             let ora = Date().formatted(.dateTime.hour().minute().second())
             let voci = ["SISTEMI NOMINALI", "VOCE \(Impostazioni.voceCloud ? "CLOUD" : "LOCALE")", "ORECCHIO \(Impostazioni.interruzioneVocale ? "ATTIVO" : "SPENTO")",
-                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VIII-1.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
+                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK VII-5.0 · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
             let riga = fase == .elaboro ? "ELABORAZIONE IN CORSO" : (fase == .ascolto ? "CANALE AUDIO APERTO" : voci[k % voci.count])
             Text(riga)
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
@@ -1287,7 +1278,7 @@ struct Fotocamera: UIViewControllerRepresentable {
     }
 }
 
-/// La riga di «MARK VIII-1.0»: le icone in alto a destra si allineano al centro di quella scritta.
+/// La riga di «MARK VII-5.0»: le icone in alto a destra si allineano al centro di quella scritta.
 extension VerticalAlignment {
     nonisolated private enum RigaMark: AlignmentID {
         static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
