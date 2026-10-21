@@ -1,6 +1,7 @@
 #if os(iOS)
 import AVFoundation
 import Speech
+import CallKit
 
 /// Il richiamo: quando JARVIS è in attesa e l'app è aperta, ascolta in silenzio e si sveglia solo sentendo «Jarvis».
 /// «Jarvis, che tempo fa domani»: raccoglie la frase intera (stesse pause dell'ascolto normale) e la consegna.
@@ -46,6 +47,12 @@ final class Richiamo {
     private var inizioSegmento = 0       // da quale parola comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimeParole = 0
     private var ultimoParziale = Date.distantPast
+    /// Un solo nuovo tentativo d'accensione alla volta: niente raffiche sovrapposte.
+    private var tentativo: Task<Void, Never>?
+    /// L'iPhone ha dato l'audio a una chiamata o a un'altra app: si aspetta che lo restituisca, senza insistere.
+    private var interrotto = false
+    private var osservatori: [NSObjectProtocol] = []
+    private let chiamate = OsservaChiamate()
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
@@ -77,21 +84,76 @@ final class Richiamo {
 
     var attivo: Bool { voluto }
 
+    init() {
+        let centro = NotificationCenter.default
+        // chiamata (anche WhatsApp, che passa da CallKit), sveglia, Siri, un'altra app che prende l'audio
+        osservatori.append(centro.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] n in
+            let inizio = (n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                .flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began
+            Task { @MainActor [weak self] in self?.interruzione(iniziata: inizio) }
+        })
+        // i servizi audio dell'iPhone ripartiti da capo: tutto il microfono va rifatto
+        osservatori.append(centro.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.voluto else { return }
+                self.spegni()
+                self.accendi()
+            }
+        })
+        chiamate.finite = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.voluto, !self.acceso else { return }
+                self.interrotto = false
+                self.accendi()                         // chiamata chiusa: riparte subito
+            }
+        }
+    }
+
     func avvia() {
         guard !voluto else { return }
         voluto = true
+        interrotto = false      // a volte l'iPhone non avvisa che l'interruzione è finita: a ogni nuova attesa si riparte puliti
         accendi()
     }
 
     func ferma() {
         voluto = false
+        tentativo?.cancel(); tentativo = nil
         spegni()
     }
 
+    /// Riprova ad accendersi fra `ms` millisecondi, finché è voluto. Sostituisce un tentativo già in attesa.
+    private func riprova(fra ms: Int) {
+        tentativo?.cancel()
+        tentativo = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(ms))
+            guard let self, !Task.isCancelled, self.voluto, !self.acceso else { return }
+            self.tentativo = nil
+            self.accendi()
+        }
+    }
+
+    private func interruzione(iniziata: Bool) {
+        if iniziata {
+            interrotto = true
+            tentativo?.cancel(); tentativo = nil
+            spegni()                                   // il microfono l'ha preso un altro: si tace e si aspetta
+        } else {
+            interrotto = false
+            guard voluto, !acceso else { return }
+            accendi()                                  // l'audio è tornato: riparte subito
+        }
+    }
+
     private func accendi() {
-        guard voluto, !acceso, let riconoscitore, riconoscitore.isAvailable else { return }
+        guard voluto, !acceso else { return }
+        // senza permessi non serve riprovare: li dà il signore nelle Impostazioni
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
+        // chiamata in corso o audio preso da un'altra app: non si disturba, si riparte quando finisce
+        if interrotto || chiamate.inCorso { return }
+        // riconoscimento non pronto (succede per un attimo dopo che JARVIS ha parlato): riprova ogni mezzo secondo
+        guard let riconoscitore, riconoscitore.isAvailable else { riprova(fra: 500); return }
         do {
             if !motore.isRunning {
                 let sessione = AVAudioSession.sharedInstance()
@@ -119,11 +181,9 @@ final class Richiamo {
             programmaRiavvio()
         } catch {
             spegni()
-            // microfono occupato (un'altra app, una chiamata): riprovo fra poco
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(3))
-                self?.accendi()
-            }
+            // microfono occupato: durante una chiamata si aspetta la fine (ci pensa OsservaChiamate),
+            // altrimenti si riprova ogni secondo
+            if !chiamate.inCorso && !interrotto { riprova(fra: 1000) }
         }
     }
 
@@ -197,10 +257,7 @@ final class Richiamo {
         timerTetto?.invalidate(); timerTetto = nil
         guard motore.isRunning, let riconoscitore else {
             spegni()
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(250))
-                self?.accendi()
-            }
+            riprova(fra: 250)
             return
         }
         // il riconoscimento si è chiuso appena partito (un errore): non riparto a raffica, aspetto un attimo
@@ -532,6 +589,22 @@ nonisolated final class Condotto: @unchecked Sendable {
             destinazione[k].update(from: sorgente[k], count: Int(b.frameLength))
         }
         return c
+    }
+}
+/// Sa se c'è una chiamata in corso (telefono, WhatsApp, FaceTime: tutte passano da CallKit) e avvisa quando finisce.
+nonisolated final class OsservaChiamate: NSObject, CXCallObserverDelegate {
+    private let osservatore = CXCallObserver()
+    var finite: (() -> Void)?
+
+    override init() {
+        super.init()
+        osservatore.setDelegate(self, queue: .main)
+    }
+
+    var inCorso: Bool { osservatore.calls.contains { !$0.hasEnded } }
+
+    func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
+        if !inCorso { finite?() }
     }
 }
 #endif
