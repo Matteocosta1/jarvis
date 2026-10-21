@@ -473,8 +473,6 @@ nonisolated final class BattitoMani: @unchecked Sendable {
             } else if ora >= pausaFino, picco > max(minimoPicco, fondo * 10), energia > fondo * 5 {
                 if BattitoMani.daIgnorare {
                     primoBattito = -1                             // un suono dell'app: non conta
-                } else if primoBattito < 0 && AmbienteSonoro.condiviso.affollato && picco < 0.3 {
-                    // musica o folla intorno: nessun primo battito
                 } else {
                     candidato = (ora, energia, 0, 0)
                 }

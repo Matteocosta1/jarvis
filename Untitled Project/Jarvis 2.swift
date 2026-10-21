@@ -533,7 +533,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Sottovoce («Jarvis, piano, …»)
 
-    /// «Piano» all'inizio della frase: JARVIS risponde sottovoce (in chiesa, in riunione, con qualcuno che dorme…) per 10 minuti,
+    /// «Piano» (entro le prime cinque parole): JARVIS risponde sottovoce (in chiesa, in riunione, con qualcuno che dorme…) per 10 minuti,
     /// e ogni «piano» li rinnova. «Voce normale» (o «parla normale», «alza la voce») torna come prima.
     private static var sottovoceFino = Date.distantPast
     static var volumeVoce: Float { Date() < sottovoceFino ? 0.05 : 1 }   // sottovoce: appena udibile, da vicino
@@ -549,7 +549,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         var parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         let pulita: (String) -> String = { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
-        guard let k = parole.prefix(3).firstIndex(where: { ["piano", "sottovoce"].contains(pulita($0)) }) else { return frase }
+        guard let k = parole.prefix(5).firstIndex(where: { ["piano", "sottovoce"].contains(pulita($0)) }) else { return frase }
         parole.remove(at: k)
         Jarvis.sottovoceFino = Date().addingTimeInterval(600)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -1821,6 +1821,7 @@ final class VoceCloud: NSObject {
     private func suona(_ dati: Data) async -> Bool {
         guard let p = try? AVAudioPlayer(data: dati) else { return false }
         p.delegate = self
+        p.volume = Jarvis.volumeVoce                   // sottovoce anche per le frasi già pronte
         lettore = p
         Volume.segui(p)
         return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
