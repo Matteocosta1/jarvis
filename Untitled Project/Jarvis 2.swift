@@ -219,6 +219,13 @@ final class Jarvis: NSObject, ObservableObject {
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
+        // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
+        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
+            BattitoMani.tastieraAperta(true)
+        }
+        NotificationCenter.default.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { _ in
+            BattitoMani.tastieraAperta(false)
+        }
         carica()
     }
 

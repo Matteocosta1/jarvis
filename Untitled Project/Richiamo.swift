@@ -432,7 +432,11 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     static func ignora(per secondi: TimeInterval) {
         lockIgnora.lock(); ignoraFino = max(ignoraFino, Date().addingTimeInterval(secondi)); lockIgnora.unlock()
     }
-    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino }
+    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino || tastiera }
+
+    /// Tastiera aperta: i suoi click dall'altoparlante sembrano battiti di mani, quindi finché si scrive non contano.
+    private nonisolated(unsafe) static var tastiera = false
+    static func tastieraAperta(_ aperta: Bool) { lockIgnora.lock(); tastiera = aperta; lockIgnora.unlock() }
 
     /// Microfono appena riacceso: si riparte puliti (niente colpi a metà rimasti dalla volta prima).
     func azzera() { lock.lock(); candidato = nil; primoBattito = -1; pausaFino = 0; lock.unlock() }
