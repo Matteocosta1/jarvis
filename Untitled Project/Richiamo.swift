@@ -51,6 +51,8 @@ final class Richiamo {
     private var tentativo: Task<Void, Never>?
     /// L'iPhone ha dato l'audio a una chiamata o a un'altra app: si aspetta che lo restituisca, senza insistere.
     private var interrotto = false
+    /// La guardia: ogni secondo controlla che il microfono dell'attesa senta davvero, e se no lo rifà da capo.
+    private var timerGuardia: Timer?
     private var osservatori: [NSObjectProtocol] = []
     private let chiamate = OsservaChiamate()
 
@@ -113,12 +115,14 @@ final class Richiamo {
         guard !voluto else { return }
         voluto = true
         interrotto = false      // a volte l'iPhone non avvisa che l'interruzione è finita: a ogni nuova attesa si riparte puliti
+        avviaGuardia()
         accendi()
     }
 
     func ferma() {
         voluto = false
         tentativo?.cancel(); tentativo = nil
+        timerGuardia?.invalidate(); timerGuardia = nil
         spegni()
     }
 
@@ -133,11 +137,36 @@ final class Richiamo {
         }
     }
 
+    /// Finché il richiamo è voluto, ogni secondo: se il microfono è spento o non arriva più audio da 2 secondi
+    /// (motore fermato dall'iPhone, cambio di cuffie, riconoscimento morto), si rifà tutto da capo.
+    /// Così, qualunque sia la causa, JARVIS non resta mai sordo più di un paio di secondi.
+    private func avviaGuardia() {
+        timerGuardia?.invalidate()
+        timerGuardia = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.guardia() }
+        }
+    }
+
+    private func guardia() {
+        guard voluto, !chiamate.inCorso else { return }
+        if !acceso {
+            if tentativo == nil { accendi() }          // spento e nessun tentativo in arrivo: ci riprovo io
+            return
+        }
+        let muto = Date().timeIntervalSince(condotto.ultimoAudio) > 2
+        guard !motore.isRunning || muto else { return }
+        spegni()
+        accendi()
+    }
+
     private func interruzione(iniziata: Bool) {
         if iniziata {
             interrotto = true
             tentativo?.cancel(); tentativo = nil
             spegni()                                   // il microfono l'ha preso un altro: si tace e si aspetta
+            // l'iPhone non sempre avvisa quando l'interruzione finisce: senza chiamata in corso si riprova ogni secondo
+            // (finché l'audio è occupato il tentativo fallisce da solo, senza disturbare)
+            if !chiamate.inCorso { riprova(fra: 1000) }
         } else {
             interrotto = false
             guard voluto, !acceso else { return }
@@ -150,8 +179,9 @@ final class Richiamo {
         // senza permessi non serve riprovare: li dà il signore nelle Impostazioni
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
-        // chiamata in corso o audio preso da un'altra app: non si disturba, si riparte quando finisce
-        if interrotto || chiamate.inCorso { return }
+        // chiamata in corso: non si disturba, si riparte quando finisce (OsservaChiamate e la guardia)
+        if chiamate.inCorso { return }
+        interrotto = false
         // riconoscimento non pronto (succede per un attimo dopo che JARVIS ha parlato): riprova ogni mezzo secondo
         guard let riconoscitore, riconoscitore.isAvailable else { riprova(fra: 500); return }
         do {
@@ -176,6 +206,7 @@ final class Richiamo {
             } else {
                 try? AVAudioSession.sharedInstance().setActive(true)    // il motore gira: l'audio dev'essere acceso anche lui
             }
+            condotto.segnaAudio()                      // appena acceso: la guardia gli lascia il tempo di partire
             azzera()
             nuovoRiconoscimento(riconoscitore, recentiDa: nil)
             programmaRiavvio()
@@ -183,7 +214,7 @@ final class Richiamo {
             spegni()
             // microfono occupato: durante una chiamata si aspetta la fine (ci pensa OsservaChiamate),
             // altrimenti si riprova ogni secondo
-            if !chiamate.inCorso && !interrotto { riprova(fra: 1000) }
+            if !chiamate.inCorso { riprova(fra: 1000) }
         }
     }
 
@@ -556,11 +587,17 @@ nonisolated final class Condotto: @unchecked Sendable {
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var recenti: [(buffer: AVAudioPCMBuffer, quando: Date)] = []
     private var fine = Date.distantPast
+    private var audio = Date.distantPast
+
+    /// L'ultimo istante in cui dal microfono è arrivato audio.
+    var ultimoAudio: Date { lock.lock(); defer { lock.unlock() }; return audio }
+    func segnaAudio() { lock.lock(); audio = Date(); lock.unlock() }
 
     func scrivi(_ b: AVAudioPCMBuffer) {
         let copia = Condotto.copia(b)
         let adesso = Date()
         lock.lock()
+        audio = adesso
         richiesta?.append(b)
         if let copia { recenti.append((copia, adesso)) }
         while let p = recenti.first, adesso.timeIntervalSince(p.quando) > 1.5 { recenti.removeFirst() }
