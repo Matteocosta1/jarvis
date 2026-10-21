@@ -13,13 +13,19 @@ import UIKit
 enum Suoni {
     static var attivi: Bool { UserDefaults.standard.object(forKey: "suoni") as? Bool ?? true }
 
-    /// All'apertura l'audio dell'iPhone va preso SUBITO, prima della musica d'avvio: finché l'app non attiva la sessione,
-    /// i tasti del volume regolano la suoneria e i suoni escono a un volume che non si sposta (era l'avvio «basso»).
-    /// «ambient»: rispetta il silenzioso e non ferma la musica di altre app; poi l'ascolto e la voce la cambiano come sempre.
+    /// All'apertura l'audio dell'iPhone va preso SUBITO, prima della musica d'avvio: l'avvio ha la precedenza.
+    /// «playback»: suona anche col silenzioso, la musica di altre app si abbassa, i tasti del volume regolano JARVIS.
     static func preparaAudio() {
         let s = AVAudioSession.sharedInstance()
-        if s.category == .soloAmbient { try? s.setCategory(.ambient, mode: .default, options: []) }
+        try? s.setCategory(.playback, mode: .default, options: [.duckOthers])
         try? s.setActive(true)
+    }
+
+    /// Finito l'avvio: l'audio torna come prima (la musica delle altre app risale); poi l'ascolto e la voce lo prendono come sempre.
+    static func fineAvvioAudio() {
+        let s = AVAudioSession.sharedInstance()
+        try? s.setActive(false, options: .notifyOthersOnDeactivation)
+        try? s.setCategory(.ambient, mode: .default, options: [])
     }
 
     /// Tocco su un'icona o sul reattore.
@@ -112,7 +118,7 @@ enum Suoni {
     static func plim(_ indice: Int) {
         guard attivi else { return }
         if indice == 0, let url = file("avvio") { riproduci(url, volume: 1.0) }   // musica d'avvio: 100%
-        if let url = file("plim") { riproduci(url, volume: 0.6); return }   // pim delle icone: 60%
+        if let url = file("plim") { riproduci(url, volume: 1.0); return }   // pim delle icone: 100% (l'avvio si deve sentire)
         let stile = UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off"   // sintesi solo se scelta apposta
         guard stile != "off" else { return }
         let k = min(max(indice, 0), 23)
