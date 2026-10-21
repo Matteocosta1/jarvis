@@ -162,7 +162,9 @@ struct Interprete: View {
             switch a {
             case .ascoltaMe: orecchio.ferma(); motore.ascolta(.io, lingua: lin)
             case .ascoltaAltro: orecchio.ferma(); motore.ascolta(.altro, lingua: lin)
-            case .ripeti: orecchio.ferma(); motore.ripeti(lin)
+            case .ripeti:                                   // niente da ripetere: l'ascolto dei comandi resta acceso
+                orecchio.ferma(); motore.ripeti(lin)
+                if motore.fase == .attesa { orecchio.avvia() }
             case .turniAutomatici(let si):
                 automatico = si
                 orecchio.ferma(); motore.annuncia(si ? "Turni automatici, Sir." : "Turni manuali, Sir.")

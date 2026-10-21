@@ -259,15 +259,15 @@ enum ComandoVocale: Equatable {
             if t.count <= 7 {
                 if uno([" emergenza ", " 112 ", " centododici ", " cento dodici ", " chiama i soccorsi ", " soccorso "]) { return .scheda(.bea112) }
                 if uno([" ti penso ", " pensiero ", " qualcosa di carino ", " qualcosa di dolce ", " qualcosa di romantico ", " un messaggio carino ",
-                        " mandale un pensiero ", " dille che la penso ", " dille che la amo ", " falle una sorpresa ", " scrivile qualcosa ", " dolce "]) { return .scheda(.beaTiPenso) }
-                if c(" whatsapp ") { return .scheda(.beaWhatsApp) }
-                if uno([" chiamala ", " chiama ", " telefonale ", " fammi parlare con lei ", " voglio sentirla "]) { return .scheda(.beaChiama) }
-                if uno([" scrivile ", " mandale un messaggio ", " messaggio ", " sms "]) { return .scheda(.beaMessaggio) }
+                        " mandale un pensiero ", " dille che la penso ", " dille che la amo ", " falle una sorpresa ", " scrivile qualcosa "]) { return .scheda(.beaTiPenso) }
+                if solo([" whatsapp ", " su whatsapp ", " scrivile su whatsapp ", " whatsapp a bea ", " mandale un whatsapp "]) { return .scheda(.beaWhatsApp) }
+                if uno([" chiamala ", " chiama bea ", " telefonale ", " telefona a bea ", " fammi parlare con lei ", " voglio sentirla "]) { return .scheda(.beaChiama) }
+                if uno([" scrivile ", " mandale un messaggio ", " mandale un sms ", " scrivi a bea "]) { return .scheda(.beaMessaggio) }
             }
         case .email?:
             if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri l app della posta ", " apri posta ", " apri la posta ", " vai su mail "]) { return .scheda(.apriMail) }
-            if solo(generiche) || uno([" riassumi ", " riassumimi ", " riassunto ", " cosa conta ", " cosa c e ", " c e qualcosa ", " qualcosa di importante ",
-                    " qualcosa di urgente ", " mail importanti ", " novita ", " leggimele ", " cosa mi e arrivato ", " chi mi ha scritto ", " cosa devo leggere "]) {
+            if solo(generiche) || uno([" riassumi ", " riassumimi ", " riassunto ", " cosa conta ", " qualcosa di importante ",
+                    " qualcosa di urgente ", " mail importanti ", " leggimele ", " cosa mi e arrivato ", " chi mi ha scritto ", " cosa devo leggere "]) || solo([" cosa c e ", " novita "]) {
                 return .scheda(.postaRiassumi)
             }
         case .spesa?:
@@ -284,7 +284,7 @@ enum ComandoVocale: Equatable {
                     " un altro codice ", " vai col prossimo ", " avanti "]) { return .scheda(.scannerAltro) }
             if uno([" ingredienti ", " cosa c e dentro ", " additivi ", " di cosa e fatto ", " cosa contiene ", " etichetta ", " composizione "]) { return .scheda(.scannerIngredienti) }
             if solo(generiche) || uno([" fa bene ", " fa male ", " e sano ", " e buono ", " lo compro ", " lo prendo ", " conviene ", " e una buona scelta ",
-                    " com e ", " voto ", " alternativa ", " c e di meglio ", " posso mangiarlo ", " lo posso prendere ", " giudizio "]) { return .scheda(.scannerGiudizio) }
+                    " voto ", " alternativa ", " c e di meglio ", " posso mangiarlo ", " lo posso prendere ", " giudizio "]) { return .scheda(.scannerGiudizio) }
         case .profiler?:
             // la scheda del soggetto dettata: «si chiama Marco Rossi», «è il fornitore audio», «lavora come gestore del locale»
             func coda(dopo n: Int) -> String? { let r = t.dropFirst(n).joined(separator: " "); return r.isEmpty ? nil : r }
@@ -322,7 +322,7 @@ enum ComandoVocale: Equatable {
         }
 
         let verbi = ["attiva", "apri", "aprimi", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra",
-                     "mostra", "mostrami", "portami", "andiamo", "dammi", "vediamo", "facciamo"]
+                     "mostra", "mostrami", "portami", "vediamo"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
 
         if c(" sentinella ") && comanda { return .apri(.sentinella) }
@@ -359,7 +359,7 @@ enum ComandoVocale: Equatable {
                       " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
             (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
-        let conVerbo = t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "andiamo", "dammi", "vediamo"].contains($0) })
+        let conVerbo = t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "vediamo"].contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
         if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "portami"].contains($0) }) {
