@@ -14,6 +14,7 @@ Per ogni build: cosa contiene, se è stata provata, com'è andata.
 | 8.0 (7) | 2ed4221 | **identica a ieri sera, Build 20 con LiDAR (b0ebe03, 20 ott 20:57)**, scritta MARK VII-5.0 compresa: cambia solo il numero di build. Annulla tutto quello fatto oggi (comandi, volume, microfono) | da provare | |
 | 8.0 (8) | 0cc3062 | 8.0 (7) + **solo** menu SISTEMI: le 4 richieste partono insieme; se il menu si chiude prima della fine non scrive più «non raggiungibile». Nient'altro | da provare | |
 | 8.0 (9) | 184b524 | 8.0 (8) + tre ritocchi: «piano/sottovoce» entro le prime 5 parole (prima 3); volume basso anche sulle frasi già pronte (piano dalla prima sillaba); battito di mani valido sempre (tolta la regola dei 12 s di «confusione», che scartava i primi battiti dopo voce o musica) | da provare | |
+| 8.0 (10) | (questo) | 8.0 (9) + **solo** LiDAR: «guarda» durante la scansione prende la foto dalla fotocamera di LiDAR (niente Occhi, la scansione non si ferma e non va al nero); fuori da LiDAR «guarda» resta come prima | da provare | |
 
 Nota 21 ott pomeriggio: fotocamere bloccate in tutte le build (anche la 6.0 (20) di ieri) → era l'iPhone; risolto col riavvio.
 

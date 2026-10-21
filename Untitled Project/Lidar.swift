@@ -6,7 +6,17 @@ import UIKit
 import simd
 #if canImport(RoomPlan)
 import RoomPlan
+import ARKit
+import CoreImage
+import ImageIO
 #endif
+
+/// «Guarda» mentre LiDAR scansiona: la foto si prende dalla fotocamera che LiDAR sta già usando,
+/// senza aprire Occhi (che le porterebbe via la fotocamera e lascerebbe la scansione al nero).
+/// nil quando non c'è una scansione in corso: allora «guarda» apre Occhi come sempre.
+enum OcchiLidar {
+    static var scatta: (() -> Data?)?
+}
 
 // MARK: - LiDAR (STRUMENTI)
 // La scansione di una stanza con il LiDAR dell'iPhone (RoomPlan di Apple): pareti, porte, finestre, aperture e mobili.
@@ -539,17 +549,31 @@ struct CatturaStanza: UIViewRepresentable {
         v.captureSession.delegate = context.coordinator
         context.coordinator.vista = v
         v.captureSession.run(configuration: RoomCaptureSession.Configuration())
+        OcchiLidar.scatta = { [weak v] in v.flatMap { CatturaStanza.fotogramma($0) } }
         return v
     }
     func updateUIView(_ v: RoomCaptureView, context: Context) {
         if ferma && !context.coordinator.fermata {
             context.coordinator.fermata = true
+            OcchiLidar.scatta = nil                    // scansione finita: «guarda» torna a Occhi
             v.captureSession.stop()
         }
     }
     static func dismantleUIView(_ v: RoomCaptureView, coordinator: Regista) {
         coordinator.annullata = true
+        OcchiLidar.scatta = nil
         if !coordinator.fermata { v.captureSession.stop() }
+    }
+
+    /// L'immagine che la fotocamera di LiDAR sta vedendo adesso, dritta (verticale) e in JPEG, lato lungo massimo 1600 px.
+    static func fotogramma(_ v: RoomCaptureView) -> Data? {
+        guard let frame = v.captureSession.arSession.currentFrame else { return nil }
+        var immagine = CIImage(cvPixelBuffer: frame.capturedImage).oriented(.right)
+        let lato = max(immagine.extent.width, immagine.extent.height)
+        if lato > 1600 { immagine = immagine.transformed(by: CGAffineTransform(scaleX: 1600 / lato, y: 1600 / lato)) }
+        guard let spazio = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        return CIContext().jpegRepresentation(of: immagine, colorSpace: spazio,
+                                              options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.8])
     }
 
     /// Riceve gli aggiornamenti della sessione e il risultato della vista. NSCoding lo chiede il protocollo di Apple.
