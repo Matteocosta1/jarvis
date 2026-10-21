@@ -22,7 +22,9 @@ enum Suoni {
     }
 
     /// Finito l'avvio: l'audio torna come prima (la musica delle altre app risale); poi l'ascolto e la voce lo prendono come sempre.
-    static func fineAvvioAudio() {
+    static func fineAvvioAudio() async {
+        // prima finiscono i suoni ancora in corso («in linea», la coda della musica): spegnere l'audio li taglierebbe
+        for _ in 0..<30 where lettori.contains(where: { $0.isPlaying }) { try? await Task.sleep(for: .milliseconds(100)) }
         let s = AVAudioSession.sharedInstance()
         try? s.setActive(false, options: .notifyOthersOnDeactivation)
         try? s.setCategory(.ambient, mode: .default, options: [])

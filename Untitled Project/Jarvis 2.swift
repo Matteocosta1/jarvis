@@ -1398,12 +1398,15 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase == .attesa || fase == .elaboro || fase == .parlo else { return }
         if Date() > dettoMacFino { dettoMac = "" }
         if Jarvis.eEco(testo, detto: dettoMac) { return }                 // è la sua stessa voce: non è il signore
+        // musica, TV o gente intorno: vale solo una frase col suo nome (o la frase di Tony); il resto della stanza non è per lui
+        if AmbienteSonoro.condiviso.affollato {
+            let basso = testo.lowercased()
+            guard Richiamo.nomi.contains(where: { basso.contains($0) }) || Benvenuto.eFraseDiTony(testo) else { return }
+        }
         if Jarvis.eSoloSilenzio(testo) {                                   // «Jarvis, muto», «basta», «stop»: tace e resta in attesa
             if fase != .attesa { mettiInAttesa() }
             return
         }
-        // musica, TV o gente intorno: vale solo «Jarvis, …» (o la frase di Tony), il resto della stanza non è per lui
-        if AmbienteSonoro.condiviso.affollato && Richiamo.dopoRichiamo(testo) == nil && !Benvenuto.eFraseDiTony(testo) { return }
         if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
             interrottoAVoce(testo)
             return

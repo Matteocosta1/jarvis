@@ -279,7 +279,7 @@ enum ComandoVocale: Equatable {
             if t.count <= 6, uno([" girati ", " gira la fotocamera ", " girala ", " cambia fotocamera ", " cambia camera ", " selfie ", " fai un selfie ",
                     " fotocamera davanti ", " fotocamera dietro ", " camera davanti ", " camera dietro ", " inquadra me ", " inquadrami ", " guardami ",
                     " guarda me ", " gira ", " girà "]) { return .scheda(.occhiGira) }
-            if t.count <= 5, uno([" zoom normale ", " normale ", " uno x ", " 1x ", " togli lo zoom ", " senza zoom "]) { return .scheda(.occhiZoomNormale) }
+            if t.count <= 5, uno([" zoom normale ", " uno x ", " 1x ", " togli lo zoom ", " senza zoom "]) || solo([" normale "]) { return .scheda(.occhiZoomNormale) }
             if t.count <= 5, uno([" allarga ", " allargati ", " piu largo ", " zoom indietro ", " meno zoom ", " grandangolo ", " rimpicciolisci ",
                     " allontana ", " allontanati ", " indietro con lo zoom "]) { return .scheda(.occhiZoomIndietro) }
             if t.count <= 5, uno([" zoom ", " zooma ", " zoomma ", " avvicina ", " avvicinati ", " piu vicino ", " ingrandisci ", " zoom avanti ",

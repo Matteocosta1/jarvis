@@ -55,6 +55,7 @@ enum SuoniOrologio {
         p.volume = 1.0
         lettoreScheda?.stop()
         lettoreScheda = p
+        MicOrologio.ignora(per: p.duration)
         p.play()
     }
     /// Una sezione si apre (caricamento) e quando è pronta: «scheda» e «schedapronta», come sull'iPhone.
@@ -64,6 +65,7 @@ enum SuoniOrologio {
         p.volume = 1.0                                                    // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
+        MicOrologio.ignora(per: p.duration)
         p.play()
     }
     static func schedaPronta() {
@@ -77,6 +79,7 @@ enum SuoniOrologio {
         p.volume = volume
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
+        MicOrologio.ignora(per: p.duration)
         p.play()
     }
 }
@@ -404,7 +407,7 @@ struct VistaOrologio: View {
                 }
 
                 if jarvis.fase != .attesa {
-                    Button("Stop", role: .destructive) { jarvis.ferma() }
+                    Button("Stop", role: .destructive) { jarvis.fermaETorna() }
                 } else if !jarvis.risposta.isEmpty {
                     Button("Ripeti") { jarvis.ripeti() }
                 }

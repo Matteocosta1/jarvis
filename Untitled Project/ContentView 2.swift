@@ -234,7 +234,6 @@ struct ContentView: View {
         }
         .onAppear {
             Aptica.prepara()
-            Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano
             accendi()
             if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
             if primaApertura {
@@ -268,6 +267,7 @@ struct ContentView: View {
     /// Sequenza di avvio alla Stark: suono, icone che si accendono in fila, «SISTEMI IN LINEA».
     private func accendi() {
         guard !acceso else { return }
+        Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano (solo la prima volta)
         withAnimation(.spring(duration: 0.6 / Avvio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
         let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
         if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
@@ -313,7 +313,7 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
-            Suoni.fineAvvioAudio()                                 // l'avvio ha avuto la precedenza: ora l'audio torna come sempre
+            await Suoni.fineAvvioAudio()                           // l'avvio ha avuto la precedenza: ora l'audio torna come sempre
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
