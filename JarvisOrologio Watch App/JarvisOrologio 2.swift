@@ -298,7 +298,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard !Task.isCancelled, fase == .elaboro else { return }
         if let testo, !testo.isEmpty {
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
-            let comando = ComandoVocale.riconosci(testo)
+            var comando = ComandoVocale.riconosci(testo)
+            // i comandi rapidi che sull'orologio hanno la loro sezione: «scrivi il diario» → Diario, «ho bisogno di parlarti» → Confidente
+            if case .rapido(let a)? = comando {
+                switch a {
+                case .diario: comando = .apri(.diario)
+                case .confidente: comando = .apri(.confidente)
+                case .cucina, .riunione: comando = nil            // vivono sull'iPhone: la frase va al cervello
+                }
+            }
             if case .apri(let reparto)? = comando {
                 compito = nil
                 WKInterfaceDevice.current().play(.click)

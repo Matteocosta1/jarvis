@@ -618,6 +618,9 @@ final class Jarvis: NSObject, ObservableObject {
         case .interprete(let codice)? where !lidarAperto:
             apriInterprete(codice)
             return true
+        case .rapido(let azione)?:
+            rapido(azione)
+            return true
         default:
             return false
         }
@@ -629,6 +632,19 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         interrompi()
         interprete = l
+    }
+
+    @Published var riunioneSubito = false     // «registra la riunione»: il Wiretap parte già registrando
+
+    /// I comandi rapidi: come toccare la sezione e poi il suo tasto principale.
+    private func rapido(_ a: ComandoVocale.AzioneRapida) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        switch a {
+        case .diario: chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")            // come «A voce» nel Diario
+        case .confidente: chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.")        // come «A voce» nel Confidente
+        case .cucina: guardaCucina()
+        case .riunione: riunioneSubito = true; repartoRichiesto = .wiretap
+        }
     }
 
     /// Una frase breve di JARVIS per un comando (le misure di LiDAR): detta quella, torna in attesa.
