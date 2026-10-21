@@ -6,7 +6,8 @@ import QuartzCore
 /// Le ultime righe di stato del menu SISTEMI, ricordate sul telefono: all'apertura si vedono subito, poi si aggiornano.
 enum MemoriaSistemi {
     static func leggi() -> [String: String] {
-        UserDefaults.standard.dictionary(forKey: "statoSistemi") as? [String: String] ?? [:]
+        // le scritte d'errore salvate dalla build 11 non si mostrano più: solo dati veri
+        (UserDefaults.standard.dictionary(forKey: "statoSistemi") as? [String: String] ?? [:]).filter { !$0.value.contains("raggiungibile") }
     }
     static func salva(_ stato: [String: String]) { UserDefaults.standard.set(stato, forKey: "statoSistemi") }
 }
@@ -819,40 +820,54 @@ struct ContentView: View {
 
     /// Le righe di stato del menu: chiamate leggere al cervello, tutte insieme.
     private func caricaStatoSistemi() async {
-        // le quattro richieste partono insieme (Supabase da sola può metterci 8 secondi)
-        async let a = VistaVitals.chiama(["archivio": true])
-        async let s = VistaVitals.chiama(["supabase": true, "ore": 24])
-        async let g = VistaVitals.chiama(["github": true])
-        async let k = VistaVitals.chiama(["consumi": true])
-        let (ra, rs, rg, rc) = await (a, s, g, k)
-        // menu chiuso prima della fine: le richieste sono state interrotte, non è un guasto. Restano le scritte di prima.
-        if Task.isCancelled { return }
-        if let ra, ra["errore"] == nil {
-            let file = ra["file"] as? [[String: Any]] ?? [], cartelle = ra["cartelle"] as? [[String: Any]] ?? []
-            statoSistemi["archivio"] = "\(file.count) file · \(cartelle.count) cartelle"
-        } else { statoSistemi["archivio"] = "non raggiungibile" }
-        if let rs {
-            if let e = rs["errore"] as? String { statoSistemi["supabase"] = e.contains("manca") ? "non collegato" : "non raggiungibile" }
-            else {
-                let log = rs["log"] as? [String: Any]
-                let errori = ((log?["richieste"] as? [[String: Any]])?.count ?? 0) + ((log?["console"] as? [[String: Any]])?.count ?? 0)
-                let mb = (rs["database_mb"] as? NSNumber)?.doubleValue ?? 0
-                statoSistemi["supabase"] = "\(errori == 0 ? "nessun errore" : "\(errori) errori") · \(Int(mb)) MB"
+        // le quattro voci partono insieme e ognuna si scrive appena arriva (Archivio e Costi non aspettano Supabase).
+        // Solo letture riuscite: se una fallisce resta la riga buona di prima, e riprova una volta.
+        async let a: Void = leggiSistema("archivio")
+        async let s: Void = leggiSistema("supabase")
+        async let g: Void = leggiSistema("github")
+        async let k: Void = leggiSistema("costi")
+        _ = await (a, s, g, k)
+    }
+
+    private func leggiSistema(_ voce: String) async {
+        let corpo: [String: Any]
+        switch voce {
+        case "supabase": corpo = ["supabase": true, "ore": 24]
+        case "costi": corpo = ["consumi": true]
+        default: corpo = [voce: true]
+        }
+        for tentativo in 0..<2 {
+            if tentativo > 0 { try? await Task.sleep(for: .seconds(2)) }
+            if Task.isCancelled { return }                      // menu chiuso: niente da segnare
+            if let r = await VistaVitals.chiama(corpo, attesa: 30), let riga = Self.rigaSistema(voce, r) {
+                statoSistemi[voce] = riga
+                MemoriaSistemi.salva(statoSistemi)              // la prossima volta il menu la mostra subito
+                return
             }
-        } else { statoSistemi["supabase"] = "cervello non raggiungibile" }
-        if let rg {
-            if let e = rg["errore"] as? String { statoSistemi["github"] = e.contains("manca") ? "non collegato" : "non raggiungibile" }
-            else {
-                let repo = rg["repository"] as? [[String: Any]] ?? []
-                let issue = repo.reduce(0) { $0 + (($1["issue_aperte"] as? NSNumber)?.intValue ?? 0) }
-                statoSistemi["github"] = "\(repo.count) repository · \(issue) issue aperte"
-            }
-        } else { statoSistemi["github"] = "cervello non raggiungibile" }
-        if let c = rc, c["errore"] == nil {
-            let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
-            statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
-        } else { statoSistemi["costi"] = "non raggiungibile" }
-        MemoriaSistemi.salva(statoSistemi)                // la prossima volta il menu le mostra subito
+        }
+    }
+
+    /// La riga di stato di una voce, solo se la lettura è riuscita (nil = fallita: resta quella di prima).
+    private static func rigaSistema(_ voce: String, _ r: [String: Any]) -> String? {
+        if let e = r["errore"] as? String { return e.contains("manca") ? "non collegato" : nil }
+        switch voce {
+        case "archivio":
+            let file = r["file"] as? [[String: Any]] ?? [], cartelle = r["cartelle"] as? [[String: Any]] ?? []
+            return "\(file.count) file · \(cartelle.count) cartelle"
+        case "supabase":
+            let log = r["log"] as? [String: Any]
+            let errori = ((log?["richieste"] as? [[String: Any]])?.count ?? 0) + ((log?["console"] as? [[String: Any]])?.count ?? 0)
+            let mb = (r["database_mb"] as? NSNumber)?.doubleValue ?? 0
+            return "\(errori == 0 ? "nessun errore" : "\(errori) errori") · \(Int(mb)) MB"
+        case "github":
+            let repo = r["repository"] as? [[String: Any]] ?? []
+            let issue = repo.reduce(0) { $0 + (($1["issue_aperte"] as? NSNumber)?.intValue ?? 0) }
+            return "\(repo.count) repository · \(issue) issue aperte"
+        case "costi":
+            let oggi = (r["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (r["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
+            return String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
+        default: return nil
+        }
     }
 
     private var registro: some View {

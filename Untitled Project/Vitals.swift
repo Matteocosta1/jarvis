@@ -261,11 +261,11 @@ struct VistaVitals: View {
         await carica()
     }
 
-    static func chiama(_ corpo: [String: Any]) async -> [String: Any]? {
+    static func chiama(_ corpo: [String: Any], attesa: TimeInterval = 20) async -> [String: Any]? {
         guard let url = URL(string: Impostazioni.indirizzo) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.timeoutInterval = 20
+        req.timeoutInterval = attesa
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
