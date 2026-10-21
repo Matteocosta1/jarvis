@@ -29,27 +29,32 @@ enum BrowserVoce {
         return false
     }
 
-    /// Scrive nel campo attivo della pagina (se non ce n'è uno, nel primo campo visibile).
+    /// Scrive nel campo attivo della pagina; se il cursore non è in un campo, nella casella di ricerca (Google & co.) o nel primo campo visibile.
+    /// Scrive come una digitazione vera (anche le caselle «moderne» dei siti se ne accorgono). Se non trova dove scrivere, non fa niente.
     static func scriviNellaPagina(_ web: WKWebView, _ testo: String) {
         guard let dati = try? JSONSerialization.data(withJSONObject: [testo]), let lista = String(data: dati, encoding: .utf8) else { return }
         let js = """
         (function(t){
+          function visibile(x){ var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+          function campo(x){ return x && (x.isContentEditable || x.tagName === 'TEXTAREA' || (x.tagName === 'INPUT' && !/^(hidden|button|submit|checkbox|radio|file|image|reset)$/i.test(x.type))); }
           var e = document.activeElement;
-          if (!e || e === document.body) {
-            e = Array.from(document.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, [contenteditable=true]'))
-                 .find(function(x){ var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
-            if (e) e.focus();
+          if (!campo(e)) {
+            var cerca = 'textarea[name=q], input[name=q], input[type=search], [role=searchbox], [role=combobox][contenteditable=true], textarea[role=combobox], input[role=combobox]';
+            e = Array.from(document.querySelectorAll(cerca)).find(visibile)
+              || Array.from(document.querySelectorAll('input, textarea, [contenteditable=true]')).find(function(x){ return campo(x) && visibile(x) && !x.disabled && !x.readOnly; });
           }
           if (!e) return false;
+          e.focus();
           if (e.isContentEditable) { document.execCommand('insertText', false, t); return true; }
-          if ('value' in e) {
-            var prima = e.value || '';
-            e.value = prima + (prima && !/\\s$/.test(prima) ? ' ' : '') + t;
-            e.dispatchEvent(new Event('input', { bubbles: true }));
-            e.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
-          }
-          return false;
+          var prima = e.value || '';
+          var nuovo = prima + (prima && !/\\s$/.test(prima) ? ' ' : '') + t;
+          var proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+          var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+          setter.call(e, nuovo);
+          try { e.setSelectionRange(nuovo.length, nuovo.length); } catch (x) {}
+          e.dispatchEvent(new InputEvent('input', { bubbles: true, data: t, inputType: 'insertText' }));
+          e.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
         })(\(lista)[0]);
         """
         web.evaluateJavaScript(js, completionHandler: nil)
