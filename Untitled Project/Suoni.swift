@@ -22,6 +22,13 @@ enum Suoni {
         try? s.setActive(true)
     }
 
+    /// Finito l'avvio: l'audio torna com'era prima di «preparaAudio» (20 ott mattina, il dialogo perfetto),
+    /// così l'ascolto e il richiamo partono dalle stesse condizioni di allora. Il volume alto dell'avvio non cambia.
+    static func rilasciaAudioAvvio() {
+        let s = AVAudioSession.sharedInstance()
+        if s.category == .ambient { try? s.setCategory(.soloAmbient, mode: .default, options: []) }
+    }
+
     /// Tocco su un'icona o sul reattore.
     static func tocco() { Aptica.click(); suona(.tocco) }
     /// JARVIS inizia ad ascoltare.

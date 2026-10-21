@@ -276,6 +276,7 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
+            Suoni.rilasciaAudioAvvio()                             // l'audio dell'avvio torna normale prima del microfono
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
