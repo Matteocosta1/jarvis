@@ -11,6 +11,11 @@ import UniformTypeIdentifiers
 /// Giro (video): 5 secondi mentre il signore muove il telefono, 4 fotogrammi ben distanziati
 /// («fai un giro», scaffali, file di dischi, stanze). Si avvia a voce o con il tasto REC del mirino manuale.
 /// Le foto escono già ridotte (lato massimo 1280 px, 1024 nel giro, JPEG) e vanno al cervello, che le guarda e risponde a voce.
+/// Occhi aperti in modalità manuale: «Jarvis, …» detto mentre inquadra fa scattare la foto (come il tasto).
+enum OcchiAperti {
+    static var scatta: (() -> Void)?
+}
+
 struct Occhiata: Identifiable {
     let id = UUID()
     let automatico: Bool
@@ -200,7 +205,7 @@ struct Occhi: View {
         }
         .statusBarHidden()
         .task { await prepara() }
-        .onDisappear { motore.ferma() }
+        .onDisappear { OcchiAperti.scatta = nil; motore.ferma() }
     }
 
     // MARK: Lavoro
@@ -243,6 +248,7 @@ struct Occhi: View {
             scatta()
         } else {
             stato = cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI"
+            OcchiAperti.scatta = { scatta() }          // a voce: «Jarvis, guarda là in fondo»
         }
     }
 
@@ -370,6 +376,7 @@ struct Occhi: View {
     private func chiudi(_ dati: [Data]) {
         guard !chiuso else { return }
         chiuso = true
+        OcchiAperti.scatta = nil
         motore.ferma()
         fine(dati)
     }

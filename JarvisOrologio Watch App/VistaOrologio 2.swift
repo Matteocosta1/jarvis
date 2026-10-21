@@ -176,6 +176,7 @@ struct VistaOrologio: View {
             case .confidente: jarvis.chiedi("Modalità confidente. Ho bisogno di parlarti di una cosa.")
             case .interprete: jarvis.chiedi("Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce.")
             case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea: scheda = r
+            case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
             }
         }

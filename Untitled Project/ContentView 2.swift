@@ -40,14 +40,21 @@ struct ContentView: View {
     @State private var aiutoBea: AiutoBea?          // il Tocco d'aiuto di Bea: schermata a tutto schermo
     @Environment(\.scenePhase) private var scena
 
-    /// Schermata principale in primo piano e niente aperto sopra: solo così il richiamo «Jarvis» resta in ascolto.
+    /// Il richiamo «Jarvis» resta in ascolto ovunque nell'app (schede, Occhi, Cucina, Impostazioni, SISTEMI, Browser, LiDAR…),
+    /// tranne dove il microfono serve già a qualcun altro: Interprete, Allenatore, Sentinella, Wiretap, Shazam, La mia voce,
+    /// e (per ora) Profiler e Scanner. App in secondo piano: spento.
     private var schermoLibero: Bool {
         let inPrimoPiano: Bool = scena == .active
-        let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
-        let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
-        let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
-        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
-        return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
+        let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
+        let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
+        return inPrimoPiano && micLibero && nienteEscluso
+    }
+
+    /// Qualcosa è aperto sopra la schermata principale (per JARVIS: prima di aprire Occhi va chiuso).
+    private var qualcosaAperto: Bool {
+        scheda != nil || mostraRicordi != nil || sorgenteFoto != nil || mostraImpostazioni || mostraBrowser || mostraSentinella
+            || mostraWiretap || mostraProfiler || mostraVitals || mostraConfidente || mostraLidar || mostraSistemi
+            || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore
     }
     @FocusState private var tastiera: Bool
 
@@ -222,6 +229,12 @@ struct ContentView: View {
         .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
+        .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
+        .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
+            guard si else { return }
+            jarvis.chiudiChiesto = false
+            chiudiTutto()
+        }
     }
 
     /// Sequenza di avvio alla Stark: suono, icone che si accendono in fila, «SISTEMI IN LINEA».
@@ -627,10 +640,8 @@ struct ContentView: View {
         ]
     }
 
-    /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
-    private func apriReparto(_ r: Reparto) {
-        let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
-            || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore || mostraLidar
+    /// Chiude tutto quello che è aperto sopra la schermata principale.
+    private func chiudiTutto() {
         mostraSentinella = false
         mostraWiretap = false
         mostraProfiler = false
@@ -639,10 +650,20 @@ struct ContentView: View {
         mostraConfidente = false
         mostraRicordi = nil
         mostraBrowser = false
-        mostraSistemi = false
+        withAnimation(.spring(duration: 0.3)) { mostraSistemi = false }
+        mostraImpostazioni = false
+        jarvis.pagina = nil
         jarvis.allenatore = false
         mostraLidar = false
         jarvis.occhiChiusi([])
+    }
+
+    /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
+    private func apriReparto(_ r: Reparto) {
+        let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
+            || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore || mostraLidar
+            || mostraImpostazioni || jarvis.pagina != nil
+        chiudiTutto()
         Task {
             if aperto { try? await Task.sleep(for: .milliseconds(700)) }     // il tempo che la schermata si chiuda
             switch r {
@@ -676,6 +697,11 @@ struct ContentView: View {
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true
             case .lidar: mostraLidar = true
+            case .costi: scheda = .costi
+            case .edith: scheda = .edith
+            case .sistemi: withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi = true }
+            case .impostazioni: mostraImpostazioni = true
+            case .pulisci: svuotaChat()
             }
         }
     }

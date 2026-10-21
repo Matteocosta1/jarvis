@@ -14,7 +14,9 @@ enum Reparto: String, Identifiable, Equatable {
     case shazam, foto
     case ricordi, interprete, browser, serata, messaggi, telefono, lidar
     // SISTEMI
-    case github, supabase, archivio
+    case github, supabase, archivio, costi, edith
+    // la schermata principale: il menu SISTEMI, le impostazioni, il cestino
+    case sistemi, impostazioni, pulisci
     var id: String { rawValue }
 
     /// La frase di JARVIS quando apre il reparto (il Wiretap tace: registrerebbe sé stesso; le schede parlano da sole).
@@ -50,6 +52,11 @@ enum Reparto: String, Identifiable, Equatable {
         case .github: return "Il cantiere su GitHub, Sir."
         case .supabase: return "Sala macchine, Sir."
         case .archivio: return "L'archivio, Sir."
+        case .costi: return "I costi, Sir."
+        case .edith: return "EDITH, Sir."
+        case .sistemi: return "Sistemi, Sir."
+        case .impostazioni: return "Impostazioni, Sir."
+        case .pulisci: return nil                     // parla il cestino: carta appallottolata
         }
     }
 }
@@ -109,11 +116,18 @@ enum ComandoVocale: Equatable {
             (.messaggi, [" messaggi ", " whatsapp ", " imessage "]), (.telefono, [" telefono ", " tastiera ", " rubrica "]),
             (.github, [" github ", " git hub ", " ghitab ", " repository ", " cantiere "]), (.supabase, [" supabase ", " supa base ", " sala macchine ", " database "]),
             (.archivio, [" archivio ", " cloud ", " disco rigido "]),
+            (.costi, [" costi ", " consumi "]), (.edith, [" edith ", " editt ", " edit "]),
+            (.sistemi, [" sistemi ", " menu sistemi "]), (.impostazioni, [" impostazioni ", " settaggi ", " rotella "]),
         ]
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
         if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra"].contains($0) }) {
             return .apri(.bea)
         }
+        // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
+        // (solo così: «svuota la spesa» o «pulisci la lista» restano al cervello)
+        if t.count <= 3, t[0] == "pulisci", !t.contains(where: { ["lista", "spesa", "casa", "cucina"].contains($0) }) { return .apri(.pulisci) }
+        if t.count <= 2, t.contains("cestino") { return .apri(.pulisci) }
+        if c(" cancella la conversazione ") || c(" cancella la chat ") || c(" svuota la chat ") || c(" svuota la conversazione ") { return .apri(.pulisci) }
         let mostra = comanda || t.contains(where: { ["mostra", "mostrami", "vedere", "vediamo", "guardiamo", "controlla", "controlliamo"].contains($0) })
         if mostra {
             for (reparto, chiavi) in schede where chiavi.contains(where: c) { return .apri(reparto) }

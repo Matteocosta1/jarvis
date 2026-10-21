@@ -4,6 +4,74 @@ import Combine
 import WebKit
 import LocalAuthentication
 
+/// Il Browser a voce: «Jarvis, scrivi …» scrive nel campo attivo (la barra degli indirizzi o un campo della pagina),
+/// «Jarvis, invia» (o «vai», «cerca», «premi invio») lo manda. JARVIS non legge la pagina: scrive solo dove c'è il cursore.
+enum BrowserVoce {
+    static var aperto: Bool { scrivi != nil }
+    static var proprietario: UUID?                     // la pagina che ha registrato i comandi (Incognito ↔ Normale la ricrea)
+    static var scrivi: ((String) -> Void)?
+    static var invia: (() -> Void)?
+
+    /// Vero se la frase era un comando del Browser (ed è stato eseguito).
+    static func comando(_ frase: String) -> Bool {
+        let t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let basso = t.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        if ["invia", "manda", "vai", "cerca", "premi invio", "invio", "conferma"].contains(basso) {
+            invia?(); return true
+        }
+        for verbo in ["scrivi ", "scrivi: ", "digita ", "scrivi,"] where basso.hasPrefix(verbo) {
+            let resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:"))
+            guard !resto.isEmpty else { return false }
+            scrivi?(resto); return true
+        }
+        return false
+    }
+
+    /// Scrive nel campo attivo della pagina (se non ce n'è uno, nel primo campo visibile).
+    static func scriviNellaPagina(_ web: WKWebView, _ testo: String) {
+        guard let dati = try? JSONSerialization.data(withJSONObject: [testo]), let lista = String(data: dati, encoding: .utf8) else { return }
+        let js = """
+        (function(t){
+          var e = document.activeElement;
+          if (!e || e === document.body) {
+            e = Array.from(document.querySelectorAll('input:not([type=hidden]):not([disabled]), textarea, [contenteditable=true]'))
+                 .find(function(x){ var r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+            if (e) e.focus();
+          }
+          if (!e) return false;
+          if (e.isContentEditable) { document.execCommand('insertText', false, t); return true; }
+          if ('value' in e) {
+            var prima = e.value || '';
+            e.value = prima + (prima && !/\\s$/.test(prima) ? ' ' : '') + t;
+            e.dispatchEvent(new Event('input', { bubbles: true }));
+            e.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+          return false;
+        })(\(lista)[0]);
+        """
+        web.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    /// Manda il campo attivo della pagina: il suo modulo, oppure un «Invio» sulla tastiera.
+    static func inviaNellaPagina(_ web: WKWebView) {
+        let js = """
+        (function(){
+          var e = document.activeElement;
+          if (e && e.form) { if (e.form.requestSubmit) e.form.requestSubmit(); else e.form.submit(); return true; }
+          if (e) {
+            ['keydown','keypress','keyup'].forEach(function(k){
+              e.dispatchEvent(new KeyboardEvent(k, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+            });
+            return true;
+          }
+          return false;
+        })();
+        """
+        web.evaluateJavaScript(js, completionHandler: nil)
+    }
+}
+
 /// Browser di JARVIS: lo guida il signore con le dita, JARVIS non vede cosa c'è sullo schermo.
 /// Due modalità: Incognito (niente cronologia, cookie o accessi salvati: sparisce tutto alla chiusura)
 /// e Normale (ricorda gli accessi ai siti). I pop-up si aprono in una finestra sopra la pagina e si chiudono con la X.
@@ -197,6 +265,7 @@ struct PaginaBrowser: View {
     @StateObject private var nav: Navigatore
     @State private var barra = ""
     @State private var mostraCronologia = false
+    @State private var idVoce = UUID()
     @FocusState private var scrivendo: Bool
 
     init(incognito: Binding<Bool>, conFaceID: Binding<Bool>, attivo: Bool, chiudi: @escaping () -> Void) {
@@ -208,6 +277,22 @@ struct PaginaBrowser: View {
     }
 
     private var accento: Color { incognito ? Color(red: 0.75, green: 0.55, blue: 1.0) : Color.ciano }
+
+    /// A voce: con la barra attiva si scrive lì, se no nel campo della pagina (o della finestra pop-up).
+    private func registraVoce() {
+        BrowserVoce.proprietario = idVoce
+        let sbloccato = attivo                                 // Face ID non ancora dato: niente
+        BrowserVoce.scrivi = { testo in
+            guard sbloccato else { return }
+            if scrivendo { barra = barra.isEmpty ? testo : barra + " " + testo }
+            else { BrowserVoce.scriviNellaPagina(nav.popup ?? nav.web, testo) }
+        }
+        BrowserVoce.invia = {
+            guard sbloccato else { return }
+            if scrivendo { if !barra.isEmpty { nav.vai(barra); scrivendo = false } }
+            else { BrowserVoce.inviaNellaPagina(nav.popup ?? nav.web) }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -273,7 +358,15 @@ struct PaginaBrowser: View {
         .animation(.easeInOut(duration: 0.25), value: nav.popup != nil)
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
         .onChange(of: attivo) { if attivo, barra.isEmpty { scrivendo = true } }
-        .onAppear { if attivo, barra.isEmpty { scrivendo = true } }
+        .onAppear {
+            if attivo, barra.isEmpty { scrivendo = true }
+            registraVoce()
+        }
+        .onChange(of: attivo) { registraVoce() }              // Face ID dato: i comandi a voce si sbloccano
+        .onDisappear {
+            guard BrowserVoce.proprietario == idVoce else { return }
+            BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.proprietario = nil
+        }
         .sheet(isPresented: $mostraCronologia) {
             VistaCronologiaBrowser(incognito: incognito, accento: accento) { url in
                 mostraCronologia = false

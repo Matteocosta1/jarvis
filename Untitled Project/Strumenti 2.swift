@@ -63,6 +63,8 @@ final class Strumenti {
     var pulireChat = false
     /// Gli occhi di JARVIS: apre la fotocamera (automatica o manuale; foto o giro) e restituisce le foto, vuoto se chiusa.
     var apriOcchi: ((Bool, Bool, Double) async -> [Data])?
+    /// La frase che il signore ha detto mentre la fotocamera era aperta (lo scatto è partito a voce).
+    var domandaOcchi: (() -> String?)?
     /// Le foto scattate da «guarda» (una, o i fotogrammi del giro): Jarvis le allega al risultato, così il cervello le vede.
     private var fotoOcchi: [Data] = []
     /// «Jarvis, traduci in spagnolo»: la lingua dell'interprete da aprire appena JARVIS ha finito di parlare.
@@ -404,6 +406,10 @@ final class Strumenti {
             return (json(["visto": false, "nota": "il signore ha chiuso la fotocamera o non ha dato il permesso: nessuna foto"]), false)
         }
         fotoOcchi = foto
+        if let detta = domandaOcchi?() {
+            return (json(["visto": true, "il_signore_ha_detto": detta,
+                          "nota": "la foto appena scattata è allegata qui: il signore l'ha scattata a voce dicendo la frase in il_signore_ha_detto; rispondi a quella"]), false)
+        }
         if foto.count > 1 {
             return (json(["visto": true, "fotogrammi": foto.count,
                           "nota": "qui sono allegati \(foto.count) fotogrammi in ordine di tempo, presi durante un giro di 5 secondi mentre il signore muoveva il telefono: è una sola scena, mettili insieme e rispondi"]), false)

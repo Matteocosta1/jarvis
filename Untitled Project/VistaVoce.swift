@@ -5,6 +5,7 @@ import AVFoundation
 /// «La mia voce»: il signore legge qualche frase, JARVIS ne ricava l'impronta e la tiene sul telefono.
 /// Serve in mezzo alla confusione: JARVIS risponde alla sua voce e non a quella degli altri.
 struct VistaLaMiaVoce: View {
+    @EnvironmentObject var jarvis: Jarvis           // qui il microfono serve a registrare l'impronta: il richiamo tace
     @AppStorage("riconosciVoce") private var riconosci = true
     @AppStorage("sogliaVoce") private var soglia = 0.80
     @State private var registrata = VoceDelSignore.registrata
@@ -109,7 +110,8 @@ struct VistaLaMiaVoce: View {
             }
         }
         .navigationTitle("La mia voce")
-        .onDisappear { registratore.ferma() }
+        .onAppear { jarvis.micOccupato = true }
+        .onDisappear { registratore.ferma(); jarvis.micOccupato = false }
     }
 
     private func avvia(prova: Bool) {

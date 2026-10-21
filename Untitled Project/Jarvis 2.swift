@@ -91,6 +91,10 @@ enum ErroreJarvis: LocalizedError {
 @MainActor
 final class Jarvis: NSObject, ObservableObject {
     @Published var messaggi: [Messaggio] = []
+    @Published var chiudiChiesto = false          // «Jarvis, chiudi» / «torna»: la schermata principale chiude quello che è aperto
+    @Published var micOccupato = false            // una schermata usa il microfono per conto suo (La mia voce): il richiamo tace
+    /// La frase detta dentro Occhi o Cucina: parte con la foto scattata a voce.
+    private var domandaOcchi: String?
     @Published var svuotaChiesto = false          // «Nuova conversazione» dalle Impostazioni: la schermata principale svuota la chat con l'animazione
     @Published var fase: Fase = .attesa { didSet { if fase != oldValue { aggiornaRichiamo() } } }
     @Published var parziale = ""
@@ -121,7 +125,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var ascoltoCloud = false       // sta registrando una frase da trascrivere in cloud
     private var ultimaFraseAVoce = ""      // la frase della domanda in corso (vuota se scritta)
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
-    @Published var occhi: Occhiata?        // fotocamera aperta (occhi di JARVIS)
+    @Published var occhi: Occhiata? { didSet { if (occhi == nil) != (oldValue == nil) { aggiornaRichiamo() } } }   // fotocamera aperta (occhi di JARVIS)
     @Published var interprete: Lingua?     // modalità interprete aperta
     @Published var allenatore = false      // modalità allenatore aperta
     private var attesaOcchi: CheckedContinuation<[Data], Never>?
@@ -151,6 +155,8 @@ final class Jarvis: NSObject, ObservableObject {
     private let richiamo = Richiamo()   // in attesa: «Jarvis, …» e lui ascolta, senza toccare
     private var avvioRichiamo: Task<Void, Never>?
     /// La schermata principale è in primo piano, senza fotocamera, interprete o altre schede aperte (lo decide ContentView).
+    /// Qualcosa è aperto sopra la schermata principale (lo dice ContentView): prima di aprire Occhi si chiude.
+    var schermataAperta = false
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     /// Durante la sequenza d'avvio il microfono resta spento: aprirlo cambia l'audio dell'iPhone e la musica uscirebbe bassa.
     var avvioInCorso = true { didSet { if avvioInCorso != oldValue { aggiornaRichiamo() } } }
@@ -210,6 +216,7 @@ final class Jarvis: NSObject, ObservableObject {
             return await self.apriOcchi(automatico: automatico, video: video, zoom: CGFloat(zoom))
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
+        strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
         carica()
     }
 
@@ -338,6 +345,12 @@ final class Jarvis: NSObject, ObservableObject {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return }
         if Jarvis.eSoloSilenzio(frase) { mettiInAttesa(); return }   // stava parlando con qualcun altro: «Jarvis, muto»
+        // dentro Occhi o Cucina: la frase fa scattare la foto e parte insieme a lei («Jarvis, guarda là in fondo»)
+        if occhi != nil, let scatta = OcchiAperti.scatta {
+            domandaOcchi = Jarvis.togliRichiamo(frase).0
+            scatta()
+            return
+        }
         fraseAVoce = ""
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
@@ -382,6 +395,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
         !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+            && !(occhi != nil && fase == .elaboro)      // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
     }
 
     private func aggiornaRichiamo() {
@@ -569,9 +583,19 @@ final class Jarvis: NSObject, ObservableObject {
             if imparato == "rito" { fraseDiTony(); return true }
             if let r = Reparto(rawValue: imparato) { apriReparto(r); return true }
         }
-        guard case .apri(let reparto)? = ComandoVocale.riconosci(frase) else { return false }
-        apriReparto(reparto)
-        return true
+        if BrowserVoce.aperto, BrowserVoce.comando(Jarvis.togliRichiamo(frase).0) { return true }   // nel Browser: «scrivi …», «invia»
+        switch ComandoVocale.riconosci(frase) {
+        case .apri(let reparto)?:
+            apriReparto(reparto)
+            return true
+        case .torna?:
+            if Jarvis.eSoloSilenzio(frase) { return false }          // «basta», «stop»: restano un ordine di silenzio
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            chiudiChiesto = true
+            return true
+        case nil:
+            return false
+        }
     }
 
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
@@ -600,6 +624,11 @@ final class Jarvis: NSObject, ObservableObject {
     func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1) async -> [Data] {
         // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
         if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
+        // una scheda o un'altra schermata aperta sopra: prima si chiude, se no Occhi non riesce ad aprirsi e JARVIS resterebbe in attesa
+        if schermataAperta && occhi == nil {
+            chiudiChiesto = true
+            try? await Task.sleep(for: .milliseconds(700))
+        }
         occhiChiusi([])                        // se ne era rimasta aperta una, si chiude
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c
@@ -613,6 +642,13 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// La fotocamera si è chiusa: consegna le foto a chi le aspettava.
+    /// La frase detta dentro Occhi, se c'è (e la consuma).
+    func prendiDomandaOcchi() -> String? {
+        defer { domandaOcchi = nil }
+        guard let d = domandaOcchi, !d.isEmpty else { return nil }
+        return d
+    }
+
     func occhiChiusi(_ dati: [Data]) {
         if occhi != nil { occhi = nil }
         guard let c = attesaOcchi else { return }
@@ -624,9 +660,10 @@ final class Jarvis: NSObject, ObservableObject {
     func guardaManuale() {
         Task {
             let dati = await apriOcchi(automatico: false)
+            let detta = prendiDomandaOcchi()
             guard !dati.isEmpty else { return }
             preparaFoto(dati)
-            await invia(dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?")
+            await invia(detta ?? (dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?"))
         }
     }
 
@@ -644,8 +681,10 @@ final class Jarvis: NSObject, ObservableObject {
     func guardaCucina() {
         Task {
             let dati = await apriOcchi(automatico: false, cucina: true)
+            let detta = prendiDomandaOcchi()
             guard !dati.isEmpty else { return }
             preparaFoto(dati)
+            if let detta { await invia("Cucina: \(detta)"); return }      // la domanda detta a voce mentre inquadrava
             switch UserDefaults.standard.integer(forKey: "cucinaModo") {
             case 1: await invia("Cucina: che piatto è questo? Dimmi come si chiama, da dove viene e la ricetta in breve, con le dosi per due.")
             case 2: await invia("Cucina: stima i valori di questo piatto o prodotto: calorie, proteine, carboidrati e grassi per porzione, dicendo che è una stima a occhio.")
@@ -1132,7 +1171,9 @@ final class Jarvis: NSObject, ObservableObject {
         Task { @MainActor [weak self] in            // il segnale di fine deve finire prima di restituire l'audio alle altre app
             try? await Task.sleep(for: .milliseconds(400))
             // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso
-            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud else { return }
+            // e mai se il microfono dell'attesa sta per ripartire o è già acceso (l'ordine 400/450 ms non deve contare)
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
+                  !self.richiamoServe, !self.richiamo.attivo else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»
