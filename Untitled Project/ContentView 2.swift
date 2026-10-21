@@ -127,8 +127,9 @@ struct ContentView: View {
             VistaWiretap(verbale: { testo, minuti in
                 mostraWiretap = false
                 jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
         }
+        .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
         // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
@@ -697,8 +698,8 @@ struct ContentView: View {
             mostraSentinella = false
             mostraWiretap = false
             Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
-        case .lidar, .sentinella:
-            break                                   // questi li gestisce il reparto stesso
+        default:
+            break                                   // gli altri li gestisce il reparto stesso
         }
     }
 

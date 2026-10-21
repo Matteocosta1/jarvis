@@ -11,6 +11,7 @@ import UIKit
 struct Allenatore: View {
     let chiudi: () -> Void
     @StateObject private var motore = MotoreAllenatore()
+    @State private var orecchio = OrecchioComandi()   // «Jarvis, fine serie», «Jarvis, quante ripetizioni?», «Jarvis, pausa»…
 
     var body: some View {
         ZStack {
@@ -88,8 +89,23 @@ struct Allenatore: View {
             }
         }
         .statusBarHidden()
-        .task { await motore.avvia() }
-        .onDisappear { motore.ferma() }
+        .task {
+            await motore.avvia()
+            // i comandi a voce: dopo il suono d'apertura (come nella Sentinella), sempre con «Jarvis» davanti
+            try? await Task.sleep(for: .seconds(1.8))
+            guard !Task.isCancelled else { return }
+            orecchio.dentro = .allenatore
+            orecchio.comando = { c in
+                switch c {
+                case .torna: motore.ferma(); orecchio.ferma(); chiudi()
+                case .allenatore(let a): motore.aVoce(a)
+                default: break
+                }
+            }
+            motore.ascoltoComandi = true
+            orecchio.avvia()
+        }
+        .onDisappear { orecchio.ferma(); motore.ferma() }
         .aperturaHUD("Allenatore", fotocamera: true)
     }
 
@@ -199,6 +215,42 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     private var lettore: AVAudioPlayer?
     private let sintesi = AVSpeechSynthesizer()
     private var inizioSerie = Date()
+    var ascoltoComandi = false                  // il microfono dei comandi è acceso: la voce non deve spegnerlo
+    @Published var inPausa = false
+
+    /// I comandi a voce («Jarvis, …»): gli stessi tasti, più le domande sulla serie e la pausa.
+    func aVoce(_ a: ComandoVocale.AzioneAllenatore) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        switch a {
+        case .fineSerie: inPausa = false; fineSerie()
+        case .azzera: inPausa = false; azzera(); Task { await parla("Azzerato, Sir.") }
+        case .ripetizioni:
+            let n = ripetizioni
+            Task { await parla(n == 0 ? "Nessuna ripetizione contata, Sir." : "\(n) ripetizion\(n == 1 ? "e" : "i"), Sir.") }
+        case .postura:
+            guard posa != nil else { Task { await parla("Non la vedo, Sir: si metta tutta nell'inquadratura.") }; return }
+            let sch = Int(inclinazioneSchiena), sim = Int(simmetria)
+            let giudizio = sch <= 12 && sim >= 85 ? "Va bene così." : (sch > 12 ? "Raddrizzi la schiena." : "Cerchi la simmetria.")
+            Task { await parla("Schiena a \(sch) gradi, simmetria al \(sim) per cento. \(giudizio)") }
+        case .camera: cambiaCamera()
+        case .pausa:
+            inPausa = true
+            commento = "In pausa. «Jarvis, riprendi» per continuare."
+            Task { await parla("In pausa, Sir.") }
+        case .riprendi:
+            inPausa = false
+            commento = "Si riparte, Sir."
+            Task { await parla("Si riparte, Sir.") }
+        case .conta(let parte):
+            switch parte {
+            case .busto: giunto = .busto
+            case .mani: giunto = .mani
+            case .ginocchia: giunto = .ginocchia
+            }
+            let nome = parte == .busto ? "il busto" : (parte == .mani ? "le mani" : "le ginocchia")
+            Task { await parla("Conto \(nome), Sir.") }
+        }
+    }
 
     func avvia() async {
         guard await AVCaptureDevice.requestAccess(for: .video) else { commento = "Serve il permesso fotocamera, Sir."; return }
@@ -254,6 +306,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     private func ricevi(_ punti: [VNHumanBodyPoseObservation.JointName: CGPoint]?) {
         posa = punti
+        guard !inPausa else { posturaFuori = false; return }      // in pausa: lo scheletro si vede, niente conteggio né commenti
         guard let p = punti, let collo = p[.neck], let bacino = p[.root] else { posturaFuori = false; return }
         // schiena: angolo tra bacino→collo e la verticale (coordinate Vision: y verso l'alto)
         let dx = (collo.x - bacino.x) * 0.5625, dy = collo.y - bacino.y   // il fotogramma è verticale 9:16: l'asse x va riscalato
@@ -320,7 +373,12 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         voceInCorso = true
         defer { voceInCorso = false }
         let s = AVAudioSession.sharedInstance()
-        try? s.setCategory(.playback, mode: .spokenAudio, options: [.mixWithOthers])
+        if ascoltoComandi {
+            // il microfono dei comandi è acceso: stessa impostazione sua, così parlando non lo spegne
+            if s.category != .playAndRecord { try? s.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers]) }
+        } else {
+            try? s.setCategory(.playback, mode: .spokenAudio, options: [.mixWithOthers])
+        }
         try? s.setActive(true)
         if Impostazioni.voceCloud, let url = URL(string: Impostazioni.indirizzo) {
             let (dati, _) = await VoceCloud.scarica(testo, id: Impostazioni.idVoceCloud, url: url, token: Portachiavi.leggi())

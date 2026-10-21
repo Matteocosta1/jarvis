@@ -106,6 +106,8 @@ RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi
 
 - **Dialogo**: microfono spento solo durante l'avvio (`avvioInCorso`); a «SISTEMI IN LINEA» si apre l'ascolto, e dopo ogni risposta torna ad ascoltare da solo come nell'ultima versione buona. Fix: a fine risposta niente `setActive(false)` mentre riparte il microfono dell'attesa; riserva in `Richiamo.accendi` (`setActive(true)`). In LiDAR il microfono resta acceso (voluto da lui).
 - **Comandi nuovi** (`ComandiVocali.swift`, parametro `dentro:`): LiDAR «fine scansione», «quanto è grande?», «quante persone ci stanno?», «salva», «mostrami il 3D» (eseguiti da `VistaLidar` via `jarvis.azioneLidar`); Sentinella «Jarvis, chi è passato?», «Jarvis, schermo nero», «Jarvis, spegni la Sentinella»; Wiretap «Jarvis, fai il verbale» / «fine riunione»; ovunque «traduci in inglese» (Interprete già sulla lingua, anche sul Watch).
+- **Comandi per ogni sezione** (21 ott, pomeriggio): Allenatore e Interprete hanno ora un loro `OrecchioComandi` («Jarvis, …»): Allenatore fine serie, quante ripetizioni, postura, pausa/riprendi, azzera, conta mani/ginocchia/busto, cambia fotocamera; Interprete ascolta me/lui, passa al francese, cambia lingua, ripeti, turni automatici/manuali (l'orecchio è acceso solo tra un turno e l'altro; nel turno del signore una frase «Jarvis, …» è un comando, non si traduce). Allenatore: con l'orecchio acceso la voce usa playAndRecord, non playback. Comandi rapidi dalla schermata (`.rapido`): «scrivi il diario», «ho bisogno di parlarti», «cosa cucino?», «registra la riunione» (Wiretap che parte già). «Che canzone è?» resta al cervello (riconosci_musica).
+- **GitHub**: `github_scrivi` resta com'è (scrive anche su main, chiede conferma): deciso da lui il 21 ott, lo usa con cautela.
 - **Lista da stampare**: `docs/comandi/COMANDI-JARVIS.pdf` (sorgente `.html` accanto): da aggiornare a ogni comando nuovo.
 - Il battito di mani e il controllo dell'impronta vocale solo col rumore: lasciati così, per sua scelta.
 
@@ -116,8 +118,6 @@ RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi
 3. **Costi**: verificare dopo un giorno quanto ha risparmiato la cache da 1 ora. Idee non applicate: strumenti a gruppi (rischio piccolo), meno Opus (**no**, vuole l'intelligenza intatta).
 4. **Instant Kill**: quando lo chiede lui.
 5. **Tocco d'aiuto di Bea**: completare con lei (tasto Azione, mappa nella schermata allarme; mockup in `docs/bea`).
-7. **GitHub da JARVIS**: `github_scrivi` esiste già nel cervello (token con Contents rw, chiede conferma, scrive sul ramo principale se non si indica il ramo). Deciso a voce: scrittura solo su un ramo a parte da far approvare a Teo o in chat. Da fare quando lui dà il via.
-8. **Comandi dentro Allenatore e Interprete** («pausa», «quante ripetizioni?», «cambia lingua»): lì il microfono principale è spento, servirebbe un ascolto apposta. Proposto, non fatto.
 6. Mock completo pubblicato (artifact «JARVIS Mark VII») con avvio, chat, sezioni e tutti i suoni: ricostruirlo solo se serve, è fedele all'app.
 
 ## 13. Note operative

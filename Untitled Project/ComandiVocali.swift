@@ -62,11 +62,26 @@ enum ComandoVocale: Equatable {
     case lidar(AzioneLidar)                 // dentro LiDAR: «fine scansione», «quanto è grande?», «salva»…
     case sentinella(AzioneSentinella)       // dentro la Sentinella: «Jarvis, chi è passato?», «Jarvis, schermo nero»
     case interprete(String)                 // «traduci in inglese», «interprete spagnolo»: apre l'Interprete già sulla lingua (codice: en, es…)
+    case allenatore(AzioneAllenatore)       // dentro l'Allenatore: «Jarvis, fine serie», «Jarvis, quante ripetizioni?»…
+    case dentroInterprete(AzioneInterprete) // dentro l'Interprete: «Jarvis, ascolta lui», «Jarvis, passa al francese»…
+    case rapido(AzioneRapida)               // dalla schermata principale: apre la sezione e fa già la sua cosa
 
     /// I comandi di LiDAR (21 ott, chiesti dal signore).
     enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre }
     /// I comandi dentro la Sentinella: gli stessi due tasti in alto.
     enum AzioneSentinella: Equatable { case registro, schermoNero }
+    /// I comandi dentro l'Allenatore: i suoi tasti, più le domande sulla serie e la pausa.
+    enum AzioneAllenatore: Equatable { case fineSerie, azzera, ripetizioni, postura, camera, pausa, riprendi, conta(ParteConteggio) }
+    enum ParteConteggio: Equatable { case busto, mani, ginocchia }
+    /// I comandi dentro l'Interprete: i due tasti, la lingua, i turni, «ripeti».
+    enum AzioneInterprete: Equatable { case ascoltaMe, ascoltaAltro, lingua(String), sceltaLingua, ripeti, turniAutomatici(Bool) }
+    /// I comandi rapidi: la sezione si apre già al lavoro.
+    enum AzioneRapida: Equatable { case diario, confidente, cucina, riunione }   // «che canzone è?» no: lo fa già il cervello (riconosci_musica)
+
+    /// Il codice della lingua se la frase finisce con una lingua («… in francese»).
+    static func linguaFinale(_ t: [String]) -> String? {
+        lingueAVoce.first { l in l.parole.contains { t.last == $0 } }?.codice
+    }
 
     /// Le lingue dell'Interprete come si dicono a voce (gli stessi codici di `Lingua.tutte`).
     static let lingueAVoce: [(codice: String, parole: [String])] = [
@@ -114,13 +129,43 @@ enum ComandoVocale: Equatable {
             if c(" schermo nero ") || c(" oscura ") || c(" spegni lo schermo ") || c(" buio ") { return .sentinella(.schermoNero) }
         case .wiretap?:
             if t.count <= 4 && (c(" verbale ") || c(" fine riunione ") || c(" riunione finita ")) { return .torna }   // il verbale parte da «torna»
+        case .allenatore?:
+            if c(" fine serie ") || c(" serie finita ") || c(" ho finito ") || c(" serie chiusa ") { return .allenatore(.fineSerie) }
+            if c(" azzera ") || c(" ricomincia ") || c(" da capo ") { return .allenatore(.azzera) }
+            if c(" quante ripetizioni ") || c(" quante ne ho fatte ") || c(" a quante sono ") || c(" quante sono ") { return .allenatore(.ripetizioni) }
+            if c(" schiena ") || c(" postura ") || c(" come sto andando ") || c(" come va ") { return .allenatore(.postura) }
+            if c(" fotocamera ") || c(" girati ") || c(" selfie ") || c(" camera ") { return .allenatore(.camera) }
+            if c(" pausa ") || c(" aspetta un attimo ") { return .allenatore(.pausa) }
+            if c(" riprendi ") || c(" ripartiamo ") || c(" continua ") || c(" riparti ") { return .allenatore(.riprendi) }
+            if c(" conta ") || c(" conteggio ") {
+                if c(" mani ") || c(" braccia ") { return .allenatore(.conta(.mani)) }
+                if c(" ginocchia ") || c(" gambe ") { return .allenatore(.conta(.ginocchia)) }
+                if c(" busto ") || c(" schiena ") { return .allenatore(.conta(.busto)) }
+            }
+        case .interprete?:
+            if c(" ascolta me ") || c(" tocca a me ") || c(" parlo io ") { return .dentroInterprete(.ascoltaMe) }
+            if c(" ascolta lui ") || c(" ascolta lei ") || c(" ascolta l altro ") || c(" ascoltalo ") || c(" ascoltala ")
+                || c(" tocca a lui ") || c(" tocca a lei ") { return .dentroInterprete(.ascoltaAltro) }
+            if c(" ripeti ") || c(" ridillo ") || c(" ripetilo ") { return .dentroInterprete(.ripeti) }
+            if c(" turni automatici ") || c(" turni automatico ") { return .dentroInterprete(.turniAutomatici(true)) }
+            if c(" turni manuali ") || c(" senza turni ") || c(" niente turni ") { return .dentroInterprete(.turniAutomatici(false)) }
+            if c(" cambia ") || c(" passa ") || c(" lingua ") || c(" metti ") {
+                if let l = linguaFinale(t) { return .dentroInterprete(.lingua(l)) }
+                if c(" lingua ") { return .dentroInterprete(.sceltaLingua) }
+            }
         default: break
         }
 
         // Interprete già sulla lingua: «traduci in inglese», «interprete spagnolo», «fammi da interprete in francese».
         // Solo frasi corte: «traduci in inglese buongiorno a tutti» resta una domanda per il cervello.
-        if t.count <= 5, c(" traduci ") || c(" traduttore ") || c(" interprete ") {
-            for l in lingueAVoce where l.parole.contains(where: { t.last == $0 }) { return .interprete(l.codice) }
+        if t.count <= 5, c(" traduci ") || c(" traduttore ") || c(" interprete "), let l = linguaFinale(t) { return .interprete(l) }
+
+        // i comandi rapidi, solo dalla schermata principale: la sezione si apre e fa già il suo lavoro
+        if dentro == nil, t.count <= 6 {
+            if c(" scrivi il diario ") || c(" scriviamo il diario ") || c(" facciamo il diario ") || c(" compiliamo il diario ") { return .rapido(.diario) }
+            if c(" ho bisogno di parlarti ") || c(" devo parlarti ") || c(" ti devo parlare ") || c(" posso parlarti ") { return .rapido(.confidente) }
+            if c(" cosa cucino ") || c(" cosa posso cucinare ") || c(" cosa preparo da mangiare ") { return .rapido(.cucina) }
+            if c(" registra la riunione ") || c(" registra questa riunione ") || c(" registra la conversazione ") { return .rapido(.riunione) }
         }
 
         let verbi = ["attiva", "apri", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra"]

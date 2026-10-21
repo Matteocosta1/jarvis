@@ -44,6 +44,11 @@ struct Interprete: View {
     let chiudi: () -> Void
     @StateObject private var motore = MotoreInterprete()
     @AppStorage("interpreteAuto") private var automatico = true
+    @State private var scelta: Lingua?                  // «Jarvis, passa al francese»: la lingua cambiata a voce
+    @State private var scegliLingua = false             // «Jarvis, cambia lingua»
+    @State private var orecchio = OrecchioComandi()     // i comandi a voce tra un turno e l'altro, sempre con «Jarvis» davanti
+    @State private var chiuso = false                   // a schermata chiusa l'orecchio non si riaccende più
+    private var lin: Lingua { scelta ?? lingua }
 
     var body: some View {
         ZStack {
@@ -53,7 +58,7 @@ struct Interprete: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("J.A.R.V.I.S.")
                             .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                        Text("INTERPRETE · \(lingua.nome.uppercased())")
+                        Text("INTERPRETE · \(lin.nome.uppercased())")
                             .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.7)
                     }
                     .foregroundStyle(Color.ciano)
@@ -68,7 +73,7 @@ struct Interprete: View {
                 HStack(spacing: 10) {
                     lato(Lingua.italiano, attivo: motore.lato == .io, titolo: "LEI")
                     Image(systemName: "arrow.left.arrow.right").foregroundStyle(Color.tenue)
-                    lato(lingua, attivo: motore.lato == .altro, titolo: "L'ALTRO")
+                    lato(lin, attivo: motore.lato == .altro, titolo: "L'ALTRO")
                 }
                 .padding(.horizontal, 20)
 
@@ -83,7 +88,7 @@ struct Interprete: View {
                         LazyVStack(alignment: .leading, spacing: 12) {
                             ForEach(motore.scambi) { s in
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text("\(s.chi == .io ? "LEI" : lingua.nome.uppercased()) · \(s.ora)")
+                                    Text("\(s.chi == .io ? "LEI" : lin.nome.uppercased()) · \(s.ora)")
                                         .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2)
                                         .foregroundStyle(s.chi == .io ? Color.ciano : Color.orange)
                                     Text(s.originale).font(.system(size: 15)).foregroundStyle(.white)
@@ -113,16 +118,68 @@ struct Interprete: View {
 
                 // i due tasti: ascolta me / ascolta l'altro
                 HStack(spacing: 14) {
-                    tasto("Ascolta me", icona: "person.wave.2", colore: Color.ciano) { motore.ascolta(.io, lingua: lingua) }
-                    tasto("Ascolta \(lingua.bandiera)", icona: "ear", colore: Color.orange) { motore.ascolta(.altro, lingua: lingua) }
+                    tasto("Ascolta me", icona: "person.wave.2", colore: Color.ciano) { orecchio.ferma(); motore.ascolta(.io, lingua: lin) }
+                    tasto("Ascolta \(lin.bandiera)", icona: "ear", colore: Color.orange) { orecchio.ferma(); motore.ascolta(.altro, lingua: lin) }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 16)
             }
         }
-        .onAppear { motore.automatico = automatico; motore.prepara(lingua: lingua) }
+        .onAppear {
+            motore.automatico = automatico
+            motore.prepara(lingua: lin)
+            orecchio.dentro = .interprete
+            orecchio.comando = { c in comando(c) }
+            motore.suComando = { c in comando(c) }          // «Jarvis, …» detto durante il suo turno: è un comando, non si traduce
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(1.8))      // dopo il suono d'apertura, come nella Sentinella
+            if !Task.isCancelled, !chiuso, motore.fase == .attesa { orecchio.avvia() }
+        }
+        // il microfono dei comandi resta acceso solo tra un turno e l'altro: nei turni il microfono è dell'Interprete
+        .onChange(of: motore.fase) { _, f in
+            if f != .attesa { orecchio.ferma(); return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(400))
+                if !chiuso, motore.fase == .attesa { orecchio.avvia() }
+            }
+        }
         .onChange(of: automatico) { _, v in motore.automatico = v }
-        .onDisappear { motore.ferma() }
+        .onDisappear { chiuso = true; orecchio.ferma(); motore.ferma() }
+        .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
+            ForEach(Lingua.tutte) { l in Button("\(l.bandiera) \(l.nome)") { cambia(l) } }
+            Button("Annulla", role: .cancel) {}
+        }
         .aperturaHUD("Interprete")
+    }
+
+    /// I comandi a voce dentro l'Interprete.
+    private func comando(_ c: ComandoVocale) {
+        switch c {
+        case .torna:
+            chiuso = true; orecchio.ferma(); motore.ferma(); chiudi()
+        case .dentroInterprete(let a):
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            switch a {
+            case .ascoltaMe: orecchio.ferma(); motore.ascolta(.io, lingua: lin)
+            case .ascoltaAltro: orecchio.ferma(); motore.ascolta(.altro, lingua: lin)
+            case .ripeti: orecchio.ferma(); motore.ripeti(lin)
+            case .turniAutomatici(let si):
+                automatico = si
+                orecchio.ferma(); motore.annuncia(si ? "Turni automatici, Sir." : "Turni manuali, Sir.")
+            case .lingua(let codice): if let l = Lingua.trova(codice) { cambia(l) }
+            case .sceltaLingua: scegliLingua = true
+            }
+        case .interprete(let codice):                         // «Jarvis, traduci in tedesco» anche da qui
+            if let l = Lingua.trova(codice) { cambia(l) }
+        default: break
+        }
+    }
+
+    private func cambia(_ l: Lingua) {
+        scelta = l
+        motore.prepara(lingua: l)
+        orecchio.ferma()
+        motore.annuncia("\(l.nome), Sir.")
     }
 
     private func lato(_ l: Lingua, attivo: Bool, titolo: String) -> some View {
@@ -169,6 +226,7 @@ final class MotoreInterprete: NSObject, ObservableObject {
     @Published var parziale = ""
     @Published var stato = "PRONTO"
     var automatico = true
+    var suComando: ((ComandoVocale) -> Void)?    // «Jarvis, …» detto nel turno del signore
 
     private let motore = AVAudioEngine()
     private var riconoscitore: SFSpeechRecognizer?
@@ -280,6 +338,13 @@ final class MotoreInterprete: NSObject, ObservableObject {
         let testo = parziale.trimmingCharacters(in: .whitespacesAndNewlines)
         parziale = ""
         guard !testo.isEmpty else { fase = .attesa; stato = "NON HO SENTITO NULLA"; return }
+        // nel suo turno, «Jarvis, ascolta lui», «Jarvis, passa al francese»…: è un comando, non una frase da tradurre
+        if lato == .io, let c = ComandoVocale.riconosci(testo, serveJarvis: true, dentro: .interprete) {
+            fase = .attesa
+            stato = "PRONTO"
+            suComando?(c)
+            return
+        }
         Task { await traduciEParla(testo) }
     }
 
@@ -305,6 +370,29 @@ final class MotoreInterprete: NSObject, ObservableObject {
         stato = "PRONTO"
         // a turni: dopo aver parlato per il signore, ascolta subito la risposta dell'altro
         if automatico && chi == .io { ascolta(.altro, lingua: lingua) }
+    }
+
+    /// «Jarvis, ripeti»: ridice l'ultima traduzione, nella lingua in cui era stata detta.
+    func ripeti(_ straniera: Lingua) {
+        guard fase == .attesa, let u = scambi.last, !u.tradotto.isEmpty, u.tradotto != "(traduzione non riuscita)" else { return }
+        Task {
+            fase = .parlo
+            stato = "RIPETO"
+            await parla(u.tradotto, lingua: u.chi == .io ? straniera : Lingua.italiano)
+            fase = .attesa
+            stato = "PRONTO"
+        }
+    }
+
+    /// Una frase breve di JARVIS in italiano (la lingua scelta, i turni).
+    func annuncia(_ testo: String) {
+        guard fase == .attesa else { return }
+        Task {
+            fase = .parlo
+            await parla(testo, lingua: Lingua.italiano)
+            fase = .attesa
+            stato = "PRONTO"
+        }
     }
 
     private func parla(_ testo: String, lingua: Lingua) async {

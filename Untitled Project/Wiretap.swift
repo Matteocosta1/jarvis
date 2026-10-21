@@ -182,6 +182,9 @@ struct VistaWiretap: View {
     let chiudi: () -> Void
     /// Comandi a voce durante l'intercettazione: «Jarvis, torna» chiude (e se c'è testo, prepara il verbale).
     var comando: (ComandoVocale) -> Void = { _ in }
+    /// «Registra la riunione»: parte già registrando, come toccare REC (dopo il suono d'apertura).
+    var avviaSubito = false
+    @State private var chiusa = false              // chiusa prima che partisse: non registra più
 
     @StateObject private var w = Wiretap()
     @State private var copiato = false
@@ -303,8 +306,14 @@ struct VistaWiretap: View {
                 if c == .torna, !testo.isEmpty { verbale(testo, w.minuti) }    // niente si perde: parte il verbale
                 else { comando(c) }
             }
+            if avviaSubito {
+                Task {
+                    try? await Task.sleep(for: .seconds(1.8))
+                    if !chiusa && !w.attivo && w.confermato.isEmpty { await w.avvia() }
+                }
+            }
         }
-        .onDisappear { w.ferma() }
+        .onDisappear { chiusa = true; w.ferma() }
         .aperturaHUD("Wiretap")
     }
 }
