@@ -32,7 +32,6 @@ enum SuoniOrologio {
     static func preparaAvvio() {
         guard let url = file("avvioorologio") ?? file("avvio"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
         try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        try? AVAudioSession.sharedInstance().setActive(true)            // l'audio è dell'app prima che suoni: la corona lo regola
         p.volume = 1.0
         p.prepareToPlay()
         lettoreAvvio = p

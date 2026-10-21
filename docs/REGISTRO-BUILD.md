@@ -1,0 +1,16 @@
+# JARVIS — registro delle build
+
+Version e Build li tiene Claude su GitHub: Alessandro fa solo Pull e Archive.
+Per ogni build: cosa contiene, se è stata provata, com'è andata.
+
+| Build | Commit | Contenuto | Provata | Esito |
+|---|---|---|---|---|
+| 8.0 (1) | def427f | MARK VIII + comandi vocali di oggi + microfono «mai sordo» | sì | ✗ dopo la risposta non sente più (serve il reattore) |
+| 8.0 (2) | 0a77723 | + guardia sul microfono | no (mai caricata) | — |
+| 8.0 (3) | 0485044 | microfono dell'attesa come il 20 ott mattina | sì | ✗ stesso problema |
+| 8.0 (4) | aa10955 | + audio normale a fine avvio | no | — |
+| 8.0 (5) | (questo) | **tutta l'app come il 20 ott alle 20:57** (b0ebe03), subito prima della modifica del volume all'avvio; solo nome MARK VIII e numeri | da provare | |
+
+Punto fermo: la conversazione era perfetta prima della modifica del volume (403ce34, 20 ott 21:40).
+Dopo la 8.0 (5), se il dialogo va, si rimettono uno alla volta: volume all'avvio, comandi LiDAR/Sentinella/Wiretap,
+comandi Allenatore/Interprete/rapidi — una build per pezzo, provata ogni volta.

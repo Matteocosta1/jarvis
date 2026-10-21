@@ -94,7 +94,7 @@ final class Wiretap: ObservableObject {
         parziale = ""
         presa.metti(nil)
         compito = nil
-        if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true, dentro: .wiretap) {   // «Jarvis, fai il verbale»
+        if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true) {
             comando?(c)                       // la frase di comando non entra nel verbale
             return
         }
@@ -182,9 +182,6 @@ struct VistaWiretap: View {
     let chiudi: () -> Void
     /// Comandi a voce durante l'intercettazione: «Jarvis, torna» chiude (e se c'è testo, prepara il verbale).
     var comando: (ComandoVocale) -> Void = { _ in }
-    /// «Registra la riunione»: parte già registrando, come toccare REC (dopo il suono d'apertura).
-    var avviaSubito = false
-    @State private var chiusa = false              // chiusa prima che partisse: non registra più
 
     @StateObject private var w = Wiretap()
     @State private var copiato = false
@@ -306,14 +303,8 @@ struct VistaWiretap: View {
                 if c == .torna, !testo.isEmpty { verbale(testo, w.minuti) }    // niente si perde: parte il verbale
                 else { comando(c) }
             }
-            if avviaSubito {
-                Task {
-                    try? await Task.sleep(for: .seconds(1.8))
-                    if !chiusa && !w.attivo && w.confermato.isEmpty { await w.avvia() }
-                }
-            }
         }
-        .onDisappear { chiusa = true; w.ferma() }
+        .onDisappear { w.ferma() }
         .aperturaHUD("Wiretap")
     }
 }

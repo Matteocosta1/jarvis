@@ -13,22 +13,6 @@ import UIKit
 enum Suoni {
     static var attivi: Bool { UserDefaults.standard.object(forKey: "suoni") as? Bool ?? true }
 
-    /// All'apertura l'audio dell'iPhone va preso SUBITO, prima della musica d'avvio: finché l'app non attiva la sessione,
-    /// i tasti del volume regolano la suoneria e i suoni escono a un volume che non si sposta (era l'avvio «basso»).
-    /// «ambient»: rispetta il silenzioso e non ferma la musica di altre app; poi l'ascolto e la voce la cambiano come sempre.
-    static func preparaAudio() {
-        let s = AVAudioSession.sharedInstance()
-        if s.category == .soloAmbient { try? s.setCategory(.ambient, mode: .default, options: []) }
-        try? s.setActive(true)
-    }
-
-    /// Finito l'avvio: l'audio torna com'era prima di «preparaAudio» (20 ott mattina, il dialogo perfetto),
-    /// così l'ascolto e il richiamo partono dalle stesse condizioni di allora. Il volume alto dell'avvio non cambia.
-    static func rilasciaAudioAvvio() {
-        let s = AVAudioSession.sharedInstance()
-        if s.category == .ambient { try? s.setCategory(.soloAmbient, mode: .default, options: []) }
-    }
-
     /// Tocco su un'icona o sul reattore.
     static func tocco() { Aptica.click(); suona(.tocco) }
     /// JARVIS inizia ad ascoltare.

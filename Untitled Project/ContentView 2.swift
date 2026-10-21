@@ -46,7 +46,7 @@ struct ContentView: View {
         let nienteDiJarvis: Bool = jarvis.pagina == nil && jarvis.occhi == nil && jarvis.interprete == nil && !jarvis.allenatore
         let nienteSchede: Bool = scheda == nil && mostraRicordi == nil && sorgenteFoto == nil
         let nienteReparti: Bool = !mostraImpostazioni && !mostraBrowser && !mostraSentinella && !mostraWiretap
-        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente   // LiDAR: il microfono resta acceso, si parla con JARVIS mentre scansiona
+        let nienteAltro: Bool = !mostraProfiler && !mostraVitals && !mostraConfidente
         return inPrimoPiano && nienteDiJarvis && nienteSchede && nienteReparti && nienteAltro
     }
     @FocusState private var tastiera: Bool
@@ -127,9 +127,8 @@ struct ContentView: View {
             VistaWiretap(verbale: { testo, minuti in
                 mostraWiretap = false
                 jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto)
         }
-        .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
         // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
@@ -181,9 +180,7 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $mostraLidar) {
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
-                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
-        .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
         .sheet(isPresented: $mostraVitals) {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
@@ -209,7 +206,6 @@ struct ContentView: View {
         }
         .onAppear {
             Aptica.prepara()
-            Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano
             accendi()
             if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
             if primaApertura {
@@ -276,7 +272,6 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
-            Suoni.rilasciaAudioAvvio()                             // l'audio dell'avvio torna normale prima del microfono
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
@@ -695,12 +690,6 @@ struct ContentView: View {
             scheda = nil
         case .apri(let r):
             apriReparto(r)
-        case .interprete(let codice):
-            mostraSentinella = false
-            mostraWiretap = false
-            Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
-        default:
-            break                                   // gli altri li gestisce il reparto stesso
         }
     }
 
