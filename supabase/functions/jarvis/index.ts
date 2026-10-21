@@ -1326,13 +1326,14 @@ async function supabaseLog(i: Record<string, any>) {
   const ore = Math.min(Math.max(num(i.ore) || 6, 1), 168), quanti = Math.min(num(i.quanti) || 40, 100);
   const soloErrori = i.solo_errori !== false;
   const fn = i.funzione ? String(i.funzione).replace(/[^a-z0-9\-_]/gi, "") : "";
-  const edge = await sbLog(`select timestamp, event_message, log_attributes['response.status_code'] as status_code, log_attributes['request.method'] as method,
+  // le due ricerche nei registri partono insieme (prima una dopo l'altra: il menu SISTEMI aspettava il doppio)
+  const [edge, console_] = await Promise.all([sbLog(`select timestamp, event_message, log_attributes['response.status_code'] as status_code, log_attributes['request.method'] as method,
     log_attributes['request.url'] as url, log_attributes['function_id'] as function_id, log_attributes['execution_time_ms'] as execution_time_ms
     from logs where source = 'function_edge_logs' ${soloErrori ? "and toInt32OrZero(log_attributes['response.status_code']) >= 400" : ""}
-    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
-  const console_ = await sbLog(`select timestamp, event_message, log_attributes['level'] as level, log_attributes['function_id'] as function_id
+    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]),
+  sbLog(`select timestamp, event_message, log_attributes['level'] as level, log_attributes['function_id'] as function_id
     from logs where source = 'function_logs' ${soloErrori ? "and log_attributes['level'] in ('error', 'warning')" : ""}
-    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }]);
+    order by timestamp desc limit ${quanti}`, ore).catch((e) => [{ errore: e.message }])]);
   // il tempo arriva come testo ISO (nuovo flusso) o come microsecondi (vecchio)
   const tempo = (t: unknown) => /^\d{13,}$/.test(String(t)) ? new Date(Number(String(t).slice(0, 13))) : new Date(String(t).replace(" ", "T") + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(t)) ? "" : "Z"));
   const pulisci = (r: any) => ({ quando: r.timestamp ? quando(tempo(r.timestamp)) : "", funzione: r.function_id ?? "", livello: r.level ?? (r.status_code ? `HTTP ${r.status_code}` : ""),
@@ -1472,6 +1473,19 @@ async function costiPeriodo(i: Record<string, any>) {
 }
 async function consumi() {
   const inizioMese = mezzanotteRoma(0, true), inizioOggi = mezzanotteRoma(0), inizioIeri = mezzanotteRoma(1), inizio7 = mezzanotteRoma(6);
+  // il piano ElevenLabs parte subito, insieme alle letture del database (prima aspettava la fine di quelle)
+  const pianoVoce = (async () => {
+    const chiave = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!chiave) return null;
+    try {
+      const r = await fetch(`${XI}/user/subscription`, { headers: { "xi-api-key": chiave }, signal: AbortSignal.timeout(6000) });
+      if (!r.ok) return null;
+      const d = await r.json();
+      const usati = num(d.character_count), limite = num(d.character_limit);
+      return { piano: d.tier ?? "", usati, limite, percento: limite ? Math.round(usati / limite * 100) : 0,
+        rinnovo: d.next_character_count_reset_unix ? quando(new Date(num(d.next_character_count_reset_unix) * 1000)) : "" };
+    } catch { return null; }   // senza piano
+  })();
   const [mese, oggi, ieri, sette, voceMese, voceOggi, primo, statoCr] = await Promise.all([
     costiFra(inizioMese), costiFra(inizioOggi), costiFra(inizioIeri, inizioOggi), costiFra(inizio7),
     voceFra(inizioMese), voceFra(inizioOggi),
@@ -1481,19 +1495,7 @@ async function consumi() {
   const modelli = mese.map((m) => ({ ...m, dollari: r2(m.dollari) })).sort((a, b) => b.dollari - a.dollari);
   const righe = primo.data ?? [];
   // la voce: il piano ElevenLabs e quanto ne resta
-  let voce: any = null;
-  const chiave = Deno.env.get("ELEVENLABS_API_KEY");
-  if (chiave) {
-    try {
-      const r = await fetch(`${XI}/user/subscription`, { headers: { "xi-api-key": chiave }, signal: AbortSignal.timeout(6000) });
-      if (r.ok) {
-        const d = await r.json();
-        const usati = num(d.character_count), limite = num(d.character_limit);
-        voce = { piano: d.tier ?? "", usati, limite, percento: limite ? Math.round(usati / limite * 100) : 0,
-          rinnovo: d.next_character_count_reset_unix ? quando(new Date(num(d.next_character_count_reset_unix) * 1000)) : "" };
-      }
-    } catch { /* senza piano */ }
-  }
+  const voce: any = await pianoVoce;
   return { mese: oggiRoma().slice(0, 7), stima: true, dollari_mese: r2(sommaDollari(mese)), dollari_oggi: r2(sommaDollari(oggi)),
     dollari_ieri: r2(sommaDollari(ieri)), dollari_7_giorni: r2(sommaDollari(sette)),
     fissi: [{ nome: "Supabase Pro", costo: "25 $/mese" }, { nome: "Apple Developer", costo: "99 €/anno" }],

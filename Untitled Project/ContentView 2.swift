@@ -3,6 +3,14 @@ import AVFoundation
 import QuartzCore
 
 /// Le schede delle icone della corona.
+/// Le ultime righe di stato del menu SISTEMI, ricordate sul telefono: all'apertura si vedono subito, poi si aggiornano.
+enum MemoriaSistemi {
+    static func leggi() -> [String: String] {
+        UserDefaults.standard.dictionary(forKey: "statoSistemi") as? [String: String] ?? [:]
+    }
+    static func salva(_ stato: [String: String]) { UserDefaults.standard.set(stato, forKey: "statoSistemi") }
+}
+
 enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
     case github, supabase, archivio, costi, edith
@@ -35,7 +43,7 @@ struct ContentView: View {
     @State private var mostraLidar = false            // STRUMENTI › LiDAR: la scansione della stanza
     @State private var mostraProfiler = false
     @State private var mostraSistemi = false        // il menu SISTEMI in alto: GitHub, Supabase, Archivio
-    @State private var statoSistemi: [String: String] = [:]   // la riga di stato sotto ogni voce del menu
+    @State private var statoSistemi: [String: String] = MemoriaSistemi.leggi()   // la riga di stato sotto ogni voce del menu: le ultime lette, subito
     @State private var scheda: SchedaApp?          // le schede delle icone: Diario, Sonno, Cuore, Meteo, Spesa…
     @State private var aiutoBea: AiutoBea?          // il Tocco d'aiuto di Bea: schermata a tutto schermo
     @Environment(\.scenePhase) private var scena
@@ -231,6 +239,10 @@ struct ContentView: View {
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
         .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
+        .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
+            try? await Task.sleep(for: .seconds(8))
+            await caricaStatoSistemi()
+        }
         .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
             guard si else { return }
             jarvis.chiudiChiesto = false
@@ -836,6 +848,7 @@ struct ContentView: View {
             let oggi = (c["dollari_oggi"] as? NSNumber)?.doubleValue ?? 0, mese = (c["dollari_mese"] as? NSNumber)?.doubleValue ?? 0
             statoSistemi["costi"] = String(format: "oggi %.2f · mese %.2f $", oggi, mese).replacingOccurrences(of: ".", with: ",")
         } else { statoSistemi["costi"] = "non raggiungibile" }
+        MemoriaSistemi.salva(statoSistemi)                // la prossima volta il menu le mostra subito
     }
 
     private var registro: some View {
