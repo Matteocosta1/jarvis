@@ -27,6 +27,8 @@ struct VistaScanner: View {
     @State private var codiceAMano = ""
     @State private var storico: [Passato] = []
     @State private var mostraIngredienti = false
+    @State private var orecchio = OrecchioComandi()   // «Jarvis, un altro», «Jarvis, fa bene?», «Jarvis, cosa c'è dentro?»
+    @Environment(\.dismiss) private var chiudiScheda
 
     var body: some View {
         CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "barcode.viewfinder", tinta: tinta, fotocamera: true) {
@@ -49,6 +51,30 @@ struct VistaScanner: View {
             }
         }
         .onAppear { storico = VistaScanner.leggi() }
+        .task {
+            // i comandi a voce, come nella Sentinella: l'ascolto parte a suono d'apertura finito
+            orecchio.dentro = .scanner
+            orecchio.comando = { c in voce(c) }
+            try? await Task.sleep(for: .seconds(1.8))
+            guard !Task.isCancelled else { return }
+            orecchio.avvia()
+        }
+        .onDisappear { orecchio.ferma() }
+    }
+
+    /// Un comando detto a voce, come il tasto corrispondente.
+    private func voce(_ c: ComandoVocale) {
+        switch c {
+        case .torna: orecchio.ferma(); chiudiScheda()
+        case .scheda(.scannerAltro): if !leggo { ricomincia() }
+        case .scheda(.scannerIngredienti): if prodotto != nil { withAnimation { mostraIngredienti = true } }
+        case .scheda(.scannerGiudizio):
+            if let p = prodotto {
+                orecchio.ferma()
+                chiedi("Ho scansionato «\(p.s("nome"))» (codice \(p.s("codice"))): è una buona scelta? Dimmi cosa pesa nel voto e che alternativa cercare.")
+            }
+        default: break
+        }
     }
 
     private var sottotitolo: String {

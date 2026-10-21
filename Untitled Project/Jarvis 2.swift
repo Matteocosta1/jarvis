@@ -625,6 +625,10 @@ final class Jarvis: NSObject, ObservableObject {
         case .rapido(let azione)?:
             rapido(azione)
             return true
+        case .domanda(let testo)?:                 // dentro una scheda, come il suo tasto «Chieda a JARVIS»: chiude e chiede
+            chiudiChiesto = true
+            Task { try? await Task.sleep(for: .milliseconds(350)); await invia(testo) }
+            return true
         case .scheda(let azione)?:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             switch azione {

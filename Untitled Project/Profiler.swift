@@ -222,7 +222,7 @@ struct VistaProfiler: View {
         case .profiler(.scatta): if foto == nil { scatta() }
         case .profiler(.gira): if foto == nil, agganciato, !scattando { Task { await giraFotocamera() } }
         case .profiler(.rifai): if foto != nil { rifai() }
-        case .profiler(.profila): if foto != nil { profila() }
+        case .profiler(.profila): if foto != nil { profila() } else { scatta() }   // «vai», «procedi»: il passo successivo
         case .profiler(.nome(let n)): if foto != nil { nome = n; Suoni.tocco() }
         case .profiler(.ruolo(let r)): if foto != nil { chi = r; Suoni.tocco() }
         default: break

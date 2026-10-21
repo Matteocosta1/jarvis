@@ -14,36 +14,48 @@ enum BrowserVoce {
     static var invia: (() -> Void)?
     /// Muoversi nel Browser a voce: «indietro», «avanti», «ricarica», «scorri giù», «vai su repubblica.it». Vero se l'ha fatto.
     static var naviga: ((Movimento) -> Bool)?
-    enum Movimento { case indietro, avanti, ricarica, giu, su, inCima, apri(String) }
+    enum Movimento { case indietro, avanti, ricarica, giu, su, inCima, svuota, apri(String) }
 
     /// Vero se la frase era un comando del Browser (ed è stato eseguito).
     static func comando(_ frase: String) -> Bool {
         let t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
         let basso = t.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        /// Quello che segue il verbo, senza punteggiatura finale e senza «su Google» in coda.
+        func resto(_ verbo: String) -> String {
+            var r = String(t.dropFirst(verbo.count)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:"))
+            while let u = r.last, ".!?;".contains(u) { r.removeLast() }   // il punto finale del riconoscimento no
+            for coda in [" su google", " in google", " con google", " su internet", " in rete"] where r.lowercased().hasSuffix(coda) { r = String(r.dropLast(coda.count)) }
+            return r.trimmingCharacters(in: .whitespaces)
+        }
         // muoversi: «indietro» qui torna alla pagina di prima (se non c'è, chiude il Browser come sempre)
         let mosse: [(Movimento, [String])] = [
-            (.indietro, ["indietro", "pagina indietro", "torna indietro", "pagina precedente", "torna alla pagina di prima", "pagina di prima"]),
-            (.avanti, ["avanti", "pagina avanti", "pagina successiva"]),
-            (.ricarica, ["ricarica", "ricarica la pagina", "aggiorna", "aggiorna la pagina"]),
-            (.giu, ["scorri", "scorri giù", "giù", "vai giù", "più giù", "scendi"]),
-            (.su, ["scorri su", "su", "vai su", "più su", "sali"]),
-            (.inCima, ["torna su", "in cima", "torna in cima", "all'inizio"]),
+            (.indietro, ["indietro", "pagina indietro", "torna indietro", "pagina precedente", "torna alla pagina di prima", "pagina di prima", "torna alla pagina precedente",
+                         "vai indietro", "una pagina indietro"]),
+            (.avanti, ["avanti", "pagina avanti", "pagina successiva", "vai avanti", "una pagina avanti"]),
+            (.ricarica, ["ricarica", "ricarica la pagina", "aggiorna", "aggiorna la pagina", "ricaricala", "riprova", "non si carica"]),
+            (.giu, ["scorri", "scorri giù", "giù", "vai giù", "più giù", "scendi", "scendi giù", "vai sotto", "fammi vedere sotto", "continua", "avanti a scorrere"]),
+            (.su, ["scorri su", "su", "vai su", "più su", "sali", "torna un po' su", "un po' su"]),
+            (.inCima, ["torna su", "in cima", "torna in cima", "all'inizio", "torna all'inizio", "vai in cima", "inizio pagina"]),
+            (.svuota, ["cancella", "cancella tutto", "cancella quello che hai scritto", "svuota il campo", "pulisci il campo", "ricomincia a scrivere", "togli il testo"]),
         ]
         for (m, frasi) in mosse where frasi.contains(basso) { return naviga?(m) ?? false }
-        for verbo in ["vai su ", "apri il sito ", "apri il sito di ", "vai al sito ", "vai sul sito ", "cerca su google ", "cerca "] where basso.hasPrefix(verbo) {
-            var resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: .whitespaces)
-            while let u = resto.last, ".!?;".contains(u) { resto.removeLast() }
-            guard !resto.isEmpty else { break }
-            return naviga?(.apri(resto)) ?? false
+        // cercare o aprire un sito: «cerca ristoranti a Milano», «cerca su Google le serate di sabato», «vai su repubblica.it», «googla…»
+        for verbo in ["cerca su google ", "cerca in google ", "cercami su google ", "scrivi su google ", "scrivi in google ", "scrivi nella ricerca ",
+                      "scrivi nella barra ", "googla ", "googlami ", "vai su ", "apri il sito di ", "apri il sito ", "vai al sito ", "vai sul sito ",
+                      "aprimi il sito ", "portami su ", "cercami ", "cerca ", "trovami ", "trova "] where basso.hasPrefix(verbo) {
+            let r = resto(verbo)
+            guard !r.isEmpty else { break }
+            return naviga?(.apri(r)) ?? false
         }
-        if ["invia", "manda", "vai", "cerca", "premi invio", "invio", "conferma"].contains(basso) {
+        if ["invia", "manda", "vai", "cerca", "premi invio", "invio", "conferma", "ok vai", "vai pure", "cerca adesso", "avvia la ricerca", "fai la ricerca",
+            "premi", "spingi", "inviala", "mandala", "manda pure", "fatto"].contains(basso) {
             invia?(); return true
         }
-        for verbo in ["scrivi ", "scrivi: ", "digita ", "scrivi,"] where basso.hasPrefix(verbo) {
-            var resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:"))
-            while let u = resto.last, ".!?;".contains(u) { resto.removeLast() }   // il punto finale del riconoscimento no
-            guard !resto.isEmpty else { return false }
-            scrivi?(resto); return true
+        // scrivere nel campo della pagina (o nella casella di Google se il cursore non è in un campo)
+        for verbo in ["scrivi: ", "scrivi, ", "scrivi ", "scrivici ", "scrivimi ", "digita ", "inserisci ", "metti nel campo "] where basso.hasPrefix(verbo) {
+            let r = resto(verbo)
+            guard !r.isEmpty else { return false }
+            scrivi?(r); return true
         }
         return false
     }
@@ -329,6 +341,20 @@ struct PaginaBrowser: View {
             case .giu: w.evaluateJavaScript("window.scrollBy({top: window.innerHeight * 0.8, behavior: 'smooth'})", completionHandler: nil)
             case .su: w.evaluateJavaScript("window.scrollBy({top: -window.innerHeight * 0.8, behavior: 'smooth'})", completionHandler: nil)
             case .inCima: w.evaluateJavaScript("window.scrollTo({top: 0, behavior: 'smooth'})", completionHandler: nil)
+            case .svuota:
+                if scrivendo { barra = "" }
+                else {
+                    w.evaluateJavaScript("""
+                    (function(){ var e = document.activeElement;
+                      if (!e || !(e.isContentEditable || e.tagName === 'TEXTAREA' || e.tagName === 'INPUT')) {
+                        e = document.querySelector('textarea[name=q], input[name=q], input[type=search], [role=searchbox]'); }
+                      if (!e) return;
+                      if (e.isContentEditable) { e.textContent = ''; } else {
+                        var proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                        Object.getOwnPropertyDescriptor(proto, 'value').set.call(e, ''); }
+                      e.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); e.focus(); })();
+                    """, completionHandler: nil)
+                }
             case .apri(let dove): scrivendo = false; nav.vai(dove)
             }
             return true

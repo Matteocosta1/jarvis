@@ -85,6 +85,7 @@ enum ComandoVocale: Equatable {
     case rapido(AzioneRapida)               // dalla schermata principale: apre la sezione e fa già la sua cosa
     case scheda(AzioneScheda)               // dentro una scheda: i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…)
     case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
+    case domanda(String)                    // dentro una scheda: «dimmi», «com'ho dormito?»: chiude la scheda e chiede a JARVIS come il suo tasto
 
     /// I comandi di LiDAR (21 ott, chiesti dal signore).
     enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre }
@@ -107,6 +108,7 @@ enum ComandoVocale: Equatable {
         case apriMail, postaRiassumi
         case spesaLeggi, spesaWhatsApp
         case occhiGiro
+        case scannerAltro, scannerGiudizio, scannerIngredienti
     }
     /// I tasti del Profiler, a voce, più la scheda del soggetto dettata.
     enum AzioneProfiler: Equatable { case scatta, gira, rifai, profila, nome(String), ruolo(String) }
@@ -140,15 +142,20 @@ enum ComandoVocale: Equatable {
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }
+        func uno(_ l: [String]) -> Bool { l.contains(where: c) }
+        func solo(_ l: [String]) -> Bool { l.contains(s) }        // frasi generiche («dimmi», «che ne pensi»): solo dette così, da sole
+        let generiche = [" dimmi ", " dimmi tutto ", " allora ", " che ne pensi ", " cosa ne pensi ", " che mi dici ", " cosa mi dici ", " come va ",
+                         " raccontami ", " spiegami ", " fammi sapere ", " aggiornami ", " novita ", " riassumi ", " riassumimi ", " leggimelo ", " leggimeli "]
 
         // tornare indietro / chiudere il reparto
         // da soli («chiudi», «indietro»…) o in poche frasi esatte: «torna a casa» e «chiudi Spotify» restano a JARVIS
-        if t.count == 1, ["torna", "indietro", "chiudi", "esci", "basta"].contains(t[0]) { return .torna }
+        if t.count == 1, ["torna", "indietro", "chiudi", "chiudimi", "chiudila", "chiudilo", "esci", "basta"].contains(t[0]) { return .torna }
         if [" torna indietro ", " chiudi tutto ", " torna alla home ", " torna alla schermata principale ", " chiudi la scheda ",
-            " chiudi questa scheda ", " esci da qui "].contains(where: { s == $0 }) { return .torna }
+             " chiudi questa scheda ", " esci da qui ", " chiudi qui ", " chiudimi tutto ", " chiudimi questa ", " chiudimi questo ", " torna alla schermata iniziale ",
+            " torna all inizio ", " vai alla home ", " portami alla home ", " esci pure ", " ok chiudi ", " grazie chiudi ", " a posto chiudi ", " fatto chiudi "].contains(where: { s == $0 }) { return .torna }
         // «chiudi l'app», «chiudi la sezione», «chiudi qui», oppure «chiudi» + il nome di una sezione di JARVIS («chiudi LiDAR», «chiudi il meteo»).
         // «chiudi Spotify», «chiudi la porta», «chiudi la musica» restano a JARVIS.
-        if t[0] == "chiudi" || t[0] == "esci", t.count <= 4 {
+        if ["chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"].contains(t[0]), t.count <= 4 {
             let resto = Array(t.dropFirst()).filter { !["l", "la", "il", "lo", "le", "i", "gli", "da", "dal", "dalla", "dallo", "questa", "questo"].contains($0) }
             let generiche: Set<String> = ["app", "applicazione", "sezione", "scheda", "schermata", "pagina", "qui", "tutto", "scansione"]
             let sezioni: Set<String> = ["lidar", "laidar", "planimetria", "occhi", "fotocamera", "camera", "cucina", "meteo", "tempo", "browser", "internet",
@@ -200,61 +207,104 @@ enum ComandoVocale: Equatable {
                 if let l = linguaFinale(t) { return .dentroInterprete(.lingua(l)) }
                 if c(" lingua ") { return .dentroInterprete(.sceltaLingua) }
             }
+        // le schede: tanti modi di dirlo, come si parla davvero («Jarvis, ti racconto una cosa», «che ne pensi di questo?»)
         case .diario?:
-            if t.count <= 6 {
-                if c(" ne parliamo ") || c(" parliamone ") || c(" rileggimi ") || c(" rileggila ") || c(" cosa ne pensi ") { return .scheda(.diarioNeParliamo) }
-                if c(" a voce ") || c(" te lo racconto ") || c(" ti racconto ") || c(" scriviamo ") || c(" scriviamolo ") || c(" lo dico a voce ") { return .scheda(.diarioAVoce) }
-            }
+            if solo(generiche) || uno([" ne parliamo ", " parliamone ", " che ne pensi ", " cosa ne pensi ", " che ne dici ", " cosa ne dici ", " rileggimi ", " rileggila ",
+                    " rileggimela ", " leggimela ", " leggimi la pagina ", " commentala ", " cosa ci leggi ", " come mi vedi ", " come ti sembro "]) { return .scheda(.diarioNeParliamo) }
+            if uno([" a voce ", " te lo racconto ", " ti racconto ", " ti devo raccontare ", " parliamo di una cosa ", " parliamo un po ", " ascoltami ",
+                    " scriviamo ", " scriviamolo ", " nuova pagina ", " aggiungi una pagina ", " scrivi la pagina ", " com e andata oggi ",
+                    " ti dico com e andata ", " voglio raccontarti ", " devo raccontarti "]) { return .scheda(.diarioAVoce) }
         case .confidente?:
-            if t.count <= 6 {
-                if c(" incolla ") || c(" incollala ") || c(" incollalo ") || c(" incolla la conversazione ") { return .scheda(.confidenteIncolla) }
-                if c(" a voce ") || c(" te lo racconto ") || c(" ti racconto ") || c(" raccontarlo ") { return .scheda(.confidenteAVoce) }
-            }
+            if uno([" incolla ", " incollala ", " incollalo ", " incolla qui ", " incolla il messaggio ", " prendi il messaggio ", " prendi quello che ho copiato ",
+                    " ho copiato ", " l ho copiato ", " l ho copiata ", " leggi quello che ho copiato "]) { return .scheda(.confidenteIncolla) }
+            if uno([" a voce ", " te lo racconto ", " ti racconto ", " ti devo raccontare ", " parliamo ", " parliamone ", " ascoltami ", " devo parlarti ",
+                    " ho bisogno di parlarti ", " mi devo sfogare ", " devo sfogarmi ", " sfogo "]) { return .scheda(.confidenteAVoce) }
         case .vitals?:
-            if t.count <= 6, c(" come sto ") || c(" come va la salute ") || c(" come mi vedi ") || c(" come sto messo ") || c(" leggimeli ") { return .scheda(.vitalsCome) }
+            if solo(generiche) || uno([" come sto ", " come sto messo ", " come sto andando ", " come va la salute ", " come mi vedi ", " sto bene ",
+                    " che dicono ", " cosa dicono ", " analizzali ", " commentali ", " a che punto sono ", " com e la situazione ", " sto migliorando ",
+                    " sto peggiorando ", " va tutto bene ", " come mi sto comportando ", " sto facendo bene "]) { return .scheda(.vitalsCome) }
         case .cuore?:
-            if t.count <= 5, c(" sos ") || c(" chiedi aiuto ") || c(" chiama aiuto ") || c(" aiuto ") || c(" sto male ") { return .scheda(.cuoreSOS) }
-        case .bea?:
-            if t.count <= 6 {
-                if c(" emergenza ") || c(" 112 ") || c(" centododici ") || c(" cento dodici ") { return .scheda(.bea112) }
-                if c(" ti penso ") || c(" pensiero ") || c(" qualcosa di carino ") || c(" qualcosa di dolce ") { return .scheda(.beaTiPenso) }
-                if c(" whatsapp ") { return .scheda(.beaWhatsApp) }
-                if c(" chiamala ") || c(" chiama ") { return .scheda(.beaChiama) }
-                if c(" scrivile ") || c(" mandale un messaggio ") || c(" messaggio ") { return .scheda(.beaMessaggio) }
+            if t.count <= 6, uno([" sos ", " chiedi aiuto ", " chiama aiuto ", " aiuto ", " sto male ", " mi sento male ", " chiama i soccorsi ", " emergenza "]) { return .scheda(.cuoreSOS) }
+            if solo(generiche + [" e normale ", " va bene ", " come sto "]) || uno([" come va il cuore ", " come sta il cuore ", " com e il battito ", " come e il battito ",
+                    " come batte ", " sono agitato ", " sono in ansia ", " batte forte ", " ho il cuore a mille ", " ho le palpitazioni "]) {
+                return .domanda("Come sta il mio cuore oggi? Guarda battito a riposo e variabilità.")
             }
-        case .email?, .briefing?:
-            if t.count <= 5 {
-                if c(" apri mail ") || c(" apri la mail ") || c(" apri l app mail ") || c(" apri l app della posta ") || c(" apri posta ") { return .scheda(.apriMail) }
-                if dentro == .email, c(" riassumi ") || c(" riassumimi ") || c(" cosa conta ") || c(" cosa c e ") { return .scheda(.postaRiassumi) }
+        case .sonno?:
+            if solo(generiche) || uno([" come ho dormito ", " com ho dormito ", " quanto ho dormito ", " ho dormito bene ", " ho dormito male ", " come va il sonno ",
+                    " sono stanco ", " perche sono stanco ", " dormo abbastanza ", " come dormo ", " stanotte ", " com e andata la notte "]) {
+                return .domanda("Come ho dormito stanotte? Dimmi anche come sta andando la settimana.")
+            }
+        case .meteo?:
+            if solo(generiche + [" che tempo fa ", " che tempo fara ", " com e fuori ", " com e il tempo ", " ombrello ", " mi serve l ombrello ", " giacca ",
+                                 " mi serve la giacca ", " come mi vesto ", " piove ", " fa freddo ", " fa caldo "]) {
+                return .domanda("Che tempo fa qui nelle prossime ore? Mi serve l'ombrello o la giacca?")
+            }
+        case .briefing?:
+            if solo(generiche + [" briefing ", " il briefing ", " fammi il briefing ", " cosa c e oggi ", " cosa ho oggi ", " com e la giornata ", " la giornata ",
+                                 " buongiorno ", " partiamo ", " vai "]) {
+                return .domanda("Buongiorno Jarvis, il briefing per favore.")
+            }
+            if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri posta ", " vai su mail "]) { return .scheda(.apriMail) }
+        case .ricordi?:
+            if uno([" ho parcheggiato ", " parcheggiato qui ", " segna la macchina ", " lascio la macchina qui ", " la macchina e qui "]) { return .domanda("Ho parcheggiato qui, segnalo.") }
+            if uno([" ricorda dove sono ", " ricordati questo posto ", " segna questo posto ", " salva questo posto ", " ricorda questo posto ", " segnati dove sono "]) {
+                return .domanda("Ricordati questo posto: dove sono adesso.")
+            }
+            if uno([" dov e la macchina ", " dove ho parcheggiato ", " portami alla macchina ", " portami li ", " portamici "]) { return .domanda("Dov'è la macchina? Portami lì.") }
+            if uno([" com e andata oggi ", " cosa ho fatto oggi ", " la mia giornata "]) { return .domanda("Com'è andata oggi?") }
+            if solo(generiche + [" cosa devo ricordare ", " cosa mi devo ricordare ", " cosa c e ", " promemoria ", " cosa ho promesso "]) {
+                return .domanda("Cosa mi devo ricordare? Promesse aperte, oggetti e parcheggio.")
+            }
+        case .bea?:
+            if t.count <= 7 {
+                if uno([" emergenza ", " 112 ", " centododici ", " cento dodici ", " chiama i soccorsi ", " soccorso "]) { return .scheda(.bea112) }
+                if uno([" ti penso ", " pensiero ", " qualcosa di carino ", " qualcosa di dolce ", " qualcosa di romantico ", " un messaggio carino ",
+                        " mandale un pensiero ", " dille che la penso ", " dille che la amo ", " falle una sorpresa ", " scrivile qualcosa ", " dolce "]) { return .scheda(.beaTiPenso) }
+                if c(" whatsapp ") { return .scheda(.beaWhatsApp) }
+                if uno([" chiamala ", " chiama ", " telefonale ", " fammi parlare con lei ", " voglio sentirla "]) { return .scheda(.beaChiama) }
+                if uno([" scrivile ", " mandale un messaggio ", " messaggio ", " sms "]) { return .scheda(.beaMessaggio) }
+            }
+        case .email?:
+            if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri l app della posta ", " apri posta ", " apri la posta ", " vai su mail "]) { return .scheda(.apriMail) }
+            if solo(generiche) || uno([" riassumi ", " riassumimi ", " riassunto ", " cosa conta ", " cosa c e ", " c e qualcosa ", " qualcosa di importante ",
+                    " qualcosa di urgente ", " mail importanti ", " novita ", " leggimele ", " cosa mi e arrivato ", " chi mi ha scritto ", " cosa devo leggere "]) {
+                return .scheda(.postaRiassumi)
             }
         case .spesa?:
-            if t.count <= 6 {
-                if c(" whatsapp ") || c(" manda la lista ") || c(" mandala ") || c(" condividi ") || c(" condividila ") { return .scheda(.spesaWhatsApp) }
-                if c(" leggimela ") || c(" leggi la lista ") || c(" leggimi la lista ") || c(" cosa devo comprare ") || c(" cosa manca ") { return .scheda(.spesaLeggi) }
-            }
+            if uno([" whatsapp ", " manda la lista ", " mandala ", " condividi ", " condividila ", " mandala a qualcuno ", " inviala "]) { return .scheda(.spesaWhatsApp) }
+            if uno([" leggimela ", " leggi la lista ", " leggimi la lista ", " cosa devo comprare ", " cosa manca ", " cosa c e in lista ", " cosa compro ",
+                    " che devo prendere ", " cosa devo prendere ",  " sono al supermercato ", " sono al super ", " sono all esselunga ", " cosa prendo ", " ricordami la spesa "]) || solo(generiche) { return .scheda(.spesaLeggi) }
         case .occhi?, .cucina?:
-            if t.count <= 4, c(" giro ") || c(" fai un giro ") || c(" video ") || c(" registra ") { return .scheda(.occhiGiro) }
+            // «Jarvis, guarda là in fondo», «guarda qua vicino», «guarda l'insieme»: lì ogni frase è già la domanda dello scatto
+            if t.count <= 7, uno([" fai un giro ", " giro ", " video ", " in video ", " fai un video ", " riprendi ", " registra ", " panoramica ",
+                    " guardati intorno ", " guarda tutto intorno ", " guarda in giro ", " dai un occhiata in giro ", " fammi vedere tutto ",
+                    " scorri lo scaffale ", " tutto lo scaffale ", " tutta la stanza "]) { return .scheda(.occhiGiro) }
+        case .scanner?:
+            if uno([" un altro ", " un altra ", " altro prodotto ", " scansiona un altro ", " prossimo ", " ancora ", " di nuovo ", " rifai ", " riprova ",
+                    " un altro codice ", " vai col prossimo ", " avanti "]) { return .scheda(.scannerAltro) }
+            if uno([" ingredienti ", " cosa c e dentro ", " additivi ", " di cosa e fatto ", " cosa contiene ", " etichetta ", " composizione "]) { return .scheda(.scannerIngredienti) }
+            if solo(generiche) || uno([" fa bene ", " fa male ", " e sano ", " e buono ", " lo compro ", " lo prendo ", " conviene ", " e una buona scelta ",
+                    " com e ", " voto ", " alternativa ", " c e di meglio ", " posso mangiarlo ", " lo posso prendere ", " giudizio "]) { return .scheda(.scannerGiudizio) }
         case .profiler?:
             // la scheda del soggetto dettata: «si chiama Marco Rossi», «è il fornitore audio», «lavora come gestore del locale»
-            let parole = Array(t)
-            func coda(dopo n: Int) -> String? {
-                let r = parole.dropFirst(n).joined(separator: " ")
-                return r.isEmpty ? nil : r
+            func coda(dopo n: Int) -> String? { let r = t.dropFirst(n).joined(separator: " "); return r.isEmpty ? nil : r }
+            func maiuscole(_ x: String) -> String { x.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ") }
+            if t.count >= 3, t[0] == "si", t[1] == "chiama", let n = coda(dopo: 2) { return .profiler(.nome(maiuscole(n))) }
+            if t.count >= 4, t[0] == "il", t[1] == "nome", t[2] == "e", let n = coda(dopo: 3) { return .profiler(.nome(maiuscole(n))) }
+            if t.count >= 2, ["nome", "chiamato", "chiamata"].contains(t[0]), let n = coda(dopo: 1) { return .profiler(.nome(maiuscole(n))) }
+            if t.count >= 3, t[0] == "lavora", ["come", "in", "per", "da", "alla", "al", "nel", "nella"].contains(t[1]), let r = coda(dopo: t[1] == "come" ? 2 : 1) { return .profiler(.ruolo(r)) }
+            if t.count >= 3, t[0] == "fa", ["il", "la", "lo", "l"].contains(t[1]), let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
+            if t.count >= 2, t[0] == "ruolo", let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
+            if t.count >= 3, t[0] == "e", ["il", "la", "lo", "l", "un", "una", "uno", "mio", "mia", "un", "nostro", "nostra"].contains(t[1]), let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
+            if uno([" rifai ", " riprova ", " un altra ", " rifalla ", " non va bene ", " e venuta male ", " venuta male ", " e mossa ", " mossa ", " sfocata ",
+                    " ricomincia ", " da capo "]) { return .profiler(.rifai) }
+            if uno([" girati ", " selfie ", " gira ", " cambia fotocamera ", " fotocamera davanti ", " fotocamera dietro ", " inquadra me ", " guarda me "]) { return .profiler(.gira) }
+            if uno([" profila ", " profilalo ", " profilala ", " dossier ", " fammi il profilo ", " fammi il dossier ", " chi e ", " dimmi chi e ", " che tipo e ",
+                    " cosa ne pensi ", " che ne pensi ", " leggilo ", " leggila ", " analizzalo ", " analizzala ", " procedi ", " vai ", " fatto ", " schedalo ", " schedala "]) {
+                return .profiler(.profila)       // senza la foto ancora: scatta (il Profiler sa a che punto è)
             }
-            if parole.count >= 3, parole[0] == "si", parole[1] == "chiama", let n = coda(dopo: 2) {
-                return .profiler(.nome(n.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")))
-            }
-            if parole.count >= 3, (parole[0] == "lavora" && parole[1] == "come") || (parole[0] == "fa" && ["il", "la", "lo", "l"].contains(parole[1])), let r = coda(dopo: 1) {
-                return .profiler(.ruolo(parole[0] == "lavora" ? (coda(dopo: 2) ?? r) : r))
-            }
-            if parole.count >= 3, parole[0] == "e", ["il", "la", "lo", "l", "un", "una", "uno", "mio", "mia"].contains(parole[1]), let r = coda(dopo: 1) {
-                return .profiler(.ruolo(r))
-            }
-            if t.count <= 4 {
-                if c(" profila ") || c(" profilalo ") || c(" profilala ") || c(" dossier ") || c(" procedi ") { return .profiler(.profila) }
-                if c(" rifai ") || c(" riprova ") || c(" un altra ") || c(" un altra foto ") || c(" rifalla ") { return .profiler(.rifai) }
-                if c(" girati ") || c(" selfie ") || c(" gira ") || c(" cambia fotocamera ") || c(" fotocamera ") { return .profiler(.gira) }
-                if c(" scatta ") || c(" foto ") || c(" acquisisci ") || c(" vai ") { return .profiler(.scatta) }
+            if uno([" scatta ", " foto ", " acquisisci ", " fotografalo ", " fotografala ", " prendilo ", " prendila ", " fai la foto ", " beccato ", " eccolo ", " eccola "]) {
+                return .profiler(.scatta)
             }
         default: break
         }
@@ -271,7 +321,8 @@ enum ComandoVocale: Equatable {
             if c(" registra la riunione ") || c(" registra questa riunione ") || c(" registra la conversazione ") { return .rapido(.riunione) }
         }
 
-        let verbi = ["attiva", "apri", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra"]
+        let verbi = ["attiva", "apri", "aprimi", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra",
+                     "mostra", "mostrami", "portami", "andiamo", "dammi", "vediamo", "facciamo"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
 
         if c(" sentinella ") && comanda { return .apri(.sentinella) }
@@ -308,10 +359,10 @@ enum ComandoVocale: Equatable {
                       " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
             (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
-        let conVerbo = t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra", "fammi"].contains($0) })
+        let conVerbo = t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "andiamo", "dammi", "vediamo"].contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
-        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra"].contains($0) }) {
+        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "portami"].contains($0) }) {
             return .apri(.bea)
         }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
