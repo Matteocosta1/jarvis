@@ -59,6 +59,15 @@ struct ContentView: View {
         return inPrimoPiano && micLibero && nienteEscluso
     }
 
+    /// La scheda aperta sopra la schermata principale, per i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…).
+    private var sezioneAperta: Reparto? {
+        if mostraConfidente { return .confidente }
+        if mostraVitals { return .vitals }
+        if mostraRicordi != nil { return .ricordi }
+        if let s = scheda { return Reparto(rawValue: s.rawValue) }
+        return nil
+    }
+
     /// Qualcosa è aperto sopra la schermata principale (per JARVIS: prima di aprire Occhi va chiuso).
     private var qualcosaAperto: Bool {
         scheda != nil || mostraRicordi != nil || sorgenteFoto != nil || mostraImpostazioni || mostraBrowser || mostraSentinella
@@ -242,6 +251,7 @@ struct ContentView: View {
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
+        .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
         .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
         .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
             try? await Task.sleep(for: .seconds(8))

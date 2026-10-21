@@ -4,6 +4,17 @@ import AVFoundation
 import Speech
 #endif
 
+extension Notification.Name {
+    /// Un tasto di una scheda detto a voce (`userInfo["azione"]`: `ComandoVocale.AzioneScheda`): lo esegue la scheda aperta.
+    static let jarvisAzioneScheda = Notification.Name("jarvisAzioneScheda")
+}
+
+/// Il Confidente aperto con una conversazione incollata: la frase detta diventa la domanda su quella conversazione.
+/// Restituisce vero se l'ha presa (c'è del testo incollato); altrimenti la frase va a JARVIS come sempre.
+enum ConfidenteAperto {
+    static var domanda: ((String) -> Bool)?
+}
+
 /// I reparti che si aprono a voce.
 enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi
@@ -72,6 +83,8 @@ enum ComandoVocale: Equatable {
     case allenatore(AzioneAllenatore)       // dentro l'Allenatore: «Jarvis, fine serie», «Jarvis, quante ripetizioni?»…
     case dentroInterprete(AzioneInterprete) // dentro l'Interprete: «Jarvis, ascolta lui», «Jarvis, passa al francese»…
     case rapido(AzioneRapida)               // dalla schermata principale: apre la sezione e fa già la sua cosa
+    case scheda(AzioneScheda)               // dentro una scheda: i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…)
+    case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
 
     /// I comandi di LiDAR (21 ott, chiesti dal signore).
     enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre }
@@ -84,6 +97,19 @@ enum ComandoVocale: Equatable {
     enum AzioneInterprete: Equatable { case ascoltaMe, ascoltaAltro, lingua(String), sceltaLingua, ripeti, turniAutomatici(Bool) }
     /// I comandi rapidi: la sezione si apre già al lavoro.
     enum AzioneRapida: Equatable { case diario, confidente, cucina, riunione }   // «che canzone è?» no: lo fa già il cervello (riconosci_musica)
+    /// I tasti delle schede, a voce (21 ott). Niente «cancella», «elimina», «svuota»: a voce sono troppo rischiosi.
+    enum AzioneScheda: Equatable {
+        case diarioAVoce, diarioNeParliamo
+        case confidenteAVoce, confidenteIncolla
+        case vitalsCome
+        case cuoreSOS
+        case beaTiPenso, beaChiama, beaMessaggio, beaWhatsApp, bea112
+        case apriMail, postaRiassumi
+        case spesaLeggi, spesaWhatsApp
+        case occhiGiro
+    }
+    /// I tasti del Profiler, a voce, più la scheda del soggetto dettata.
+    enum AzioneProfiler: Equatable { case scatta, gira, rifai, profila, nome(String), ruolo(String) }
 
     /// Il codice della lingua se la frase finisce con una lingua («… in francese»).
     static func linguaFinale(_ t: [String]) -> String? {
@@ -173,6 +199,62 @@ enum ComandoVocale: Equatable {
             if c(" cambia ") || c(" passa ") || c(" lingua ") || c(" metti ") {
                 if let l = linguaFinale(t) { return .dentroInterprete(.lingua(l)) }
                 if c(" lingua ") { return .dentroInterprete(.sceltaLingua) }
+            }
+        case .diario?:
+            if t.count <= 6 {
+                if c(" ne parliamo ") || c(" parliamone ") || c(" rileggimi ") || c(" rileggila ") || c(" cosa ne pensi ") { return .scheda(.diarioNeParliamo) }
+                if c(" a voce ") || c(" te lo racconto ") || c(" ti racconto ") || c(" scriviamo ") || c(" scriviamolo ") || c(" lo dico a voce ") { return .scheda(.diarioAVoce) }
+            }
+        case .confidente?:
+            if t.count <= 6 {
+                if c(" incolla ") || c(" incollala ") || c(" incollalo ") || c(" incolla la conversazione ") { return .scheda(.confidenteIncolla) }
+                if c(" a voce ") || c(" te lo racconto ") || c(" ti racconto ") || c(" raccontarlo ") { return .scheda(.confidenteAVoce) }
+            }
+        case .vitals?:
+            if t.count <= 6, c(" come sto ") || c(" come va la salute ") || c(" come mi vedi ") || c(" come sto messo ") || c(" leggimeli ") { return .scheda(.vitalsCome) }
+        case .cuore?:
+            if t.count <= 5, c(" sos ") || c(" chiedi aiuto ") || c(" chiama aiuto ") || c(" aiuto ") || c(" sto male ") { return .scheda(.cuoreSOS) }
+        case .bea?:
+            if t.count <= 6 {
+                if c(" emergenza ") || c(" 112 ") || c(" centododici ") || c(" cento dodici ") { return .scheda(.bea112) }
+                if c(" ti penso ") || c(" pensiero ") || c(" qualcosa di carino ") || c(" qualcosa di dolce ") { return .scheda(.beaTiPenso) }
+                if c(" whatsapp ") { return .scheda(.beaWhatsApp) }
+                if c(" chiamala ") || c(" chiama ") { return .scheda(.beaChiama) }
+                if c(" scrivile ") || c(" mandale un messaggio ") || c(" messaggio ") { return .scheda(.beaMessaggio) }
+            }
+        case .email?, .briefing?:
+            if t.count <= 5 {
+                if c(" apri mail ") || c(" apri la mail ") || c(" apri l app mail ") || c(" apri l app della posta ") || c(" apri posta ") { return .scheda(.apriMail) }
+                if dentro == .email, c(" riassumi ") || c(" riassumimi ") || c(" cosa conta ") || c(" cosa c e ") { return .scheda(.postaRiassumi) }
+            }
+        case .spesa?:
+            if t.count <= 6 {
+                if c(" whatsapp ") || c(" manda la lista ") || c(" mandala ") || c(" condividi ") || c(" condividila ") { return .scheda(.spesaWhatsApp) }
+                if c(" leggimela ") || c(" leggi la lista ") || c(" leggimi la lista ") || c(" cosa devo comprare ") || c(" cosa manca ") { return .scheda(.spesaLeggi) }
+            }
+        case .occhi?, .cucina?:
+            if t.count <= 4, c(" giro ") || c(" fai un giro ") || c(" video ") || c(" registra ") { return .scheda(.occhiGiro) }
+        case .profiler?:
+            // la scheda del soggetto dettata: «si chiama Marco Rossi», «è il fornitore audio», «lavora come gestore del locale»
+            let parole = Array(t)
+            func coda(dopo n: Int) -> String? {
+                let r = parole.dropFirst(n).joined(separator: " ")
+                return r.isEmpty ? nil : r
+            }
+            if parole.count >= 3, parole[0] == "si", parole[1] == "chiama", let n = coda(dopo: 2) {
+                return .profiler(.nome(n.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")))
+            }
+            if parole.count >= 3, (parole[0] == "lavora" && parole[1] == "come") || (parole[0] == "fa" && ["il", "la", "lo", "l"].contains(parole[1])), let r = coda(dopo: 1) {
+                return .profiler(.ruolo(parole[0] == "lavora" ? (coda(dopo: 2) ?? r) : r))
+            }
+            if parole.count >= 3, parole[0] == "e", ["il", "la", "lo", "l", "un", "una", "uno", "mio", "mia"].contains(parole[1]), let r = coda(dopo: 1) {
+                return .profiler(.ruolo(r))
+            }
+            if t.count <= 4 {
+                if c(" profila ") || c(" profilalo ") || c(" profilala ") || c(" dossier ") || c(" procedi ") { return .profiler(.profila) }
+                if c(" rifai ") || c(" riprova ") || c(" un altra ") || c(" un altra foto ") || c(" rifalla ") { return .profiler(.rifai) }
+                if c(" girati ") || c(" selfie ") || c(" gira ") || c(" cambia fotocamera ") || c(" fotocamera ") { return .profiler(.gira) }
+                if c(" scatta ") || c(" foto ") || c(" acquisisci ") || c(" vai ") { return .profiler(.scatta) }
             }
         default: break
         }
@@ -345,6 +427,20 @@ final class OrecchioComandi {
                                               esito: @escaping @Sendable (String?, Bool) -> Void) -> SFSpeechRecognitionTask {
         ric.recognitionTask(with: r) { ris, err in
             esito(ris?.bestTranscription.formattedString, (ris?.isFinal ?? false) || err != nil)
+        }
+    }
+}
+#endif
+
+#if os(iOS)
+import SwiftUI
+import Combine
+
+extension View {
+    /// I tasti della scheda detti a voce: JARVIS li riconosce, la scheda aperta li esegue.
+    func tastiAVoce(_ fai: @escaping (ComandoVocale.AzioneScheda) -> Void) -> some View {
+        onReceive(NotificationCenter.default.publisher(for: .jarvisAzioneScheda)) { n in
+            if let a = n.userInfo?["azione"] as? ComandoVocale.AzioneScheda { fai(a) }
         }
     }
 }

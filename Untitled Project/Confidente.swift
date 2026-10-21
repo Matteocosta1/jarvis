@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 /// Il confidente: il signore incolla una conversazione (WhatsApp, messaggi) o racconta cosa è successo,
 /// e JARVIS gli dice cosa ne pensa, schietto in entrambe le direzioni. Oppure glielo racconta a voce.
@@ -126,6 +127,25 @@ struct VistaConfidente: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .task { stato = await SaluteOggi.leggi() }
+            .tastiAVoce { a in
+                switch a {
+                case .confidenteIncolla:
+                    if let c = UIPasteboard.general.string, !c.isEmpty { testo = testo.isEmpty ? c : testo + "\n" + c; Suoni.tocco() }
+                case .confidenteAVoce: Suoni.tocco(); aVoce()
+                default: break
+                }
+            }
+            .onAppear {
+                // con la conversazione incollata, quello che dice a voce è la sua domanda («Jarvis, ho esagerato io?»)
+                ConfidenteAperto.domanda = { frase in
+                    let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !t.isEmpty else { return false }
+                    let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+                    invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
+                    return true
+                }
+            }
+            .onDisappear { ConfidenteAperto.domanda = nil }
             .navigationTitle("Confidente")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)

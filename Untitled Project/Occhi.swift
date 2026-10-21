@@ -14,6 +14,7 @@ import UniformTypeIdentifiers
 /// Occhi aperti in modalità manuale: «Jarvis, …» detto mentre inquadra fa scattare la foto (come il tasto).
 enum OcchiAperti {
     static var scatta: (() -> Bool)?
+    static var giro: (() -> Bool)?        // «Jarvis, fai un giro»: come il tasto REC
 }
 
 struct Occhiata: Identifiable {
@@ -205,7 +206,7 @@ struct Occhi: View {
         }
         .statusBarHidden()
         .task { await prepara() }
-        .onDisappear { OcchiAperti.scatta = nil; motore.ferma() }
+        .onDisappear { OcchiAperti.scatta = nil; OcchiAperti.giro = nil; motore.ferma() }
     }
 
     // MARK: Lavoro
@@ -251,6 +252,11 @@ struct Occhi: View {
             OcchiAperti.scatta = {                     // a voce: «Jarvis, guarda là in fondo»
                 guard agganciato, !scattando, !chiuso, !cambiando else { return false }
                 scatta()
+                return true
+            }
+            OcchiAperti.giro = {                       // a voce: «Jarvis, fai un giro»
+                guard agganciato, !scattando, !registrando, !chiuso, !cambiando else { return false }
+                Task { await giro() }
                 return true
             }
         }
@@ -381,6 +387,7 @@ struct Occhi: View {
         guard !chiuso else { return }
         chiuso = true
         OcchiAperti.scatta = nil
+        OcchiAperti.giro = nil
         motore.ferma()
         fine(dati)
     }

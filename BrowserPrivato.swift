@@ -12,11 +12,30 @@ enum BrowserVoce {
     static var proprietario: UUID?                     // la pagina che ha registrato i comandi (Incognito ↔ Normale la ricrea)
     static var scrivi: ((String) -> Void)?
     static var invia: (() -> Void)?
+    /// Muoversi nel Browser a voce: «indietro», «avanti», «ricarica», «scorri giù», «vai su repubblica.it». Vero se l'ha fatto.
+    static var naviga: ((Movimento) -> Bool)?
+    enum Movimento { case indietro, avanti, ricarica, giu, su, inCima, apri(String) }
 
     /// Vero se la frase era un comando del Browser (ed è stato eseguito).
     static func comando(_ frase: String) -> Bool {
         let t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
         let basso = t.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        // muoversi: «indietro» qui torna alla pagina di prima (se non c'è, chiude il Browser come sempre)
+        let mosse: [(Movimento, [String])] = [
+            (.indietro, ["indietro", "pagina indietro", "torna indietro", "pagina precedente", "torna alla pagina di prima", "pagina di prima"]),
+            (.avanti, ["avanti", "pagina avanti", "pagina successiva"]),
+            (.ricarica, ["ricarica", "ricarica la pagina", "aggiorna", "aggiorna la pagina"]),
+            (.giu, ["scorri", "scorri giù", "giù", "vai giù", "più giù", "scendi"]),
+            (.su, ["scorri su", "su", "vai su", "più su", "sali"]),
+            (.inCima, ["torna su", "in cima", "torna in cima", "all'inizio"]),
+        ]
+        for (m, frasi) in mosse where frasi.contains(basso) { return naviga?(m) ?? false }
+        for verbo in ["vai su ", "apri il sito ", "apri il sito di ", "vai al sito ", "vai sul sito ", "cerca su google ", "cerca "] where basso.hasPrefix(verbo) {
+            var resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: .whitespaces)
+            while let u = resto.last, ".!?;".contains(u) { resto.removeLast() }
+            guard !resto.isEmpty else { break }
+            return naviga?(.apri(resto)) ?? false
+        }
         if ["invia", "manda", "vai", "cerca", "premi invio", "invio", "conferma"].contains(basso) {
             invia?(); return true
         }
@@ -300,6 +319,20 @@ struct PaginaBrowser: View {
             if scrivendo { if !barra.isEmpty { nav.vai(barra); scrivendo = false } }
             else { BrowserVoce.inviaNellaPagina(nav.popup ?? nav.web) }
         }
+        BrowserVoce.naviga = { m in
+            guard sbloccato else { return false }
+            let w = nav.popup ?? nav.web
+            switch m {
+            case .indietro: guard w.canGoBack else { return false }; w.goBack()
+            case .avanti: guard w.canGoForward else { return false }; w.goForward()
+            case .ricarica: w.reload()
+            case .giu: w.evaluateJavaScript("window.scrollBy({top: window.innerHeight * 0.8, behavior: 'smooth'})", completionHandler: nil)
+            case .su: w.evaluateJavaScript("window.scrollBy({top: -window.innerHeight * 0.8, behavior: 'smooth'})", completionHandler: nil)
+            case .inCima: w.evaluateJavaScript("window.scrollTo({top: 0, behavior: 'smooth'})", completionHandler: nil)
+            case .apri(let dove): scrivendo = false; nav.vai(dove)
+            }
+            return true
+        }
     }
 
     var body: some View {
@@ -373,7 +406,7 @@ struct PaginaBrowser: View {
         .onChange(of: attivo) { registraVoce() }              // Face ID dato: i comandi a voce si sbloccano
         .onDisappear {
             guard BrowserVoce.proprietario == idVoce else { return }
-            BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.proprietario = nil; BrowserVoce.sbloccato = false
+            BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.naviga = nil; BrowserVoce.proprietario = nil; BrowserVoce.sbloccato = false
         }
         .sheet(isPresented: $mostraCronologia) {
             VistaCronologiaBrowser(incognito: incognito, accento: accento) { url in

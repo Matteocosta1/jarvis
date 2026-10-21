@@ -26,6 +26,7 @@ struct VistaProfiler: View {
     @State private var chiuso = false
     @State private var stato = "AVVIO OTTICHE"
     @FocusState private var campo: Bool
+    @State private var orecchio = OrecchioComandi()   // «Jarvis, scatta», «Jarvis, si chiama Marco Rossi», «Jarvis, profila»
 
     var body: some View {
         ZStack {
@@ -56,7 +57,7 @@ struct VistaProfiler: View {
         }
         .statusBarHidden()
         .task { await avvia() }
-        .onDisappear { motore.ferma() }
+        .onDisappear { orecchio.ferma(); motore.ferma() }
     }
 
     // MARK: Pezzi
@@ -146,11 +147,7 @@ struct VistaProfiler: View {
             Text("Con il nome confronto le schede passate e, se è un contatto di lavoro, cerco in rete. Senza nome: solo lettura e stile.")
                 .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
             HStack(spacing: 10) {
-                Button {
-                    Suoni.tocco()
-                    withAnimation(.easeOut(duration: 0.25)) { foto = nil }
-                    stato = "INQUADRI IL SOGGETTO"
-                } label: {
+                Button { rifai() } label: {
                     Label("Rifai", systemImage: "arrow.counterclockwise")
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .frame(maxWidth: .infinity).frame(height: 46)
@@ -210,6 +207,32 @@ struct VistaProfiler: View {
         agganciato = true
         Suoni.aperturaCamera()
         stato = "INQUADRI IL SOGGETTO"
+        // i comandi a voce: l'ascolto cambia la sessione audio, quindi parte a suono d'apertura finito (come nella Sentinella)
+        orecchio.dentro = .profiler
+        orecchio.comando = { c in voce(c) }
+        try? await Task.sleep(for: .seconds(1.5))
+        guard !chiuso, !Task.isCancelled else { return }
+        orecchio.avvia()
+    }
+
+    /// Un comando detto a voce, come il tasto corrispondente.
+    private func voce(_ c: ComandoVocale) {
+        switch c {
+        case .torna: Suoni.tocco(); chiudi([])
+        case .profiler(.scatta): if foto == nil { scatta() }
+        case .profiler(.gira): if foto == nil, agganciato, !scattando { Task { await giraFotocamera() } }
+        case .profiler(.rifai): if foto != nil { rifai() }
+        case .profiler(.profila): if foto != nil { profila() }
+        case .profiler(.nome(let n)): if foto != nil { nome = n; Suoni.tocco() }
+        case .profiler(.ruolo(let r)): if foto != nil { chi = r; Suoni.tocco() }
+        default: break
+        }
+    }
+
+    private func rifai() {
+        Suoni.tocco()
+        withAnimation(.easeOut(duration: 0.25)) { foto = nil }
+        stato = "INQUADRI IL SOGGETTO"
     }
 
     private func monta(_ p: AVCaptureDevice.Position) async -> Bool {
@@ -264,6 +287,7 @@ struct VistaProfiler: View {
     private func chiudi(_ dati: [Data], _ nome: String = "") {
         guard !chiuso else { return }
         chiuso = true
+        orecchio.ferma()
         motore.ferma()
         fine(dati, nome)
     }

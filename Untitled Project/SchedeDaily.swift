@@ -364,6 +364,9 @@ struct VistaPosta: View {
             }
         }
         .task(id: "\(ore)-\(soloNonLette)") { await carica() }
+        .tastiAVoce { a in
+            if a == .postaRiassumi { chiedi("Riassumimi la posta delle ultime \(ore) ore: cosa conta davvero e cosa posso ignorare?") }
+        }
     }
 
     private func carica() async {
@@ -383,6 +386,7 @@ struct VistaSpesa: View {
     let chiedi: (String) -> Void
     private let tinta = Tinte.spesa
     @Environment(\.dismiss) private var chiudi
+    @Environment(\.openURL) private var apriLink
 
     struct Voce: Identifiable, Equatable {
         let id: Int
@@ -511,6 +515,17 @@ struct VistaSpesa: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) } }
             .onAppear { Suoni.schedaApre() }
             .task { await carica(); if caricata { Suoni.schedaPronta() } }
+            .tastiAVoce { a in
+                switch a {
+                case .spesaLeggi: chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.")
+                case .spesaWhatsApp:                    // WhatsApp con la lista già scritta: sceglie lui a chi mandarla
+                    guard !daComprare.isEmpty,
+                          let t = testoDaCondividere.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))),
+                          let u = URL(string: "https://wa.me/?text=\(t)") else { return }
+                    apriLink(u)
+                default: break
+                }
+            }
         }
         .preferredColorScheme(.dark)
     }

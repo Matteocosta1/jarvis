@@ -106,6 +106,7 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
     @Published var azioneLidar: ComandoVocale.AzioneLidar?   // comando vocale dentro LiDAR: lo esegue la sua schermata
     var lidarAperto = false                      // LiDAR aperto: valgono anche i suoi comandi («salva», «fine scansione»…)
+    var sezioneAperta: Reparto?                  // la scheda aperta sopra la schermata principale: valgono anche i suoi tasti a voce
     @Published var diagnosiMac = ""             // Mac: la riga di controllo del microfono in attesa
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
     /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
@@ -356,6 +357,8 @@ final class Jarvis: NSObject, ObservableObject {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return }
         if Jarvis.eSoloSilenzio(frase) { mettiInAttesa(); return }   // stava parlando con qualcun altro: «Jarvis, muto»
+        // nel Confidente con la conversazione incollata: la frase è la domanda su quella conversazione («ho esagerato io?»)
+        if let domanda = ConfidenteAperto.domanda, domanda(Jarvis.togliRichiamo(frase).0) { return }
         // dentro Occhi o Cucina: la frase fa scattare la foto e parte insieme a lei («Jarvis, guarda là in fondo»)
         if occhi != nil, let scatta = OcchiAperti.scatta {
             let detta = Jarvis.togliRichiamo(frase).0
@@ -602,7 +605,8 @@ final class Jarvis: NSObject, ObservableObject {
             NotificationCenter.default.post(name: .jarvisRifaiLidar, object: nil)
             return true
         }
-        switch ComandoVocale.riconosci(frase, dentro: lidarAperto ? .lidar : nil) {
+        let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
+        switch ComandoVocale.riconosci(frase, dentro: dentro) {
         case .apri(let reparto)?:
             apriReparto(reparto)
             return true
@@ -620,6 +624,18 @@ final class Jarvis: NSObject, ObservableObject {
             return true
         case .rapido(let azione)?:
             rapido(azione)
+            return true
+        case .scheda(let azione)?:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            switch azione {
+            case .occhiGiro:
+                if let giro = OcchiAperti.giro, giro() { return true }
+                return false                              // il giro non può partire: la frase resta allo scatto di sempre
+            case .apriMail:
+                if let u = URL(string: "message://") { UIApplication.shared.open(u) }
+            default:
+                NotificationCenter.default.post(name: .jarvisAzioneScheda, object: nil, userInfo: ["azione": azione])
+            }
             return true
         default:
             return false

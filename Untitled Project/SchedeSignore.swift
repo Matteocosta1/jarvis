@@ -351,6 +351,16 @@ struct VistaDiario: View {
             }
         }
         .task { await carica() }
+        .tastiAVoce { a in
+            switch a {
+            case .diarioAVoce: scrivi()
+            case .diarioNeParliamo:                 // la pagina aperta, altrimenti l'ultima
+                if let p = pagine?.first(where: { $0.id == aperta }) ?? pagine?.first {
+                    chiedi("Rileggimi la pagina di diario del \(p.giornoTesto) e dimmi cosa ne pensi.")
+                }
+            default: break
+            }
+        }
         .confirmationDialog("Cancellare questa pagina?", isPresented: Binding(get: { daCancellare != nil }, set: { if !$0 { daCancellare = nil } }), titleVisibility: .visible) {
             Button("Cancella", role: .destructive) { if let p = daCancellare { Task { await cancella("\(p.id)") } } }
         }
@@ -660,6 +670,7 @@ struct VistaCuoreTelefono: View {
                     .font(.footnote).foregroundStyle(Color.tenue)
             }
         }
+        .tastiAVoce { a in if a == .cuoreSOS { confermaSOS = true } }   // a voce si apre solo la domanda: il «sì» resta col dito
         .confirmationDialog("Chiedo aiuto al contatto di emergenza, con la sua posizione?", isPresented: $confermaSOS, titleVisibility: .visible) {
             Button("SÌ, CHIEDI AIUTO", role: .destructive) { Task { await sos() } }
             Button("Annulla", role: .cancel) {}

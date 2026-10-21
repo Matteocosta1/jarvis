@@ -102,6 +102,9 @@ struct VistaVitals: View {
             }
         }
         .task { oggi = await SaluteOggi.leggi() }
+        .tastiAVoce { a in
+            if a == .vitalsCome { chiedi("Jarvis, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") }
+        }
     }
 
     private func domanda(_ icona: String, _ titolo: String, azione: @escaping () -> Void) -> some View {

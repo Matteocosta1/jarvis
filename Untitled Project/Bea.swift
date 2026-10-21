@@ -27,6 +27,7 @@ struct VistaBea: View {
     @State private var pensiero: String?          // «Ti penso»: il messaggio pronto, da ritoccare e mandare
     @State private var scrivePensiero = false
     @State private var chiama112 = false
+    @State private var chiama112AVoce = false     // «Jarvis, emergenza»: la stessa domanda, aperta a voce (il «sì» resta col dito)
     @FocusState private var scrivendo: Bool
 
     var body: some View {
@@ -65,6 +66,21 @@ struct VistaBea: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) } }
             .onAppear { Suoni.schedaApre() }
             .task { await carica(); if dati != nil { Suoni.schedaPronta() } }   // come tutte le altre schede
+            .tastiAVoce { a in
+                let n = Rubrica.pulisci(numero)
+                switch a {
+                case .beaTiPenso: if !numero.isEmpty, !scrivePensiero { Task { await nuovoPensiero() } }
+                case .beaChiama: if !numero.isEmpty { apri("tel:\(n)") }
+                case .beaMessaggio: if !numero.isEmpty { apri("sms:\(n)") }
+                case .beaWhatsApp: if !numero.isEmpty { apri("https://wa.me/\(Rubrica.internazionale(numero))") }
+                case .bea112: chiama112AVoce = true
+                default: break
+                }
+            }
+            .confirmationDialog("Chiamare il 112?", isPresented: $chiama112AVoce, titleVisibility: .visible) {
+                Button("Chiama il 112", role: .destructive) { apri("tel:112") }
+                Button("Annulla", role: .cancel) {}
+            } message: { Text("Il numero unico di emergenza.") }
             .sheet(isPresented: $sceltaContatto) {
                 SceltaContattoBea { c, n in
                     nomeContatto = c.nome
