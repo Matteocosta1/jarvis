@@ -13,7 +13,7 @@ Per ogni build: cosa contiene, se è stata provata, com'è andata.
 | 8.0 (6) | 1b75d6d | 8.0 (5) + musica d'avvio +2 dB (solo il file, nessuna modifica all'audio dell'iPhone) + comandi vocali di stamattina: LiDAR (microfono acceso, fine/misure/capienza/salva/3D), Sentinella, Wiretap, «traduci in inglese» (anche Watch), Allenatore, Interprete, comandi rapidi. Microfono e conversazione: come 8.0 (5) | da provare | |
 | 8.0 (7) | 2ed4221 | **identica a ieri sera, Build 20 con LiDAR (b0ebe03, 20 ott 20:57)**, scritta MARK VII-5.0 compresa: cambia solo il numero di build. Annulla tutto quello fatto oggi (comandi, volume, microfono) | da provare | |
 | 8.0 (8) | 0cc3062 | 8.0 (7) + **solo** menu SISTEMI: le 4 richieste partono insieme; se il menu si chiude prima della fine non scrive più «non raggiungibile». Nient'altro | da provare | |
-| 8.0 (9) | (questo) | 8.0 (8) + tre ritocchi: «piano/sottovoce» entro le prime 5 parole (prima 3); volume basso anche sulle frasi già pronte (piano dalla prima sillaba); battito di mani valido sempre (tolta la regola dei 12 s di «confusione», che scartava i primi battiti dopo voce o musica) | da provare | |
+| 8.0 (9) | 184b524 | 8.0 (8) + tre ritocchi: «piano/sottovoce» entro le prime 5 parole (prima 3); volume basso anche sulle frasi già pronte (piano dalla prima sillaba); battito di mani valido sempre (tolta la regola dei 12 s di «confusione», che scartava i primi battiti dopo voce o musica) | da provare | |
 
 Nota 21 ott pomeriggio: fotocamere bloccate in tutte le build (anche la 6.0 (20) di ieri) → era l'iPhone; risolto col riavvio.
 
