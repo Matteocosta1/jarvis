@@ -59,9 +59,25 @@ enum Reparto: String, Identifiable, Equatable {
 enum ComandoVocale: Equatable {
     case apri(Reparto)
     case torna
+    case lidar(AzioneLidar)                 // dentro LiDAR: «fine scansione», «quanto è grande?», «salva»…
+    case sentinella(AzioneSentinella)       // dentro la Sentinella: «Jarvis, chi è passato?», «Jarvis, schermo nero»
+    case interprete(String)                 // «traduci in inglese», «interprete spagnolo»: apre l'Interprete già sulla lingua (codice: en, es…)
+
+    /// I comandi di LiDAR (21 ott, chiesti dal signore).
+    enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre }
+    /// I comandi dentro la Sentinella: gli stessi due tasti in alto.
+    enum AzioneSentinella: Equatable { case registro, schermoNero }
+
+    /// Le lingue dell'Interprete come si dicono a voce (gli stessi codici di `Lingua.tutte`).
+    static let lingueAVoce: [(codice: String, parole: [String])] = [
+        ("en", ["inglese"]), ("es", ["spagnolo"]), ("fr", ["francese"]), ("de", ["tedesco"]), ("pt", ["portoghese", "brasiliano"]),
+        ("zh", ["cinese"]), ("ja", ["giapponese"]), ("ar", ["arabo"]), ("ru", ["russo"]), ("tr", ["turco"]), ("ro", ["rumeno"]),
+        ("nl", ["olandese"]), ("pl", ["polacco"]), ("el", ["greco"]), ("hi", ["hindi", "indiano"]), ("uk", ["ucraino"]),
+    ]
 
     /// `serveJarvis`: dentro un reparto il comando deve cominciare con «Jarvis» (lì intorno parlano anche altri).
-    static func riconosci(_ frase: String, serveJarvis: Bool = false) -> ComandoVocale? {
+    /// `dentro`: il reparto aperto, per i comandi che valgono solo lì («salva» in LiDAR, «chi è passato?» nella Sentinella).
+    static func riconosci(_ frase: String, serveJarvis: Bool = false, dentro: Reparto? = nil) -> ComandoVocale? {
         var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
@@ -79,6 +95,33 @@ enum ComandoVocale: Equatable {
 
         // tornare indietro / chiudere il reparto
         if t.count <= 3, ["torna", "indietro", "chiudi", "esci", "basta"].contains(t[0]) { return .torna }
+        // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
+        if t.count <= 4, ["spegni", "disattiva", "ferma"].contains(t[0]),
+           c(" sentinella ") || c(" wiretap ") || c(" wire tap ") || c(" registrazione ") { return .torna }
+
+        // i comandi che valgono solo dentro un reparto
+        switch dentro {
+        case .lidar?:
+            if t.count <= 5 {
+                if c(" quante persone ") || c(" capienza ") || c(" quanta gente ") || c(" ci stanno ") { return .lidar(.capienza) }
+                if c(" quanto e grande ") || c(" quanto misura ") || c(" quanti metri ") || c(" metri quadri ") || c(" superficie ") || c(" misure ") { return .lidar(.misure) }
+                if c(" 3d ") || c(" tre d ") || c(" tre di ") || c(" modello ") || c(" ologramma ") { return .lidar(.tre) }
+                if c(" salva ") || c(" salvala ") || c(" salvalo ") || c(" salvami ") { return .lidar(.salva) }
+                if c(" fine ") || c(" finito ") || c(" ho finito ") || c(" termina ") { return .lidar(.fine) }   // «stop» no: è il «zitto» di sempre
+            }
+        case .sentinella?:
+            if c(" chi e passato ") || c(" chi c e stato ") || c(" registro ") || c(" cosa hai visto ") { return .sentinella(.registro) }
+            if c(" schermo nero ") || c(" oscura ") || c(" spegni lo schermo ") || c(" buio ") { return .sentinella(.schermoNero) }
+        case .wiretap?:
+            if t.count <= 4 && (c(" verbale ") || c(" fine riunione ") || c(" riunione finita ")) { return .torna }   // il verbale parte da «torna»
+        default: break
+        }
+
+        // Interprete già sulla lingua: «traduci in inglese», «interprete spagnolo», «fammi da interprete in francese».
+        // Solo frasi corte: «traduci in inglese buongiorno a tutti» resta una domanda per il cervello.
+        if t.count <= 5, c(" traduci ") || c(" traduttore ") || c(" interprete ") {
+            for l in lingueAVoce where l.parole.contains(where: { t.last == $0 }) { return .interprete(l.codice) }
+        }
 
         let verbi = ["attiva", "apri", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
@@ -128,6 +171,7 @@ enum ComandoVocale: Equatable {
 @MainActor
 final class OrecchioComandi {
     var comando: ((ComandoVocale) -> Void)?
+    var dentro: Reparto?                  // il reparto in cui ascolta, per i suoi comandi («Jarvis, chi è passato?»)
 
     private let motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
@@ -203,7 +247,7 @@ final class OrecchioComandi {
         presa.metti(nil)?.endAudio()
         compito?.cancel()
         compito = nil
-        if let c = ComandoVocale.riconosci(frase, serveJarvis: true) {
+        if let c = ComandoVocale.riconosci(frase, serveJarvis: true, dentro: dentro) {
             comando?(c)
         }
         nuovaFrase()       // si continua ad ascoltare

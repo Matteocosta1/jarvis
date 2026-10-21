@@ -102,6 +102,13 @@ Porte · Fughe · Link · Domini · Password (SHA-1 on-device) · **Azienda** (V
 
 RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi RoomBuilder e risultato di JARVIS: **Pianta** (Canvas ciano, misure per parete, porte arancio, finestre), **3D** (USDZ parametrico in SceneKit a fil di ferro che ruota), **Archivio** (Documenti › LiDAR, `archivio.json`). Misure, capienza indicativa 1,2 persone/m² (DM 19/08/1996, sale da ballo), Salva/Condividi (PNG + USDZ)/Chiedi. Voce: «scansiona la stanza», «LiDAR», «planimetria». Solo iPhone Pro; sul Mac mostra l'archivio.
 
+## 11c. Build 21 e comandi vocali (21 ott)
+
+- **Dialogo**: microfono spento solo durante l'avvio (`avvioInCorso`); a «SISTEMI IN LINEA» si apre l'ascolto, e dopo ogni risposta torna ad ascoltare da solo come nell'ultima versione buona. Fix: a fine risposta niente `setActive(false)` mentre riparte il microfono dell'attesa; riserva in `Richiamo.accendi` (`setActive(true)`). In LiDAR il microfono resta acceso (voluto da lui).
+- **Comandi nuovi** (`ComandiVocali.swift`, parametro `dentro:`): LiDAR «fine scansione», «quanto è grande?», «quante persone ci stanno?», «salva», «mostrami il 3D» (eseguiti da `VistaLidar` via `jarvis.azioneLidar`); Sentinella «Jarvis, chi è passato?», «Jarvis, schermo nero», «Jarvis, spegni la Sentinella»; Wiretap «Jarvis, fai il verbale» / «fine riunione»; ovunque «traduci in inglese» (Interprete già sulla lingua, anche sul Watch).
+- **Lista da stampare**: `docs/comandi/COMANDI-JARVIS.pdf` (sorgente `.html` accanto): da aggiornare a ogni comando nuovo.
+- Il battito di mani e il controllo dell'impronta vocale solo col rumore: lasciati così, per sua scelta.
+
 ## 12. Lavori in sospeso
 
 1. **Build 16**: in upload il 20 ott mattina. Avviso Xcode «CFBundleVersion 15 vs 16»: i tre target risultano a 16, probabilmente avviso vecchio; se l'upload fallisce, Clean Build Folder e ricontrollare Build Settings › Current Project Version.
@@ -109,6 +116,8 @@ RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi
 3. **Costi**: verificare dopo un giorno quanto ha risparmiato la cache da 1 ora. Idee non applicate: strumenti a gruppi (rischio piccolo), meno Opus (**no**, vuole l'intelligenza intatta).
 4. **Instant Kill**: quando lo chiede lui.
 5. **Tocco d'aiuto di Bea**: completare con lei (tasto Azione, mappa nella schermata allarme; mockup in `docs/bea`).
+7. **GitHub da JARVIS**: `github_scrivi` esiste già nel cervello (token con Contents rw, chiede conferma, scrive sul ramo principale se non si indica il ramo). Deciso a voce: scrittura solo su un ramo a parte da far approvare a Teo o in chat. Da fare quando lui dà il via.
+8. **Comandi dentro Allenatore e Interprete** («pausa», «quante ripetizioni?», «cambia lingua»): lì il microfono principale è spento, servirebbe un ascolto apposta. Proposto, non fatto.
 6. Mock completo pubblicato (artifact «JARVIS Mark VII») con avvio, chat, sezioni e tutti i suoni: ricostruirlo solo se serve, è fedele all'app.
 
 ## 13. Note operative

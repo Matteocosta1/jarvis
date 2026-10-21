@@ -298,11 +298,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard !Task.isCancelled, fase == .elaboro else { return }
         if let testo, !testo.isEmpty {
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
-            if case .apri(let reparto)? = ComandoVocale.riconosci(testo) {
+            let comando = ComandoVocale.riconosci(testo)
+            if case .apri(let reparto)? = comando {
                 compito = nil
                 WKInterfaceDevice.current().play(.click)
                 repartoRichiesto = reparto
                 if let a = reparto.annuncio { parla(a) } else { fase = .attesa }
+                return
+            }
+            // «traduci in inglese»: come la sezione Interprete dell'orologio, già sulla lingua
+            if case .interprete(let codice)? = comando, let lingua = ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first {
+                WKInterfaceDevice.current().play(.click)
+                chiedi("Fammi da interprete in \(lingua): ti dirò una frase, tu traducila in \(lingua) e dimmela ad alta voce.")
                 return
             }
             chiedi(testo)

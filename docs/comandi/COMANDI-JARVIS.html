@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><title>Comandi JARVIS</title>
+<style>
+@page { size: A4; margin: 14mm 13mm; }
+* { box-sizing: border-box; }
+body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #111; font-size: 10.2pt; line-height: 1.35; margin: 0; background: #fff; }
+h1 { font-size: 22pt; letter-spacing: 4px; margin: 0; }
+.sotto { color: #555; font-size: 9.5pt; margin: 2px 0 10px; }
+h2 { font-size: 11pt; letter-spacing: 2.5px; text-transform: uppercase; margin: 14px 0 4px; padding-bottom: 3px; border-bottom: 2px solid #0aa8c4; break-after: avoid; }
+table { width: 100%; border-collapse: collapse; break-inside: auto; }
+tr { break-inside: avoid; }
+td, th { padding: 3.5px 5px; border-bottom: 1px solid #e3e3e3; vertical-align: top; text-align: left; }
+th { font-size: 8pt; color: #666; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; }
+td.f { font-weight: 600; width: 46%; }
+td.d { color: #333; }
+td.x, th.x { width: 34px; text-align: center; color: #0a8aa3; font-weight: 700; }
+.nuovo { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: 1px; color: #fff; background: #0aa8c4; border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+.nota { font-size: 8.8pt; color: #555; margin: 4px 0 0; }
+.box { border: 1px solid #0aa8c4; border-radius: 6px; padding: 7px 10px; margin: 8px 0; font-size: 9.3pt; }
+</style></head><body>
+
+<h1>J.A.R.V.I.S.</h1>
+<div class="sotto">Comandi vocali · Build 21 · 21 ottobre 2026 · ● = funziona lì</div>
+
+<div class="box"><b>Come si dicono.</b> In attesa si comincia con «Jarvis, …». Dopo una risposta JARVIS ascolta già: basta parlare.
+Dentro Sentinella e Wiretap serve sempre «Jarvis, …» davanti, perché lì intorno parlano anche altri.
+Le parole tra parentesi sono alternative: va bene una qualsiasi.</div>
+
+<h2>Voce</h2>
+<table>
+<tr><th>Frase</th><th>Cosa fa</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Jarvis, piano, …»  (sottovoce)</td><td class="d">Risponde sottovoce per 10 minuti</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Voce normale»  (parla normale, alza la voce)</td><td class="d">Torna al volume normale</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Muto»  (zitto, basta, stop, silenzio)</td><td class="d">Tace e torna in attesa</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Aspetta, …»  (un attimo, ascoltami)</td><td class="d">Aggiunge alla domanda di prima</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Wake up, daddy's home»  (papà è a casa)</td><td class="d">Il rito di benvenuto</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+</table>
+
+<h2>Apri</h2>
+<table>
+<tr><th>Frase</th><th>Cosa apre</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Attiva la Sentinella»</td><td class="d">Sentinella</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri il Wiretap»</td><td class="d">Wiretap, registra la riunione</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Fammi un profilo»  (apri il Profiler)</td><td class="d">Profiler</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri gli occhi»</td><td class="d">Fotocamera di JARVIS</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Fai un giro»</td><td class="d">5 secondi di video, poi dice cosa ha visto</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri la cucina»</td><td class="d">Frigo, dispensa, piatto</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri lo scanner»  (codice a barre, etichetta)</td><td class="d">Scanner prodotti</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Scansiona la stanza»  (misura la stanza, apri il LiDAR, planimetria)</td><td class="d">LiDAR</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Apri Bea»  (vai a Bea)</td><td class="d">Bea</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Inizia l'allenamento»  (apri l'allenatore)</td><td class="d">Allenatore</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri il diario»</td><td class="d">Diario</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Mostrami il sonno»  (dormito)</td><td class="d">Sonno</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Mostrami il cuore»  (battito)</td><td class="d">Cuore</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri i Vitals»  (parametri)</td><td class="d">Vitals</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri il Confidente»</td><td class="d">Confidente</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri il briefing»</td><td class="d">Briefing</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Fammi vedere il meteo»  (tempo)</td><td class="d">Meteo</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri la posta»  (email, mail)</td><td class="d">Posta</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri la spesa»</td><td class="d">Lista della spesa</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri Shazam»</td><td class="d">Shazam</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri le foto»  (galleria)</td><td class="d">Foto</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri i ricordi»</td><td class="d">Ricordi</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri l'interprete»  (traduttore)</td><td class="d">Interprete, con la scelta della lingua</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri il browser»  (internet)</td><td class="d">Browser privato</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri la serata»</td><td class="d">Conti delle serate</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri i messaggi»  (WhatsApp, iMessage)</td><td class="d">Messaggi</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri il telefono»  (tastiera, rubrica)</td><td class="d">Telefono</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri GitHub»  (cantiere, repository)</td><td class="d">GitHub</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri Supabase»  (sala macchine, database)</td><td class="d">Supabase</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Apri l'archivio»  (cloud)</td><td class="d">Archivio</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+</table>
+<p class="nota">Al posto di «apri» vanno bene anche: attiva, avvia, vai, mostra, mostrami, fammi vedere, controlla.</p>
+
+<h2>Interprete</h2>
+<table>
+<tr><th>Frase</th><th>Cosa fa</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Traduci in inglese» <span class="nuovo">NUOVO</span><br>(interprete spagnolo, fammi da interprete in francese)</td><td class="d">Apre l'Interprete già sulla lingua, senza sceglierla. Lingue: inglese, spagnolo, francese, tedesco, portoghese, cinese, giapponese, arabo, russo, turco, rumeno, olandese, polacco, greco, hindi, ucraino</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+</table>
+<p class="nota">La lingua va detta per ultima. «Traduci in inglese buongiorno a tutti» resta una domanda: JARVIS traduce la frase e basta.</p>
+
+<h2>LiDAR</h2>
+<table>
+<tr><th>Frase, con LiDAR aperto</th><th>Cosa fa</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Fine scansione» <span class="nuovo">NUOVO</span><br>(fine, ho finito, termina)</td><td class="d">Chiude la scansione e mostra la pianta</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Quanto è grande?» <span class="nuovo">NUOVO</span><br>(quanti metri, metri quadri, superficie, misure)</td><td class="d">Dice i metri quadri, anche mentre scansiona; a fine scansione anche l'altezza</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Quante persone ci stanno?» <span class="nuovo">NUOVO</span><br>(capienza, quanta gente)</td><td class="d">Capienza indicativa, 1,2 persone al m²</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Salva» <span class="nuovo">NUOVO</span></td><td class="d">Salva la scansione nell'archivio</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Mostrami il 3D» <span class="nuovo">NUOVO</span><br>(modello, ologramma)</td><td class="d">Apre il modello 3D</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+</table>
+<p class="nota">Il LiDAR c'è solo sull'iPhone Pro: sul Mac e sul Watch non si apre.</p>
+
+<h2>Sentinella</h2>
+<table>
+<tr><th>Frase, con la Sentinella accesa</th><th>Cosa fa</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Jarvis, chi è passato?» <span class="nuovo">NUOVO</span><br>(registro, cosa hai visto)</td><td class="d">Apre il registro degli allarmi</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Jarvis, schermo nero» <span class="nuovo">NUOVO</span><br>(oscura, buio)</td><td class="d">Schermo nero: la Sentinella continua a guardare</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Jarvis, spegni la Sentinella» <span class="nuovo">NUOVO</span><br>(Jarvis, torna, chiudi, esci)</td><td class="d">Spegne la Sentinella ed esce</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+</table>
+
+<h2>Wiretap</h2>
+<table>
+<tr><th>Frase, mentre registra</th><th>Cosa fa</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Jarvis, fai il verbale» <span class="nuovo">NUOVO</span><br>(fine riunione, riunione finita)</td><td class="d">Ferma la registrazione e prepara il verbale</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Jarvis, ferma il Wiretap» <span class="nuovo">NUOVO</span><br>(Jarvis, torna)</td><td class="d">Come sopra: niente si perde, parte il verbale</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+</table>
+<p class="nota">Le frasi di comando non finiscono nel verbale.</p>
+
+<h2>Domande</h2>
+<table>
+<tr><th>Frase</th><th>Risposta</th><th class="x">iPhone</th><th class="x">Mac</th><th class="x">Watch</th></tr>
+<tr><td class="f">«Buongiorno Jarvis, il briefing»</td><td class="d">Il briefing della mattina</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Come ho dormito stanotte?»</td><td class="d">Sonno e andamento della settimana</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Come sta il mio cuore oggi?»</td><td class="d">Battito a riposo e variabilità</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Come sto ultimamente?»</td><td class="d">I Vitals: umore, sonno, cuore</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Che tempo fa? Mi serve l'ombrello?»</td><td class="d">Meteo delle prossime ore</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Riassumimi la posta»</td><td class="d">Cosa conta e cosa ignorare</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Leggimi la lista della spesa»</td><td class="d">Un reparto alla volta</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Ricordati questo posto»</td><td class="d">Salva dove si trova adesso</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Ho parcheggiato qui»</td><td class="d">Segna il parcheggio</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Com'è andata oggi?»</td><td class="d">Il filo della giornata dai Ricordi</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Ricordami che…»</td><td class="d">Salva un ricordo con data e posto</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Quanto abbiamo incassato sabato?»</td><td class="d">Riepilogo della serata Discosizer</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Idee per stasera con Bea»</td><td class="d">Due idee dalla scheda di Bea</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Quante lezioni ha Bea domani?»</td><td class="d">Dal gestionale del pilates</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Manda un messaggio a…»</td><td class="d">Scrive e manda, dopo la sua conferma</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Ultimi commit di JARVIS»</td><td class="d">Cosa è cambiato su GitHub</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«EDITH, controllo completo»</td><td class="d">Sicurezza della rete di adesso</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Quanto mi è costato JARVIS questo mese?»</td><td class="d">I costi del cervello e della voce</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+</table>
+<p class="nota">Queste le capisce il cervello: vanno bene anche dette con parole sue.</p>
+
+</body></html>

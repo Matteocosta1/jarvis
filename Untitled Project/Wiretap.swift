@@ -94,7 +94,7 @@ final class Wiretap: ObservableObject {
         parziale = ""
         presa.metti(nil)
         compito = nil
-        if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true) {
+        if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true, dentro: .wiretap) {   // «Jarvis, fai il verbale»
             comando?(c)                       // la frase di comando non entra nel verbale
             return
         }
