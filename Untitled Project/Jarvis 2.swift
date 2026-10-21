@@ -635,6 +635,9 @@ final class Jarvis: NSObject, ObservableObject {
             case .occhiGiro:
                 if let giro = OcchiAperti.giro, giro() { return true }
                 return false                              // il giro non può partire: la frase resta allo scatto di sempre
+            case .occhiGira, .occhiZoomAvanti, .occhiZoomIndietro, .occhiZoomNormale:
+                if let c = OcchiAperti.comando, c(azione) { return true }
+                return true                               // fotocamera occupata un attimo: niente scatto per sbaglio
             case .apriMail:
                 if let u = URL(string: "message://") { UIApplication.shared.open(u) }
             default:

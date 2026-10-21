@@ -15,6 +15,7 @@ import UniformTypeIdentifiers
 enum OcchiAperti {
     static var scatta: (() -> Bool)?
     static var giro: (() -> Bool)?        // «Jarvis, fai un giro»: come il tasto REC
+    static var comando: ((ComandoVocale.AzioneScheda) -> Bool)?   // «girati», «zoom», «allarga», «zoom normale»
 }
 
 struct Occhiata: Identifiable {
@@ -206,7 +207,7 @@ struct Occhi: View {
         }
         .statusBarHidden()
         .task { await prepara() }
-        .onDisappear { OcchiAperti.scatta = nil; OcchiAperti.giro = nil; motore.ferma() }
+        .onDisappear { OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; motore.ferma() }
     }
 
     // MARK: Lavoro
@@ -252,6 +253,22 @@ struct Occhi: View {
             OcchiAperti.scatta = {                     // a voce: «Jarvis, guarda là in fondo»
                 guard agganciato, !scattando, !chiuso, !cambiando else { return false }
                 scatta()
+                return true
+            }
+            OcchiAperti.comando = { a in               // a voce: i tasti della fotocamera
+                guard agganciato, !scattando, !registrando, !chiuso, !cambiando else { return false }
+                switch a {
+                case .occhiGira: Task { await giraFotocamera() }
+                case .occhiZoomAvanti:
+                    let dopo = preselezioni.first(where: { $0 > zoom + 0.05 }) ?? min(zoom * 2, zoomMassimo)
+                    imposta(dopo, animato: true)
+                case .occhiZoomIndietro:
+                    let prima = preselezioni.last(where: { $0 < zoom - 0.05 }) ?? (preselezioni.first ?? 1)
+                    imposta(prima, animato: true)
+                case .occhiZoomNormale: imposta(1, animato: true)
+                default: return false
+                }
+                Suoni.tocco()
                 return true
             }
             OcchiAperti.giro = {                       // a voce: «Jarvis, fai un giro»
@@ -388,6 +405,7 @@ struct Occhi: View {
         chiuso = true
         OcchiAperti.scatta = nil
         OcchiAperti.giro = nil
+        OcchiAperti.comando = nil
         motore.ferma()
         fine(dati)
     }

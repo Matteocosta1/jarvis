@@ -107,7 +107,7 @@ enum ComandoVocale: Equatable {
         case beaTiPenso, beaChiama, beaMessaggio, beaWhatsApp, bea112
         case apriMail, postaRiassumi
         case spesaLeggi, spesaWhatsApp
-        case occhiGiro
+        case occhiGiro, occhiGira, occhiZoomAvanti, occhiZoomIndietro, occhiZoomNormale
         case scannerAltro, scannerGiudizio, scannerIngredienti
     }
     /// I tasti del Profiler, a voce, più la scheda del soggetto dettata.
@@ -276,9 +276,17 @@ enum ComandoVocale: Equatable {
                     " che devo prendere ", " cosa devo prendere ",  " sono al supermercato ", " sono al super ", " sono all esselunga ", " cosa prendo ", " ricordami la spesa "]) || solo(generiche) { return .scheda(.spesaLeggi) }
         case .occhi?, .cucina?:
             // «Jarvis, guarda là in fondo», «guarda qua vicino», «guarda l'insieme»: lì ogni frase è già la domanda dello scatto
+            if t.count <= 6, uno([" girati ", " gira la fotocamera ", " girala ", " cambia fotocamera ", " cambia camera ", " selfie ", " fai un selfie ",
+                    " fotocamera davanti ", " fotocamera dietro ", " camera davanti ", " camera dietro ", " inquadra me ", " inquadrami ", " guardami ",
+                    " guarda me ", " gira ", " girà "]) { return .scheda(.occhiGira) }
+            if t.count <= 5, uno([" zoom normale ", " normale ", " uno x ", " 1x ", " togli lo zoom ", " senza zoom "]) { return .scheda(.occhiZoomNormale) }
+            if t.count <= 5, uno([" allarga ", " allargati ", " piu largo ", " zoom indietro ", " meno zoom ", " grandangolo ", " rimpicciolisci ",
+                    " allontana ", " allontanati ", " indietro con lo zoom "]) { return .scheda(.occhiZoomIndietro) }
+            if t.count <= 5, uno([" zoom ", " zooma ", " zoomma ", " avvicina ", " avvicinati ", " piu vicino ", " ingrandisci ", " zoom avanti ",
+                    " piu zoom ", " stringi "]) { return .scheda(.occhiZoomAvanti) }
             if t.count <= 7, uno([" fai un giro ", " giro ", " video ", " in video ", " fai un video ", " riprendi ", " registra ", " panoramica ",
                     " guardati intorno ", " guarda tutto intorno ", " guarda in giro ", " dai un occhiata in giro ", " fammi vedere tutto ",
-                    " scorri lo scaffale ", " tutto lo scaffale ", " tutta la stanza "]) { return .scheda(.occhiGiro) }
+                    " scorri lo scaffale ", " tutto lo scaffale ", " tutta la stanza ", " tutto il frigo ", " tutta la dispensa ", " tutto il frigorifero "]) { return .scheda(.occhiGiro) }
         case .scanner?:
             if uno([" un altro ", " un altra ", " altro prodotto ", " scansiona un altro ", " prossimo ", " ancora ", " di nuovo ", " rifai ", " riprova ",
                     " un altro codice ", " vai col prossimo ", " avanti "]) { return .scheda(.scannerAltro) }
@@ -339,7 +347,7 @@ enum ComandoVocale: Equatable {
             || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
             return .apri(.lidar)
         }
-        if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && comanda { return .apri(.scanner) }
+        if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && (comanda || c(" scansiona ")) { return .apri(.scanner) }
 
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [

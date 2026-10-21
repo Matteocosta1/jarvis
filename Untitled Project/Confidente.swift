@@ -138,7 +138,14 @@ struct VistaConfidente: View {
             .onAppear {
                 // con la conversazione incollata, quello che dice a voce è la sua domanda («Jarvis, ho esagerato io?»)
                 ConfidenteAperto.domanda = { frase in
-                    let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                    var t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // niente incollato, ma parla di «questo messaggio», «questa chat»…: prende quello che ha copiato
+                    let basso = frase.lowercased()
+                    if t.isEmpty, ["messaggio", "questo", "questa", "conversazione", "chat", "whatsapp", "ha scritto", "mi ha detto", "copiato"].contains(where: { basso.contains($0) }),
+                       let copiato = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !copiato.isEmpty {
+                        testo = copiato
+                        t = copiato
+                    }
                     guard !t.isEmpty else { return false }
                     let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
                     invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
