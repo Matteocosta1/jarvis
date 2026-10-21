@@ -20,6 +20,8 @@ nonisolated enum Musica {
 
     static func riconosci(secondi: Double) async -> Esito {
         guard await AVAudioApplication.requestRecordPermission() else { return .errore("manca il permesso del microfono") }
+        NotificationCenter.default.post(name: .jarvisMicServe, object: nil)        // l'attesa in ascolto lascia il microfono a Shazam
+        defer { NotificationCenter.default.post(name: .jarvisMicLibero, object: nil) }
         // musica di altre app: la lasciamo suonare (mixWithOthers), così Shazam la sente
         let s = AVAudioSession.sharedInstance()
         #if os(iOS)
@@ -82,4 +84,10 @@ nonisolated final class UnaVolta: @unchecked Sendable {
         usata = true
         return true
     }
+}
+
+extension Notification.Name {
+    /// Qualcuno (Shazam) prende il microfono / lo restituisce: l'attesa in ascolto del Watch si fa da parte e poi riprende.
+    static let jarvisMicServe = Notification.Name("jarvisMicServe")
+    static let jarvisMicLibero = Notification.Name("jarvisMicLibero")
 }

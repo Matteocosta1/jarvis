@@ -51,7 +51,7 @@ enum SuoniOrologio {
     /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
     static func apertura() {
         guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
         p.volume = 1.0
         lettoreScheda?.stop()
         lettoreScheda = p
@@ -60,7 +60,7 @@ enum SuoniOrologio {
     /// Una sezione si apre (caricamento) e quando è pronta: «scheda» e «schedapronta», come sull'iPhone.
     static func schedaApre() {
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
         p.volume = 1.0                                                    // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
@@ -73,7 +73,7 @@ enum SuoniOrologio {
     private static var lettoreScheda: AVAudioPlayer?
     private static func suona(_ url: URL?, volume: Float) {
         guard let url, let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
         p.volume = volume
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
@@ -148,7 +148,8 @@ struct VistaOrologio: View {
             accendi()
         }
         .onChange(of: scena) { _, fase in
-            if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi() }
+            if fase == .active { PosizioneOrologio.risveglia(); jarvis.riprendiAscolto() }          // torna davanti: l'attesa riascolta
+            else if fase == .background { PosizioneOrologio.dormi(); jarvis.fermaPassivo() }
         }
         // comando vocale: «apri il meteo», «fammi vedere la spesa»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
