@@ -196,7 +196,9 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $mostraLidar) {
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
+                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
+        .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
         .sheet(isPresented: $mostraVitals) {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
@@ -737,6 +739,12 @@ struct ContentView: View {
             scheda = nil
         case .apri(let r):
             apriReparto(r)
+        case .interprete(let codice):
+            mostraSentinella = false
+            mostraWiretap = false
+            Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
+        case .lidar, .sentinella:
+            break                                   // questi li gestisce il reparto stesso
         }
     }
 

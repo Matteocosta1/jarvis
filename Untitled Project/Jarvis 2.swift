@@ -104,6 +104,8 @@ final class Jarvis: NSObject, ObservableObject {
     private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
+    @Published var azioneLidar: ComandoVocale.AzioneLidar?   // comando vocale dentro LiDAR: lo esegue la sua schermata
+    var lidarAperto = false                      // LiDAR aperto: valgono anche i suoi comandi («salva», «fine scansione»…)
     @Published var diagnosiMac = ""             // Mac: la riga di controllo del microfono in attesa
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
     /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
@@ -600,7 +602,7 @@ final class Jarvis: NSObject, ObservableObject {
             NotificationCenter.default.post(name: .jarvisRifaiLidar, object: nil)
             return true
         }
-        switch ComandoVocale.riconosci(frase) {
+        switch ComandoVocale.riconosci(frase, dentro: lidarAperto ? .lidar : nil) {
         case .apri(let reparto)?:
             apriReparto(reparto)
             return true
@@ -609,9 +611,30 @@ final class Jarvis: NSObject, ObservableObject {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             chiudiChiesto = true
             return true
-        case nil:
+        case .lidar(let azione)?:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            azioneLidar = azione
+            return true
+        case .interprete(let codice)? where !lidarAperto:
+            apriInterprete(codice)
+            return true
+        default:
             return false
         }
+    }
+
+    /// «Traduci in inglese»: l'Interprete si apre già sulla lingua, senza passare dalla scelta.
+    func apriInterprete(_ codice: String) {
+        guard !lidarAperto, let l = Lingua.trova(codice) else { return }   // sopra LiDAR non si apre un'altra schermata
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        interrompi()
+        interprete = l
+    }
+
+    /// Una frase breve di JARVIS per un comando (le misure di LiDAR): detta quella, torna in attesa.
+    func annuncia(_ frase: String) {
+        flussoFinito = true
+        accodaVoce(frase, forza: true)
     }
 
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
