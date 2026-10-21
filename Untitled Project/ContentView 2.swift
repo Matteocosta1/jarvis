@@ -54,7 +54,7 @@ struct ContentView: View {
     private var qualcosaAperto: Bool {
         scheda != nil || mostraRicordi != nil || sorgenteFoto != nil || mostraImpostazioni || mostraBrowser || mostraSentinella
             || mostraWiretap || mostraProfiler || mostraVitals || mostraConfidente || mostraLidar || mostraSistemi
-            || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore
+            || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore || scegliLingua || chiediPulizia
     }
     @FocusState private var tastiera: Bool
 
@@ -230,6 +230,7 @@ struct ContentView: View {
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
+        .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
         .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
             guard si else { return }
             jarvis.chiudiChiesto = false
@@ -653,6 +654,9 @@ struct ContentView: View {
         withAnimation(.spring(duration: 0.3)) { mostraSistemi = false }
         mostraImpostazioni = false
         jarvis.pagina = nil
+        sorgenteFoto = nil
+        scegliLingua = false
+        chiediPulizia = false
         jarvis.allenatore = false
         mostraLidar = false
         jarvis.occhiChiusi([])

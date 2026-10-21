@@ -85,7 +85,10 @@ enum ComandoVocale: Equatable {
         func c(_ x: String) -> Bool { s.contains(x) }
 
         // tornare indietro / chiudere il reparto
-        if t.count <= 3, ["torna", "indietro", "chiudi", "esci", "basta"].contains(t[0]) { return .torna }
+        // da soli («chiudi», «indietro»…) o in poche frasi esatte: «torna a casa» e «chiudi Spotify» restano a JARVIS
+        if t.count == 1, ["torna", "indietro", "chiudi", "esci", "basta"].contains(t[0]) { return .torna }
+        if [" torna indietro ", " chiudi tutto ", " torna alla home ", " torna alla schermata principale ", " chiudi la scheda ",
+            " chiudi questa scheda ", " esci da qui "].contains(where: { s == $0 }) { return .torna }
 
         let verbi = ["attiva", "apri", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
@@ -116,18 +119,22 @@ enum ComandoVocale: Equatable {
             (.messaggi, [" messaggi ", " whatsapp ", " imessage "]), (.telefono, [" telefono ", " tastiera ", " rubrica "]),
             (.github, [" github ", " git hub ", " ghitab ", " repository ", " cantiere "]), (.supabase, [" supabase ", " supa base ", " sala macchine ", " database "]),
             (.archivio, [" archivio ", " cloud ", " disco rigido "]),
-            (.costi, [" costi ", " consumi "]), (.edith, [" edith ", " editt ", " edit "]),
-            (.sistemi, [" sistemi ", " menu sistemi "]), (.impostazioni, [" impostazioni ", " settaggi ", " rotella "]),
         ]
+        // le sezioni nuove solo con un verbo: «apri i costi», «mostrami EDITH», «vai alle impostazioni» («che costi?» resta a JARVIS)
+        let nuove: [(Reparto, [String])] = [
+            (.costi, [" costi ", " consumi "]), (.edith, [" edith ", " editt "]),
+            (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
+        ]
+        let conVerbo = t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra", "fammi"].contains($0) })
+        if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
         if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "mostra", "mostrami", "vai", "entra"].contains($0) }) {
             return .apri(.bea)
         }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
-        // (solo così: «svuota la spesa» o «pulisci la lista» restano al cervello)
-        if t.count <= 3, t[0] == "pulisci", !t.contains(where: { ["lista", "spesa", "casa", "cucina"].contains($0) }) { return .apri(.pulisci) }
-        if t.count <= 2, t.contains("cestino") { return .apri(.pulisci) }
-        if c(" cancella la conversazione ") || c(" cancella la chat ") || c(" svuota la chat ") || c(" svuota la conversazione ") { return .apri(.pulisci) }
+        // solo frasi esatte: «pulisci il bagno» o «cancella la chat con Bea» restano a JARVIS
+        if [" pulisci ", " pulisci la chat ", " pulisci tutto ", " pulisci lo schermo ", " svuota la chat ", " svuota la conversazione ",
+            " cancella la chat ", " cancella la conversazione ", " cestino ", " svuota il cestino "].contains(where: { s == $0 }) { return .apri(.pulisci) }
         let mostra = comanda || t.contains(where: { ["mostra", "mostrami", "vedere", "vediamo", "guardiamo", "controlla", "controlliamo"].contains($0) })
         if mostra {
             for (reparto, chiavi) in schede where chiavi.contains(where: c) { return .apri(reparto) }

@@ -7,7 +7,8 @@ import LocalAuthentication
 /// Il Browser a voce: «Jarvis, scrivi …» scrive nel campo attivo (la barra degli indirizzi o un campo della pagina),
 /// «Jarvis, invia» (o «vai», «cerca», «premi invio») lo manda. JARVIS non legge la pagina: scrive solo dove c'è il cursore.
 enum BrowserVoce {
-    static var aperto: Bool { scrivi != nil }
+    static var aperto: Bool { scrivi != nil && sbloccato }    // prima del Face ID le frasi vanno a JARVIS come sempre
+    static var sbloccato = false
     static var proprietario: UUID?                     // la pagina che ha registrato i comandi (Incognito ↔ Normale la ricrea)
     static var scrivi: ((String) -> Void)?
     static var invia: (() -> Void)?
@@ -20,7 +21,8 @@ enum BrowserVoce {
             invia?(); return true
         }
         for verbo in ["scrivi ", "scrivi: ", "digita ", "scrivi,"] where basso.hasPrefix(verbo) {
-            let resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:"))
+            var resto = String(t.dropFirst(verbo.count)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:"))
+            while let u = resto.last, ".!?;".contains(u) { resto.removeLast() }   // il punto finale del riconoscimento no
             guard !resto.isEmpty else { return false }
             scrivi?(resto); return true
         }
@@ -282,6 +284,7 @@ struct PaginaBrowser: View {
     private func registraVoce() {
         BrowserVoce.proprietario = idVoce
         let sbloccato = attivo                                 // Face ID non ancora dato: niente
+        BrowserVoce.sbloccato = sbloccato
         BrowserVoce.scrivi = { testo in
             guard sbloccato else { return }
             if scrivendo { barra = barra.isEmpty ? testo : barra + " " + testo }
@@ -365,7 +368,7 @@ struct PaginaBrowser: View {
         .onChange(of: attivo) { registraVoce() }              // Face ID dato: i comandi a voce si sbloccano
         .onDisappear {
             guard BrowserVoce.proprietario == idVoce else { return }
-            BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.proprietario = nil
+            BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.proprietario = nil; BrowserVoce.sbloccato = false
         }
         .sheet(isPresented: $mostraCronologia) {
             VistaCronologiaBrowser(incognito: incognito, accento: accento) { url in

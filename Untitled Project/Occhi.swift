@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 /// Le foto escono già ridotte (lato massimo 1280 px, 1024 nel giro, JPEG) e vanno al cervello, che le guarda e risponde a voce.
 /// Occhi aperti in modalità manuale: «Jarvis, …» detto mentre inquadra fa scattare la foto (come il tasto).
 enum OcchiAperti {
-    static var scatta: (() -> Void)?
+    static var scatta: (() -> Bool)?
 }
 
 struct Occhiata: Identifiable {
@@ -248,7 +248,11 @@ struct Occhi: View {
             scatta()
         } else {
             stato = cucina ? "INQUADRI FRIGO, DISPENSA O PIATTO" : "INQUADRI E SCATTI"
-            OcchiAperti.scatta = { scatta() }          // a voce: «Jarvis, guarda là in fondo»
+            OcchiAperti.scatta = {                     // a voce: «Jarvis, guarda là in fondo»
+                guard agganciato, !scattando, !chiuso, !cambiando else { return false }
+                scatta()
+                return true
+            }
         }
     }
 

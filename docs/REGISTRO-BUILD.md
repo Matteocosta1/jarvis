@@ -15,6 +15,7 @@ Per ogni build: cosa contiene, se è stata provata, com'è andata.
 | 8.0 (8) | 0cc3062 | 8.0 (7) + **solo** menu SISTEMI: le 4 richieste partono insieme; se il menu si chiude prima della fine non scrive più «non raggiungibile». Nient'altro | da provare | |
 | 8.0 (9) | 184b524 | 8.0 (8) + tre ritocchi: «piano/sottovoce» entro le prime 5 parole (prima 3); volume basso anche sulle frasi già pronte (piano dalla prima sillaba); battito di mani valido sempre (tolta la regola dei 12 s di «confusione», che scartava i primi battiti dopo voce o musica) | da provare | |
 | 8.0 (10) | 776d618 | 8.0 (9) + **solo** LiDAR: «guarda» durante la scansione prende la foto dalla fotocamera di LiDAR (niente Occhi, la scansione non si ferma e non va al nero); fuori da LiDAR «guarda» resta come prima | da provare | |
+| 8.0 (11) | (questo) | 8.0 (10) + **voce ovunque**: «Jarvis» ascolta in schede, Occhi, Cucina, LiDAR, Impostazioni, SISTEMI, Browser, Vitals, Confidente, Ricordi (no: Interprete, Allenatore, Sentinella, Wiretap, Shazam, Scanner, Profiler, La mia voce). Comandi: «apri sistemi/impostazioni/costi/EDITH», «pulisci» (frasi esatte), «chiudi»/«torna»/«indietro» (da soli). Occhi e Cucina: la frase fa scattare e parte con la foto. Browser: «scrivi …», «invia». Watch: «pulisci». I 50 ms NON inclusi (la musica resterebbe abbassata) | da provare | |
 
 Nota 21 ott pomeriggio: fotocamere bloccate in tutte le build (anche la 6.0 (20) di ieri) → era l'iPhone; risolto col riavvio.
 
