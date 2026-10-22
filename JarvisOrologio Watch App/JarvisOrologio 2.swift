@@ -191,6 +191,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     func ferma() {
+        inCorso = nil                                  // fermato: quello che dice dopo non è più «la risposta in corso»
         riascolta = false
         compito?.cancel()
         compito = nil
@@ -371,6 +372,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 compito = nil
                 WKInterfaceDevice.current().play(.click)
                 repartoRichiesto = reparto
+                daUnire = nil                          // un comando è un'azione nuova: la domanda interrotta non si porta dietro
+                inCorso = nil
                 if let a = reparto.annuncio { parla(a) } else { fase = .attesa }
                 return
             }
@@ -779,6 +782,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in fineFrase = c }
         }
         guard mio == turnoVoce else { return }
+        inCorso = nil                                  // risposta letta tutta (a frasi): da qui una frase nuova è una domanda nuova
         lettoreCoda = nil
         lettore = nil
         if fase == .parlo {
@@ -845,6 +849,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     private func interrottoAVoce() {
         segnaInterruzione()
+        inCorso = nil
         fermaMonitor()
         zittisci()
         compito?.cancel()
