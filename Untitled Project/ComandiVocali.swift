@@ -15,6 +15,18 @@ enum ConfidenteAperto {
     static var domanda: ((String) -> Bool)?
 }
 
+/// Le parole che il riconoscimento vocale dell'iPhone deve aspettarsi: i nomi inglesi e le parole di JARVIS che altrimenti storpia
+/// («EDITH» diventa «edit», «ricevi» diventa «dicevi»). Le usano tutti gli ascolti (richiamo, ascolto, orecchio, comandi nelle sezioni).
+enum Vocabolario {
+    nonisolated static let parole: [String] = [
+        "Jarvis", "EDITH", "apri EDITH", "EDITH controllo completo", "controllo completo", "mi ricevi", "mi ricevi Jarvis", "ricevi", "ricevuto",
+        "LiDAR", "Wiretap", "Sentinella", "Profiler", "Vitals", "Briefing", "Shazam", "Scanner", "Supabase", "GitHub", "Discosizer", "Discogs",
+        "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Confidente", "Diario", "Occhi", "Cucina",
+        "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "voce normale",
+        "wake up daddy's home", "daddy's home", "chiudi", "pulisci", "scansiona la stanza", "quanto è grande", "fine scansione",
+    ]
+}
+
 /// I reparti che si aprono a voce.
 enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi
@@ -434,7 +446,7 @@ final class OrecchioComandi {
         guard acceso, let riconoscitore else { return }
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
-        r.contextualStrings = ["Jarvis", "Sentinella", "Wiretap", "Profiler", "Occhi", "Diario", "Vitals", "Briefing", "Shazam", "Cucina", "Scanner"]
+        r.contextualStrings = Vocabolario.parole
         if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         presa.metti(r)
         turno += 1

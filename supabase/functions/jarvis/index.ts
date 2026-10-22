@@ -47,6 +47,7 @@ PARLATO NATURALE, come una persona al telefono: la PRIMA frase è cortissima (3-
 LUNGHEZZA, regola ferrea (il signore ti trova spesso logorroico): la risposta normale è di UNA o DUE frasi. Comandi, conferme, meteo, orari, dati: una frase, massimo due. L'ironia e la flemma restano ma condensate in UNA battuta al massimo, mai tre, e mai una battuta se la risposta è già completa senza. Niente commenti sul contesto, niente riepiloghi di ciò che hai fatto, niente «se vuole posso anche…» a fine risposta. Ti allunghi SOLO quando la domanda chiede davvero una spiegazione o un ragionamento (perché, come funziona, cosa ne pensi, aiutami a decidere, il confidente, il diario): anche lì vai dritto, senza riempitivi, e ti fermi quando hai detto la cosa. La sostanza arriva nella prima frase, senza preamboli («Certo», «Allora», «Ottima domanda») e senza ripetere la domanda. Sull'Apple Watch ancora più breve: una frase, perché lo schermo e l'altoparlante sono piccoli.
 Se una scelta del signore è discutibile, glielo dici con garbo ma chiaramente.
 Il riconoscimento vocale storpia spesso «Discosizer» (es. «disco Size», «disco Cyber», «disco sizer»): intendi sempre Discosizer, la società e il nome delle serate.
+Storpia anche «EDITH» (il sistema di sicurezza): arriva come «edit», «editt», «edid», «idit», «idith», «e dit», «hedith», «Edith» o «heidi»: se si parla di sicurezza, link, porte, IBAN, partite IVA o numeri sospetti, intendi EDITH. «Mi dicevi?», «mi dici?» detto da solo all'inizio, senza un discorso aperto, è quasi sempre «mi ricevi?»: rispondi che lo ricevi forte e chiaro.
 
 INTELLIGENZA
 Sei un'intelligenza artificiale completa, non solo un esecutore di comandi. Sai ragionare, spiegare, consigliare, scrivere, tradurre, fare calcoli, risolvere problemi, aiutare con il codice, con la musica, con l'arte e con gli affari: usa tutta la tua conoscenza, come farebbe il miglior assistente del mondo.
@@ -2047,8 +2048,34 @@ const idValido = (x: unknown) => typeof x === "string" && /^[A-Za-z0-9]{10,40}$/
 // Se ElevenLabs non risponde (credito finito, chiave assente) si passa a Google Gemini, con la stessa personalità.
 let elevenSospesaFino = 0;
 
+// Pronuncia: la voce parla in italiano, quindi le parole inglesi si scrivono come si dicono (solo per l'audio:
+// sullo schermo restano scritte normali). «Sir» resta com'è: è la sua firma.
+const PRONUNCE: [RegExp, string][] = [
+  [/\bwake up,? daddy'?s home\b/gi, "uèic ap, dèdis hòum"], [/\bdaddy'?s home\b/gi, "dèdis hòum"],
+  [/\bresident advisor\b/gi, "Rèsident Advàisor"], [/\bapple watch\b/gi, "Èpol Uòcc"], [/\bapple music\b/gi, "Èpol Miùsic"],
+  [/\bface ?id\b/gi, "Féis Ai Dì"], [/\bthe clash\b/gi, "de Clèsh"], [/\btony stark\b/gi, "Tòni Stàrk"],
+  [/\bj\.?a\.?r\.?v\.?i\.?s\.?(?=\W|$)/gi, "Giàrvis"], [/\bjarvis\b/gi, "Giàrvis"],
+  [/\bedith\b/gi, "Ìdith"], [/\blidar\b/gi, "Làidar"], [/\bwire ?tap\b/gi, "Uàier tap"], [/\bprofiler\b/gi, "Pròfailer"],
+  [/\bbriefing\b/gi, "brìfing"], [/\bshazam\b/gi, "Sciàzam"], [/\bspotify\b/gi, "Spòtifai"], [/\bgithub\b/gi, "Ghìt-hab"],
+  [/\bsupabase\b/gi, "Supabéis"], [/\bvitals\b/gi, "Vàitals"], [/\bdiscosizer\b/gi, "Discosàizer"], [/\bwhatsapp\b/gi, "Uòtsapp"],
+  [/\biphone\b/gi, "àifon"], [/\bipad\b/gi, "àipad"], [/\bgoogle\b/gi, "Gùgol"], [/\byoutube\b/gi, "Iùtiub"], [/\be-?mail\b/gi, "ìmeil"], [/\bmail\b/gi, "méil"],
+  [/\bcloud\b/gi, "clàud"], [/\bonline\b/gi, "onlàin"], [/\boffline\b/gi, "offlàin"], [/\bbrowser\b/gi, "bràuser"],
+  [/\bbluetooth\b/gi, "blùtut"], [/\bwi-?fi\b/gi, "uài-fai"], [/\bpassword\b/gi, "pàssuord"], [/\bfeedback\b/gi, "fìdbec"],
+  [/\bweekend\b/gi, "uìkend"], [/\bsumup\b/gi, "Sàmap"], [/\btestflight\b/gi, "Test-flàit"], [/\bxcode\b/gi, "Ics-còud"],
+  [/\belevenlabs\b/gi, "Ìlevenlebs"], [/\bclaude\b/gi, "Clòd"], [/\bsmartphone\b/gi, "smàrtfon"], [/\bsmartwatch\b/gi, "smàrtuocc"],
+  [/\bsentinel\b/gi, "Sèntinel"], [/\bscanner\b/gi, "scànner"], [/\bplaylist\b/gi, "plèilist"], [/\bstreaming\b/gi, "strìming"],
+  [/\bdownload\b/gi, "dàunload"], [/\bupload\b/gi, "àpload"], [/\bupdate\b/gi, "àpdeit"], [/\bbackup\b/gi, "bècap"],
+  [/\bmeeting\b/gi, "mìting"], [/\bdeadline\b/gi, "dèdlain"], [/\bfood\b/gi, "fùd"], [/\bdrink\b/gi, "drìnk"],
+  [/\blive\b/gi, "làiv"], [/\bsound\b/gi, "sàund"], [/\bline-?up\b/gi, "làinap"], [/\bdj\b/gi, "dìgei"], [/\bclub\b/gi, "clàb"],
+];
+function pronuncia(t: string): string {
+  let r = t;
+  for (const [re, al] of PRONUNCE) r = r.replace(re, al);
+  return r;
+}
+
 async function voceTts(testo: string, idVoce: unknown, flusso = false) {
-  const t = testo.trim().slice(0, 1500);
+  const t = pronuncia(testo.trim().slice(0, 1500));
   if (!t) return json({ errore: "testo vuoto" }, 400);
   const errori: string[] = [];
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
