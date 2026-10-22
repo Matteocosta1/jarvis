@@ -83,6 +83,16 @@ struct ContentView: View {
     /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera, ma quando si chiude rientra solo a tastiera
     /// già scesa: così il reattore non si muove insieme alla tastiera e alla chat (lo scatto) e torna con un'animazione fluida.
     @State private var reattoreGrande = true
+    @State private var giroReattore = 0                  // ogni chiusura della tastiera ha il suo numero: vale solo l'ultima
+    /// Il reattore piccolo e il microfono spento mentre si scrive: solo sull'iPhone (iPad e Mac restano come prima).
+    private var telefono: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+    /// Una schermata aperta da JARVIS o dal Tocco d'aiuto di Bea, non dal signore.
+    private var schermataDaSola: Bool {
+        let pagina: Bool = jarvis.pagina != nil
+        let occhi: Bool = jarvis.occhi != nil
+        let interprete: Bool = jarvis.interprete != nil
+        return pagina || occhi || interprete || jarvis.allenatore || aiutoBea != nil
+    }
 
     var body: some View {
         GeometryReader { g in
@@ -129,9 +139,9 @@ struct ContentView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        intestazione(mini: !reattoreGrande)
+                        intestazione(mini: telefono && !reattoreGrande)
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
-                        if reattoreGrande {
+                        if reattoreGrande || !telefono {
                             centroHUD
                                 .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
                         }
@@ -139,16 +149,20 @@ struct ContentView: View {
                         barraTesto
                     }
                     .onChange(of: tastiera) { _, aperta in
+                        giroReattore += 1
                         if aperta {
                             withAnimation(.easeOut(duration: 0.25)) { reattoreGrande = false }
                         } else {
+                            let mio = giroReattore
                             Task {
                                 try? await Task.sleep(for: .milliseconds(300))      // la tastiera finisce di scendere
-                                guard !tastiera else { return }                      // riaperta nel frattempo: resta piccolo
+                                guard !tastiera, mio == giroReattore else { return } // riaperta (o richiusa) nel frattempo: decide l'ultima
                                 withAnimation(.spring(response: 0.55, dampingFraction: 0.88)) { reattoreGrande = true }
                             }
                         }
                     }
+                    // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
+                    .onAppear { if !tastiera { reattoreGrande = true } }
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
@@ -276,6 +290,10 @@ struct ContentView: View {
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
         .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
         .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
+        // si apre una schermata da sola (pagina web, Occhi, Interprete, Allenatore, l'SOS di Bea): la tastiera si chiude
+        .onChange(of: schermataDaSola) { _, aperta in
+            if aperta { tastiera = false }
+        }
         .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
             try? await Task.sleep(for: .seconds(8))
             await caricaStatoSistemi()
