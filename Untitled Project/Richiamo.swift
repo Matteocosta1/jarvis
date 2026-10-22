@@ -20,7 +20,7 @@ final class Richiamo {
     /// Due battiti di mani (come Tony Stark): JARVIS si mette in ascolto.
     var applauso: (() -> Void)?
 
-    private let motore = AVAudioEngine()
+    private var motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private let condotto = Condotto()
@@ -103,6 +103,9 @@ final class Richiamo {
                     try sessione.setCategory(.playAndRecord, options: [.mixWithOthers])
                 }
                 try sessione.setActive(true)
+                // un motore nuovo, creato ADESSO che l'audio permette il microfono: quello vecchio poteva essersi
+                // «ricordato» l'audio dell'avvio (nessun ingresso) e restare acceso ma sordo (il «Jarvis» che non sente)
+                motore = AVAudioEngine()
                 mani.quandoSente = { [weak self] in
                     guard let richiamo = self else { return }
                     Task { @MainActor in richiamo.applauso?() }

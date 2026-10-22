@@ -99,7 +99,7 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var fase: Fase = .attesa {
         didSet {
             guard fase != oldValue else { return }
-            if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(fase == .parlo || avvioInCorso) }   // Mac: la sua voce non è «confusione»
+            AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio (e sul Mac la sua voce) non è «confusione»
             aggiornaRichiamo()
         }
     }
@@ -142,7 +142,7 @@ final class Jarvis: NSObject, ObservableObject {
     let strumenti = Strumenti()
 
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
-    private let motore = AVAudioEngine()
+    private var motore = AVAudioEngine()
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var compito: SFSpeechRecognitionTask?
     private var timerSilenzio: Timer?
@@ -173,7 +173,7 @@ final class Jarvis: NSObject, ObservableObject {
     var avvioInCorso = true {
         didSet {
             guard avvioInCorso != oldValue else { return }
-            if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(fase == .parlo || avvioInCorso) }   // Mac: la musica d'avvio non è «confusione»
+            AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio non è «confusione»
             aggiornaRichiamo()
         }
     }
@@ -218,7 +218,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        if Jarvis.usaAscoltoCloud { AmbienteSonoro.condiviso.jarvisSuona(true) }   // Mac: si apre con la musica d'avvio
+        AmbienteSonoro.condiviso.jarvisSuona(true)   // si apre con la musica d'avvio: non è «confusione»
         sintesi.delegate = self
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti) }       // le frasi ponte sono già pronte in cache, a costo zero
@@ -1353,6 +1353,8 @@ final class Jarvis: NSObject, ObservableObject {
             r.addsPunctuation = true                 // il «?» aiuta a capire quando la domanda è finita
             r.contextualStrings = ["Discosizer", "Jarvis", "Discogs", "Resident Advisor", "SumUp", "EDITH", "mi ricevi"]
             richiesta = r
+            // iPhone: un motore nuovo, creato ora che l'audio permette il microfono (come nel richiamo); sul Mac resta quello dell'attesa
+            if !Jarvis.usaAscoltoCloud && !motore.isRunning { motore = AVAudioEngine() }
             try Jarvis.collegaMicrofono(motore.inputNode, a: r)
             motore.prepare()
             try motore.start()

@@ -51,7 +51,7 @@ nonisolated final class AmbienteSonoro: NSObject, SNResultsObserving, @unchecked
         }
         guard rumoroso else { return }
         lock.lock()
-        let suoNoMio = !(ProcessInfo.processInfo.isiOSAppOnMac && (suonaJarvis || Date() < suonaJarvisFino))
+        let suoNoMio = !(suonaJarvis || Date() < suonaJarvisFino)
         if suoNoMio { confusioneFino = Date().addingTimeInterval(12) }
         lock.unlock()
     }

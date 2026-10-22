@@ -51,21 +51,19 @@ enum SuoniOrologio {
     /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
     static func apertura() {
         guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
-        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
         p.volume = 1.0
         lettoreScheda?.stop()
         lettoreScheda = p
-        MicOrologio.ignora(per: p.duration)
         p.play()
     }
     /// Una sezione si apre (caricamento) e quando è pronta: «scheda» e «schedapronta», come sull'iPhone.
     static func schedaApre() {
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
         p.volume = 1.0                                                    // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
-        MicOrologio.ignora(per: p.duration)
         p.play()
     }
     static func schedaPronta() {
@@ -75,11 +73,10 @@ enum SuoniOrologio {
     private static var lettoreScheda: AVAudioPlayer?
     private static func suona(_ url: URL?, volume: Float) {
         guard let url, let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        if !MicOrologio.aperto { try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default) }   // col microfono dell'attesa acceso l'audio resta com'è
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
         p.volume = volume
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
-        MicOrologio.ignora(per: p.duration)
         p.play()
     }
 }
@@ -151,8 +148,7 @@ struct VistaOrologio: View {
             accendi()
         }
         .onChange(of: scena) { _, fase in
-            if fase == .active { PosizioneOrologio.risveglia() }
-            else if fase == .background { PosizioneOrologio.dormi(); jarvis.fermaPassivo() }
+            if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi() }
         }
         // comando vocale: «apri il meteo», «fammi vedere la spesa»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
@@ -302,7 +298,7 @@ struct VistaOrologio: View {
                 chatDa = Date()
                 Task { @MainActor in try? await Task.sleep(for: .seconds(1.3 / v)); chatDa = nil }
             }
-            // sistemi in linea: JARVIS ascolta subito, senza toccare il reattore (finito il suono della chat, che non deve sentire)
+            // icone (e chat) caricate: JARVIS si mette in ascolto da solo; il suono della chat prima finisce
             let ricarica = chatDa != nil
             Task { @MainActor in
                 if ricarica { try? await Task.sleep(for: .seconds(1.4 / v)) }
@@ -407,7 +403,7 @@ struct VistaOrologio: View {
                 }
 
                 if jarvis.fase != .attesa {
-                    Button("Stop", role: .destructive) { jarvis.fermaETorna() }
+                    Button("Stop", role: .destructive) { jarvis.ferma() }
                 } else if !jarvis.risposta.isEmpty {
                     Button("Ripeti") { jarvis.ripeti() }
                 }
