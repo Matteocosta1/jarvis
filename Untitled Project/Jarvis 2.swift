@@ -18,15 +18,11 @@ struct Messaggio: Identifiable, Codable, Equatable {
     var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
     var aggiunta: Bool? = nil         // il signore completa la richiesta precedente («Jarvis, aspetta, ascoltami…»)
     var seguito: Bool? = nil          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
-    var interruzione: String? = nil   // l'ha interrotto mentre rispondeva a questa domanda: decide il cervello se la completa o è nuova
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
         let base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
         if aggiunta == true { return "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" }
-        if let q = interruzione {
-            return "(ti ho interrotto mentre rispondevi a «\(q)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) \(base)"
-        }
         if seguito == true {
             return "(riprendo il discorso: se questo completa o aggiunge qualcosa a quello che ti ho detto prima, rispondi tenendo conto di entrambe le cose; se è un argomento nuovo, rispondi solo a questo) \(base)"
         }
@@ -185,8 +181,6 @@ final class Jarvis: NSObject, ObservableObject {
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var ultimoPonte = Date.distantPast     // quando ha detto l'ultima frase ponte
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
-    private var idTurno: UUID?                     // la risposta in preparazione o detta adesso: solo questa si può interrompere per unire
-    private var domandaInterrotta: String?         // il testo della domanda interrotta (la risposta vuota sparisce subito, la domanda no)
     private var quandoInterrotto: Date?
     private var ultimoInvio = Date.distantPast
     /// La memoria visiva di JARVIS: l'ultima foto (o il giro) che ha visto e il messaggio a cui appartiene.
@@ -303,7 +297,7 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.eSoloSilenzio(resto) { aggiuntaInArrivo = false; return }   // «muto», «basta», «Jarvis, zitto»: resta in attesa
         let (pulito, chiedeAggiunta) = Jarvis.togliRichiamo(resto)
         if chiedeAggiunta { aggiuntaInArrivo = true }
-        if !pulito.isEmpty, eseguiComando(pulito) { aggiuntaInArrivo = false; return }   // solo «aspetta»: niente comando, riascolta
+        if eseguiComando(pulito) { aggiuntaInArrivo = false; return }
         if !pulito.isEmpty {
             Task { await instrada(resto) }    // ha detto cosa vuole: «Jarvis, che ore sono», «aspetta, e anche…»
         } else if chiedeAggiunta {
@@ -315,13 +309,9 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Ricorda quale risposta il signore sta interrompendo: se poi aggiunge qualcosa, va unito alla domanda di prima.
     private func segnaInterruzione() {
-        // solo la risposta a una domanda in corso: non un annuncio di sezione, una notifica letta o una frase del Diario
-        guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant", ultimo.id == idTurno else { return }
+        guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant" else { return }
         rispostaInterrotta = ultimo.id
         quandoInterrotto = Date()
-        if let i = messaggi.lastIndex(where: { $0.id == ultimo.id }), i > 0, messaggi[i - 1].ruolo == "user" {
-            domandaInterrotta = messaggi[i - 1].testo
-        }
     }
 
     /// «Muto», «stop», «basta», «zitto», «Jarvis, basta», «stai zitto», «fermati»: la frase è solo un ordine di silenzio.
@@ -351,9 +341,9 @@ final class Jarvis: NSObject, ObservableObject {
     /// Restituisce la frase senza richiamo e se il signore sta chiaramente completando la richiesta di prima.
     nonisolated static func togliRichiamo(_ frase: String) -> (String, Bool) {
         let richiami = ["jarvis", "giarvis", "ehi", "hey", "bro", "fratello", "frate", "socio", "amico", "capo", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
-                        "un momento", "un secondo", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
-        let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento", "un secondo"]
-        let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "e anche"]   // «un'altra cosa» è una domanda nuova (Seguito)
+                        "un momento", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
+        let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento"]
+        let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "un'altra cosa", "e anche"]
         var t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
         var aggiunta = false
         var cambiato = true
@@ -396,24 +386,35 @@ final class Jarvis: NSObject, ObservableObject {
             await avviaAscolto()
             return
         }
-        let riprende = chiede || aggiuntaInArrivo           // «aspetta…» detto adesso o un attimo fa
+        let recente = (quandoInterrotto.map { Date().timeIntervalSince($0) < 120 } ?? false)
+        // l'ha fermato pochi secondi dopo aver finito di parlare: non aveva finito il pensiero, è il seguito
+        let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 2.5   // 2 s + il tempo che il riconoscimento impiega a sentirlo
+        let aggiunta = (chiede || aggiuntaInArrivo || continua) && !pulito.isEmpty
         aggiuntaInArrivo = false
-        defer { rispostaInterrotta = nil; quandoInterrotto = nil; domandaInterrotta = nil }
-        // Come in una conversazione vera, decide il cervello (22 ott, chiesto dal signore): niente frasi incollate a forza.
-        // L'aveva interrotto (tocco, «Jarvis», voce sopra, anche solo «muto»): il cervello vede la domanda interrotta,
-        // la risposta tagliata e la frase nuova, e capisce lui se è il seguito (risponde a tutto insieme) o una domanda nuova.
-        if rispostaInterrotta != nil, let q = domandaInterrotta {
-            let detta = pulito.isEmpty ? frase : pulito         // anche solo «no», «ok»: va con la sua domanda interrotta
-            fraseAVoce = detta
-            await invia(detta, interrottoSu: q)
+        defer { rispostaInterrotta = nil; quandoInterrotto = nil }
+        guard aggiunta else {
+            // non ha detto «aspetta» ma riprende il discorso: dopo avermi interrotto, o entro un minuto dalla sua ultima frase.
+            // Non lo tronco e non lo forzo: lo segno come possibile seguito e il cervello capisce se completa il pensiero di prima.
+            let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
+            let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < 60 } ?? false
+            fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
+            await invia(frase, comeSeguito: rispostaInterrotta != nil || vicino)
             return
         }
-        // non interrotto: se riprende il discorso («aspetta…», «ascoltami…», entro un minuto dall'ultima domanda)
-        // la frase va come possibile seguito, e anche qui decide il cervello se completa quella di prima o è nuova
+        // interrotta a metà: la domanda di prima e l'aggiunta diventano una sola richiesta, la risposta tagliata sparisce
+        if recente, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
+           iR > 0, messaggi[iR - 1].ruolo == "user", !messaggi[iR - 1].conFoto {
+            let domanda = messaggi[iR - 1].id
+            await invia(pulito, unisciA: domanda)
+            return
+        }
+        // la risposta era già finita (o c'era una foto): la mando come aggiunta, il cervello la lega a quella di prima
         let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
-        let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < (riprende ? 300 : 60) } ?? false
-        fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
-        await invia(pulito.isEmpty ? frase : pulito, comeSeguito: vicino)
+        if let u = ultimaDomanda, Date().timeIntervalSince(u.data) < 300 {
+            await invia(pulito, comeAggiunta: true)
+        } else {
+            await invia(pulito)
+        }
     }
 
     // MARK: Richiamo («Jarvis» in attesa)
@@ -603,14 +604,6 @@ final class Jarvis: NSObject, ObservableObject {
     /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
     @discardableResult
     func eseguiComando(_ fraseIntera: String) -> Bool {
-        let fatto = eseguiComandoLocale(fraseIntera)
-        // un comando eseguito (sezione, LiDAR, Interprete, tasto di una scheda, Browser, rito…) è un'azione nuova:
-        // la domanda interrotta prima non si porta dietro
-        if fatto, !fraseIntera.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { chiudiInterruzione() }
-        return fatto
-    }
-
-    private func eseguiComandoLocale(_ fraseIntera: String) -> Bool {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
@@ -632,7 +625,6 @@ final class Jarvis: NSObject, ObservableObject {
             return true
         case .torna?:
             if Jarvis.eSoloSilenzio(frase) { return false }          // «basta», «stop»: restano un ordine di silenzio
-            chiudiInterruzione()
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             chiudiChiesto = true
             return true
@@ -681,16 +673,7 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var riunioneSubito = false     // «registra la riunione»: il Wiretap parte già registrando
 
     /// I comandi rapidi: come toccare la sezione e poi il suo tasto principale.
-    /// Un comando (sezione, «chiudi», comando rapido): è un'azione nuova, la domanda interrotta prima non si porta dietro.
-    private func chiudiInterruzione() {
-        rispostaInterrotta = nil
-        quandoInterrotto = nil
-        domandaInterrotta = nil
-        aggiuntaInArrivo = false
-    }
-
     private func rapido(_ a: ComandoVocale.AzioneRapida) {
-        chiudiInterruzione()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         switch a {
         case .diario: chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")            // come «A voce» nel Diario
@@ -708,7 +691,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
     private func apriReparto(_ reparto: Reparto, annuncia: Bool = true) {
-        chiudiInterruzione()
         if reparto == .scanner && LidarAperta.aperta { return }      // dentro LiDAR «scansione» è la stanza, mai lo Scanner
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if annuncia, let a = reparto.annuncio {
@@ -831,7 +813,6 @@ final class Jarvis: NSObject, ObservableObject {
     func leggi(_ testo: String) {
         let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        idTurno = nil                            // una lettura (notifiche, briefing) non è la risposta a una domanda
         interrompi()
         messaggi.append(Messaggio(ruolo: "assistant", testo: t))
         salva()
@@ -840,7 +821,6 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     func interrompi() {
-        idTurno = nil                       // la risposta è fermata: un annuncio o un errore detti dopo non sono più «la risposta»
         fermaBenvenuto()
         liberoMacFinoA = .distantPast
         compitoRete?.cancel()
@@ -860,11 +840,7 @@ final class Jarvis: NSObject, ObservableObject {
         if fase != .ascolto { fase = .attesa }
     }
 
-    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false, interrottoSu: String? = nil) async {
-        rispostaInterrotta = nil                      // una domanda è partita (anche scritta): l'interruzione di prima è chiusa
-        quandoInterrotto = nil
-        domandaInterrotta = nil
-        aggiuntaInArrivo = false
+    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
         ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
         fraseAVoce = ""
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -888,7 +864,7 @@ final class Jarvis: NSObject, ObservableObject {
             // foto nuova: diventa quella di cui si parla, legata a questo messaggio
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
-            if comeAggiunta { m.aggiunta = true } else if let q = interrottoSu { m.interruzione = q } else if comeSeguito { m.seguito = true }
+            if comeAggiunta { m.aggiunta = true } else if comeSeguito { m.seguito = true }
             messaggi.append(m)
         }
         let recenti = messaggi.suffix(20).filter { !$0.testo.isEmpty }
@@ -903,7 +879,6 @@ final class Jarvis: NSObject, ObservableObject {
         }
         let risposta = Messaggio(ruolo: "assistant", testo: "")
         messaggi.append(risposta)
-        idTurno = risposta.id
         salva()
 
         ultimoInvio = Date()
@@ -993,7 +968,6 @@ final class Jarvis: NSObject, ObservableObject {
                     concludi(id: id, testo: testo, azioni: azioni)
                     return
                 case .errore(let msg):
-                    idTurno = nil                   // un messaggio d'errore non è una risposta da completare
                     concludi(id: id, testo: msg, azioni: [])
                     return
                 case .client(let e):
@@ -1033,7 +1007,6 @@ final class Jarvis: NSObject, ObservableObject {
                     if let posizione { corpo["posizione"] = posizione }
                 }
             }
-            idTurno = nil
             concludi(id: id, testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni: [])
         } catch is CancellationError {
             rimuoviSeVuoto(id)              // interrotto dal signore: niente da dire
@@ -1041,7 +1014,6 @@ final class Jarvis: NSObject, ObservableObject {
             rimuoviSeVuoto(id)
         } catch {
             Suoni.errore()
-            idTurno = nil
             concludi(id: id, testo: Jarvis.spiegaErroreRete(error), azioni: [])
         }
     }
@@ -1284,7 +1256,6 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func fineParlato() {
-        if flussoFinito { idTurno = nil }        // risposta detta tutta: da qui in poi una frase nuova è una domanda nuova
         orecchio.ferma()
         orecchio.testoDetto = ""
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
