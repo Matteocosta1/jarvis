@@ -122,10 +122,15 @@ struct ContentView: View {
                 } else {
                     VStack(spacing: 0) {
                         intestazione
-                        centroHUD
+                        // mentre scrive il reattore si fa da parte: sopra la tastiera restano la chat, il testo e il tasto per inviare
+                        if !tastiera {
+                            centroHUD
+                                .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                        }
                         registro
                         barraTesto
                     }
+                    .animation(.easeInOut(duration: 0.3), value: tastiera)
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
