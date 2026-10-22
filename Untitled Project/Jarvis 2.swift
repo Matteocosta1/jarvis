@@ -18,11 +18,15 @@ struct Messaggio: Identifiable, Codable, Equatable {
     var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
     var aggiunta: Bool? = nil         // il signore completa la richiesta precedente («Jarvis, aspetta, ascoltami…»)
     var seguito: Bool? = nil          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
+    var interruzione: String? = nil   // l'ha interrotto mentre rispondeva a questa domanda: decide il cervello se la completa o è nuova
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
         let base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
         if aggiunta == true { return "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" }
+        if let q = interruzione {
+            return "(ti ho interrotto mentre rispondevi a «\(q)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) \(base)"
+        }
         if seguito == true {
             return "(riprendo il discorso: se questo completa o aggiunge qualcosa a quello che ti ho detto prima, rispondi tenendo conto di entrambe le cose; se è un argomento nuovo, rispondi solo a questo) \(base)"
         }
@@ -345,7 +349,7 @@ final class Jarvis: NSObject, ObservableObject {
         let richiami = ["jarvis", "giarvis", "ehi", "hey", "bro", "fratello", "frate", "socio", "amico", "capo", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
                         "un momento", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
         let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento"]
-        let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "un'altra cosa", "e anche"]
+        let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "e anche"]   // «un'altra cosa» è una domanda nuova (Seguito)
         var t = frase.trimmingCharacters(in: .whitespacesAndNewlines)
         var aggiunta = false
         var cambiato = true
@@ -388,38 +392,23 @@ final class Jarvis: NSObject, ObservableObject {
             await avviaAscolto()
             return
         }
-        let recente = (quandoInterrotto.map { Date().timeIntervalSince($0) < 120 } ?? false)
-        // l'ha fermato pochi secondi dopo aver finito di parlare: non aveva finito il pensiero, è il seguito
-        let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 2.5   // 2 s + il tempo che il riconoscimento impiega a sentirlo
-        // l'aveva interrotto (mentre pensava o parlava, anche solo con «muto»): quello che dice adesso completa la domanda di prima,
-        // sempre, anche senza «aspetta» (22 ott, chiesto dal signore)
-        let interrotta = rispostaInterrotta != nil
-        let aggiunta = (chiede || aggiuntaInArrivo || continua || interrotta) && !pulito.isEmpty
         aggiuntaInArrivo = false
         defer { rispostaInterrotta = nil; quandoInterrotto = nil }
-        guard aggiunta else {
-            // non ha detto «aspetta» ma riprende il discorso: dopo avermi interrotto, o entro un minuto dalla sua ultima frase.
-            // Non lo tronco e non lo forzo: lo segno come possibile seguito e il cervello capisce se completa il pensiero di prima.
-            let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
-            let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < 60 } ?? false
-            fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
-            await invia(frase, comeSeguito: rispostaInterrotta != nil || vicino)
+        // Come in una conversazione vera, decide il cervello (22 ott, chiesto dal signore): niente frasi incollate a forza.
+        // L'aveva interrotto (tocco, «Jarvis», voce sopra, anche solo «muto»): il cervello vede la domanda interrotta,
+        // la risposta tagliata e la frase nuova, e capisce lui se è il seguito (risponde a tutto insieme) o una domanda nuova.
+        if !pulito.isEmpty, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
+           iR > 0, messaggi[iR - 1].ruolo == "user" {
+            fraseAVoce = pulito
+            await invia(pulito, interrottoSu: messaggi[iR - 1].testo)
             return
         }
-        // interrotta a metà: la domanda di prima e l'aggiunta diventano una sola richiesta, la risposta tagliata sparisce
-        if recente || interrotta, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
-           iR > 0, messaggi[iR - 1].ruolo == "user", !messaggi[iR - 1].conFoto {
-            let domanda = messaggi[iR - 1].id
-            await invia(pulito, unisciA: domanda)
-            return
-        }
-        // la risposta era già finita (o c'era una foto): la mando come aggiunta, il cervello la lega a quella di prima
+        // non interrotto: se riprende il discorso («aspetta…», «ascoltami…», entro un minuto dall'ultima domanda)
+        // la frase va come possibile seguito, e anche qui decide il cervello se completa quella di prima o è nuova
         let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
-        if let u = ultimaDomanda, Date().timeIntervalSince(u.data) < 300 {
-            await invia(pulito, comeAggiunta: true)
-        } else {
-            await invia(pulito)
-        }
+        let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < (chiede ? 300 : 60) } ?? false
+        fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
+        await invia(pulito.isEmpty ? frase : pulito, comeSeguito: vicino)
     }
 
     // MARK: Richiamo («Jarvis» in attesa)
@@ -846,7 +835,7 @@ final class Jarvis: NSObject, ObservableObject {
         if fase != .ascolto { fase = .attesa }
     }
 
-    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
+    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false, interrottoSu: String? = nil) async {
         rispostaInterrotta = nil                      // una domanda è partita (anche scritta): l'interruzione di prima è chiusa
         quandoInterrotto = nil
         ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
@@ -872,7 +861,7 @@ final class Jarvis: NSObject, ObservableObject {
             // foto nuova: diventa quella di cui si parla, legata a questo messaggio
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
-            if comeAggiunta { m.aggiunta = true } else if comeSeguito { m.seguito = true }
+            if comeAggiunta { m.aggiunta = true } else if let q = interrottoSu { m.interruzione = q } else if comeSeguito { m.seguito = true }
             messaggi.append(m)
         }
         let recenti = messaggi.suffix(20).filter { !$0.testo.isEmpty }

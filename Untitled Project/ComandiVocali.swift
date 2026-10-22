@@ -68,6 +68,19 @@ enum Pronunce {
     }
 }
 
+/// Dopo un'interruzione decide il cervello, come in una conversazione vera: niente parole chiave obbligatorie (22 ott, chiesto dal signore).
+/// Qui solo il caso «aspetta» / «ascoltami» detto da solo: JARVIS riascolta, la frase vera arriva adesso.
+enum Seguito {
+    nonisolated static func soloAspetta(_ frase: String) -> Bool {
+        let parole = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        let segnali: Set<String> = ["aspetta", "aspetti", "ascoltami", "ascolta", "ascolti", "attimo", "momento", "secondo"]
+        let contorno: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "senti", "scusa", "un", "mi", "dai", "no", "allora", "ah"]
+        guard !parole.isEmpty, parole.count <= 6, parole.contains(where: { segnali.contains($0) }) else { return false }
+        return parole.allSatisfy { segnali.contains($0) || contorno.contains($0) }
+    }
+}
+
 /// I reparti che si aprono a voce.
 enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi

@@ -140,7 +140,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// `aVoce`: la frase detta a voce (e non scritta o da un tasto): se prima l'aveva interrotto, completa la domanda di prima.
     func chiedi(_ grezzo: String, aVoce: Bool = false) {
-        var testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
+        let testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !testo.isEmpty else { stato = Date() < sottovoceFino ? "🤫 Sottovoce" : nil; return }
         if Self.eSoloSilenzio(testo) {                          // «muto», «stop», «basta», «zitto», «Jarvis, basta»: tace e resta in attesa
             if fase == .elaboro || fase == .parlo { segnaInterruzione() }
@@ -149,12 +149,21 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         let prima = aVoce ? daUnire : nil
         daUnire = nil
+        if prima != nil, Seguito.soloAspetta(testo) {           // solo «aspetta», «ascoltami»: lo riascolto, la frase vera arriva adesso
+            daUnire = prima
+            ferma()
+            Task { await self.ascolta() }
+            return
+        }
         ferma()
+        // l'aveva interrotto: come sull'iPhone decide il cervello, che vede la domanda interrotta e la frase nuova
+        var perCervello: String?
         if let prima {
-            // interrotto: la domanda di prima e quello che aggiunge diventano una sola richiesta, la risposta tagliata sparisce
-            if storia.last?["role"] == "assistant", storia.count >= 2,
-               storia[storia.count - 2]["role"] == "user", storia[storia.count - 2]["content"] == prima { storia.removeLast() }
-            testo = prima + " … " + testo
+            perCervello = "(ti ho interrotto mentre rispondevi a «\(prima)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) \(testo)"
+            if storia.last?["role"] == "user" {                 // interrotto mentre pensava: la domanda resta, la frase nuova le va accanto
+                let q = storia.removeLast()["content"] ?? ""
+                perCervello = q + "\n\n" + perCervello!
+            }
         }
         domanda = testo
         risposta = ""
@@ -162,7 +171,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         stato = nil
         fase = .elaboro
         if storia.last?["role"] == "user" { storia.removeLast() }   // domanda precedente rimasta senza risposta (o quella che si allunga)
-        storia.append(["role": "user", "content": testo])
+        storia.append(["role": "user", "content": perCervello ?? testo])
         inCorso = testo
         storia = Array(storia.suffix(12))
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
