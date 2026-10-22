@@ -88,6 +88,6 @@ nonisolated final class UnaVolta: @unchecked Sendable {
 
 extension Notification.Name {
     /// Qualcuno (Shazam) prende il microfono / lo restituisce: l'attesa in ascolto del Watch si fa da parte e poi riprende.
-    static let jarvisMicServe = Notification.Name("jarvisMicServe")
-    static let jarvisMicLibero = Notification.Name("jarvisMicLibero")
+    nonisolated static let jarvisMicServe = Notification.Name("jarvisMicServe")
+    nonisolated static let jarvisMicLibero = Notification.Name("jarvisMicLibero")
 }
