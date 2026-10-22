@@ -80,6 +80,9 @@ struct ContentView: View {
     /// Sta scrivendo: tastiera appena aperta o testo che cambia. Inviato il messaggio torna falso (microfono di nuovo acceso
     /// anche con la tastiera aperta: risponde a voce, lo interrompe, «muto»); ricomincia a scrivere e torna vero.
     @State private var scrive = false
+    /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera, ma quando si chiude rientra solo a tastiera
+    /// già scesa: così il reattore non si muove insieme alla tastiera e alla chat (lo scatto) e torna con un'animazione fluida.
+    @State private var reattoreGrande = true
 
     var body: some View {
         GeometryReader { g in
@@ -126,16 +129,26 @@ struct ContentView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        intestazione(mini: tastiera)
+                        intestazione(mini: !reattoreGrande)
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
-                        if !tastiera {
+                        if reattoreGrande {
                             centroHUD
-                                .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                                .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
                         }
                         registro
                         barraTesto
                     }
-                    .animation(.easeInOut(duration: 0.3), value: tastiera)
+                    .onChange(of: tastiera) { _, aperta in
+                        if aperta {
+                            withAnimation(.easeOut(duration: 0.25)) { reattoreGrande = false }
+                        } else {
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(300))      // la tastiera finisce di scendere
+                                guard !tastiera else { return }                      // riaperta nel frattempo: resta piccolo
+                                withAnimation(.spring(response: 0.55, dampingFraction: 0.88)) { reattoreGrande = true }
+                            }
+                        }
+                    }
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
