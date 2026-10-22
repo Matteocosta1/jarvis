@@ -1351,7 +1351,7 @@ final class Jarvis: NSObject, ObservableObject {
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
             r.addsPunctuation = true                 // il «?» aiuta a capire quando la domanda è finita
-            r.contextualStrings = Vocabolario.parole
+            r.contextualStrings = ["Discosizer", "Jarvis", "Discogs", "Resident Advisor", "SumUp", "EDITH", "mi ricevi"]
             richiesta = r
             try Jarvis.collegaMicrofono(motore.inputNode, a: r)
             motore.prepare()

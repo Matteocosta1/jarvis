@@ -132,7 +132,7 @@ final class Richiamo {
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
-        r.contextualStrings = ["ascoltami", "ehi Jarvis", "hey Jarvis", "wake up"] + Vocabolario.parole
+        r.contextualStrings = ["Jarvis", "ascoltami", "ehi Jarvis", "hey Jarvis", "wake up", "daddy's home", "wake up daddy's home", "EDITH", "mi ricevi"]
         if ric.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         richiesta = r
         turno += 1

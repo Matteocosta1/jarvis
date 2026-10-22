@@ -313,7 +313,7 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
             }
-            await Suoni.fineAvvioAudio()                           // l'avvio ha avuto la precedenza: ora l'audio torna come sempre
+            if !Impostazioni.richiamo { await Suoni.fineAvvioAudio() }   // col «Jarvis» acceso l'audio lo prende lui, come nella 12
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false

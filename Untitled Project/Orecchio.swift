@@ -64,7 +64,7 @@ final class Orecchio {
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
             r.addsPunctuation = true
-            r.contextualStrings = Vocabolario.parole
+            r.contextualStrings = ["Jarvis", "EDITH", "mi ricevi"]
             if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // niente quota Apple, niente rete
             richiesta = r
             try Orecchio.collega(motore, a: r)
