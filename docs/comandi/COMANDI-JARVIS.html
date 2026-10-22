@@ -21,7 +21,7 @@ td.x { width: 40px; text-align: center; color: #0a8aa3; font-weight: 700; }
 .nuovo { font-size: 6.5pt; letter-spacing: 1px; color: #fff; background: #0aa8c4; border-radius: 3px; padding: 0 4px; margin-left: 3px; vertical-align: 1px; }
 </style></head><body>
 <h1>J.A.R.V.I.S.</h1>
-<div class="sotto">Comandi vocali · MARK VIII · Build 8.0 (18) · 22 ottobre 2026</div>
+<div class="sotto">Comandi vocali · MARK VIII · Build 8.0 (18) · 22 ottobre 2026, sera</div>
 <div class="box"><b>Come si dicono.</b> In attesa si comincia con «Jarvis, …»; dopo una risposta JARVIS ascolta già, basta parlare.
 Dentro Sentinella, Wiretap, Allenatore e Interprete serve sempre «Jarvis, …» davanti. Tra parentesi le alternative.
 Al posto di «apri» vanno bene: aprimi, attiva, avvia, vai, portami, mostrami, fammi vedere. Dentro Profiler e Scanner serve «Jarvis, …» davanti. Le domande le capisce il cervello: vanno bene anche con parole sue.</div>
@@ -32,6 +32,8 @@ Al posto di «apri» vanno bene: aprimi, attiva, avvia, vai, portami, mostrami, 
 <tr><td class="f">«Aspetta, …» (un attimo, ascoltami)</td><td class="d">Aggiunge alla domanda di prima</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
 <tr><td class="f">«Wake up, daddy's home» (papà è a casa)</td><td class="d">Il rito di benvenuto</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
 <tr><td class="f">«Chiudi» (chiudimi, chiudila, toglimi, levami la scheda, torna alla home, ok chiudi) <b class="nuovo">NUOVO</b></td><td class="d">Chiude la scheda aperta e torna alla schermata principale</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Jarvis, apri Meteo» (attiva, avvia, accendi, lancia, aprimi, mostrami, vai su, fammi vedere, entra in, portami) — anche «apri la sezione Meteo», «attiva sezione Meteo» <b class="nuovo">NUOVO</b></td><td class="d">Apre qualsiasi sezione di JARVIS: vale per tutte (Diario, Vitals, LiDAR, EDITH, Bea, Costi, Sistemi, Impostazioni…)</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">Lo interrompe (tocco, «Jarvis», gli parla sopra, anche solo «muto») e poi parla <b class="nuovo">NUOVO</b></td><td class="d">Quello che dice completa sempre la domanda di prima, come con «aspetta»: risponde a tutto insieme</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
 <tr><td class="f">«Dimmi» (che ne pensi, che mi dici, raccontami, aggiornami, riassumi) — dentro una scheda <b class="nuovo">NUOVO</b></td><td class="d">Ogni scheda risponde col suo tasto «Chieda a JARVIS»</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
 </table></section>
 <section><h2>Pronunce <span>I nomi inglesi delle sezioni: capiti anche storpiati <b class="nuovo">NUOVO</b></span></h2><table>
@@ -234,11 +236,243 @@ Al posto di «apri» vanno bene: aprimi, attiva, avvia, vai, portami, mostrami, 
 <section><h2>EDITH</h2><table><tr class="t"><td></td><td></td><td class="x">iPhone</td><td class="x">Mac</td><td class="x">Watch</td></tr>
 <tr><td class="f">«EDITH, controllo completo»</td><td class="d">La sicurezza della rete di adesso</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
 <tr><td class="f">«Questo link è sicuro?»</td><td class="d">Controlla il link senza aprirlo</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Cosa si vede della mia rete da internet?» (controlla le porte) <b class="nuovo">NUOVO</b></td><td class="d">Porte aperte e servizi esposti di casa/ufficio</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Controlla il dominio discosizer.it» <b class="nuovo">NUOVO</b></td><td class="d">DNS, certificato, domini truffa simili</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«La mia mail è finita in qualche furto di dati?» <b class="nuovo">NUOVO</b></td><td class="d">Le violazioni note</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Cosa si dice in giro di …?» <b class="nuovo">NUOVO</b></td><td class="d">La reputazione pubblica di un'azienda o un sito</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
 <tr><td class="f">«Controlla questa partita IVA» / «questo IBAN» / «questo numero»</td><td class="d">Verifica nei registri</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
 </table></section>
-<section><h2>iPhone</h2><table><tr class="t"><td></td><td></td><td class="x">iPhone</td><td class="x">Mac</td><td class="x">Watch</td></tr>
+<section><h2>Altro <span>Li capisce il cervello: vanno bene anche con parole sue</span></h2><table><tr class="t"><td></td><td></td><td class="x">iPhone</td><td class="x">Mac</td><td class="x">Watch</td></tr>
+<tr><td class="f">«Cerca su Discogs …» (titolo, barcode, catalogo) <b class="nuovo">NUOVO</b></td><td class="d">Stampe, anno, etichetta, prezzo minimo</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Cercami immagini di …» <b class="nuovo">NUOVO</b></td><td class="d">Immagini dal web sotto la risposta</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Come siamo messi al bar?» / «cosa manca in magazzino?» <b class="nuovo">NUOVO</b></td><td class="d">Drink, margini, scorte sotto il minimo</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+<tr><td class="f">«Quanto credito resta?» / «ho ricaricato 20 dollari» <b class="nuovo">NUOVO</b></td><td class="d">Il credito che fa funzionare JARVIS</td><td class="x">●</td><td class="x">●</td><td class="x">●</td></tr>
+</table></section>
+<section><h2>iPhone <span>Wi-Fi, Bluetooth, Non disturbare, timer e sveglia passano dai Comandi rapidi «JARVIS …» del suo iPhone</span></h2><table><tr class="t"><td></td><td></td><td class="x">iPhone</td><td class="x">Mac</td><td class="x">Watch</td></tr>
 <tr><td class="f">«Accendi la torcia» / «spegni la torcia»</td><td class="d">La torcia</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
 <tr><td class="f">«Quanta batteria ho?»</td><td class="d">La batteria</td><td class="x">●</td><td class="x">●</td><td class="x"></td></tr>
 <tr><td class="f">«Abbassa la luminosità»</td><td class="d">Lo schermo</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Accendi il Wi-Fi» / «spegni il Wi-Fi» <b class="nuovo">NUOVO</b></td><td class="d">Comando rapido «JARVIS wifi on» / «JARVIS wifi off»</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Accendi il Bluetooth» / «spegni il Bluetooth» <b class="nuovo">NUOVO</b></td><td class="d">Comando rapido «JARVIS bluetooth on» / «off»</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Attiva Non disturbare» / «togli Non disturbare» <b class="nuovo">NUOVO</b></td><td class="d">Comando rapido «JARVIS non disturbare on» / «off»</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Metti un timer di 15 minuti» <b class="nuovo">NUOVO</b></td><td class="d">Comando rapido «JARVIS timer»</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Svegliami alle 7» (metti la sveglia alle 7 e mezza) <b class="nuovo">NUOVO</b></td><td class="d">Comando rapido «JARVIS sveglia»</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
+<tr><td class="f">«Manda un messaggio a Teo: arrivo» <b class="nuovo">NUOVO</b></td><td class="d">Parte da solo con il Comando rapido «JARVIS invia» (iMessage/SMS); WhatsApp si apre già scritto</td><td class="x">●</td><td class="x"></td><td class="x"></td></tr>
 </table></section>
+<section><h2>Mac <span>Dal Comando rapido «JARVIS Mac»</span></h2><table><tr class="t"><td></td><td></td><td class="x">iPhone</td><td class="x">Mac</td><td class="x">Watch</td></tr>
+<tr><td class="f">«Alza il volume» / «abbassa il volume» / «volume a metà» <b class="nuovo">NUOVO</b></td><td class="d">Il volume del Mac</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Togli l'audio del Mac» <b class="nuovo">NUOVO</b></td><td class="d">Toglie l'audio del Mac</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Metti in pausa la musica» / «fai ripartire la musica» / «canzone successiva» / «canzone precedente» <b class="nuovo">NUOVO</b></td><td class="d">La musica: Spotify se è aperto, altrimenti Musica</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri Safari» (Spotify, Mail, Xcode, Finder…) <b class="nuovo">NUOVO</b></td><td class="d">Apre l'app</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Apri la cartella …» (sulla Scrivania) <b class="nuovo">NUOVO</b></td><td class="d">Apre la cartella</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Modalità scura» / «modalità chiara» <b class="nuovo">NUOVO</b></td><td class="d">L'aspetto del Mac</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Blocca lo schermo» <b class="nuovo">NUOVO</b></td><td class="d">Blocca il Mac</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Fai uno screenshot» <b class="nuovo">NUOVO</b></td><td class="d">Salvato sulla Scrivania</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Riordina la scrivania» / «ordina i download» <b class="nuovo">NUOVO</b></td><td class="d">Immagini, documenti, video, audio e archivi nelle loro cartelle</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+<tr><td class="f">«Svuota il cestino del Mac» <b class="nuovo">NUOVO</b></td><td class="d">Svuota il cestino del Mac</td><td class="x"></td><td class="x">●</td><td class="x"></td></tr>
+</table></section>
+<section style="break-before: page"><h2>Tutte le frasi <span>Ogni modo di dire provato uno per uno sul codice dell'app: 415 frasi</span></h2>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">VOCE</h3><table>
+<tr><td class="d" style="width:62%">«piano, che ore sono» · «sottovoce che ore sono»</td><td class="d" style="color:#777">schermata principale → sottovoce + cervello</td></tr>
+<tr><td class="d" style="width:62%">«voce normale» · «parla normale» · «alza la voce»</td><td class="d" style="color:#777">schermata principale → volume normale</td></tr>
+<tr><td class="d" style="width:62%">«muto» · «zitto» · «basta» · «stop» · «silenzio»</td><td class="d" style="color:#777">schermata principale → silenzio</td></tr>
+<tr><td class="d" style="width:62%">«aspetta, e anche domani» · «un attimo, aggiungo una cosa»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«wake up, daddy&#x27;s home» · «papà è a casa»</td><td class="d" style="color:#777">schermata principale → rito</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «chiudimi» · «chiudila» · «toglimi la scheda» · «levami la scheda» · «torna alla home» · «ok chiudi»</td><td class="d" style="color:#777">diario → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «chiudimi» · «chiudila» · «toglimi la scheda» · «levami la scheda» · «torna alla home» · «ok chiudi»</td><td class="d" style="color:#777">meteo → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «chiudimi» · «chiudila» · «toglimi la scheda» · «levami la scheda» · «torna alla home» · «ok chiudi»</td><td class="d" style="color:#777">vitals → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «chiudimi» · «chiudila» · «toglimi la scheda» · «levami la scheda» · «torna alla home» · «ok chiudi»</td><td class="d" style="color:#777">spesa → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «chiudimi» · «chiudila» · «toglimi la scheda» · «levami la scheda» · «torna alla home» · «ok chiudi»</td><td class="d" style="color:#777">email → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«apri il meteo» · «aprimi il meteo» · «portami al meteo» · «mostrami il meteo» · «fammi vedere il meteo»</td><td class="d" style="color:#777">schermata principale → apre meteo</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici» · «raccontami» · «aggiornami» · «riassumi»</td><td class="d" style="color:#777">sonno → chiede a JARVIS (sonno)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici» · «raccontami» · «aggiornami» · «riassumi»</td><td class="d" style="color:#777">vitals → tasto della scheda (vitalsCome)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici» · «raccontami» · «aggiornami» · «riassumi»</td><td class="d" style="color:#777">meteo → chiede a JARVIS (meteo)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici» · «raccontami» · «aggiornami» · «riassumi»</td><td class="d" style="color:#777">email → tasto della scheda (postaRiassumi)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici» · «raccontami» · «aggiornami» · «riassumi»</td><td class="d" style="color:#777">briefing → chiede a JARVIS (briefing)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici»</td><td class="d" style="color:#777">cuore → chiede a JARVIS (cuore)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici»</td><td class="d" style="color:#777">diario → tasto della scheda (diarioNeParliamo)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che ne pensi» · «che mi dici»</td><td class="d" style="color:#777">ricordi → chiede a JARVIS (ricordare)</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che mi dici»</td><td class="d" style="color:#777">spesa → tasto della scheda (spesaLeggi)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SENTINELLA</h3><table>
+<tr><td class="d" style="width:62%">«attiva la Sentinella»</td><td class="d" style="color:#777">schermata principale → apre sentinella</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chi è passato?» · «Jarvis, registro» · «Jarvis, cosa hai visto»</td><td class="d" style="color:#777">sentinella → sentinella registro</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, schermo nero» · «Jarvis, oscura» · «Jarvis, buio»</td><td class="d" style="color:#777">sentinella → sentinella schermoNero</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, spegni la Sentinella» · «Jarvis, torna» · «Jarvis, chiudi» · «Jarvis, esci»</td><td class="d" style="color:#777">sentinella → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">WIRETAP</h3><table>
+<tr><td class="d" style="width:62%">«apri il Wiretap»</td><td class="d" style="color:#777">schermata principale → apre wiretap</td></tr>
+<tr><td class="d" style="width:62%">«registra la riunione» · «registra la conversazione»</td><td class="d" style="color:#777">schermata principale → rapido riunione</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, fai il verbale» · «Jarvis, fine riunione» · «Jarvis, riunione finita»</td><td class="d" style="color:#777">wiretap → chiude e torna alla schermata principale</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, ferma il Wiretap» · «Jarvis, torna»</td><td class="d" style="color:#777">wiretap → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">OCCHI</h3><table>
+<tr><td class="d" style="width:62%">«cosa vedi?» · «guarda qui»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«fai un giro»</td><td class="d" style="color:#777">schermata principale → apre giro</td></tr>
+<tr><td class="d" style="width:62%">«apri gli occhi»</td><td class="d" style="color:#777">schermata principale → apre occhi</td></tr>
+<tr><td class="d" style="width:62%">«fammi un profilo» · «apri il Profiler»</td><td class="d" style="color:#777">schermata principale → apre profiler</td></tr>
+<tr><td class="d" style="width:62%">«guarda là in fondo» · «guarda qua vicino» · «guarda l&#x27;insieme» · «cosa c&#x27;è scritto qui»</td><td class="d" style="color:#777">occhi → scatta con la domanda</td></tr>
+<tr><td class="d" style="width:62%">«in video» · «fai un giro» · «guardati intorno» · «fammi vedere tutto» · «tutto lo scaffale»</td><td class="d" style="color:#777">occhi → tasto della scheda (occhiGiro)</td></tr>
+<tr><td class="d" style="width:62%">«girati» · «selfie» · «cambia fotocamera» · «fotocamera davanti» · «inquadrami»</td><td class="d" style="color:#777">occhi → tasto della scheda (occhiGira)</td></tr>
+<tr><td class="d" style="width:62%">«zoom» · «avvicina» · «più vicino» · «ingrandisci»</td><td class="d" style="color:#777">occhi → tasto della scheda (occhiZoomAvanti)</td></tr>
+<tr><td class="d" style="width:62%">«allarga» · «grandangolo» · «meno zoom» · «zoom indietro»</td><td class="d" style="color:#777">occhi → tasto della scheda (occhiZoomIndietro)</td></tr>
+<tr><td class="d" style="width:62%">«zoom normale» · «togli lo zoom»</td><td class="d" style="color:#777">occhi → tasto della scheda (occhiZoomNormale)</td></tr>
+<tr><td class="d" style="width:62%">«chiudi» · «torna alla home»</td><td class="d" style="color:#777">occhi → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">PROFILER</h3><table>
+<tr><td class="d" style="width:62%">«Jarvis, scatta» · «Jarvis, eccolo» · «Jarvis, beccato» · «Jarvis, fotografalo»</td><td class="d" style="color:#777">profiler → profiler scatta</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, girati» · «Jarvis, selfie» · «Jarvis, cambia fotocamera»</td><td class="d" style="color:#777">profiler → profiler gira</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, è mossa» · «Jarvis, rifai» · «Jarvis, riprova» · «Jarvis, è venuta male»</td><td class="d" style="color:#777">profiler → profiler rifai</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, si chiama Marco Rossi»</td><td class="d" style="color:#777">profiler → profiler nome marco rossi</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, è il fornitore audio»</td><td class="d" style="color:#777">profiler → profiler ruolo il fornitore audio</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, lavora come gestore del locale»</td><td class="d" style="color:#777">profiler → profiler ruolo gestore del locale</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chi è?» · «Jarvis, dossier» · «Jarvis, che tipo è» · «Jarvis, profila» · «Jarvis, vai»</td><td class="d" style="color:#777">profiler → profiler profila</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chiudi»</td><td class="d" style="color:#777">profiler → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">CUCINA</h3><table>
+<tr><td class="d" style="width:62%">«cosa cucino?» · «cosa posso cucinare»</td><td class="d" style="color:#777">schermata principale → rapido cucina</td></tr>
+<tr><td class="d" style="width:62%">«apri la cucina»</td><td class="d" style="color:#777">schermata principale → apre cucina</td></tr>
+<tr><td class="d" style="width:62%">«in video» · «fai un giro» · «tutto il frigo»</td><td class="d" style="color:#777">cucina → tasto della scheda (occhiGiro)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SCANNER</h3><table>
+<tr><td class="d" style="width:62%">«apri lo scanner» · «apri il codice a barre» · «scansiona l&#x27;etichetta»</td><td class="d" style="color:#777">schermata principale → apre scanner</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, un altro» · «Jarvis, prossimo» · «Jarvis, ancora» · «Jarvis, di nuovo»</td><td class="d" style="color:#777">scanner → tasto della scheda (scannerAltro)</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, fa bene?» · «Jarvis, lo compro?» · «Jarvis, conviene?» · «Jarvis, c&#x27;è di meglio?»</td><td class="d" style="color:#777">scanner → tasto della scheda (scannerGiudizio)</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, cosa c&#x27;è dentro?» · «Jarvis, ingredienti» · «Jarvis, additivi»</td><td class="d" style="color:#777">scanner → tasto della scheda (scannerIngredienti)</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chiudi»</td><td class="d" style="color:#777">scanner → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">LIDAR</h3><table>
+<tr><td class="d" style="width:62%">«scansiona la stanza» · «misura la stanza» · «planimetria»</td><td class="d" style="color:#777">schermata principale → apre lidar</td></tr>
+<tr><td class="d" style="width:62%">«fine scansione» · «fine» · «ho finito» · «termina»</td><td class="d" style="color:#777">lidar → lidar fine</td></tr>
+<tr><td class="d" style="width:62%">«quanto è grande?» · «quanti metri» · «superficie» · «misure»</td><td class="d" style="color:#777">lidar → lidar misure</td></tr>
+<tr><td class="d" style="width:62%">«quante persone ci stanno?» · «capienza»</td><td class="d" style="color:#777">lidar → lidar capienza</td></tr>
+<tr><td class="d" style="width:62%">«salva»</td><td class="d" style="color:#777">lidar → lidar salva</td></tr>
+<tr><td class="d" style="width:62%">«mostrami il 3D» · «modello» · «ologramma»</td><td class="d" style="color:#777">lidar → lidar tre</td></tr>
+<tr><td class="d" style="width:62%">«riprova la scansione» · «rifai la scansione» · «ricomincia»</td><td class="d" style="color:#777">lidar → lidar rifai</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">ALLENATORE</h3><table>
+<tr><td class="d" style="width:62%">«inizia l&#x27;allenamento» · «apri l&#x27;allenatore»</td><td class="d" style="color:#777">schermata principale → apre allenatore</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, fine serie» · «Jarvis, serie finita» · «Jarvis, ho finito»</td><td class="d" style="color:#777">allenatore → allenatore fineSerie</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, quante ripetizioni?» · «Jarvis, quante ne ho fatte»</td><td class="d" style="color:#777">allenatore → allenatore ripetizioni</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, com&#x27;è la schiena?» · «Jarvis, postura» · «Jarvis, come va»</td><td class="d" style="color:#777">allenatore → allenatore postura</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, pausa»</td><td class="d" style="color:#777">allenatore → allenatore pausa</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, riprendi»</td><td class="d" style="color:#777">allenatore → allenatore riprendi</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, azzera» · «Jarvis, ricomincia» · «Jarvis, da capo»</td><td class="d" style="color:#777">allenatore → allenatore azzera</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, conta le mani»</td><td class="d" style="color:#777">allenatore → allenatore conta mani</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, conta le ginocchia»</td><td class="d" style="color:#777">allenatore → allenatore conta ginocchia</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, conta il busto»</td><td class="d" style="color:#777">allenatore → allenatore conta busto</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, cambia fotocamera» · «Jarvis, girati» · «Jarvis, selfie»</td><td class="d" style="color:#777">allenatore → allenatore camera</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chiudi» · «Jarvis, torna» · «Jarvis, esci»</td><td class="d" style="color:#777">allenatore → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">INTERPRETE</h3><table>
+<tr><td class="d" style="width:62%">«traduci in inglese» · «interprete spagnolo»</td><td class="d" style="color:#777">schermata principale → apre l&#x27;Interprete già sulla lingua</td></tr>
+<tr><td class="d" style="width:62%">«apri l&#x27;interprete» · «apri il traduttore»</td><td class="d" style="color:#777">schermata principale → apre interprete</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, ascolta me» · «Jarvis, tocca a me»</td><td class="d" style="color:#777">interprete → interprete ascoltaMe</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, ascolta lui» · «Jarvis, ascolta lei» · «Jarvis, ascolta l&#x27;altro» · «Jarvis, tocca a lui»</td><td class="d" style="color:#777">interprete → interprete ascoltaAltro</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, passa al francese»</td><td class="d" style="color:#777">interprete → interprete lingua fr</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, cambia in tedesco»</td><td class="d" style="color:#777">interprete → interprete lingua de</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, cambia lingua»</td><td class="d" style="color:#777">interprete → interprete sceltaLingua</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, ripeti» · «Jarvis, ridillo»</td><td class="d" style="color:#777">interprete → interprete ripeti</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, turni automatici»</td><td class="d" style="color:#777">interprete → interprete turni on</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, turni manuali»</td><td class="d" style="color:#777">interprete → interprete turni off</td></tr>
+<tr><td class="d" style="width:62%">«Jarvis, chiudi» · «Jarvis, torna» · «Jarvis, esci»</td><td class="d" style="color:#777">interprete → chiude e torna alla schermata principale</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">DIARIO</h3><table>
+<tr><td class="d" style="width:62%">«scrivi il diario» · «facciamo il diario»</td><td class="d" style="color:#777">schermata principale → rapido diario</td></tr>
+<tr><td class="d" style="width:62%">«leggimi il diario di ieri»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«apri il diario»</td><td class="d" style="color:#777">schermata principale → apre diario</td></tr>
+<tr><td class="d" style="width:62%">«ti racconto una cosa» · «parliamo di una cosa» · «ascoltami» · «nuova pagina»</td><td class="d" style="color:#777">diario → tasto della scheda (diarioAVoce)</td></tr>
+<tr><td class="d" style="width:62%">«che ne dici?» · «ne parliamo» · «rileggimela» · «come mi vedi»</td><td class="d" style="color:#777">diario → tasto della scheda (diarioNeParliamo)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">CONFIDENTE</h3><table>
+<tr><td class="d" style="width:62%">«ho bisogno di parlarti» · «devo parlarti»</td><td class="d" style="color:#777">schermata principale → rapido confidente</td></tr>
+<tr><td class="d" style="width:62%">«apri il Confidente»</td><td class="d" style="color:#777">schermata principale → apre confidente</td></tr>
+<tr><td class="d" style="width:62%">«che ne pensi di questo messaggio?»</td><td class="d" style="color:#777">confidente → domanda sulla conversazione</td></tr>
+<tr><td class="d" style="width:62%">«incolla» · «prendi quello che ho copiato»</td><td class="d" style="color:#777">confidente → tasto della scheda (confidenteIncolla)</td></tr>
+<tr><td class="d" style="width:62%">«mi devo sfogare» · «ti racconto» · «a voce» · «ho bisogno di parlarti»</td><td class="d" style="color:#777">confidente → tasto della scheda (confidenteAVoce)</td></tr>
+<tr><td class="d" style="width:62%">«ho esagerato io?»</td><td class="d" style="color:#777">confidente → domanda sulla conversazione</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SALUTE</h3><table>
+<tr><td class="d" style="width:62%">«come ho dormito stanotte?» · «come sta il mio cuore oggi?» · «come sto ultimamente?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«mostrami il sonno»</td><td class="d" style="color:#777">schermata principale → apre sonno</td></tr>
+<tr><td class="d" style="width:62%">«mostrami il cuore» · «il cuore»</td><td class="d" style="color:#777">schermata principale → apre cuore</td></tr>
+<tr><td class="d" style="width:62%">«mostrami i Vitals» · «i vitals»</td><td class="d" style="color:#777">schermata principale → apre vitals</td></tr>
+<tr><td class="d" style="width:62%">«come sto?» · «sto migliorando?» · «va tutto bene?» · «dimmi»</td><td class="d" style="color:#777">vitals → tasto della scheda (vitalsCome)</td></tr>
+<tr><td class="d" style="width:62%">«sono agitato» · «batte forte» · «com&#x27;è il battito» · «dimmi»</td><td class="d" style="color:#777">cuore → chiede a JARVIS (cuore)</td></tr>
+<tr><td class="d" style="width:62%">«SOS» · «chiedi aiuto» · «sto male»</td><td class="d" style="color:#777">cuore → tasto della scheda (cuoreSOS)</td></tr>
+<tr><td class="d" style="width:62%">«ho dormito male» · «perché sono stanco» · «stanotte» · «dimmi»</td><td class="d" style="color:#777">sonno → chiede a JARVIS (sonno)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">BRIEFING</h3><table>
+<tr><td class="d" style="width:62%">«buongiorno Jarvis, il briefing» · «cosa ho in agenda domani?» · «metti in calendario la cena alle 9»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«fammi il briefing» · «com&#x27;è la giornata» · «partiamo» · «dimmi»</td><td class="d" style="color:#777">briefing → chiede a JARVIS (briefing)</td></tr>
+<tr><td class="d" style="width:62%">«apri Mail»</td><td class="d" style="color:#777">briefing → tasto della scheda (apriMail)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">METEO</h3><table>
+<tr><td class="d" style="width:62%">«mi serve l&#x27;ombrello?» · «che tempo fa qui» · «che tempo fa a Roma domani?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«dimmi» · «che tempo fa» · «ombrello» · «come mi vesto»</td><td class="d" style="color:#777">meteo → chiede a JARVIS (meteo)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">POSTA</h3><table>
+<tr><td class="d" style="width:62%">«riassumimi la posta» · «ho mail importanti?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«c&#x27;è qualcosa di urgente?» · «chi mi ha scritto» · «riassumi» · «novità»</td><td class="d" style="color:#777">email → tasto della scheda (postaRiassumi)</td></tr>
+<tr><td class="d" style="width:62%">«apri Mail» · «apri la posta»</td><td class="d" style="color:#777">email → tasto della scheda (apriMail)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SPESA</h3><table>
+<tr><td class="d" style="width:62%">«aggiungi il latte alla spesa» · «leggimi la lista della spesa» · «ho comprato il latte»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«sono al supermercato» · «cosa devo prendere» · «leggimela»</td><td class="d" style="color:#777">spesa → tasto della scheda (spesaLeggi)</td></tr>
+<tr><td class="d" style="width:62%">«mandala su WhatsApp» · «manda la lista» · «condividila»</td><td class="d" style="color:#777">spesa → tasto della scheda (spesaWhatsApp)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">MUSICA</h3><table>
+<tr><td class="d" style="width:62%">«che canzone è?» · «metti i Clash» · «metti musica da concentrazione» · «salta» · «pausa» · «riprendi la musica»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«apri Shazam»</td><td class="d" style="color:#777">schermata principale → apre shazam</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">RICORDI</h3><table>
+<tr><td class="d" style="width:62%">«ricordati questo posto» · «ho parcheggiato qui» · «dove ho parcheggiato?» · «ricordami di chiamare Teo domani alle 9» · «ho messo le chiavi nel cassetto» · «dove ho messo le chiavi?» · «com&#x27;è andata oggi?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«dov&#x27;è la macchina?» · «portami lì»</td><td class="d" style="color:#777">ricordi → chiede a JARVIS (macchina)</td></tr>
+<tr><td class="d" style="width:62%">«cosa mi devo ricordare?» · «promemoria» · «dimmi»</td><td class="d" style="color:#777">ricordi → chiede a JARVIS (ricordare)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">BEA</h3><table>
+<tr><td class="d" style="width:62%">«apri Bea»</td><td class="d" style="color:#777">schermata principale → apre bea</td></tr>
+<tr><td class="d" style="width:62%">«segna che a Bea piace il sushi» · «idee per stasera con Bea» · «un&#x27;idea regalo per Bea» · «quante lezioni ha Bea domani?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«dille che la penso» · «scrivile qualcosa di carino» · «ti penso»</td><td class="d" style="color:#777">bea → tasto della scheda (beaTiPenso)</td></tr>
+<tr><td class="d" style="width:62%">«telefonale» · «chiamala» · «voglio sentirla»</td><td class="d" style="color:#777">bea → tasto della scheda (beaChiama)</td></tr>
+<tr><td class="d" style="width:62%">«scrivile»</td><td class="d" style="color:#777">bea → tasto della scheda (beaMessaggio)</td></tr>
+<tr><td class="d" style="width:62%">«su WhatsApp»</td><td class="d" style="color:#777">bea → tasto della scheda (beaWhatsApp)</td></tr>
+<tr><td class="d" style="width:62%">«emergenza» · «112»</td><td class="d" style="color:#777">bea → tasto della scheda (bea112)</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SERATE</h3><table>
+<tr><td class="d" style="width:62%">«quanto abbiamo incassato sabato?» · «quanto guadagniamo sullo spritz?»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«apri la serata»</td><td class="d" style="color:#777">schermata principale → apre serata</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">CONTATTI</h3><table>
+<tr><td class="d" style="width:62%">«scrivi a Teo che arrivo» · «chiama Teo» · «portami a casa» · «portami a Milano»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«apri i messaggi»</td><td class="d" style="color:#777">schermata principale → apre messaggi</td></tr>
+<tr><td class="d" style="width:62%">«apri il telefono»</td><td class="d" style="color:#777">schermata principale → apre telefono</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">WEB</h3><table>
+<tr><td class="d" style="width:62%">«cerca i ristoranti a Milano» · «cerca su internet le serate di sabato» · «apri il sito di Repubblica» · «trovami le foto di Roma»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+<tr><td class="d" style="width:62%">«apri il browser»</td><td class="d" style="color:#777">schermata principale → apre browser</td></tr>
+<tr><td class="d" style="width:62%">«cerca su Google ristoranti Milano» · «googla ristoranti Milano» · «cercami ristoranti Milano» · «cerca ristoranti Milano su Google»</td><td class="d" style="color:#777">browser → browser apri «ristoranti Milano»</td></tr>
+<tr><td class="d" style="width:62%">«vai su repubblica.it»</td><td class="d" style="color:#777">browser → browser apri «repubblica.it»</td></tr>
+<tr><td class="d" style="width:62%">«scrivi ristoranti Milano» · «digita ristoranti Milano» · «inserisci ristoranti Milano»</td><td class="d" style="color:#777">browser → browser scrive «ristoranti Milano»</td></tr>
+<tr><td class="d" style="width:62%">«cancella quello che hai scritto» · «svuota il campo»</td><td class="d" style="color:#777">browser → browser svuota</td></tr>
+<tr><td class="d" style="width:62%">«invia» · «vai pure» · «fai la ricerca» · «conferma»</td><td class="d" style="color:#777">browser → browser invia</td></tr>
+<tr><td class="d" style="width:62%">«indietro»</td><td class="d" style="color:#777">browser → browser indietro</td></tr>
+<tr><td class="d" style="width:62%">«avanti»</td><td class="d" style="color:#777">browser → browser avanti</td></tr>
+<tr><td class="d" style="width:62%">«ricarica»</td><td class="d" style="color:#777">browser → browser ricarica</td></tr>
+<tr><td class="d" style="width:62%">«scorri giù»</td><td class="d" style="color:#777">browser → browser giu</td></tr>
+<tr><td class="d" style="width:62%">«torna in cima»</td><td class="d" style="color:#777">browser → browser inCima</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">GITHUB</h3><table>
+<tr><td class="d" style="width:62%">«ultimi commit di JARVIS» · «raccontami l&#x27;ultimo commit» · «apri una issue su jarvis» · «scrivi su GitHub il file prova»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">SISTEMI</h3><table>
+<tr><td class="d" style="width:62%">«controlla i sistemi» · «diagnostica» · «ci sono errori nei log?» · «quanto mi è costato JARVIS questo mese?» · «salva il verbale nell&#x27;archivio» · «cerca nell&#x27;archivio il verbale»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">EDITH</h3><table>
+<tr><td class="d" style="width:62%">«EDITH, controllo completo» · «questo link è sicuro?» · «controlla questa partita IVA» · «controlla questo IBAN» · «controlla questo numero»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+</table>
+<h3 style="font-size:9pt;letter-spacing:2px;margin:8px 0 2px;color:#0a8aa3">IPHONE</h3><table>
+<tr><td class="d" style="width:62%">«accendi la torcia» · «spegni la torcia» · «quanta batteria ho?» · «abbassa la luminosità»</td><td class="d" style="color:#777">schermata principale → risponde JARVIS</td></tr>
+</table>
+</section>
 </body></html>
