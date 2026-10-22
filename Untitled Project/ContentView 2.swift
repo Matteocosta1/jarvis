@@ -141,7 +141,7 @@ struct ContentView: View {
                     VStack(spacing: 0) {
                         intestazione(mini: telefono && !reattoreGrande)
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
-                        if telefono && !reattoreGrande {
+                        if telefono && !reattoreGrande && g.size.height > 300 {   // iPhone piccolo girato: non c'è posto, niente riga
                             rigaStato
                                 .transition(.opacity)
                         }
@@ -432,7 +432,8 @@ struct ContentView: View {
     /// La riga di stato con la tastiera aperta: la fase («PARLO», «LA ASCOLTO»…) e sotto la frase che sta sentendo,
     /// quello che sta facendo («Cerco sul web…») o l'avviso. Gli stessi testi che con la tastiera chiusa stanno sotto il reattore.
     private var rigaStato: some View {
-        let frase: String = !jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? suggerimento)
+        // solo cosa sente o cosa fa: i suggerimenti («tocchi il reattore…») qui non valgono, il reattore piccolo chiude la tastiera
+        let frase: String = !jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? "")
         return VStack(spacing: 2) {
             Text(jarvis.fase.rawValue)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
@@ -445,7 +446,7 @@ struct ContentView: View {
                     .font(.footnote)
                     .foregroundStyle(.orange)
                     .lineLimit(1)
-            } else {
+            } else if !frase.isEmpty {
                 Text(frase)
                     .font(.system(size: 13))
                     .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
@@ -1005,6 +1006,11 @@ struct ContentView: View {
             }
             .onAppear {
                 if let ultimo = jarvis.messaggi.last { proxy.scrollTo(ultimo.id, anchor: .bottom) }
+            }
+            // si apre la tastiera e la chat si accorcia: l'ultimo messaggio resta in vista
+            .onChange(of: tastiera) { _, aperta in
+                guard aperta, telefono, let ultimo = jarvis.messaggi.last else { return }
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
             // il reattore grande rientra e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: reattoreGrande) { _, grande in
