@@ -56,7 +56,9 @@ struct ContentView: View {
         let inPrimoPiano: Bool = scena == .active
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
-        return inPrimoPiano && micLibero && nienteEscluso
+        // iPhone: mentre scrive (tastiera aperta) non aspetta «Jarvis»; chiusa la tastiera l'attesa riparte da sola
+        let nonScrive: Bool = !tastiera || ProcessInfo.processInfo.isiOSAppOnMac
+        return inPrimoPiano && micLibero && nienteEscluso && nonScrive
     }
 
     /// La scheda aperta sopra la schermata principale, per i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…).
@@ -97,7 +99,7 @@ struct ContentView: View {
                 if grande {
                     ZStack(alignment: .bottom) {
                         VStack(spacing: 0) {
-                            intestazione
+                            intestazione()
                             Spacer(minLength: 0)
                             corona
                                 .frame(width: 430)
@@ -121,8 +123,8 @@ struct ContentView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        intestazione
-                        // mentre scrive il reattore si fa da parte: sopra la tastiera restano la chat, il testo e il tasto per inviare
+                        intestazione(mini: tastiera)
+                        // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if !tastiera {
                             centroHUD
                                 .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
@@ -396,7 +398,8 @@ struct ContentView: View {
         }
     }
 
-    private var intestazione: some View {
+    /// `mini`: con la tastiera aperta (solo iPhone) il reattore, in piccolo, sta qui tra il titolo e i tasti.
+    private func intestazione(mini: Bool = false) -> some View {
         HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VIII», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
@@ -416,6 +419,23 @@ struct ContentView: View {
             .opacity(acceso ? 1 : 0)
             .offset(x: acceso ? 0 : -12)
             Spacer()
+            if mini {
+                // il reattore in piccolo, sempre acceso: toccato chiude la tastiera e fa come il reattore grande
+                Button { tastiera = false; jarvis.toccaReattore() } label: {
+                    ZStack {
+                        AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
+                        Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
+                    }
+                    .frame(width: 240, height: 240)
+                    .scaleEffect(40.0 / 290.0)
+                    .frame(width: 40, height: 40)
+                }
+                .buttonStyle(StileStark())
+                .padding(.trailing, 8)
+                .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+                .transition(.opacity.combined(with: .scale(scale: 0.3)))
+                .accessibilityLabel("Parla con Jarvis")
+            }
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
