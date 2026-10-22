@@ -186,6 +186,11 @@ enum ComandoVocale: Equatable {
         }
         if serveJarvis && !chiamato { return nil }
         t = Pronunce.sistema(t)                                   // «laidar» → lidar, «idit» → edith, «vai tals» → vitals…
+        // «apri la sezione meteo», «attiva sezione LiDAR»: la parola «sezione» (con l'articolo) non cambia il comando
+        if let k = t.firstIndex(where: { $0 == "sezione" || $0 == "sezioni" }), k + 1 < t.count {
+            t.remove(at: k)
+            if k > 0, ["la", "le", "nella", "alla", "in"].contains(t[k - 1]) { t.remove(at: k - 1) }
+        }
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }
@@ -414,10 +419,13 @@ enum ComandoVocale: Equatable {
                       " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
             (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
-        let conVerbo = t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "vediamo"].contains($0) })
+        // tutti i verbi di comando valgono per ogni sezione: «attiva EDITH», «avvia i costi», «lancia le impostazioni» (22 ott)
+        let conVerbo = t.contains(where: { verbi.contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
-        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { ["apri", "aprimi", "mostra", "mostrami", "vai", "entra", "portami"].contains($0) }) {
+        let versoBea = ["chiam", "scriv", "telefon", "mand", "messagg", "dill", "dic"]      // «fammi chiamare Bea», «scrivi a Bea»: restano a JARVIS
+        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbi.contains($0) })
+            && !t.contains(where: { p in versoBea.contains(where: { p.hasPrefix($0) }) }) {
             return .apri(.bea)
         }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»

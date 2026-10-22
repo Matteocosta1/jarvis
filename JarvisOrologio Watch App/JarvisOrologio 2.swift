@@ -68,6 +68,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var inizioAscolto = Date()
     private var automatico = false                    // ascolto partito da solo (fine avvio, dopo una risposta): se tace, si chiude in silenzio
     private var riascolta = false                     // detta la risposta, riascolta da solo
+    /// La domanda che il signore ha interrotto (toccando o parlando mentre JARVIS pensava o parlava, anche solo per «muto»):
+    /// la prossima frase detta a voce la completa, come sull'iPhone (22 ott, chiesto dal signore).
+    private var daUnire: String?
     // Orecchio mentre JARVIS parla: un secondo registratore che misura solo il volume, per capire se il signore sta parlando
     private var monitor: AVAudioRecorder?
     private var timerMonitor: Timer?
@@ -132,17 +135,30 @@ final class JarvisOrologio: NSObject, ObservableObject {
         return parole.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,.;:!"))
     }
 
-    func chiedi(_ grezzo: String) {
-        let testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
+    /// `aVoce`: la frase detta a voce (e non scritta o da un tasto): se prima l'aveva interrotto, completa la domanda di prima.
+    func chiedi(_ grezzo: String, aVoce: Bool = false) {
+        var testo = togliSbatti(grezzo.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !testo.isEmpty else { stato = Date() < sottovoceFino ? "🤫 Sottovoce" : nil; return }
-        if Self.eSoloSilenzio(testo) { ferma(); return }       // «muto», «stop», «basta», «zitto», «Jarvis, basta»: tace e resta in attesa
+        if Self.eSoloSilenzio(testo) {                          // «muto», «stop», «basta», «zitto», «Jarvis, basta»: tace e resta in attesa
+            if fase == .elaboro || fase == .parlo { segnaInterruzione() }
+            ferma()
+            return
+        }
+        let prima = aVoce ? daUnire : nil
+        daUnire = nil
         ferma()
+        if let prima {
+            // interrotto: la domanda di prima e quello che aggiunge diventano una sola richiesta, la risposta tagliata sparisce
+            if storia.last?["role"] == "assistant", storia.count >= 2,
+               storia[storia.count - 2]["role"] == "user", storia[storia.count - 2]["content"] == prima { storia.removeLast() }
+            testo = prima + " … " + testo
+        }
         domanda = testo
         risposta = ""
         immagini = []
         stato = nil
         fase = .elaboro
-        if storia.last?["role"] == "user" { storia.removeLast() }   // domanda precedente rimasta senza risposta
+        if storia.last?["role"] == "user" { storia.removeLast() }   // domanda precedente rimasta senza risposta (o quella che si allunga)
         storia.append(["role": "user", "content": testo])
         storia = Array(storia.suffix(12))
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
@@ -178,11 +194,17 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Ascolto col reattore: tocco, parlo, si ferma da solo quando taccio (o al secondo tocco)
 
+    /// Ricorda la domanda che il signore sta interrompendo: quello che dirà adesso la completa.
+    private func segnaInterruzione() {
+        if let u = storia.last(where: { $0["role"] == "user" })?["content"], !u.isEmpty { daUnire = u }
+    }
+
     func toccaReattore() {
         switch fase {
         case .attesa: Task { await self.ascolta() }
         case .ascolto: fermaEInvia()
         case .elaboro, .parlo:
+            segnaInterruzione()
             ferma()
             Task { await self.ascolta() }
         }
@@ -345,7 +367,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 chiedi("Fammi da interprete in \(lingua): ti dirò una frase, tu traducila in \(lingua) e dimmela ad alta voce.")
                 return
             }
-            chiedi(testo)
+            chiedi(testo, aVoce: true)
         } else {
             compito = nil
             fase = .attesa
@@ -807,6 +829,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     private func interrottoAVoce() {
+        segnaInterruzione()
         fermaMonitor()
         zittisci()
         compito?.cancel()

@@ -389,7 +389,10 @@ final class Jarvis: NSObject, ObservableObject {
         let recente = (quandoInterrotto.map { Date().timeIntervalSince($0) < 120 } ?? false)
         // l'ha fermato pochi secondi dopo aver finito di parlare: non aveva finito il pensiero, è il seguito
         let continua = rispostaInterrotta != nil && (quandoInterrotto ?? .distantPast).timeIntervalSince(ultimoInvio) < 2.5   // 2 s + il tempo che il riconoscimento impiega a sentirlo
-        let aggiunta = (chiede || aggiuntaInArrivo || continua) && !pulito.isEmpty
+        // l'aveva interrotto (mentre pensava o parlava, anche solo con «muto»): quello che dice adesso completa la domanda di prima,
+        // sempre, anche senza «aspetta» (22 ott, chiesto dal signore)
+        let interrotta = rispostaInterrotta != nil
+        let aggiunta = (chiede || aggiuntaInArrivo || continua || interrotta) && !pulito.isEmpty
         aggiuntaInArrivo = false
         defer { rispostaInterrotta = nil; quandoInterrotto = nil }
         guard aggiunta else {
@@ -841,6 +844,8 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false) async {
+        rispostaInterrotta = nil                      // una domanda è partita (anche scritta): l'interruzione di prima è chiusa
+        quandoInterrotto = nil
         ultimaFraseAVoce = fraseAVoce                 // vuota se la domanda è scritta: si imparano solo le frasi dette a voce
         fraseAVoce = ""
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
