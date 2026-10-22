@@ -149,6 +149,7 @@ struct ContentView: View {
                         barraTesto
                     }
                     .onChange(of: tastiera) { _, aperta in
+                        guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
                         giroReattore += 1
                         if aperta {
                             withAnimation(.easeOut(duration: 0.25)) { reattoreGrande = false }
@@ -162,7 +163,7 @@ struct ContentView: View {
                         }
                     }
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
-                    .onAppear { if !tastiera { reattoreGrande = true } }
+                    .onAppear { reattoreGrande = !tastiera }
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
@@ -292,7 +293,7 @@ struct ContentView: View {
         .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
         // si apre una schermata da sola (pagina web, Occhi, Interprete, Allenatore, l'SOS di Bea): la tastiera si chiude
         .onChange(of: schermataDaSola) { _, aperta in
-            if aperta { tastiera = false }
+            if aperta && telefono { tastiera = false }
         }
         .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
             try? await Task.sleep(for: .seconds(8))
@@ -463,6 +464,7 @@ struct ContentView: View {
                     .frame(width: 240, height: 240)
                     .scaleEffect(34.0 / 290.0)
                     .frame(width: 34, height: 34)
+                    .contentShape(Rectangle())                  // si tocca tutto il quadrato, non solo il disegno
                 }
                 .buttonStyle(StileStark())
                 .padding(.trailing, 4)
@@ -494,7 +496,7 @@ struct ContentView: View {
             } message: {
                 Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
             }
-            Button { Suoni.clickTesta(); tastiera = false; mostraImpostazioni = true } label: {
+            Button { Suoni.clickTesta(); if telefono { tastiera = false }; mostraImpostazioni = true } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
@@ -732,7 +734,7 @@ struct ContentView: View {
 
     /// Chiude tutto quello che è aperto sopra la schermata principale.
     private func chiudiTutto() {
-        tastiera = false
+        if telefono { tastiera = false }
         mostraSentinella = false
         mostraWiretap = false
         mostraProfiler = false
@@ -968,6 +970,11 @@ struct ContentView: View {
             }
             .onAppear {
                 if let ultimo = jarvis.messaggi.last { proxy.scrollTo(ultimo.id, anchor: .bottom) }
+            }
+            // il reattore grande rientra e la chat si accorcia: l'ultimo messaggio resta in vista
+            .onChange(of: reattoreGrande) { _, grande in
+                guard grande, let ultimo = jarvis.messaggi.last else { return }
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.88)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
         }
         .coordinateSpace(.named("chat"))
