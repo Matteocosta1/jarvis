@@ -303,7 +303,7 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.eSoloSilenzio(resto) { aggiuntaInArrivo = false; return }   // «muto», «basta», «Jarvis, zitto»: resta in attesa
         let (pulito, chiedeAggiunta) = Jarvis.togliRichiamo(resto)
         if chiedeAggiunta { aggiuntaInArrivo = true }
-        if eseguiComando(pulito) { aggiuntaInArrivo = false; return }
+        if !pulito.isEmpty, eseguiComando(pulito) { aggiuntaInArrivo = false; return }   // solo «aspetta»: niente comando, riascolta
         if !pulito.isEmpty {
             Task { await instrada(resto) }    // ha detto cosa vuole: «Jarvis, che ore sono», «aspetta, e anche…»
         } else if chiedeAggiunta {
@@ -603,6 +603,14 @@ final class Jarvis: NSObject, ObservableObject {
     /// Se la frase è un comando («attiva la Sentinella», «apri il Wiretap», «fai un giro»), apre il reparto e risponde vero.
     @discardableResult
     func eseguiComando(_ fraseIntera: String) -> Bool {
+        let fatto = eseguiComandoLocale(fraseIntera)
+        // un comando eseguito (sezione, LiDAR, Interprete, tasto di una scheda, Browser, rito…) è un'azione nuova:
+        // la domanda interrotta prima non si porta dietro
+        if fatto, !fraseIntera.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { chiudiInterruzione() }
+        return fatto
+    }
+
+    private func eseguiComandoLocale(_ fraseIntera: String) -> Bool {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }

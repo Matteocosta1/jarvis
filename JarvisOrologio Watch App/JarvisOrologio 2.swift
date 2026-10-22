@@ -626,8 +626,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     private func fallisci(_ messaggio: String) {
-        inCorso = nil
         guard !Task.isCancelled else { return }   // fermato o sostituito da una nuova domanda: non tocca nulla
+        inCorso = nil
         if storia.last?["role"] == "user" { storia.removeLast() }   // la domanda senza risposta non resta in cronologia
         compito = nil
         stato = nil

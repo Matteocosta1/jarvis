@@ -163,7 +163,7 @@ struct ContentView: View {
                         }
                     }
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
-                    .onAppear { reattoreGrande = !tastiera }
+                    .onAppear { if telefono { reattoreGrande = !tastiera } }
                 }
             }
             .frame(width: g.size.width, height: g.size.height)
