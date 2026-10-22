@@ -140,6 +140,11 @@ struct ContentView: View {
                 } else {
                     VStack(spacing: 0) {
                         intestazione(mini: telefono && !reattoreGrande)
+                        // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
+                        if telefono && !reattoreGrande {
+                            rigaStato
+                                .transition(.opacity)
+                        }
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if reattoreGrande || !telefono {
                             centroHUD
@@ -422,6 +427,36 @@ struct ContentView: View {
             if id > 0 { Task { _ = await VistaVitals.chiama(["bea_sos_visto": id]) } }
             jarvis.leggi(prova ? "Prova del Tocco d'aiuto di Bea, Sir: funziona." : "Sir, Bea ha chiesto aiuto. La chiami subito.")
         }
+    }
+
+    /// La riga di stato con la tastiera aperta: la fase («PARLO», «LA ASCOLTO»…) e sotto la frase che sta sentendo,
+    /// quello che sta facendo («Cerco sul web…») o l'avviso. Gli stessi testi che con la tastiera chiusa stanno sotto il reattore.
+    private var rigaStato: some View {
+        let frase: String = !jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? suggerimento)
+        return VStack(spacing: 2) {
+            Text(jarvis.fase.rawValue)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .tracking(3)
+                .foregroundStyle(Color.ciano)
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.3), value: jarvis.fase)
+            if let avviso = jarvis.avviso {
+                Text(avviso)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .lineLimit(1)
+            } else {
+                Text(frase)
+                    .font(.system(size: 13))
+                    .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
+                    .lineLimit(1)
+                    .truncationMode(.head)              // mentre parla si vede la fine della frase, quella appena detta
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
     }
 
     private var suggerimento: String {
