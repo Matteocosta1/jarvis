@@ -56,8 +56,8 @@ struct ContentView: View {
         let inPrimoPiano: Bool = scena == .active
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
-        // iPhone: mentre scrive (tastiera aperta) non aspetta «Jarvis»; chiusa la tastiera l'attesa riparte da sola
-        let nonScrive: Bool = !tastiera || ProcessInfo.processInfo.isiOSAppOnMac
+        // iPhone: mentre scrive non aspetta «Jarvis» (i tasti non lo fanno partire); inviato il messaggio o chiusa la tastiera l'attesa riparte da sola
+        let nonScrive: Bool = !(tastiera && scrive) || ProcessInfo.processInfo.isiOSAppOnMac
         return inPrimoPiano && micLibero && nienteEscluso && nonScrive
     }
 
@@ -77,6 +77,9 @@ struct ContentView: View {
             || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore || scegliLingua || chiediPulizia
     }
     @FocusState private var tastiera: Bool
+    /// Sta scrivendo: tastiera appena aperta o testo che cambia. Inviato il messaggio torna falso (microfono di nuovo acceso
+    /// anche con la tastiera aperta: risponde a voce, lo interrompe, «muto»); ricomincia a scrivere e torna vero.
+    @State private var scrive = false
 
     var body: some View {
         GeometryReader { g in
@@ -420,8 +423,8 @@ struct ContentView: View {
             .offset(x: acceso ? 0 : -12)
             Spacer()
             if mini {
-                // il reattore in piccolo, sempre acceso: toccato chiude la tastiera e fa come il reattore grande
-                Button { tastiera = false; jarvis.toccaReattore() } label: {
+                // il reattore in piccolo, sempre acceso: toccato chiude la tastiera e basta (si torna alla voce di sempre)
+                Button { tastiera = false } label: {
                     ZStack {
                         AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
                         Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
@@ -434,7 +437,7 @@ struct ContentView: View {
                 .padding(.trailing, 8)
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
                 .transition(.opacity.combined(with: .scale(scale: 0.3)))
-                .accessibilityLabel("Parla con Jarvis")
+                .accessibilityLabel("Chiudi la tastiera")
             }
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
@@ -972,6 +975,8 @@ struct ContentView: View {
             TextField("Oppure scriva qui, signore…", text: $testo, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($tastiera)
+                .onChange(of: tastiera) { _, aperta in scrive = aperta }                     // tastiera su: sta per scrivere
+                .onChange(of: testo) { _, nuovo in if tastiera && !nuovo.isEmpty { scrive = true } }   // riprende a scrivere
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background(Color(red: 0.04, green: 0.12, blue: 0.15).opacity(0.8))
@@ -980,6 +985,7 @@ struct ContentView: View {
             Button {
                 let t = testo
                 testo = ""
+                scrive = false                      // la tastiera resta aperta, il microfono si riaccende per la risposta
                 Task { await jarvis.invia(t) }
             } label: {
                 Image(systemName: "arrow.up")
