@@ -24,7 +24,41 @@ enum Vocabolario {
         "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Confidente", "Diario", "Occhi", "Cucina",
         "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "voce normale",
         "wake up daddy's home", "daddy's home", "chiudi", "pulisci", "scansiona la stanza", "quanto è grande", "fine scansione",
+        // i nomi inglesi delle sezioni dentro le frasi di tutti i giorni: così il riconoscimento li aspetta scritti giusti
+        "apri LiDAR", "apri EDITH", "apri Vitals", "apri il Briefing", "apri Shazam", "apri lo Scanner", "apri il Profiler", "apri il Wiretap",
+        "apri GitHub", "apri Supabase", "apri il Browser", "apri l'Email", "Email", "Browser", "Intelligence", "Daily",
     ]
+}
+
+/// Come il riconoscimento italiano storpia i nomi inglesi delle sezioni («laidar», «idit», «vai tals»…): prima di cercare il comando
+/// ogni storpiatura torna il nome giusto, così «apri laidar» apre LiDAR e «Jarvis, vai tals» apre Vitals (22 ott, chiesto dal signore).
+enum Pronunce {
+    /// (nome giusto, come può arrivare scritto): parole già in minuscolo, senza accenti né punteggiatura; le più lunghe prima.
+    nonisolated static let varianti: [(giusto: String, modi: [String])] = [
+        ("lidar", ["lai dar s", "lai dar", "lay dar", "lai der", "lie dar", "laidar", "lai da", "laider", "leader", "l idar", "lidarr", "layder", "raider", "li dar", "laida", "lider", "lyder", "li da", "lida", "lidl"]),
+        ("edith", ["edit h", "e dith", "i dith", "editth", "editte", "editti", "eddith", "hedith", "heidit", "editto", "e dit", "i dit", "editt", "edyth", "edite", "idith", "iditt", "iddit", "edito", "edita", "eddie", "heidi", "edeth", "edit", "edid", "idit", "idid", "eddy", "edi", "idi"]),
+        ("vitals", ["vai tal s", "white als", "vai tals", "wait als", "vai tal", "vital s", "vaitals", "vaitols", "waitals", "vitalls", "baitals", "vitaels", "vitali", "vaital", "vaitol", "vaitls", "vitols", "bitals", "fitals", "vital"]),
+        ("briefing", ["bri ffing", "bri fing", "brief in", "briffing", "breefing", "brifing", "briefin", "prifing", "brifin", "brief", "brif"]),
+        ("shazam", ["scia zam", "sha zam", "sha sam", "sha zan", "sciazam", "shazaam", "sciasam", "shazamm", "sciazan", "shazzam", "shazan", "chazam"]),
+        ("scanner", ["scanners", "skanner", "scannar", "scaner", "skaner", "scanne", "scan"]),
+        ("profiler", ["pro fai ler", "pro failer", "pro filer", "profailer", "profiller", "profayler", "proviler"]),
+        ("wiretap", ["waiter tap", "uaier tap", "uaier tep", "where tap", "wire tape", "waitertap", "uair tap", "wair tap", "wear tap", "wire tab", "uaia tap", "wire tap", "uaiertep", "uaiertap", "uairtap", "waretap"]),
+        ("github", ["ghit hab", "ghit hub", "git hub", "kit hub", "ghi tab", "ghithub", "git ab", "ghitab", "githab", "gitab"]),
+        ("supabase", ["super base", "supa base", "supa beis", "supa beys", "suba base", "superbase", "supa bas", "supabeis"]),
+        ("email", ["i meil", "i mail", "e mail", "imeil", "imail", "emeil"]),
+        ("browser", ["brau ser", "brausser", "brauser", "brouser", "brawser"]),
+    ]
+
+    /// Le parole della frase, con ogni storpiatura sostituita dal nome giusto.
+    nonisolated static func sistema(_ t: [String]) -> [String] {
+        var s = " " + t.joined(separator: " ") + " "
+        for (giusto, modi) in varianti {
+            for m in modi {
+                while s.contains(" \(m) ") { s = s.replacingOccurrences(of: " \(m) ", with: " \(giusto) ") }
+            }
+        }
+        return s.split(separator: " ").map(String.init)
+    }
 }
 
 /// I reparti che si aprono a voce.
@@ -151,6 +185,7 @@ enum ComandoVocale: Equatable {
             t.removeFirst()
         }
         if serveJarvis && !chiamato { return nil }
+        t = Pronunce.sistema(t)                                   // «laidar» → lidar, «idit» → edith, «vai tals» → vitals…
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }
