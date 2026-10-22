@@ -301,7 +301,7 @@ struct VistaOrologio: View {
             // icone (e chat) caricate: JARVIS si mette in ascolto da solo; il suono della chat prima finisce
             let ricarica = chatDa != nil
             Task { @MainActor in
-                if ricarica { try? await Task.sleep(for: .seconds(1.4 / v)) }
+                try? await Task.sleep(for: .seconds((ricarica ? 1.4 : 0.4) / v))   // la coda della musica (o il suono della chat) finisce prima
                 jarvis.ascoltaDopoAvvio()
             }
             try? await Task.sleep(for: .seconds(2.2 / v))
