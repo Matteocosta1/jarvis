@@ -37,7 +37,7 @@ enum Pronunce {
     nonisolated static let varianti: [(giusto: String, modi: [String])] = [
         ("lidar", ["lai dar s", "lai dar", "lay dar", "lai der", "lie dar", "laidar", "lai da", "laider", "leader", "l idar", "lidarr", "layder", "raider", "li dar", "laida", "lider", "lyder", "li da", "lida", "lidl"]),
         ("edith", ["edit h", "e dith", "i dith", "editth", "editte", "editti", "eddith", "hedith", "heidit", "editto", "e dit", "i dit", "editt", "edyth", "edite", "idith", "iditt", "iddit", "edito", "edita", "eddie", "heidi", "edeth", "edit", "edid", "idit", "idid", "eddy", "edi", "idi"]),
-        ("vitals", ["vai tal s", "white als", "vai tals", "wait als", "vai tal", "vital s", "vaitals", "vaitols", "waitals", "vitalls", "baitals", "vitaels", "vitali", "vaital", "vaitol", "vaitls", "vitols", "bitals", "fitals", "vital"]),
+        ("vitals", ["vai tel s", "vai tels", "vaitels", "vitels", "vai tal s", "white als", "vai tals", "wait als", "vai tal", "vital s", "vaitals", "vaitols", "waitals", "vitalls", "baitals", "vitaels", "vitali", "vaital", "vaitol", "vaitls", "vitols", "bitals", "fitals", "vital"]),
         ("briefing", ["bri ffing", "bri fing", "brief in", "briffing", "breefing", "brifing", "briefin", "prifing", "brifin", "brief", "brif"]),
         ("shazam", ["scia zam", "sha zam", "sha sam", "sha zan", "sciazam", "shazaam", "sciasam", "shazamm", "sciazan", "shazzam", "shazan", "chazam"]),
         ("scanner", ["scanners", "skanner", "scannar", "scaner", "skaner", "scanne", "scan"]),
