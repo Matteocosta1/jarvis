@@ -181,6 +181,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var compitoPonte: Task<Void, Never>?   // la frase «ponte» se il cervello tarda a rispondere
     private var ultimoPonte = Date.distantPast     // quando ha detto l'ultima frase ponte
     private var rispostaInterrotta: UUID?          // la risposta che il signore ha appena interrotto (per unire l'aggiunta)
+    private var idTurno: UUID?                     // la risposta in preparazione o detta adesso: solo questa si può interrompere per unire
     private var quandoInterrotto: Date?
     private var ultimoInvio = Date.distantPast
     /// La memoria visiva di JARVIS: l'ultima foto (o il giro) che ha visto e il messaggio a cui appartiene.
@@ -309,7 +310,8 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Ricorda quale risposta il signore sta interrompendo: se poi aggiunge qualcosa, va unito alla domanda di prima.
     private func segnaInterruzione() {
-        guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant" else { return }
+        // solo la risposta a una domanda in corso: non un annuncio di sezione, una notifica letta o una frase del Diario
+        guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant", ultimo.id == idTurno else { return }
         rispostaInterrotta = ultimo.id
         quandoInterrotto = Date()
     }
@@ -405,7 +407,7 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         // interrotta a metà: la domanda di prima e l'aggiunta diventano una sola richiesta, la risposta tagliata sparisce
-        if recente, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
+        if recente || interrotta, let idR = rispostaInterrotta, let iR = messaggi.lastIndex(where: { $0.id == idR }),
            iR > 0, messaggi[iR - 1].ruolo == "user", !messaggi[iR - 1].conFoto {
             let domanda = messaggi[iR - 1].id
             await invia(pulito, unisciA: domanda)
@@ -816,6 +818,7 @@ final class Jarvis: NSObject, ObservableObject {
     func leggi(_ testo: String) {
         let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
+        idTurno = nil                            // una lettura (notifiche, briefing) non è la risposta a una domanda
         interrompi()
         messaggi.append(Messaggio(ruolo: "assistant", testo: t))
         salva()
@@ -884,6 +887,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         let risposta = Messaggio(ruolo: "assistant", testo: "")
         messaggi.append(risposta)
+        idTurno = risposta.id
         salva()
 
         ultimoInvio = Date()
@@ -1261,6 +1265,7 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func fineParlato() {
+        if flussoFinito { idTurno = nil }        // risposta detta tutta: da qui in poi una frase nuova è una domanda nuova
         orecchio.ferma()
         orecchio.testoDetto = ""
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando

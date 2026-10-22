@@ -35,7 +35,7 @@ enum Vocabolario {
 enum Pronunce {
     /// (nome giusto, come può arrivare scritto): parole già in minuscolo, senza accenti né punteggiatura; le più lunghe prima.
     nonisolated static let varianti: [(giusto: String, modi: [String])] = [
-        ("lidar", ["lai dar s", "lai dar", "lay dar", "lai der", "lie dar", "laidar", "lai da", "laider", "leader", "l idar", "lidarr", "layder", "raider", "li dar", "laida", "lider", "lyder", "li da", "lida", "lidl"]),
+        ("lidar", ["lai dar s", "lai dar", "lay dar", "lai der", "lie dar", "laidar", "lai da", "laider", "leader", "l idar", "lidarr", "layder", "raider", "li dar", "laida", "lider", "lyder", "li da", "lida"]),
         ("edith", ["edit h", "e dith", "i dith", "editth", "editte", "editti", "eddith", "hedith", "heidit", "editto", "e dit", "i dit", "editt", "edyth", "edite", "idith", "iditt", "iddit", "edito", "edita", "eddie", "heidi", "edeth", "edit", "edid", "idit", "idid", "eddy", "edi", "idi"]),
         ("vitals", ["vai tel s", "vai tels", "vaitels", "vitels", "vai tal s", "white als", "vai tals", "wait als", "vai tal", "vital s", "vaitals", "vaitols", "waitals", "vitalls", "baitals", "vitaels", "vitali", "vaital", "vaitol", "vaitls", "vitols", "bitals", "fitals", "vital"]),
         ("briefing", ["bri ffing", "bri fing", "brief in", "briffing", "breefing", "brifing", "briefin", "prifing", "brifin", "brief", "brif"]),
@@ -49,11 +49,18 @@ enum Pronunce {
         ("browser", ["brau ser", "brausser", "brauser", "brouser", "brawser"]),
     ]
 
+    /// Storpiature che sono anche parole normali («il leader», «il Lidl», «uno scan»): valgono solo in una frase di comando.
+    nonisolated static let soloConVerbo: Set<String> = ["leader", "raider", "lider", "lida", "li da", "brief", "brif", "scan",
+                                                        "vital", "vitali", "idi", "edi", "eddie", "eddy", "heidi", "edita", "edito", "editto", "e mail"]
+    nonisolated static let verbiComando: Set<String> = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai",
+                                                        "entra", "fammi", "portami", "vediamo", "chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"]
+
     /// Le parole della frase, con ogni storpiatura sostituita dal nome giusto.
     nonisolated static func sistema(_ t: [String]) -> [String] {
         var s = " " + t.joined(separator: " ") + " "
+        let comando = t.contains(where: { verbiComando.contains($0) })
         for (giusto, modi) in varianti {
-            for m in modi {
+            for m in modi where comando || !soloConVerbo.contains(m) {
                 while s.contains(" \(m) ") { s = s.replacingOccurrences(of: " \(m) ", with: " \(giusto) ") }
             }
         }
@@ -425,7 +432,7 @@ enum ComandoVocale: Equatable {
         let conVerbo = t.contains(where: { verbiApri.contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
-        let versoBea = ["chiam", "scriv", "telefon", "mand", "messagg", "dill", "dic"]      // «fammi chiamare Bea», «scrivi a Bea»: restano a JARVIS
+        let versoBea = ["chiam", "scriv", "telefon", "mand", "messagg", "dill", "dic", "parl", "sent"]      // «fammi chiamare Bea», «scrivi a Bea»: restano a JARVIS
         if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbiApri.contains($0) })
             && !t.contains(where: { p in versoBea.contains(where: { p.hasPrefix($0) }) }) {
             return .apri(.bea)
