@@ -420,11 +420,13 @@ enum ComandoVocale: Equatable {
             (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
         // tutti i verbi di comando valgono per ogni sezione: «attiva EDITH», «avvia i costi», «lancia le impostazioni» (22 ott)
-        let conVerbo = t.contains(where: { verbi.contains($0) })
+        // («fai», «passa», «metti», «parti»… no: «fai il punto sui costi» resta una domanda per JARVIS)
+        let verbiApri = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "vediamo"]
+        let conVerbo = t.contains(where: { verbiApri.contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
         let versoBea = ["chiam", "scriv", "telefon", "mand", "messagg", "dill", "dic"]      // «fammi chiamare Bea», «scrivi a Bea»: restano a JARVIS
-        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbi.contains($0) })
+        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbiApri.contains($0) })
             && !t.contains(where: { p in versoBea.contains(where: { p.hasPrefix($0) }) }) {
             return .apri(.bea)
         }
