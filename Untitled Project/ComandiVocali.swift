@@ -15,8 +15,8 @@ enum ConfidenteAperto {
     static var domanda: ((String) -> Bool)?
 }
 
-/// Le parole che il riconoscimento vocale dell'iPhone deve aspettarsi: i nomi inglesi e le parole di JARVIS che altrimenti storpia
-/// («EDITH» diventa «edit», «ricevi» diventa «dicevi»). Le usano tutti gli ascolti (richiamo, ascolto, orecchio, comandi nelle sezioni).
+/// Le parole che il riconoscimento vocale dell'iPhone dovrebbe aspettarsi (nomi inglesi, parole di JARVIS).
+/// Nota (22 ott): al momento nessun ascolto usa questa lista (gli ascolti hanno le loro, dalla build 12); le storpiature le corregge `Pronunce`.
 enum Vocabolario {
     nonisolated static let parole: [String] = [
         "Jarvis", "EDITH", "apri EDITH", "EDITH controllo completo", "controllo completo", "mi ricevi", "mi ricevi Jarvis", "ricevi", "ricevuto",
@@ -55,16 +55,32 @@ enum Pronunce {
     nonisolated static let verbiComando: Set<String> = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai",
                                                         "entra", "fammi", "portami", "vediamo", "chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"]
 
-    /// Le parole della frase, con ogni storpiatura sostituita dal nome giusto.
+    /// Tra il verbo e il nome possono stare solo queste parole: «apri il leader», «vai su leader», «fammi vedere la sezione edit».
+    nonisolated static let ponte: Set<String> = ["il", "lo", "la", "l", "i", "gli", "le", "su", "a", "al", "alla", "in", "nella", "sezione", "vedere"]
+
+    /// Le parole della frase, con ogni storpiatura sostituita dal nome giusto. Le storpiature che sono anche parole normali
+    /// valgono solo come comando secco: verbo (più al massimo «il», «la», «su», «sezione»…) e il nome in fondo alla frase.
+    /// Così «apri leader» apre LiDAR, ma «mostrami chi è il leader del partito» resta una domanda.
     nonisolated static func sistema(_ t: [String]) -> [String] {
-        var s = " " + t.joined(separator: " ") + " "
-        let comando = t.contains(where: { verbiComando.contains($0) })
+        var p = t
         for (giusto, modi) in varianti {
-            for m in modi where comando || !soloConVerbo.contains(m) {
-                while s.contains(" \(m) ") { s = s.replacingOccurrences(of: " \(m) ", with: " \(giusto) ") }
+            for m in modi {
+                let w = m.split(separator: " ").map(String.init)
+                var i = 0
+                while i + w.count <= p.count {
+                    if Array(p[i..<(i + w.count)]) == w {
+                        var j = i - 1
+                        while j >= 0, ponte.contains(p[j]) { j -= 1 }
+                        let comandoSecco = j >= 0 && verbiComando.contains(p[j]) && i + w.count == p.count
+                        if !soloConVerbo.contains(m) || comandoSecco {
+                            p.replaceSubrange(i..<(i + w.count), with: [giusto])
+                        }
+                    }
+                    i += 1
+                }
             }
         }
-        return s.split(separator: " ").map(String.init)
+        return p
     }
 }
 
@@ -74,9 +90,11 @@ enum Seguito {
     nonisolated static func soloAspetta(_ frase: String) -> Bool {
         let parole = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
             .components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
-        let segnali: Set<String> = ["aspetta", "aspetti", "ascoltami", "ascolta", "ascolti", "attimo", "momento", "secondo"]
-        let contorno: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "senti", "scusa", "un", "mi", "dai", "no", "allora", "ah"]
-        guard !parole.isEmpty, parole.count <= 6, parole.contains(where: { segnali.contains($0) }) else { return false }
+        let segnali: Set<String> = ["aspetta", "aspetti", "ascoltami", "ascolta", "ascolti", "attimo", "momento"]
+        let contorno: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "senti", "scusa", "un", "mi", "dai", "no", "allora", "ah",
+                                     "si", "per", "favore", "secondo"]
+        let unSecondo = parole.joined(separator: " ").contains("un secondo")    // «un secondo» sì, «secondo» da solo no
+        guard !parole.isEmpty, parole.count <= 6, unSecondo || parole.contains(where: { segnali.contains($0) }) else { return false }
         return parole.allSatisfy { segnali.contains($0) || contorno.contains($0) }
     }
 }
@@ -205,7 +223,7 @@ enum ComandoVocale: Equatable {
             t.removeFirst()
         }
         if serveJarvis && !chiamato { return nil }
-        t = Pronunce.sistema(t)                                   // «laidar» → lidar, «idit» → edith, «vai tals» → vitals…
+        if dentro != .profiler { t = Pronunce.sistema(t) }        // «laidar» → lidar, «idit» → edith… (nel Profiler no: lì si dettano nomi)
         // «apri la sezione meteo», «attiva sezione LiDAR»: la parola «sezione» (con l'articolo) non cambia il comando
         if let k = t.firstIndex(where: { $0 == "sezione" || $0 == "sezioni" }), k + 1 < t.count {
             t.remove(at: k)
@@ -233,7 +251,8 @@ enum ComandoVocale: Equatable {
             let sezioni: Set<String> = ["lidar", "laidar", "planimetria", "occhi", "fotocamera", "camera", "cucina", "meteo", "tempo", "browser", "internet",
                                         "impostazioni", "sistemi", "costi", "edith", "edit", "diario", "sonno", "cuore", "vitals", "briefing", "posta",
                                         "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
-                                        "confidente", "github", "supabase", "archivio", "scanner", "profiler"]
+                                        "confidente", "github", "supabase", "archivio", "scanner", "profiler",
+                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento"]
             if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) { return .torna }
         }
         // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
@@ -445,9 +464,10 @@ enum ComandoVocale: Equatable {
         let conVerbo = t.contains(where: { verbiApri.contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
-        let versoBea = ["chiam", "scriv", "telefon", "mand", "messagg", "dill", "dic", "parl", "sent"]      // «fammi chiamare Bea», «scrivi a Bea»: restano a JARVIS
+        // solo «apri Bea», «mostrami la scheda di Bea»…: «chiama Bea», «fammi videochiamare Bea», «portami da Bea» restano a JARVIS
+        let paroleBea: Set<String> = ["bea", "beatrice", "vedere", "a", "di", "su", "la", "il", "in", "nella", "alla", "scheda", "sezione"]
         if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbiApri.contains($0) })
-            && !t.contains(where: { p in versoBea.contains(where: { p.hasPrefix($0) }) }) {
+            && t.allSatisfy({ verbiApri.contains($0) || paroleBea.contains($0) }) {
             return .apri(.bea)
         }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
