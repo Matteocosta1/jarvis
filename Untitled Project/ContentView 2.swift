@@ -57,7 +57,7 @@ struct ContentView: View {
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
         // iPhone: mentre scrive non aspetta «Jarvis» (i tasti non lo fanno partire); inviato il messaggio o chiusa la tastiera l'attesa riparte da sola
-        let nonScrive: Bool = !(tastiera && scrive) || ProcessInfo.processInfo.isiOSAppOnMac
+        let nonScrive: Bool = !(tastiera && scrive) || UIDevice.current.userInterfaceIdiom != .phone   // solo iPhone (iPad e Mac come prima)
         return inPrimoPiano && micLibero && nienteEscluso && nonScrive
     }
 
@@ -430,11 +430,11 @@ struct ContentView: View {
                         Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
                     }
                     .frame(width: 240, height: 240)
-                    .scaleEffect(40.0 / 290.0)
-                    .frame(width: 40, height: 40)
+                    .scaleEffect(34.0 / 290.0)
+                    .frame(width: 34, height: 34)
                 }
                 .buttonStyle(StileStark())
-                .padding(.trailing, 8)
+                .padding(.trailing, 4)
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
                 .transition(.opacity.combined(with: .scale(scale: 0.3)))
                 .accessibilityLabel("Chiudi la tastiera")
@@ -463,7 +463,7 @@ struct ContentView: View {
             } message: {
                 Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
             }
-            Button { Suoni.clickTesta(); mostraImpostazioni = true } label: {
+            Button { Suoni.clickTesta(); tastiera = false; mostraImpostazioni = true } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
@@ -701,6 +701,7 @@ struct ContentView: View {
 
     /// Chiude tutto quello che è aperto sopra la schermata principale.
     private func chiudiTutto() {
+        tastiera = false
         mostraSentinella = false
         mostraWiretap = false
         mostraProfiler = false
