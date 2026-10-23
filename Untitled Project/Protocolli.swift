@@ -139,6 +139,27 @@ struct TendinaProtocolli: View {
     private let fondo = Color(red: 7 / 255, green: 13 / 255, blue: 15 / 255)
 
     var body: some View {
+        // iPhone piccolo o girato: se non ci sta tutta, la tendina scorre (maniglia e frasi restano raggiungibili)
+        ViewThatFits(in: .vertical) {
+            contenuto
+            ScrollView(.vertical, showsIndicators: false) { contenuto }
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
+                .fill(fondo.opacity(0.84))
+                .background(.ultraThinMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34))
+                .overlay(alignment: .bottom) {
+                    UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
+                        .stroke(tinta.opacity(0.25), lineWidth: 1).mask(alignment: .bottom) { Rectangle().frame(height: 40) }
+                }
+                .shadow(color: .black.opacity(0.6), radius: 25, y: 18)
+                .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var contenuto: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("PROTOCOLLI")
                 .font(.system(size: 13, weight: .bold, design: .monospaced)).tracking(3)
@@ -166,19 +187,6 @@ struct TendinaProtocolli: View {
         .padding(.top, margineAlto + 8)
         .padding(.horizontal, 14)
         .padding(.bottom, 2)
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
-        .background {
-            UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
-                .fill(fondo.opacity(0.84))
-                .background(.ultraThinMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34))
-                .overlay(alignment: .bottom) {
-                    UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
-                        .stroke(tinta.opacity(0.25), lineWidth: 1).mask(alignment: .bottom) { Rectangle().frame(height: 40) }
-                }
-                .shadow(color: .black.opacity(0.6), radius: 25, y: 18)
-                .ignoresSafeArea(edges: .top)
-        }
     }
 
     private func scheda(_ p: Protocollo) -> some View {

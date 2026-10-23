@@ -75,6 +75,7 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
             case "briefing": Comandi.condiviso.richiesta = .briefing
             case "diario": Comandi.condiviso.richiesta = .diario(testo)     // la domanda della sera: JARVIS la legge e ascolta
             case "radar": Comandi.condiviso.richiesta = .radar              // arriva la pioggia: si apre il Meteo, con RADAR in testa
+            case "avviso": break                                            // un avviso dell'app aperta (es. «Luogo salvato»): già visto, niente da leggere
             default: Comandi.condiviso.richiesta = .leggi(testo)
             }
         }

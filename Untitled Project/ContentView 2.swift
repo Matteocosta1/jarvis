@@ -128,18 +128,21 @@ struct ContentView: View {
                     ZStack(alignment: .bottom) {
                         VStack(spacing: 0) {
                             intestazione()
-                                .simultaneousGesture(tiraGiuTendina)
+                                .contentShape(Rectangle())
+                                .highPriorityGesture(tiraGiuTendina)
                             Spacer(minLength: 0)
                             corona
                                 .frame(width: 430)
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
                                 .frame(width: g.size.width, height: (altezzaCorona + 12) * scala, alignment: .top)
-                                .simultaneousGesture(tiraGiuTendina)
+                                .contentShape(Rectangle())
+                                .highPriorityGesture(tiraGiuTendina)
                             testiHUD
                                 .frame(maxWidth: max(0, min(640, (g.size.width - 32) / 1.25)))
                                 .scaleEffect(mac ? 1.25 : 1, anchor: .top)
                                 .frame(height: altezzaTesti, alignment: .top)
-                                .simultaneousGesture(tiraGiuTendina)
+                                .contentShape(Rectangle())
+                                .highPriorityGesture(tiraGiuTendina)
                             Spacer(minLength: 0)
                             Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
                         }
@@ -155,7 +158,8 @@ struct ContentView: View {
                 } else {
                     VStack(spacing: 0) {
                         intestazione(mini: telefono && !reattoreGrande)
-                            .simultaneousGesture(tiraGiuTendina)
+                            .contentShape(Rectangle())
+                                .highPriorityGesture(tiraGiuTendina)
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
                         if telefono && !reattoreGrande && g.size.height > 300 {   // iPhone piccolo girato: non c'è posto, niente riga
                             rigaStato
@@ -164,7 +168,8 @@ struct ContentView: View {
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if reattoreGrande || !telefono {
                             centroHUD
-                                .simultaneousGesture(tiraGiuTendina)
+                                .contentShape(Rectangle())
+                                .highPriorityGesture(tiraGiuTendina)
                                 .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
                         }
                         registro
@@ -203,6 +208,8 @@ struct ContentView: View {
             .frame(width: g.size.width, height: g.size.height)
             .defersSystemGestures(on: .top)                 // il dito che tira giù la tendina non apre il Centro notifiche di iOS
         }
+        // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
+        .onChange(of: scena) { _, fase in if fase != .active && !tendinaAperta { tendinaTrascina = 0 } }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
             chiudiTutto()
@@ -842,21 +849,26 @@ struct ContentView: View {
             .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea(edges: .top)
             .ignoresSafeArea(.keyboard)
+            .opacity(quanto > 0 ? 1 : 0)                       // chiusa del tutto: nemmeno l'ombra sotto la barra di stato
             .allowsHitTesting(tendinaAperta)
             .accessibilityHidden(!tendinaAperta)
             .zIndex(20)
     }
 
-    /// Giù col dito dal titolo o dal reattore: la tendina segue il dito e, lasciata oltre un terzo (o lanciata), scende tutta.
+    /// Giù col dito dal titolo o dal reattore: la tendina segue il dito (anche se torna su) e, lasciata oltre un terzo
+    /// (o lanciata), scende tutta. Ha la precedenza sui tasti sotto solo quando il dito si muove: un tocco resta un tocco,
+    /// e una tirata che finisce sul reattore non lo accende.
     private var tiraGiuTendina: some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .global)
             .onChanged { v in
-                guard !tendinaAperta, tendinaLibera, v.translation.height > 0, abs(v.translation.height) > abs(v.translation.width) * 1.2 else { return }
+                guard !tendinaAperta, tendinaLibera else { return }
+                if tendinaTrascina > 0 { tendinaTrascina = max(0.5, v.translation.height); return }   // già partita: segue il dito su e giù
+                guard v.translation.height > 0, abs(v.translation.height) > abs(v.translation.width) * 1.2 else { return }
                 tendinaTrascina = v.translation.height
             }
             .onEnded { v in
                 guard !tendinaAperta, tendinaTrascina > 0 else { tendinaTrascina = 0; return }
-                if tendinaTrascina > altezzaTendina * 0.3 || v.predictedEndTranslation.height > altezzaTendina * 0.6 { apriTendina() }
+                if v.translation.height > altezzaTendina * 0.3 || v.predictedEndTranslation.height > altezzaTendina * 0.6 { apriTendina() }
                 else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
             }
     }
@@ -880,6 +892,7 @@ struct ContentView: View {
     /// Chiude tutto quello che è aperto sopra la schermata principale.
     private func chiudiTutto() {
         if telefono { tastiera = false }
+        if !tendinaAperta { tendinaTrascina = 0 }        // una tirata rimasta a metà (gesto interrotto) non resta appesa
         mostraSentinella = false
         mostraWiretap = false
         mostraProfiler = false

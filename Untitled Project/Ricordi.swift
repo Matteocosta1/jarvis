@@ -20,6 +20,7 @@ struct VistaRicordi: View {
     @State private var errore = false
     @State private var fotoAperta: Data?
     @State private var guidaAccesa = false
+    @State private var salvaDaFare = false        // «ricorda questo luogo»: una volta sola, anche cambiando scheda
 
     var body: some View {
         NavigationStack {
@@ -36,7 +37,7 @@ struct VistaRicordi: View {
                         // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
                         ScrollView {
                             PannelliTraccia(luoghi: d.posti.filter { $0.tipo == "posto" || $0.tipo == "parcheggio" }, ultimi: Array(d.ricordi.prefix(3)),
-                                            guida: $guidaAccesa, salvaSubito: salva, ricarica: { await carica() })
+                                            guida: $guidaAccesa, salvaSubito: $salvaDaFare, ricarica: { await carica() })
                                 .padding(16)
                                 .padding(.bottom, 30)
                         }
@@ -65,7 +66,9 @@ struct VistaRicordi: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
             }
-            .onAppear { scheda = iniziale; guidaAccesa = guida }
+            .onAppear { scheda = iniziale; guidaAccesa = guida; salvaDaFare = salva }
+            // TRACCIA mostra tutti i luoghi: una ricerca lasciata nella scheda Ricordi non li deve filtrare
+            .onChange(of: scheda) { _, nuova in if nuova == .traccia && !cerca.isEmpty { cerca = "" } }
             .task { await carica() }
             .task(id: cerca) {
                 try? await Task.sleep(for: .milliseconds(350))

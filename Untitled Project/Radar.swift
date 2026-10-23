@@ -73,8 +73,10 @@ final class PosizioneSfondo: NSObject, ObservableObject, CLLocationManagerDelega
         guard !token.isEmpty, let url = URL(string: Impostazioni.indirizzo) else { return }
         ultimaInviata = (lat, lon, Date())
         // iOS ci lascia finire la richiesta anche se l'app è stata svegliata in sottofondo solo per questo
-        let sfondo = UIApplication.shared.beginBackgroundTask(withName: "jarvis-posizione") { }
-        defer { if sfondo != .invalid { UIApplication.shared.endBackgroundTask(sfondo) } }
+        // se iOS dice che il tempo è finito, si chiude il compito subito (altrimenti l'app viene terminata); la fine normale la fa il defer
+        let sfondo = CompitoSfondo()
+        sfondo.id = UIApplication.shared.beginBackgroundTask(withName: "jarvis-posizione") { sfondo.chiudi() }
+        defer { sfondo.chiudi() }
         let iso = ISO8601DateFormatter()
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -146,6 +148,15 @@ struct PannelloRadar: View {
             }
             PannelloAVoce(frasi: ["«Jarvis, radar pioggia»", "«Jarvis, pioverà?»", "«Jarvis, mi serve l'ombrello?»"])
         }
+    }
+}
+/// Il compito in sottofondo di iOS, chiuso una volta sola: a fine richiesta o quando iOS dice che il tempo è finito.
+final class CompitoSfondo {
+    var id: UIBackgroundTaskIdentifier = .invalid
+    func chiudi() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }
 #endif

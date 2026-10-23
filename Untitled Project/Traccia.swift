@@ -13,15 +13,15 @@ struct PannelliTraccia: View {
     let ultimi: [DatiRicordi.Riga]
     /// La Guida (fotocamera e frecce): spenta quando si apre Ricordi, accesa subito da «Jarvis, portami al luogo».
     @Binding var guida: Bool
-    /// «Jarvis, ricorda questo luogo»: appena c'è la posizione, si salva da solo (una volta).
-    var salvaSubito = false
+    /// «Jarvis, ricorda questo luogo»: appena c'è la posizione, si salva da solo. Il segno sta in VistaRicordi e si spegne
+    /// appena parte il salvataggio, così cambiando scheda e tornando su TRACCIA non si salva una seconda volta.
+    @Binding var salvaSubito: Bool
     /// Dopo un salvataggio: ricarica i ricordi (il luogo nuovo arriva in testa) e dice quale id scegliere.
     let ricarica: () async -> Void
     @StateObject private var bussola = Bussola()
     @State private var sceltoId: Int?
     @State private var elenco = false
     @State private var salvo = false
-    @State private var salvatoSubito = false
     @State private var avviso: String?
     private let tinta = Color.ciano
 
@@ -86,8 +86,8 @@ struct PannelliTraccia: View {
         .onDisappear { bussola.spegni() }
         .task(id: bussola.lat != nil) {
             // «ricorda questo luogo»: appena arriva la posizione, una volta sola
-            guard salvaSubito, !salvatoSubito, bussola.lat != nil else { return }
-            salvatoSubito = true
+            guard salvaSubito, bussola.lat != nil else { return }
+            salvaSubito = false
             await salva()
         }
     }
@@ -149,6 +149,7 @@ struct PannelliTraccia: View {
         c.title = "JARVIS"
         c.body = testo
         c.sound = nil
+        c.userInfo = ["jarvis_azione": "avviso"]                          // toccata: niente da leggere, l'ha già vista
         let r = UNNotificationRequest(identifier: "luogo-\(Date().timeIntervalSince1970)", content: c, trigger: nil)
         try? await UNUserNotificationCenter.current().add(r)
     }
