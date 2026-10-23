@@ -10,7 +10,7 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o, null, 1), { status, headers: { "content-type": "application/json" } });
 const XI = "https://api.elevenlabs.io/v1";
 const VOCE = Deno.env.get("ELEVENLABS_VOICE_ID") || "onwK4e9ZLuTAKqWW03F9";   // come il cervello: Daniel se non ce n'è un'altra
-const BUCKET = "vocali";   // l'«archivio» su questo progetto non esiste: si usa la cartella dei vocali, che c'è
+const BUCKET = "backup";   // «archivio» qui non esiste e «vocali» accetta solo m4a: si usa backup (nessun limite), cartella prove-voce
 const IMPOSTAZIONI = { stability: 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 };   // quelle del cervello
 
 // [testo per il modello di oggi, testo per v4 Turbo con il tono]
