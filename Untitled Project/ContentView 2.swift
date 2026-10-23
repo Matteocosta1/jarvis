@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AVFoundation
 import QuartzCore
 
@@ -82,11 +83,12 @@ struct ContentView: View {
     /// Con la tastiera aperta e `scrive` falso JARVIS è in attesa come sempre: qualsiasi frase lo mette in ascolto.
     @State private var scrive = false
     @State private var giroTasti = 0                     // ogni tasto ha il suo numero: l'attesa riparte solo dopo l'ultimo
-    /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera, ma quando si chiude rientra solo a tastiera
-    /// già scesa: così il reattore non si muove insieme alla tastiera e alla chat (lo scatto) e torna con un'animazione fluida.
+    /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera: quando scende rientra insieme a lei,
+    /// con la sua stessa durata e curva (keyboardWillHide), in un movimento solo.
     @State private var reattoreGrande = true
-    /// La curva della tastiera di iOS (circa 0,3 s, morbida all'inizio e alla fine): reattore, riga di stato e chat si muovono con lei.
-    static let curvaTastiera: Animation = .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.32)
+    /// La curva della tastiera di iOS (parte veloce e si posa piano, circa 0,25 s): reattore, riga di stato e chat si muovono con lei.
+    static let curvaTastiera: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: 0.25)
+    @State private var durataRientro: Double = 0.25      // la durata vera dell'ultima discesa della tastiera (per far scorrere la chat insieme)
     /// Il reattore piccolo e il microfono spento mentre si scrive: solo sull'iPhone (iPad e Mac restano come prima).
     private var telefono: Bool { UIDevice.current.userInterfaceIdiom == .phone }
     /// Una schermata aperta da JARVIS o dal Tocco d'aiuto di Bea, non dal signore.
@@ -161,10 +163,21 @@ struct ContentView: View {
                         if aperta {
                             withAnimation(ContentView.curvaTastiera) { reattoreGrande = false }
                         } else {
-                            // il reattore cresce mentre la tastiera scende, con la stessa durata: un movimento solo, la chat
-                            // non si allunga prima per poi restringersi (era lo scatto)
-                            withAnimation(ContentView.curvaTastiera) { reattoreGrande = true }
+                            // rete di sicurezza (tastiera fisica, notifica mancata): di solito il rientro lo fa già keyboardWillHide qui sotto
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(60))
+                                if !tastiera && !reattoreGrande { withAnimation(ContentView.curvaTastiera) { reattoreGrande = true } }
+                            }
                         }
+                    }
+                    // il reattore cresce mentre la tastiera scende, con la durata e la curva della tastiera stessa (anche nello swipe,
+                    // dove la tastiera è già a metà): un movimento solo, la chat non si allunga prima per poi restringersi (era lo scatto)
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { n in
+                        guard telefono, !reattoreGrande else { return }
+                        let d = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+                        let curva: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: max(d, 0.2))
+                        durataRientro = max(d, 0.2)
+                        withAnimation(curva) { reattoreGrande = true }
                     }
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
                     .onAppear { if telefono { reattoreGrande = !tastiera } }
@@ -1014,7 +1027,7 @@ struct ContentView: View {
             // il reattore grande rientra e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: reattoreGrande) { _, grande in
                 guard grande, let ultimo = jarvis.messaggi.last else { return }
-                withAnimation(ContentView.curvaTastiera) { proxy.scrollTo(ultimo.id, anchor: .bottom) }   // stessa curva del reattore
+                withAnimation(.timingCurve(0.38, 0.7, 0.125, 1, duration: durataRientro)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }   // insieme al reattore
             }
         }
         .coordinateSpace(.named("chat"))
