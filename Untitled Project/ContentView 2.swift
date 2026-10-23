@@ -56,7 +56,8 @@ struct ContentView: View {
         let inPrimoPiano: Bool = scena == .active
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
-        // iPhone: mentre scrive non aspetta «Jarvis» (i tasti non lo fanno partire); inviato il messaggio o chiusa la tastiera l'attesa riparte da sola
+        // iPhone, tastiera aperta (23 ott): JARVIS resta in attesa e appena lei parla passa in ascolto; mentre preme i tasti il microfono
+        // tace (i tasti non lo fanno partire) e un attimo dopo l'ultimo tasto torna in attesa. Chiusa la tastiera: la voce di sempre
         let nonScrive: Bool = !(tastiera && scrive) || UIDevice.current.userInterfaceIdiom != .phone   // solo iPhone (iPad e Mac come prima)
         return inPrimoPiano && micLibero && nienteEscluso && nonScrive
     }
@@ -77,13 +78,15 @@ struct ContentView: View {
             || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore || scegliLingua || chiediPulizia
     }
     @FocusState private var tastiera: Bool
-    /// Sta scrivendo: tastiera appena aperta o testo che cambia. Inviato il messaggio torna falso (microfono di nuovo acceso
-    /// anche con la tastiera aperta: risponde a voce, lo interrompe, «muto»); ricomincia a scrivere e torna vero.
+    /// Sta premendo i tasti: vero a ogni tasto, torna falso 1,2 secondi dopo l'ultimo (e subito con Invia o con la tastiera chiusa).
+    /// Con la tastiera aperta e `scrive` falso JARVIS è in attesa come sempre: qualsiasi frase lo mette in ascolto.
     @State private var scrive = false
+    @State private var giroTasti = 0                     // ogni tasto ha il suo numero: l'attesa riparte solo dopo l'ultimo
     /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera, ma quando si chiude rientra solo a tastiera
     /// già scesa: così il reattore non si muove insieme alla tastiera e alla chat (lo scatto) e torna con un'animazione fluida.
     @State private var reattoreGrande = true
-    @State private var giroReattore = 0                  // ogni chiusura della tastiera ha il suo numero: vale solo l'ultima
+    /// La curva della tastiera di iOS (circa 0,3 s, morbida all'inizio e alla fine): reattore, riga di stato e chat si muovono con lei.
+    static let curvaTastiera: Animation = .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.32)
     /// Il reattore piccolo e il microfono spento mentre si scrive: solo sull'iPhone (iPad e Mac restano come prima).
     private var telefono: Bool { UIDevice.current.userInterfaceIdiom == .phone }
     /// Una schermata aperta da JARVIS o dal Tocco d'aiuto di Bea, non dal signore.
@@ -148,23 +151,19 @@ struct ContentView: View {
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if reattoreGrande || !telefono {
                             centroHUD
-                                .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .top)))
+                                .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
                         }
                         registro
                         barraTesto
                     }
                     .onChange(of: tastiera) { _, aperta in
                         guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
-                        giroReattore += 1
                         if aperta {
-                            withAnimation(.easeOut(duration: 0.25)) { reattoreGrande = false }
+                            withAnimation(ContentView.curvaTastiera) { reattoreGrande = false }
                         } else {
-                            let mio = giroReattore
-                            Task {
-                                try? await Task.sleep(for: .milliseconds(300))      // la tastiera finisce di scendere
-                                guard !tastiera, mio == giroReattore else { return } // riaperta (o richiusa) nel frattempo: decide l'ultima
-                                withAnimation(.spring(response: 0.55, dampingFraction: 0.88)) { reattoreGrande = true }
-                            }
+                            // il reattore cresce mentre la tastiera scende, con la stessa durata: un movimento solo, la chat
+                            // non si allunga prima per poi restringersi (era lo scatto)
+                            withAnimation(ContentView.curvaTastiera) { reattoreGrande = true }
                         }
                     }
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
@@ -1010,12 +1009,12 @@ struct ContentView: View {
             // si apre la tastiera e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: tastiera) { _, aperta in
                 guard aperta, telefono, let ultimo = jarvis.messaggi.last else { return }
-                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
+                withAnimation(ContentView.curvaTastiera) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
             // il reattore grande rientra e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: reattoreGrande) { _, grande in
                 guard grande, let ultimo = jarvis.messaggi.last else { return }
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.88)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
+                withAnimation(ContentView.curvaTastiera) { proxy.scrollTo(ultimo.id, anchor: .bottom) }   // stessa curva del reattore
             }
         }
         .coordinateSpace(.named("chat"))
@@ -1055,8 +1054,17 @@ struct ContentView: View {
             TextField("Oppure scriva qui, signore…", text: $testo, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($tastiera)
-                .onChange(of: tastiera) { _, aperta in scrive = aperta }                     // tastiera su: sta per scrivere
-                .onChange(of: testo) { _, nuovo in if tastiera && !nuovo.isEmpty { scrive = true } }   // riprende a scrivere
+                .onChange(of: tastiera) { _, _ in scrive = false }                        // tastiera su o giù: in attesa, non sta ancora scrivendo
+                .onChange(of: testo) { _, nuovo in
+                    guard tastiera, !nuovo.isEmpty else { return }
+                    scrive = true                                                        // preme i tasti: microfono zitto
+                    giroTasti += 1
+                    let mio = giroTasti
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        if mio == giroTasti { scrive = false }                           // smesso di scrivere: di nuovo in attesa
+                    }
+                }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background(Color(red: 0.04, green: 0.12, blue: 0.15).opacity(0.8))
@@ -1065,7 +1073,7 @@ struct ContentView: View {
             Button {
                 let t = testo
                 testo = ""
-                scrive = false                      // la tastiera resta aperta, il microfono si riaccende per la risposta
+                scrive = false                      // la tastiera resta aperta: di nuovo in attesa, risponde e si può interrompere
                 Task { await jarvis.invia(t) }
             } label: {
                 Image(systemName: "arrow.up")
