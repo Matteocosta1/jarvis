@@ -116,8 +116,9 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
 /// storpiature imparate. Risposta immediata, niente cervello, e non si imparano mai come storpiature.
 nonisolated enum ComandoDedicato: Equatable, Sendable {
     case protocollo(Protocollo)   // «protocollo party», «attiva il protocollo notte»: Telefono › PROTOCOLLI, e parte
-    case traccia                  // «traccia la macchina»: Ricordi › TRACCIA (la bussola, fotocamera spenta)
-    case guida                    // «portami alla macchina»: Ricordi › TRACCIA con la Guida accesa (fotocamera e frecce)
+    case traccia                  // «traccia il luogo»: Ricordi › TRACCIA (la bussola, fotocamera spenta)
+    case guida                    // «portami al luogo»: Ricordi › TRACCIA con la Guida accesa (fotocamera e frecce)
+    case salvaLuogo               // «ricorda questo luogo»: Ricordi › TRACCIA, e il posto dove si trova diventa un luogo
     case radar                    // «radar pioggia»: Meteo › RADAR
     case priorita                 // «rapporto posta»: Email › PRIORITÀ
     case organismo                // «scansione organismo», «stato dell'organismo»: Vitals (sull'orologio l'Organismo)
@@ -145,8 +146,9 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
             }
         }
         switch t.joined(separator: " ") {
-        case "traccia la macchina": return .traccia
-        case "portami alla macchina": return .guida
+        case "traccia il luogo": return .traccia
+        case "portami al luogo": return .guida
+        case "ricorda questo luogo", "salva questo luogo": return .salvaLuogo
         case "radar pioggia": return .radar
         case "rapporto posta": return .priorita
         case "scansione organismo", "stato dell organismo": return .organismo
@@ -157,7 +159,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
     }
 }
 
-// MARK: - TRACCIA: la strada verso la macchina
+// MARK: - TRACCIA: la strada verso un luogo salvato
 
 nonisolated enum Rotta {
     /// Il rilevamento da un punto all'altro, in gradi dal nord (0…360).

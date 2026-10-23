@@ -40,7 +40,8 @@ struct ContentView: View {
     @State private var mostraVitals = false
     @State private var mostraConfidente = false
     @State private var mostraRicordi: VistaRicordi.Scheda?
-    @State private var guidaRicordi = false          // build 22: TRACCIA con la Guida già accesa («portami alla macchina»)
+    @State private var guidaRicordi = false          // build 22: TRACCIA con la Guida già accesa («portami al luogo»)
+    @State private var salvaRicordi = false          // build 22: TRACCIA salva subito il posto dove si trova («ricorda questo luogo»)
     @State private var mostraSentinella = false
     @State private var mostraWiretap = false
     @State private var mostraLidar = false            // STRUMENTI › LiDAR: la scansione della stanza
@@ -273,7 +274,7 @@ struct ContentView: View {
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }
         }
         .sheet(item: $mostraRicordi) { scheda in
-            VistaRicordi(iniziale: scheda, guida: guidaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }
+            VistaRicordi(iniziale: scheda, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }
         }
         .sheet(isPresented: $mostraConfidente) {
             VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
@@ -593,7 +594,7 @@ struct ContentView: View {
             ("SENSI", "shazam.logo", "Shazam", { tastiera = false; jarvis.interrompi(); scheda = .shazam }),
             ("SENSI", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
 
-            ("STRUMENTI", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
+            ("STRUMENTI", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
             ("STRUMENTI", "globe.europe.africa", "Interprete", { tastiera = false; scegliLingua = true }),
             ("STRUMENTI", "globe", "Browser", { mostraBrowser = true }),
             ("STRUMENTI", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
@@ -845,8 +846,10 @@ struct ContentView: View {
             case .allenatore: jarvis.allenatore = true
             case .bea: scheda = .bea
             case .ricordi:                                         // build 22: TRACCIA per prima, come nel mockup
-                guidaRicordi = jarvis.guidaTraccia                 // con la Guida solo se è stato «portami alla macchina»
+                guidaRicordi = jarvis.guidaTraccia                 // con la Guida solo se è stato «portami al luogo»
+                salvaRicordi = jarvis.salvaTraccia                 // e salva subito solo se è stato «ricorda questo luogo»
                 jarvis.guidaTraccia = false
+                jarvis.salvaTraccia = false
                 mostraRicordi = .traccia
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true

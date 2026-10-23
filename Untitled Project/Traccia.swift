@@ -1,26 +1,42 @@
 #if os(iOS)
 import SwiftUI
 import AVFoundation
+import UserNotifications
 
-/// Ricordi › TRACCIA (build 22): la bussola con la freccia verso l'ultimo parcheggio, i metri grandi, la distanza
-/// e il tempo a piedi; sotto gli ultimi ricordi e le frasi A VOCE. La fotocamera si accende solo col tasto «Guida»
-/// (o con «Jarvis, portami alla macchina»): allora la vista dalla fotocamera con le frecce olografiche, come nel mockup.
+/// Ricordi › TRACCIA (build 22): la bussola con la freccia verso un LUOGO salvato (di base il più recente), i metri grandi,
+/// la distanza e il tempo a piedi. «Luoghi» li elenca per sceglierne un altro, «Salva» aggiunge quello dove si trova adesso.
+/// La fotocamera si accende solo col tasto «Guida» (o con «Jarvis, portami al luogo»): allora la vista dalla fotocamera
+/// con le frecce olografiche, come nel mockup.
 struct PannelliTraccia: View {
-    let parcheggio: DatiRicordi.Riga?
+    /// I luoghi salvati, dal più recente (i «posti» della seconda memoria con le coordinate).
+    let luoghi: [DatiRicordi.Riga]
     let ultimi: [DatiRicordi.Riga]
-    /// La Guida (fotocamera e frecce): spenta quando si apre Ricordi, accesa subito da «Jarvis, portami alla macchina».
+    /// La Guida (fotocamera e frecce): spenta quando si apre Ricordi, accesa subito da «Jarvis, portami al luogo».
     @Binding var guida: Bool
+    /// «Jarvis, ricorda questo luogo»: appena c'è la posizione, si salva da solo (una volta).
+    var salvaSubito = false
+    /// Dopo un salvataggio: ricarica i ricordi (il luogo nuovo arriva in testa) e dice quale id scegliere.
+    let ricarica: () async -> Void
     @StateObject private var bussola = Bussola()
+    @State private var sceltoId: Int?
+    @State private var elenco = false
+    @State private var salvo = false
+    @State private var salvatoSubito = false
+    @State private var avviso: String?
     private let tinta = Color.ciano
+
+    /// Il luogo puntato: quello scelto, se c'è ancora; altrimenti il più recente.
+    private var scelto: DatiRicordi.Riga? { luoghi.first { $0.id == sceltoId } ?? luoghi.first }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Pannello(titolo: "TRACCIA", tinta: tinta) {
-                if let pk = parcheggio, let lat = pk.lat, let lon = pk.lon {
+                if let avviso { AvvisoJarvis(testo: avviso) }
+                if let l = scelto, let lat = l.lat, let lon = l.lon {
                     let rotta = bussola.verso(lat: lat, lon: lon)
                     if guida {
                         // la fotocamera vive solo dentro VistaAR: spenta la Guida, VistaAR esce e la ferma (onDisappear)
-                        VistaAR(lat: lat, lon: lon, bussola: bussola)
+                        VistaAR(lat: lat, lon: lon, nome: PannelliTraccia.etichetta(l), bussola: bussola)
                             .aspectRatio(720.0 / 520.0, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(tinta.opacity(0.22), lineWidth: 1))
@@ -34,14 +50,28 @@ struct PannelliTraccia: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                     }
-                    RigaHUD("Parcheggiata", [pk.quando, pk.luogo ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
+                    RigaHUD("Luogo", PannelliTraccia.nome(l))
+                    RigaHUD("Salvato", l.quando)
                     RigaHUD("Distanza", rotta.map { Rotta.distanza($0.metri) } ?? "cerco la posizione…")
                     RigaHUD("A piedi", rotta.map { Rotta.aPiedi($0.metri) } ?? "—")
-                    TastoComando(testo: guida ? "Bussola" : "Guida") { guida.toggle() }
                 } else {
-                    Text("Nessun parcheggio salvato, Sir. Quando lascia la macchina dica «Jarvis, ho parcheggiato qui».")
+                    Text("Nessun luogo salvato, Sir. Tocchi «Salva» dove si trova, o dica «Jarvis, ricorda questo luogo».")
                         .font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
+                HStack(spacing: 8) {
+                    TastoComando(testo: guida ? "Bussola" : "Guida", attivo: scelto != nil) { Suoni.tocco(); guida.toggle() }
+                    TastoComando(testo: "Luoghi", attivo: !luoghi.isEmpty) { Suoni.tocco(); withAnimation(.easeOut(duration: 0.25)) { elenco.toggle() } }
+                    TastoComando(testo: salvo ? "…" : "Salva", attivo: !salvo) { Task { await salva() } }
+                }
+            }
+            if elenco && !luoghi.isEmpty {
+                Pannello(titolo: "LUOGHI", tinta: tinta) {
+                    ForEach(luoghi) { l in
+                        Button { Suoni.tocco(); sceltoId = l.id } label: { rigaLuogo(l, attivo: l.id == scelto?.id) }
+                            .buttonStyle(StileStark())
+                    }
+                }
+                .transition(.opacity)
             }
             Pannello(titolo: "ULTIMI", tinta: tinta) {
                 if ultimi.isEmpty {
@@ -49,16 +79,83 @@ struct PannelliTraccia: View {
                 }
                 ForEach(ultimi) { r in RigaHUD(r.testo, r.luogo ?? r.quando) }
             }
-            PannelloAVoce(frasi: ["«Jarvis, traccia la macchina»", "«Jarvis, portami alla macchina»",
-                                  "«Jarvis, dov'è la macchina?»", "«Jarvis, dove ho messo le chiavi?»"])
+            PannelloAVoce(frasi: ["«Jarvis, traccia il luogo»", "«Jarvis, portami al luogo»",
+                                  "«Jarvis, ricorda questo luogo»", "«Jarvis, dove ho messo le chiavi?»"])
         }
-        .onAppear { if parcheggio?.lat != nil { bussola.accendi() } }
+        .onAppear { bussola.accendi() }
         .onDisappear { bussola.spegni() }
+        .task(id: bussola.lat != nil) {
+            // «ricorda questo luogo»: appena arriva la posizione, una volta sola
+            guard salvaSubito, !salvatoSubito, bussola.lat != nil else { return }
+            salvatoSubito = true
+            await salva()
+        }
+    }
+
+    /// Una riga di LUOGHI: nome e via a sinistra, la distanza da qui a destra; quello puntato è acceso.
+    private func rigaLuogo(_ l: DatiRicordi.Riga, attivo: Bool) -> some View {
+        let metri = l.lat.flatMap { la in l.lon.flatMap { lo in bussola.verso(lat: la, lon: lo)?.metri } }
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.testo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                Text(l.luogo ?? l.quando).font(.system(size: 13)).foregroundStyle(Color(red: 0.56, green: 0.70, blue: 0.74)).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(metri.map { Rotta.distanza($0) } ?? "—")
+                .font(.system(size: 14, weight: .semibold, design: .monospaced)).monospacedDigit().foregroundStyle(tinta)
+        }
+        .padding(.vertical, 10).padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(tinta.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(attivo ? tinta : Color(red: 0.07, green: 0.20, blue: 0.23), lineWidth: attivo ? 1.5 : 1))
+        .contentShape(Rectangle())
+    }
+
+    /// «Salva»: il posto dove si trova adesso diventa un luogo (con la via), e la freccia passa su di lui.
+    private func salva() async {
+        guard !salvo else { return }
+        guard let lat = bussola.lat, let lon = bussola.lon else {
+            Suoni.errore(); avviso = "Non ho ancora la sua posizione, Sir: un attimo e riprovi."; return
+        }
+        salvo = true
+        defer { salvo = false }
+        guard let o = await VistaVitals.chiama(["luogo_salva": ["lat": lat, "lon": lon] as [String: Any]], attesa: 15),
+              let riga = o["luogo"] as? [String: Any], let id = (riga["id"] as? NSNumber)?.intValue else {
+            Suoni.errore(); avviso = "Il luogo non si è salvato, Sir: riprovi tra poco."; return
+        }
+        Suoni.pronto()
+        avviso = nil
+        await ricarica()
+        sceltoId = id
+        let via = (riga["luogo"] as? String) ?? (riga["testo"] as? String) ?? "posizione salvata"
+        await PannelliTraccia.notifica("Luogo salvato, Sir: \(via).")
+    }
+
+    /// «Studio · Via Tortona 12» (o solo la via, se il nome è la via).
+    static func nome(_ l: DatiRicordi.Riga) -> String {
+        guard let via = l.luogo, !via.isEmpty, via != l.testo else { return l.testo }
+        return "\(l.testo) · \(via)"
+    }
+
+    /// L'etichetta sopra la meta nella Guida: il nome in maiuscolo, al massimo 16 lettere (come nel mockup).
+    static func etichetta(_ l: DatiRicordi.Riga) -> String {
+        let n = l.testo.uppercased()
+        return n.isEmpty ? "LUOGO" : String(n.prefix(16))
+    }
+
+    /// L'avviso che scende dall'alto, come nel mockup: una notifica di iOS subito, senza suono (il «pronto» l'ha già fatto l'app).
+    static func notifica(_ testo: String) async {
+        let c = UNMutableNotificationContent()
+        c.title = "JARVIS"
+        c.body = testo
+        c.sound = nil
+        let r = UNNotificationRequest(identifier: "luogo-\(Date().timeIntervalSince1970)", content: c, trigger: nil)
+        try? await UNUserNotificationCenter.current().add(r)
     }
 }
 
 /// La bussola di TRACCIA (come `bussola` del mockup e la versione dell'orologio): il quadrante gira con l'iPhone,
-/// la freccia punta la macchina. Si ridisegna quando la bussola cambia (ogni 2°), senza animazione continua.
+/// la freccia punta il luogo scelto. Si ridisegna quando la bussola cambia (ogni 2°), senza animazione continua.
 private struct BussolaTraccia: View {
     let rilevamento: Double?
     let direzione: Double?
@@ -103,12 +200,14 @@ private struct BussolaTraccia: View {
     }
 }
 
-/// La strada vista dalla fotocamera e la freccia olografica verso la macchina (disegnata come `disegnaAR` del mockup).
-/// Direzione = rilevamento verso la macchina meno la direzione dell'iPhone; in alto la bussola.
+/// La strada vista dalla fotocamera e la freccia olografica verso il luogo scelto (disegnata come `disegnaAR` del mockup).
+/// Direzione = rilevamento verso il luogo meno la direzione dell'iPhone; in alto la bussola.
 /// Esiste solo con la Guida accesa: la fotocamera parte quando compare e si ferma quando esce (Guida spenta o pagina chiusa).
 struct VistaAR: View {
     let lat: Double
     let lon: Double
+    /// Il nome sopra la meta («STUDIO · 180 m»).
+    let nome: String
     @ObservedObject var bussola: Bussola
     /// Creato una volta sola, quando serve: con `= MotoreOcchi()` ogni ridisegno ne costruirebbe uno nuovo (e una sessione).
     @State private var motore: MotoreOcchi?
@@ -140,7 +239,7 @@ struct VistaAR: View {
         let s = W / 720                                       // le misure del mockup sono su una tela larga 720
         let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
         let rotta = bussola.verso(lat: lat, lon: lon)
-        // la macchina sullo schermo: a destra o a sinistra di quanto bisogna girarsi (oltre gli 80° resta sul bordo)
+        // il luogo sullo schermo: a destra o a sinistra di quanto bisogna girarsi (oltre gli 80° resta sul bordo)
         let rel: Double = rotta.map { Rotta.relativa(rilevamento: $0.rilevamento, direzione: bussola.direzione ?? 0) } ?? 0
         let angolo: Double = max(-80, min(80, rel)) * Double.pi / 180
         let bx: Double = W * (0.5 + 0.42 * sin(angolo)), by: Double = H * 0.52
@@ -155,7 +254,7 @@ struct VistaAR: View {
 
         var luce = gc
         luce.addFilter(.shadow(color: ciano, radius: CGFloat(8 * max(s, 0.5))))
-        // le frecce a chevron che scorrono verso la macchina
+        // le frecce a chevron che scorrono verso il luogo
         for k in 0..<7 {
             let u: Double = (Double(k) + (t * 0.9).truncatingRemainder(dividingBy: 1)) / 7
             if u > 0.96 { continue }
@@ -171,7 +270,7 @@ struct VistaAR: View {
             let spessore: Double = max(2, 9 * (1 - u * 0.8)) * s
             g.stroke(freccia, with: .color(ciano), style: StrokeStyle(lineWidth: CGFloat(spessore), lineCap: .round, lineJoin: .round))
         }
-        // il punto della macchina: l'anello che pulsa e l'asta
+        // il punto del luogo: l'anello che pulsa e l'asta
         let pulsa: Double = (t * 0.8).truncatingRemainder(dividingBy: 1)
         let rx: Double = (18 + pulsa * 40) * s
         var anello = luce
@@ -181,8 +280,8 @@ struct VistaAR: View {
         asta.move(to: pt(bx, by))
         asta.addLine(to: pt(bx, by - 70 * s))
         luce.stroke(asta, with: .color(ciano), lineWidth: 2)
-        // l'etichetta «MACCHINA · 180 m»
-        let testo = rotta.map { "MACCHINA · \(Rotta.distanza($0.metri))" } ?? "MACCHINA"
+        // l'etichetta «STUDIO · 180 m»
+        let testo = rotta.map { "\(nome) · \(Rotta.distanza($0.metri))" } ?? nome
         let scritta = gc.resolve(Text(testo).font(.system(size: CGFloat(22 * s), weight: .bold, design: .monospaced)).foregroundStyle(ColoriHUD.chiaro))
         let misura = scritta.measure(in: size)
         let lw: Double = Double(misura.width) + 28 * s, lh: Double = 42 * s

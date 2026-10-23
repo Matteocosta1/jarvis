@@ -1,13 +1,15 @@
 #if os(iOS)
 import SwiftUI
 
-/// La seconda memoria di JARVIS, sull'iPhone: tutti i ricordi e i posti (qualsiasi luogo salvato, macchina compresa),
+/// La seconda memoria di JARVIS, sull'iPhone: tutti i ricordi e i posti (qualsiasi luogo salvato),
 /// con ricerca, spunta e cancellazione con uno scorrimento. La lista della spesa ha la sua scheda (icona Spesa).
 struct VistaRicordi: View {
     enum Scheda: String, CaseIterable, Identifiable { case traccia = "Traccia", ricordi = "Ricordi", posti = "Posti"; var id: String { rawValue } }
     var iniziale: Scheda = .ricordi
-    /// TRACCIA con la Guida già accesa (fotocamera e frecce): «Jarvis, portami alla macchina».
+    /// TRACCIA con la Guida già accesa (fotocamera e frecce): «Jarvis, portami al luogo».
     var guida = false
+    /// TRACCIA salva subito il posto dove si trova: «Jarvis, ricorda questo luogo».
+    var salva = false
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
 
@@ -31,9 +33,10 @@ struct VistaRicordi: View {
                     .padding(.horizontal, 16).padding(.top, 8)
 
                     if let d = dati, scheda == .traccia {
-                        // build 22: TRACCIA, la strada verso la macchina (come nel mockup)
+                        // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
                         ScrollView {
-                            PannelliTraccia(parcheggio: d.parcheggio, ultimi: Array(d.ricordi.prefix(3)), guida: $guidaAccesa)
+                            PannelliTraccia(luoghi: d.posti.filter { $0.tipo == "posto" || $0.tipo == "parcheggio" }, ultimi: Array(d.ricordi.prefix(3)),
+                                            guida: $guidaAccesa, salvaSubito: salva, ricarica: { await carica() })
                                 .padding(16)
                                 .padding(.bottom, 30)
                         }
@@ -129,13 +132,13 @@ struct VistaRicordi: View {
         .listRowBackground(Color.clear)
     }
 
-    // MARK: Posti (qualsiasi ricordo con una posizione: la macchina, un locale, dove ha visto qualcuno)
+    // MARK: Posti (qualsiasi ricordo con una posizione: un luogo salvato, un locale, dove ha visto qualcuno)
 
     @ViewBuilder private func posti(_ d: DatiRicordi) -> some View {
         Section {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
-                TextField("Cerchi un posto: bar, Luca, macchina…", text: $cerca).foregroundStyle(.white)
+                TextField("Cerchi un posto: bar, Luca, studio…", text: $cerca).foregroundStyle(.white)
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }
             .listRowBackground(Color.ciano.opacity(0.06))

@@ -158,7 +158,7 @@ struct VistaOrologio: View {
             jarvis.repartoRichiesto = nil
             apri(r)
         }
-        // build 22, comando a frase esatta: «protocollo notte», «traccia la macchina», «radar pioggia», «rapporto posta»
+        // build 22, comando a frase esatta: «protocollo notte», «traccia il luogo», «radar pioggia», «rapporto posta»
         .onChange(of: jarvis.polsoRichiesto) { _, s in
             guard let s else { return }
             jarvis.polsoRichiesto = nil

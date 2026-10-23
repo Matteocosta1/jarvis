@@ -365,7 +365,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard !Task.isCancelled, fase == .elaboro else { return }
         if let testo, !testo.isEmpty {
             // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…), prima di tutto il resto
-            if let d = ComandoDedicato.riconosci(testo) { dedicato(d); return }
+            // «ricorda questo luogo» sul polso va al cervello: lo salva lui con la posizione dell'orologio
+            if let d = ComandoDedicato.riconosci(testo), d != .salvaLuogo { dedicato(d); return }
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
             var comando = ComandoVocale.riconosci(testo)
             // i comandi rapidi che sull'orologio hanno la loro sezione: «scrivi il diario» → Diario, «ho bisogno di parlarti» → Confidente
@@ -415,6 +416,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             fase = .attesa
             return
         case .traccia, .guida: polsoRichiesto = .traccia; reparto = .ricordi   // sul polso niente fotocamera: la bussola
+        case .salvaLuogo: return                                              // non arriva qui (va al cervello, vedi sopra)
         case .radar: polsoRichiesto = .radar; reparto = .meteo
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: polsoRichiesto = .organismo; reparto = .vitals   // direttamente l'Organismo, non l'elenco di Vitals

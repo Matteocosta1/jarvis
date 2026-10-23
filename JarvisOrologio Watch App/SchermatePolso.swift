@@ -177,32 +177,35 @@ struct VistaProtocolliOrologio: View {
 
 // MARK: - TRACCIA
 
-/// La bussola con la freccia verso la macchina (l'ultimo «parcheggio»), i metri e l'indirizzo, come nel mockup.
+/// La bussola con la freccia verso l'ultimo luogo salvato (lo stesso che l'iPhone punta di base), i metri e il nome, come nel mockup.
 struct VistaTracciaOrologio: View {
-    private struct Macchina { let lat: Double; let lon: Double; let luogo: String }
+    private struct Luogo { let lat: Double; let lon: Double; let nome: String }
     @StateObject private var bussola = Bussola()
-    @State private var macchina: Macchina?
+    @State private var luogo: Luogo?
     @State private var caricato = false
 
     var body: some View {
         SchermoPolso(titolo: "TRACCIA", pronto: caricato) {
-            if let m = macchina {
+            if let m = luogo {
                 let rotta = bussola.verso(lat: m.lat, lon: m.lon)
                 Canvas { gc, size in disegna(gc, size, rilevamento: rotta?.rilevamento) }
                     .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)   // sta anche sul 40 mm
                 Text(rotta.map { Rotta.distanza($0.metri) } ?? "…")
                     .font(.system(size: 22, weight: .bold, design: .monospaced)).foregroundStyle(.white)
-                Text(m.luogo.isEmpty ? "Macchina" : "Macchina · \(m.luogo)")
+                Text(m.nome)
                     .font(.system(size: 9)).foregroundStyle(ColoriPolso.tenue).multilineTextAlignment(.center)
             } else {
-                Text("Nessun parcheggio salvato, Sir.").font(.system(size: 11)).foregroundStyle(ColoriPolso.testo)
+                Text("Nessun luogo salvato, Sir.").font(.system(size: 11)).foregroundStyle(ColoriPolso.testo)
                     .multilineTextAlignment(.center)
             }
         }
         .task {
-            if let o = await VistaVitalsOrologio.chiama(["ricordi": true]), let pk = o["parcheggio"] as? [String: Any],
+            // i posti arrivano dal più recente: il primo luogo salvato (o vecchio parcheggio) con le coordinate
+            if let o = await VistaVitalsOrologio.chiama(["ricordi": true]),
+               let pk = (o["posti"] as? [[String: Any]] ?? []).first(where: { ["posto", "parcheggio"].contains($0["tipo"] as? String ?? "") }),
                let lat = (pk["lat"] as? NSNumber)?.doubleValue, let lon = (pk["lon"] as? NSNumber)?.doubleValue {
-                macchina = Macchina(lat: lat, lon: lon, luogo: (pk["luogo"] as? String) ?? (pk["testo"] as? String) ?? "")
+                let testo = (pk["testo"] as? String) ?? "Luogo", via = (pk["luogo"] as? String) ?? ""
+                luogo = Luogo(lat: lat, lon: lon, nome: via.isEmpty || via == testo ? testo : "\(testo) · \(via)")
                 bussola.accendi()
             }
             caricato = true
@@ -210,7 +213,7 @@ struct VistaTracciaOrologio: View {
         .onDisappear { bussola.spegni() }
     }
 
-    /// Come `bussola` del mockup: il quadrante gira con il polso, la freccia punta la macchina.
+    /// Come `bussola` del mockup: il quadrante gira con il polso, la freccia punta il luogo.
     private func disegna(_ gc: GraphicsContext, _ size: CGSize, rilevamento: Double?) {
         let W = Double(size.width), H = Double(size.height)
         let cx = W / 2, cy = H / 2, r = H * 0.42
