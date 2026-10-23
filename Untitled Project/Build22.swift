@@ -121,8 +121,8 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
     case radar                    // «radar pioggia»: Meteo › RADAR
     case priorita                 // «rapporto posta»: Email › PRIORITÀ
     case organismo                // «scansione organismo», «stato dell'organismo»: Vitals (sull'orologio l'Organismo)
-    case specchio                 // «modalità specchio»: Allenatore
-    case squat                    // «contami gli squat»: Allenatore
+    case specchio                 // «modalità specchio»: Allenatore, sullo Specchio
+    case allenamento              // «allenamento allo specchio»: Allenatore, sullo Specchio
 
     static func riconosci(_ frase: String) -> ComandoDedicato? {
         var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
@@ -151,7 +151,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         case "rapporto posta": return .priorita
         case "scansione organismo", "stato dell organismo": return .organismo
         case "modalita specchio": return .specchio
-        case "contami gli squat", "contami gli squats", "contami gli squad": return .squat
+        case "allenamento allo specchio", "allenati allo specchio": return .allenamento
         default: return nil
         }
     }

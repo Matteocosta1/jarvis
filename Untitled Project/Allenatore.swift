@@ -9,7 +9,13 @@ import simd
 /// L'allenatore di JARVIS: inquadra chi si allena, l'iPhone riconosce lo scheletro del corpo (Vision, tutto in locale)
 /// e lo disegna in stile HUD sopra la ripresa. JARVIS commenta la postura a voce (schiena, spalle, braccia),
 /// conta le ripetizioni e a fine serie fa il riassunto. Pensato per il Pilates, va bene per squat, piegamenti, addominali.
-/// Build 22: contando le ginocchia (si apre così) è lo SPECCHIO · SQUAT del mockup, con lo scheletro «giusto» e i conti sul corpo.
+/// Build 22: con «Specchio» (conta le ginocchia) c'è lo SPECCHIO · ALLENAMENTO del mockup, con lo scheletro «giusto» e i conti sul corpo.
+/// Si apre sul Busto come sempre: lo Specchio parte scegliendolo, oppure con «Jarvis, modalità specchio» / «allenamento allo specchio».
+extension Notification.Name {
+    /// «Jarvis, modalità specchio» / «allenamento allo specchio»: l'Allenatore passa allo Specchio.
+    static let jarvisSpecchio = Notification.Name("jarvisSpecchio")
+}
+
 struct Allenatore: View {
     let chiudi: () -> Void
     @StateObject private var motore = MotoreAllenatore()
@@ -20,7 +26,7 @@ struct Allenatore: View {
             Color.black.ignoresSafeArea()
             AnteprimaAllenatore(sessione: motore.sessione).ignoresSafeArea()
             ScheletroHUD(posa: motore.posa, allarme: motore.posturaFuori, specchio: motore.frontale).ignoresSafeArea().allowsHitTesting(false)
-            // BUILD 22 · B — Specchio · Squat: lo scheletro giusto in verde e i conti sul corpo
+            // BUILD 22 · B — Specchio: lo scheletro giusto in verde e i conti sul corpo
             if motore.giunto == .ginocchia {
                 SpecchioHUD(posa: motore.posa, ginocchio: motore.ginocchio, in3D: motore.ginocchioIn3D, altezza: motore.altezzaInPiedi,
                             ripetizioni: motore.ripetizioni, schiena: motore.inclinazioneSchiena, specchio: motore.frontale)
@@ -73,14 +79,14 @@ struct Allenatore: View {
                     .animation(.easeInOut(duration: 0.3), value: motore.commento)
 
                 if motore.giunto == .ginocchia {
-                    Text("SPECCHIO · SQUAT").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                    Text("SPECCHIO · ALLENAMENTO").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         .foregroundStyle(Color.ciano)
                 }
 
                 Picker("Conteggio", selection: $motore.giunto) {
                     Text("Busto").tag(MotoreAllenatore.Giunto.busto)
                     Text("Mani").tag(MotoreAllenatore.Giunto.mani)
-                    Text("Ginocchia").tag(MotoreAllenatore.Giunto.ginocchia)
+                    Text("Specchio").tag(MotoreAllenatore.Giunto.ginocchia)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 40)
@@ -104,7 +110,11 @@ struct Allenatore: View {
             }
         }
         .statusBarHidden()
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisSpecchio)) { _ in   // detto con l'Allenatore già aperto
+            MotoreAllenatore.specchioRichiesto = false; motore.giunto = .ginocchia
+        }
         .task {
+            if MotoreAllenatore.specchioRichiesto { MotoreAllenatore.specchioRichiesto = false; motore.giunto = .ginocchia }
             await motore.avvia()
             // i comandi a voce: dopo il suono d'apertura (come nella Sentinella), sempre con «Jarvis» davanti
             try? await Task.sleep(for: .seconds(1.8))
@@ -186,9 +196,9 @@ struct ScheletroHUD: View {
     }
 }
 
-// MARK: - BUILD 22 · B — Specchio · Squat
+// MARK: - BUILD 22 · B — Specchio
 
-/// Lo specchio dello squat (mockup «SPECCHIO · SQUAT»): sopra il suo scheletro, quello «giusto» in verde trasparente
+/// Lo Specchio (mockup «SPECCHIO · ALLENAMENTO»): sopra il suo scheletro, quello «giusto» in verde trasparente
 /// che scende fino alla profondità corretta (ginocchio a 90°), e i conti sul corpo: RIPETIZIONI n / 12 sopra la testa,
 /// GINOCCHIO accanto al ginocchio destro, SCHIENA accanto al busto (la riga della telemetria in alto qui è nascosta).
 /// Il verde è la ripetizione del mockup (`posa(s)` di scena3d) messa sull'immagine: piedi sulle sue caviglie,
@@ -341,7 +351,9 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     @Published var posturaFuori = false
     @Published var commento = ""
     @Published var frontale = false
-    @Published var giunto: Giunto = .ginocchia { didSet { azzeraConteggio(); camera.usa3D(giunto == .ginocchia) } }   // build 22: si apre sullo Specchio · Squat
+    @Published var giunto: Giunto = .busto { didSet { azzeraConteggio(); camera.usa3D(giunto == .ginocchia) } }   // si apre sul Busto, come sempre
+    /// «Jarvis, modalità specchio» con l'Allenatore ancora chiuso: lo Specchio parte appena si apre.
+    static var specchioRichiesto = false
     @Published var ginocchio: Double?           // angolo del ginocchio in gradi (3D se c'è, se no dall'immagine)
     @Published var altezzaInPiedi: Double = 0   // collo → caviglie in piedi, in frazione dell'altezza dell'immagine
     @Published var ginocchioIn3D = false        // l'angolo viene dallo scheletro 3D
@@ -440,7 +452,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         let durata = Int(Date().timeIntervalSince(inizioSerie))
         var frase = n == 0 ? "Serie chiusa senza ripetizioni contate, Sir." : "Serie chiusa: \(n) ripetizion\(n == 1 ? "e" : "i") in \(durata / 60) minuti e \(durata % 60) secondi."
         if !serieSchiena.isEmpty {
-            frase += schiena < 8 ? " Schiena allineata per tutta la serie, davvero bene." : schiena < 15 ? " Schiena un po' inclinata, in media \(Int(schiena)) gradi: si può fare meglio." : " Attenzione alla schiena: in media \(Int(schiena)) gradi fuori asse."
+            let (ok, quasi) = giunto == .ginocchia ? (sogliaSchiena - 15, sogliaSchiena) : (8.0, 15.0)   // nello Specchio il busto si piega di suo
+            frase += schiena < ok ? " Schiena allineata per tutta la serie, davvero bene." : schiena < quasi ? " Schiena un po' inclinata, in media \(Int(schiena)) gradi: si può fare meglio." : " Attenzione alla schiena: in media \(Int(schiena)) gradi fuori asse."
             frase += simm >= 92 ? " Simmetria ottima." : " Simmetria al \(Int(simm)) per cento: un lato lavora più dell'altro."
         }
         commento = frase
@@ -516,7 +529,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         Suoni.tocco()
     }
 
-    // MARK: Specchio · Squat (build 22)
+    // MARK: Specchio (build 22)
 
     /// Squat contato con l'angolo del ginocchio: giù sotto i 110°, su sopra i 155°.
     /// I 45° di isteresi e almeno 0,6 s tra due ripetizioni evitano di contare due volte lo stesso squat.
@@ -624,7 +637,7 @@ nonisolated final class CameraPosa: NSObject, AVCaptureVideoDataOutputSampleBuff
     private var ingresso: AVCaptureDeviceInput?
     private var contatore = 0
     private let richiesta = VNDetectHumanBodyPoseRequest()
-    // build 22: lo scheletro 3D (iOS 17) per l'angolo vero del ginocchio, solo nello Specchio · Squat
+    // build 22: lo scheletro 3D (iOS 17) per l'angolo vero del ginocchio, solo nello Specchio
     private let richiesta3D = VNDetectHumanBodyPose3DRequest()
     private var vuole3D = false
     private var turno3D = 0

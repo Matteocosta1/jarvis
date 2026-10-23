@@ -418,7 +418,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .radar: polsoRichiesto = .radar; reparto = .meteo
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: polsoRichiesto = .organismo; reparto = .vitals   // direttamente l'Organismo, non l'elenco di Vitals
-        case .specchio, .squat: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
+        case .specchio, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
         }
         if let a = reparto?.annuncio { parla(a) } else { fase = .attesa }
     }
