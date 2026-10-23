@@ -1342,7 +1342,8 @@ function base64Righe(byte: Uint8Array) {
   return (btoa(bin).match(/.{1,76}/g) ?? []).join("\r\n");
 }
 
-async function smtpManda(a: string, messaggio: string) {
+/// a e messaggio null: prova solo l'accesso (saluto e password), senza mandare niente.
+async function smtpManda(a: string | null, messaggio: string | null) {
   const conn = await Deno.connectTls({ hostname: "smtp.mail.me.com", port: 465 });
   const enc = new TextEncoder(), dec = new TextDecoder();
   const buf = new Uint8Array(8192);
@@ -1368,6 +1369,7 @@ async function smtpManda(a: string, messaggio: string) {
     await passo(null, [220], "la connessione");
     await passo("EHLO jarvis.local", [250], "il saluto");
     await passo(`AUTH PLAIN ${btoa(`\0${ICLOUD_EMAIL}\0${ICLOUD_PASS}`)}`, [235], "l'accesso (password per app)");
+    if (a === null || messaggio === null) { try { await conn.write(enc.encode("QUIT\r\n")); } catch { /* */ } return; }
     await passo(`MAIL FROM:<${ICLOUD_EMAIL}>`, [250], "il mittente");
     await passo(`RCPT TO:<${a}>`, [250, 251], "il destinatario");
     await passo("DATA", [354], "il messaggio");
@@ -3439,6 +3441,10 @@ Deno.serve(async (req) => {
   if (corpo?.posta_priorita === true) {                                                   // Email › PRIORITÀ
     if (!ICLOUD_EMAIL || !ICLOUD_PASS) return json({ errore: "La posta iCloud non è collegata: mancano ICLOUD_EMAIL e la password per app." });
     try { return json(await postaPriorita(corpo.forza === true)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.smtp_prova === true) {                                                       // collaudo: l'invio di posta iCloud è raggiungibile?
+    const t0 = Date.now();
+    try { await smtpManda(null, null); return json({ ok: true, ms: Date.now() - t0 }); } catch (e) { return json({ ok: false, errore: (e as Error).message, ms: Date.now() - t0 }); }
   }
   if (corpo?.posta_rispondi && typeof corpo.posta_rispondi === "object") {                // Email › PRIORITÀ › Invia (dopo il tocco del signore)
     return json(await postaRispondi({ id: String(corpo.posta_rispondi.id ?? ""), testo: corpo.posta_rispondi.testo }));
