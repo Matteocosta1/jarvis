@@ -9,7 +9,9 @@ import CoreLocation
 /// I toni che il cervello può mettere nel testo per la voce di ElevenLabs («[whispers]», «[sarcastic]», «[serious]»…):
 /// servono solo alla voce. A schermo e nella cronologia non compaiono mai (23 ott).
 nonisolated enum TagVoce {
-    /// Il testo senza i tag tra parentesi quadre (una lettera, poi da 1 a 24 tra lettere, spazi e trattini) e senza lo spazio dopo.
+    /// Il testo senza i tag tra parentesi quadre e senza lo spazio dopo. Un tag è solo inglese minuscolo («[whispers]»,
+    /// «[sarcastic]»: una lettera, poi da 1 a 24 tra lettere minuscole, spazi e trattini) e sta a inizio testo, dopo uno
+    /// spazio o dopo un a capo: «array[index]» e «[Nota]» restano come sono.
     /// `inCorso`: la risposta sta ancora arrivando a pezzi; un tag non ancora chiuso in fondo («[whis») non si mostra.
     static func togli(_ testo: String, inCorso: Bool = false) -> String {
         guard testo.contains("[") else { return testo }
@@ -18,7 +20,7 @@ nonisolated enum TagVoce {
         out.reserveCapacity(c.count)
         var i = 0
         while i < c.count {
-            if c[i] == "[", let fine = chiusura(c, da: i) {
+            if c[i] == "[", libero(out.last), let fine = chiusura(c, da: i) {
                 var j = fine + 1
                 let aCapo = out.isEmpty || out.last == "\n"                       // tag da solo in testa a una riga: via anche l'a capo
                 while j < c.count, c[j] == " " || c[j] == "\t" || (aCapo && c[j] == "\n") { j += 1 }   // lo spazio dopo il tag
@@ -32,7 +34,7 @@ nonisolated enum TagVoce {
             out.append(c[i])
             i += 1
         }
-        if inCorso, let k = out.lastIndex(of: "["), forseTag(out[(k + 1)...]) {
+        if inCorso, let k = out.lastIndex(of: "["), libero(k > 0 ? out[k - 1] : nil), forseTag(out[(k + 1)...]) {
             out.removeSubrange(k...)
         }
         return String(out)
@@ -48,16 +50,26 @@ nonisolated enum TagVoce {
         return k
     }
 
+    /// Prima della «[» di un tag: l'inizio del testo, uno spazio o un a capo (quello che resta a schermo: dopo un tag tolto
+    /// ne può venire subito un altro). Attaccata a una parola («array[index]») non è un tag.
+    private static func libero(_ prima: Character?) -> Bool {
+        guard let prima else { return true }
+        return prima == " " || prima == "\n"
+    }
+
+    /// Una lettera inglese minuscola (a…z).
+    private static func minuscola(_ c: Character) -> Bool { c.isASCII && c.isLetter && c.isLowercase }
+
     private static func valido(_ s: ArraySlice<Character>) -> Bool {
-        guard s.count >= 2, s.count <= 25, let p = s.first, p.isASCII, p.isLetter else { return false }
-        return s.allSatisfy { ($0.isASCII && $0.isLetter) || $0 == " " || $0 == "-" }
+        guard s.count >= 2, s.count <= 25, let p = s.first, minuscola(p) else { return false }
+        return s.allSatisfy { minuscola($0) || $0 == " " || $0 == "-" }
     }
 
     /// Un pezzo di tag non ancora chiuso («[», «[whis»): potrebbe diventarlo col prossimo pezzo di testo.
     private static func forseTag(_ s: ArraySlice<Character>) -> Bool {
         guard s.count <= 25 else { return false }
-        if let p = s.first, !(p.isASCII && p.isLetter) { return false }
-        return s.allSatisfy { ($0.isASCII && $0.isLetter) || $0 == " " || $0 == "-" }
+        if let p = s.first, !minuscola(p) { return false }
+        return s.allSatisfy { minuscola($0) || $0 == " " || $0 == "-" }
     }
 }
 
