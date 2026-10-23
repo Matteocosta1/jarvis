@@ -172,6 +172,10 @@ struct ContentView: View {
                     }
                     // il reattore cresce mentre la tastiera scende, con la durata e la curva della tastiera stessa (anche nello swipe,
                     // dove la tastiera è già a metà): un movimento solo, la chat non si allunga prima per poi restringersi (era lo scatto)
+                    // la tastiera ricompare senza che il campo sia cambiato (app riaperta, iPhone girato…): il reattore torna piccolo
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                        if telefono && tastiera && reattoreGrande { withAnimation(ContentView.curvaTastiera) { reattoreGrande = false } }
+                    }
                     .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { n in
                         guard telefono, !reattoreGrande else { return }
                         let d = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
@@ -1096,7 +1100,7 @@ struct ContentView: View {
                     .background(Color.ciano2)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled((testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil) || jarvis.fase == .elaboro)
+            .disabled(testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil)   // anche mentre pensa: scritto vale come interromperlo
             .accessibilityLabel("Invia")
             }
             .padding(.horizontal, 16)

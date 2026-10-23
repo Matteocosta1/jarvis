@@ -313,7 +313,6 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    /// Ricorda quale risposta il signore sta interrompendo: se poi aggiunge qualcosa, va unito alla domanda di prima.
     /// Un messaggio scritto (Invia): se JARVIS stava pensando o rispondendo, vale come un'interruzione a voce (23 ott, chiesto dal signore):
     /// il cervello vede la domanda interrotta e decide se è il seguito o una domanda nuova, come nel dialogo a voce.
     func inviaScritto(_ testo: String) async {
@@ -325,6 +324,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
+    /// Ricorda quale risposta il signore sta interrompendo: se poi aggiunge qualcosa, va unito alla domanda di prima.
     private func segnaInterruzione() {
         // solo la risposta a una domanda in corso: non un annuncio di sezione, una notifica letta o una frase del Diario
         guard fase == .parlo || fase == .elaboro, let ultimo = messaggi.last, ultimo.ruolo == "assistant", ultimo.id == idTurno else { return }
