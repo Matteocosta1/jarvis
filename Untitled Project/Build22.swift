@@ -151,7 +151,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         case "rapporto posta": return .priorita
         case "scansione organismo": return .organismo
         case "modalita specchio": return .specchio
-        case "contami gli squat", "contami gli squats": return .squat
+        case "contami gli squat", "contami gli squats", "contami gli squad": return .squat
         default: return nil
         }
     }
