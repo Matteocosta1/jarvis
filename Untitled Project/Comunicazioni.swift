@@ -331,6 +331,7 @@ struct VistaTelefono: View {
     @State private var registro: [VoceRegistro] = Registro.leggi("registroChiamate")
     @State private var caricato = false
     @State private var daChiamare: (String, String)?
+    @ObservedObject private var protocolli = Protocolli.condiviso
 
     var body: some View {
         CorniceScheda(titolo: "Telefono", sottotitolo: pagina.rawValue.lowercased(), icona: "phone", tinta: tinta, pronto: caricato) {
@@ -347,18 +348,22 @@ struct VistaTelefono: View {
             }
         }
         .task { contatti = await Rubrica.tutti(); caricato = true }
-        .task {
-            // «Jarvis, protocollo notte»: come nel mockup la scheda si vede, poi parte da sola (come il tasto «Avvia»)
-            guard let p = Protocolli.condiviso.prendiRichiesto() else { return }
-            pagina = .protocolli
-            try? await Task.sleep(for: .seconds(2.3))
-            guard !Task.isCancelled else { return }
-            Protocolli.condiviso.avvia(p)
-        }
+        .task { await protocolloRichiesto() }
+        // detto con il Telefono già aperto: il .task non riparte, la richiesta arriva da qui
+        .onChange(of: protocolli.richiesta) { _, _ in Task { await protocolloRichiesto() } }
         .confirmationDialog(daChiamare.map { "Chiamo \($0.0)?" } ?? "", isPresented: Binding(get: { daChiamare != nil }, set: { if !$0 { daChiamare = nil } }), titleVisibility: .visible) {
             Button("Chiama") { if let d = daChiamare { chiama(nome: d.0, numero: d.1) } }
             Button("Annulla", role: .cancel) {}
         }
+    }
+
+    /// «Jarvis, protocollo notte»: come nel mockup la scheda si vede, poi parte da sola (come il tasto «Avvia»).
+    private func protocolloRichiesto() async {
+        guard let p = Protocolli.condiviso.prendiRichiesto() else { return }
+        pagina = .protocolli
+        try? await Task.sleep(for: .seconds(2.3))
+        guard !Task.isCancelled else { return }
+        Protocolli.condiviso.avvia(p)
     }
 
     private var contattoDelNumero: Contatto? {

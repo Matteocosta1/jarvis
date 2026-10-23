@@ -17,12 +17,14 @@ final class Protocolli: ObservableObject {
     @Published private(set) var fase: Fase = .fermo
     @Published private(set) var spuntati = 0                 // i passi già spuntati del protocollo attivo
     @Published private(set) var nota: String?                // Comando rapido mancante, annullato, non riuscito
+    /// Cresce a ogni richiesta a voce: la scheda Telefono già aperta se ne accorge (il suo .task non riparte).
+    @Published private(set) var richiesta = 0
     private var lanciato: Date?                               // aspetta il ritorno da Comandi rapidi
     private var richiesto: (Protocollo, Date)?                // detto a voce: parte appena si apre la scheda Telefono
     private var giro = 0                                      // ogni avvio ha il suo numero: le spunte di un avvio vecchio si fermano
 
     /// «Jarvis, protocollo notte»: la scheda Telefono lo avvia appena si apre.
-    func richiedi(_ p: Protocollo) { richiesto = (p, Date()) }
+    func richiedi(_ p: Protocollo) { richiesto = (p, Date()); richiesta += 1 }
 
     /// Il protocollo chiesto a voce pochi secondi fa (e lo consuma): se la scheda non si è aperta, non parte più tardi a sorpresa.
     func prendiRichiesto() -> Protocollo? {
