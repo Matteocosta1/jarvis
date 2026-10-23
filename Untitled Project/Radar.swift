@@ -65,7 +65,8 @@ final class PosizioneSfondo: NSObject, ObservableObject, CLLocationManagerDelega
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
         let posizione: [String: Any] = ["lat": lat, "lon": lon, "precisione": precisione, "quando": iso.string(from: quando)]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["posizione_aggiorna": posizione, "dispositivo": Impostazioni.dispositivo])
+        let corpo: [String: Any] = ["posizione_aggiorna": posizione, "dispositivo": Impostazioni.dispositivo]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
         _ = try? await URLSession.shared.data(for: req)
     }
 }
