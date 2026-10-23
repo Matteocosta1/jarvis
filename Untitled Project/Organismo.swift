@@ -596,27 +596,8 @@ struct VistaOlogramma: UIViewRepresentable {
     }
 }
 
-/// Il riquadro dei pannelli del mockup (.pannello): fondo ciano 5%, bordo 22%, angoli 12.
-struct StilePannello22: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.vertical, 12).padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.ciano.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.22), lineWidth: 1))
-    }
-}
-
-/// Il titolo dei pannelli del mockup (h3): 10 pt mono, spaziato, ciano.
-struct TitoloPannello22: View {
-    let testo: String
-    var body: some View {
-        Text(testo).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
-    }
-}
-
 /// ORGANISMO in Vitals: la persona olografica che gira, poi Prontezza, Sonno, Battito a riposo, Passi ieri, Umore.
+/// Lo stesso `Pannello` delle altre schede (e di A VOCE sotto): angoli, fondo e titolo identici.
 struct PannelloOrganismo: View {
     let oggi: SaluteOggi?
     let diario: DatiVitals?
@@ -628,8 +609,7 @@ struct PannelloOrganismo: View {
 
     var body: some View {
         let d = dati
-        VStack(alignment: .leading, spacing: 8) {
-            TitoloPannello22(testo: "ORGANISMO")
+        Pannello(titolo: "ORGANISMO", tinta: .ciano) {
             VistaOlogramma(ologramma: ologramma)
                 .aspectRatio(720.0 / 640.0, contentMode: .fit)
                 .overlay(alignment: .bottomTrailing) {
@@ -652,7 +632,6 @@ struct PannelloOrganismo: View {
             riga("Passi ieri", d.testoPassi)
             riga("Umore", d.testoUmore)
         }
-        .modifier(StilePannello22())
         .task { storia = await SaluteStorica.giorni(31) }
         .onAppear { ologramma.pausa(false); ologramma.aggiorna(d) }
         .onDisappear { ologramma.pausa(true) }
