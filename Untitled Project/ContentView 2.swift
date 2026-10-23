@@ -1087,7 +1087,7 @@ struct ContentView: View {
                 let t = testo
                 testo = ""
                 scrive = false                      // la tastiera resta aperta: di nuovo in attesa, risponde e si può interrompere
-                Task { await jarvis.invia(t) }
+                Task { await jarvis.inviaScritto(t) }   // scritto mentre risponde: come interromperlo a voce
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 17, weight: .bold))
