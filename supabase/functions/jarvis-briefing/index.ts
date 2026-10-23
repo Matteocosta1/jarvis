@@ -3,7 +3,8 @@
 // Segreti: JARVIS_TOKEN, JARVIS_BUNDLE_ID (identificatore dell'app JARVIS in Xcode), APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID.
 // Corpo facoltativo: { forza: true } manda subito, a qualunque ora; { testo: "..." } manda questo avviso invece del briefing;
 // { promesse: true } (pg_cron ogni 15 minuti) manda le promesse della seconda memoria in scadenza;
-// { diario: true } (pg_cron alle 23:30 di Roma) manda la domanda della sera del diario.
+// { diario: true } (pg_cron alle 23:30 di Roma) manda la domanda della sera del diario;
+// { radar: true } (pg_cron ogni 10 minuti) manda l'avviso di pioggia quando il cervello dice che sta per piovere (una volta per pioggia).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
@@ -61,7 +62,7 @@ async function chiediAlCervello(richiesta: string) {
   const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jarvis`, {
     method: "POST", signal: AbortSignal.timeout(80_000),
     headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
-    body: JSON.stringify({ messaggi: [{ role: "user", content: richiesta }], dispositivo: "iphone", strumenti_client: [] }),
+    body: JSON.stringify({ messaggi: [{ role: "user", content: richiesta }], dispositivo: "iphone", strumenti_client: [], senza_filo: true }),   // il briefing non tocca il filo della chat
   });
   if (!r.ok || !r.body) throw new Error(`cervello: ${r.status}`);
   let testo = "", resto = "";
@@ -151,6 +152,18 @@ Deno.serve(async (req) => {
       if (!(e as any).errore) inviate++;
     }
     return json({ promesse: (data ?? []).length, inviate });
+  }
+  if (corpo.radar === true) {                                                        // RADAR (pg_cron ogni 10 minuti): il cervello decide, qui si avvisa
+    try {
+      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jarvis`, {
+        method: "POST", signal: AbortSignal.timeout(20_000),
+        headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
+        body: JSON.stringify({ radar_avviso: true }),
+      });
+      const d: any = await r.json().catch(() => ({}));
+      if (!d.manda || typeof d.testo !== "string") return json({ inviata: false, motivo: d.motivo ?? d.errore ?? `cervello ${r.status}` });
+      return json({ ...(await mandaATutti(String(d.titolo || "Radar"), d.testo, "radar")), testo: d.testo });
+    } catch (e) { return json({ inviata: false, errore: (e as Error).message }); }
   }
   if (corpo.diario === true) {                                                       // il diario della sera, alle 23:30 di Roma
     if (daCron && !corpo.forza && oraRoma() !== 23) return json({ saltato: true, ora_roma: oraRoma() });
