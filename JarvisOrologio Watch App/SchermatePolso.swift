@@ -164,9 +164,9 @@ struct VistaProtocolliOrologio: View {
                 try? await Task.sleep(for: .milliseconds(300))
                 guard giro == mio else { return }
                 mostrati = k + 1
-                SuoniOrologio.tick()
+                if p.passi[k].jarvis { SuoniOrologio.tick() }    // come nel mockup: il tick solo sui passi di JARVIS (✓)
             }
-            if p.passi.contains(where: { $0.jarvis }) { SuoniOrologio.fatto() }
+            SuoniOrologio.fatto()                                 // e alla fine sempre «pronto»
             try? await Task.sleep(for: .milliseconds(400))      // i suoni finiscono prima della voce
             guard giro == mio else { return }
             jarvis.protocolloDalPolso(p)
