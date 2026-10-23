@@ -188,7 +188,7 @@ struct VistaTracciaOrologio: View {
             if let m = macchina {
                 let rotta = bussola.verso(lat: m.lat, lon: m.lon)
                 Canvas { gc, size in disegna(gc, size, rilevamento: rotta?.rilevamento) }
-                    .frame(width: 160, height: 120)
+                    .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)   // sta anche sul 40 mm
                 Text(rotta.map { Rotta.distanza($0.metri) } ?? "…")
                     .font(.system(size: 22, weight: .bold, design: .monospaced)).foregroundStyle(.white)
                 Text(m.luogo.isEmpty ? "Macchina" : "Macchina · \(m.luogo)")
