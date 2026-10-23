@@ -629,6 +629,12 @@ struct VistaVitalsOrologio: View {
 
     var body: some View {
         List {
+            // BUILD 22 · B — Organismo: la persona olografica con la prontezza (file OrganismoOrologio.swift)
+            Section {
+                NavigationLink { VistaOrganismoOrologio() } label: {
+                    Label("Organismo", systemImage: "figure.stand").foregroundStyle(ciano)
+                }
+            }
             Section {
                 riga("heart.fill", .red, "Battito ora", cuore.ultimo.map { "\(Int($0.rounded())) bpm" } ?? "—")
                 riga("bed.double.fill", ciano, "Sonno", oggi?.sonno ?? (oggi == nil ? "…" : "—"))
