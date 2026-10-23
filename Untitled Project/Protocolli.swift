@@ -100,7 +100,7 @@ final class Protocolli: ObservableObject {
                 try? await Task.sleep(for: .milliseconds(320))
                 guard self.giro == mio else { return }
                 self.spuntati = k + 1
-                Suoni.tocco()
+                Suoni.clickTesta()                                  // lo stesso click delle icone in alto (SISTEMI, cestino)
             }
             Suoni.fatto()
             self.fase = .attivo
