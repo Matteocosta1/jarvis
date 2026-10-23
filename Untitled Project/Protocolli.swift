@@ -3,8 +3,8 @@ import SwiftUI
 import Combine
 import UIKit
 
-/// Telefono › PROTOCOLLI (build 22). «Avvia» lancia il Comando rapido del protocollo («JARVIS Party», «JARVIS Notte»,
-/// «JARVIS Rientro») con il ritorno automatico in JARVIS (x-callback-url). Tornato qui i passi si spuntano a schermo
+/// PROTOCOLLI (build 22), nella tendina che scende dall'alto. «Avvia» lancia il Comando rapido del protocollo («JARVIS Party», «JARVIS Notte»,
+/// «JARVIS Rientro») con il ritorno automatico in JARVIS (x-callback-url). Tornato qui i passi si spuntano nella tendina
 /// e JARVIS fa le sue parti: NOTTE la domanda del diario, RIENTRO messaggi da leggere e meteo di domani (chiesti al cervello).
 @MainActor
 final class Protocolli: ObservableObject {
@@ -17,16 +17,16 @@ final class Protocolli: ObservableObject {
     @Published private(set) var fase: Fase = .fermo
     @Published private(set) var spuntati = 0                 // i passi già spuntati del protocollo attivo
     @Published private(set) var nota: String?                // Comando rapido mancante, annullato, non riuscito
-    /// Cresce a ogni richiesta a voce: la scheda Telefono già aperta se ne accorge (il suo .task non riparte).
+    /// Cresce a ogni richiesta a voce: la schermata principale apre la tendina e lo avvia.
     @Published private(set) var richiesta = 0
     private var lanciato: Date?                               // aspetta il ritorno da Comandi rapidi
     private var richiesto: (Protocollo, Date)?                // detto a voce: parte appena si apre la scheda Telefono
     private var giro = 0                                      // ogni avvio ha il suo numero: le spunte di un avvio vecchio si fermano
 
-    /// «Jarvis, protocollo notte»: la scheda Telefono lo avvia appena si apre.
+    /// «Jarvis, protocollo notte»: la tendina scende e lo avvia.
     func richiedi(_ p: Protocollo) { richiesto = (p, Date()); richiesta += 1 }
 
-    /// Il protocollo chiesto a voce pochi secondi fa (e lo consuma): se la scheda non si è aperta, non parte più tardi a sorpresa.
+    /// Il protocollo chiesto a voce pochi secondi fa (e lo consuma): se la tendina non è scesa, non parte più tardi a sorpresa.
     func prendiRichiesto() -> Protocollo? {
         defer { richiesto = nil }
         guard let r = richiesto, Date().timeIntervalSince(r.1) < 8 else { return nil }
@@ -127,20 +127,58 @@ final class Protocolli: ObservableObject {
     }
 }
 
-/// Il pannello PROTOCOLLI e il suo A VOCE, come nel mockup.
-struct PannelloProtocolli: View {
+/// La tendina PROTOCOLLI (build 22), come il Centro di Controllo di iOS e come nel mockup: scende dall'alto tirandola giù
+/// dalla parte alta di JARVIS e risale con uno swipe in su (o toccando la maniglia o il velo). Dentro: le tre schede
+/// PARTY · NOTTE · RIENTRO con «Avvia» e i passi che si spuntano, le frasi A VOCE e la nota sui Comandi rapidi.
+struct TendinaProtocolli: View {
+    /// Lo spazio in alto da lasciare libero (la Dynamic Island e l'ora).
+    let margineAlto: CGFloat
+    let chiudi: () -> Void
     @ObservedObject private var protocolli = Protocolli.condiviso
     private let tinta = Color.ciano
+    private let fondo = Color(red: 7 / 255, green: 13 / 255, blue: 15 / 255)
 
     var body: some View {
-        Pannello(titolo: "PROTOCOLLI", tinta: tinta) {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("PROTOCOLLI")
+                .font(.system(size: 13, weight: .bold, design: .monospaced)).tracking(3)
+                .foregroundStyle(tinta).shadow(color: tinta.opacity(0.5), radius: 5)
+                .padding(.horizontal, 4)
             ForEach(Protocollo.allCases) { p in scheda(p) }
             if let n = protocolli.nota {
-                Text(n).font(.system(size: 12)).foregroundStyle(.orange)
+                Text(n).font(.system(size: 12)).foregroundStyle(.orange).padding(.horizontal, 6)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(["«Jarvis, protocollo party»", "«Jarvis, protocollo notte»", "«Jarvis, protocollo rientro»"], id: \.self) {
+                    Text($0).font(.system(size: 13)).foregroundStyle(ColoriHUD.testo)
+                }
+            }
+            .padding(.horizontal, 6)
+            Text("Ogni protocollo è un Comando rapido dell'app Comandi («JARVIS Party», «JARVIS Notte», «JARVIS Rientro»): i passi si cambiano lì.")
+                .font(.system(size: 11)).foregroundStyle(Color.tenue).padding(.horizontal, 6)
+            Capsule().fill(ColoriHUD.chiaro.opacity(0.45))
+                .frame(width: 44, height: 5)
+                .frame(maxWidth: .infinity).padding(.top, 4).padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .onTapGesture { chiudi() }
+                .accessibilityLabel("Chiudi i protocolli").accessibilityAddTraits(.isButton)
         }
-        PannelloAVoce(frasi: ["«Jarvis, protocollo party»", "«Jarvis, protocollo notte»", "«Jarvis, protocollo rientro»"],
-                      nota: "Ogni protocollo è un Comando rapido dell'app Comandi («JARVIS Party», «JARVIS Notte», «JARVIS Rientro»): i passi si cambiano lì.")
+        .padding(.top, margineAlto + 8)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 2)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
+                .fill(fondo.opacity(0.84))
+                .background(.ultraThinMaterial, in: UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34))
+                .overlay(alignment: .bottom) {
+                    UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
+                        .stroke(tinta.opacity(0.25), lineWidth: 1).mask(alignment: .bottom) { Rectangle().frame(height: 40) }
+                }
+                .shadow(color: .black.opacity(0.6), radius: 25, y: 18)
+                .ignoresSafeArea(edges: .top)
+        }
     }
 
     private func scheda(_ p: Protocollo) -> some View {
@@ -170,11 +208,12 @@ struct PannelloProtocolli: View {
                 }
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 22).fill(acceso ? tinta.opacity(0.1) : Color.white.opacity(0.045)))
         .overlay(
-            RoundedRectangle(cornerRadius: 10).stroke(acceso ? tinta : tinta.opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 22).stroke(acceso ? tinta : tinta.opacity(0.16), lineWidth: 1)
                 .shadow(color: acceso ? tinta.opacity(0.25) : .clear, radius: 8)        // il bagliore solo sul bordo, come nel mockup
         )
         .animation(.easeOut(duration: 0.3), value: acceso)

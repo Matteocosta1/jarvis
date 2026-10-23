@@ -322,48 +322,32 @@ struct VistaMessaggi: View {
 struct VistaTelefono: View {
     let chiedi: (String) -> Void
     private let tinta = Color.ciano
-    enum Pagina: String, CaseIterable, Identifiable { case protocolli = "Protocolli", tastiera = "Tastiera", rubrica = "Rubrica", recenti = "Recenti"; var id: String { rawValue } }
+    enum Pagina: String, CaseIterable, Identifiable { case tastiera = "Tastiera", rubrica = "Rubrica", recenti = "Recenti"; var id: String { rawValue } }
 
-    @State private var pagina: Pagina = .protocolli          // build 22: PROTOCOLLI per primi, come nel mockup
+    @State private var pagina: Pagina = .tastiera              // build 22: i PROTOCOLLI non stanno più qui, ma nella tendina dall'alto
     @State private var numero = ""
     @State private var contatti: [Contatto] = []
     @State private var cerca = ""
     @State private var registro: [VoceRegistro] = Registro.leggi("registroChiamate")
     @State private var caricato = false
     @State private var daChiamare: (String, String)?
-    @ObservedObject private var protocolli = Protocolli.condiviso
 
     var body: some View {
         CorniceScheda(titolo: "Telefono", sottotitolo: pagina.rawValue.lowercased(), icona: "phone", tinta: tinta, pronto: caricato) {
             Picker("Pagina", selection: $pagina) { ForEach(Pagina.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
             switch pagina {
-            case .protocolli: PannelloProtocolli()
             case .tastiera: tastiera
             case .rubrica: rubrica
             case .recenti: recenti
             }
-            if pagina != .protocolli {
-                Text("La chiamata parte dall'app Telefono: iOS chiede un tocco di conferma, e riattacca lei da lì. Dica anche «Jarvis, chiama Marco».")
-                    .font(.system(size: 11)).foregroundStyle(Color.tenue)
-            }
+            Text("La chiamata parte dall'app Telefono: iOS chiede un tocco di conferma, e riattacca lei da lì. Dica anche «Jarvis, chiama Marco».")
+                .font(.system(size: 11)).foregroundStyle(Color.tenue)
         }
         .task { contatti = await Rubrica.tutti(); caricato = true }
-        .task { await protocolloRichiesto() }
-        // detto con il Telefono già aperto: il .task non riparte, la richiesta arriva da qui
-        .onChange(of: protocolli.richiesta) { _, _ in Task { await protocolloRichiesto() } }
         .confirmationDialog(daChiamare.map { "Chiamo \($0.0)?" } ?? "", isPresented: Binding(get: { daChiamare != nil }, set: { if !$0 { daChiamare = nil } }), titleVisibility: .visible) {
             Button("Chiama") { if let d = daChiamare { chiama(nome: d.0, numero: d.1) } }
             Button("Annulla", role: .cancel) {}
         }
-    }
-
-    /// «Jarvis, protocollo notte»: come nel mockup la scheda si vede, poi parte da sola (come il tasto «Avvia»).
-    private func protocolloRichiesto() async {
-        guard let p = Protocolli.condiviso.prendiRichiesto() else { return }
-        pagina = .protocolli
-        try? await Task.sleep(for: .seconds(2.3))
-        guard !Task.isCancelled else { return }
-        Protocolli.condiviso.avvia(p)
     }
 
     private var contattoDelNumero: Contatto? {

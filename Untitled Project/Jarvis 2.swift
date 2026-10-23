@@ -691,8 +691,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func eseguiDedicato(_ d: ComandoDedicato) {
         switch d {
         case .protocollo(let p):
-            Protocolli.condiviso.richiedi(p)     // la scheda Telefono lo avvia appena aperta, come il tasto «Avvia»
-            apriReparto(.telefono)
+            Protocolli.condiviso.richiedi(p)     // la tendina PROTOCOLLI scende e lo avvia, come il tasto «Avvia» (ContentView)
         case .traccia: guidaTraccia = false; salvaTraccia = false; apriReparto(.ricordi)   // Ricordi si apre su TRACCIA, con la bussola
         case .guida: guidaTraccia = true; salvaTraccia = false; apriReparto(.ricordi)      // TRACCIA con la Guida già accesa (fotocamera e frecce)
         case .salvaLuogo: guidaTraccia = false; salvaTraccia = true; apriReparto(.ricordi) // TRACCIA salva il posto dove si trova

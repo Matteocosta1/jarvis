@@ -50,6 +50,11 @@ struct ContentView: View {
     @State private var statoSistemi: [String: String] = MemoriaSistemi.leggi()   // la riga di stato sotto ogni voce del menu: le ultime lette, subito
     @State private var scheda: SchedaApp?          // le schede delle icone: Diario, Sonno, Cuore, Meteo, Spesa…
     @State private var aiutoBea: AiutoBea?          // il Tocco d'aiuto di Bea: schermata a tutto schermo
+    // build 22: la tendina PROTOCOLLI, giù col dito dalla parte alta di JARVIS (titolo e reattore), su per mandarla via
+    @State private var tendinaAperta = false
+    @State private var tendinaTrascina: CGFloat = 0      // di quanto la sta tirando il dito (in giù da chiusa, in su da aperta)
+    @State private var altezzaTendina: CGFloat = 640     // misurata appena la tendina c'è
+    @ObservedObject private var protocolli = Protocolli.condiviso
     @Environment(\.scenePhase) private var scena
 
     /// Il richiamo «Jarvis» resta in ascolto ovunque nell'app (schede, Occhi, Cucina, Impostazioni, SISTEMI, Browser, LiDAR…),
@@ -123,15 +128,18 @@ struct ContentView: View {
                     ZStack(alignment: .bottom) {
                         VStack(spacing: 0) {
                             intestazione()
+                                .simultaneousGesture(tiraGiuTendina)
                             Spacer(minLength: 0)
                             corona
                                 .frame(width: 430)
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
                                 .frame(width: g.size.width, height: (altezzaCorona + 12) * scala, alignment: .top)
+                                .simultaneousGesture(tiraGiuTendina)
                             testiHUD
                                 .frame(maxWidth: max(0, min(640, (g.size.width - 32) / 1.25)))
                                 .scaleEffect(mac ? 1.25 : 1, anchor: .top)
                                 .frame(height: altezzaTesti, alignment: .top)
+                                .simultaneousGesture(tiraGiuTendina)
                             Spacer(minLength: 0)
                             Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
                         }
@@ -147,6 +155,7 @@ struct ContentView: View {
                 } else {
                     VStack(spacing: 0) {
                         intestazione(mini: telefono && !reattoreGrande)
+                            .simultaneousGesture(tiraGiuTendina)
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
                         if telefono && !reattoreGrande && g.size.height > 300 {   // iPhone piccolo girato: non c'è posto, niente riga
                             rigaStato
@@ -155,6 +164,7 @@ struct ContentView: View {
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if reattoreGrande || !telefono {
                             centroHUD
+                                .simultaneousGesture(tiraGiuTendina)
                                 .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
                         }
                         registro
@@ -188,8 +198,20 @@ struct ContentView: View {
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
                     .onAppear { if telefono { reattoreGrande = !tastiera } }
                 }
+                tendina(g)
             }
             .frame(width: g.size.width, height: g.size.height)
+            .defersSystemGestures(on: .top)                 // il dito che tira giù la tendina non apre il Centro notifiche di iOS
+        }
+        // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
+        .onReceive(protocolli.$richiesta.dropFirst()) { _ in
+            chiudiTutto()
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(400))
+                apriTendina()
+                try? await Task.sleep(for: .milliseconds(600))
+                if let p = Protocolli.condiviso.prendiRichiesto() { Protocolli.condiviso.avvia(p) }
+            }
         }
         .sheet(isPresented: $mostraImpostazioni, onDismiss: {
             eseguiComando()
@@ -787,6 +809,73 @@ struct ContentView: View {
             ("link", "Bea", { tastiera = false; scheda = .bea }),                    // 20 ott: Bea passa in INTELLIGENCE
         ]
     }
+
+    // MARK: Build 22 · la tendina PROTOCOLLI (come il Centro di Controllo di iOS, come nel mockup)
+
+    /// Il velo scuro e la tendina. Chiusa sta appena sopra lo schermo; mentre il dito la tira segue il dito.
+    @ViewBuilder private func tendina(_ g: GeometryProxy) -> some View {
+        let chiusa = -(altezzaTendina + 12)
+        let y: CGFloat = tendinaAperta ? min(0, tendinaTrascina) : min(0, chiusa + max(0, tendinaTrascina))
+        let quanto = max(0, min(1, 1 + y / (altezzaTendina + 12)))          // 0 chiusa, 1 tutta giù
+        Color.black.opacity(0.45 * quanto)
+            .ignoresSafeArea()
+            .allowsHitTesting(tendinaAperta)
+            .onTapGesture { chiudiTendina() }
+            .zIndex(19)
+        TendinaProtocolli(margineAlto: g.safeAreaInsets.top) { chiudiTendina() }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in if h > 100 { altezzaTendina = h } }
+            .offset(y: y)
+            .gesture(
+                // su col dito per mandarla via (giù non va oltre: è già tutta aperta)
+                DragGesture(minimumDistance: 10)
+                    .onChanged { v in
+                        guard tendinaAperta, abs(v.translation.height) > abs(v.translation.width) else { return }
+                        tendinaTrascina = min(0, v.translation.height)
+                    }
+                    .onEnded { v in
+                        guard tendinaAperta else { return }
+                        let su = -min(0, v.predictedEndTranslation.height)
+                        if -tendinaTrascina > altezzaTendina * 0.3 || su > altezzaTendina * 0.5 { chiudiTendina() }
+                        else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
+                    }
+            )
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(.keyboard)
+            .allowsHitTesting(tendinaAperta)
+            .accessibilityHidden(!tendinaAperta)
+            .zIndex(20)
+    }
+
+    /// Giù col dito dal titolo o dal reattore: la tendina segue il dito e, lasciata oltre un terzo (o lanciata), scende tutta.
+    private var tiraGiuTendina: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { v in
+                guard !tendinaAperta, tendinaLibera, v.translation.height > 0, abs(v.translation.height) > abs(v.translation.width) * 1.2 else { return }
+                tendinaTrascina = v.translation.height
+            }
+            .onEnded { v in
+                guard !tendinaAperta, tendinaTrascina > 0 else { tendinaTrascina = 0; return }
+                if tendinaTrascina > altezzaTendina * 0.3 || v.predictedEndTranslation.height > altezzaTendina * 0.6 { apriTendina() }
+                else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
+            }
+    }
+
+    /// La tendina scende solo sulla schermata principale libera: niente tastiera aperta, niente menu SISTEMI.
+    private var tendinaLibera: Bool { !tastiera && !mostraSistemi }
+
+    private func apriTendina() {
+        if !tendinaAperta { Suoni.clickTesta() }                 // il click delle icone in alto, come nel mockup
+        if telefono { tastiera = false }
+        withAnimation(ContentView.curvaTendina) { tendinaAperta = true; tendinaTrascina = 0 }
+    }
+
+    private func chiudiTendina() {
+        withAnimation(ContentView.curvaTendina) { tendinaAperta = false; tendinaTrascina = 0 }
+    }
+
+    /// La curva della tendina: parte decisa e si posa piano (0,42 s, come nel mockup).
+    static let curvaTendina: Animation = .timingCurve(0.2, 0.9, 0.25, 1, duration: 0.42)
 
     /// Chiude tutto quello che è aperto sopra la schermata principale.
     private func chiudiTutto() {
