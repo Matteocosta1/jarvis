@@ -5,7 +5,7 @@ import Charts
 /// Vitals: tutti i parametri vitali del signore in un posto solo, come JARVIS li legge a Stark nell'armatura.
 /// Oggi: sonno con le fasi, battito a riposo, passi, calorie, allenamenti (dall'app Salute).
 /// Nel tempo: umore (ricavato da JARVIS dal diario della sera) incrociato con sonno, battito e passi.
-/// Sotto, il diario da rileggere e cancellare.
+/// Sotto, il diario da rileggere e cancellare. In cima (build 22) l'ORGANISMO: la persona olografica con la prontezza.
 struct VistaVitals: View {
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
@@ -23,6 +23,9 @@ struct VistaVitals: View {
                 Color.fondo.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
+                        PannelloOrganismo(oggi: oggi, diario: dati)
+                        PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
                         sezioneOggi
 
                         Picker("Periodo", selection: $giorni) {
