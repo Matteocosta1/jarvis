@@ -1091,7 +1091,7 @@ struct ContentView: View {
                 let t = testo
                 testo = ""
                 scrive = false                      // la tastiera resta aperta: di nuovo in attesa, risponde e si può interrompere
-                Task { await jarvis.inviaScritto(t) }   // scritto mentre risponde: come interromperlo a voce
+                if telefono { Task { await jarvis.inviaScritto(t) } } else { Task { await jarvis.invia(t) } }   // iPhone: scritto mentre risponde vale come interromperlo a voce
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 17, weight: .bold))
@@ -1100,7 +1100,7 @@ struct ContentView: View {
                     .background(Color.ciano2)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled(testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil)   // anche mentre pensa: scritto vale come interromperlo
+            .disabled((testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil) || (!telefono && jarvis.fase == .elaboro))   // iPhone: anche mentre pensa (vale come interromperlo); iPad e Mac come prima
             .accessibilityLabel("Invia")
             }
             .padding(.horizontal, 16)
