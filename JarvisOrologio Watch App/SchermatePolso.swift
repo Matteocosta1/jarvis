@@ -258,7 +258,9 @@ struct VistaRadarOrologio: View {
     var body: some View {
         SchermoPolso(titolo: "RADAR", pronto: caricato) {
             if let r = radar {
-                if r.piove {
+                if let e = r.errore {
+                    Text(e).font(.system(size: 11)).foregroundStyle(.orange)
+                } else if r.piove {
                     RiquadroPolso {
                         etichettaPolso("JARVIS · ORA")
                         Text(r.avvisoBreve)
@@ -291,7 +293,7 @@ struct VistaRadarOrologio: View {
 
 /// La prima mail che conta, la risposta proposta da JARVIS e INVIA (spedisce solo dopo il tocco).
 struct VistaPrioritaOrologio: View {
-    private enum Invio: Equatable { case pronta, invio, inviata, errore }
+    private enum Invio: Equatable { case pronta, invio, inviata, errore(String) }
     @State private var posta: PostaPriorita?
     @State private var errore: String?
     @State private var caricato = false
@@ -314,8 +316,8 @@ struct VistaPrioritaOrologio: View {
                         Task { await invia(m, PostaPriorita.senzaVirgolette(r)) }
                     }
                     .disabled(stato == .invio || stato == .inviata)
-                    if stato == .errore {
-                        Text("Non sono riuscito a inviarla, Sir.").font(.system(size: 10)).foregroundStyle(.orange)
+                    if case .errore(let e) = stato {
+                        Text(e).font(.system(size: 10)).foregroundStyle(.orange)
                     }
                 }
             } else if posta != nil {
@@ -325,15 +327,17 @@ struct VistaPrioritaOrologio: View {
             }
         }
         .task {
-            if let o = await VistaVitalsOrologio.chiama(["posta_priorita": true], attesa: 45) {
+            if let o = await VistaVitalsOrologio.chiama(["posta_priorita": true], attesa: 60) {
                 if let e = o["errore"] as? String { errore = e } else { posta = PostaPriorita(o) }
+            } else {
+                errore = "Sto ancora leggendo la posta, Sir: riapra tra un minuto."
             }
             caricato = true
         }
     }
 
     private func invia(_ m: MailImportante, _ testo: String) async {
-        guard stato == .pronta || stato == .errore, !testo.isEmpty else { return }
+        guard stato != .invio, stato != .inviata, !testo.isEmpty else { return }
         stato = .invio
         WKInterfaceDevice.current().play(.click)
         let o = await VistaVitalsOrologio.chiama(m.corpoRisposta(testo), attesa: 45)
@@ -342,7 +346,9 @@ struct VistaPrioritaOrologio: View {
             SuoniOrologio.fatto()
             WKInterfaceDevice.current().play(.success)
         } else {
-            stato = .errore
+            // nessuna risposta in tempo: potrebbe essere partita lo stesso; riprovare è sicuro, il cervello non la rimanda
+            stato = .errore(o == nil ? "Non so se è partita, Sir: controlli in Inviata."
+                                     : (o?["errore"] as? String) ?? "Non sono riuscito a inviarla, Sir.")
             WKInterfaceDevice.current().play(.failure)
         }
     }

@@ -37,7 +37,8 @@ struct PannelloPriorita: View {
 
     /// La posta che conta, dal cervello.
     static func chiedi() async -> (PostaPriorita?, String?) {
-        guard let o = await VistaVitals.chiama(["posta_priorita": true], attesa: 45) else { return (nil, "Non raggiungo la posta, Sir.") }
+        // la prima lettura dopo posta nuova può essere lunga (intestazioni, testi, riassunti): il cervello la finisce e la tiene pronta
+        guard let o = await VistaVitals.chiama(["posta_priorita": true], attesa: 60) else { return (nil, "Sto ancora leggendo la posta, Sir: riapra tra un minuto.") }
         if let e = o["errore"] as? String { return (nil, e) }
         guard let p = PostaPriorita(o) else { return (nil, "La posta non è arrivata come mi aspettavo, Sir.") }
         return (p, nil)
@@ -120,14 +121,17 @@ private struct MailPriorita: View {
         guard !testo.isEmpty, stato != .invio, stato != .inviata else { return }
         stato = .invio
         fuoco = false
-        let o = await VistaVitals.chiama(mail.corpoRisposta(testo), attesa: 30)
+        // il cervello apre la casella, spedisce, segna la mail come risposta e mette la copia in Inviata: può volerci un po'
+        let o = await VistaVitals.chiama(mail.corpoRisposta(testo), attesa: 45)
         if (o?["ok"] as? Bool) == true {
             stato = .inviata
             cambia = false
             Suoni.fatto()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } else {
-            stato = .errore((o?["errore"] as? String) ?? "Non sono riuscito a inviarla, Sir. Riprovi.")
+            // nessuna risposta in tempo: la mail potrebbe essere partita lo stesso. Riprovare è sicuro: il cervello non la rimanda
+            stato = .errore(o == nil ? "Non so se è partita, Sir: controlli in Inviata. Se riprova, JARVIS non la manda due volte."
+                                     : (o?["errore"] as? String) ?? "Non sono riuscito a inviarla, Sir. Riprovi.")
         }
     }
 }

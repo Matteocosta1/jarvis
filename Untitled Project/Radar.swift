@@ -116,7 +116,9 @@ struct PannelloRadar: View {
             if let r = radar, r.piove { AvvisoJarvis(testo: r.avviso) }
             Pannello(titolo: "RADAR", tinta: tinta) {
                 if let r = radar {
-                    if r.piove {
+                    if let e = r.errore {
+                        Text(e).font(.system(size: 14)).foregroundStyle(.orange)
+                    } else if r.piove {
                         RigaHUD("Inizia", r.inizia)
                         RigaHUD("Quanta", "\(r.millimetri) mm in mezz'ora")
                         RigaHUD("Smette", r.smette.isEmpty ? "—" : r.smette)

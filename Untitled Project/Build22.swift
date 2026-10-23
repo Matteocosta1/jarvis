@@ -265,10 +265,17 @@ nonisolated struct DatiRadar: Equatable, Sendable {
     let iniziaMin: Int
     let mm30: Double
     let smette: String
+    /// Il cervello non ha potuto guardare il radar e dice perché (es. «Non so dove si trova, Sir: serve la posizione dell'iPhone.»).
+    let errore: String?
 
-    /// Dalla risposta del cervello: { piove, inizia_min, mm_30, smette }. nil se non è una risposta del radar.
+    /// Dalla risposta del cervello: { piove, inizia_min, mm_30, smette } oppure { errore }. nil se non è una risposta del radar.
     init?(_ o: [String: Any]) {
-        guard let p = o["piove"] as? Bool else { return nil }
+        guard let p = o["piove"] as? Bool else {
+            guard let e = (o["errore"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !e.isEmpty else { return nil }
+            piove = false; iniziaMin = 0; mm30 = 0; smette = ""; errore = e
+            return
+        }
+        errore = nil
         piove = p
         iniziaMin = (o["inizia_min"] as? NSNumber)?.intValue ?? 0
         mm30 = (o["mm_30"] as? NSNumber)?.doubleValue ?? 0

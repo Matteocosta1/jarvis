@@ -93,7 +93,7 @@ struct VistaRicordi: View {
         Section {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
-                TextField("Cerchi: chiavi, Luca, vino, targa…", text: $cerca).foregroundStyle(.white)
+                TextField("Cerchi: chiavi, Luca, vino…", text: $cerca).foregroundStyle(.white)
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }
             .listRowBackground(Color.ciano.opacity(0.06))
@@ -148,7 +148,7 @@ struct VistaRicordi: View {
         }
         Section {
             if d.posti.isEmpty {
-                Text(cerca.isEmpty ? "Nessun posto salvato. Dica a JARVIS «ricordati questo posto» o «ho parcheggiato»." : "Niente con «\(cerca)».")
+                Text(cerca.isEmpty ? "Nessun posto salvato. Dica a JARVIS «ricorda questo luogo» o «ricordati questo posto»." : "Niente con «\(cerca)».")
                     .font(.footnote).foregroundStyle(Color.tenue).listRowBackground(Color.clear)
             }
             ForEach(d.posti) { r in
@@ -179,9 +179,6 @@ struct VistaRicordi: View {
         Section {
             Button { chiedi("Ricordati questo posto: dove sono adesso.") } label: {
                 Label("Ricorda dove sono", systemImage: "mappin.and.ellipse").foregroundStyle(Color.ciano)
-            }
-            Button { chiedi("Ho parcheggiato qui, segnalo.") } label: {
-                Label("Ho parcheggiato qui", systemImage: "car").foregroundStyle(Color.ciano)
             }
         }
         .listRowBackground(Color.clear)
