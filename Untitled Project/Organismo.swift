@@ -169,9 +169,9 @@ struct EtichettaOlo: View {
 
 // MARK: - La persona olografica (SceneKit)
 
-/// La scena dell'Organismo, costruita come `persona(giunture(false), "fantasma")` + «Armatura» del mockup:
-/// capsule, sfere e coni (altezza 1,78 m), materiale olografico ciano additivo con il bordo luminoso (fresnel)
-/// e le righe di scansione, anello ambra sulla testa, cuore verde che batte, anelli verdi alle ginocchia,
+/// La scena dell'Organismo, costruita come «Armatura» del mockup: il corpo umano vero (MakeHuman, CC0, lo stesso file
+/// `corpo.bin` del mockup: 13.380 punti, 26.756 triangoli, alto 1,78 m) in materiale olografico ciano additivo con il bordo
+/// luminoso (fresnel) e le righe di scansione, anello ambra sulla testa, cuore verde che batte, anelli verdi alle ginocchia,
 /// mirino ad anelli a terra e polvere. `leggero` è l'orologio: meno segmenti, niente etichette né linea della schiena.
 /// Tutto gira con le azioni di SceneKit (niente codice per fotogramma): la vista che la mostra decide solo l'angolo.
 final class OlogrammaOrganismo: ObservableObject {
@@ -247,10 +247,11 @@ final class OlogrammaOrganismo: ObservableObject {
         guard !leggero, d != ultimiDati else { return }
         ultimiDati = d
         etichette.forEach { $0.removeFromParentNode() }
-        etichette = [
-            etichetta(d.etichettaSonno, .ambra, SIMD3(0.42, 1.74, 0)),
-            etichetta(d.etichettaBattito, .verde, SIMD3(-0.5, 1.34, 0)),
-            etichetta(d.etichettaPassi, .verde, SIMD3(0.42, 0.5, 0)),
+        let te = Self.g("testa"), gd = Self.g("giDx")
+        etichette = [                                                     // dove le mette il mockup
+            etichetta(d.etichettaSonno, .ambra, SIMD3(0.45, te.y + 0.08, te.z)),
+            etichetta(d.etichettaBattito, .verde, SIMD3(-0.55, 1.34, Self.g("collo").z + 0.07)),
+            etichetta(d.etichettaPassi, .verde, SIMD3(0.48, gd.y, gd.z)),
             etichetta(d.etichettaPronto, .grande, SIMD3(0, 2.0, 0)),
         ].compactMap { $0 }
     }
@@ -319,31 +320,6 @@ final class OlogrammaOrganismo: ObservableObject {
     private func sfera(_ r: Float) -> SCNGeometry {
         let g = SCNSphere(radius: CGFloat(r)); g.segmentCount = spicchi; return g
     }
-    private func cono(_ alto: Float, _ basso: Float, _ h: Float) -> SCNGeometry {
-        let g = SCNCone(topRadius: CGFloat(alto), bottomRadius: CGFloat(basso), height: CGFloat(h))
-        g.radialSegmentCount = leggero ? 14 : 28; g.heightSegmentCount = 1
-        return g
-    }
-    /// Mezza sfera in alto (i capelli: SphereGeometry con thetaLength π/2).
-    private func calotta(_ r: Float) -> SCNGeometry {
-        let nf = leggero ? 12 : 24, nt = leggero ? 4 : 8
-        var v: [SCNVector3] = [], n: [SCNVector3] = [], idx: [UInt16] = []
-        for i in 0...nt {
-            let t = Float(i) / Float(nt) * .pi / 2
-            for j in 0...nf {
-                let p = Float(j) / Float(nf) * 2 * .pi
-                let d = SIMD3<Float>(-cos(p) * sin(t), cos(t), sin(p) * sin(t))
-                v.append(SCNVector3(x: d.x * r, y: d.y * r, z: d.z * r)); n.append(SCNVector3(x: d.x, y: d.y, z: d.z))
-            }
-        }
-        for i in 0..<nt { for j in 0..<nf {
-            let a = UInt16(i * (nf + 1) + j), b = a + UInt16(nf + 1)
-            idx += [a, b, a + 1, b, b + 1, a + 1]
-        } }
-        return SCNGeometry(sources: [SCNGeometrySource(vertices: v), SCNGeometrySource(normals: n)],
-                           elements: [SCNGeometryElement(indices: idx, primitiveType: .triangles)])
-    }
-
     @discardableResult
     private func pezzo(_ g: SCNGeometry, _ m: SCNMaterial, _ p: SIMD3<Float>, rot: SIMD3<Float>? = nil, scala: SIMD3<Float>? = nil,
                        verso: simd_quatf? = nil, in genitore: SCNNode? = nil) -> SCNNode {
@@ -365,54 +341,93 @@ final class OlogrammaOrganismo: ObservableObject {
         pezzo(capsula(r, l), m, (a + b) / 2, verso: simd_quatf(from: SIMD3(0, 1, 0), to: simd_normalize(d)))
     }
 
-    // MARK: La persona (giunture(false), solo il fantasma olografico)
+    // MARK: La persona: il corpo umano vero, in ologramma
 
-    private func persona() {
-        let J: [String: SIMD3<Float>] = [
-            "testa": [0, 1.67, 0], "collo": [0, 1.5, 0], "spSx": [-0.2, 1.42, 0], "spDx": [0.2, 1.42, 0],
-            "goSx": [-0.27, 1.16, 0], "goDx": [0.27, 1.16, 0], "maSx": [-0.31, 0.9, 0.02], "maDx": [0.31, 0.9, 0.02],
-            "bac": [0, 0.95, 0], "anSx": [-0.1, 0.92, 0], "anDx": [0.1, 0.92, 0], "giSx": [-0.11, 0.5, 0.01], "giDx": [0.11, 0.5, 0.01],
-            "piSx": [-0.11, 0.08, 0], "piDx": [0.11, 0.08, 0],
-        ]
-        func g(_ k: String) -> SIMD3<Float> { J[k] ?? .zero }
-        let m = Self.olo(0x4fe3ff, alfa: 0.32)
-        for (s, sg) in [("Sx", Float(-1)), ("Dx", Float(1))] {
-            pezzo(capsula(0.045, 0.16), m, [sg * 0.11, 0.045, 0.04], rot: [.pi / 2, 0, 0], scala: [1, 1, 0.8])     // scarpa
-            osso(g("pi" + s), g("gi" + s), 0.06, m)
-            osso(g("gi" + s), g("an" + s), 0.085, m)
-            let sp = g("sp" + s), go = g("go" + s), ma = g("ma" + s)
-            let meta = sp + (go - sp) * 0.45
-            osso(sp, meta, 0.058, m); osso(meta, go, 0.047, m); osso(go, ma, 0.041, m)
-            pezzo(sfera(0.045), m, ma + simd_normalize(ma - go) * 0.07, scala: [0.65, 1.2, 0.9])                  // mano
-            pezzo(sfera(0.085), m, [sg * 0.18, 1.41, 0])                                                            // spalla
+    /// Le articolazioni del corpo MakeHuman (A-pose, metri, piedi a terra, guarda verso +z): le stesse `GIUNTURE_CORPO` del mockup.
+    static let giunture: [String: SIMD3<Float>] = [
+        "testa": [0, 1.6301, -0.0948], "collo": [0, 1.5319, -0.1274], "spSx": [-0.1916, 1.4251, -0.1209], "spDx": [0.1916, 1.4251, -0.1209],
+        "goSx": [-0.3618, 1.23, -0.1231], "goDx": [0.3618, 1.23, -0.1231], "maSx": [-0.4971, 1.1013, 0.0679], "maDx": [0.4971, 1.1013, 0.0679],
+        "bac": [0, 0.9559, -0.1358], "anSx": [-0.1118, 0.9503, -0.1466], "anDx": [0.1118, 0.9503, -0.1466],
+        "giSx": [-0.1553, 0.5165, -0.1114], "giDx": [0.1553, 0.5165, -0.1114], "piSx": [-0.1999, 0.0736, -0.1234], "piDx": [0.1999, 0.0736, -0.1234],
+    ]
+    private static func g(_ k: String) -> SIMD3<Float> { giunture[k] ?? .zero }
+
+    /// Il corpo da `corpo.bin`: 2 × UInt32 (punti, triangoli), poi le posizioni (Float32, metri) e gli indici (UInt16),
+    /// tutto little-endian. Le normali si calcolano qui, morbide (media delle facce pesata con l'area), come `computeVertexNormals`.
+    /// Letto una volta sola e condiviso (iPhone e orologio hanno ognuno il suo file nell'app).
+    static let corpo: SCNGeometry? = {
+        guard let url = Bundle.main.url(forResource: "corpo", withExtension: "bin"),
+              let d = try? Data(contentsOf: url, options: .mappedIfSafe), d.count >= 8 else { return nil }
+        func u32(_ o: Int) -> Int { Int(d[o]) | Int(d[o + 1]) << 8 | Int(d[o + 2]) << 16 | Int(d[o + 3]) << 24 }
+        let nv = u32(0), nt = u32(4)
+        guard nv > 0, nv <= 65_536, nt > 0, d.count == 8 + nv * 12 + nt * 6 else { return nil }
+        var pos = [SIMD3<Float>](repeating: .zero, count: nv)
+        var idx = [UInt16](repeating: 0, count: nt * 3)
+        d.withUnsafeBytes { (b: UnsafeRawBufferPointer) in
+            for i in 0..<nv {
+                let o = 8 + i * 12
+                pos[i] = SIMD3(Float(bitPattern: b.loadUnaligned(fromByteOffset: o, as: UInt32.self).littleEndian),
+                               Float(bitPattern: b.loadUnaligned(fromByteOffset: o + 4, as: UInt32.self).littleEndian),
+                               Float(bitPattern: b.loadUnaligned(fromByteOffset: o + 8, as: UInt32.self).littleEndian))
+            }
+            let base = 8 + nv * 12
+            for k in 0..<(nt * 3) { idx[k] = b.loadUnaligned(fromByteOffset: base + k * 2, as: UInt16.self).littleEndian }
         }
-        pezzo(capsula(0.11, 0.14), m, [0, 0.95, 0], rot: [0, 0, .pi / 2], scala: [1, 1, 0.75])                       // bacino
-        let cintura = SCNCylinder(radius: 0.168, height: 0.04); cintura.radialSegmentCount = leggero ? 14 : 28
-        pezzo(cintura, m, [0, 1.01, 0], scala: [1, 1, 0.72])
-        pezzo(cono(0.195, 0.165, 0.46), m, [0, 1.24, 0], scala: [1, 1, 0.62])                                       // busto
-        pezzo(cono(0.05, 0.055, 0.12), m, [0, 1.52, 0])                                                             // collo
-        pezzo(sfera(0.105), m, [0, 1.67, 0], scala: [0.92, 1.12, 1])                                                // testa
-        pezzo(calotta(0.112), m, [0, 1.695, -0.008], scala: [0.94, 1.05, 1.02])                                     // capelli
+        guard idx.allSatisfy({ Int($0) < nv }) else { return nil }
+        var nor = [SIMD3<Float>](repeating: .zero, count: nv)
+        for t in 0..<nt {
+            let a = Int(idx[t * 3]), b = Int(idx[t * 3 + 1]), c = Int(idx[t * 3 + 2])
+            let n = simd_cross(pos[b] - pos[a], pos[c] - pos[a])         // lunga quanto il doppio dell'area: pesa da sola
+            nor[a] += n; nor[b] += n; nor[c] += n
+        }
+        let vertici = pos.map { SCNVector3(x: $0.x, y: $0.y, z: $0.z) }
+        let normali = nor.map { v -> SCNVector3 in let l = simd_length(v); let u = l > 0 ? v / l : SIMD3<Float>(0, 1, 0); return SCNVector3(x: u.x, y: u.y, z: u.z) }
+        return SCNGeometry(sources: [SCNGeometrySource(vertices: vertici), SCNGeometrySource(normals: normali)],
+                           elements: [SCNGeometryElement(indices: idx, primitiveType: .triangles)])
+    }()
+
+    /// Il corpo in ologramma, più luminoso che altrove (alfa 0,62 come nel mockup: nell'Organismo il protagonista è lui).
+    /// Se il file mancasse, il fantasma di capsule di prima: la pagina non resta mai vuota.
+    private func persona() {
+        let m = Self.olo(0x4fe3ff, alfa: 0.62)
+        if let corpo = Self.corpo?.copy() as? SCNGeometry {
+            corpo.materials = [m]
+            radice.addChildNode(SCNNode(geometry: corpo))
+            return
+        }
+        for (s, sg) in [("Sx", Float(-1)), ("Dx", Float(1))] {
+            osso(Self.g("pi" + s), Self.g("gi" + s), 0.06, m)
+            osso(Self.g("gi" + s), Self.g("an" + s), 0.085, m)
+            osso(Self.g("sp" + s), Self.g("go" + s), 0.052, m)
+            osso(Self.g("go" + s), Self.g("ma" + s), 0.041, m)
+            pezzo(sfera(0.085), m, Self.g("sp" + s) + SIMD3(-sg * 0.01, 0, 0))
+        }
+        pezzo(capsula(0.11, 0.14), m, Self.g("bac"), rot: [0, 0, .pi / 2], scala: [1, 1, 0.75])
+        osso(Self.g("bac"), Self.g("collo"), 0.16, m)
+        pezzo(sfera(0.105), m, Self.g("testa"), scala: [0.92, 1.12, 1])
     }
 
     // MARK: Armatura: i parametri sulle zone del corpo
 
     private func armatura() {
         // sonno: l'anello ambra sulla testa, che gira
-        let anello = SCNTorus(ringRadius: 0.16, pipeRadius: 0.007)
+        let te = Self.g("testa")
+        let anello = SCNTorus(ringRadius: 0.14, pipeRadius: 0.007)
         anello.ringSegmentCount = leggero ? 32 : 64; anello.pipeSegmentCount = leggero ? 6 : 8
-        let testa = pezzo(anello, Self.pieno(0xffb45a, 0.9), [0, 1.67, 0])
+        let testa = pezzo(anello, Self.pieno(0xffb45a, 0.9), [0, te.y + 0.07, te.z])
         testa.runAction(.repeatForever(.rotateBy(x: 0, y: 0.8, z: 0, duration: 1)))
         // battito: il cuore verde e il suo alone
-        let sc = sfera(0.045); sc.materials = [Self.pieno(0x78e696, 0.9)]
-        cuore.geometry = sc; cuore.simdPosition = [-0.05, 1.32, 0.07]; radice.addChildNode(cuore)
-        let sa = sfera(0.09); sa.materials = [Self.pieno(0x78e696, 1)]
-        alone.geometry = sa; alone.simdPosition = [-0.05, 1.32, 0.07]; alone.opacity = 0.12; radice.addChildNode(alone)
+        // il cuore a sinistra della persona (che ci guarda: a destra per noi), dentro il petto
+        let posCuore = SIMD3<Float>(0.045, 1.33, Self.g("collo").z + 0.07)
+        let sc = sfera(0.04); sc.materials = [Self.pieno(0x78e696, 0.9)]
+        cuore.geometry = sc; cuore.simdPosition = posCuore; radice.addChildNode(cuore)
+        let sa = sfera(0.08); sa.materials = [Self.pieno(0x78e696, 1)]
+        alone.geometry = sa; alone.simdPosition = posCuore; alone.opacity = 0.12; radice.addChildNode(alone)
         // passi: gli anelli verdi alle ginocchia, che respirano (0,55 + 0,35·sin(2t + i))
-        for (i, x) in [Float(-0.11), Float(0.11)].enumerated() {
-            let t = SCNTorus(ringRadius: 0.085, pipeRadius: 0.006)
+        for (i, k) in ["giSx", "giDx"].enumerated() {
+            let t = SCNTorus(ringRadius: 0.08, pipeRadius: 0.006)
             t.ringSegmentCount = leggero ? 24 : 48; t.pipeSegmentCount = leggero ? 6 : 8
-            let gin = pezzo(t, Self.pieno(0x78e696, 1), [x, 0.5, 0.01])
+            let gin = pezzo(t, Self.pieno(0x78e696, 1), Self.g(k))
             let passi = leggero ? 12 : 24
             var seq: [SCNAction] = []
             for k in 1...passi {
@@ -424,7 +439,8 @@ final class OlogrammaOrganismo: ObservableObject {
         }
         // la schiena: la linea dal bacino al collo (sull'orologio no: nel mockup è nascosta in anteprima)
         if !leggero {
-            let v = [SCNVector3(x: 0, y: 0.95, z: 0), SCNVector3(x: 0, y: 1.5, z: 0)]
+            let ba = Self.g("bac"), co = Self.g("collo")
+            let v = [SCNVector3(x: ba.x, y: ba.y, z: ba.z), SCNVector3(x: co.x, y: co.y, z: co.z)]
             let l = SCNGeometry(sources: [SCNGeometrySource(vertices: v)], elements: [SCNGeometryElement(indices: [UInt16(0), 1], primitiveType: .line)])
             let ml = SCNMaterial(); ml.lightingModel = .constant; ml.diffuse.contents = Self.colore(0x7feeff); ml.transparency = 0.7; ml.writesToDepthBuffer = false
             l.materials = [ml]
