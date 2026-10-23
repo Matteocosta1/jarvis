@@ -4,10 +4,12 @@ import Combine
 import AVFoundation
 import Vision
 import UIKit
+import simd
 
 /// L'allenatore di JARVIS: inquadra chi si allena, l'iPhone riconosce lo scheletro del corpo (Vision, tutto in locale)
 /// e lo disegna in stile HUD sopra la ripresa. JARVIS commenta la postura a voce (schiena, spalle, braccia),
 /// conta le ripetizioni e a fine serie fa il riassunto. Pensato per il Pilates, va bene per squat, piegamenti, addominali.
+/// Build 22: contando le ginocchia (si apre così) è lo SPECCHIO · SQUAT del mockup, con lo scheletro «giusto» e i conti sul corpo.
 struct Allenatore: View {
     let chiudi: () -> Void
     @StateObject private var motore = MotoreAllenatore()
@@ -18,6 +20,12 @@ struct Allenatore: View {
             Color.black.ignoresSafeArea()
             AnteprimaAllenatore(sessione: motore.sessione).ignoresSafeArea()
             ScheletroHUD(posa: motore.posa, allarme: motore.posturaFuori, specchio: motore.frontale).ignoresSafeArea().allowsHitTesting(false)
+            // BUILD 22 · B — Specchio · Squat: lo scheletro giusto in verde e i conti sul corpo
+            if motore.giunto == .ginocchia {
+                SpecchioHUD(posa: motore.posa, ginocchio: motore.ginocchio, in3D: motore.ginocchioIn3D, altezza: motore.altezzaInPiedi,
+                            ripetizioni: motore.ripetizioni, schiena: motore.inclinazioneSchiena, specchio: motore.frontale)
+                    .ignoresSafeArea().allowsHitTesting(false)
+            }
 
             VStack(spacing: 10) {
                 HStack {
@@ -61,6 +69,11 @@ struct Allenatore: View {
                     .clipShape(Capsule())
                     .opacity(motore.commento.isEmpty ? 0 : 1)
                     .animation(.easeInOut(duration: 0.3), value: motore.commento)
+
+                if motore.giunto == .ginocchia {
+                    Text("SPECCHIO · SQUAT").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        .foregroundStyle(Color.ciano)
+                }
 
                 Picker("Conteggio", selection: $motore.giunto) {
                     Text("Busto").tag(MotoreAllenatore.Giunto.busto)
@@ -171,6 +184,134 @@ struct ScheletroHUD: View {
     }
 }
 
+// MARK: - BUILD 22 · B — Specchio · Squat
+
+/// Lo specchio dello squat (mockup «SPECCHIO · SQUAT»): sopra il suo scheletro, quello «giusto» in verde trasparente
+/// che scende fino alla profondità corretta (ginocchio a 90°), e i conti sul corpo: RIPETIZIONI n / 12 sopra la testa,
+/// GINOCCHIO accanto al ginocchio destro, SCHIENA accanto al busto (lo stesso numero della telemetria in alto).
+/// Il verde è la ripetizione del mockup (`posa(s)` di scena3d) messa sull'immagine: piedi sulle sue caviglie,
+/// misura dalla sua altezza in piedi (collo → caviglie = 1,34 m del modello), girato come lui (di fronte o di lato).
+/// Va un po' avanti a lui: è in fondo quando lui è all'86% della discesa, così si vede quanto manca.
+struct SpecchioHUD: View {
+    let posa: [VNHumanBodyPoseObservation.JointName: CGPoint]?
+    let ginocchio: Double?
+    let in3D: Bool
+    let altezza: Double
+    let ripetizioni: Int
+    let schiena: Double
+    let specchio: Bool
+
+    static let obiettivo = 12
+
+    var body: some View {
+        GeometryReader { geo in
+            if let s = Sagoma(posa: posa, ginocchio: in3D ? ginocchio : nil, altezza: altezza, specchio: specchio, area: geo.size) {
+                ZStack {
+                    Canvas { gc, _ in s.disegna(&gc) }
+                    EtichettaOlo(testo: "RIPETIZIONI \(ripetizioni) / \(Self.obiettivo)", stile: .grande).position(s.ripetizioni)
+                    EtichettaOlo(testo: "GINOCCHIO " + (ginocchio.map { "\(Int($0.rounded()))°" } ?? "—"), stile: .ambra).position(s.ginocchio)
+                    EtichettaOlo(testo: "SCHIENA \(Int(schiena))°").position(s.schiena)
+                }
+            }
+        }
+    }
+
+    /// Lo scheletro giusto e il posto delle etichette, in punti dello schermo (stessa mappa di ScheletroHUD).
+    private struct Sagoma {
+        typealias V = SIMD3<Double>
+        var ossa: [(CGPoint, CGPoint)] = []
+        var nodi: [(CGPoint, Bool)] = []          // (punto, è la testa)
+        var ripetizioni = CGPoint.zero, ginocchio = CGPoint.zero, schiena = CGPoint.zero
+
+        private static let coppie: [(String, String)] = [
+            ("testa", "collo"), ("collo", "spSx"), ("collo", "spDx"), ("spSx", "goSx"), ("spDx", "goDx"), ("goSx", "maSx"), ("goDx", "maDx"),
+            ("collo", "bac"), ("bac", "anSx"), ("bac", "anDx"), ("anSx", "giSx"), ("anDx", "giDx"), ("giSx", "piSx"), ("giDx", "piDx"),
+        ]
+
+        init?(posa: [VNHumanBodyPoseObservation.JointName: CGPoint]?, ginocchio g: Double?, altezza: Double, specchio: Bool, area: CGSize) {
+            guard let posa, altezza > 0.05, area.width > 0, area.height > 0 else { return nil }
+            let W = area.width, H = area.height
+            func p(_ j: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
+                guard let n = posa[j] else { return nil }
+                return CGPoint(x: (specchio ? 1 - n.x : n.x) * W, y: (1 - n.y) * H)
+            }
+            guard let cs = p(.leftAnkle), let cd = p(.rightAnkle) else { return nil }
+            let piedi = CGPoint(x: (cs.x + cd.x) / 2, y: (cs.y + cd.y) / 2)
+            let ky = CGFloat(altezza) * H / 1.34                  // punti per metro in verticale
+            let kx = ky * (W / H) / 0.5625                        // e in orizzontale (fotogramma 9:16 steso sullo schermo)
+            let lato: CGFloat = cs.x <= cd.x ? 1 : -1             // il suo sinistro a sinistra dello schermo?
+            var fronte: CGFloat = 1                               // 1 di fronte, 0 di lato (dalla larghezza delle spalle)
+            if let ss = p(.leftShoulder), let sd = p(.rightShoulder) { fronte = min(1, abs(ss.x - sd.x) / (0.40 * kx)) }
+            let fianco = (1 - fronte * fronte).squareRoot()
+            var verso: CGFloat = 1                                // di lato: da che parte guarda
+            if let n = p(.nose), let c = p(.neck), abs(n.x - c.x) > 2 { verso = n.x > c.x ? 1 : -1 }
+            // quanto è sceso: dal ginocchio 3D (175° in piedi, 90° in fondo) o, senza, dall'altezza del bacino
+            var sceso = 0.0
+            if let g { sceso = (175 - g) / 85 }
+            else if let b = p(.root) { sceso = (0.95 - (Double((piedi.y - b.y) / ky) + 0.08)) / 0.37 }
+            sceso = min(1, max(0, sceso))
+            let J = Self.posa(min(1, sceso / 0.86))
+            func q(_ v: V) -> CGPoint {
+                CGPoint(x: piedi.x + (CGFloat(v.x) * lato * fronte + CGFloat(v.z) * verso * fianco) * kx, y: piedi.y - CGFloat(v.y - 0.08) * ky)
+            }
+            ossa = Self.coppie.compactMap { a, b in
+                guard let pa = J[a], let pb = J[b] else { return nil }
+                return (q(pa), q(pb))
+            }
+            nodi = J.map { (q($0.value), $0.key == "testa") }
+            // le etichette: dentro lo schermo, lontane dai tasti
+            func dentro(_ c: CGPoint) -> CGPoint { CGPoint(x: min(max(c.x, 90), W - 90), y: min(max(c.y, H * 0.22), H * 0.74)) }
+            ripetizioni = dentro(CGPoint(x: piedi.x, y: piedi.y - (2.02 - 0.08) * ky))
+            let gd = p(.rightKnee), gs = p(.leftKnee)
+            var fuori: CGFloat = 1                                // l'etichetta del ginocchio va dalla parte del ginocchio destro
+            if let gd, let gs, gd.x < gs.x { fuori = -1 }
+            let pg = gd ?? gs ?? q(J["giDx"] ?? V(0.14, 0.5, 0))
+            ginocchio = dentro(CGPoint(x: pg.x + 0.32 * kx * fuori, y: pg.y))
+            let busto: CGPoint
+            if let b = p(.root), let c = p(.neck) { busto = CGPoint(x: (b.x + c.x) / 2, y: (b.y + c.y) / 2) }
+            else { busto = q(V(0, 1.2, 0)) }
+            schiena = dentro(CGPoint(x: busto.x - 0.5 * kx * fuori, y: busto.y))
+        }
+
+        /// La ripetizione giusta del mockup a profondità s (0 in piedi, 1 in fondo): metri, piedi a terra, guarda verso di noi.
+        static func posa(_ s: Double) -> [String: V] {
+            let th = 0.62 * s
+            let dir = V(0, cos(th), sin(th))
+            let ay = 0.92 - 0.37 * s, az = -0.22 * s
+            let B = V(0, ay + 0.03, az)
+            let C = B + dir * 0.55
+            func sp(_ x: Double) -> V { V(x, C.y - 0.08, C.z) }
+            func ma(_ x: Double) -> V { V(x * 1.05, C.y - 0.08 - 0.5 * (1 - s) - 0.05 * s, C.z + 0.55 * s + 0.02) }
+            func go(_ x: Double) -> V { V(x * 1.1, (sp(x).y + ma(x).y) / 2, (C.z + ma(x).z) / 2 - 0.02) }
+            var J: [String: V] = [:]
+            J["testa"] = C + dir * 0.17
+            J["collo"] = C
+            J["spSx"] = sp(-0.2); J["spDx"] = sp(0.2)
+            J["goSx"] = go(-0.22); J["goDx"] = go(0.22)
+            J["maSx"] = ma(-0.22); J["maDx"] = ma(0.22)
+            J["bac"] = B
+            J["anSx"] = V(-0.1, ay, az); J["anDx"] = V(0.1, ay, az)
+            J["giSx"] = V(-0.14, 0.5 - 0.05 * s, 0.15 * s); J["giDx"] = V(0.14, 0.5 - 0.05 * s, 0.15 * s)
+            J["piSx"] = V(-0.13, 0.08, 0); J["piDx"] = V(0.13, 0.08, 0)
+            return J
+        }
+
+        /// Ossa verdi al 35% e giunture chiare al 35%, sommate alla ripresa (additivo, come nel mockup).
+        func disegna(_ gc: inout GraphicsContext) {
+            gc.blendMode = .plusLighter
+            var linee = Path()
+            for (a, b) in ossa { linee.move(to: a); linee.addLine(to: b) }
+            gc.stroke(linee, with: .color(Color(red: 120 / 255, green: 230 / 255, blue: 150 / 255).opacity(0.35)),
+                      style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+            let chiaro = Color(red: 230 / 255, green: 244 / 255, blue: 248 / 255).opacity(0.35)
+            for (c, testa) in nodi {
+                let r: CGFloat = testa ? 6 : 4
+                gc.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)), with: .color(chiaro))
+            }
+        }
+    }
+}
+
 struct AnteprimaAllenatore: UIViewRepresentable {
     let sessione: AVCaptureSession
     final class Vista: UIView {
@@ -198,7 +339,10 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     @Published var posturaFuori = false
     @Published var commento = ""
     @Published var frontale = false
-    @Published var giunto: Giunto = .busto { didSet { azzeraConteggio() } }
+    @Published var giunto: Giunto = .ginocchia { didSet { azzeraConteggio(); camera.usa3D(giunto == .ginocchia) } }   // build 22: si apre sullo Specchio · Squat
+    @Published var ginocchio: Double?           // angolo del ginocchio in gradi (3D se c'è, se no dall'immagine)
+    @Published var altezzaInPiedi: Double = 0   // collo → caviglie in piedi, in frazione dell'altezza dell'immagine
+    @Published var ginocchioIn3D = false        // l'angolo viene dallo scheletro 3D
 
     private let camera = CameraPosa()
     var sessione: AVCaptureSession { camera.sessione }
@@ -207,6 +351,11 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     private var altezza: Double = 0            // 0 in alto, 1 in basso (coordinate schermo)
     private var minimo: Double = 1, massimo: Double = 0
     private var giu = false
+    // squat con l'angolo del ginocchio (build 22)
+    private var giuSquat = false
+    private var conAngolo = false               // arrivato l'angolo 3D: la serie si conta con quello
+    private var ultimaRipetizione = Date.distantPast
+    private var ultimoAngolo3D = Date.distantPast
     private var ultimoCampione = Date.distantPast
     private var serieSchiena: [Double] = [], serieSimmetria: [Double] = []
     private var ultimoCommento = Date.distantPast
@@ -254,7 +403,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     func avvia() async {
         guard await AVCaptureDevice.requestAccess(for: .video) else { commento = "Serve il permesso fotocamera, Sir."; return }
-        camera.esito = { [weak self] punti in Task { @MainActor [weak self] in self?.ricevi(punti) } }
+        camera.esito = { [weak self] punti, ginocchio in Task { @MainActor [weak self] in self?.ricevi(punti, ginocchio3D: ginocchio) } }
+        camera.usa3D(giunto == .ginocchia)
         configura(frontale: false)
         inizioSerie = Date()
         commento = "Inquadri tutta la persona, Sir."
@@ -275,7 +425,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         commento = "Azzerato. Quando vuole, Sir."
     }
 
-    private func azzeraConteggio() { ripetizioni = 0; minimo = 1; massimo = 0; giu = false }
+    private func azzeraConteggio() { ripetizioni = 0; minimo = 1; massimo = 0; giu = false; giuSquat = false; conAngolo = false }
 
     func fineSerie() {
         let n = ripetizioni
@@ -304,8 +454,9 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     // MARK: Analisi di ogni posa
 
-    private func ricevi(_ punti: [VNHumanBodyPoseObservation.JointName: CGPoint]?) {
+    private func ricevi(_ punti: [VNHumanBodyPoseObservation.JointName: CGPoint]?, ginocchio3D: Double?) {
         posa = punti
+        misuraSpecchio(punti, ginocchio3D)
         guard !inPausa else { posturaFuori = false; return }      // in pausa: lo scheletro si vede, niente conteggio né commenti
         guard let p = punti, let collo = p[.neck], let bacino = p[.root] else { posturaFuori = false; return }
         // schiena: angolo tra bacino→collo e la verticale (coordinate Vision: y verso l'alto)
@@ -332,6 +483,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     /// Conta le ripetizioni: il giunto scelto scende sotto una soglia e torna su.
     private func conta(_ p: [VNHumanBodyPoseObservation.JointName: CGPoint]) {
+        if giunto == .ginocchia && conAngolo { contaSquat(); return }
         let y: Double?
         switch giunto {
         case .busto: y = p[.neck].map { 1 - $0.y }
@@ -348,10 +500,70 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         if !giu && pos > 0.7 { giu = true }
         if giu && pos < 0.3 {
             giu = false
-            ripetizioni += 1
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Suoni.tocco()
+            unaRipetizione()
         }
+    }
+
+    private func unaRipetizione() {
+        ripetizioni += 1
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Suoni.tocco()
+    }
+
+    // MARK: Specchio · Squat (build 22)
+
+    /// Squat contato con l'angolo del ginocchio: giù sotto i 110°, su sopra i 155°.
+    /// I 45° di isteresi e almeno 0,6 s tra due ripetizioni evitano di contare due volte lo stesso squat.
+    private func contaSquat() {
+        guard let g = ginocchio else { return }
+        if !giuSquat && g < 110 { giuSquat = true }
+        if giuSquat && g > 155 && Date().timeIntervalSince(ultimaRipetizione) > 0.6 {
+            giuSquat = false
+            ultimaRipetizione = Date()
+            unaRipetizione()
+        }
+    }
+
+    /// L'angolo del ginocchio (3D di Vision; se manca, dall'immagine) e l'altezza in piedi per la misura dello scheletro giusto.
+    private func misuraSpecchio(_ p: [VNHumanBodyPoseObservation.JointName: CGPoint]?, _ g3: Double?) {
+        if let g3 {
+            // 3D: media con il valore prima (se era 3D anche quello)
+            ginocchio = ginocchioIn3D ? (ginocchio ?? g3) * 0.5 + g3 * 0.5 : g3
+            ginocchioIn3D = true
+            conAngolo = true
+            ultimoAngolo3D = Date()
+        } else if conAngolo {
+            // il 3D c'era: un fotogramma senza non si mescola con l'angolo piatto (conterebbe due volte); dopo 1 s si azzera
+            if Date().timeIntervalSince(ultimoAngolo3D) > 1 { ginocchio = nil; ginocchioIn3D = false }
+        } else {
+            let g = p.flatMap { Self.ginocchio2D($0) }
+            ginocchio = g.map { nuovo in ginocchio.map { $0 * 0.5 + nuovo * 0.5 } ?? nuovo }
+            ginocchioIn3D = false
+        }
+        guard let p, let collo = p[.neck] else { return }
+        let caviglie = [p[.leftAnkle], p[.rightAnkle]].compactMap { $0 }
+        guard !caviglie.isEmpty else { return }
+        let h = Double(collo.y) - caviglie.map { Double($0.y) }.reduce(0, +) / Double(caviglie.count)
+        guard h > 0.1 else { return }
+        // si aggiorna solo in piedi (ginocchio 3D oltre 160°, o alto quasi quanto prima): accucciato non deve rimpicciolire
+        let inPiedi = g3.map { $0 > 160 } ?? (h >= altezzaInPiedi * 0.92)
+        if altezzaInPiedi == 0 { altezzaInPiedi = h }
+        else if inPiedi || h > altezzaInPiedi { altezzaInPiedi = altezzaInPiedi * 0.9 + h * 0.1 }
+    }
+
+    /// Angolo anca-ginocchio-caviglia nell'immagine (x riscalata 9:16), media dei due lati. Di lato è giusto, di fronte no.
+    private static func ginocchio2D(_ p: [VNHumanBodyPoseObservation.JointName: CGPoint]) -> Double? {
+        typealias J = VNHumanBodyPoseObservation.JointName
+        var angoli: [Double] = []
+        for (a, b, c) in [(J.leftHip, J.leftKnee, J.leftAnkle), (J.rightHip, J.rightKnee, J.rightAnkle)] {
+            guard let pa = p[a], let pb = p[b], let pc = p[c] else { continue }
+            let ux = Double(pa.x - pb.x) * 0.5625, uy = Double(pa.y - pb.y)
+            let wx = Double(pc.x - pb.x) * 0.5625, wy = Double(pc.y - pb.y)
+            let lu = hypot(ux, uy), lw = hypot(wx, wy)
+            guard lu > 0.01, lw > 0.01 else { continue }
+            angoli.append(acos(max(-1, min(1, (ux * wx + uy * wy) / (lu * lw)))) * 180 / .pi)
+        }
+        return angoli.isEmpty ? nil : angoli.reduce(0, +) / Double(angoli.count)
     }
 
     /// JARVIS parla ogni tanto: solo se c'è qualcosa da dire, mai sopra se stesso.
@@ -401,11 +613,19 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 nonisolated final class CameraPosa: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let sessione = AVCaptureSession()
     let coda = DispatchQueue(label: "it.discosizer.jarvis.allenatore")
-    var esito: (@Sendable ([VNHumanBodyPoseObservation.JointName: CGPoint]?) -> Void)?
+    var esito: (@Sendable ([VNHumanBodyPoseObservation.JointName: CGPoint]?, Double?) -> Void)?   // scheletro 2D e ginocchio 3D
     private let uscita = AVCaptureVideoDataOutput()
     private var ingresso: AVCaptureDeviceInput?
     private var contatore = 0
     private let richiesta = VNDetectHumanBodyPoseRequest()
+    // build 22: lo scheletro 3D (iOS 17) per l'angolo vero del ginocchio, solo nello Specchio · Squat
+    private let richiesta3D = VNDetectHumanBodyPose3DRequest()
+    private var vuole3D = false
+    private var turno3D = 0
+    private var lento3D = false
+    private var ultimo3D: (gradi: Double, quando: Date)?
+
+    func usa3D(_ si: Bool) { coda.async { self.vuole3D = si; if !si { self.ultimo3D = nil } } }
 
     func configura(frontale: Bool, pronto: @escaping @Sendable (Bool) -> Void) {
         coda.async {
@@ -442,10 +662,47 @@ nonisolated final class CameraPosa: NSObject, AVCaptureVideoDataOutputSampleBuff
         guard contatore % 3 == 0, let pixel = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let gestore = VNImageRequestHandler(cvPixelBuffer: pixel, orientation: .up)
         try? gestore.perform([richiesta])
-        guard let oss = richiesta.results?.first, let punti = try? oss.recognizedPoints(.all) else { esito?(nil); return }
+        guard let oss = richiesta.results?.first, let punti = try? oss.recognizedPoints(.all) else { esito?(nil, nil); return }
         var out: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
         for (nome, p) in punti where p.confidence > 0.3 { out[nome] = CGPoint(x: p.location.x, y: p.location.y) }
-        esito?(out.count >= 5 ? out : nil)
+        let visto = out.count >= 5
+        esito?(visto ? out : nil, visto ? ginocchio3D(gestore) : nil)
+    }
+
+    /// L'angolo del ginocchio dallo scheletro 3D: vale anche di fronte, dove nell'immagine piatta il ginocchio sembra sempre dritto.
+    /// Se il 3D è lento (oltre 80 ms) si calcola un fotogramma sì e uno no, tenendo buono l'ultimo valore per 0,4 s.
+    private func ginocchio3D(_ gestore: VNImageRequestHandler) -> Double? {
+        guard vuole3D else { return nil }
+        turno3D += 1
+        if lento3D && turno3D % 2 == 1 {
+            guard let u = ultimo3D, Date().timeIntervalSince(u.quando) < 0.4 else { return nil }
+            return u.gradi
+        }
+        let inizio = Date()
+        var gradi: Double?
+        if (try? gestore.perform([richiesta3D])) != nil, let o = richiesta3D.results?.first { gradi = Self.angoloGinocchio(o) }
+        lento3D = Date().timeIntervalSince(inizio) > 0.08
+        if let gradi { ultimo3D = (gradi, Date()) }
+        return gradi
+    }
+
+    /// Anca-ginocchio-caviglia in metri, media dei due lati.
+    private static func angoloGinocchio(_ o: VNHumanBodyPose3DObservation) -> Double? {
+        typealias J = VNHumanBodyPose3DObservation.JointName
+        func punto(_ j: J) -> simd_float3? {
+            guard let r = try? o.recognizedPoint(j) else { return nil }
+            let c = r.position.columns.3
+            return simd_float3(c.x, c.y, c.z)
+        }
+        var angoli: [Double] = []
+        for (a, b, c) in [(J.leftHip, J.leftKnee, J.leftAnkle), (J.rightHip, J.rightKnee, J.rightAnkle)] {
+            guard let pa = punto(a), let pb = punto(b), let pc = punto(c) else { continue }
+            let u = pa - pb, w = pc - pb
+            let lu = simd_length(u), lw = simd_length(w)
+            guard lu > 0.01, lw > 0.01 else { continue }
+            angoli.append(Double(acos(max(-1, min(1, simd_dot(u, w) / (lu * lw))))) * 180 / .pi)
+        }
+        return angoli.isEmpty ? nil : angoli.reduce(0, +) / Double(angoli.count)
     }
 }
 #endif
