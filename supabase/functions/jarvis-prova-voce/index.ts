@@ -13,11 +13,11 @@ const VOCE = Deno.env.get("ELEVENLABS_VOICE_ID") || "onwK4e9ZLuTAKqWW03F9";   //
 const BUCKET = "backup";   // «archivio» qui non esiste e «vocali» accetta solo m4a: si usa backup (nessun limite), cartella prove-voce
 const IMPOSTAZIONI = { stability: 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 };   // quelle del cervello
 
-// [testo per il modello di oggi, testo per v4 Turbo con il tono]
+// 23 ottobre, sera: il confronto chiesto dal signore. Sempre v4 Turbo e sempre la stessa voce: la stessa frase SENZA tono
+// e CON il tono, per sentire solo la differenza che fanno i toni. [testo senza tono, testo con il tono]
 const FRASI: [string, string, string][] = [
-  ["normale", "Buonasera, Sir. Tutti i sistemi sono in linea, e domani a Milano non piove.", "Buonasera, Sir. Tutti i sistemi sono in linea, e domani a Milano non piove."],
   ["ironica", "Diciamo che oggi ha avuto i suoi momenti, Sir.", "[sarcastic] Diciamo che oggi ha avuto i suoi momenti, Sir."],
-  ["sussurro", "Sono le otto e cinque, Sir.", "[whispers] Sono le otto e cinque, Sir."],
+  ["sussurro", "Sono le otto e cinque, Sir. Beatrice dorme ancora.", "[whispers] Sono le otto e cinque, Sir. Beatrice dorme ancora."],
 ];
 
 async function crediti(chiave: string): Promise<number | null> {
@@ -67,9 +67,8 @@ Deno.serve(async (req) => {
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
   if (!chiave) return json({ errore: "manca ELEVENLABS_API_KEY" }, 500);
 
-  const oggi = Deno.env.get("ELEVENLABS_MODELLO") || "eleven_multilingual_v2";
   const risultati: unknown[] = [];
-  for (const [modello, colonna] of [[oggi, 1], ["eleven_v4_turbo", 2]] as [string, number][]) {
+  for (const [modello, colonna, nome] of [["eleven_v4_turbo", 1, "senza-tono"], ["eleven_v4_turbo", 2, "con-tono"]] as [string, number, string][]) {
     const prima = await crediti(chiave);
     const frasi: unknown[] = [];
     let caratteri = 0;
@@ -80,7 +79,7 @@ Deno.serve(async (req) => {
         const d = await dici(testo, modello, chiave);
         if ("errore" in d && d.errore) { frasi.push({ tipo: f[0], testo, errore: d.errore, nota: d.nota }); continue; }
         const { audio, ...dati } = d as any;
-        const percorso = `prove-voce/${new Date().toISOString().slice(0, 10)}-${modello}-${f[0]}.mp3`;
+        const percorso = `prove-voce/${new Date().toISOString().slice(0, 10)}-v4-${f[0]}-${nome}.mp3`;
         const su = await db.storage.from(BUCKET).upload(percorso, audio, { contentType: "audio/mpeg", upsert: true });
         const link = su.error ? null : (await db.storage.from(BUCKET).createSignedUrl(percorso, 86400)).data?.signedUrl ?? null;
         frasi.push({ tipo: f[0], testo, ...dati, link, errore_archivio: su.error?.message ?? null });
@@ -88,7 +87,7 @@ Deno.serve(async (req) => {
     }
     await new Promise((r) => setTimeout(r, 2500));       // il conteggio dei crediti si aggiorna con un attimo di ritardo
     const dopo = await crediti(chiave);
-    risultati.push({ modello, caratteri_mandati: caratteri, crediti_consumati: prima !== null && dopo !== null ? dopo - prima : null,
+    risultati.push({ modello, prova: nome, caratteri_mandati: caratteri, crediti_consumati: prima !== null && dopo !== null ? dopo - prima : null,
       crediti_per_carattere: prima !== null && dopo !== null && caratteri ? Math.round(((dopo - prima) / caratteri) * 100) / 100 : null, frasi });
   }
   return json({ voce: VOCE, risultati });
