@@ -669,20 +669,6 @@ struct PannelloOrganismo: View {
     }
 }
 
-/// A VOCE: le frasi che aprono e leggono l'Organismo.
-struct PannelloAVoce: View {
-    let frasi: [String]
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TitoloPannello22(testo: "A VOCE")
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(frasi, id: \.self) { f in
-                    Text(f).font(.system(size: 14)).foregroundStyle(Color(red: 207 / 255, green: 226 / 255, blue: 232 / 255))
-                }
-            }
-        }
-        .modifier(StilePannello22())
-    }
-}
+// A VOCE: si usa PannelloAVoce di Pannelli.swift (parte A), lo stesso di Telefono, Ricordi, Meteo ed Email.
 
 #endif
