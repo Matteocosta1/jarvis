@@ -308,9 +308,19 @@ struct VistaPosta: View {
         let oggetto: String
         let data: String
         let letta: Bool
-        var nome: String { da.components(separatedBy: " <").first?.trimmingCharacters(in: .whitespaces) ?? da }
+        var a: String = ""           // Inviata e Bozze: conta a chi va, non chi la manda
+        var nome: String {
+            let chi = a.isEmpty ? da : a
+            return chi.components(separatedBy: " <").first?.trimmingCharacters(in: .whitespaces) ?? chi
+        }
     }
 
+    /// Le cartelle iCloud, come nel mockup (build 22): la chiave va al cervello, l'etichetta sul tasto.
+    static let cartelle: [(chiave: String, etichetta: String)] = [("arrivo", "Arrivo"), ("inviata", "Inviata"), ("indesiderata", "Indesiderata"),
+                                                                  ("bozze", "Bozze"), ("cestino", "Cestino"), ("archivio", "Archivio")]
+    @State private var cartella = "arrivo"
+    private var inArrivo: Bool { cartella == "arrivo" }
+    private var nomeCartella: String { Self.cartelle.first { $0.chiave == cartella }?.etichetta ?? "Arrivo" }
     @State private var ore = 72
     @State private var soloNonLette = false
     @State private var posta: [Mail]?
@@ -319,16 +329,42 @@ struct VistaPosta: View {
     @State private var erroreP: String?
 
     var body: some View {
-        CorniceScheda(titolo: "Email", sottotitolo: posta.map { "\($0.filter { !$0.letta }.count) non lette · ultime \(ore / 24 == 1 ? "24 ore" : "\(ore / 24) giorni")" } ?? "apro la casella iCloud",
+        CorniceScheda(titolo: "Email", sottotitolo: posta.map { p in
+                          inArrivo ? "\(p.filter { !$0.letta }.count) non lette · ultime \(ore / 24 == 1 ? "24 ore" : "\(ore / 24) giorni")" : "\(nomeCartella) · ultimi 30 giorni" } ?? "apro la casella iCloud",
                       icona: "envelope", tinta: tinta, pronto: posta != nil || errore != nil) {
             PannelloPriorita(posta: priorita, errore: erroreP)     // in testa, come nel mockup
-            Picker("Periodo", selection: $ore) {
-                Text("24 ore").tag(24)
-                Text("3 giorni").tag(72)
-                Text("7 giorni").tag(168)
+            // le cartelle (build 22): Arrivo è la posta di sempre; le altre mostrano gli ultimi 30 giorni
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(Self.cartelle, id: \.chiave) { c in
+                    Button {
+                        guard cartella != c.chiave else { return }
+                        Suoni.tocco()
+                        posta = nil
+                        errore = nil
+                        cartella = c.chiave
+                    } label: {
+                        Text(c.etichetta.uppercased())
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .foregroundStyle(cartella == c.chiave ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                            .frame(maxWidth: .infinity).padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(cartella == c.chiave ? Color.ciano : .clear))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(cartella == c.chiave ? 1 : 0.3), lineWidth: 1))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(StileStark())
+                    .accessibilityAddTraits(cartella == c.chiave ? .isSelected : [])
+                }
             }
-            .pickerStyle(.segmented)
-            Toggle(isOn: $soloNonLette) { Text("Solo non lette").font(.system(size: 14)).foregroundStyle(.white) }.tint(tinta)
+            if inArrivo {
+                Picker("Periodo", selection: $ore) {
+                    Text("24 ore").tag(24)
+                    Text("3 giorni").tag(72)
+                    Text("7 giorni").tag(168)
+                }
+                .pickerStyle(.segmented)
+                Toggle(isOn: $soloNonLette) { Text("Solo non lette").font(.system(size: 14)).foregroundStyle(.white) }.tint(tinta)
+            }
             HStack(spacing: 10) {
                 TastoJarvis(testo: "Riassumi", icona: "text.alignleft", tinta: tinta) { chiedi("Riassumimi la posta delle ultime \(ore) ore: cosa conta davvero e cosa posso ignorare?") }
                 Link(destination: URL(string: "message://")!) {
@@ -341,7 +377,7 @@ struct VistaPosta: View {
             }
             if let posta {
                 if posta.isEmpty {
-                    Text(soloNonLette ? "Nessuna email da leggere. Casella in ordine, Sir." : "Nessuna email nel periodo.")
+                    Text(!inArrivo ? "\(nomeCartella): niente negli ultimi 30 giorni." : soloNonLette ? "Nessuna email da leggere. Casella in ordine, Sir." : "Nessuna email nel periodo.")
                         .font(.footnote).foregroundStyle(Color.tenue)
                 }
                 ForEach(posta) { m in
@@ -373,7 +409,7 @@ struct VistaPosta: View {
                 ProgressView().tint(tinta).frame(maxWidth: .infinity).padding(.top, 40)
             }
         }
-        .task(id: "\(ore)-\(soloNonLette)") { await carica() }
+        .task(id: "\(cartella)-\(ore)-\(soloNonLette)") { await carica() }
         .task {
             let (p, e) = await PannelloPriorita.chiedi()
             priorita = p
@@ -386,10 +422,15 @@ struct VistaPosta: View {
 
     private func carica() async {
         errore = nil
-        guard let o = await VistaVitals.chiama(["posta": true, "ore": ore, "solo_non_lette": soloNonLette]) else { errore = "Non raggiungo la posta, Sir."; return }
+        let chiesta = cartella
+        let corpo: [String: Any] = inArrivo ? ["posta": true, "ore": ore, "solo_non_lette": soloNonLette, "cartella": "arrivo"]
+                                            : ["posta": true, "ore": 720, "cartella": chiesta]
+        guard let o = await VistaVitals.chiama(corpo) else { if chiesta == cartella { errore = "Non raggiungo la posta, Sir." }; return }
+        guard chiesta == cartella else { return }          // nel frattempo ha scelto un'altra cartella
         if let e = o["errore"] as? String { errore = e; posta = nil; return }
         let lista = (o["email"] as? [[String: Any]] ?? []).map {
-            Mail(da: $0["da"] as? String ?? "", oggetto: $0["oggetto"] as? String ?? "", data: $0["data"] as? String ?? "", letta: ($0["letta"] as? Bool) ?? true)
+            Mail(da: $0["da"] as? String ?? "", oggetto: $0["oggetto"] as? String ?? "", data: $0["data"] as? String ?? "", letta: ($0["letta"] as? Bool) ?? true,
+                 a: $0["a"] as? String ?? "")
         }
         withAnimation(.easeOut(duration: 0.25)) { posta = lista }
     }
