@@ -321,7 +321,7 @@ struct VistaPrioritaOrologio: View {
             }
         }
         .task {
-            if let o = await VistaVitalsOrologio.chiama(["posta_priorita": true]) {
+            if let o = await VistaVitalsOrologio.chiama(["posta_priorita": true], attesa: 45) {
                 if let e = o["errore"] as? String { errore = e } else { posta = PostaPriorita(o) }
             }
             caricato = true
@@ -332,7 +332,7 @@ struct VistaPrioritaOrologio: View {
         guard stato == .pronta || stato == .errore, !testo.isEmpty else { return }
         stato = .invio
         WKInterfaceDevice.current().play(.click)
-        let o = await VistaVitalsOrologio.chiama(m.corpoRisposta(testo))
+        let o = await VistaVitalsOrologio.chiama(m.corpoRisposta(testo), attesa: 45)
         if (o?["ok"] as? Bool) == true {
             stato = .inviata
             SuoniOrologio.fatto()

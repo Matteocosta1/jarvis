@@ -815,13 +815,14 @@ struct VistaVitalsOrologio: View {
         await carica()
     }
 
-    static func chiama(_ corpo: [String: Any]) async -> [String: Any]? {
+    /// `attesa`: quanti secondi aspettare il cervello (PRIORITÀ legge la posta e ne mette di più, come l'iPhone).
+    static func chiama(_ corpo: [String: Any], attesa: TimeInterval = 20) async -> [String: Any]? {
         guard let url = URL(string: ImpostazioniOrologio.indirizzo) else { return nil }
         let token = PortachiaviOrologio.leggi()
         guard !token.isEmpty else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.timeoutInterval = 20
+        req.timeoutInterval = attesa
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
