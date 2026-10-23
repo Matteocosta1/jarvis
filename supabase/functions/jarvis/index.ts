@@ -1862,9 +1862,12 @@ const blocchiImmagine = (lista: string[]) =>
   lista.map((d, k) => k === lista.length - 1 ? { ...bloccoImmagine(d), cache_control: { type: "ephemeral" } } : bloccoImmagine(d));
 
 function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone") {
-  // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo
-  const t = testo.trim().toLowerCase();
-  const secco = t.length <= 30 && /^(pausa|stop|play|riprendi|avanti|indietro|prossim|alza|abbassa|volume|che ore|grazie|ok|perfetto|ciao|buonanotte)/.test(t);
+  // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
+  // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
+  // la frase oltre i 140 caratteri e ogni interruzione finiva su Opus, il più lento.
+  const t = testo.replace(/\s*\(ti ho interrotto mentre rispondevi a[\s\S]*$/i, "").trim().toLowerCase();
+  const secco = t.length <= 30 && !t.includes("?") && (/^(pausa|stop|play|riprendi|avanti|indietro|prossim|alza|abbassa|volume|che ore|grazie|ok|perfetto|ciao|buonanotte)/.test(t) ||
+    /^(sì|si|no|va bene|d'accordo|certo|esatto|giusto|buongiorno|buonasera|salve|ehi|che giorno|che data|bravo|ottimo|a dopo|ci sentiamo|alla grande|tutto ok)\b/.test(t));
   if (secco && !conImmagine) return MODELLO_RAPIDO;
   // al polso conta la prontezza: risposte di una frase, il modello veloce basta e risponde in metà tempo
   if (dispositivo === "orologio" && MODELLO_RISERVA) return MODELLO_RISERVA;
@@ -1946,17 +1949,31 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
   }, (e) => console.log(`langfuse non raggiungibile: ${(e as Error).message}`)));
 }
 
+// v108: quanto ragiona ogni modello (output_config.effort). Fisso per modello: cambiarlo da una richiesta all'altra
+// invaliderebbe la cache. Sonnet di suo ragiona al massimo («high») anche per «che tempo fa?»: a voce basta «low».
+// Opus resta al suo valore normale («medium», quindi niente parametro). Si spegne con il segreto SFORZO=off.
+const senzaSforzo = new Set<string>();
+const sforzo = (modello: string) =>
+  Deno.env.get("SFORZO") === "off" || senzaSforzo.has(modello) ? null : /haiku|sonnet/i.test(modello) ? "low" : null;
 async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void) {
   const inizio = new Date();
   let primaParola: Date | null = null;
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const corpo = (conSforzo: boolean) => JSON.stringify({
+    model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
+    system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
+    ...(conSforzo && sforzo(modello) ? { output_config: { effort: sforzo(modello) } } : {}),
+  });
+  const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
-      system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
-    }),
+    body: corpo(conSforzo),
   });
+  let r = await manda(true);
+  if (r.status === 400 && sforzo(modello)) {           // se un giorno il parametro non fosse accettato, si riprova senza e lo si ricorda
+    const testo = await r.text().catch(() => "");
+    if (/effort|output_config/i.test(testo)) { senzaSforzo.add(modello); console.log(`effort rifiutato da ${modello}: ${testo.slice(0, 160)}`); r = await manda(false); }
+    else r = new Response(testo, { status: 400, headers: { "content-type": "application/json" } });
+  }
   if (!r.ok || !r.body) {
     const d = await r.json().catch(() => ({}));
     const err: any = new Error(`${d?.error?.type ?? ""} ${d?.error?.message || `Errore API ${r.status}`} (${r.status})`.trim());
