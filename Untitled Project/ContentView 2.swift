@@ -609,7 +609,7 @@ struct ContentView: View {
             ("SIGNORE", "waveform.path.ecg", "Vitals", { tastiera = false; mostraVitals = true }),
             ("SIGNORE", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
             ("SIGNORE", "heart", "Cuore", { tastiera = false; scheda = .cuore }),
-            ("SIGNORE", "figure.pilates", "Allenatore", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
+            ("SIGNORE", "figure.pilates", "Trainer", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
 
             ("DAILY", "sun.horizon", "Briefing", { tastiera = false; scheda = .briefing }),
             ("DAILY", "cloud.sun", "Meteo", { tastiera = false; scheda = .meteo }),

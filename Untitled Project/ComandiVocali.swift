@@ -21,7 +21,7 @@ enum Vocabolario {
     nonisolated static let parole: [String] = [
         "Jarvis", "EDITH", "apri EDITH", "EDITH controllo completo", "controllo completo", "mi ricevi", "mi ricevi Jarvis", "ricevi", "ricevuto",
         "LiDAR", "Wiretap", "Sentinella", "Profiler", "Vitals", "Briefing", "Shazam", "Scanner", "Supabase", "GitHub", "Discosizer", "Discogs",
-        "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Confidente", "Diario", "Occhi", "Cucina",
+        "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Trainer", "Personal Trainer", "apri il Trainer", "Confidente", "Diario", "Occhi", "Cucina",
         "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "voce normale",
         "wake up daddy's home", "daddy's home", "chiudi", "pulisci", "scansiona la stanza", "quanto è grande", "fine scansione",
         // i nomi inglesi delle sezioni dentro le frasi di tutti i giorni: così il riconoscimento li aspetta scritti giusti
@@ -129,7 +129,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .cuore: return "Il suo cuore, Sir."
         case .vitals: return "Vitals, Sir."
         case .confidente: return "Confidente. La ascolto, Sir."
-        case .allenatore: return "Allenatore pronto, Sir."
+        case .allenatore: return "Personal trainer pronto, Sir."
         case .bea: return "Bea, Sir."
         case .briefing: return "Il briefing, Sir."
         case .meteo: return "Il meteo, Sir."
@@ -252,7 +252,7 @@ enum ComandoVocale: Equatable {
                                         "impostazioni", "sistemi", "costi", "edith", "edit", "diario", "sonno", "cuore", "vitals", "briefing", "posta",
                                         "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
                                         "confidente", "github", "supabase", "archivio", "scanner", "profiler",
-                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento"]
+                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner", "personal"]
             if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) { return .torna }
         }
         // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
@@ -442,7 +442,7 @@ enum ComandoVocale: Equatable {
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [
             (.diario, [" diario "]), (.sonno, [" sonno ", " dormito "]), (.cuore, [" cuore ", " battito "]), (.vitals, [" vitals ", " vitali ", " parametri "]),
-            (.confidente, [" confidente "]), (.bea, [" reparto bea ", " scheda di bea ", " sezione bea "]), (.allenatore, [" allenatore ", " allenamento "]), (.briefing, [" briefing ", " brifing "]),
+            (.confidente, [" confidente "]), (.bea, [" reparto bea ", " scheda di bea ", " sezione bea "]), (.allenatore, [" allenatore ", " allenamento ", " trainer ", " treiner ", " personal trainer "]), (.briefing, [" briefing ", " brifing "]),
             (.meteo, [" meteo ", " tempo "]), (.email, [" email ", " mail ", " posta "]), (.spesa, [" spesa "]),
             (.shazam, [" shazam "]), (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi "]),
             (.interprete, [" interprete ", " traduttore "]), (.browser, [" browser ", " internet ", " navigatore "]), (.serata, [" serata "]),

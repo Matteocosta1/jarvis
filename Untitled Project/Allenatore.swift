@@ -38,7 +38,7 @@ struct Allenatore: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("J.A.R.V.I.S.").font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                        Text("ALLENATORE").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.7)
+                        Text("PERSONAL TRAINER").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.7)
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer()
@@ -133,7 +133,7 @@ struct Allenatore: View {
             orecchio.avvia()
         }
         .onDisappear { orecchio.ferma(); motore.ferma() }
-        .aperturaHUD("Allenatore", fotocamera: true)
+        .aperturaHUD("Trainer", fotocamera: true)
     }
 
     private func dato(_ titolo: String, _ valore: String, caldo: Bool) -> some View {
