@@ -9,7 +9,8 @@ import simd
 /// L'allenatore di JARVIS: inquadra chi si allena, l'iPhone riconosce lo scheletro del corpo (Vision, tutto in locale)
 /// e lo disegna in stile HUD sopra la ripresa. JARVIS commenta la postura a voce (schiena, spalle, braccia),
 /// conta le ripetizioni e a fine serie fa il riassunto. Pensato per il Pilates, va bene per squat, piegamenti, addominali.
-/// Build 22: con «Specchio» (conta le ginocchia) c'è lo SPECCHIO · ALLENAMENTO del mockup, con lo scheletro «giusto» e i conti sul corpo.
+/// Build 22: quattro scelte, Busto · Mani · Ginocchia · Specchio. Le prime tre sono quelle di sempre; con «Specchio» c'è lo
+/// SPECCHIO · ALLENAMENTO del mockup (conta le ginocchia con l'angolo 3D, scheletro «giusto» e conti sul corpo).
 /// Si apre sul Busto come sempre: lo Specchio parte scegliendolo, oppure con «Jarvis, modalità specchio» / «allenamento allo specchio».
 extension Notification.Name {
     /// «Jarvis, modalità specchio» / «allenamento allo specchio»: l'Allenatore passa allo Specchio.
@@ -27,7 +28,7 @@ struct Allenatore: View {
             AnteprimaAllenatore(sessione: motore.sessione).ignoresSafeArea()
             ScheletroHUD(posa: motore.posa, allarme: motore.posturaFuori, specchio: motore.frontale).ignoresSafeArea().allowsHitTesting(false)
             // BUILD 22 · B — Specchio: lo scheletro giusto in verde e i conti sul corpo
-            if motore.giunto == .ginocchia {
+            if motore.giunto == .specchio {
                 SpecchioHUD(posa: motore.posa, ginocchio: motore.ginocchio, in3D: motore.ginocchioIn3D, altezza: motore.altezzaInPiedi,
                             ripetizioni: motore.ripetizioni, schiena: motore.inclinazioneSchiena, specchio: motore.frontale)
                     .ignoresSafeArea().allowsHitTesting(false)
@@ -57,7 +58,7 @@ struct Allenatore: View {
                 .padding(.horizontal, 20).padding(.top, 8)
 
                 // telemetria (nello Specchio no: i numeri stanno solo sul corpo, come nel mockup)
-                if motore.giunto != .ginocchia {
+                if motore.giunto != .specchio {
                     HStack(spacing: 10) {
                         dato("RIPETIZIONI", "\(motore.ripetizioni)", caldo: false)
                         dato("SCHIENA", motore.posa == nil ? "—" : "\(Int(motore.inclinazioneSchiena))°", caldo: motore.inclinazioneSchiena > motore.sogliaSchiena)
@@ -78,7 +79,7 @@ struct Allenatore: View {
                     .opacity(motore.commento.isEmpty ? 0 : 1)
                     .animation(.easeInOut(duration: 0.3), value: motore.commento)
 
-                if motore.giunto == .ginocchia {
+                if motore.giunto == .specchio {
                     Text("SPECCHIO · ALLENAMENTO").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         .foregroundStyle(Color.ciano)
                 }
@@ -86,10 +87,11 @@ struct Allenatore: View {
                 Picker("Conteggio", selection: $motore.giunto) {
                     Text("Busto").tag(MotoreAllenatore.Giunto.busto)
                     Text("Mani").tag(MotoreAllenatore.Giunto.mani)
-                    Text("Specchio").tag(MotoreAllenatore.Giunto.ginocchia)
+                    Text("Ginocchia").tag(MotoreAllenatore.Giunto.ginocchia)
+                    Text("Specchio").tag(MotoreAllenatore.Giunto.specchio)
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 20)                 // quattro scelte: un po' più di spazio che con tre
 
                 HStack(spacing: 14) {
                     Button { Suoni.tocco(); motore.azzera() } label: {
@@ -111,10 +113,10 @@ struct Allenatore: View {
         }
         .statusBarHidden()
         .onReceive(NotificationCenter.default.publisher(for: .jarvisSpecchio)) { _ in   // detto con l'Allenatore già aperto
-            MotoreAllenatore.specchioRichiesto = false; motore.giunto = .ginocchia
+            MotoreAllenatore.specchioRichiesto = false; motore.giunto = .specchio
         }
         .task {
-            if MotoreAllenatore.specchioRichiesto { MotoreAllenatore.specchioRichiesto = false; motore.giunto = .ginocchia }
+            if MotoreAllenatore.specchioRichiesto { MotoreAllenatore.specchioRichiesto = false; motore.giunto = .specchio }
             await motore.avvia()
             // i comandi a voce: dopo il suono d'apertura (come nella Sentinella), sempre con «Jarvis» davanti
             try? await Task.sleep(for: .seconds(1.8))
@@ -342,7 +344,7 @@ struct AnteprimaAllenatore: UIViewRepresentable {
 
 @MainActor
 final class MotoreAllenatore: NSObject, ObservableObject {
-    enum Giunto { case busto, mani, ginocchia }
+    enum Giunto { case busto, mani, ginocchia, specchio }   // build 22: Ginocchia resta com'era, Specchio è la modalità nuova
 
     @Published var posa: [VNHumanBodyPoseObservation.JointName: CGPoint]?
     @Published var ripetizioni = 0
@@ -351,7 +353,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     @Published var posturaFuori = false
     @Published var commento = ""
     @Published var frontale = false
-    @Published var giunto: Giunto = .busto { didSet { azzeraConteggio(); camera.usa3D(giunto == .ginocchia) } }   // si apre sul Busto, come sempre
+    @Published var giunto: Giunto = .busto { didSet { azzeraConteggio(); camera.usa3D(giunto == .specchio) } }   // si apre sul Busto, come sempre
     /// «Jarvis, modalità specchio» con l'Allenatore ancora chiuso: lo Specchio parte appena si apre.
     static var specchioRichiesto = false
     @Published var ginocchio: Double?           // angolo del ginocchio in gradi (3D se c'è, se no dall'immagine)
@@ -360,7 +362,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     /// Oltre questa inclinazione la schiena è «fuori asse». Nello squat (ginocchia) il busto corretto si piega in avanti
     /// di circa 30°: lì la soglia è 45°, negli altri casi 12°.
-    var sogliaSchiena: Double { giunto == .ginocchia ? 45 : 12 }
+    var sogliaSchiena: Double { giunto == .specchio ? 45 : 12 }
 
     private let camera = CameraPosa()
     var sessione: AVCaptureSession { camera.sessione }
@@ -413,9 +415,15 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             case .busto: giunto = .busto
             case .mani: giunto = .mani
             case .ginocchia: giunto = .ginocchia
+            case .specchio: giunto = .specchio
             }
-            // la terza scelta ora si chiama Specchio (il corpo 3D con i conti sopra): JARVIS la chiama così
-            let frase = parte == .busto ? "Conto il busto, Sir." : (parte == .mani ? "Conto le mani, Sir." : "Specchio, Sir.")
+            let frase: String
+            switch parte {
+            case .busto: frase = "Conto il busto, Sir."
+            case .mani: frase = "Conto le mani, Sir."
+            case .ginocchia: frase = "Conto le ginocchia, Sir."
+            case .specchio: frase = "Specchio, Sir."
+            }
             Task { await parla(frase) }
         }
     }
@@ -423,7 +431,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     func avvia() async {
         guard await AVCaptureDevice.requestAccess(for: .video) else { commento = "Serve il permesso fotocamera, Sir."; return }
         camera.esito = { [weak self] punti, ginocchio in Task { @MainActor [weak self] in self?.ricevi(punti, ginocchio3D: ginocchio) } }
-        camera.usa3D(giunto == .ginocchia)
+        camera.usa3D(giunto == .specchio)
         configura(frontale: false)
         inizioSerie = Date()
         commento = "Inquadri tutta la persona, Sir."
@@ -453,7 +461,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         let durata = Int(Date().timeIntervalSince(inizioSerie))
         var frase = n == 0 ? "Serie chiusa senza ripetizioni contate, Sir." : "Serie chiusa: \(n) ripetizion\(n == 1 ? "e" : "i") in \(durata / 60) minuti e \(durata % 60) secondi."
         if !serieSchiena.isEmpty {
-            let (ok, quasi) = giunto == .ginocchia ? (sogliaSchiena - 15, sogliaSchiena) : (8.0, 15.0)   // nello Specchio il busto si piega di suo
+            let (ok, quasi) = giunto == .specchio ? (sogliaSchiena - 15, sogliaSchiena) : (8.0, 15.0)   // nello Specchio il busto si piega di suo
             frase += schiena < ok ? " Schiena allineata per tutta la serie, davvero bene." : schiena < quasi ? " Schiena un po' inclinata, in media \(Int(schiena)) gradi: si può fare meglio." : " Attenzione alla schiena: in media \(Int(schiena)) gradi fuori asse."
             frase += simm >= 92 ? " Simmetria ottima." : " Simmetria al \(Int(simm)) per cento: un lato lavora più dell'altro."
         }
@@ -503,12 +511,12 @@ final class MotoreAllenatore: NSObject, ObservableObject {
 
     /// Conta le ripetizioni: il giunto scelto scende sotto una soglia e torna su.
     private func conta(_ p: [VNHumanBodyPoseObservation.JointName: CGPoint]) {
-        if giunto == .ginocchia && conAngolo { contaSquat(); return }
+        if giunto == .specchio && conAngolo { contaSquat(); return }
         let y: Double?
         switch giunto {
         case .busto: y = p[.neck].map { 1 - $0.y }
         case .mani: if let a = p[.leftWrist], let b = p[.rightWrist] { y = 1 - (a.y + b.y) / 2 } else { y = nil }
-        case .ginocchia: if let a = p[.leftKnee], let b = p[.rightKnee] { y = 1 - (a.y + b.y) / 2 } else { y = nil }
+        case .ginocchia, .specchio: if let a = p[.leftKnee], let b = p[.rightKnee] { y = 1 - (a.y + b.y) / 2 } else { y = nil }   // lo Specchio senza angolo 3D conta come Ginocchia
         }
         guard let y else { return }
         altezza = altezza == 0 ? y : altezza * 0.6 + y * 0.4

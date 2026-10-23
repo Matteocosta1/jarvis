@@ -183,7 +183,6 @@ struct VistaBriefing: View {
     @State private var posta: (totale: Int, nonLette: Int)?
     @State private var spesa = 0
     @State private var promesse: [(String, String)] = []
-    @State private var parcheggio: String?
     @State private var caricato = false
 
     var body: some View {
@@ -241,11 +240,6 @@ struct VistaBriefing: View {
                     }
                 }
             }
-            if let parcheggio {
-                Pannello(titolo: "LA MACCHINA", tinta: tinta) {
-                    Label(parcheggio, systemImage: "car.fill").font(.system(size: 14)).foregroundStyle(.white)
-                }
-            }
             if let s = salute {
                 HStack(spacing: 10) {
                     Button { apri(.cuore) } label: { Valore(titolo: "CUORE", valore: s.battito.map { "\($0)" } ?? "—", sotto: "bpm a riposo", tinta: tinta) }
@@ -287,7 +281,6 @@ struct VistaBriefing: View {
         if let o = await VistaVitals.chiama(["ricordi": true]) {
             spesa = (o["spesa"] as? [Any])?.count ?? 0
             promesse = (o["promesse"] as? [[String: Any]] ?? []).prefix(4).map { ($0["testo"] as? String ?? "", [$0["persona"] as? String, $0["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · ")) }
-            if let pk = o["parcheggio"] as? [String: Any] { parcheggio = [pk["luogo"] as? String, pk["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · ") }
         }
         if let o = await VistaVitals.chiama(["posta": true, "ore": 24]), o["errore"] == nil {
             posta = ((o["totale"] as? NSNumber)?.intValue ?? 0, (o["non_lette"] as? NSNumber)?.intValue ?? 0)

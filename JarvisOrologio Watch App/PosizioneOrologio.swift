@@ -2,7 +2,7 @@ import Foundation
 import CoreLocation
 
 /// Dove si trova il signore: la posizione dell'orologio va al cervello con ogni richiesta,
-/// così la seconda memoria sa dove è stato salvato ogni ricordo (macchina, posti, persone).
+/// così la seconda memoria sa dove è stato salvato ogni ricordo (luoghi, oggetti, persone).
 /// Solo «mentre usa l'app», mai in sottofondo. Stesso permesso già chiesto dall'allarme cuore.
 /// Per non far aspettare le risposte, il GPS parte appena l'app si apre e la domanda al massimo aspetta 0,3 secondi.
 @MainActor

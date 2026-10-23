@@ -154,7 +154,7 @@ struct VistaRicordi: View {
             ForEach(d.posti) { r in
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: r.tipo == "parcheggio" ? "car.fill" : VistaRicordi.icona(r.tipo)).foregroundStyle(Color.ciano).frame(width: 22)
+                        Image(systemName: VistaRicordi.icona(r.tipo)).foregroundStyle(Color.ciano).frame(width: 22)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(r.testo).font(.system(size: 15)).foregroundStyle(.white)
                             Text([r.luogo, r.persona, r.quando].compactMap { $0 }.joined(separator: " · "))
@@ -194,7 +194,7 @@ struct VistaRicordi: View {
     static func icona(_ tipo: String) -> String {
         switch tipo {
         case "oggetto": return "key.fill"
-        case "posto": return "mappin.and.ellipse"
+        case "posto", "parcheggio": return "mappin.and.ellipse"     // i vecchi parcheggi sono luoghi come gli altri
         case "persona": return "person.fill"
         case "visto": return "eye.fill"
         case "idea": return "lightbulb.fill"

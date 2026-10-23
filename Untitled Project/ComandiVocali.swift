@@ -177,7 +177,7 @@ enum ComandoVocale: Equatable {
     enum AzioneSentinella: Equatable { case registro, schermoNero }
     /// I comandi dentro l'Allenatore: i suoi tasti, più le domande sulla serie e la pausa.
     enum AzioneAllenatore: Equatable { case fineSerie, azzera, ripetizioni, postura, camera, pausa, riprendi, conta(ParteConteggio) }
-    enum ParteConteggio: Equatable { case busto, mani, ginocchia }
+    enum ParteConteggio: Equatable { case busto, mani, ginocchia, specchio }
     /// I comandi dentro l'Interprete: i due tasti, la lingua, i turni, «ripeti».
     enum AzioneInterprete: Equatable { case ascoltaMe, ascoltaAltro, lingua(String), sceltaLingua, ripeti, turniAutomatici(Bool) }
     /// I comandi rapidi: la sezione si apre già al lavoro.
@@ -282,7 +282,7 @@ enum ComandoVocale: Equatable {
             if c(" fotocamera ") || c(" girati ") || c(" selfie ") || c(" camera ") { return .allenatore(.camera) }
             if c(" pausa ") || c(" aspetta un attimo ") { return .allenatore(.pausa) }
             if c(" riprendi ") || c(" ripartiamo ") || c(" continua ") || c(" riparti ") { return .allenatore(.riprendi) }
-            if c(" specchio ") { return .allenatore(.conta(.ginocchia)) }     // build 22: «Jarvis, specchio» dentro l'Allenatore
+            if c(" specchio ") { return .allenatore(.conta(.specchio)) }      // build 22: «Jarvis, specchio» dentro l'Allenatore
             if c(" conta ") || c(" conteggio ") {
                 if c(" mani ") || c(" braccia ") { return .allenatore(.conta(.mani)) }
                 if c(" ginocchia ") || c(" gambe ") { return .allenatore(.conta(.ginocchia)) }
@@ -338,14 +338,12 @@ enum ComandoVocale: Equatable {
             }
             if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri posta ", " vai su mail "]) { return .scheda(.apriMail) }
         case .ricordi?:
-            if uno([" ho parcheggiato ", " parcheggiato qui ", " segna la macchina ", " lascio la macchina qui ", " la macchina e qui "]) { return .domanda("Ho parcheggiato qui, segnalo.") }
             if uno([" ricorda dove sono ", " ricordati questo posto ", " segna questo posto ", " salva questo posto ", " ricorda questo posto ", " segnati dove sono "]) {
                 return .domanda("Ricordati questo posto: dove sono adesso.")
             }
-            if uno([" dov e la macchina ", " dove ho parcheggiato ", " portami alla macchina ", " portami li ", " portamici "]) { return .domanda("Dov'è la macchina? Portami lì.") }
             if uno([" com e andata oggi ", " cosa ho fatto oggi ", " la mia giornata "]) { return .domanda("Com'è andata oggi?") }
             if solo(generiche + [" cosa devo ricordare ", " cosa mi devo ricordare ", " cosa c e ", " promemoria ", " cosa ho promesso "]) {
-                return .domanda("Cosa mi devo ricordare? Promesse aperte, oggetti e parcheggio.")
+                return .domanda("Cosa mi devo ricordare? Promesse aperte e oggetti.")
             }
         case .bea?:
             if t.count <= 7 {

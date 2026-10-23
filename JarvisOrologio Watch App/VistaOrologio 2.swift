@@ -115,7 +115,7 @@ struct VistaOrologio: View {
                 .navigationDestination(item: $polso) { s in paginaPolso(s) }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        // Ricordi: la seconda memoria (macchina, spesa, promesse, ultime cose segnate)
+                        // Ricordi: la seconda memoria (luoghi, spesa, promesse, ultime cose segnate)
                         NavigationLink { VistaRicordiOrologio() } label: {
                             Image(systemName: "brain.head.profile").foregroundStyle(ciano)
                         }
@@ -832,7 +832,7 @@ struct VistaVitalsOrologio: View {
     }
 }
 
-/// Ricordi: la seconda memoria sul polso. La macchina (con il percorso a piedi), la lista della spesa da spuntare,
+/// Ricordi: la seconda memoria sul polso. La lista della spesa da spuntare,
 /// le promesse con il loro avviso, le ultime cose segnate. Per aggiungere: basta dirlo a JARVIS.
 struct VistaRicordiOrologio: View {
     @EnvironmentObject var jarvis: JarvisOrologio
@@ -914,7 +914,6 @@ struct VistaRicordiOrologio: View {
 
             Section {
                 Button { jarvis.chiedi("Ricordati questo posto: dove sono adesso."); chiudi() } label: { Label("Ricorda dove sono", systemImage: "mappin.and.ellipse") }
-                Button { jarvis.chiedi("Ho parcheggiato qui, segnalo."); chiudi() } label: { Label("Ho parcheggiato", systemImage: "car") }
                 Button { jarvis.chiedi("Com'è andata oggi?"); chiudi() } label: { Label("Com'è andata oggi?", systemImage: "clock.arrow.circlepath") }
             }
         }

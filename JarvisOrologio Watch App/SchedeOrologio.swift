@@ -240,7 +240,6 @@ struct VistaBriefingOrologio: View {
     @State private var meteo: String?
     @State private var spesa = 0
     @State private var promesse: [String] = []
-    @State private var parcheggio: String?
     @State private var posta: String?
     @State private var caricato = false
     private let ciano = TintaOrologio.ciano
@@ -267,10 +266,6 @@ struct VistaBriefingOrologio: View {
                 IntestazioneOrologio(testo: "PROMESSE")
                 ForEach(promesse, id: \.self) { Text($0).font(.footnote) }
             }
-            if let parcheggio {
-                IntestazioneOrologio(testo: "LA MACCHINA")
-                Label(parcheggio, systemImage: "car.fill").font(.footnote)
-            }
         }
         .task {
             async let s = SaluteOggi.leggi()
@@ -285,7 +280,6 @@ struct VistaBriefingOrologio: View {
             if let o = await VistaVitalsOrologio.chiama(["ricordi": true]) {
                 spesa = (o["spesa"] as? [Any])?.count ?? 0
                 promesse = (o["promesse"] as? [[String: Any]] ?? []).prefix(3).compactMap { $0["testo"] as? String }
-                if let pk = o["parcheggio"] as? [String: Any] { parcheggio = [pk["luogo"] as? String, pk["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · ") }
             }
             if let o = await VistaVitalsOrologio.chiama(["posta": true, "ore": 24]), o["errore"] == nil {
                 posta = "\((o["non_lette"] as? NSNumber)?.intValue ?? 0)"
