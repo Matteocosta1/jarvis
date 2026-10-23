@@ -67,6 +67,8 @@ Deno.serve(async (req) => {
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
   if (!chiave) return json({ errore: "manca ELEVENLABS_API_KEY" }, 500);
 
+  const { data: secchio } = await db.storage.getBucket(BUCKET);        // l'Archivio si crea alla prima volta, come nel cervello
+  if (!secchio) await db.storage.createBucket(BUCKET, { public: false, fileSizeLimit: "200MB" });
   const oggi = Deno.env.get("ELEVENLABS_MODELLO") || "eleven_multilingual_v2";
   const risultati: unknown[] = [];
   for (const [modello, colonna] of [[oggi, 1], ["eleven_v4_turbo", 2]] as [string, number][]) {
