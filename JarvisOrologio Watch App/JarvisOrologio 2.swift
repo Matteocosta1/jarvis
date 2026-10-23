@@ -414,7 +414,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             polsoRichiesto = .protocolli(p)    // parla la schermata dei protocolli, quando parte
             fase = .attesa
             return
-        case .traccia: polsoRichiesto = .traccia; reparto = .ricordi
+        case .traccia, .guida: polsoRichiesto = .traccia; reparto = .ricordi   // sul polso niente fotocamera: la bussola
         case .radar: polsoRichiesto = .radar; reparto = .meteo
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: repartoRichiesto = .vitals; reparto = .vitals

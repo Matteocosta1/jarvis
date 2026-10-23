@@ -2,11 +2,14 @@
 import SwiftUI
 import AVFoundation
 
-/// Ricordi › TRACCIA (build 22): la vista dalla fotocamera con le frecce olografiche verso l'ultimo parcheggio,
-/// la distanza e il tempo a piedi; sotto gli ultimi ricordi e le frasi A VOCE. Come nel mockup.
+/// Ricordi › TRACCIA (build 22): la bussola con la freccia verso l'ultimo parcheggio, i metri grandi, la distanza
+/// e il tempo a piedi; sotto gli ultimi ricordi e le frasi A VOCE. La fotocamera si accende solo col tasto «Guida»
+/// (o con «Jarvis, portami alla macchina»): allora la vista dalla fotocamera con le frecce olografiche, come nel mockup.
 struct PannelliTraccia: View {
     let parcheggio: DatiRicordi.Riga?
     let ultimi: [DatiRicordi.Riga]
+    /// La Guida (fotocamera e frecce): spenta quando si apre Ricordi, accesa subito da «Jarvis, portami alla macchina».
+    @Binding var guida: Bool
     @StateObject private var bussola = Bussola()
     private let tinta = Color.ciano
 
@@ -15,13 +18,26 @@ struct PannelliTraccia: View {
             Pannello(titolo: "TRACCIA", tinta: tinta) {
                 if let pk = parcheggio, let lat = pk.lat, let lon = pk.lon {
                     let rotta = bussola.verso(lat: lat, lon: lon)
-                    VistaAR(lat: lat, lon: lon, bussola: bussola)
-                        .aspectRatio(720.0 / 520.0, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(tinta.opacity(0.22), lineWidth: 1))
+                    if guida {
+                        // la fotocamera vive solo dentro VistaAR: spenta la Guida, VistaAR esce e la ferma (onDisappear)
+                        VistaAR(lat: lat, lon: lon, bussola: bussola)
+                            .aspectRatio(720.0 / 520.0, contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(tinta.opacity(0.22), lineWidth: 1))
+                    } else {
+                        BussolaTraccia(rilevamento: rotta?.rilevamento, direzione: bussola.direzione)
+                            .aspectRatio(4.0 / 3.0, contentMode: .fit)
+                            .frame(maxWidth: 280)
+                            .frame(maxWidth: .infinity)
+                        Text(rotta.map { Rotta.distanza($0.metri) } ?? "…")
+                            .font(.system(size: 34, weight: .bold, design: .monospaced)).monospacedDigit()
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                    }
                     RigaHUD("Parcheggiata", [pk.quando, pk.luogo ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
                     RigaHUD("Distanza", rotta.map { Rotta.distanza($0.metri) } ?? "cerco la posizione…")
                     RigaHUD("A piedi", rotta.map { Rotta.aPiedi($0.metri) } ?? "—")
+                    TastoComando(testo: guida ? "Bussola" : "Guida") { guida.toggle() }
                 } else {
                     Text("Nessun parcheggio salvato, Sir. Quando lascia la macchina dica «Jarvis, ho parcheggiato qui».")
                         .font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
@@ -41,33 +57,82 @@ struct PannelliTraccia: View {
     }
 }
 
+/// La bussola di TRACCIA (come `bussola` del mockup e la versione dell'orologio): il quadrante gira con l'iPhone,
+/// la freccia punta la macchina. Si ridisegna quando la bussola cambia (ogni 2°), senza animazione continua.
+private struct BussolaTraccia: View {
+    let rilevamento: Double?
+    let direzione: Double?
+
+    var body: some View {
+        Canvas { gc, size in disegna(gc, size) }
+            .allowsHitTesting(false)
+    }
+
+    private func disegna(_ gc: GraphicsContext, _ size: CGSize) {
+        let W = Double(size.width), H = Double(size.height)
+        let s = H / 240                                       // le misure del mockup sono su una tela 320 × 240
+        let cx = W / 2, cy = H / 2, r = H * 0.42
+        let giro = (direzione ?? 0) * Double.pi / 180
+        let dir = ((rilevamento ?? 0) - (direzione ?? 0)) * Double.pi / 180
+        func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: CGFloat(x), y: CGFloat(y)) }
+        let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
+        gc.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)), with: .color(ciano.opacity(0.35)), lineWidth: CGFloat(2 * s))
+        var tacche = Path()
+        for i in 0..<36 {
+            let a: Double = Double(i) / 36 * 2 * Double.pi - giro
+            let l: Double = (i % 9 == 0 ? 14 : 6) * s
+            tacche.move(to: pt(cx + sin(a) * r, cy - cos(a) * r))
+            tacche.addLine(to: pt(cx + sin(a) * (r - l), cy - cos(a) * (r - l)))
+        }
+        gc.stroke(tacche, with: .color(ciano.opacity(0.35)), lineWidth: CGFloat(2 * s))
+        let arancio = Color(red: 1.0, green: 0.706, blue: 0.353)          // #ffb45a
+        gc.draw(Text("N").font(.system(size: CGFloat(16 * s), weight: .bold, design: .monospaced)).foregroundStyle(arancio),
+                at: pt(cx + sin(-giro) * (r - 26 * s), cy - cos(-giro) * (r - 26 * s)), anchor: .center)
+        guard rilevamento != nil else { return }                       // senza posizione, niente freccia
+        var freccia = Path()
+        freccia.move(to: pt(0, -r * 0.78))
+        freccia.addLine(to: pt(r * 0.28, r * 0.12))
+        freccia.addLine(to: pt(0, -r * 0.05))
+        freccia.addLine(to: pt(-r * 0.28, r * 0.12))
+        freccia.closeSubpath()
+        var g = gc
+        g.translateBy(x: CGFloat(cx), y: CGFloat(cy))
+        g.rotate(by: .radians(dir))
+        g.addFilter(.shadow(color: ciano, radius: CGFloat(9 * s)))
+        g.fill(freccia, with: .color(ciano))
+    }
+}
+
 /// La strada vista dalla fotocamera e la freccia olografica verso la macchina (disegnata come `disegnaAR` del mockup).
 /// Direzione = rilevamento verso la macchina meno la direzione dell'iPhone; in alto la bussola.
+/// Esiste solo con la Guida accesa: la fotocamera parte quando compare e si ferma quando esce (Guida spenta o pagina chiusa).
 struct VistaAR: View {
     let lat: Double
     let lon: Double
     @ObservedObject var bussola: Bussola
-    @State private var motore = MotoreOcchi()
+    /// Creato una volta sola, quando serve: con `= MotoreOcchi()` ogni ridisegno ne costruirebbe uno nuovo (e una sessione).
+    @State private var motore: MotoreOcchi?
     @State private var camera = false
 
     var body: some View {
         ZStack {
             Color(red: 0.02, green: 0.03, blue: 0.035)          // #050809, se la fotocamera non c'è
-            if camera { AnteprimaOcchi(sessione: motore.sessione) }
+            if camera, let m = motore { AnteprimaOcchi(sessione: m.sessione) }
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
             }
             .allowsHitTesting(false)
         }
         .task {
-            guard await AVCaptureDevice.requestAccess(for: .video) else { return }
-            let m = motore
+            guard await AVCaptureDevice.requestAccess(for: .video), !Task.isCancelled else { return }
+            let m = motore ?? MotoreOcchi()
+            motore = m
             let ok = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
                 m.avvia { ok in c.resume(returning: ok) }
             }
             if !Task.isCancelled { camera = ok } else { m.ferma() }
         }
-        .onDisappear { motore.ferma() }
+        .onDisappear { motore?.ferma(); camera = false }
     }
 
     private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double) {

@@ -114,6 +114,7 @@ final class Jarvis: NSObject, ObservableObject {
     private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
+    var guidaTraccia = false                     // build 22: Ricordi › TRACCIA si apre con la Guida (fotocamera) accesa
     @Published var azioneLidar: ComandoVocale.AzioneLidar?   // comando vocale dentro LiDAR: lo esegue la sua schermata
     var lidarAperto = false                      // LiDAR aperto: valgono anche i suoi comandi («salva», «fine scansione»…)
     var sezioneAperta: Reparto?                  // la scheda aperta sopra la schermata principale: valgono anche i suoi tasti a voce
@@ -691,7 +692,8 @@ final class Jarvis: NSObject, ObservableObject {
         case .protocollo(let p):
             Protocolli.condiviso.richiedi(p)     // la scheda Telefono lo avvia appena aperta, come il tasto «Avvia»
             apriReparto(.telefono)
-        case .traccia: apriReparto(.ricordi)      // Ricordi si apre su TRACCIA
+        case .traccia: guidaTraccia = false; apriReparto(.ricordi)   // Ricordi si apre su TRACCIA, con la bussola
+        case .guida: guidaTraccia = true; apriReparto(.ricordi)      // TRACCIA con la Guida già accesa (fotocamera e frecce)
         case .radar: apriReparto(.meteo)          // RADAR è in testa al Meteo
         case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
         case .organismo: apriReparto(.vitals)

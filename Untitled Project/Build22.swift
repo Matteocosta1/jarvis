@@ -104,7 +104,8 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
 /// storpiature imparate. Risposta immediata, niente cervello, e non si imparano mai come storpiature.
 nonisolated enum ComandoDedicato: Equatable, Sendable {
     case protocollo(Protocollo)   // «protocollo party», «attiva il protocollo notte»: Telefono › PROTOCOLLI, e parte
-    case traccia                  // «traccia la macchina», «portami alla macchina»: Ricordi › TRACCIA
+    case traccia                  // «traccia la macchina»: Ricordi › TRACCIA (la bussola, fotocamera spenta)
+    case guida                    // «portami alla macchina»: Ricordi › TRACCIA con la Guida accesa (fotocamera e frecce)
     case radar                    // «radar pioggia»: Meteo › RADAR
     case priorita                 // «rapporto posta»: Email › PRIORITÀ
     case organismo                // «scansione organismo»: Vitals
@@ -132,7 +133,8 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
             }
         }
         switch t.joined(separator: " ") {
-        case "traccia la macchina", "portami alla macchina": return .traccia
+        case "traccia la macchina": return .traccia
+        case "portami alla macchina": return .guida
         case "radar pioggia": return .radar
         case "rapporto posta": return .priorita
         case "scansione organismo": return .organismo

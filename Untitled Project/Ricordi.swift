@@ -6,6 +6,8 @@ import SwiftUI
 struct VistaRicordi: View {
     enum Scheda: String, CaseIterable, Identifiable { case traccia = "Traccia", ricordi = "Ricordi", posti = "Posti"; var id: String { rawValue } }
     var iniziale: Scheda = .ricordi
+    /// TRACCIA con la Guida già accesa (fotocamera e frecce): «Jarvis, portami alla macchina».
+    var guida = false
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
 
@@ -15,6 +17,7 @@ struct VistaRicordi: View {
     @State private var cerca = ""
     @State private var errore = false
     @State private var fotoAperta: Data?
+    @State private var guidaAccesa = false
 
     var body: some View {
         NavigationStack {
@@ -30,7 +33,7 @@ struct VistaRicordi: View {
                     if let d = dati, scheda == .traccia {
                         // build 22: TRACCIA, la strada verso la macchina (come nel mockup)
                         ScrollView {
-                            PannelliTraccia(parcheggio: d.parcheggio, ultimi: Array(d.ricordi.prefix(3)))
+                            PannelliTraccia(parcheggio: d.parcheggio, ultimi: Array(d.ricordi.prefix(3)), guida: $guidaAccesa)
                                 .padding(16)
                                 .padding(.bottom, 30)
                         }
@@ -59,7 +62,7 @@ struct VistaRicordi: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
             }
-            .onAppear { scheda = iniziale }
+            .onAppear { scheda = iniziale; guidaAccesa = guida }
             .task { await carica() }
             .task(id: cerca) {
                 try? await Task.sleep(for: .milliseconds(350))
