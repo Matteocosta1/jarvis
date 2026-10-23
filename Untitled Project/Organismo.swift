@@ -552,8 +552,8 @@ struct VistaOlogramma: UIViewRepresentable {
         v.scene = ologramma.scena
         v.pointOfView = ologramma.camera
         v.backgroundColor = .clear
-        v.antialiasingMode = .multisampling4X
-        v.preferredFramesPerSecond = 60
+        v.antialiasingMode = .multisampling2X
+        v.preferredFramesPerSecond = 30
         v.allowsCameraControl = false
         v.isPlaying = true
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinatore.trascina(_:)))
