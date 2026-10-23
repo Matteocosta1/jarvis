@@ -701,6 +701,15 @@ function paroleUtili(domanda: string) {
   return [...new Set(domanda.toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 2 && !PAROLE_VUOTE.has(p)))].slice(0, 8);
 }
 
+async function contaSenzaVettore() {
+  const conti: Record<string, number | null> = {};
+  for (const t of Object.keys(TESTO_DA_VETTORE)) {
+    const { count } = await db.from(t).select("id", { count: "exact", head: true }).is("vettore", null);
+    conti[t] = count ?? null;
+  }
+  return conti;
+}
+
 /// Unisce i risultati per parole e per significato: prima le parole, poi i significati nuovi, senza doppioni.
 function unisci<T extends { id: number }>(perParole: T[], perSignificato: T[], quanti: number) {
   const visti = new Set(perParole.map((r) => Number(r.id)));
@@ -1486,7 +1495,11 @@ let bucketPronto = false;
 async function archivioPronto() {
   if (bucketPronto) return;
   const { data } = await db.storage.getBucket(BUCKET);
-  if (!data) await db.storage.createBucket(BUCKET, { public: false, fileSizeLimit: "200MB" });
+  if (!data) {
+    // 50 MB: il limite dei file del progetto (200 MB veniva rifiutato e l'archivio non nasceva mai)
+    const { error } = await db.storage.createBucket(BUCKET, { public: false, fileSizeLimit: "50MB" });
+    if (error && !/already exists|duplicate/i.test(error.message)) throw new Error(`l'archivio non si crea: ${error.message}`);
+  }
   bucketPronto = true;
 }
 const nomePulito = (s: string) => s.normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9._ \-]/g, "").trim().replace(/\s+/g, "-").slice(0, 80);
@@ -1506,12 +1519,16 @@ async function archivioSalva(i: Record<string, any>, turno: Turno) {
   } else if (i.ultima_foto && turno.foto) {
     dati = Uint8Array.from(atob(turno.foto), (c) => c.charCodeAt(0)); tipo = "image/jpeg";
   } else return { errore: "niente da salvare: serve un testo, un file o l'ultima foto" };
-  if (dati.length > 200 * 1048576) return { errore: "file oltre i 200 MB" };
+  if (dati.length > 50 * 1048576) return { errore: `file di ${Math.round(dati.length / 1048576)} MB: l'archivio accetta file fino a 50 MB` };
   const base = nomePulito(String(i.nome || `file-${Date.now()}`)) || `file-${Date.now()}`;
   const nome = base + estensione(tipo, base);
   const percorso = `${cartella}/${nome}`;
   const { error } = await db.storage.from(BUCKET).upload(percorso, dati, { contentType: tipo, upsert: true });
-  if (error) throw error;
+  if (error) {
+    if (/maximum allowed size|too large|413/i.test(error.message)) return { errore: "file troppo grande per l'archivio (massimo 50 MB)" };
+    if (/mime type|not supported/i.test(error.message)) return { errore: `l'archivio non accetta file di tipo ${tipo}` };
+    throw new Error(`l'archivio non salva il file: ${error.message}`);
+  }
   const riga = { percorso, nome, cartella, tipo, dimensione: dati.length, descrizione: i.descrizione ? String(i.descrizione).slice(0, 500) : null };
   const { error: e2 } = await db.from("jarvis_archivio").upsert(riga, { onConflict: "percorso" });
   if (e2) throw e2;
@@ -2152,7 +2169,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   let primaParola: Date | null = null;
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
-    system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
+    system: [{ type: "text", text: SISTEMA + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
     ...(conSforzo && sforzo(modello) ? { output_config: { effort: sforzo(modello) } } : {}),
   });
   const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
@@ -2278,10 +2295,34 @@ const PRONUNCE: [RegExp, string][] = [
   [/\blive\b/gi, "làiv"], [/\bsound\b/gi, "sàund"], [/\bline-?up\b/gi, "làinap"], [/\bdj\b/gi, "dìgei"], [/\bclub\b/gi, "clàb"],
 ];
 function pronuncia(t: string): string {
-  let r = t;
-  for (const [re, al] of PRONUNCE) r = r.replace(re, al);
-  return r;
+  // i toni («[whispers]») restano com'erano: le pronunce valgono solo per le parole dette
+  return t.split(/(\[[a-z][a-z \-]{0,23}\])/).map((pezzo, k) => {
+    if (k % 2 === 1) return pezzo;
+    let r = pezzo;
+    for (const [re, al] of PRONUNCE) r = r.replace(re, al);
+    return r;
+  }).join("");
 }
+
+// ───────── Toni della voce (build 22, pronti ma SPENTI) ─────────
+// Con ElevenLabs v4 Turbo (o v3) JARVIS può dire una frase sussurrando o con ironia, con un tono tra parentesi quadre
+// all'inizio della frase. Si accendono con due segreti, solo dopo che il signore ha ascoltato le prove e detto sì:
+// ELEVENLABS_MODELLO=eleven_v4_turbo e VOCE_TONI=on. Spenti (o con un modello che non li capisce) i toni si tolgono dal testo.
+// L'app li toglie sempre dallo schermo (TagVoce); il cervello li toglie dall'audio quando non servono.
+const VOCE_TONI = Deno.env.get("VOCE_TONI") === "on";
+const TONI_AMMESSI = new Set(["whispers", "sarcastic"]);   // i due provati il 23 ottobre con la voce di JARVIS
+const TONO = /(^|\s)\[([a-z][a-z \-]{0,23})\](?!\()[ \t]*/g;
+const capisceToni = (modello: string) => /eleven_v3|eleven_v4/.test(modello);
+/// Il testo da mandare alla voce: con i toni accesi e un modello che li capisce restano solo quelli ammessi, altrimenti via tutti.
+function toniPerVoce(t: string, modello: string) {
+  const tieni = VOCE_TONI && capisceToni(modello);
+  return t.replace(TONO, (intero, prima, tono) => tieni && TONI_AMMESSI.has(tono) ? intero : prima)
+    .replace(/[ \t]+([.,;:!?…])/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+}
+const SISTEMA_TONI = VOCE_TONI ? `
+
+TONI DELLA VOCE
+La tua voce ora sa cambiare tono. Su iPhone e Apple Watch (mai sul Mac) puoi aprire UNA frase con un tono tra parentesi quadre, in inglese minuscolo: [whispers] per sussurrare (sempre quando il signore chiede di parlare piano, sottovoce, che c'è qualcuno che dorme), [sarcastic] per una battuta ironica alla Stark. Al massimo un tono per risposta, solo quando dà davvero qualcosa: di norma nessuno. Non usare altri toni e non spiegarli: sullo schermo non si vedono.` : "";
 
 async function voceTts(testo: string, idVoce: unknown, flusso = false) {
   const t = pronuncia(testo.trim().slice(0, 1500));
@@ -2296,7 +2337,7 @@ async function voceTts(testo: string, idVoce: unknown, flusso = false) {
   // Gemini TTS gratuito ha limiti bassissimi (poche frasi al minuto): la voce cambierebbe a metà risposta.
   // Si usa solo se acceso esplicitamente con il segreto GEMINI_TTS=on (es. con un piano a pagamento).
   if (Deno.env.get("GEMINI_API_KEY") && Deno.env.get("GEMINI_TTS") === "on") {
-    const r = await voceGemini(t);
+    const r = await voceGemini(toniPerVoce(t, "gemini"));
     if (r instanceof Response) return r;
     errori.push(r.errore);
   }
@@ -2326,7 +2367,7 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
         method: "POST",
         headers: { "xi-api-key": chiave, "content-type": "application/json", accept: "audio/mpeg" },
         body: JSON.stringify({
-          text: t, model_id: modello,
+          text: toniPerVoce(t, modello), model_id: modello,
           ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}),
           voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 },
         }),
@@ -2373,7 +2414,7 @@ async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Pro
         method: "POST",
         headers: { "xi-api-key": chiave, "content-type": "application/json" },
         body: JSON.stringify({
-          text: t, model_id: modello,
+          text: toniPerVoce(t, modello), model_id: modello,
           ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}),
           voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 },
         }),
@@ -2783,7 +2824,17 @@ const STATI: Record<string, string> = {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ errore: "metodo non ammesso" }, 405);
   const segreto = Deno.env.get("JARVIS_TOKEN") ?? "";
-  if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) return json({ errore: "parola d'ordine errata" }, 401);
+  if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) {
+    // collaudo: un codice usa-e-getta della tabella jarvis_deploy_codici (come jarvis-deploy), valido per una sola richiesta.
+    // Lo crea solo chi ha già le chiavi del database: serve a provare il cervello vero prima di consegnarlo al signore.
+    const codice = new URL(req.url).searchParams.get("codice") ?? "";
+    let ok = false;
+    if (/^[a-f0-9]{32,64}$/.test(codice)) {
+      const { data } = await db.from("jarvis_deploy_codici").delete().eq("codice", codice).gt("scade", new Date().toISOString()).select("codice");
+      ok = (data?.length ?? 0) > 0;
+    }
+    if (!ok) return json({ errore: "parola d'ordine errata" }, 401);
+  }
 
   const ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   let corpo: any;
@@ -2792,6 +2843,18 @@ Deno.serve(async (req) => {
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
   if (typeof corpo?.edith === "string") {                                                    // la scheda EDITH (sicurezza)
     try { return json(await paginaEdith(corpo, ipChiamante)); } catch (e) { return json({ errore: (e as Error).message }); }
+  }
+  if (corpo?.vettori_completa === true) {                                                  // collaudo e recupero: dà il vettore alle righe che non l'hanno
+    const prima = await contaSenzaVettore();
+    await completaVettori(Math.min(Math.max(num(corpo.quanti) || 25, 1), 60));
+    return json({ senza_vettore_prima: prima, senza_vettore_dopo: await contaSenzaVettore(), modello: significatoAssente ? "non disponibile" : "gte-small" });
+  }
+  if (typeof corpo?.significato_prova === "object" && corpo.significato_prova) {         // collaudo: cosa trova la ricerca per significato
+    const t = String(corpo.significato_prova.testo ?? "").slice(0, 300);
+    const tabella = (["jarvis_memoria", "jarvis_ricordi", "jarvis_note", "jarvis_diario"] as const).find((x) => x === corpo.significato_prova.tabella) ?? "jarvis_ricordi";
+    const v = await vicini(tabella, t, 8, 0.5);
+    const { data } = v.length ? await db.from(tabella).select(TESTO_DA_VETTORE[tabella].colonne).in("id", v.map((x) => x.id)) : { data: [] as any[] };
+    return json({ testo: t, tabella, soglia_in_uso: SOGLIA_SIGNIFICATO, vicini: v.map((x) => ({ ...x, riga: TESTO_DA_VETTORE[tabella].testo((data ?? []).find((r: any) => Number(r.id) === x.id) ?? {}) })) });
   }
   if (corpo?.voci === true) return await elencoVoci();                                      // voci disponibili sull'account ElevenLabs
   if (corpo?.github === true) {                                                             // scheda GitHub
