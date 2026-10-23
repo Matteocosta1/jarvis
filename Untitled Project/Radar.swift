@@ -11,6 +11,7 @@ import UIKit
 final class PosizioneSfondo: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let condiviso = PosizioneSfondo()
     @Published private(set) var sempre = false              // permesso «Sempre» dato
+    @Published private(set) var negato = false              // chiesto «Sempre» ma iOS non l'ha dato (o la posizione è negata)
     private let gestore = CLLocationManager()
     private var ultimaInviata: (lat: Double, lon: Double, quando: Date)?
 
@@ -23,15 +24,31 @@ final class PosizioneSfondo: NSObject, ObservableObject, CLLocationManagerDelega
     /// All'avvio (anche quando iOS riapre l'app in sottofondo per uno spostamento): con «Sempre», segue gli spostamenti grandi.
     func avvia() {
         sempre = gestore.authorizationStatus == .authorizedAlways
+        if sempre { negato = false }
         guard sempre, CLLocationManager.significantLocationChangeMonitoringAvailable() else { return }
         gestore.startMonitoringSignificantLocationChanges()
     }
 
-    /// Dal pannello RADAR: chiede «Sempre» (iOS mostra la domanda una volta sola; poi si cambia in Impostazioni).
+    /// Solo dal tasto «Attiva» del pannello RADAR, mai da sola: chiede «Sempre» (con «Quando in uso» è il passaggio a «Sempre»).
+    /// iOS mostra la domanda una volta sola: se non la mostra, o la risposta non è «Sempre», `negato` lo dice
+    /// e il pannello spiega dove abilitarla in Impostazioni.
     func chiediSempre() {
         switch gestore.authorizationStatus {
-        case .notDetermined, .authorizedWhenInUse: gestore.requestAlwaysAuthorization()
-        default: break
+        case .notDetermined, .authorizedWhenInUse:
+            negato = false
+            gestore.requestAlwaysAuthorization()
+            Task {
+                // con la domanda di iOS a schermo l'app non è attiva: si aspetta la risposta, poi si guarda com'è andata
+                try? await Task.sleep(for: .seconds(1))
+                while UIApplication.shared.applicationState != .active { try? await Task.sleep(for: .milliseconds(300)) }
+                try? await Task.sleep(for: .milliseconds(500))
+                self.sempre = self.gestore.authorizationStatus == .authorizedAlways
+                self.negato = !self.sempre
+            }
+        case .authorizedAlways:
+            sempre = true
+        default:
+            negato = true                                     // negata o limitata: si cambia solo in Impostazioni
         }
     }
 
@@ -110,18 +127,25 @@ struct PannelloRadar: View {
                 Text("JARVIS avvisa una volta sola, solo quando sta per piovere dove si trova lei.")
                     .font(.system(size: 11)).foregroundStyle(Color.tenue)
                 if !posizione.sempre {
-                    Button {
-                        if let u = URL(string: UIApplication.openSettingsURLString) { apriLink(u) }
-                    } label: {
-                        Text("Per l'avviso serve la posizione «Sempre»: Impostazioni › Jarvis › Posizione.")
-                            .font(.system(size: 11)).foregroundStyle(.orange).multilineTextAlignment(.leading)
+                    // il permesso «Sempre» si chiede solo a questo tocco, mai da solo all'apertura del Meteo
+                    HStack(spacing: 10) {
+                        Text("Avviso pioggia spento").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                        Spacer(minLength: 8)
+                        TastoComando(testo: "Attiva", corto: true) { posizione.chiediSempre() }
                     }
-                    .buttonStyle(.plain)
+                    if posizione.negato {
+                        Button {
+                            if let u = URL(string: UIApplication.openSettingsURLString) { apriLink(u) }
+                        } label: {
+                            Text("iOS non ha dato la posizione «Sempre», Sir: la attivi in Impostazioni › Jarvis › Posizione › Sempre.")
+                                .font(.system(size: 11)).foregroundStyle(.orange).multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             PannelloAVoce(frasi: ["«Jarvis, radar pioggia»", "«Jarvis, pioverà?»", "«Jarvis, mi serve l'ombrello?»"])
         }
-        .onAppear { posizione.chiediSempre() }
     }
 }
 #endif
