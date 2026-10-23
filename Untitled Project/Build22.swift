@@ -120,7 +120,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
     case guida                    // «portami alla macchina»: Ricordi › TRACCIA con la Guida accesa (fotocamera e frecce)
     case radar                    // «radar pioggia»: Meteo › RADAR
     case priorita                 // «rapporto posta»: Email › PRIORITÀ
-    case organismo                // «scansione organismo»: Vitals
+    case organismo                // «scansione organismo», «stato dell'organismo»: Vitals (sull'orologio l'Organismo)
     case specchio                 // «modalità specchio»: Allenatore
     case squat                    // «contami gli squat»: Allenatore
 
@@ -149,7 +149,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         case "portami alla macchina": return .guida
         case "radar pioggia": return .radar
         case "rapporto posta": return .priorita
-        case "scansione organismo": return .organismo
+        case "scansione organismo", "stato dell organismo": return .organismo
         case "modalita specchio": return .specchio
         case "contami gli squat", "contami gli squats", "contami gli squad": return .squat
         default: return nil

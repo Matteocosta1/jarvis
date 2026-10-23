@@ -210,6 +210,7 @@ struct VistaOrologio: View {
         case .traccia: VistaTracciaOrologio()
         case .radar: VistaRadarOrologio()
         case .priorita: VistaPrioritaOrologio()
+        case .organismo: VistaOrganismoOrologio()
         }
     }
 

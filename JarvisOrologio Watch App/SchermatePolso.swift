@@ -2,10 +2,11 @@ import SwiftUI
 import WatchKit
 
 /// Le schermate nuove della build 22 sul polso, come nel mockup: PROTOCOLLI, TRACCIA, RADAR, PRIORITÀ.
-/// (ORGANISMO è di Vitals; lo Specchio vive sull'iPhone: serve la fotocamera.)
+/// (ORGANISMO è di Vitals, ma a voce si apre direttamente; lo Specchio vive sull'iPhone: serve la fotocamera.)
 nonisolated enum SchermataPolso: Hashable, Sendable {
     case protocolli(Protocollo?)        // con un protocollo: detto a voce, parte da solo
     case traccia, radar, priorita
+    case organismo                      // «scansione organismo», «stato dell'organismo»: VistaOrganismoOrologio
 }
 
 /// I colori del mockup sul polso.
