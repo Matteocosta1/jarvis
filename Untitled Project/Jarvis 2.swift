@@ -119,6 +119,8 @@ final class Jarvis: NSObject, ObservableObject {
     var sezioneAperta: Reparto?                  // la scheda aperta sopra la schermata principale: valgono anche i suoi tasti a voce
     @Published var diagnosiMac = ""             // Mac: la riga di controllo del microfono in attesa
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
+    /// La risposta come arriva dal cervello, toni compresi («[whispers]»): serve alla voce; in chat e in cronologia va senza (TagVoce).
+    private var testiGrezzi: [UUID: String] = [:]
     /// Sul Mac l'ascolto non usa il riconoscimento di Apple: registra e trascrive in cloud (AscoltoCloud.swift).
     nonisolated static var usaAscoltoCloud: Bool { ProcessInfo.processInfo.isiOSAppOnMac }
     private let registratore = RegistratoreVoce()
@@ -625,6 +627,8 @@ final class Jarvis: NSObject, ObservableObject {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
+        // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…): subito, senza cervello, prima delle storpiature
+        if let d = ComandoDedicato.riconosci(frase) { eseguiDedicato(d); return true }
         // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
         if let imparato = Storpiature.cerca(frase) {
             if imparato == "rito" { fraseDiTony(); return true }
@@ -678,6 +682,20 @@ final class Jarvis: NSObject, ObservableObject {
             return true
         default:
             return false
+        }
+    }
+
+    /// Build 22: un comando a frase esatta apre la sua sezione, già sul pannello giusto.
+    private func eseguiDedicato(_ d: ComandoDedicato) {
+        switch d {
+        case .protocollo(let p):
+            Protocolli.condiviso.richiedi(p)     // la scheda Telefono lo avvia appena aperta, come il tasto «Avvia»
+            apriReparto(.telefono)
+        case .traccia: apriReparto(.ricordi)      // Ricordi si apre su TRACCIA
+        case .radar: apriReparto(.meteo)          // RADAR è in testa al Meteo
+        case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
+        case .organismo: apriReparto(.vitals)
+        case .specchio, .squat: apriReparto(.allenatore)
         }
     }
 
@@ -844,7 +862,8 @@ final class Jarvis: NSObject, ObservableObject {
         guard !t.isEmpty else { return }
         idTurno = nil                            // una lettura (notifiche, briefing) non è la risposta a una domanda
         interrompi()
-        messaggi.append(Messaggio(ruolo: "assistant", testo: t))
+        let mostrato = TagVoce.togli(t).trimmingCharacters(in: .whitespacesAndNewlines)   // i toni della voce non si vedono
+        if !mostrato.isEmpty { messaggi.append(Messaggio(ruolo: "assistant", testo: mostrato)) }
         salva()
         flussoFinito = true
         accodaVoce(t, forza: true)
@@ -1100,6 +1119,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func azzeraTesto(_ id: UUID) {
         if let i = messaggi.firstIndex(where: { $0.id == id }) { messaggi[i].testo = "" }
+        testiGrezzi[id] = nil
         bufferVoce = ""
     }
 
@@ -1152,6 +1172,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func rimuoviSeVuoto(_ id: UUID) {
         if let i = messaggi.firstIndex(where: { $0.id == id }), messaggi[i].testo.isEmpty { messaggi.remove(at: i) }
+        testiGrezzi[id] = nil
         salva()
     }
 
@@ -1186,15 +1207,20 @@ final class Jarvis: NSObject, ObservableObject {
             UserDefaults.standard.set(latenzaMedia, forKey: "latenzaMedia")
             inizioTurno = nil
         }
-        if let i = messaggi.firstIndex(where: { $0.id == id }) { messaggi[i].testo += pezzo }
+        if let i = messaggi.firstIndex(where: { $0.id == id }) {
+            let grezzo = (testiGrezzi[id] ?? messaggi[i].testo) + pezzo
+            testiGrezzi[id] = grezzo
+            messaggi[i].testo = TagVoce.togli(grezzo, inCorso: true)     // in chat senza i toni della voce
+        }
         stato = nil
-        accodaVoce(pezzo)
+        accodaVoce(pezzo)                                                 // la voce li riceve tutti
     }
 
     private func concludi(id: UUID, testo: String, azioni: [String]) {
-        let giaDetto = messaggi.first(where: { $0.id == id })?.testo ?? ""
+        let giaDetto = testiGrezzi[id] ?? messaggi.first(where: { $0.id == id })?.testo ?? ""
+        testiGrezzi[id] = nil
         if let i = messaggi.firstIndex(where: { $0.id == id }) {
-            messaggi[i].testo = testo
+            messaggi[i].testo = TagVoce.togli(testo)                      // chat e cronologia senza i toni della voce
             messaggi[i].azioni = azioni
         }
         salva()
@@ -1263,7 +1289,10 @@ final class Jarvis: NSObject, ObservableObject {
             // per un istante e le prime sillabe andrebbero perse (succede con le frasi già pronte in cache, che partono subito)
             if conOrecchio && !orecchio.attivo { cloud.partiDopo(0.3) }
         }
-        let u = AVSpeechUtterance(string: frase)
+        // i toni («[whispers]») li sa dire solo la voce di JARVIS dal cloud: la voce dell'iPhone li salta
+        let detta = vocePerCloud ? frase : TagVoce.togli(frase)
+        if detta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
+        let u = AVSpeechUtterance(string: detta)
         u.voice = Jarvis.voceScelta()
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
         u.volume = Jarvis.volumeVoce                   // «sbatti»: sottovoce
@@ -1323,7 +1352,8 @@ final class Jarvis: NSObject, ObservableObject {
         }
         if let c = strumenti.comandoDaEseguire {   // il cervello ha capito un comando storpiato: lo eseguo e lo imparo
             strumenti.comandoDaEseguire = nil
-            if !ultimaFraseAVoce.isEmpty { Storpiature.impara(ultimaFraseAVoce, comando: c) }
+            // i comandi a frase esatta della build 22 non si imparano mai come storpiature
+            if !ultimaFraseAVoce.isEmpty, ComandoDedicato.riconosci(ultimaFraseAVoce) == nil { Storpiature.impara(ultimaFraseAVoce, comando: c) }
             if c == "rito" { benvenuto() } else if let r = Reparto(rawValue: c) { apriReparto(r, annuncia: false) }
         }
     }
@@ -2013,10 +2043,20 @@ final class VoceCloud: NSObject {
     }
 
     private func leggiConRiserva(_ u: AVSpeechUtterance) async -> Bool {
-        await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+        // la voce dell'iPhone non sa dire i toni («[whispers]»): li salta
+        let pulita = TagVoce.togli(u.speechString)
+        if pulita.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let frase: AVSpeechUtterance
+        if pulita == u.speechString { frase = u } else {
+            frase = AVSpeechUtterance(string: pulita)
+            frase.voice = u.voice
+            frase.rate = u.rate
+            frase.volume = u.volume
+        }
+        return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
             attesa = c
-            attuale = ObjectIdentifier(u)
-            riserva.speak(u)
+            attuale = ObjectIdentifier(frase)
+            riserva.speak(frase)
         }
     }
 

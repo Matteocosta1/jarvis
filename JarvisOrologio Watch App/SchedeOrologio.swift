@@ -309,6 +309,7 @@ struct VistaMeteoOrologio: View {
 
     var body: some View {
         CorniceOrologio(titolo: "Meteo", pronto: meteo != nil || errore != nil) {
+            NavigationLink { VistaRadarOrologio() } label: { Label("Radar", systemImage: "cloud.rain") }   // build 22: RADAR
             if let m = meteo {
                 let c = m.currentWeather
                 HStack(spacing: 10) {
@@ -375,6 +376,7 @@ struct VistaPostaOrologio: View {
 
     var body: some View {
         CorniceOrologio(titolo: "Email", pronto: posta != nil || errore != nil) {
+            NavigationLink { VistaPrioritaOrologio() } label: { Label("Priorità", systemImage: "exclamationmark.circle") }   // build 22: PRIORITÀ
             if let posta {
                 let nonLette = posta.filter { !(($0["letta"] as? Bool) ?? true) }.count
                 Text("\(nonLette) non lette · ultimi 3 giorni").font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)

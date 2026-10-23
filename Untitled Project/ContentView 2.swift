@@ -442,6 +442,8 @@ struct ContentView: View {
             // visto: il cervello segna che l'avviso è stato aperto
             if id > 0 { Task { _ = await VistaVitals.chiama(["bea_sos_visto": id]) } }
             jarvis.leggi(prova ? "Prova del Tocco d'aiuto di Bea, Sir: funziona." : "Sir, Bea ha chiesto aiuto. La chiami subito.")
+        case .radar:
+            apriReparto(.meteo)                      // la notifica della pioggia: il Meteo con RADAR in testa
         }
     }
 
@@ -590,7 +592,7 @@ struct ContentView: View {
             ("SENSI", "shazam.logo", "Shazam", { tastiera = false; jarvis.interrompi(); scheda = .shazam }),
             ("SENSI", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
 
-            ("STRUMENTI", "brain.head.profile", "Ricordi", { tastiera = false; mostraRicordi = .ricordi }),
+            ("STRUMENTI", "brain.head.profile", "Ricordi", { tastiera = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
             ("STRUMENTI", "globe.europe.africa", "Interprete", { tastiera = false; scegliLingua = true }),
             ("STRUMENTI", "globe", "Browser", { mostraBrowser = true }),
             ("STRUMENTI", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
@@ -841,7 +843,7 @@ struct ContentView: View {
             case .confidente: mostraConfidente = true
             case .allenatore: jarvis.allenatore = true
             case .bea: scheda = .bea
-            case .ricordi: mostraRicordi = .ricordi
+            case .ricordi: mostraRicordi = .traccia                // build 22: TRACCIA per prima, come nel mockup
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true
             case .lidar: mostraLidar = true

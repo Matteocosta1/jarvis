@@ -61,6 +61,7 @@
 		000000000000000000000120 /* Untitled Project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Untitled Project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "JarvisOrologio Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6303069130796D9D005C3D6F /* JarvisOrologio-Watch-App-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "JarvisOrologio-Watch-App-Info.plist"; sourceTree = "<group>"; };
+		63030722308A2201005C3D6F /* Untitled-Project-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Untitled-Project-Info.plist"; sourceTree = "<group>"; };
 		630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserPrivato.swift; sourceTree = "<group>"; };
 		630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JarvisComplicazioneExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		630306BE3079C367005C3D6F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -77,6 +78,7 @@
 				avvio.m4a,
 				avvioorologio.m4a,
 				Benessere.swift,
+				Build22.swift,
 				chatcarica.m4a,
 				chatsvuota.m4a,
 				clicktesta.m4a,
@@ -151,6 +153,7 @@
 				630306D2307C20E0005C3D6F /* ReattoreHUD.swift */,
 				630306AF3079AF9C005C3D6F /* BrowserPrivato.swift */,
 				6303069130796D9D005C3D6F /* JarvisOrologio-Watch-App-Info.plist */,
+				63030722308A2201005C3D6F /* Untitled-Project-Info.plist */,
 				000000000000000000000010 /* Untitled Project */,
 				6303066A30785BD7005C3D6F /* JarvisOrologio Watch App */,
 				630306C23079C368005C3D6F /* JarvisComplicazione */,
@@ -489,6 +492,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
@@ -497,6 +501,7 @@
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";
@@ -546,6 +551,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
@@ -554,6 +560,7 @@
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";

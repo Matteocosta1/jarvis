@@ -4,7 +4,7 @@ import SwiftUI
 /// La seconda memoria di JARVIS, sull'iPhone: tutti i ricordi e i posti (qualsiasi luogo salvato, macchina compresa),
 /// con ricerca, spunta e cancellazione con uno scorrimento. La lista della spesa ha la sua scheda (icona Spesa).
 struct VistaRicordi: View {
-    enum Scheda: String, CaseIterable, Identifiable { case ricordi = "Ricordi", posti = "Posti"; var id: String { rawValue } }
+    enum Scheda: String, CaseIterable, Identifiable { case traccia = "Traccia", ricordi = "Ricordi", posti = "Posti"; var id: String { rawValue } }
     var iniziale: Scheda = .ricordi
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
@@ -27,11 +27,18 @@ struct VistaRicordi: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 16).padding(.top, 8)
 
-                    if let d = dati {
+                    if let d = dati, scheda == .traccia {
+                        // build 22: TRACCIA, la strada verso la macchina (come nel mockup)
+                        ScrollView {
+                            PannelliTraccia(parcheggio: d.parcheggio, ultimi: Array(d.ricordi.prefix(3)))
+                                .padding(16)
+                                .padding(.bottom, 30)
+                        }
+                    } else if let d = dati {
                         List {
                             switch scheda {
                             case .posti: posti(d)
-                            case .ricordi: ricordi(d)
+                            case .ricordi, .traccia: ricordi(d)
                             }
                         }
                         .listStyle(.plain)
@@ -234,6 +241,7 @@ struct DatiRicordi {
     let spesa: [Riga]
     let posti: [Riga]
     let ricordi: [Riga]
+    let parcheggio: Riga?          // l'ultimo «parcheggio» (build 22: TRACCIA)
 
     init(_ o: [String: Any]) {
         func riga(_ r: [String: Any]) -> Riga? {
@@ -246,6 +254,7 @@ struct DatiRicordi {
         posti = (o["posti"] as? [[String: Any]] ?? []).compactMap(riga)
         spesa = (o["spesa"] as? [[String: Any]] ?? []).compactMap(riga)
         ricordi = (o["ricordi"] as? [[String: Any]] ?? []).compactMap(riga)
+        parcheggio = (o["parcheggio"] as? [String: Any]).flatMap(riga)
     }
 }
 #endif

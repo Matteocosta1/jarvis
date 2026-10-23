@@ -16,9 +16,12 @@ struct VistaMeteo: View {
     @State private var errore: String?
     @State private var marchio: URL?
     @State private var legale: URL?
+    @State private var radar: DatiRadar?          // build 22: la pioggia in arrivo, dal cervello
+    @State private var radarFinito = false
 
     var body: some View {
         CorniceScheda(titolo: "Meteo", sottotitolo: luogo, icona: "cloud.sun", tinta: tinta, pronto: meteo != nil || errore != nil) {
+            PannelloRadar(radar: radar, finito: radarFinito)       // in testa, come nel mockup
             if let m = meteo {
                 adesso(m.currentWeather)
                 prossimeOre(Array(m.hourlyForecast.forecast.filter { $0.date > Date().addingTimeInterval(-1800) }.prefix(24)))
@@ -34,6 +37,10 @@ struct VistaMeteo: View {
             }
         }
         .task { await carica() }
+        .task {
+            radar = await Radar.chiedi()
+            radarFinito = true
+        }
     }
 
     private func adesso(_ c: CurrentWeather) -> some View {
@@ -308,10 +315,13 @@ struct VistaPosta: View {
     @State private var soloNonLette = false
     @State private var posta: [Mail]?
     @State private var errore: String?
+    @State private var priorita: PostaPriorita?       // build 22: la posta che conta, dal cervello
+    @State private var erroreP: String?
 
     var body: some View {
         CorniceScheda(titolo: "Email", sottotitolo: posta.map { "\($0.filter { !$0.letta }.count) non lette · ultime \(ore / 24 == 1 ? "24 ore" : "\(ore / 24) giorni")" } ?? "apro la casella iCloud",
                       icona: "envelope", tinta: tinta, pronto: posta != nil || errore != nil) {
+            PannelloPriorita(posta: priorita, errore: erroreP)     // in testa, come nel mockup
             Picker("Periodo", selection: $ore) {
                 Text("24 ore").tag(24)
                 Text("3 giorni").tag(72)
@@ -364,6 +374,11 @@ struct VistaPosta: View {
             }
         }
         .task(id: "\(ore)-\(soloNonLette)") { await carica() }
+        .task {
+            let (p, e) = await PannelloPriorita.chiedi()
+            priorita = p
+            erroreP = e
+        }
         .tastiAVoce { a in
             if a == .postaRiassumi { chiedi("Riassumimi la posta delle ultime \(ore) ore: cosa conta davvero e cosa posso ignorare?") }
         }

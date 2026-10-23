@@ -89,6 +89,7 @@ struct VistaOrologio: View {
     @ObservedObject private var sentinella = SentinellaOrologio.condiviso
     @State private var mostraSentinella = false
     @State private var scheda: Reparto?                  // la sezione aperta (Diario, Sonno, Meteo…)
+    @State private var polso: SchermataPolso?            // build 22: PROTOCOLLI, TRACCIA, RADAR, PRIORITÀ
     @State private var dettato = ""
     @State private var chiediPulizia = false
     @State private var mostraVitals = false
@@ -111,6 +112,7 @@ struct VistaOrologio: View {
                 .navigationDestination(isPresented: $mostraVitals) { VistaVitalsOrologio() }
                 .navigationDestination(isPresented: $mostraSentinella) { VistaSentinellaOrologio() }
                 .navigationDestination(item: $scheda) { r in paginaScheda(r) }
+                .navigationDestination(item: $polso) { s in paginaPolso(s) }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         // Ricordi: la seconda memoria (macchina, spesa, promesse, ultime cose segnate)
@@ -156,6 +158,12 @@ struct VistaOrologio: View {
             jarvis.repartoRichiesto = nil
             apri(r)
         }
+        // build 22, comando a frase esatta: «protocollo notte», «traccia la macchina», «radar pioggia», «rapporto posta»
+        .onChange(of: jarvis.polsoRichiesto) { _, s in
+            guard let s else { return }
+            jarvis.polsoRichiesto = nil
+            apriPolso(s)
+        }
         .onChange(of: jarvis.fase) { vecchia, nuova in
             // vibrazioni alla Stark: risposta in arrivo e risposta finita
             if vecchia == .elaboro && nuova == .parlo { vibra(.directionUp) }
@@ -169,6 +177,7 @@ struct VistaOrologio: View {
         mostraVitals = false
         mostraSentinella = false
         scheda = nil
+        polso = nil
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(350))
             switch r {
@@ -180,6 +189,27 @@ struct VistaOrologio: View {
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
             }
+        }
+    }
+
+    /// Apre una schermata nuova della build 22; se ce n'è una aperta, prima torna indietro.
+    private func apriPolso(_ s: SchermataPolso) {
+        mostraVitals = false
+        mostraSentinella = false
+        scheda = nil
+        polso = nil
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            polso = s
+        }
+    }
+
+    @ViewBuilder private func paginaPolso(_ s: SchermataPolso) -> some View {
+        switch s {
+        case .protocolli(let p): VistaProtocolliOrologio(avvia: p)
+        case .traccia: VistaTracciaOrologio()
+        case .radar: VistaRadarOrologio()
+        case .priorita: VistaPrioritaOrologio()
         }
     }
 
@@ -805,6 +835,9 @@ struct VistaRicordiOrologio: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink { VistaTracciaOrologio() } label: { Label("Traccia", systemImage: "location.north.line") }   // build 22
+            }
             if let d = dati {
                 let posti = (d["posti"] as? [[String: Any]] ?? []).prefix(8)
                 if !posti.isEmpty {

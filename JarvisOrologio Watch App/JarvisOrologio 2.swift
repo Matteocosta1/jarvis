@@ -53,6 +53,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
     @Published var stato: String?
     @Published var immagini: [FotoOrologio] = []  // immagini della risposta (web, Discogs, Shazam, foto del signore)
     @Published var repartoRichiesto: Reparto?    // comando vocale: la schermata apre questa sezione
+    @Published var polsoRichiesto: SchermataPolso?   // build 22: comando a frase esatta, la schermata nuova da aprire
+    /// La risposta come arriva dal cervello, toni compresi («[whispers]»): serve alla voce; a schermo e in cronologia va senza.
+    private var rispostaGrezza = ""
+    /// Detto l'annuncio, JARVIS chiede questa frase al cervello (i protocolli dal polso).
+    private var dopoAnnuncio: String?
 
     @Published private(set) var storia: [[String: String]] = [] { didSet { salvaStoria() } }   // ultimi scambi, solo testo
     private var compito: Task<Void, Never>?
@@ -167,6 +172,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         domanda = testo
         risposta = ""
+        rispostaGrezza = ""
         immagini = []
         stato = nil
         fase = .elaboro
@@ -358,6 +364,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let (testo, errore) = await JarvisOrologio.trascrivi(audio, token: PortachiaviOrologio.leggi(), indirizzo: indirizzo)
         guard !Task.isCancelled, fase == .elaboro else { return }
         if let testo, !testo.isEmpty {
+            // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…), prima di tutto il resto
+            if let d = ComandoDedicato.riconosci(testo) { dedicato(d); return }
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
             var comando = ComandoVocale.riconosci(testo)
             // i comandi rapidi che sull'orologio hanno la loro sezione: «scrivi il diario» → Diario, «ho bisogno di parlarti» → Confidente
@@ -388,6 +396,53 @@ final class JarvisOrologio: NSObject, ObservableObject {
             compito = nil
             fase = .attesa
             stato = errore ?? "Non ho capito, Sir. Riprovi."
+        }
+    }
+
+    // MARK: Build 22: comandi a frase esatta e protocolli dal polso
+
+    /// Un comando a frase esatta: si apre la sua schermata, senza passare dal cervello (come i comandi di sempre).
+    private func dedicato(_ d: ComandoDedicato) {
+        compito = nil
+        daUnire = nil                          // un comando è un'azione nuova: la domanda interrotta non si porta dietro
+        inCorso = nil
+        stato = nil
+        WKInterfaceDevice.current().play(.click)
+        let reparto: Reparto?
+        switch d {
+        case .protocollo(let p):
+            polsoRichiesto = .protocolli(p)    // parla la schermata dei protocolli, quando parte
+            fase = .attesa
+            return
+        case .traccia: polsoRichiesto = .traccia; reparto = .ricordi
+        case .radar: polsoRichiesto = .radar; reparto = .meteo
+        case .priorita: polsoRichiesto = .priorita; reparto = .email
+        case .organismo: repartoRichiesto = .vitals; reparto = .vitals
+        case .specchio, .squat: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
+        }
+        if let a = reparto?.annuncio { parla(a) } else { fase = .attesa }
+    }
+
+    /// Una frase di JARVIS e poi, se c'è, una domanda al cervello (che parte appena ha finito di dirla).
+    func annuncia(_ testo: String, poi: String?) {
+        ferma()
+        daUnire = nil
+        parla(testo)
+        dopoAnnuncio = poi                     // dopo parla(): parla() azzera tutto quello che era in sospeso
+    }
+
+    /// Dal polso i Comandi rapidi dell'iPhone non partono: watchOS non li lancia, e l'app dell'iPhone svegliata in sottofondo
+    /// non può aprire l'app Comandi. L'orologio fa solo le parti di JARVIS e lo dice chiaramente.
+    func protocolloDalPolso(_ p: Protocollo) {
+        switch p {
+        case .party:
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: il protocollo party lo lanci dall'iPhone.", poi: nil)
+        case .notte:
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Non disturbare, Bluetooth e sveglia li lanci dall'iPhone. Intanto, il diario.",
+                     poi: "Jarvis, voglio scrivere il diario di oggi.")
+        case .rientro:
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Wi-Fi e Non disturbare li lanci dall'iPhone. Intanto, messaggi e meteo.",
+                     poi: Protocollo.fraseRientro)
         }
     }
 
@@ -483,9 +538,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 switch try await flussoConRitentativi(token: token, corpo: corpo, richiesta: UUID().uuidString) {
                 case .fine(let testo):
                     guard !Task.isCancelled else { return }
-                    risposta = testo
+                    risposta = TagVoce.togli(testo)                               // i toni della voce non si vedono
+                    rispostaGrezza = ""
                     stato = nil
-                    storia.append(["role": "assistant", "content": testo])
+                    storia.append(["role": "assistant", "content": TagVoce.togli(testo)])
                     compito = nil
                     riascolta = true                                             // detta la risposta, riascolta da solo
                     if giaParlato { chiudiFlussoVoce() } else { parla(testo) }   // già partito a frasi: dice solo il resto
@@ -538,6 +594,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             } catch let e as URLError where JarvisOrologio.lineaCaduta(e) && tentativo < 3 {
                 tentativo += 1
                 risposta = ""                                 // quello arrivato a metà si butta: la risposta ricomincia intera
+                rispostaGrezza = ""
                 zittisci()
                 fase = .elaboro                               // sta ancora lavorando: niente «attesa» a metà
                 iniziaFlussoVoce()
@@ -603,7 +660,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
                   let tipo = e["t"] as? String else { continue }
             switch tipo {
             case "testo":
-                if let pezzo = e["d"] as? String { risposta += pezzo; stato = nil; accodaPezzo(pezzo) }
+                if let pezzo = e["d"] as? String {
+                    rispostaGrezza += pezzo
+                    risposta = TagVoce.togli(rispostaGrezza, inCorso: true)      // a schermo senza i toni; la voce li riceve tutti
+                    stato = nil
+                    accodaPezzo(pezzo)
+                }
             case "stato":
                 stato = e["d"] as? String
             case "immagini":
@@ -613,7 +675,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 }
                 immagini = Array((immagini + nuove).prefix(10))
             case "fine":
-                return .fine(e["testo"] as? String ?? risposta)
+                return .fine(e["testo"] as? String ?? rispostaGrezza)
             case "errore":
                 return .errore(e["d"] as? String ?? "Un intoppo tecnico, Sir.")
             case "client":
@@ -656,7 +718,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 if p.play() { avviaMonitor(); return }
                 lettore = nil
             }
-            let u = AVSpeechUtterance(string: testo)
+            let pulita = TagVoce.togli(testo)                             // la voce dell'orologio non sa dire i toni
+            if pulita.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { voceFinita(); return }
+            let u = AVSpeechUtterance(string: pulita)
             u.voice = AVSpeechSynthesisVoice(language: "it-IT")
             u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
         u.volume = volumeVoce
@@ -666,6 +730,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     private func zittisci() {
+        dopoAnnuncio = nil
         turnoVoce += 1
         lettoreCoda?.cancel()
         lettoreCoda = nil
@@ -691,6 +756,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         lettore = nil
         fase = .attesa
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if let f = dopoAnnuncio { dopoAnnuncio = nil; chiedi(f); return }   // detto l'annuncio del protocollo: la sua parte di JARVIS
         dopoRisposta()
     }
 
@@ -772,7 +838,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 partito = p.play()
             }
             if !partito {
-                let u = AVSpeechUtterance(string: frase)
+                let pulita = TagVoce.togli(frase)                             // la voce dell'orologio non sa dire i toni
+                if pulita.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { continue }   // solo un tono: niente da dire
+                let u = AVSpeechUtterance(string: pulita)
                 u.voice = AVSpeechSynthesisVoice(language: "it-IT")
                 u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
         u.volume = volumeVoce

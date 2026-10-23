@@ -10,6 +10,7 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         Task { await Notifiche.chiediPermesso(application) }
+        PosizioneSfondo.condiviso.avvia()       // RADAR: gli spostamenti grandi (anche quando iOS riapre l'app in sottofondo per questo)
         return true
     }
 
@@ -73,6 +74,7 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
             switch azione {
             case "briefing": Comandi.condiviso.richiesta = .briefing
             case "diario": Comandi.condiviso.richiesta = .diario(testo)     // la domanda della sera: JARVIS la legge e ascolta
+            case "radar": Comandi.condiviso.richiesta = .radar              // arriva la pioggia: si apre il Meteo, con RADAR in testa
             default: Comandi.condiviso.richiesta = .leggi(testo)
             }
         }
