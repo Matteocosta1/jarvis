@@ -437,14 +437,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// non può aprire l'app Comandi. L'orologio fa solo le parti di JARVIS e lo dice chiaramente.
     func protocolloDalPolso(_ p: Protocollo) {
         switch p {
-        case .party:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: il protocollo party lo lanci dall'iPhone.", poi: nil)
-        case .notte:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Non disturbare, Bluetooth e sveglia li lanci dall'iPhone. Intanto, il diario.",
-                     poi: "Jarvis, voglio scrivere il diario di oggi.")
+        case .lavoro:
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion e Wi-Fi li lanci dall'iPhone. Intanto, impegni e posta.",
+                     poi: Protocollo.fraseLavoro)
         case .rientro:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Wi-Fi e Non disturbare li lanci dall'iPhone. Intanto, messaggi e meteo.",
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion e Wi-Fi li lanci dall'iPhone. Intanto, messaggi e meteo.",
                      poi: Protocollo.fraseRientro)
+        case .notte:
+            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion, Bluetooth e sveglia li lanci dall'iPhone. Intanto, il diario.",
+                     poi: "Jarvis, voglio scrivere il diario di oggi.")
         }
     }
 

@@ -3,9 +3,11 @@ import SwiftUI
 import Combine
 import UIKit
 
-/// PROTOCOLLI (build 22), nella tendina che scende dall'alto. «Avvia» lancia il Comando rapido del protocollo («JARVIS Party», «JARVIS Notte»,
-/// «JARVIS Rientro») con il ritorno automatico in JARVIS (x-callback-url). Tornato qui i passi si spuntano nella tendina
-/// e JARVIS fa le sue parti: NOTTE la domanda del diario, RIENTRO messaggi da leggere e meteo di domani (chiesti al cervello).
+/// PROTOCOLLI (build 22), nella tendina che scende dall'alto: LAVORO · RIENTRO · NOTTE. «Avvia» lancia il Comando rapido del protocollo
+/// («JARVIS Lavoro», «JARVIS Rientro», «JARVIS Notte») con il testo «avvia» e il ritorno automatico in JARVIS (x-callback-url).
+/// Tornato qui le luci dei passi si accendono verdi una alla volta e JARVIS fa le sue parti: LAVORO impegni e posta, RIENTRO messaggi
+/// e meteo di domani (chiesti al cervello), NOTTE la domanda del diario. Dopo, un tocco su una luce verde spegne solo quel passo:
+/// lo stesso Comando rapido riceve «annulla:<chiave>» (un altro tocco: «rifai:<chiave>»). I passi di JARVIS non hanno niente da spegnere.
 @MainActor
 final class Protocolli: ObservableObject {
     static let condiviso = Protocolli()
@@ -15,13 +17,14 @@ final class Protocolli: ObservableObject {
     enum Fase: Equatable { case fermo, inCorso, attivo }
     @Published private(set) var attivo: Protocollo?         // la scheda accesa
     @Published private(set) var fase: Fase = .fermo
-    @Published private(set) var spuntati = 0                 // i passi già spuntati del protocollo attivo
+    @Published private(set) var accesi: Set<String> = []     // le chiavi dei passi con la luce verde
+    @Published private(set) var inCambio: String?            // il passo che il Comando rapido sta spegnendo o riaccendendo
     @Published private(set) var nota: String?                // Comando rapido mancante, annullato, non riuscito
     /// Cresce a ogni richiesta a voce: la schermata principale apre la tendina e lo avvia.
     @Published private(set) var richiesta = 0
     private var lanciato: Date?                               // aspetta il ritorno da Comandi rapidi
-    private var richiesto: (Protocollo, Date)?                // detto a voce: parte appena si apre la scheda Telefono
-    private var giro = 0                                      // ogni avvio ha il suo numero: le spunte di un avvio vecchio si fermano
+    private var richiesto: (Protocollo, Date)?                // detto a voce: parte appena scende la tendina
+    private var giro = 0                                      // ogni avvio ha il suo numero: le luci di un avvio vecchio si fermano
 
     /// «Jarvis, protocollo notte»: la tendina scende e lo avvia.
     func richiedi(_ p: Protocollo) { richiesto = (p, Date()); richiesta += 1 }
@@ -37,22 +40,42 @@ final class Protocolli: ObservableObject {
         giro += 1
         attivo = p
         fase = .inCorso
-        spuntati = 0
+        accesi = []
+        inCambio = nil
         nota = nil
-        guard let url = indirizzo(p) else { fallito("Non riesco a preparare il Comando rapido, Sir."); return }
+        apri(p, testo: "avvia", passo: nil) { self.fallito($0) }
+    }
+
+    /// Dopo l'Avvia: il tocco su una luce. Verde → il Comando rapido annulla quel passo; grigia → lo rifà.
+    func cambia(_ p: Protocollo, _ passo: Protocollo.Passo) {
+        guard attivo == p, fase == .attivo, inCambio == nil else { return }
+        nota = nil
+        let acceso = accesi.contains(passo.chiave)
+        if passo.jarvis {                                     // le parti di JARVIS sono già fatte: cambia solo la luce
+            if acceso { accesi.remove(passo.chiave) } else { accesi.insert(passo.chiave) }
+            Suoni.clickTesta()
+            return
+        }
+        inCambio = passo.chiave
+        apri(p, testo: "\(acceso ? "annulla" : "rifai"):\(passo.chiave)", passo: passo.chiave) { t in self.inCambio = nil; self.nota = t }
+    }
+
+    /// shortcuts://x-callback-url/run-shortcut con il testo per il Comando rapido e il ritorno
+    /// it.discosizer.jarvis://protocollo?nome=…&esito=ok|annullato|errore(&passo=…)
+    private func apri(_ p: Protocollo, testo: String, passo: String?, errore: @escaping @MainActor (String) -> Void) {
+        func indietro(_ esito: String) -> String {
+            Strumenti.codifica("\(Protocolli.schema)://protocollo?nome=\(p.rawValue)&esito=\(esito)" + (passo.map { "&passo=\($0)" } ?? ""))
+        }
+        guard let url = URL(string: "shortcuts://x-callback-url/run-shortcut?name=\(Strumenti.codifica(p.comandoRapido))&input=text&text=\(Strumenti.codifica(testo))"
+                            + "&x-success=\(indietro("ok"))&x-cancel=\(indietro("annullato"))&x-error=\(indietro("errore"))") else {
+            errore("Non riesco a preparare il Comando rapido, Sir."); return
+        }
         lanciato = Date()
         let mio = giro
         Task {
             let ok = await UIApplication.shared.open(url)
-            if !ok, self.giro == mio { self.fallito("Non riesco ad aprire l'app Comandi, Sir.") }
+            if !ok, self.giro == mio { self.lanciato = nil; errore("Non riesco ad aprire l'app Comandi, Sir.") }
         }
-    }
-
-    /// shortcuts://x-callback-url/run-shortcut con il ritorno it.discosizer.jarvis://protocollo?nome=…&esito=ok|annullato|errore
-    private func indirizzo(_ p: Protocollo) -> URL? {
-        func indietro(_ esito: String) -> String { Strumenti.codifica("\(Protocolli.schema)://protocollo?nome=\(p.rawValue)&esito=\(esito)") }
-        return URL(string: "shortcuts://x-callback-url/run-shortcut?name=\(Strumenti.codifica(p.comandoRapido))"
-                   + "&x-success=\(indietro("ok"))&x-cancel=\(indietro("annullato"))&x-error=\(indietro("errore"))")
     }
 
     /// Il ritorno da Comandi rapidi. Vale anche se arriva tardi (il signore era già tornato a mano).
@@ -63,7 +86,22 @@ final class Protocolli: ObservableObject {
         // anche se iOS ha chiuso JARVIS mentre andava il Comando rapido (attivo vuoto): il protocollo si completa lo stesso
         guard let p = Protocollo(rawValue: valore("nome") ?? ""), attivo == nil || attivo == p else { return }
         lanciato = nil
-        switch valore("esito") ?? "" {
+        let esito = valore("esito") ?? ""
+        if let chiave = valore("passo") {                     // un passo spento o riacceso dopo l'Avvia
+            inCambio = nil
+            guard attivo == p, fase == .attivo else { return }
+            switch esito {
+            case "ok":
+                if accesi.contains(chiave) { accesi.remove(chiave) } else { accesi.insert(chiave) }
+                Suoni.clickTesta()
+            case "annullato": break
+            default:
+                let perche = valore("errorMessage").map { ": \($0)" } ?? "."
+                nota = "Il Comando rapido «\(p.comandoRapido)» non ha cambiato il passo, Sir\(perche)"
+            }
+            return
+        }
+        switch esito {
         case "ok":
             completa(p, jarvis: jarvis)
         case "annullato":
@@ -82,29 +120,29 @@ final class Protocolli: ObservableObject {
             try? await Task.sleep(for: .milliseconds(1500))          // il ritorno di Comandi rapidi arriva subito dopo l'apertura
             guard self.giro == mio, self.lanciato != nil, let p = self.attivo else { return }
             self.lanciato = nil
-            self.fallito("Il Comando rapido «\(p.comandoRapido)» non ha risposto, Sir: controlli che esista in Comandi, con questo nome.")
+            let testo = "Il Comando rapido «\(p.comandoRapido)» non ha risposto, Sir: controlli che esista in Comandi, con questo nome."
+            if self.inCambio != nil { self.inCambio = nil; self.nota = testo } else { self.fallito(testo) }
         }
     }
 
-    /// Comandi rapidi ha finito: i passi si spuntano uno alla volta (come nel mockup), poi JARVIS fa la sua parte
+    /// Comandi rapidi ha finito: le luci si accendono verdi una alla volta (come nel mockup), poi JARVIS fa la sua parte
     /// (dopo i suoni, così non si sovrappongono alla sua voce).
     private func completa(_ p: Protocollo, jarvis: Jarvis) {
         giro += 1
         let mio = giro
         attivo = p
         fase = .inCorso
-        spuntati = 0
+        accesi = []
         nota = nil
         Task {
-            for k in p.passi.indices {
+            for passo in p.passi {
                 try? await Task.sleep(for: .milliseconds(320))
                 guard self.giro == mio else { return }
-                self.spuntati = k + 1
+                self.accesi.insert(passo.chiave)
                 Suoni.clickTesta()                                  // lo stesso click delle icone in alto (SISTEMI, cestino)
             }
             Suoni.fatto()
             self.fase = .attivo
-            guard p.passi.contains(where: { $0.jarvis }) else { return }
             try? await Task.sleep(for: .milliseconds(500))
             guard self.giro == mio else { return }
             self.parteDiJarvis(p, jarvis: jarvis)
@@ -113,23 +151,24 @@ final class Protocolli: ObservableObject {
 
     private func parteDiJarvis(_ p: Protocollo, jarvis: Jarvis) {
         switch p {
-        case .notte: jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")   // come «A voce» nel Diario
+        case .lavoro: Task { await jarvis.invia(Protocollo.fraseLavoro) }
         case .rientro: Task { await jarvis.invia(Protocollo.fraseRientro) }
-        case .party: break
+        case .notte: jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")   // come «A voce» nel Diario
         }
     }
 
     private func fallito(_ testo: String) {
         lanciato = nil
         fase = .fermo
-        spuntati = 0
+        accesi = []
+        inCambio = nil
         nota = testo
     }
 }
 
 /// La tendina PROTOCOLLI (build 22), come il Centro di Controllo di iOS e come nel mockup: scende dall'alto tirandola giù
 /// dalla parte alta di JARVIS e risale con uno swipe in su (o toccando la maniglia o il velo). Dentro: le tre schede
-/// PARTY · NOTTE · RIENTRO con «Avvia» e i passi che si spuntano, le frasi A VOCE e la nota sui Comandi rapidi.
+/// LAVORO · RIENTRO · NOTTE con «Avvia» e le luci dei passi, le frasi A VOCE e la nota sui Comandi rapidi.
 struct TendinaProtocolli: View {
     /// Lo spazio in alto da lasciare libero (la Dynamic Island e l'ora).
     let margineAlto: CGFloat
@@ -170,12 +209,14 @@ struct TendinaProtocolli: View {
                 Text(n).font(.system(size: 12)).foregroundStyle(.orange).padding(.horizontal, 6)
             }
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(["«Jarvis, protocollo party»", "«Jarvis, protocollo notte»", "«Jarvis, protocollo rientro»"], id: \.self) {
+                ForEach(["«Jarvis, protocollo lavoro»", "«Jarvis, protocollo rientro»", "«Jarvis, protocollo notte»"], id: \.self) {
                     Text($0).font(.system(size: 13)).foregroundStyle(ColoriHUD.testo)
                 }
             }
             .padding(.horizontal, 6)
-            Text("Ogni protocollo è un Comando rapido dell'app Comandi («JARVIS Party», «JARVIS Notte», «JARVIS Rientro»): i passi si cambiano lì.")
+            Text("Dopo Avvia, tocchi una luce verde per spegnere solo quel passo; un altro tocco lo riaccende.")
+                .font(.system(size: 11)).foregroundStyle(Color.tenue).padding(.horizontal, 6)
+            Text("Ogni protocollo è un Comando rapido dell'app Comandi («JARVIS Lavoro», «JARVIS Rientro», «JARVIS Notte»): i passi si cambiano lì.")
                 .font(.system(size: 11)).foregroundStyle(Color.tenue).padding(.horizontal, 6)
             Capsule().fill(ColoriHUD.chiaro.opacity(0.45))
                 .frame(width: 44, height: 5)
@@ -191,7 +232,7 @@ struct TendinaProtocolli: View {
 
     private func scheda(_ p: Protocollo) -> some View {
         let acceso = protocolli.attivo == p && protocolli.fase != .fermo
-        let fatti = acceso ? protocolli.spuntati : 0
+        let toccabile = protocolli.attivo == p && protocolli.fase == .attivo
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Text(p.titolo)
@@ -201,18 +242,25 @@ struct TendinaProtocolli: View {
                 TastoComando(testo: etichetta(p), corto: true) { protocolli.avvia(p) }
             }
             VStack(alignment: .leading, spacing: 5) {
-                ForEach(Array(p.passi.enumerated()), id: \.offset) { k, passo in
-                    let ok = k < fatti
+                ForEach(Array(p.passi.enumerated()), id: \.offset) { _, passo in
+                    let ok = acceso && protocolli.accesi.contains(passo.chiave)
+                    let cambia = protocolli.inCambio == passo.chiave
                     HStack(spacing: 8) {
                         Circle()
                             .fill(ok ? ColoriHUD.verde : Color.clear)
                             .overlay(Circle().stroke(ok ? ColoriHUD.verde : tinta.opacity(0.5), lineWidth: 1))
                             .frame(width: 7, height: 7)
                             .shadow(color: ok ? ColoriHUD.verde : .clear, radius: 3)
+                            .opacity(cambia ? 0.4 : 1)
                         Text(passo.testo)
                             .font(.system(size: 13))
                             .foregroundStyle(ok ? ColoriHUD.chiaro : ColoriHUD.spento)
+                        Spacer(minLength: 0)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { if toccabile { protocolli.cambia(p, passo) } }   // dopo l'Avvia: spegne (o riaccende) solo questo passo
+                    .accessibilityAddTraits(toccabile ? .isButton : [])
+                    .accessibilityValue(ok ? "acceso" : "spento")
                 }
             }
         }

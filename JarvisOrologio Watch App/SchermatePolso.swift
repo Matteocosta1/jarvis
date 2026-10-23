@@ -57,7 +57,7 @@ struct SchermoPolso<Contenuto: View>: View {
     }
 }
 
-/// Il tasto largo del polso («PARTY ›»); acceso: pieno di ciano.
+/// Il tasto largo del polso («LAVORO ›»); acceso: pieno di ciano.
 private struct TastoPolso: View {
     let testo: String
     var segno = "›"

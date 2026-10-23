@@ -75,47 +75,50 @@ nonisolated enum TagVoce {
 
 // MARK: - I comandi a frase esatta
 
-/// I protocolli alla Stark (Telefono › PROTOCOLLI). Sull'iPhone «Avvia» lancia un Comando rapido per protocollo
-/// («JARVIS Party», «JARVIS Notte», «JARVIS Rientro»); poi JARVIS fa le sue parti.
+/// I protocolli alla Stark (la tendina PROTOCOLLI). Sull'iPhone «Avvia» lancia un Comando rapido per protocollo
+/// («JARVIS Lavoro», «JARVIS Rientro», «JARVIS Notte»); poi JARVIS fa le sue parti. Dopo, ogni passo si può spegnere da solo:
+/// lo stesso Comando rapido riceve «annulla:<chiave>» (o «rifai:<chiave>» per riaccenderlo).
 nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Sendable {
-    case party, notte, rientro
+    case lavoro, rientro, notte
     var id: String { rawValue }
-    /// Come si legge sulla scheda: PARTY, NOTTE, RIENTRO.
+    /// Come si legge sulla scheda: LAVORO, RIENTRO, NOTTE.
     var titolo: String { rawValue.uppercased() }
     /// Il nome del Comando rapido che il signore crea nell'app Comandi.
     var comandoRapido: String { "JARVIS " + rawValue.capitalized }
 
-    /// Un passo del protocollo: `testo` sull'iPhone, `breve` sul polso; `jarvis`: lo fa JARVIS, non il Comando rapido.
-    nonisolated struct Passo: Sendable { let testo: String; let breve: String; let jarvis: Bool }
+    /// Un passo del protocollo: `chiave` per il Comando rapido, `testo` sull'iPhone, `breve` sul polso;
+    /// `jarvis`: lo fa JARVIS, non il Comando rapido.
+    nonisolated struct Passo: Sendable { let chiave: String; let testo: String; let breve: String; let jarvis: Bool }
 
     var passi: [Passo] {
         switch self {
-        case .party:
-            return [Passo(testo: "Non disturbare acceso", breve: "Non disturbare", jarvis: false),
-                    Passo(testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
-                    Passo(testo: "Playlist «Serata»", breve: "Playlist", jarvis: false),
-                    Passo(testo: "Sveglia alle 11:00", breve: "Sveglia 11:00", jarvis: false)]
-        case .notte:
-            return [Passo(testo: "Non disturbare acceso", breve: "Non disturbare", jarvis: false),
-                    Passo(testo: "Bluetooth spento", breve: "Bluetooth spento", jarvis: false),
-                    Passo(testo: "Sveglia alle 9:30", breve: "Sveglia 9:30", jarvis: false),
-                    Passo(testo: "Domanda del diario", breve: "Diario", jarvis: true)]
+        case .lavoro:
+            return [Passo(chiave: "full-immersion-lavoro", testo: "Full immersion «Lavoro» accesa", breve: "Full immersion Lavoro", jarvis: false),
+                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
+                    Passo(chiave: "impegni", testo: "Impegni di oggi", breve: "Impegni di oggi", jarvis: true),
+                    Passo(chiave: "posta", testo: "Posta PRIORITÀ", breve: "Posta PRIORITÀ", jarvis: true)]
         case .rientro:
-            return [Passo(testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
-                    Passo(testo: "Non disturbare spento", breve: "Non disturbare spento", jarvis: false),
-                    Passo(testo: "Messaggi da leggere", breve: "Messaggi", jarvis: true),
-                    Passo(testo: "Meteo di domani", breve: "Meteo domani", jarvis: true)]
+            return [Passo(chiave: "full-immersion-spenta", testo: "Full immersion spenta", breve: "Full immersion spenta", jarvis: false),
+                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
+                    Passo(chiave: "messaggi", testo: "Messaggi da leggere", breve: "Messaggi", jarvis: true),
+                    Passo(chiave: "meteo", testo: "Meteo di domani", breve: "Meteo domani", jarvis: true)]
+        case .notte:
+            return [Passo(chiave: "full-immersion-riposo", testo: "Full immersion «Riposo» accesa", breve: "Full immersion Riposo", jarvis: false),
+                    Passo(chiave: "bluetooth", testo: "Bluetooth spento", breve: "Bluetooth spento", jarvis: false),
+                    Passo(chiave: "sveglia", testo: "Sveglia alle 9:30", breve: "Sveglia 9:30", jarvis: false),
+                    Passo(chiave: "diario", testo: "Domanda del diario", breve: "Diario", jarvis: true)]
         }
     }
 
-    /// La frase per il cervello del RIENTRO (messaggi da leggere e meteo di domani), come se la dicesse il signore.
+    /// Le frasi per il cervello, come se le dicesse il signore.
+    static let fraseLavoro = "Protocollo lavoro: dimmi gli impegni di oggi e le mail importanti."
     static let fraseRientro = "Protocollo rientro: dimmi se ci sono messaggi da leggere e che tempo farà domani."
 }
 
 /// I comandi a frase esatta (dopo «Jarvis»): riconosciuti sul dispositivo prima di ogni altro comando e prima delle
 /// storpiature imparate. Risposta immediata, niente cervello, e non si imparano mai come storpiature.
 nonisolated enum ComandoDedicato: Equatable, Sendable {
-    case protocollo(Protocollo)   // «protocollo party», «attiva il protocollo notte»: Telefono › PROTOCOLLI, e parte
+    case protocollo(Protocollo)   // «protocollo lavoro», «attiva il protocollo notte»: la tendina PROTOCOLLI, e parte
     case traccia                  // «traccia il luogo»: Ricordi › TRACCIA (la bussola, fotocamera spenta)
     case guida                    // «portami al luogo»: Ricordi › TRACCIA con la Guida accesa (fotocamera e frecce)
     case salvaLuogo               // «ricorda questo luogo»: Ricordi › TRACCIA, e il posto dove si trova diventa un luogo
@@ -139,9 +142,9 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         }
         if p.count == 2, p[0] == "protocollo" {
             switch p[1] {
-            case "party", "parti": return .protocollo(.party)
-            case "notte": return .protocollo(.notte)
+            case "lavoro": return .protocollo(.lavoro)
             case "rientro": return .protocollo(.rientro)
+            case "notte": return .protocollo(.notte)
             default: return nil
             }
         }
