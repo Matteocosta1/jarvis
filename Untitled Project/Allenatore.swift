@@ -50,13 +50,15 @@ struct Allenatore: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
 
-                // telemetria
-                HStack(spacing: 10) {
-                    dato("RIPETIZIONI", "\(motore.ripetizioni)", caldo: false)
-                    dato("SCHIENA", motore.posa == nil ? "—" : "\(Int(motore.inclinazioneSchiena))°", caldo: motore.inclinazioneSchiena > 12)
-                    dato("SIMMETRIA", motore.posa == nil ? "—" : "\(Int(motore.simmetria))%", caldo: motore.simmetria < 85)
+                // telemetria (nello Specchio no: i numeri stanno solo sul corpo, come nel mockup)
+                if motore.giunto != .ginocchia {
+                    HStack(spacing: 10) {
+                        dato("RIPETIZIONI", "\(motore.ripetizioni)", caldo: false)
+                        dato("SCHIENA", motore.posa == nil ? "—" : "\(Int(motore.inclinazioneSchiena))°", caldo: motore.inclinazioneSchiena > motore.sogliaSchiena)
+                        dato("SIMMETRIA", motore.posa == nil ? "—" : "\(Int(motore.simmetria))%", caldo: motore.simmetria < 85)
+                    }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
 
                 Spacer()
 
@@ -188,7 +190,7 @@ struct ScheletroHUD: View {
 
 /// Lo specchio dello squat (mockup «SPECCHIO · SQUAT»): sopra il suo scheletro, quello «giusto» in verde trasparente
 /// che scende fino alla profondità corretta (ginocchio a 90°), e i conti sul corpo: RIPETIZIONI n / 12 sopra la testa,
-/// GINOCCHIO accanto al ginocchio destro, SCHIENA accanto al busto (lo stesso numero della telemetria in alto).
+/// GINOCCHIO accanto al ginocchio destro, SCHIENA accanto al busto (la riga della telemetria in alto qui è nascosta).
 /// Il verde è la ripetizione del mockup (`posa(s)` di scena3d) messa sull'immagine: piedi sulle sue caviglie,
 /// misura dalla sua altezza in piedi (collo → caviglie = 1,34 m del modello), girato come lui (di fronte o di lato).
 /// Va un po' avanti a lui: è in fondo quando lui è all'86% della discesa, così si vede quanto manca.
@@ -344,6 +346,10 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     @Published var altezzaInPiedi: Double = 0   // collo → caviglie in piedi, in frazione dell'altezza dell'immagine
     @Published var ginocchioIn3D = false        // l'angolo viene dallo scheletro 3D
 
+    /// Oltre questa inclinazione la schiena è «fuori asse». Nello squat (ginocchia) il busto corretto si piega in avanti
+    /// di circa 30°: lì la soglia è 45°, negli altri casi 12°.
+    var sogliaSchiena: Double { giunto == .ginocchia ? 45 : 12 }
+
     private let camera = CameraPosa()
     var sessione: AVCaptureSession { camera.sessione }
 
@@ -378,8 +384,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             Task { await parla(n == 0 ? "Nessuna ripetizione contata, Sir." : "\(n) ripetizion\(n == 1 ? "e" : "i"), Sir.") }
         case .postura:
             guard posa != nil else { Task { await parla("Non la vedo, Sir: si metta tutta nell'inquadratura.") }; return }
-            let sch = Int(inclinazioneSchiena), sim = Int(simmetria)
-            let giudizio = sch <= 12 && sim >= 85 ? "Va bene così." : (sch > 12 ? "Raddrizzi la schiena." : "Cerchi la simmetria.")
+            let sch = Int(inclinazioneSchiena), sim = Int(simmetria), soglia = Int(sogliaSchiena)
+            let giudizio = sch <= soglia && sim >= 85 ? "Va bene così." : (sch > soglia ? "Raddrizzi la schiena." : "Cerchi la simmetria.")
             Task { await parla("Schiena a \(sch) gradi, simmetria al \(sim) per cento. \(giudizio)") }
         case .camera: cambiaCamera()
         case .pausa:
@@ -471,7 +477,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             let s = max(0, 100 - scarto * 100)
             simmetria = simmetria * 0.7 + s * 0.3
         }
-        posturaFuori = inclinazioneSchiena > 12 || simmetria < 85
+        posturaFuori = inclinazioneSchiena > sogliaSchiena || simmetria < 85
         let adesso = Date()
         if adesso.timeIntervalSince(ultimoCampione) > 0.5 {
             ultimoCampione = adesso
@@ -570,8 +576,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     private func commenta(_ adesso: Date) {
         guard !voceInCorso, adesso.timeIntervalSince(ultimoCommento) > 9 else { return }
         var frase = ""
-        if inclinazioneSchiena > 18 { frase = "Schiena fuori asse di \(Int(inclinazioneSchiena)) gradi: la raddrizzi." }
-        else if inclinazioneSchiena > 12 { frase = "Un filo di inclinazione nella schiena, \(Int(inclinazioneSchiena)) gradi." }
+        if inclinazioneSchiena > sogliaSchiena + 6 { frase = "Schiena fuori asse di \(Int(inclinazioneSchiena)) gradi: la raddrizzi." }
+        else if inclinazioneSchiena > sogliaSchiena { frase = "Un filo di inclinazione nella schiena, \(Int(inclinazioneSchiena)) gradi." }
         else if simmetria < 80 { frase = "Un lato più basso dell'altro: cerchi la simmetria." }
         else if adesso.timeIntervalSince(ultimoCommento) > 25 { frase = ["Postura ottima, continui così.", "Schiena allineata, molto bene.", "Esecuzione pulita."].randomElement()! }
         guard !frase.isEmpty, frase != ultimoAvviso || adesso.timeIntervalSince(ultimoCommento) > 30 else { return }
