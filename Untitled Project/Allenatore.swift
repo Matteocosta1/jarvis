@@ -414,8 +414,9 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             case .mani: giunto = .mani
             case .ginocchia: giunto = .ginocchia
             }
-            let nome = parte == .busto ? "il busto" : (parte == .mani ? "le mani" : "le ginocchia")
-            Task { await parla("Conto \(nome), Sir.") }
+            // la terza scelta ora si chiama Specchio (il corpo 3D con i conti sopra): JARVIS la chiama così
+            let frase = parte == .busto ? "Conto il busto, Sir." : (parte == .mani ? "Conto le mani, Sir." : "Specchio, Sir.")
+            Task { await parla(frase) }
         }
     }
 

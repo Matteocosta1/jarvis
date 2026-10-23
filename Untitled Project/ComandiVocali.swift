@@ -282,6 +282,7 @@ enum ComandoVocale: Equatable {
             if c(" fotocamera ") || c(" girati ") || c(" selfie ") || c(" camera ") { return .allenatore(.camera) }
             if c(" pausa ") || c(" aspetta un attimo ") { return .allenatore(.pausa) }
             if c(" riprendi ") || c(" ripartiamo ") || c(" continua ") || c(" riparti ") { return .allenatore(.riprendi) }
+            if c(" specchio ") { return .allenatore(.conta(.ginocchia)) }     // build 22: «Jarvis, specchio» dentro l'Allenatore
             if c(" conta ") || c(" conteggio ") {
                 if c(" mani ") || c(" braccia ") { return .allenatore(.conta(.mani)) }
                 if c(" ginocchia ") || c(" gambe ") { return .allenatore(.conta(.ginocchia)) }
