@@ -31,3 +31,30 @@ Nota 21 ott pomeriggio: fotocamere bloccate in tutte le build (anche la 6.0 (20)
 Punto fermo: la conversazione era perfetta prima della modifica del volume (403ce34, 20 ott 21:40).
 Dopo la 8.0 (5), se il dialogo va, si rimettono uno alla volta: volume all'avvio, comandi LiDAR/Sentinella/Wiretap,
 comandi Allenatore/Interprete/rapidi — una build per pezzo, provata ogni volta.
+
+## Apprendimenti
+
+Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiornato a ogni sessione.
+
+### 23 ottobre 2026 (build 22 e preparazione della 23)
+
+*Tecnica*
+1. **Posta**: Supabase blocca le porte 25 e 587 → la posta parte dalla porta sicura **465** di iCloud. Da provare dal vivo dopo il deploy: finché non va, non è data per buona.
+2. **Radar**: in Open-Meteo ogni valore a 15 minuti è la pioggia del quarto d'ora che **finisce** a quell'ora. Verificato con una chiamata vera (altrimenti l'avviso sbagliava di 15 minuti).
+3. **Ordine del radar**: il controllo ogni 10 minuti si accende solo **dopo** aver pubblicato il briefing nuovo, altrimenti il vecchio lo scambia per la sveglia del mattino e manda briefing a ripetizione → migrazione separata.
+4. **Testo delle mail**: un errore di decodifica (base64) tagliava l'ultimo pezzo del testo; trovato con le prove e corretto.
+5. **Voce v4 Turbo**: primo suono in ~0,1 s invece di ~0,7 s, costo circa la metà; i toni sussurrato e ironico funzionano davvero.
+6. **Ricerca per significato**: dentro Supabase (gte-small), senza servizi esterni né costi in più.
+7. **Avvio**: ogni icona ha il suo colpo dentro la traccia; il metodo giusto è allineare i colpi a una griglia con un unico anticipo comune (~20 ms), non cercarli uno per uno.
+8. **Tendina**: su iPhone Safari lo swipe del mockup va solo con la gestione del tocco dedicata; nell'app il gesto sopra i pulsanti dev'essere prioritario e con l'area di tocco definita, altrimenti i tasti se lo prendono.
+9. **Controllo indipendente**: ha trovato 4 errori che non avevo visto (luogo salvato due volte, reattore che si attivava dopo aver tirato giù la tendina, area di tocco, trascinamento rimasto a metà). Il secondo controllo serve sempre.
+10. **Comandi vocali**: 570 frasi provate con il traduttore di prova, 0 errori.
+
+*Metodo (dalle correzioni del signore)*
+11. **Aggiungere senza togliere**: Specchio aveva preso il posto di Ginocchia. Le novità si aggiungono, non sostituiscono niente senza il suo sì.
+12. **Prima i fatti, poi le funzioni**: Muri e macchina non servivano. Prima di progettare una funzione, verificare che corrisponda alla sua vita reale.
+13. **Le scritte**: «solo cose sue» non andava. Le diciture devono suonare come un sistema, alla Stark, non come una spiegazione (EDITH ora: «Sistema di Difesa e Riconoscimento»).
+14. **Dire cosa è finto**: nel mockup va detto chiaramente quando una cosa è simulata (es. i tempi di ascolto) e quando è identica all'app.
+15. **Nomi esatti**: «le tracce aspettano l'ascolto» ha confuso, perché erano già nel mockup. Nominare sempre esattamente la cosa di cui si parla.
+16. **Mai dare un controllo per fatto senza il risultato**: il primo controllo del cervello si era fermato senza risposta; rifatto partire.
+17. **Salvare subito su GitHub**: il ramo della build 22 era solo sul disco di lavoro; ora ogni ramo va su GitHub appena c'è lavoro.

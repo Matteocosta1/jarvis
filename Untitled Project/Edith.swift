@@ -25,7 +25,7 @@ struct VistaEdith: View {
     @State private var esitoPassword: String?
 
     var body: some View {
-        CorniceScheda(titolo: "EDITH", sottotitolo: "difesa · solo cose sue", icona: "eyeglasses", tinta: tinta) {
+        CorniceScheda(titolo: "EDITH", sottotitolo: "Sistema di Difesa e Riconoscimento", icona: "eyeglasses", tinta: tinta) {
             // PORTE
             Pannello(titolo: "PORTE", tinta: tinta) {
                 Text("Cosa si vede da internet della sua rete: router, DVR, NAS, PC.").font(.footnote).foregroundStyle(Color.tenue)
