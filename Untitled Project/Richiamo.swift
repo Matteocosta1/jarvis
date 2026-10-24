@@ -40,6 +40,9 @@ final class Richiamo {
     /// Fino a quando, finita una risposta, il seguito vale senza «Jarvis» («Perché?», «E domani?»). Come `liberoFinoA`,
     /// ma non in mezzo alla folla: lì le voci degli altri non devono svegliarlo (revisione del dialogo, M6).
     var seguitoFinoA = Date.distantPast
+    /// Idea C (25 ott): JARVIS sta preparando la risposta a una domanda (lo dice Jarvis). Con l'impronta della sua voce
+    /// registrata, in quel momento senza «Jarvis» la risposta la ferma solo la voce del signore.
+    var inRisposta: (() -> Bool)?
     /// L'ultima volta che ha sentito parlare (anche frasi non per lui): JARVIS non attacca il riempitivo sopra il signore.
     private(set) var ultimaVoce = Date.distantPast
     private var precedente = ""         // l'ultima trascrizione ricevuta
@@ -311,7 +314,18 @@ final class Richiamo {
                     // folla, come il seguito. Con gente o TV intorno l'aggiunta vale con «Jarvis» o con la sua voce riconosciuta;
                     // prima qualsiasi frase di chiunque («sì sì» del vicino) fermava la risposta e si univa alla domanda
                     let inAggiunta = adesso < liberoFinoA
-                    if !t.isEmpty, (inAggiunta && (!affollato || voceConfermata)) || (adesso < seguitoFinoA && !affollato) || voceConfermata
+                    // idea C (25 ott, approvata dal signore): se l'impronta della sua voce è registrata (Impostazioni › La mia voce),
+                    // mentre JARVIS prepara una risposta una frase senza «Jarvis» la ferma solo se è la sua voce: non quella di Bea,
+                    // di un amico o della TV. Restano sempre valide la frase di Tony e, in una stanza tranquilla, «muto», «basta»,
+                    // «stop». Senza impronta, o fuori da una risposta, tutto come prima
+                    let soloLui = VoceDelSignore.attiva && (inRisposta?() ?? false)
+                    if !t.isEmpty, soloLui {
+                        if voceConfermata || Benvenuto.eFraseDiTony(t) || (!affollato && Jarvis.eSoloSilenzio(t)) {
+                            trovato = t; soloDopoNome = false
+                        } else if parole.count >= 2, !controlloInCorso, inAggiunta || Impostazioni.ascoltoSempre {
+                            controllaVoce(turno: mio)             // l'impronta decide (circa 0,7 s), poi la frase continua da dov'era
+                        }
+                    } else if !t.isEmpty, (inAggiunta && (!affollato || voceConfermata)) || (adesso < seguitoFinoA && !affollato) || voceConfermata
                         || Benvenuto.eFraseDiTony(t)
                         || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false

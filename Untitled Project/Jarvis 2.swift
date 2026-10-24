@@ -272,6 +272,7 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t } }
         richiamo.consegna = { [weak self] frase in self?.fraseRichiamo(frase) }
         richiamo.applauso = { [weak self] in self?.applaudito() }
+        richiamo.inRisposta = { [weak self] in self?.fase == .elaboro && self?.idTurno != nil }   // idea C: una risposta in preparazione
         strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
             return await self.apriOcchi(automatico: automatico, video: video, zoom: CGFloat(zoom))

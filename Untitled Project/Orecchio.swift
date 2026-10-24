@@ -186,7 +186,10 @@ final class Orecchio {
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
                 // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
                 if OrologioInUso.attivo { if fine { riavvia() }; return }
-                if AmbienteSonoro.condiviso.affollato && !voceConfermata {
+                // idea C (25 ott, approvata dal signore): con l'impronta della sua voce registrata anche in una stanza tranquilla
+                // la risposta la ferma solo la sua voce (o una parola d'ordine, qui sopra: «Jarvis», «basta», «muto», «aspetta»);
+                // le due parole di Bea o di un amico non la fermano più. Senza impronta, come prima: solo con la folla
+                if (AmbienteSonoro.condiviso.affollato || VoceDelSignore.attiva) && !voceConfermata {
                     // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
                     // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
                     if VoceDelSignore.attiva && !controlloInCorso {
