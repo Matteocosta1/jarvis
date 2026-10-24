@@ -698,9 +698,11 @@ final class Jarvis: NSObject, ObservableObject {
         case .radar: apriReparto(.meteo)          // RADAR è in testa al Meteo
         case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
         case .organismo: apriReparto(.vitals)
-        case .specchio, .allenamento:             // l'Allenatore sullo Specchio (si apre sul Busto solo quando lo si apre a mano)
-            MotoreAllenatore.specchioRichiesto = true
-            NotificationCenter.default.post(name: .jarvisSpecchio, object: nil)
+        case .ologramma:                          // build 23: il Trainer già sull'Ologramma (a mano si apre sul Busto)
+            MotoreAllenatore.ologrammaRichiesto = true
+            NotificationCenter.default.post(name: .jarvisOlogramma, object: nil)
+            apriReparto(.allenatore)
+        case .allenamento:                        // «allenati allo specchio»: il Trainer, come il mockup 23
             apriReparto(.allenatore)
         }
     }
