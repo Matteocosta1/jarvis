@@ -48,12 +48,26 @@ private struct TastoSat: View {
 final class GuidaPolso: ObservableObject {
     static let condivisa = GuidaPolso()
     @Published private(set) var dati: GuidaPolsoDati?
+    /// Decisione 39 (24 ott): la guida chiesta dal polso che l'iPhone non è riuscito a far partire (niente posizione, niente
+    /// strada): il motivo, come lo scrive l'iPhone. GUIDA lo mostra al posto di «Nessuna guida» e JARVIS lo dice
+    /// (VistaOrologio). Prima l'iPhone rispondeva «ok» prima di calcolare la strada e al polso restava «— · Nessuna guida».
+    /// Si dice una volta sola, quando arriva (lo stesso motivo riletto da «stato» non si ripete).
+    @Published private(set) var nonPartita: String? {
+        didSet { if let m = nonPartita, m != oldValue { annuncia?(m) } }
+    }
+    /// Chi dice il motivo a voce: JARVIS (lo collega VistaOrologio all'apertura dell'app).
+    var annuncia: (@MainActor (String) -> Void)?
 
-    /// Un messaggio dall'iPhone: { guida: {…} } con la guida, { guida: { fine: true } } quando finisce.
+    /// Un messaggio dall'iPhone: { guida: {…} } con la guida, { guida: { fine: true } } quando finisce,
+    /// { guida: { errore: "…" } } quando la guida chiesta dal polso non parte (decisione 39).
     nonisolated static func ricevi(_ m: [String: Any]) {
         guard let d = m["guida"] as? [String: Any] else { return }
-        let g = GuidaPolsoDati(d)                        // nil con { fine: true }
-        Task { @MainActor in condivisa.dati = g }
+        let g = GuidaPolsoDati(d)                        // nil con { fine: true } e con { errore: … }
+        let motivo = d["errore"] as? String
+        Task { @MainActor in
+            condivisa.dati = g
+            condivisa.nonPartita = g == nil ? motivo : nil
+        }
     }
 
     /// Chiede all'iPhone lo stato attuale (all'apertura della schermata). Falso se l'iPhone non ha risposto.
@@ -61,11 +75,15 @@ final class GuidaPolso: ObservableObject {
     func aggiorna() async -> Bool {
         guard let r = await PonteOrologio.condiviso.guida(["guida": "stato"]) else { return false }
         dati = r.guida
+        // decisione 39: il motivo arrivato prima resta finché non c'è una guida, una guida nuova o FINE (una risposta
+        // «nessuna guida» partita prima del motivo non lo cancella)
+        if r.guida != nil { nonPartita = nil } else if let m = r.nonPartita { nonPartita = m }
         return true
     }
 
     /// Fa partire la guida sull'iPhone. nil se è partita, altrimenti il motivo.
     func avvia(_ l: LuogoSat) async -> String? {
+        nonPartita = nil                                 // decisione 39: un tentativo nuovo, il motivo di prima non vale più
         var m: [String: Any] = ["guida": "avvia", "lat": l.lat, "lon": l.lon, "nome": l.nome, "via": l.via, "chiave": l.chiave]
         if let id = l.ricordo { m["ricordo"] = id }
         guard let r = await PonteOrologio.condiviso.guida(m) else { return "iPhone non raggiungibile, Sir: la guida parte da lì." }
@@ -75,6 +93,7 @@ final class GuidaPolso: ObservableObject {
     /// FINE: la guida si ferma anche sull'iPhone.
     func ferma() {
         dati = nil
+        nonPartita = nil
         Task { _ = await PonteOrologio.condiviso.guida(["guida": "ferma"]) }
     }
 }
@@ -167,7 +186,12 @@ struct VistaGuidaOrologio: View {
                     .font(.system(size: 9)).foregroundStyle(ColoriSat.tenue).multilineTextAlignment(.center)
             } else {
                 Text("—").font(.system(size: 22, weight: .bold, design: .monospaced)).foregroundStyle(.white)
-                Text("Nessuna guida").font(.system(size: 9)).foregroundStyle(ColoriSat.tenue)
+                if let motivo = guida.nonPartita {
+                    // decisione 39: perché la guida non è partita, nello stile degli avvisi di SATELLITE
+                    Text(motivo).font(.system(size: 10)).foregroundStyle(.orange).multilineTextAlignment(.center)
+                } else {
+                    Text("Nessuna guida").font(.system(size: 9)).foregroundStyle(ColoriSat.tenue)
+                }
             }
             TastoSat(testo: "FINE", destra: "›") {
                 WKInterfaceDevice.current().play(.click)

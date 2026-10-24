@@ -148,6 +148,9 @@ struct VistaOrologio: View {
             jarvis.controllaCollegamento()
             PosizioneOrologio.risveglia()            // il GPS si scalda subito: la domanda non lo aspetta
             accendi()
+            // build 23, decisione 39: la guida chiesta dal polso non parte sull'iPhone: JARVIS dice il motivo
+            let j = jarvis
+            GuidaPolso.condivisa.annuncia = { [weak j] motivo in j?.annunciaGuida(motivo) }
         }
         .onChange(of: scena) { _, fase in
             if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi() }

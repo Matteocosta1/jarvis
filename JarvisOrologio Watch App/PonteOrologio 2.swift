@@ -95,6 +95,8 @@ final class PonteOrologio: NSObject {
     nonisolated struct RispostaGuida: Sendable {
         let errore: String?
         let guida: GuidaPolsoDati?
+        /// Decisione 39: la guida chiesta dal polso non è partita sull'iPhone (niente posizione, niente strada): il motivo.
+        var nonPartita: String? = nil
     }
 
     /// Build 23: avvia, ferma o chiede la GUIDA sull'iPhone ({ guida: "avvia" | "ferma" | "stato", … }). nil se l'iPhone non risponde.
@@ -105,7 +107,9 @@ final class PonteOrologio: NSObject {
         guard s.isReachable else { return nil }
         return await withCheckedContinuation { (c: CheckedContinuation<RispostaGuida?, Never>) in
             s.sendMessage(messaggio, replyHandler: { @Sendable r in
-                c.resume(returning: RispostaGuida(errore: r["errore"] as? String, guida: (r["guida"] as? [String: Any]).flatMap { GuidaPolsoDati($0) }))
+                let g = r["guida"] as? [String: Any]
+                c.resume(returning: RispostaGuida(errore: r["errore"] as? String, guida: g.flatMap { GuidaPolsoDati($0) },
+                                                  nonPartita: g?["errore"] as? String))
             }, errorHandler: { @Sendable _ in
                 c.resume(returning: nil)
             })
