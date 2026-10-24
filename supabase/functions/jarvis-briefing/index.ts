@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
       "Buongiorno Jarvis. Preparami il briefing del mattino per una notifica sul telefono: meteo di oggi a Milano, email importanti arrivate da ieri sera, " +
       "note aperte o in scadenza, prossima serata se nota. Al massimo quattro frasi brevi, da maggiordomo al mattino, senza elenchi. " +
       "Non hai calendario né dati di salute in questo momento: non nominarli.");
-    const esito = await mandaATutti("Buongiorno, signore", testo, "briefing");
+    const esito = await mandaATutti("Buongiorno, Sir", testo, "briefing");   // decisione 13 (24 ott): «Sir», come le altre frasi fisse
     await db.from("jarvis_azioni").insert({ dispositivo: "cervello", strumento: "briefing_push", dettagli: JSON.stringify({ ora: oraRoma() }), esito: JSON.stringify(esito).slice(0, 200), errore: !!(esito as any).errore }).then(() => {}, () => {});
     return json({ ...esito, testo });
   } catch (e) {
