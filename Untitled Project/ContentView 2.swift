@@ -917,6 +917,7 @@ struct ContentView: View {
         let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
             || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore || mostraLidar
             || mostraImpostazioni || jarvis.pagina != nil
+        if tendinaAperta { chiudiTendina() }      // come nel mockup: la sezione chiesta a voce non si apre con la tendina PROTOCOLLI rimasta giù dietro
         chiudiTutto()
         Task {
             if aperto { try? await Task.sleep(for: .milliseconds(700)) }     // il tempo che la schermata si chiuda

@@ -56,8 +56,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
     @Published var polsoRichiesto: SchermataPolso?   // build 22: comando a frase esatta, la schermata nuova da aprire
     /// La risposta come arriva dal cervello, toni compresi («[whispers]»): serve alla voce; a schermo e in cronologia va senza.
     private var rispostaGrezza = ""
-    /// Detto l'annuncio, JARVIS chiede questa frase al cervello (i protocolli dal polso).
-    private var dopoAnnuncio: String?
 
     @Published private(set) var storia: [[String: String]] = [] { didSet { salvaStoria() } }   // ultimi scambi, solo testo
     private var compito: Task<Void, Never>?
@@ -400,7 +398,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
-    // MARK: Build 22: comandi a frase esatta e protocolli dal polso
+    // MARK: Build 22: comandi a frase esatta
 
     /// Un comando a frase esatta: si apre la sua schermata, senza passare dal cervello (come i comandi di sempre).
     private func dedicato(_ d: ComandoDedicato) {
@@ -423,14 +421,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .specchio, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
         }
         if let a = reparto?.annuncio { parla(a) } else { fase = .attesa }
-    }
-
-    /// Una frase di JARVIS e poi, se c'è, una domanda al cervello (che parte appena ha finito di dirla).
-    func annuncia(_ testo: String, poi: String?) {
-        ferma()
-        daUnire = nil
-        parla(testo)
-        dopoAnnuncio = poi                     // dopo parla(): parla() azzera tutto quello che era in sospeso
     }
 
     nonisolated static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (String?, String?) {
@@ -717,7 +707,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     private func zittisci() {
-        dopoAnnuncio = nil
         turnoVoce += 1
         lettoreCoda?.cancel()
         lettoreCoda = nil
@@ -743,7 +732,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
         lettore = nil
         fase = .attesa
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        if let f = dopoAnnuncio { dopoAnnuncio = nil; chiedi(f); return }   // detto l'annuncio del protocollo: la sua parte di JARVIS
         dopoRisposta()
     }
 

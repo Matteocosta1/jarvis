@@ -83,27 +83,26 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
     /// Come si legge sulla scheda: LAVORO, RIENTRO, NOTTE.
     var titolo: String { rawValue.uppercased() }
 
-    /// Un passo del protocollo: `chiave` per il Comando rapido, `testo` sull'iPhone, `breve` sul polso;
-    /// `jarvis`: lo fa JARVIS, non il Comando rapido.
-    nonisolated struct Passo: Sendable { let chiave: String; let testo: String; let breve: String; let jarvis: Bool }
+    /// Un passo del protocollo: `chiave` per riconoscere la sua luce, `testo` sull'iPhone, `breve` sul polso.
+    nonisolated struct Passo: Sendable { let chiave: String; let testo: String; let breve: String }
 
     var passi: [Passo] {
         switch self {
         case .lavoro:
-            return [Passo(chiave: "full-immersion-lavoro", testo: "Full immersion «Lavoro» accesa", breve: "Full immersion Lavoro", jarvis: false),
-                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
-                    Passo(chiave: "impegni", testo: "Impegni di oggi", breve: "Impegni di oggi", jarvis: true),
-                    Passo(chiave: "posta", testo: "Posta PRIORITÀ", breve: "Posta PRIORITÀ", jarvis: true)]
+            return [Passo(chiave: "full-immersion-lavoro", testo: "Full immersion «Lavoro» accesa", breve: "Full immersion Lavoro"),
+                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi"),
+                    Passo(chiave: "impegni", testo: "Impegni di oggi", breve: "Impegni di oggi"),
+                    Passo(chiave: "posta", testo: "Posta PRIORITÀ", breve: "Posta PRIORITÀ")]
         case .rientro:
-            return [Passo(chiave: "full-immersion-spenta", testo: "Full immersion spenta", breve: "Full immersion spenta", jarvis: false),
-                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi", jarvis: false),
-                    Passo(chiave: "messaggi", testo: "Messaggi da leggere", breve: "Messaggi", jarvis: true),
-                    Passo(chiave: "meteo", testo: "Meteo di domani", breve: "Meteo domani", jarvis: true)]
+            return [Passo(chiave: "full-immersion-spenta", testo: "Full immersion spenta", breve: "Full immersion spenta"),
+                    Passo(chiave: "wifi", testo: "Wi-Fi acceso", breve: "Wi-Fi"),
+                    Passo(chiave: "messaggi", testo: "Messaggi da leggere", breve: "Messaggi"),
+                    Passo(chiave: "meteo", testo: "Meteo di domani", breve: "Meteo domani")]
         case .notte:
-            return [Passo(chiave: "full-immersion-riposo", testo: "Full immersion «Riposo» accesa", breve: "Full immersion Riposo", jarvis: false),
-                    Passo(chiave: "bluetooth", testo: "Bluetooth spento", breve: "Bluetooth spento", jarvis: false),
-                    Passo(chiave: "sveglia", testo: "Sveglia alle 9:30", breve: "Sveglia 9:30", jarvis: false),
-                    Passo(chiave: "diario", testo: "Domanda del diario", breve: "Diario", jarvis: true)]
+            return [Passo(chiave: "full-immersion-riposo", testo: "Full immersion «Riposo» accesa", breve: "Full immersion Riposo"),
+                    Passo(chiave: "bluetooth", testo: "Bluetooth spento", breve: "Bluetooth spento"),
+                    Passo(chiave: "sveglia", testo: "Sveglia alle 9:30", breve: "Sveglia 9:30"),
+                    Passo(chiave: "diario", testo: "Domanda del diario", breve: "Diario")]
         }
     }
 }
