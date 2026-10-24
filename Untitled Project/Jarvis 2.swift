@@ -347,6 +347,14 @@ final class Jarvis: NSObject, ObservableObject {
         if !pulito.isEmpty {
             Task { await instrada(resto) }    // ha detto cosa vuole: «Jarvis, che ore sono», «aspetta, e anche…»
         } else if chiedeAggiunta {
+            if Jarvis.usaAscoltoCloud {
+                // Mac: la frase «Jarvis, aspetta» arriva appena trascritta, senza i 5 secondi dell'orecchio dell'iPhone. Come in
+                // attesa (instrada): lo ascolta per il resto dei 5 secondi e solo se tace «Mi dica, Sir» (decisione del signore, 24 ott)
+                aggiuntaInArrivo = true
+                dopoAspetta = .aspetta
+                Task { await avviaAscolto(silenzio: max(1.5, Dialogo.silenzioDopoAspetta - Jarvis.pausaFineFrase(resto))) }
+                return
+            }
             // «aspetta, ascoltami» e poi silenzio: l'orecchio ha già aspettato i 5 secondi (decisione del signore, 24 ott)
             miDica()
         } else {
@@ -1520,7 +1528,8 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// `bip`: il suono di ascolto solo quando il signore tocca il reattore; a voce si ascolta in silenzio, come una persona.
     /// `silenzio`: quanto aspettare che cominci a parlare (dopo «aspetta» meno: la pausa di fine frase è già passata).
-    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, dalNome: Bool = false, silenzio: Double = 5) async {
+    /// Nil: il solito (5 secondi sull'iPhone, 7 sul Mac, dove la frase si registra e si trascrive in cloud).
+    private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, dalNome: Bool = false, silenzio: Double? = nil) async {
         avviso = nil
         guard fase == .attesa else { return }
         guard await Jarvis.chiediPermessi() else {
@@ -1535,7 +1544,7 @@ final class Jarvis: NSObject, ObservableObject {
             liberoMacFinoA = .distantPast
             // chiamato per nome: gli ultimi 3 secondi già sentiti (dentro c'è «Jarvis» e l'inizio della domanda), presi solo adesso
             // che il richiamo è spento, così non si perde niente di ciò che ha detto nel frattempo
-            avviaAscoltoCloud(bip: bip, precarica: dalNome ? RegistroMicrofono.condiviso.ultimi(3) : [])
+            avviaAscoltoCloud(bip: bip, precarica: dalNome ? RegistroMicrofono.condiviso.ultimi(3) : [], attesa: silenzio)
             return
         }
         guard let riconoscitore, riconoscitore.isAvailable else {
@@ -1576,7 +1585,7 @@ final class Jarvis: NSObject, ObservableObject {
             compito = Jarvis.avviaRiconoscimento(riconoscitore, r) { [weak self] testo, finale, errore in
                 Task { @MainActor [weak self] in self?.aggiorna(testo: testo, finale: finale, errore: errore, ascolto: mio) }
             }
-            armaSilenzio(secondi: silenzio)   // tempo per iniziare a parlare
+            armaSilenzio(secondi: silenzio ?? 5)   // tempo per iniziare a parlare
         } catch {
             fermaAscolto(invia: false)
             if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }
@@ -1636,7 +1645,8 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// Registra la frase; quando il signore ha finito (o tocca il reattore) la trascrive in cloud e la manda come sull'iPhone.
-    private func avviaAscoltoCloud(bip: Bool, precarica: [Float]) {
+    /// `attesa`: quanto aspettare che cominci a parlare (nil: i soliti 7 secondi; dopo «aspetta» meno).
+    private func avviaAscoltoCloud(bip: Bool, precarica: [Float], attesa: Double? = nil) {
         do {
             let sessione = AVAudioSession.sharedInstance()
             do {
@@ -1646,7 +1656,7 @@ final class Jarvis: NSObject, ObservableObject {
                 try sessione.setCategory(.playAndRecord, options: [.mixWithOthers])
             }
             try sessione.setActive(true, options: .notifyOthersOnDeactivation)
-            registratore.azzera()
+            registratore.azzera(attesa: attesa ?? 7)
             registratore.precarica(precarica)
             turnoAscolto += 1
             let mio = turnoAscolto
