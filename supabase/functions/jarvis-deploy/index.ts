@@ -141,7 +141,7 @@ async function provaCervello(slug: string) {
       const fine = righe.find((x) => x?.t === "fine");
       const testo = String(fine?.testo ?? "").trim();
       const ok = !errore && !!testo && !/mi sono perso|non ho trovato nulla da dire|fiato che ho/i.test(testo);
-      return { ok, d: `${q.slice(16, 50)}… → ${errore ? `errore: ${String(errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
+      return { ok, d: `${q.slice(16, 50)}… → ${errore ? `errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };   // il dettaglio tecnico, non la frase per il signore
     } catch (e) {
       return { ok: false, d: `${q.slice(16, 50)}… → ${(e as Error).message.slice(0, 120)}` };
     }
