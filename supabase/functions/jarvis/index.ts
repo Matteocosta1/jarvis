@@ -43,7 +43,7 @@ const SISTEMA = `Sei JARVIS, l'assistente personale di ${NOME} ("signore"), soci
 VOCE E STILE
 Parli italiano con il carattere del JARVIS di Tony Stark: flemma da maggiordomo britannico, calma imperturbabile anche quando le cose vanno storte, ironia asciutta e un filo di sarcasmo elegante (mai cattivo, mai servile, mai da comico). Dai del lei e chiami il signore «Sir», con naturalezza: in apertura o chiusura quando suona bene, non in ogni frase. Una battuta ben piazzata vale più di tre: l'ironia accompagna la risposta, non la sostituisce, e sparisce quando il signore è giù, preoccupato o parla di cose serie (confidente, salute, emergenze).
 Le risposte vengono LETTE AD ALTA VOCE: frasi brevi e naturali, niente markdown, niente elenchi, niente emoji, niente URL.
-PARLATO NATURALE, come una persona al telefono: la PRIMA frase è cortissima (3-8 parole) e dice già il punto, così la voce parte subito; poi frasi brevi da dire, non da leggere. Usa la punteggiatura per dare il ritmo del parlato: virgole per le pause brevi, punto per chiudere, «…» per una pausa di pensiero, il punto di domanda quando chiedi. Niente parentesi, sigle o simboli da leggere (scrivi «euro», «per cento», «circa»). Numeri detti come si dicono («le nove e mezza», «una quarantina di euro»). Non ripetere le parole del signore e non annunciare cosa stai per dire. Se il messaggio comincia con «(riprendo il discorso…» o «(aggiunta…», non dirlo e non commentarlo: rispondi naturalmente al pensiero completo. Se comincia con «(ti ho interrotto mentre rispondevi a…», il signore ti ha fermato a metà: non dirlo, non scusarti e non riprendere da dove eri rimasto; decidi tu come farebbe una persona. Se la frase nuova da sola non sta in piedi o si aggancia a quella di prima («e sabato?», «alle otto però», «anche il latte»), è il seguito: rispondi alla richiesta completa, tutto insieme. Se sta in piedi da sola ed è su un'altra cosa, è una domanda nuova: rispondi solo a quella.
+PARLATO NATURALE, come una persona al telefono: la PRIMA frase è cortissima (3-8 parole) e dice già il punto, così la voce parte subito; poi frasi brevi da dire, non da leggere. Usa la punteggiatura per dare il ritmo del parlato: virgole per le pause brevi, punto per chiudere, «…» per una pausa di pensiero, il punto di domanda quando chiedi. Niente parentesi, sigle o simboli da leggere (scrivi «euro», «per cento», «circa»). Numeri detti come si dicono («le nove e mezza», «una quarantina di euro»). Non ripetere le parole del signore e non annunciare cosa stai per dire. Le note tra parentesi tonde nei messaggi le aggiunge l'app: non leggerle, non citarle e non scriverle mai tu. Se il messaggio comincia con «(riprendo il discorso…» o «(aggiunta…», rispondi naturalmente al pensiero completo. Se comincia con «(ti ho interrotto mentre rispondevi a…», il signore ti ha fermato a metà: non dirlo e non scusarti; decidi tu come farebbe una persona. Se la frase nuova da sola non sta in piedi o si aggancia a quella di prima («e sabato?», «alle otto però», «anche il latte»), è il seguito: rispondi alla richiesta completa, tutto insieme. Se sta in piedi da sola ed è su un'altra cosa, è una domanda nuova: rispondi solo a quella, senza tornare sul discorso interrotto. In una tua risposta precedente, «(qui il signore mi ha interrotto…» segna il punto esatto in cui ti ha fermato: quello che c'è prima l'ha sentito, il resto no; «(il signore mi ha interrotto prima che cominciassi…» vuol dire che non ha sentito nulla. Se ti chiede di continuare («continua», «vai avanti», «dicevi?», «e poi?», «finisci pure»), riprendi esattamente da quel punto, senza ripetere né riassumere ciò che ha già sentito.
 LUNGHEZZA, regola ferrea (il signore ti trova spesso logorroico): la risposta normale è di UNA o DUE frasi. Comandi, conferme, meteo, orari, dati: una frase, massimo due. L'ironia e la flemma restano ma condensate in UNA battuta al massimo, mai tre, e mai una battuta se la risposta è già completa senza. Niente commenti sul contesto, niente riepiloghi di ciò che hai fatto, niente «se vuole posso anche…» a fine risposta. Ti allunghi SOLO quando la domanda chiede davvero una spiegazione o un ragionamento (perché, come funziona, cosa ne pensi, aiutami a decidere, il confidente, il diario): anche lì vai dritto, senza riempitivi, e ti fermi quando hai detto la cosa. La sostanza arriva nella prima frase, senza preamboli («Certo», «Allora», «Ottima domanda») e senza ripetere la domanda. Sull'Apple Watch ancora più breve: una frase, perché lo schermo e l'altoparlante sono piccoli.
 Se una scelta del signore è discutibile, glielo dici con garbo ma chiaramente.
 Il riconoscimento vocale storpia spesso «Discosizer» (es. «disco Size», «disco Cyber», «disco sizer»): intendi sempre Discosizer, la società e il nome delle serate.
@@ -2663,22 +2663,33 @@ function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphon
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
   // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
   // la frase oltre i 140 caratteri e ogni interruzione finiva su Opus, il più lento.
-  // le note dell'app stanno DAVANTI alla frase del signore: si tolgono solo loro (fino alla loro chiusura fissa)
+  // le note dell'app stanno DAVANTI alla frase del signore: si tolgono solo loro (fino alla loro chiusura fissa).
+  // 24 ott (revisione del dialogo): anche «(riprendo il discorso…)», che prima restava e mandava su Opus perfino un «sì»;
+  // si toglie prima della nota della foto, perché l'app la mette davanti a quella.
+  const dopoInterruzione = /^\s*\(ti ho interrotto mentre rispondevi a/i.test(testo);
   const t = testo
     .replace(/^\s*\(ti ho interrotto mentre rispondevi a[\s\S]*?senza riprendere la risposta interrotta\)\s*/i, "")
     .replace(/^\s*\(aggiunta alla mia richiesta precedente, considerala insieme a quella\)\s*/i, "")
+    .replace(/^\s*\(riprendo il discorso:[\s\S]*?rispondi solo a questo\)\s*/i, "")
     .replace(/^\s*\(il signore ha mandato una foto\)\s*/i, "")
     .trim().toLowerCase();
   // «\b» in JavaScript vale solo per le lettere senza accento: «sì» non lo passava mai. La fine della parola si guarda a mano.
-  const breve = /^(sì|si|no|va bene|d['’]accordo|certo|esatto|giusto|buongiorno|buonasera|salve|ehi|che giorno|che data|bravo|ottimo|a dopo|ci sentiamo|alla grande|tutto ok)(?=$|[\s,.!?;:])/;
-  const secco = t.length <= 30 && (!t.includes("?") || /^(che ore|che giorno|che data)/.test(t)) &&
-    (/^(pausa|stop|play|riprendi|avanti|indietro|prossim|alza|abbassa|volume|che ore|grazie|ok|perfetto|ciao|buonanotte)/.test(t) || breve.test(t));
+  // 24 ott: la frase deve essere TUTTA di cortesia («sì», «no grazie», «va bene, grazie Sir»): prima bastava l'inizio,
+  // e «no, chiama Matteo» o «grazie, ora spiegami il contratto» finivano sul modello rapido.
+  const cortesia = /^(sì|si|no|ok|okay|va bene|d['’]accordo|certo|esatto|giusto|grazie|perfetto|ciao|buonanotte|buongiorno|buonasera|salve|ehi|bravo|ottimo|a dopo|ci sentiamo|alla grande|tutto ok)(?:[\s,.!?;:]+(?:grazie|mille|sir|jarvis|pure|certo|perfetto|ok|ottimo|bravo|a dopo))*[\s,.!?;:]*$/;
+  const parole = t.split(/[\s,.!?;:]+/).filter(Boolean).length;
+  // musica e orario: comandi secchi di poche parole («alza il volume», «prossima canzone», «che ore sono?»).
+  // Dopo un'interruzione «avanti» vuol dire «continua il discorso»: lì serve il cervello vero.
+  const media = parole <= 3 && (/^(pausa|stop|play|avanti|indietro|prossim[a-z]*|alza|abbassa|volume|metti in pausa|riprendi la musica|riprendi la canzone)(?=$|[\s,.!?;:])/.test(t) || /^riprendi[\s,.!?;:]*$/.test(t));
+  const orario = /^(che ore sono|che ora è|che giorno è|che data è)(?: oggi| domani)?(?:[\s,.!?;:]+(?:sir|jarvis))*[\s,.!?;:]*$/.test(t);
+  const secco = t.length <= 30 && (cortesia.test(t) || (!dopoInterruzione && (media || orario)));
   if (secco && !conImmagine) return MODELLO_RAPIDO;
   // al polso conta la prontezza: risposte di una frase, il modello veloce basta e risponde in metà tempo
   if (dispositivo === "orologio" && MODELLO_RISERVA) return MODELLO_RISERVA;
   // a voce conta la prontezza: il cervello completo solo quando serve davvero (immagini, richieste lunghe, ragionamenti e lavoro sui dati)
+  // «conti\b»: i conti della serata, non «continua», «contiene», «continente» (24 ott: ogni «continua» finiva su Opus)
   const pesante = conImmagine || t.length > 140 ||
-    /\b(analizz|calcol|confront|ragion|spieg|scriv|prepar|riassum|traduc|progett|serat|conti|incass|spes|ricord|email|posta|briefing|profil|cucin|dieta|allenament|codice|script)/.test(t);
+    /\b(analizz|calcol|confront|ragion|spieg|scriv|prepar|riassum|traduc|progett|serat|conti\b|incass|spes|ricord|email|posta|briefing|profil|cucin|dieta|allenament|codice|script)/.test(t);
   if (!pesante && MODELLO_RISERVA && Deno.env.get("SEMPRE_OPUS") !== "1") return MODELLO_RISERVA;
   return MODELLO;
 }
@@ -2826,7 +2837,11 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
         if (e.delta?.stop_reason) stop = e.delta.stop_reason;
         if (e.usage?.output_tokens) uso.token_out = num(e.usage.output_tokens);
       } else if (e.type === "error") {
-        throw new Error(e.error?.message || "errore nello streaming");
+        // 24 ott: un «Overloaded» a metà flusso ma prima della prima parola vale come un errore prima di parlare:
+        // il signore non ha sentito niente, quindi si passa al modello di riserva invece di arrendersi
+        const err: any = new Error(`${e.error?.type ?? ""} ${e.error?.message || "errore nello streaming"}`.trim());
+        if (!primaParola) err.primaDiParlare = true;
+        throw err;
       }
     }
   }
@@ -3654,6 +3669,9 @@ Deno.serve(async (req) => {
     async start(ctrl) {
       const cod = new TextEncoder();
       const invia = (o: unknown) => ctrl.enqueue(cod.encode(JSON.stringify(o) + "\n"));
+      // 24 ott: un segno di vita ogni 15 secondi mentre il cervello lavora in silenzio (ricerche lunghe, strumenti lenti):
+      // senza, dopo 120 secondi muti l'app crede la linea caduta e rifà tutta la richiesta. Le app ignorano «vivo».
+      const battito = setInterval(() => { try { invia({ t: "vivo" }); } catch { clearInterval(battito); } }, 15_000);
       try {
         let lavoro: any[], modello: string, azioni: string[], detto: string;
         if (corpo.continua) {
@@ -3674,7 +3692,7 @@ Deno.serve(async (req) => {
               ...(x.is_error ? { is_error: true } : {}),
             };
           });
-          if (!lavoro.length || !risultati.length) { invia({ t: "errore", d: "continuazione non valida" }); ctrl.close(); return; }
+          if (!lavoro.length || !risultati.length) { invia({ t: "errore", d: "Ho perso il filo del lavoro in corso, Sir. Me lo richieda, per favore." }); ctrl.close(); return; }
           if (!turno.foto) {   // una foto vista prima in questo stesso turno (occhi o foto del signore) resta disponibile per ricorda
             for (const m of [...lavoro].reverse()) {
               if (m?.role !== "user" || !Array.isArray(m.content)) continue;
@@ -3704,7 +3722,7 @@ Deno.serve(async (req) => {
           });
           if (fotoPrima.length) turno.foto = fotoPrima[0];   // anche «ricorda questo» può usare la foto di prima
           while (storia.length && storia[0].role !== "user") storia.shift();
-          if (!storia.length || storia.at(-1).role !== "user") { invia({ t: "errore", d: "manca il messaggio" }); ctrl.close(); return; }
+          if (!storia.length || storia.at(-1).role !== "user") { invia({ t: "errore", d: "Non mi è arrivata la domanda, Sir. Me la ripete?" }); ctrl.close(); return; }
           // il filo: le battute di questa finestra, così come le ha mandate l'app (senza contesto né foto)
           const battute: Battuta[] = scelti.map(({ m }) => ({ r: m.role, t: String(m.content).slice(0, 4000) }));
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
@@ -3793,10 +3811,20 @@ Deno.serve(async (req) => {
       } catch (e) {
         segnaEsito({ t: "errore" });
         const msg = (e as Error).message;
+        console.log(`errore del turno: ${msg.slice(0, 300)}`);
+        // 24 ott: al signore una frase in italiano da dire ad alta voce, mai il messaggio tecnico inglese
+        // («Overloaded», «rate_limit_error»…): quello resta nei log e nel campo «tecnico» (per jarvis-deploy)
         const finito = /credit balance|billing|purchase credits/i.test(msg);
-        try { invia({ t: "errore", d: finito ? "Sir, il credito Anthropic è finito: mi ricarichi dalla Console e torno subito al suo servizio." : `Un intoppo tecnico, signore: ${msg}` }); } catch { /* linea già chiusa */ }
+        const frase = finito ? "Sir, il credito Anthropic è finito: mi ricarichi dalla Console e torno subito al suo servizio."
+          : /overloaded|529/i.test(msg) ? "I miei server sono sovraccarichi in questo momento, Sir. Me lo richieda tra qualche secondo."
+          : /rate.?limit|429/i.test(msg) ? "Troppe richieste tutte insieme, Sir: mi conceda qualche secondo e me lo richieda."
+          : /timed? ?out|timeout|aborted/i.test(msg) ? "Il mio cervello ci sta mettendo troppo, Sir. Riprovi tra un momento."
+          : "Ho avuto un intoppo tecnico, Sir. Riprovi tra un momento.";
+        try { invia({ t: "errore", d: frase, tecnico: msg.slice(0, 300) }); } catch { /* linea già chiusa */ }
+      } finally {
+        clearInterval(battito);
       }
-      ctrl.close();
+      try { ctrl.close(); } catch { /* già chiusa */ }
     },
   });
   return new Response(flusso, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache" } });
