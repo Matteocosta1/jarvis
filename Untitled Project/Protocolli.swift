@@ -37,7 +37,7 @@ final class Protocolli: ObservableObject {
         giro += 1
         let mio = giro
         inCorso = p
-        accesi[p] = []
+        // come nel mockup: le luci già verdi restano accese, le altre si accendono una alla volta (prima tornavano tutte grigie)
         Task {
             for passo in p.passi {
                 try? await Task.sleep(for: .milliseconds(320))
