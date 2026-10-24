@@ -429,6 +429,19 @@ function turnoContaminato(lavoro: any[]) {
 /// Ciò che il cervello sa del turno in corso: posizione dell'iPhone e ultima foto vista (occhi o foto del signore).
 type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; ip?: string };
 
+// Revisione 24 ott: uno strumento del cervello non tiene fermo il turno più di 90 secondi. Prima ci pensava il limite di 120 s
+// dell'app; con il segno di vita ({"t":"vivo"}) l'app aspetterebbe all'infinito un servizio esterno appeso (meteo, Discogs, web…).
+const STRUMENTO_MAX_MS = 90_000;
+async function eseguiConLimite(nome: string, i: Record<string, any>, turno: Turno) {
+  let timer: number | undefined;
+  const lavoro = esegui(nome, i, turno);
+  lavoro.catch(() => {});                          // se arriva tardi, il suo errore non deve restare senza padrone
+  const limite = new Promise<Record<string, string>>((ok) => {
+    timer = setTimeout(() => ok({ errore: `${nome} non ha risposto in ${STRUMENTO_MAX_MS / 1000} secondi: non so se ha finito (potrebbe aver agito lo stesso). Dillo al signore e non riprovare da solo.` }), STRUMENTO_MAX_MS);
+  });
+  try { return await Promise.race([lavoro, limite]); } finally { clearTimeout(timer); }
+}
+
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
     case "credito": return await credito(i);
@@ -3816,7 +3829,7 @@ Deno.serve(async (req) => {
             }
             if (client.has(b.name)) { richieste.push({ id: b.id, name: b.name, input: b.input ?? {} }); continue; }
             if (STATI[b.name]) invia({ t: "stato", d: STATI[b.name] });
-            let out: any; try { out = await esegui(b.name, b.input ?? {}, turno); } catch (e) { out = { errore: (e as Error).message }; }
+            let out: any; try { out = await eseguiConLimite(b.name, b.input ?? {}, turno); } catch (e) { out = { errore: (e as Error).message }; }
             if (out && Array.isArray(out.__immagini)) { invia({ t: "immagini", d: out.__immagini }); delete out.__immagini; }
             risultatiServer.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out).slice(0, 12000) });
           }
