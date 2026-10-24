@@ -32,6 +32,11 @@ final class SentinellaOrologio: NSObject, ObservableObject {
     private var sveglia: WKExtendedRuntimeSession?
     private var lettore: AVAudioPlayer?
     private let voce = AVSpeechSynthesizer()
+    private var voceInArrivo = false              // la frase dell'allarme si sta scaricando (la sessione è già sua)
+
+    /// Decisione 37 (24 ott): la voce dell'allarme («Perimetro violato, Sir.») è la voce di JARVIS: mentre si scarica o si
+    /// sente, i suoni del polso non le cambiano la sessione audio (`SuoniOrologio`).
+    var parla: Bool { voceInArrivo || (lettore?.isPlaying ?? false) || voce.isSpeaking }
 
     // MARK: Dall'iPhone
 
@@ -68,6 +73,8 @@ final class SentinellaOrologio: NSObject, ObservableObject {
         }
         let frase = "Perimetro violato, Sir."
         Task { @MainActor in
+            voceInArrivo = true
+            defer { voceInArrivo = false }               // da qui in poi la voce suona (o non c'è): lo dicono lettore e sintesi
             let s = AVAudioSession.sharedInstance()
             try? s.setCategory(.playback, mode: .spokenAudio)
             try? s.setActive(true)

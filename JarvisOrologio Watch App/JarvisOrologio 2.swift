@@ -128,6 +128,35 @@ final class JarvisOrologio: NSObject, ObservableObject {
            let s = try? JSONDecoder().decode([[String: String]].self, from: d) { storia = s }
         if let ultima = storia.last, ultima["role"] == "assistant" { risposta = ultima["content"] ?? "" }
         if storia.count >= 2, let d = storia[storia.count - 2]["content"], storia[storia.count - 2]["role"] == "user" { domanda = d }
+        SuoniOrologio.jarvis = self                  // decisione 37: i suoni del polso sanno quando l'audio è di JARVIS
+        // Decisione 38b (24 ott), come sull'iPhone (Jarvis 2.swift, `audioInterrotto`): una telefonata, Siri, un allarme si
+        // prendono l'audio. Prima al polso nessuno lo sentiva: il lettore si fermava senza dire «finito» e JARVIS restava
+        // «parlo» per sempre (fino a un tocco), oppure l'ascolto restava aperto su un microfono muto.
+        NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] n in
+            let tipo = (n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            guard let tipo else { return }
+            Task { @MainActor [weak self] in self?.audioInterrotto(iniziato: tipo == .began) }
+        }
+    }
+
+    /// Decisione 38b: l'audio dell'orologio è stato preso da altro (telefonata, Siri, un allarme) o restituito. Come sull'iPhone:
+    /// mentre pensa o parla si ferma come se l'avesse interrotto il signore (poi «continua» o «dicevi?» riprende da lì);
+    /// mentre ascolta, l'ascolto si chiude senza mandare niente. A chiamata finita non c'è niente da riaccendere: al polso non
+    /// c'è il «Jarvis» in attesa dell'iPhone, e il prossimo tocco (o la complicazione) riapre l'audio da capo.
+    private func audioInterrotto(iniziato: Bool) {
+        guard iniziato else { return }
+        switch fase {
+        case .parlo, .elaboro:
+            segnaInterruzione()
+            ferma()                                      // anche Shazam, se stava ascoltando la musica (decisione 38c)
+        case .ascolto:
+            dopoAspetta = .no                            // come `fermaAscolto(invia: false)` dell'iPhone: niente «Mi dica, Sir» dopo
+            primaParte = nil                             // la frase di prima non parte con un'aggiunta che non c'è più
+            ferma()
+        case .attesa:
+            break
+        }
+        chiudiAggiunta(spegniAudio: false)               // anche il microfono dell'aggiunta: l'audio adesso è della telefonata
     }
 
     private func salvaStoria() {
@@ -617,7 +646,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     /// Le sezioni che al polso non ci sono (servono la fotocamera, il LiDAR o lo schermo dell'iPhone): `VistaOrologio.apri`
-    /// scrive «… vive sull'iPhone, Sir.» (il Trainer: «Trainer: questa sezione vive sull'iPhone, Sir.»), senza annuncio.
+    /// scrive «… vive sull'iPhone, Sir.» (il Trainer: «Trainer: questa sezione vive sull'iPhone, Sir.»), senza l'annuncio
+    /// d'apertura; la stessa frase JARVIS la dice anche a voce (decisione 36, `diciSeSoloIPhone`).
     private static func soloIPhone(_ r: Reparto) -> Bool {
         switch r {
         case .occhi, .giro, .profiler, .wiretap, .cucina, .scanner, .foto, .browser, .messaggi, .telefono, .lidar,
@@ -626,6 +656,24 @@ final class JarvisOrologio: NSObject, ObservableObject {
         default:
             return false
         }
+    }
+
+    /// Decisione 36 (24 ott): una sezione che vive sull'iPhone, chiesta al polso, si dice anche a voce, non solo scritta.
+    /// La frase è la stessa che `VistaOrologio.apri` scrive sotto il reattore. La chiama la schermata quando arriva la
+    /// richiesta (`repartoRichiesto`): vale per tutte le strade che la mandano («apri gli occhi», «modalità specchio»…).
+    /// Solo se JARVIS è libero: non parla sopra un ascolto o un'altra risposta.
+    func diciSeSoloIPhone(_ r: Reparto) {
+        guard JarvisOrologio.soloIPhone(r), fase == .attesa else { return }
+        parla(r == .allenatore ? "Trainer: questa sezione vive sull'iPhone, Sir."
+                               : "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir.")
+    }
+
+    /// Decisione 37 (24 ott): JARVIS sta usando l'audio per parlare o ascoltare, quindi la sessione è sua (.playAndRecord o
+    /// .playback): i suoni del polso (`SuoniOrologio`) in questi momenti non le cambiano categoria. Ascolto, voce (anche la
+    /// frase che si sta scaricando), l'aggiunta dei 2 secondi dopo la domanda, Shazam dentro una risposta, l'avviso
+    /// «la linea fa i capricci».
+    var usaAudio: Bool {
+        fase == .ascolto || fase == .parlo || aggiunta != nil || orecchioSospeso || fraseInVoce || sintesiInciso.isSpeaking
     }
 
     // MARK: Build 22: comandi a frase esatta
@@ -910,12 +958,32 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func fallisci(_ messaggio: String) {
         guard !Task.isCancelled else { return }   // fermato o sostituito da una nuova domanda: non tocca nulla
         inCorso = nil
-        if storia.last?["role"] == "user" { storia.removeLast() }   // la domanda senza risposta non resta in cronologia
         compito = nil
         stato = nil
-        risposta = messaggio
-        flussoAperto = false
-        parla(messaggio)
+        // Decisione 38a (24 ott), come sull'iPhone (`concludiConErrore`): l'errore arriva a risposta già cominciata. Il pezzo
+        // già arrivato resta a schermo e in cronologia con l'errore sotto; le frasi intere già in coda si dicono fino in fondo,
+        // la frase rimasta a metà no, e poi JARVIS dice l'errore. Prima `parla` zittiva tutto: il pezzo spariva sotto l'errore
+        // e JARVIS si interrompeva a metà frase.
+        let parziale = risposta.trimmingCharacters(in: .whitespacesAndNewlines)   // già senza i toni della voce
+        guard !parziale.isEmpty else {
+            if storia.last?["role"] == "user" { storia.removeLast() }   // la domanda senza risposta non resta in cronologia
+            risposta = messaggio
+            flussoAperto = false
+            parla(messaggio)
+            return
+        }
+        risposta = parziale + "\n\n" + messaggio
+        rispostaGrezza = ""
+        if storia.last?["role"] == "user" { storia.append(["role": "assistant", "content": risposta]) }
+        rispostaInStoria = false                       // un errore non è una risposta da completare (sull'iPhone idTurno = nil)
+        if giaParlato {
+            bufferFrase = ""                           // la frase rimasta a metà non si dice: si passa all'errore
+            accodaFrase(messaggio)                     // dopo le frasi già in coda, nella stessa voce a frasi (la coda la legge
+            flussoAperto = false                       // `leggiCoda`, che finita la coda torna in attesa come a fine risposta)
+        } else {
+            flussoAperto = false
+            parla(messaggio)                           // nessuna frase ancora partita: si dice solo l'errore
+        }
     }
 
     // MARK: Voce: prima quella di JARVIS dal cloud, se non arriva la voce dell'orologio
