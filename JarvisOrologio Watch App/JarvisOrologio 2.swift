@@ -365,6 +365,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             return
         }
         guard fase == .attesa, !micSpento else { return }   // microfono spento a mano: niente ascolto finché non ritocca
+        PosizioneOrologio.scalda()                          // difetto 5: il GPS si sveglia mentre il signore parla
         zittisci()
         chiudiAggiunta(spegniAudio: false)
         limiteInizio = limite
@@ -556,6 +557,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Il signore sta già parlando e il registratore lo sta già registrando dall'inizio della frase: si continua da lì
     /// come un ascolto normale (stesse pause), senza perdere le prime parole. `eco`: le parole di JARVIS finite nel file.
     private func continuaAscolto(_ r: AVAudioRecorder, eco: String? = nil) {
+        PosizioneOrologio.scalda()                       // difetto 5: il GPS si sveglia mentre il signore parla
         timerAscolto?.invalidate()
         registratore = r
         automatico = false

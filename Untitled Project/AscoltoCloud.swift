@@ -177,6 +177,12 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         get { lock.lock(); defer { lock.unlock() }; return avviso }
         set { lock.lock(); avviso = newValue; lock.unlock() }
     }
+    private var avvisoInizio: (@Sendable () -> Void)?
+    /// Difetto 5 (25 ott): qualcuno ha cominciato a parlare (chiamato dal thread audio): il GPS si può svegliare già adesso.
+    var quandoComincia: (@Sendable () -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return avvisoInizio }
+        set { lock.lock(); avvisoInizio = newValue; lock.unlock() }
+    }
 
     func azzera() {
         lock.lock()
@@ -195,6 +201,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         let secondi = Double(n) / fr
         let pezzo = RegistroMicrofono.a16k(Array(UnsafeBufferPointer(start: dati, count: n)), da: fr)
         var pronta: [Float]?
+        var cominciata = false
         lock.lock()
         ultimoLivello = energia
         ultimoBuffer = Date()
@@ -204,7 +211,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
             if prima.count > 6_400 { prima.removeFirst(prima.count - 6_400) }
             if energia > soglia {
                 voceDi += secondi
-                if voceDi >= 0.15 { inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0; inizio = Date().addingTimeInterval(-voceDi) }
+                if voceDi >= 0.15 { inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0; inizio = Date().addingTimeInterval(-voceDi); cominciata = true }
             } else {
                 voceDi = 0
                 fondo = fondo * 0.95 + energia * 0.05
@@ -225,7 +232,9 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         }
         let chiama = pronta != nil ? avviso : nil
         let quando = inizio
+        let comincia = cominciata ? avvisoInizio : nil
         lock.unlock()
+        comincia?()
         if let pronta, let chiama { chiama(RegistratoreVoce.creaWAV(pronta, hz: 16_000), quando) }
     }
 }
@@ -312,6 +321,8 @@ final class AttesaMac {
             segmenti.quandoFrase = { [weak self] audio, inizio in
                 Task { @MainActor [weak self] in self?.trascrivi(audio, inizio) }
             }
+            // difetto 5 (25 ott): la frase comincia, il GPS si sveglia mentre il signore parla (la domanda non lo aspetta)
+            segmenti.quandoComincia = { Task { @MainActor in Posizione.scalda() } }
             mani.azzera()
             segmenti.azzera()
             if motore.isRunning { motore.stop() }   // qui si arriva solo in attesa: l'ascolto vero è già chiuso

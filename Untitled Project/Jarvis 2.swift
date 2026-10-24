@@ -327,6 +327,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Il signore ha iniziato a parlare mentre JARVIS parlava: JARVIS tace all'istante e resta in ascolto
     /// (l'orecchio continua a raccogliere la frase e la consegna a `interrottoAVoce` quando è finita).
     private func zittisciPerAscolto() {
+        Posizione.scalda()                  // difetto 5: gli parla sopra, la frase nuova partirà fra poco: il GPS si sveglia ora
         segnaInterruzione()                 // prima di cambiare fase: serve per legare quello che sta per dire alla domanda di prima
         ascoltaDopo = false                 // gli ha parlato sopra («Mi dica, Sir», la domanda del diario): sta già ascoltando
         compitoPonte?.cancel()
@@ -563,6 +564,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
     private func richiamato() {
+        Posizione.scalda()                               // difetto 5: il GPS si sveglia mentre il signore dice la frase
         if fase == .elaboro {                            // stava pensando: lo fermo, come un'interruzione
             segnaInterruzione()
             interrompi()
@@ -1607,6 +1609,7 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
+        Posizione.scalda()                      // difetto 5: il GPS si sveglia mentre il signore parla, la domanda non lo aspetta
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         if Jarvis.usaAscoltoCloud {

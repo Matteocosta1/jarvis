@@ -31,6 +31,16 @@ enum PosizioneOrologio {
     static func dormi() {
         spegni?.cancel()
         gestore.stopUpdatingLocation()
+        ultimoScaldato = .distantPast
+    }
+
+    private static var ultimoScaldato = Date.distantPast
+    /// Difetto 5 (controllo del 25 ott), come sull'iPhone: JARVIS comincia ad ascoltare e il GPS si sveglia adesso, mentre il
+    /// signore parla, così la domanda non aspetta la posizione. Al massimo una volta ogni 30 secondi.
+    static func scalda() {
+        guard Date().timeIntervalSince(ultimoScaldato) > 30 else { return }
+        ultimoScaldato = Date()
+        risveglia()
     }
 
     /// Posizione recente (al massimo 3 minuti), oppure una nuova lettura aspettando al massimo 0,3 secondi.
