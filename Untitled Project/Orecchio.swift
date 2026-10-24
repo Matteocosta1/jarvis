@@ -26,6 +26,9 @@ final class Orecchio {
     private var ultimaLunghezza = 0
     private var ultimoParziale = Date.distantPast
     private var timerSilenzio: Timer?
+    private var timerTetto: Timer?      // come l'ascolto normale: al massimo un minuto di frase
+    /// «Che ore sono, Jarvis?»: quello che il signore ha detto prima del nome, nello stesso fiato (senza l'eco di JARVIS).
+    private var primaDelNome = ""
 
     private let motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
@@ -51,8 +54,11 @@ final class Orecchio {
         inPresa = false
         voceConfermata = false
         primaPresa = ""
+        primaDelNome = ""
         timerSilenzio?.invalidate()
         timerSilenzio = nil
+        timerTetto?.invalidate()
+        timerTetto = nil
         spegni()
     }
 
@@ -156,10 +162,16 @@ final class Orecchio {
                 // «Jarvis», «aspetta», «basta»…: JARVIS tace subito, ma io continuo ad ascoltare sullo stesso microfono
                 // dalla parola d'ordine in poi, così non si perde nulla e non serve riaprire l'ascolto (niente bip)
                 if let r = segmento.range(of: parola, options: [.caseInsensitive, .backwards]) {
+                    // M2: se la parola è il nome, quello che il signore ha detto subito prima («Che ore sono, Jarvis?») si tiene da
+                    // parte, senza l'eco di JARVIS in testa: se dopo il nome non aggiunge altro, la domanda è quella (prima si perdeva)
+                    if ["jarvis", "giarvis", "jervis"].contains(parola), !AmbienteSonoro.condiviso.affollato {   // con TV o folla no: «Thank you, Jarvis»
+                        primaDelNome = Orecchio.senzaEco(String(segmento[..<r.lowerBound]), detto: testoDetto)
+                    }
                     inizioSegmento = min(inizioSegmento + segmento.distance(from: segmento.startIndex, to: r.lowerBound), testo.count)
                     segmento = String(testo.dropFirst(inizioSegmento))
                 }
                 inPresa = true
+                avviaTetto()
                 zittisci?()
             }
             let parole = Orecchio.parole(segmento)
@@ -169,6 +181,9 @@ final class Orecchio {
                 let estranee = parole.filter { !mie.contains($0) }
                 // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
                 guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
+                // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
+                if OrologioInUso.attivo { if fine { riavvia() }; return }
                 if AmbienteSonoro.condiviso.affollato && !voceConfermata {
                     // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
                     // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
@@ -193,6 +208,7 @@ final class Orecchio {
                     return
                 }
                 inPresa = true
+                avviaTetto()
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
             // solo la frase del signore, senza l'eco di prima (più quanto detto prima di un'eventuale ripartenza)
@@ -200,11 +216,16 @@ final class Orecchio {
             // la frase è finita quando il signore tace (più a lungo se si è fermato a metà: «…e», «…perché»)
             timerSilenzio?.invalidate()
             // solo la parola d'ordine («Jarvis…»): gli lascio qualche secondo per dire cosa vuole
-            // («basta», «zitto», «stop» da soli: tace e basta, quindi aspetto poco)
+            // («basta», «zitto», «stop» da soli: tace e basta, quindi aspetto poco;
+            // «aspetta» da solo: 5 secondi, poi «Mi dica, Sir», deciso dal signore il 24 ott;
+            // «Che ore sono, Jarvis?»: la domanda c'è già, la pausa è quella della frase)
             let (pulito, chiede) = Jarvis.togliRichiamo(ultimoTesto)
             let basso = ultimoTesto.lowercased()
             let chiama = chiede || ["jarvi", "giarvi", "jervis", "ehi", "hey", "bro", "fratello"].contains(where: { basso.contains($0) })
-            let attesa = pulito.isEmpty ? (chiama ? 4.0 : 1.2) : Jarvis.pausaFineFrase(ultimoTesto)
+            let attesa: Double
+            if pulito.isEmpty, !chiede, !primaDelNome.isEmpty { attesa = Jarvis.pausaFineFrase(primaDelNome + " " + ultimoTesto) }
+            else if pulito.isEmpty { attesa = chiede ? Dialogo.silenzioDopoAspetta : (chiama ? 4.0 : 1.2) }
+            else { attesa = Jarvis.pausaFineFrase(ultimoTesto) }
             timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.consegna() }
             }
@@ -227,10 +248,37 @@ final class Orecchio {
     /// La frase del signore è completa: la passo a JARVIS.
     private func consegna() {
         guard inPresa else { return }
-        let testo = ultimoTesto.trimmingCharacters(in: .whitespacesAndNewlines)
+        var testo = ultimoTesto.trimmingCharacters(in: .whitespacesAndNewlines)
+        // «Che ore sono, Jarvis?»: dopo il nome niente, quindi la domanda è quella detta prima del nome (M2).
+        // «…Jarvis, basta» o «…Jarvis, apri il meteo» restano come sono: vale quello che viene dopo il nome.
+        let (pulito, chiede) = Jarvis.togliRichiamo(testo)
+        if pulito.isEmpty, !chiede, !primaDelNome.isEmpty, !Jarvis.eSoloSilenzio(testo) { testo = primaDelNome + " " + testo }
         primaPresa = ""
         ferma()
         interrotto?(testo)
+    }
+
+    /// Un minuto al massimo per la frase con cui il signore l'ha interrotto, come l'ascolto normale (prima nessun limite).
+    private func avviaTetto() {
+        timerTetto?.invalidate()
+        timerTetto = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.consegna() }
+        }
+    }
+
+    /// Le parole dette prima del nome, senza l'eco in testa: se cominciano con un pezzo (almeno due parole di fila) di quello
+    /// che JARVIS stava dicendo, quel pezzo è l'altoparlante e si toglie. Una parola sola che coincide resta: è più probabile
+    /// che sia del signore («che» in «Che ore sono, Jarvis?»).
+    nonisolated static func senzaEco(_ prima: String, detto: String) -> String {
+        let p = parole(prima), d = parole(detto)
+        var eco = 0
+        if p.count >= 2, d.count >= 2 {
+            for n in stride(from: p.count, through: 2, by: -1) where n <= d.count {
+                let pezzo = Array(p[0..<n])
+                if (0...(d.count - n)).contains(where: { Array(d[$0..<($0 + n)]) == pezzo }) { eco = n; break }
+            }
+        }
+        return Richiamo.dallaParola(eco, prima).trimmingCharacters(in: CharacterSet(charactersIn: " ,;:.!?"))
     }
 
     // MARK: Ponti fuori dal thread principale

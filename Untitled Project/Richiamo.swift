@@ -37,10 +37,17 @@ final class Richiamo {
     private var resto = ""
     /// Fino a quando basta parlare, senza «Jarvis»: subito dopo una richiesta il signore può aggiungere ancora qualcosa.
     var liberoFinoA = Date.distantPast
+    /// Fino a quando, finita una risposta, il seguito vale senza «Jarvis» («Perché?», «E domani?»). Come `liberoFinoA`,
+    /// ma non in mezzo alla folla: lì le voci degli altri non devono svegliarlo (revisione del dialogo, M6).
+    var seguitoFinoA = Date.distantPast
+    /// L'ultima volta che ha sentito parlare (anche frasi non per lui): JARVIS non attacca il riempitivo sopra il signore.
+    private(set) var ultimaVoce = Date.distantPast
     private var precedente = ""         // l'ultima trascrizione ricevuta
     private var prima = ""              // ciò che ha già detto dopo il richiamo, prima che il riconoscimento ripartisse da capo
     private var soloDopoNome = true      // vero: conta ciò che segue «Jarvis»; falso: conta tutta la frase (seguito senza nome)
     private var corrente = ""
+    /// «Che ore sono, Jarvis?»: la frase intera col nome in fondo; vale se dopo il nome il signore non aggiunge altro.
+    private var vocativo: String?
     private var voceConfermata = false     // in mezzo alla confusione: l'impronta ha riconosciuto il signore
     private var controlloInCorso = false
     private var inizioSegmento = 0       // da quale parola comincia l'ultima frase (dopo una pausa) nella trascrizione
@@ -73,6 +80,21 @@ final class Richiamo {
             return String(dopo).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
         }
         return nil
+    }
+
+    /// «Che ore sono, Jarvis?»: il nome in fondo, detto come si chiama una persona. Vero se prima del nome c'è una frase vera
+    /// (non solo «senti», «ehi», «ok») e il nome non è dentro un discorso («chiedilo a Jarvis», «io e Jarvis»).
+    /// Revisione del dialogo (24 ott, come M2 per l'orecchio): prima restava solo quello che veniva DOPO il nome, cioè niente,
+    /// e la domanda si perdeva dopo 5 secondi di attesa.
+    nonisolated static func nomeInFondo(_ segmento: String) -> Bool {
+        let parole = segmento.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
+        guard parole.count >= 2, let ultima = parole.last, nomi.contains(where: { ultima.hasPrefix($0) }) else { return false }
+        let prima = parole.dropLast()
+        let legate: Set<String> = ["a", "ad", "di", "da", "con", "su", "per", "tra", "fra", "il", "al", "del", "dal", "col", "sul", "che", "e", "o", "come"]
+        guard let precedente = prima.last, !legate.contains(precedente) else { return false }
+        let soloRichiami: Set<String> = ["senti", "ascolta", "ascoltami", "ehi", "hey", "ei", "ok", "okay", "scusa", "allora", "dai", "oh", "ciao",
+                                         "buongiorno", "buonasera", "no", "sì", "si", "aspetta", "bro", "fratello", "frate", "socio", "amico", "capo"]
+        return prima.contains(where: { p in !soloRichiami.contains(p) && !nomi.contains(where: { p.hasPrefix($0) }) })
     }
 
     var attivo: Bool { voluto }
@@ -172,6 +194,7 @@ final class Richiamo {
         precedente = ""
         prima = ""
         corrente = ""
+        vocativo = nil
         soloDopoNome = true
     }
 
@@ -257,6 +280,7 @@ final class Richiamo {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
             let adesso = Date()
+            ultimaVoce = adesso
             let pausa = adesso.timeIntervalSince(ultimoParziale)
             let ripartito = Richiamo.pezzoNuovo(precedente: precedente, nuovo: testo, pausa: pausa)
             precedente = testo
@@ -270,16 +294,20 @@ final class Richiamo {
                 let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 var trovato = Richiamo.dopoRichiamo(segmento)
                 soloDopoNome = true
-                if trovato == nil {
+                vocativo = trovato?.isEmpty == true && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+                // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
+                // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)
+                if trovato == nil, !OrologioInUso.attivo {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
                     let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
                     let breve = parole.count == 1 && Richiamo.risposteBrevi.contains(String(parole[0]).lowercased())
                     // ascolto sempre aperto: qualsiasi frase del signore lo sveglia, non solo «Jarvis» (ma se intorno c'è folla,
                     // musica o TV, solo «Jarvis» e le parole di richiamo; una parola isolata
                     // conta solo se è una risposta tipo «sì», «no», «grazie», così un rumore non lo accende);
-                    // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola
+                    // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola; così pure appena
+                    // finita una risposta («Perché?»), ma non in mezzo alla folla
                     let affollato = AmbienteSonoro.condiviso.affollato
-                    if !t.isEmpty, adesso < liberoFinoA || voceConfermata || Benvenuto.eFraseDiTony(t)
+                    if !t.isEmpty, adesso < liberoFinoA || (adesso < seguitoFinoA && !affollato) || voceConfermata || Benvenuto.eFraseDiTony(t)
                         || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
                     } else if !t.isEmpty, Impostazioni.ascoltoSempre, affollato, VoceDelSignore.attiva {
@@ -306,7 +334,8 @@ final class Richiamo {
                 ultimoParziale = adesso
                 if ripartito {
                     // il riconoscimento è ripartito da capo: tengo ciò che aveva già detto e continuo ad aggiungere
-                    prima = resto
+                    prima = resto.isEmpty ? (vocativo ?? "") : resto
+                    vocativo = nil
                     corrente = ""
                     inizioSegmento = 0
                     soloDopoNome = false
@@ -314,14 +343,17 @@ final class Richiamo {
                 let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 if soloDopoNome {
                     if let dopo = Richiamo.dopoRichiamo(segmento) { corrente = dopo }
+                    // «Che ore sono, Jarvis?» e niente dopo il nome: vale la frase intera
+                    vocativo = corrente.isEmpty && prima.isEmpty && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
                 } else {
                     corrente = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,;:"))
                 }
             }
             resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
-            self.testo?(resto)
+            self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
             // solo «Jarvis»: gli lascio qualche secondo per iniziare la domanda; poi le solite pause
-            let attesa = resto.isEmpty ? 5.0 : Jarvis.pausaFineFrase(resto)
+            // («Che ore sono, Jarvis?»: la frase c'è già, la pausa è quella della frase)
+            let attesa = resto.isEmpty ? (vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0) : Jarvis.pausaFineFrase(resto)
             timerSilenzio?.invalidate()
             timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.chiudi() }
@@ -352,7 +384,8 @@ final class Richiamo {
     private func continuaDopoFine() {
         guard sveglio else { return }
         guard motore.isRunning, let riconoscitore else { chiudi(); return }
-        let detto = resto
+        let detto = resto.isEmpty ? (vocativo ?? "") : resto
+        vocativo = nil
         // il microfono non si ferma: cambio solo il trascrittore, e gli rileggo l'audio arrivato dopo la sua chiusura
         nuovoRiconoscimento(riconoscitore, recentiDa: condotto.ultimaFine)
         prima = detto
@@ -368,7 +401,7 @@ final class Richiamo {
     /// riprende subito a parlare («…e anche un'altra cosa») l'attacco non si perde. Se a JARVIS non servo, mi spegne lui.
     private func chiudi() {
         guard sveglio else { return }
-        let frase = resto
+        let frase = resto.isEmpty ? (vocativo ?? "") : resto
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
         if voluto, motore.isRunning, let riconoscitore {

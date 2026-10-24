@@ -4,6 +4,18 @@ import WatchConnectivity
 import CoreLocation
 import UIKit
 
+/// Decisione del signore (24 ott, M8): mentre usa l'orologio, l'iPhone per 10 secondi non risponde alle frasi senza «Jarvis».
+/// Prima rispondevano tutti e due, e l'iPhone sentiva perfino la voce dell'orologio e le rispondeva.
+/// L'orologio lo segnala quando ascolta, pensa o parla (ogni pochi secondi) e quando ha finito: i 10 secondi contano da lì.
+nonisolated enum OrologioInUso {
+    private static let lock = NSLock()
+    private nonisolated(unsafe) static var fino = Date.distantPast
+    static let durata: TimeInterval = 10
+
+    static func segnala() { lock.lock(); fino = Date().addingTimeInterval(durata); lock.unlock() }
+    static var attivo: Bool { lock.lock(); defer { lock.unlock() }; return Date() < fino }
+}
+
 /// Ponte verso l'Apple Watch: consegna all'orologio la parola d'ordine e l'indirizzo del cervello,
 /// cerca le foto per l'orologio e porta all'orologio gli allarmi e le immagini della Sentinella.
 /// Non legge altro dall'app: funziona anche quando iOS la sveglia in background su richiesta dell'orologio.
@@ -52,7 +64,13 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         invia()
     }
 
+    /// L'orologio avvisa che il signore lo sta usando (ascolta, pensa o parla): vedi `OrologioInUso`.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if message["orologio"] != nil { OrologioInUso.segnala() }
+    }
+
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        if message["orologio"] != nil { OrologioInUso.segnala(); replyHandler([:]); return }
         // l'orologio parla con la Sentinella: «guarda ora», «disattiva», «a che punto sei»
         if let comando = message["sentinella"] as? String {
             PonteSentinella.ricevi(comando, rispondi: replyHandler)

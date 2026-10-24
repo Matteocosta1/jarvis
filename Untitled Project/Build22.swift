@@ -73,6 +73,139 @@ nonisolated enum TagVoce {
     }
 }
 
+// MARK: - Il dialogo: le regole in comune tra iPhone e orologio (revisione del dialogo, 24 ott)
+
+nonisolated enum Dialogo {
+    /// La nota «ti ho interrotto mentre rispondevi a…» vale due minuti, poi sparisce (deciso dal signore, 24 ott):
+    /// passato quel tempo, quello che dice è una domanda nuova.
+    static let validitaInterruzione: TimeInterval = 120
+    /// «Aspetta» e poi silenzio: dopo 5 secondi JARVIS dice «Mi dica, Sir» e lo ascolta (deciso dal signore, 24 ott).
+    static let silenzioDopoAspetta: TimeInterval = 5
+    static let miDica = "Mi dica, Sir."
+    /// Subito dopo una domanda JARVIS ascolta ancora per 2 secondi un'aggiunta («…e anche domani»), senza «Jarvis»;
+    /// il riempitivo («Un attimo, Sir») parte solo dopo (deciso dal signore, 24 ott).
+    static let finestraAggiunta: TimeInterval = 2
+    /// Finita una risposta, per 4 secondi il seguito vale anche senza «Jarvis» («Perché?», «E domani?»), come tra due persone.
+    static let finestraSeguito: TimeInterval = 4
+
+    // MARK: Il punto dell'interruzione
+
+    /// La risposta interrotta come la rilegge il cervello nei turni dopo: quello che il signore ha sentito, la nota con il punto
+    /// esatto del taglio, poi il resto che non ha sentito. Così con «continua», «dicevi?» riprende da lì, senza ripetere.
+    /// `detto`: le frasi dette per intero prima dell'interruzione (vuoto: non aveva ancora cominciato a parlare).
+    /// Le note cominciano come le aspetta il cervello: «(qui il signore mi ha interrotto…» e «(il signore mi ha interrotto prima che cominciassi…».
+    static func rispostaInterrotta(_ testo: String, detto: String) -> String {
+        let tutto = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentito = TagVoce.togli(detto).trimmingCharacters(in: .whitespacesAndNewlines)
+        if sentito.isEmpty {
+            let nota = "(il signore mi ha interrotto prima che cominciassi a parlare: non ha sentito nulla)"
+            return tutto.isEmpty ? nota : "\(nota) \(tutto)"
+        }
+        let nota = "(qui il signore mi ha interrotto: il resto non l'ho detto)"
+        guard let k = taglio(tutto, dopo: sentito) else { return "\(sentito) \(nota)" }
+        let prima = tutto[..<k].trimmingCharacters(in: .whitespacesAndNewlines)
+        let resto = tutto[k...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return resto.isEmpty ? "\(prima) \(nota)" : "\(prima) \(nota) \(resto)"
+    }
+
+    /// Dove finisce, dentro `testo`, la parte già detta. Contano solo lettere e cifre: spazi, a capo e punteggiatura
+    /// possono cambiare fra le frasi dette una per una e il testo intero. Nil se il detto non è l'inizio del testo.
+    static func taglio(_ testo: String, dopo detto: String) -> String.Index? {
+        let voluti = detto.compactMap { c -> String? in c.isLetter || c.isNumber ? String(c).lowercased() : nil }
+        guard !voluti.isEmpty else { return nil }
+        var k = 0
+        var i = testo.startIndex
+        while i < testo.endIndex {
+            let c = testo[i]
+            i = testo.index(after: i)
+            guard c.isLetter || c.isNumber else { continue }
+            guard String(c).lowercased() == voluti[k] else { return nil }
+            k += 1
+            if k == voluti.count {
+                // la punteggiatura attaccata all'ultima parola detta («…domani piove.») resta con la parte detta
+                while i < testo.endIndex, !testo[i].isWhitespace, !testo[i].isLetter, !testo[i].isNumber { i = testo.index(after: i) }
+                return i
+            }
+        }
+        return nil
+    }
+
+    // MARK: L'eco sull'orologio
+
+    /// Orologio: la frase con cui il signore interrompe JARVIS è registrata dallo stesso microfono che sentiva la sua voce.
+    /// Toglie dall'inizio della trascrizione le parole di JARVIS (nell'ordine in cui le diceva): resta solo il signore.
+    static func togliEco(_ sentito: String, detto: String) -> String {
+        func norma(_ s: Substring) -> String {
+            s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+        }
+        let separa: (Character) -> Bool = { !$0.isLetter && !$0.isNumber && $0 != "'" }
+        let d = TagVoce.togli(detto).split(whereSeparator: separa).map(norma)
+        let s = sentito.split(whereSeparator: separa)
+        guard !d.isEmpty, !s.isEmpty else { return sentito }
+        var i = 0, j = 0, fine = 0
+        var saltata = false
+        while i < s.count, j < d.count {
+            if let k = d[j..<min(d.count, j + 4)].firstIndex(of: norma(s[i])) {
+                j = k + 1; i += 1; fine = i; saltata = false
+                continue
+            }
+            // una parola dell'eco capita male: la salto se quella dopo torna a combaciare
+            if !saltata, i + 1 < s.count, d[j..<min(d.count, j + 5)].contains(norma(s[i + 1])) { saltata = true; i += 1; continue }
+            break
+        }
+        guard fine > 0 else { return sentito }
+        guard fine < s.count else { return "" }
+        return String(sentito[s[fine].startIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: Sottovoce
+
+    enum CambioVoce: Equatable { case sottovoce, normale }
+
+    /// «Piano» / «sottovoce» (risponde sottovoce per 10 minuti) e «voce normale» (torna come prima): uguali su iPhone e orologio.
+    /// Restituisce la frase senza il comando e il cambio da fare (nil: nessun comando, la frase resta com'è).
+    /// Revisione del dialogo (24 ott): prima bastava «piano» fra le prime cinque parole (tre sull'orologio), e «qual è il piano
+    /// per stasera?» accendeva il sottovoce e perdeva la parola; «ma è una voce normale?» spariva come se fosse un ordine.
+    /// Ora «piano» vale in testa alla frase («piano, che ore sono», «Jarvis, piano…») o dopo «parla», «rispondi», «più»
+    /// («parla piano»); «sottovoce» dove stava già (fra le prime cinque parole); «voce normale» solo se non è dentro un discorso.
+    static func volume(_ frase: String) -> (resto: String, cambio: CambioVoce?) {
+        let parole = frase.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let p = parole.map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+        // «voce normale»: un ordine («Jarvis, voce normale», «torna alla voce normale»), non un discorso («ma è una voce normale?»)
+        if frase.count < 40 {
+            let unita = " " + p.joined(separator: " ") + " "
+            let discorso: Set<String> = ["è", "era", "sembra", "sembrava", "una", "un", "ha", "hai", "ho", "sei", "come", "che", "non",
+                                         "perché", "perche", "mai", "cosa", "quale"]
+            for ordine in ["voce normale", "parla normale", "alza la voce", "torna normale"] {
+                guard let r = unita.range(of: " " + ordine + " ") else { continue }
+                if !unita[..<r.lowerBound].split(separator: " ").contains(where: { discorso.contains(String($0)) }) { return ("", .normale) }
+            }
+        }
+        let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+        var inizio = 0                                   // la frase vera comincia dopo «Jarvis», «ehi», «ok»
+        while inizio < p.count, nomi.contains(where: { p[inizio].hasPrefix($0) }) || ["ehi", "hey", "ok", "okay"].contains(p[inizio]) { inizio += 1 }
+        let verbiVoce: Set<String> = ["parla", "parlami", "rispondi", "rispondimi"]
+        // «piano» seguito da queste parole è un nome o un avverbio, non l'ordine: «piano terra», «piano piano», «piano B»
+        let nonOrdine: Set<String> = ["piano", "terra", "terreno", "primo", "secondo", "terzo", "superiore", "inferiore", "di", "del", "della",
+                                      "dei", "delle", "per", "b", "a", "è", "e", "era", "sarà", "sara", "bar", "forte", "regolatore"]
+        for k in 0..<min(p.count, 5) where p[k] == "piano" || p[k] == "sottovoce" {
+            var togli: Set<Int> = [k]
+            var j = k - 1
+            if j >= 0, ["più", "piu"].contains(p[j]) { togli.insert(j); j -= 1 }          // «parla più piano»
+            let dopoVerbo = j >= 0 && verbiVoce.contains(p[j])
+            if dopoVerbo { togli.insert(j) }                                                 // «parla piano»: via anche «parla»
+            if p[k] == "piano" && !dopoVerbo && !togli.contains(k - 1) {
+                guard k == inizio else { continue }                                          // «qual è il piano per stasera?»
+                let chiuso = k + 1 == p.count || [",", ":", ";", "!", "."].contains(where: { parole[k].hasSuffix($0) })
+                if !chiuso, nonOrdine.contains(p[k + 1]) { continue }                       // «piano terra», «piano piano»
+            }
+            let resto = parole.enumerated().filter { !togli.contains($0.offset) }.map(\.element).joined(separator: " ")
+            return (resto.trimmingCharacters(in: CharacterSet(charactersIn: " ,.;:!")), .sottovoce)
+        }
+        return (frase, nil)
+    }
+}
+
 // MARK: - I comandi a frase esatta
 
 /// I protocolli alla Stark (la tendina PROTOCOLLI), deciso dal signore il 24 ott: solo le luci. «Avvia» le accende tutte,
