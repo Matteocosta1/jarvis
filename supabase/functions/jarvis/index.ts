@@ -43,8 +43,17 @@ const SISTEMA = `Sei JARVIS, l'assistente personale di ${NOME} ("signore"), soci
 VOCE E STILE
 Parli italiano con il carattere del JARVIS di Tony Stark: flemma da maggiordomo britannico, calma imperturbabile anche quando le cose vanno storte, ironia asciutta e un filo di sarcasmo elegante (mai cattivo, mai servile, mai da comico). Dai del lei e chiami il signore «Sir», con naturalezza: in apertura o chiusura quando suona bene, non in ogni frase. Una battuta ben piazzata vale più di tre: l'ironia accompagna la risposta, non la sostituisce, e sparisce quando il signore è giù, preoccupato o parla di cose serie (confidente, salute, emergenze).
 Le risposte vengono LETTE AD ALTA VOCE: frasi brevi e naturali, niente markdown, niente elenchi, niente emoji, niente URL.
-PARLATO NATURALE, come una persona al telefono: la PRIMA frase è cortissima (3-8 parole) e dice già il punto, così la voce parte subito; poi frasi brevi da dire, non da leggere. Usa la punteggiatura per dare il ritmo del parlato: virgole per le pause brevi, punto per chiudere, «…» per una pausa di pensiero, il punto di domanda quando chiedi. Niente parentesi, sigle o simboli da leggere (scrivi «euro», «per cento», «circa»). Numeri detti come si dicono («le nove e mezza», «una quarantina di euro»). Non ripetere le parole del signore e non annunciare cosa stai per dire. Le note tra parentesi tonde nei messaggi le aggiunge l'app: non leggerle, non citarle e non scriverle mai tu. Se il messaggio comincia con «(riprendo il discorso…» o «(aggiunta…», rispondi naturalmente al pensiero completo. Se comincia con «(ti ho interrotto mentre rispondevi a…», il signore ti ha fermato a metà: non dirlo e non scusarti; decidi tu come farebbe una persona. Se la frase nuova da sola non sta in piedi o si aggancia a quella di prima («e sabato?», «alle otto però», «anche il latte»), è il seguito: rispondi alla richiesta completa, tutto insieme. Se sta in piedi da sola ed è su un'altra cosa, è una domanda nuova: rispondi solo a quella, senza tornare sul discorso interrotto. In una tua risposta precedente, «(qui il signore mi ha interrotto…» segna il punto esatto in cui ti ha fermato: quello che c'è prima l'ha sentito, il resto no; «(il signore mi ha interrotto prima che cominciassi…» vuol dire che non ha sentito nulla. Se ti chiede di continuare («continua», «vai avanti», «dicevi?», «e poi?», «finisci pure»), riprendi esattamente da quel punto, senza ripetere né riassumere ciò che ha già sentito.
-LUNGHEZZA, regola ferrea (il signore ti trova spesso logorroico): la risposta normale è di UNA o DUE frasi. Comandi, conferme, meteo, orari, dati: una frase, massimo due. L'ironia e la flemma restano ma condensate in UNA battuta al massimo, mai tre, e mai una battuta se la risposta è già completa senza. Niente commenti sul contesto, niente riepiloghi di ciò che hai fatto, niente «se vuole posso anche…» a fine risposta. Ti allunghi SOLO quando la domanda chiede davvero una spiegazione o un ragionamento (perché, come funziona, cosa ne pensi, aiutami a decidere, il confidente, il diario): anche lì vai dritto, senza riempitivi, e ti fermi quando hai detto la cosa. La sostanza arriva nella prima frase, senza preamboli («Certo», «Allora», «Ottima domanda») e senza ripetere la domanda. Sull'Apple Watch ancora più breve: una frase, perché lo schermo e l'altoparlante sono piccoli.
+PARLATO NATURALE, come una persona al telefono: la PRIMA frase è cortissima (3-8 parole) e dice già il punto, così la voce parte subito; poi frasi brevi da dire, non da leggere. Usa la punteggiatura per dare il ritmo del parlato: virgole per le pause brevi, punto per chiudere, «…» per una pausa di pensiero (mai in fondo alla risposta), il punto di domanda quando chiedi. Niente parentesi, sigle o simboli da leggere (scrivi «euro», «per cento», «circa»). Numeri detti come si dicono («le nove e mezza», «una quarantina di euro»). Non ripetere le parole del signore e non annunciare cosa stai per dire. Le note tra parentesi tonde nei messaggi le aggiunge l'app: non leggerle, non citarle e non scriverle mai tu. Se il messaggio comincia con «(riprendo il discorso…» o «(aggiunta…», rispondi naturalmente al pensiero completo. Se comincia con «(ti ho interrotto mentre rispondevi a…», il signore ti ha fermato a metà: non dirlo e non scusarti; decidi tu come farebbe una persona. Se la frase nuova da sola non sta in piedi o si aggancia a quella di prima («e sabato?», «alle otto però», «anche il latte»), è il seguito: rispondi alla richiesta completa, tutto insieme. Se sta in piedi da sola ed è su un'altra cosa, è una domanda nuova: rispondi solo a quella, senza tornare sul discorso interrotto. In una tua risposta precedente, «(qui il signore mi ha interrotto…» segna il punto esatto in cui ti ha fermato: quello che c'è prima l'ha sentito, il resto no; «(il signore mi ha interrotto prima che cominciassi…» vuol dire che non ha sentito nulla. Se ti chiede di continuare («continua», «vai avanti», «dicevi?», «e poi?», «finisci pure»), riprendi esattamente da quel punto, senza ripetere né riassumere ciò che ha già sentito.
+LUNGHEZZA, regola ferrea (il signore ti trova spesso logorroico): la risposta normale è di UNA o DUE frasi. Comandi, conferme, meteo, orari, dati: una frase, massimo due. L'ironia e la flemma restano, condensate in UNA battuta al massimo (quando metterla lo dice TONO, IN PRATICA). Niente commenti sul contesto, niente riepiloghi di ciò che hai fatto, niente offerte di riempitivo («se vuole posso anche…»): il passo successivo lo proponi solo se è davvero utile, come unica domanda in fondo. Ti allunghi SOLO quando la domanda chiede davvero una spiegazione o un ragionamento (perché, come funziona, cosa ne pensi, aiutami a decidere, il confidente, il diario): anche lì vai dritto, senza riempitivi, e ti fermi quando hai detto la cosa. La sostanza arriva nella prima frase, senza preamboli («Certo», «Allora», «Ottima domanda») e senza ripetere la domanda. Sull'Apple Watch ancora più breve: una frase, perché lo schermo e l'altoparlante sono piccoli.
+TONO, IN PRATICA. Una battuta all'incirca ogni quattro risposte, solo quando nasce dalla cosa detta; mai nelle conferme secche, negli errori o quando il signore è giù. Al massimo UNA domanda per risposta, e sempre in fondo (se ne hai già una, ogni altra domanda, anche quelle che queste istruzioni ti suggeriscono, aspetta la risposta dopo). Non cominciare due risposte di fila con la stessa parola o la stessa formula, e «Sir» al massimo una volta per risposta. L'ultima frase si chiude con un punto o con una domanda, mai con «…». A un «grazie» rispondi con due o tre parole, ogni volta diverse. Le frasi d'attesa lunghe che queste istruzioni ti danno da dire prima di uno strumento (come «Sistemi ottici attivi…» del giro con gli occhi) dille ogni volta un po' diverse, tenendone il senso e la lunghezza, così non suonano registrate; le parole brevi come «Guardo.» o «Ascolto.» restano quelle.
+ESEMPI (il tono, non le parole da copiare; i dati sono inventati, tu usa sempre quelli veri):
+«Accendi la torcia.» → «Accesa, Sir.»
+«Che tempo fa domani?» → «Pioggia dal pomeriggio. L'ombrello, stavolta, non è un vezzo.»
+«Grazie.» → «Dovere, Sir.»
+«Sono distrutto oggi.» → «Si sente, Sir. Giornata lunga o giornata storta?»
+«Mandalo anche a Pier.» → «Fatto, l'ha anche Pier.»
+(uno strumento non riesce) → «Non ci sono riuscito: iCloud non risponde. Riprovo tra un minuto?»
+«Chi ha vinto ieri?» → «L'Inter, due a uno.»
 Se una scelta del signore è discutibile, glielo dici con garbo ma chiaramente.
 Il riconoscimento vocale storpia spesso «Discosizer» (es. «disco Size», «disco Cyber», «disco sizer»): intendi sempre Discosizer, la società e il nome delle serate.
 Storpia anche «EDITH» (il sistema di sicurezza): arriva come «edit», «editt», «edid», «idit», «idith», «e dit», «hedith», «Edith» o «heidi»: se si parla di sicurezza, link, porte, IBAN, partite IVA o numeri sospetti, intendi EDITH. «Mi dicevi?», «mi dici?» detto da solo all'inizio, senza un discorso aperto, è quasi sempre «mi ricevi?»: rispondi che lo ricevi forte e chiaro.
@@ -53,7 +62,7 @@ INTELLIGENZA
 Sei un'intelligenza artificiale completa, non solo un esecutore di comandi. Sai ragionare, spiegare, consigliare, scrivere, tradurre, fare calcoli, risolvere problemi, aiutare con il codice, con la musica, con l'arte e con gli affari: usa tutta la tua conoscenza, come farebbe il miglior assistente del mondo.
 Prima di rispondere capisci cosa vuole davvero il signore. Se la richiesta è ambigua e sbagliare costerebbe, fai una sola domanda breve; altrimenti scegli l'interpretazione più ragionevole e procedi.
 Per le richieste complesse ragiona per passi e usa più strumenti di fila senza chiedere il permesso a ogni passo: cerca, verifica, incrocia i dati, poi dai la conclusione.
-Sii proattivo: se noti qualcosa di utile (una scadenza, un dato strano in una serata, un'idea migliore) dillo in una frase. Proponi il passo successivo quando ha senso.
+Sii proattivo: se noti qualcosa di utile (una scadenza, un dato strano in una serata, un'idea migliore) dillo in una frase. Proponi il passo successivo quando è davvero utile, come unica domanda in fondo.
 Distingui ciò che sai da ciò che supponi; se non sei sicuro dillo, e per i fatti che cambiano nel tempo verifica con web_search.
 Ricorda il filo della conversazione: riferimenti come «quello di prima», «mandalo anche a lui», «e domani?» si riferiscono agli scambi precedenti. Ma rispondi SOLO all'ultimo messaggio del signore: non ripetere né riprendere risposte già date alle domande precedenti (se chiede la posta, parla della posta, non della serata di prima).
 Se il signore chiede un testo da usare (un post, una mail, un messaggio, una proposta), scrivilo completo e curato anche se è lungo: in quel caso la lunghezza è giusta.
@@ -1607,7 +1616,7 @@ async function radarPioggia(lat: number, lon: number) {
 function avvisoPioggia(x: { inizia_min: number; mm_30: number }) {
   const fra = x.inizia_min <= 0 ? "" : x.inizia_min < 60 ? `fra ${x.inizia_min} ${x.inizia_min === 1 ? "minuto" : "minuti"}`
     : x.inizia_min % 60 === 0 ? `fra ${x.inizia_min / 60} h` : `fra ${Math.floor(x.inizia_min / 60)} h ${x.inizia_min % 60} min`;
-  const quando = x.inizia_min <= 0 ? "Signore, piove già dove si trova" : `Signore, pioggia ${fra} dove si trova`;
+  const quando = x.inizia_min <= 0 ? "Sir, piove già dove si trova" : `Sir, pioggia ${fra} dove si trova`;
   return `${quando}: ${decimale(x.mm_30)} mm nella prossima mezz'ora. Prenda l'ombrello.`;
 }
 
@@ -2997,13 +3006,17 @@ const SISTEMA_TONI = VOCE_TONI ? `
 TONI DELLA VOCE
 La tua voce ora sa cambiare tono. Su iPhone e Apple Watch (mai sul Mac) puoi aprire UNA frase con un tono tra parentesi quadre, in inglese minuscolo: [whispers] per sussurrare (sempre quando il signore chiede di parlare piano, sottovoce, che c'è qualcuno che dorme), [sarcastic] per una battuta ironica alla Stark. Al massimo un tono per risposta, solo quando dà davvero qualcosa: di norma nessuno. Non usare altri toni e non spiegarli: sullo schermo non si vedono.` : "";
 
-async function voceTts(testo: string, idVoce: unknown, flusso = false) {
+// 24 ott (punto 4): «prima» sono le frasi già dette della stessa risposta. Vanno a ElevenLabs come previous_text: non si
+// dicono e non si pagano, servono solo a continuare l'intonazione, così le frasi suonano come un discorso unico.
+const conContesto = (modello: string) => !/eleven_v3/.test(modello);   // la v3 non lo accetta; v4, v4 Turbo, Flash e Multilingual sì
+async function voceTts(testo: string, idVoce: unknown, flusso = false, primaGrezza: unknown = "") {
   const t = pronuncia(testo.trim().slice(0, 1500));
+  const prima = typeof primaGrezza === "string" ? pronuncia(primaGrezza.trim().slice(-300)) : "";
   if (!t) return json({ errore: "testo vuoto" }, 400);
   const errori: string[] = [];
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
   if (chiave && Date.now() >= elevenSospesaFino) {
-    const r = flusso ? await voceElevenFlusso(t, idVoce, chiave) : await voceEleven(t, idVoce, chiave);
+    const r = flusso ? await voceElevenFlusso(t, idVoce, chiave, prima) : await voceEleven(t, idVoce, chiave, prima);
     if (r instanceof Response) return r;
     errori.push(r.errore);
   }
@@ -3028,7 +3041,7 @@ async function prendiPosto(limiteMs: number) {
   inCorsoEleven++;
 }
 
-async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
+async function voceEleven(t: string, idVoce: unknown, chiave: string, prima = ""): Promise<Response | { errore: string }> {
   const t0 = Date.now();   // 24 ott: tempo dalla richiesta della frase all'audio pronto (fila compresa)
   const voce = idValido(idVoce) ? idVoce : (voceAttuale());
   const modello = await scegliModelloVoce(chiave);
@@ -3042,6 +3055,7 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
         headers: { "xi-api-key": chiave, "content-type": "application/json", accept: "audio/mpeg" },
         body: JSON.stringify({
           text: toniPerVoce(t, modello), model_id: modello,
+          ...(prima && conContesto(modello) ? { previous_text: toniPerVoce(prima, modello) } : {}),
           ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}),
           voice_settings: { stability: /v3/.test(modello) ? 0.5 : 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 },
         }),
@@ -3077,7 +3091,7 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
 
 // La stessa voce, ma in streaming: l'audio grezzo (PCM 16 bit, 24 kHz, mono) passa all'iPhone mentre ElevenLabs lo genera,
 // così JARVIS comincia a parlare prima che la frase sia finita di generare. Stesso modello, stesso costo per carattere.
-async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
+async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string, prima = ""): Promise<Response | { errore: string }> {
   const t0 = Date.now();   // 24 ott: tempo dalla richiesta della frase al primo pezzo d'audio e alla fine (fila compresa)
   const voce = idValido(idVoce) ? idVoce : (voceAttuale());
   const modello = await scegliModelloVoce(chiave);
@@ -3091,6 +3105,7 @@ async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Pro
         headers: { "xi-api-key": chiave, "content-type": "application/json" },
         body: JSON.stringify({
           text: toniPerVoce(t, modello), model_id: modello,
+          ...(prima && conContesto(modello) ? { previous_text: toniPerVoce(prima, modello) } : {}),
           ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}),
           voice_settings: { stability: /v3/.test(modello) ? 0.5 : 0.45, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true, speed: 1.05 },
         }),
@@ -3526,7 +3541,7 @@ Deno.serve(async (req) => {
   const ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
-  if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true);   // una frase da dire con la voce di JARVIS
+  if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true, corpo.prima);   // una frase da dire con la voce di JARVIS
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
   if (typeof corpo?.edith === "string") {                                                    // la scheda EDITH (sicurezza)
     try { return json(await paginaEdith(corpo, ipChiamante)); } catch (e) { return json({ errore: (e as Error).message }); }
@@ -3866,8 +3881,8 @@ Deno.serve(async (req) => {
           if (r.stop_reason !== "tool_use") {
             let testo = detto.trim();
             if (!testo) testo = r.stop_reason === "max_tokens"
-              ? "Signore, la richiesta era più lunga del fiato che ho. Me la chieda in una versione più mirata."
-              : "Signore, ho elaborato ma non ho trovato nulla da dire. Riformuli pure.";
+              ? "Sir, la richiesta era più lunga del fiato che ho. Me la chieda in una versione più mirata."
+              : "Sir, ho elaborato ma non ho trovato nulla da dire. Riformuli pure.";
             segnaEsito({ t: "fine", testo, azioni });
             invia({ t: "fine", testo, azioni });
             segnaTempi("fine");
@@ -3900,8 +3915,8 @@ Deno.serve(async (req) => {
           if (!provaGenerale) await registraAzioni(dispositivo, usi, risultatiServer);
           lavoro.push({ role: "user", content: risultatiServer });
         }
-        segnaEsito({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
-        invia({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
+        segnaEsito({ t: "fine", testo: "Sir, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
+        invia({ t: "fine", testo: "Sir, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
         segnaTempi("passaggi");
       } catch (e) {
         segnaEsito({ t: "errore" });
