@@ -104,6 +104,33 @@ enum ErroreJarvis: LocalizedError {
     nonisolated var errorDescription: String? { "L'indirizzo nelle impostazioni non è valido." }
 }
 
+// MARK: - Idea D (25 ott): sul Mac la frase va al cervello come audio insieme alla richiesta della risposta
+
+/// Una frase del Mac partita col giro unico: l'audio, da dove viene, la nota che il cervello le mette davanti e la presa per
+/// chiudere la richiesta all'istante se la frase trascritta è un comando dell'app.
+@MainActor
+final class GiroUnicoMac {
+    enum Origine { case ascolto(turno: Int), stanza(inizio: Date) }
+    let audio: Data
+    let origine: Origine
+    let prefisso: String
+    let fine: Date
+    let presa = PresaRichiesta()
+    var gestito = false                   // «trascritto» già arrivato (un nuovo tentativo dopo la linea caduta lo ripete)
+    private var fatto: (() -> Void)?      // l'attesa del Mac può mandare la frase che aspettava
+
+    init(audio: Data, origine: Origine, prefisso: String, fine: Date, fatto: (() -> Void)?) {
+        self.audio = audio; self.origine = origine; self.prefisso = prefisso; self.fine = fine; self.fatto = fatto
+    }
+
+    /// La frase è passata (accettata o rimandata alla strada di prima): l'attesa può andare avanti. Una volta sola.
+    func libera() {
+        let f = fatto
+        fatto = nil
+        f?()
+    }
+}
+
 // MARK: - JARVIS
 
 @MainActor
@@ -156,6 +183,9 @@ final class Jarvis: NSObject, ObservableObject {
         a.applauso = { [weak self, weak a] in a?.segnaBattiti(); self?.applaudito() }
         a.diagnosi = { [weak self] riga in self?.diagnosiMac = riga }
         a.frase = { [weak self] testo, inizio, fine in self?.fraseSentitaMac(testo, inizio: inizio, fine: fine) ?? false }
+        a.giroUnico = { [weak self] audio, inizio, eco, fatto in   // idea D: la frase in un giro solo, se si può
+            self?.partiGiroUnico(audio, origine: .stanza(inizio: inizio), fine: eco.fine, fatto: fatto) ?? false
+        }
         return a
     }()
     /// Sul Mac, subito dopo una risposta: per qualche secondo si può continuare a parlare senza dire «Jarvis».
@@ -1176,8 +1206,10 @@ final class Jarvis: NSObject, ObservableObject {
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["sveglia": true])
         // il cervello dice anche qual è la voce predefinita: se cambia, le frasi in cache si rifanno con la voce nuova
         if let (d, _) = try? await URLSession.shared.data(for: req),
-           let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let voce = o["voce"] as? String, !voce.isEmpty {
-            UserDefaults.standard.set(voce, forKey: "vocePredefinitaCloud")
+           let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+            if let voce = o["voce"] as? String, !voce.isEmpty { UserDefaults.standard.set(voce, forKey: "vocePredefinitaCloud") }
+            // idea D (25 ott): il cervello sa ricevere la frase come audio insieme alla richiesta della risposta (Mac)
+            UserDefaults.standard.set(o["giro_unico"] as? Bool ?? false, forKey: "giroUnicoCervello")
         }
     }
 
@@ -1191,11 +1223,19 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Un turno di dialogo con il cervello (streaming + strumenti del telefono)
 
-    private enum Esito { case fine(String, [String]), client([String: Any]), errore(String), doppione }
+    /// `lascia` e `ripiega`: idea D, il giro unico si ferma dopo la trascrizione (frase da fare come prima, trascrizione fallita).
+    private enum Esito { case fine(String, [String]), client([String: Any]), errore(String), doppione, lascia(String), ripiega }
 
     private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], allegato: String? = nil,
-                       fotoStoria: (Int, [Data])? = nil, id: UUID, fineVoce: Date? = nil) async {
+                       fotoStoria: (Int, [Data])? = nil, id: UUID, fineVoce: Date? = nil, unico: GiroUnicoMac? = nil) async {
+        defer { unico?.libera() }          // idea D: l'attesa del Mac può mandare la frase dopo, qualunque cosa succeda qui
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi]
+        if let unico {
+            // idea D: la frase come audio; il cervello la trascrive, la mette dopo la cronologia con la nota e risponde
+            corpo["audio_domanda"] = unico.audio.base64EncodedString()
+            corpo["formato_audio"] = "wav"
+            corpo["prefisso_domanda"] = unico.prefisso
+        }
         if let fineVoce {
             // idea A: detta a voce (Opus risponde più svelto); idea B: se un altro dispositivo ha sentito la stessa frase,
             // il cervello fa rispondere uno solo e all'altro manda «doppione»
@@ -1216,7 +1256,7 @@ final class Jarvis: NSObject, ObservableObject {
         do {
             for _ in 0..<6 {
                 // ogni passo ha un suo numero: se la linea cade e si riprova, il cervello riconosce la stessa richiesta e non ripete le azioni
-                let esito = try await flussoConRitentativi(corpo, id: id, richiesta: UUID().uuidString)
+                let esito = try await flussoConRitentativi(corpo, id: id, richiesta: UUID().uuidString, unico: unico)
                 try Task.checkCancellation()
                 switch esito {
                 case .fine(let testo, let azioni):
@@ -1228,6 +1268,18 @@ final class Jarvis: NSObject, ObservableObject {
                     return
                 case .doppione:
                     concludiDoppione(id: id)        // idea B: risponde un altro dispositivo
+                    return
+                case .lascia(let testo):
+                    // idea D: la frase trascritta non è una domanda da mandare così (un comando, «muto», l'eco…): la richiesta è
+                    // già chiusa, e con il testo si fa esattamente come prima
+                    if let unico { await lasciaGiroUnico(unico, testo: testo, errore: nil) }
+                    return
+                case .ripiega:
+                    // idea D: il cervello non è riuscito a trascrivere: la trascrizione di prima, poi come prima
+                    if let unico {
+                        let (testo, errore) = await RegistratoreVoce.trascrivi(unico.audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
+                        await lasciaGiroUnico(unico, testo: testo ?? "", errore: errore)
+                    }
                     return
                 case .client(let e):
                     let richieste = e["richieste"] as? [[String: Any]] ?? []
@@ -1315,11 +1367,11 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Se la linea cade (o scade il tempo), riprova da sola fino a quattro volte (pause di 1, 2 e 4 secondi), con lo stesso
     /// numero di richiesta. Al secondo inciampo JARVIS lo dice a voce, così il signore non parla con un muro.
-    private func flussoConRitentativi(_ corpo: [String: Any], id: UUID, richiesta: String) async throws -> Esito {
+    private func flussoConRitentativi(_ corpo: [String: Any], id: UUID, richiesta: String, unico: GiroUnicoMac? = nil) async throws -> Esito {
         var tentativo = 0
         while true {
             do {
-                return try await flusso(corpo, id: id, richiesta: richiesta)
+                return try await flusso(corpo, id: id, richiesta: richiesta, unico: unico)
             } catch let e as URLError where Jarvis.lineaCaduta(e) && tentativo < 3 {
                 tentativo += 1
                 azzeraTesto(id)                       // quello arrivato a metà si butta: la risposta ricomincia intera
@@ -1342,7 +1394,7 @@ final class Jarvis: NSObject, ObservableObject {
         bufferVoce = ""
     }
 
-    private func flusso(_ corpo: [String: Any], id: UUID, richiesta: String) async throws -> Esito {
+    private func flusso(_ corpo: [String: Any], id: UUID, richiesta: String, unico: GiroUnicoMac? = nil) async throws -> Esito {
         guard let url = URL(string: Impostazioni.indirizzo) else { throw ErroreJarvis.indirizzo }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -1352,8 +1404,9 @@ final class Jarvis: NSObject, ObservableObject {
         req.setValue(richiesta, forHTTPHeaderField: "x-richiesta")
         req.httpBody = try JSONSerialization.data(withJSONObject: corpo)
 
-        let (righe, resp) = try await URLSession.shared.bytes(for: req)
+        let (righe, resp) = try await URLSession.shared.bytes(for: req, delegate: unico?.presa)
         let codice = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if let unico, !unico.gestito, codice != 200 { unico.presa.chiudi(); return .ripiega }   // idea D: la strada di prima
         if codice == 401 { return .errore("La parola d'ordine non coincide, Sir. La controlli nelle impostazioni.") }
         guard codice == 200 else { return .errore("Il mio cervello ha risposto con un errore (codice \(codice)).") }
 
@@ -1377,6 +1430,14 @@ final class Jarvis: NSObject, ObservableObject {
                 return .errore(e["d"] as? String ?? "Un intoppo tecnico, Sir.")
             case "doppione":
                 return .doppione
+            case "trascritto":
+                // idea D: la frase detta, trascritta dal cervello dentro questa stessa richiesta
+                guard let unico, !unico.gestito else { break }       // un nuovo tentativo dopo la linea caduta: già fatto
+                unico.gestito = true
+                let t = (e["d"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if t.isEmpty, e["errore"] != nil { unico.presa.chiudi(); return .ripiega }
+                guard accettaGiroUnico(unico, testo: t, id: id) else { unico.presa.chiudi(); return .lascia(t) }
+                unico.libera()                                        // accettata: l'attesa del Mac va avanti
             default:
                 break
             }
@@ -1401,6 +1462,130 @@ final class Jarvis: NSObject, ObservableObject {
         salva()
         stato = nil
         if inCoda.isEmpty, fase != .ascolto { fase = .attesa }   // se stava dicendo il riempitivo, lo finisce e poi torna in attesa
+    }
+
+    // MARK: Idea D (25 ott): sul Mac la frase in un giro solo
+
+    /// Fa partire la frase del Mac come audio dentro la richiesta della risposta. Falso: non si può (cervello di prima, una
+    /// foto in giro, Occhi o LiDAR aperti…) e si fa come prima, trascrizione e poi risposta.
+    private func partiGiroUnico(_ audio: Data, origine: GiroUnicoMac.Origine, fine: Date, fatto: (() -> Void)?) -> Bool {
+        guard Jarvis.usaAscoltoCloud, UserDefaults.standard.bool(forKey: "giroUnicoCervello"), !micSpento,
+              foto == nil, fotoGiro.isEmpty, allegato == nil, occhi == nil, !lidarAperto, !LidarAperta.aperta, !BrowserVoce.aperto,
+              ConfidenteAperto.domanda == nil, audio.count > 1_000 else { return false }
+        if case .stanza = origine { guard fase == .attesa else { return false } } else { guard fase == .elaboro else { return false } }
+        // la foto vista poco fa tornerebbe nella cronologia (foto_storia): lì la strada di prima, che la sa rimettere al suo posto
+        if idFotoRecente != nil, !fotoRecenti.isEmpty, Date().timeIntervalSince(quandoFotoRecenti) < 600 { return false }
+        // la nota che `invia` metterebbe davanti a una frase normale detta adesso: la mette il cervello, uguale
+        var m = Messaggio(ruolo: "user", testo: "")
+        if let q = interruzioneValida() { m.interruzione = q }
+        else if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < (aggiuntaInArrivo ? 300 : 60) { m.seguito = true }
+        // la cronologia che `invia` manderebbe, senza la domanda nuova (le ultime 19 più quella fanno le sue 20)
+        let storia: [[String: Any]] = messaggi.suffix(19).filter { !$0.testo.isEmpty }.map { ["role": $0.ruolo, "content": $0.testoPerCervello] }
+        let giro = GiroUnicoMac(audio: audio, origine: origine, prefisso: m.testoPerCervello, fine: fine, fatto: fatto)
+        let id = UUID()
+        compitoRete?.cancel()
+        compitoRete = Task { await self.turno(storia: storia, foto: nil, id: id, fineVoce: fine, unico: giro) }
+        return true
+    }
+
+    /// La frase che è arrivata con «trascritto» è una domanda normale, con la stessa nota che il cervello le ha messo davanti?
+    /// Allora si accoglie come farebbero `instrada` e `invia`, senza un'altra richiesta: la risposta sta già arrivando in questa.
+    private func accettaGiroUnico(_ giro: GiroUnicoMac, testo: String, id: UUID) -> Bool {
+        guard !testo.isEmpty, !micSpento, foto == nil, fotoGiro.isEmpty, allegato == nil else { return false }
+        var frase = testo
+        switch giro.origine {
+        case .ascolto(let t):
+            guard fase == .elaboro, !ascoltoCloud, turnoAscolto == t else { return false }
+        case .stanza:
+            // come `fraseSentitaMac` in attesa, senza fare niente: nessuna eco, folla, ordine di silenzio, interruttore, nome da solo
+            guard fase == .attesa else { return false }
+            if Date() > dettoMacFino { dettoMac = "" }
+            guard Dialogo.togliEcoAiBordi(testo, detto: dettoMac) == testo, !Jarvis.eEco(testo, detto: dettoMac) else { return false }
+            if AmbienteSonoro.condiviso.affollato {
+                let basso = testo.lowercased()
+                guard Richiamo.nomi.contains(where: { basso.contains($0) }) || Benvenuto.eFraseDiTony(testo) else { return false }
+            }
+            guard !Jarvis.eSoloSilenzio(testo) else { return false }
+            let conNome = Richiamo.dopoRichiamo(testo) != nil
+            let dopo = Richiamo.dopoRichiamo(testo) ?? testo
+            if !Impostazioni.ascoltoSempre, !conNome, !Benvenuto.eFraseDiTony(testo) {
+                guard Date() < liberoMacFinoA || Date() < richiamo.liberoFinoA else { return false }
+            }
+            guard !(conNome && dopo.isEmpty) else { return false }
+            frase = dopo
+        }
+        // come `eseguiComando` (nessun comando dell'app) e `instrada` (domanda nuova, interrotta o seguito)
+        guard !comandoLocale(frase), !frase.isEmpty, !Jarvis.eSoloSilenzio(frase) else { return false }
+        let (pulito, chiede) = Jarvis.togliRichiamo(frase)
+        guard !(chiede && pulito.isEmpty) else { return false }
+        let detta = pulito.isEmpty ? frase : pulito
+        let riprende = chiede || aggiuntaInArrivo
+        var m = Messaggio(ruolo: "user", testo: "")
+        let interrottoSu = interruzioneValida()
+        if let q = interrottoSu { m.interruzione = q }
+        else if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < (riprende ? 300 : 60) { m.seguito = true }
+        guard m.testoPerCervello == giro.prefisso else { return false }   // cambiata nel frattempo: la strada di prima
+        // accolta: quello che fanno `fraseSentitaMac`, `instrada` e `invia`, tranne la richiesta (è già questa)
+        if case .ascolto = giro.origine, stato == "Un attimo, Sir" { stato = nil }
+        liberoMacFinoA = .distantPast
+        avviso = nil
+        parziale = ""
+        fermaBenvenuto()
+        compitoPonte?.cancel()
+        rispostaInterrotta = nil
+        quandoInterrotto = nil
+        domandaInterrotta = nil
+        aggiuntaInArrivo = false
+        dopoAspetta = .no
+        ultimaFraseAVoce = detta
+        fraseAVoce = ""
+        fineFraseVoce = nil
+        m.testo = detta
+        messaggi.append(m)
+        messaggi.append(Messaggio(id: id, ruolo: "assistant", testo: ""))
+        idTurno = id
+        salva()
+        ultimoInvio = Date()
+        rispostaIniziata = false
+        frasiVoce = []
+        dettoRisposta = (id, "")
+        richiamo.liberoFinoA = Date().addingTimeInterval(Dialogo.finestraAggiunta)
+        richiamo.seguitoFinoA = .distantPast
+        bufferVoce = ""
+        fase = .elaboro
+        flussoFinito = false
+        if Date().timeIntervalSince(ultimoPonte) < 20 { compitoPonte?.cancel(); inizioTurno = Date() } else { armaPonte(id: id, testo: detta) }
+        return true
+    }
+
+    /// Idea D: la frase sarebbe un comando dell'app (`eseguiComandoLocale`)? Lo stesso riconoscimento, senza eseguire niente.
+    /// Nel dubbio vero: si fa come prima.
+    private func comandoLocale(_ frase: String) -> Bool {
+        if Dialogo.volume(frase).cambio != nil || Benvenuto.eFraseDiTony(frase) { return true }
+        if ComandoDedicato.riconosci(frase) != nil || ComandoOcchi.riconosci(frase) != nil || Storpiature.cerca(frase) != nil { return true }
+        if BrowserVoce.aperto || LidarAperta.aperta || lidarAperto { return true }
+        let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
+        return ComandoVocale.riconosci(frase, dentro: dentro) != nil
+    }
+
+    /// Idea D: la frase del giro unico si fa come prima, con il testo già trascritto (la richiesta è già chiusa).
+    private func lasciaGiroUnico(_ giro: GiroUnicoMac, testo grezzo: String, errore: String?) async {
+        let testo = grezzo.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch giro.origine {
+        case .ascolto(let t):
+            // come `chiudiAscoltoCloud` dopo la trascrizione
+            guard fase == .elaboro, !ascoltoCloud, turnoAscolto == t else { return }   // interrotto nel frattempo
+            if stato == "Un attimo, Sir" { stato = nil }
+            fase = .attesa
+            fineFraseVoce = giro.fine
+            guard !testo.isEmpty else { avviso = errore ?? "Non ho capito, Sir. Riprovi."; return }
+            if foto == nil, eseguiComando(testo) { return }
+            if foto == nil { await instrada(testo) } else { await invia(testo) }
+        case .stanza(let inizio):
+            // come l'attesa del Mac dopo la trascrizione
+            guard attesaMac.inAscolto, !testo.isEmpty else { return }
+            fraseSentitaMac(testo, inizio: inizio, fine: giro.fine)
+        }
     }
 
     /// Nella chat, la domanda che ha fatto aprire gli occhi prende l'icona 📷.
@@ -1862,6 +2047,9 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .elaboro
         Task { [weak self] in
             let audio = await Task.detached { registratore.wav() }.value      // il file si prepara fuori dal thread principale
+            // idea D: la frase va al cervello insieme alla richiesta della risposta (un giro solo), se il cervello lo sa fare
+            if let me = self, me.fase == .elaboro, !me.ascoltoCloud, me.turnoAscolto == turno,
+               me.partiGiroUnico(audio, origine: .ascolto(turno: turno), fine: fineVoce, fatto: nil) { return }
             let (testo, errore) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
             guard let self, self.fase == .elaboro, !self.ascoltoCloud, self.turnoAscolto == turno else { return }   // interrotto nel frattempo
             if self.stato == "Un attimo, Sir" { self.stato = nil }

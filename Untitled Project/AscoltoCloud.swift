@@ -391,6 +391,11 @@ nonisolated final class Segmentatore: @unchecked Sendable {
 @MainActor
 final class AttesaMac {
     var applauso: (() -> Void)?
+    /// Idea D (25 ott): prende la frase per mandarla al cervello come audio insieme alla richiesta della risposta (un giro solo).
+    /// Vero: presa; allora chiama l'ultimo argomento quando la frase è passata, e solo dopo parte quella che aspettava.
+    var giroUnico: ((Data, Date, EcoPezzo, @escaping () -> Void) -> Bool)?
+    /// Acceso (voluto): il Mac sta ascoltando la stanza.
+    var inAscolto: Bool { voluto }
     /// Il testo trascritto, il momento in cui il signore ha cominciato a dirlo e quello in cui ha smesso.
     /// Restituisce vero se era solo l'eco di JARVIS.
     var frase: ((String, Date, Date) -> Bool)?
@@ -537,6 +542,8 @@ final class AttesaMac {
         invii.append(adesso)
         inViaggio = true
         frasiMandate += 1
+        // idea D: senza la voce di JARVIS in mezzo, la frase va al cervello insieme alla richiesta della risposta
+        if !eco.candidato, let prendi = giroUnico, prendi(audio, inizio, eco, { [weak self] in self?.viaggioFinito() }) { return }
         Task { [weak self] in
             let (testo, errore) = await RegistratoreVoce.trascrivi(audio, token: Portachiavi.leggi(), indirizzo: Impostazioni.indirizzo)
             guard let self else { return }
@@ -553,6 +560,12 @@ final class AttesaMac {
             }
             if let coda = self.inCoda { self.inCoda = nil; self.trascrivi(coda.0, coda.1, coda.2) }
         }
+    }
+
+    /// Idea D: la frase del giro unico è passata: parte quella arrivata nel frattempo.
+    private func viaggioFinito() {
+        inViaggio = false
+        if let coda = inCoda { inCoda = nil; trascrivi(coda.0, coda.1, coda.2) }
     }
 
     nonisolated private static func collega(_ motore: AVAudioEngine, _ mani: BattitoMani, _ segmenti: Segmentatore) throws {
