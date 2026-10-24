@@ -56,10 +56,12 @@ final class GuidaPolso: ObservableObject {
         Task { @MainActor in condivisa.dati = g }
     }
 
-    /// Chiede all'iPhone lo stato attuale (all'apertura della schermata).
-    func aggiorna() async {
-        guard let r = await PonteOrologio.condiviso.guida(["guida": "stato"]) else { return }
+    /// Chiede all'iPhone lo stato attuale (all'apertura della schermata). Falso se l'iPhone non ha risposto.
+    @discardableResult
+    func aggiorna() async -> Bool {
+        guard let r = await PonteOrologio.condiviso.guida(["guida": "stato"]) else { return false }
         dati = r.guida
+        return true
     }
 
     /// Fa partire la guida sull'iPhone. nil se è partita, altrimenti il motivo.
@@ -89,6 +91,7 @@ struct VistaSatelliteOrologio: View {
     @State private var avviso: String?
     @State private var parte: String?            // la chiave del luogo per cui sta partendo la guida
     @State private var guida = false
+    @State private var azioneFatta = false       // «guidami allo studio»: una volta sola (tornando da GUIDA il compito riparte)
 
     var body: some View {
         SchermoPolso(titolo: "SATELLITE", pronto: caricato) {
@@ -114,9 +117,11 @@ struct VistaSatelliteOrologio: View {
         .task {
             if let o = await VistaVitalsOrologio.chiama(["ricordi": true]) { luoghi = LuogoSat.daRicordi(o) }
             caricato = true
-            if !luoghi.isEmpty { bussola.accendi() }
-            // a voce: «guidami allo studio» parte da solo (gli altri comandi di SATELLITE vivono sull'iPhone: qui la lista)
-            if case .guida(let nome)? = azione {
+            if !luoghi.isEmpty, !Task.isCancelled { bussola.accendi() }   // pagina già chiusa mentre arrivavano i luoghi: GPS spento
+            // a voce: «guidami allo studio» parte da solo (gli altri comandi di SATELLITE vivono sull'iPhone: qui la lista).
+            // Una volta sola: tornando da GUIDA (FINE) il compito della pagina riparte e prima rifaceva partire la guida.
+            if !azioneFatta, case .guida(let nome)? = azione {
+                azioneFatta = true
                 try? await Task.sleep(for: .seconds(1.3))          // come il mockup: prima la schermata, poi la guida
                 guard !Task.isCancelled else { return }
                 if let l = LuogoSat.trova(nome, in: luoghi) { await avvia(l) }

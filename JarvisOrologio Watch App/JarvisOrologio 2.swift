@@ -581,6 +581,17 @@ final class JarvisOrologio: NSObject, ObservableObject {
             // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…), prima di tutto il resto
             // «ricorda questo luogo» sul polso va al cervello: lo salva lui con la posizione dell'orologio
             if let d = ComandoDedicato.riconosci(testo), d != .salvaLuogo { dedicato(d); return }
+            // build 23: le frasi esatte degli Occhi alla Stark e dei modi di LiDAR vivono sull'iPhone (fotocamera, LiDAR):
+            // al polso la schermata scrive «… vive sull'iPhone, Sir.», come per «apri gli occhi»; prima andavano al cervello
+            if let r = JarvisOrologio.fraseDellIPhone(testo) {
+                compito = nil
+                WKInterfaceDevice.current().play(.click)
+                repartoRichiesto = r
+                daUnire = nil
+                inCorso = nil
+                fase = .attesa
+                return
+            }
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
             var comando = ComandoVocale.riconosci(testo)
             // i comandi rapidi che sull'orologio hanno la loro sezione: «scrivi il diario» → Diario, «ho bisogno di parlarti» → Confidente
@@ -652,7 +663,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .satellite(let a): polsoRichiesto = .satellite(a); reparto = .satellite  // build 23: SATELLITE; «guidami a…» fa partire la guida
         case .fermaGuida:                                                             // build 23: la guida vive sull'iPhone: si ferma lì
             Task { @MainActor in
-                await GuidaPolso.condivisa.aggiorna()                                 // lo stato vero, dall'iPhone
+                // lo stato vero, dall'iPhone; se l'iPhone non risponde la guida non si può fermare da qui: lo dice
+                // (prima diceva «Guida fermata, Sir.» anche se il messaggio non era arrivato e la guida continuava)
+                guard await GuidaPolso.condivisa.aggiorna() else { parla("L'iPhone non risponde, Sir: lo tenga vicino."); return }
                 let c_era = GuidaPolso.condivisa.dati != nil
                 GuidaPolso.condivisa.ferma()
                 parla(c_era ? "Guida fermata, Sir." : "Non c'è nessuna guida in corso, Sir.")
@@ -660,6 +673,21 @@ final class JarvisOrologio: NSObject, ObservableObject {
             return
         }
         if let a = reparto?.annuncio { parla(a) } else { fase = .attesa }
+    }
+
+    /// Build 23: «mostra le etichette», «scansione olografica», «aggancia il bersaglio», «cerca questo sul web»… (le stesse frasi
+    /// di `ComandoOcchi`, OcchiStark.swift, che è solo dell'iPhone) e i modi di LiDAR («metro laser», «mappa la stanza»…).
+    private static func fraseDellIPhone(_ frase: String) -> Reparto? {
+        var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
+            .split(separator: " ").map(String.init)
+        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
+        let occhi: Set<String> = ["mostra le etichette", "togli le etichette", "scansione olografica", "disattiva l ologramma",
+                                  "aggancia il bersaglio", "cerca questo sul web"]
+        if occhi.contains(t.joined(separator: " ")) { return .occhi }
+        if ComandoVocale.modoLidar(t) != nil { return .lidar }
+        return nil
     }
 
     nonisolated static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (String?, String?) {
