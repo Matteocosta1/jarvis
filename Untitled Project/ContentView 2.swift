@@ -505,7 +505,7 @@ struct ContentView: View {
         // solo cosa sente o cosa fa: i suggerimenti («tocchi il reattore…») qui non valgono, il reattore piccolo chiude la tastiera
         let frase: String = !jarvis.parziale.isEmpty ? jarvis.parziale : (jarvis.stato.map { "\($0)…" } ?? "")
         return VStack(spacing: 2) {
-            Text(jarvis.fase.rawValue)
+            Text(jarvis.etichettaFase)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .tracking(3)
                 .foregroundStyle(Color.ciano)
@@ -532,7 +532,7 @@ struct ContentView: View {
 
     private var suggerimento: String {
         switch jarvis.fase {
-        case .attesa: return "Tocchi il reattore e parli"
+        case .attesa: return jarvis.micSpento ? "Non ascolto nulla · tocchi il reattore per parlare" : "Tocchi il reattore e parli"
         case .ascolto: return "La ascolto, signore…"
         case .elaboro: return "Un momento…"
         case .parlo: return "Tocchi il reattore per interrompermi"
@@ -713,7 +713,7 @@ struct ContentView: View {
     /// Sotto il reattore: lo stato, la telemetria, la frase che sta dicendo (o il suggerimento) e gli avvisi.
     private var testiHUD: some View {
         VStack(spacing: 0) {
-            Text(jarvis.fase.rawValue)
+            Text(jarvis.etichettaFase)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .tracking(4)
                 .foregroundStyle(Color.ciano)

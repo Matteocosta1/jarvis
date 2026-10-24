@@ -104,6 +104,14 @@ final class Jarvis: NSObject, ObservableObject {
     /// La frase detta dentro Occhi o Cucina: parte con la foto scattata a voce.
     private var domandaOcchi: String?
     @Published var svuotaChiesto = false          // «Nuova conversazione» dalle Impostazioni: la schermata principale svuota la chat con l'animazione
+    /// 24 ott: il signore ha spento il microfono con un tocco sul reattore (in attesa). Finché non lo ritocca JARVIS non sente
+    /// nulla: niente «Jarvis», niente battiti, niente «Ascolto sempre», niente ascolto automatico. Riaprendo l'app riparte acceso.
+    @Published var micSpento = false {
+        didSet { if micSpento != oldValue { aggiornaRichiamo() } }
+    }
+    /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO».
+    var etichettaFase: String { fase == .attesa && micSpento ? "MICROFONO SPENTO" : fase.rawValue }
+
     @Published var fase: Fase = .attesa {
         didSet {
             guard fase != oldValue else { return }
@@ -297,11 +305,14 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
         switch fase {
-        case .attesa: Task { await avviaAscolto(bip: true) }
+        case .attesa:
+            // 24 ott: in attesa il tocco spegne il microfono; il tocco dopo lo riaccende e ascolta subito (come prima)
+            if micSpento { micSpento = false; Task { await avviaAscolto(bip: true) } } else { micSpento = true }
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
         case .parlo, .elaboro:
             segnaInterruzione()
+            micSpento = false               // ha toccato per parlare: il microfono si riaccende
             ascoltaDopo = false             // ascolta adesso: dopo la prossima risposta il microfono non si riapre da solo
             interrompi()                    // lo zittisce e ascolta subito
             Task { await avviaAscolto(bip: true) }
@@ -516,7 +527,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+        !inBenvenuto && !avvioInCorso && !micSpento && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
             && !(occhi != nil && fase == .elaboro)      // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
     }
 
@@ -524,7 +535,7 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
             // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
-            let serve = !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
+            let serve = !inBenvenuto && !avvioInCorso && !micSpento && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
                 && !(occhi != nil && fase == .elaboro)          // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
             guard serve else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
@@ -1475,7 +1486,7 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .parlo
         orecchio.testoDetto += " " + frase          // così l'orecchio riconosce la propria eco
         if Jarvis.usaAscoltoCloud { dettoMac += " " + frase; dettoMacFino = Date().addingTimeInterval(30) }
-        if conOrecchio, !orecchio.attivo { orecchio.avvia() }
+        if conOrecchio, !micSpento, !orecchio.attivo { orecchio.avvia() }   // microfono spento a mano: non ascolta nemmeno mentre parla
         if vocePerCloud {
             // solo le frasi della risposta portano il loro «prima» (le ultime due, fino a 300 caratteri); frasi ponte e annunci no
             var prima: String?
@@ -1582,7 +1593,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Nil: il solito (5 secondi sull'iPhone, 7 sul Mac, dove la frase si registra e si trascrive in cloud).
     private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, dalNome: Bool = false, silenzio: Double? = nil) async {
         avviso = nil
-        guard fase == .attesa else { return }
+        guard fase == .attesa, !micSpento else { return }      // microfono spento a mano: nessun ascolto finché non ritocca
         guard await Jarvis.chiediPermessi() else {
             avviso = "Servono microfono e riconoscimento vocale: li attivi in Impostazioni › Jarvis."
             return

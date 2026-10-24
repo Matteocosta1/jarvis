@@ -383,8 +383,8 @@ struct VistaOrologio: View {
 
                 barraRapida
 
-                if jarvis.fase == .attesa && jarvis.risposta.isEmpty && jarvis.stato == nil {
-                    Text("Tocchi il reattore e parli, Sir")
+                if jarvis.fase == .attesa && (jarvis.micSpento || (jarvis.risposta.isEmpty && jarvis.stato == nil)) {
+                    Text(jarvis.micSpento ? "MICROFONO SPENTO" : "Tocchi il reattore e parli, Sir")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

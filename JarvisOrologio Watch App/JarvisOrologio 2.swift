@@ -284,11 +284,17 @@ final class JarvisOrologio: NSObject, ObservableObject {
         rispostaInStoria = false
     }
 
+    /// 24 ott, come sull'iPhone: in attesa il tocco sul reattore spegne il microfono (niente ascolto da solo dopo le risposte);
+    /// il tocco dopo lo riaccende e ascolta subito. Riaprendo l'app riparte acceso.
+    @Published var micSpento = false
+
     func toccaReattore() {
         switch fase {
-        case .attesa: Task { await self.ascolta() }
+        case .attesa:
+            if micSpento { micSpento = false; Task { await self.ascolta() } } else { micSpento = true }
         case .ascolto: fermaEInvia()
         case .elaboro, .parlo:
+            micSpento = false
             segnaInterruzione()
             ferma()
             Task { await self.ascolta() }
@@ -298,6 +304,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Tocco sulla complicazione del quadrante: JARVIS si apre e ascolta subito.
     func ascoltaDaComplicazione() {
         guard fase == .attesa else { return }
+        micSpento = false                                    // tocco voluto sulla complicazione: il microfono si riaccende
         Task {
             try? await Task.sleep(for: .milliseconds(400))   // il tempo che l'app sia davvero in primo piano
             if fase == .attesa { await ascolta() }
@@ -328,7 +335,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             stato = "Mi serve il microfono, Sir: lo attivi in Impostazioni › Privacy e sicurezza › Microfono."
             return
         }
-        guard fase == .attesa else { return }
+        guard fase == .attesa, !micSpento else { return }   // microfono spento a mano: niente ascolto finché non ritocca
         zittisci()
         chiudiAggiunta(spegniAudio: false)
         limiteInizio = limite
