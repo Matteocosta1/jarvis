@@ -14,7 +14,9 @@ import WeatherKit
 @MainActor
 final class RichiestaSatellite: ObservableObject {
     static let condivisa = RichiestaSatellite()
-    @Published var azione: AzioneSatellite?
+    @Published var azione: AzioneSatellite? { didSet { quando = Date() } }
+    /// Quando è stata detta: una richiesta vecchia (la sezione non si è aperta) non parte più alla prossima apertura.
+    private(set) var quando = Date.distantPast
 }
 
 /// Le schede dei luoghi, come i tasti del mockup.
@@ -342,7 +344,9 @@ struct VistaSatellite: View {
     /// Come il mockup: prima la sezione, poi il volo sul luogo, poi JARVIS lo dice e si apre la schermata.
     private func eseguiVoce() async {
         guard let a = richiesta.azione else { return }
+        let fresca = Date().timeIntervalSince(richiesta.quando) < 15
         richiesta.azione = nil
+        guard fresca else { return }
         try? await Task.sleep(for: .seconds(1.3))
         if case .ricognizione(let via) = a {
             indirizzo = via
