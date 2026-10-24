@@ -626,7 +626,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .radar: polsoRichiesto = .radar; reparto = .meteo
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: polsoRichiesto = .organismo; reparto = .vitals   // direttamente l'Organismo, non l'elenco di Vitals
-        case .specchio, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
+        case .ologramma, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // il Trainer vive sull'iPhone: lo scrive la schermata
         case .satellite(let a): polsoRichiesto = .satellite(a); reparto = .satellite  // build 23: SATELLITE; «guidami a…» fa partire la guida
         case .fermaGuida:                                                             // build 23: la guida vive sull'iPhone: si ferma lì
             Task { @MainActor in

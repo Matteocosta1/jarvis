@@ -4,6 +4,8 @@ import AVFoundation
 import UIKit
 import ImageIO
 import UniformTypeIdentifiers
+import CoreVideo
+import CoreMedia
 
 /// Gli occhi di JARVIS: la fotocamera posteriore con un mirino da HUD.
 /// Automatico: si apre, aggancia e scatta da solo dopo poco più di un secondo («Jarvis, cosa sto guardando?»).
@@ -16,6 +18,10 @@ enum OcchiAperti {
     static var scatta: (() -> Bool)?
     static var giro: (() -> Bool)?        // «Jarvis, fai un giro»: come il tasto REC
     static var comando: ((ComandoVocale.AzioneScheda) -> Bool)?   // «girati», «zoom», «allarga», «zoom normale»
+    /// Build 23: «mostra le etichette», «scansione olografica», «aggancia il bersaglio», «cerca questo sul web»… (Occhi manuali aperti).
+    static var stark: ((ComandoOcchi) -> Bool)?
+    /// Build 23: la voce di JARVIS dagli Occhi («Ecco cosa ho trovato, Sir.»): la imposta Jarvis.
+    static var parla: ((String) -> Void)?
 }
 
 struct Occhiata: Identifiable {
@@ -25,6 +31,10 @@ struct Occhiata: Identifiable {
     var cucina = false
     /// Lo zoom con cui si aprono gli Occhi: «guarda da lontano» → 3×, «guarda tutta la stanza» → 0,5×.
     var zoom: CGFloat = 1
+    /// Build 23, aperti a voce: già con l'OLOGRAMMA, le ETICHETTE o il bersaglio agganciato (a mano si aprono sempre spenti).
+    var olo = false
+    var eti = false
+    var aggancia = false
 }
 
 struct Occhi: View {
@@ -34,6 +44,10 @@ struct Occhi: View {
     var cucina = false
     /// Lo zoom di partenza (lo sceglie JARVIS dalla richiesta a voce).
     var zoomIniziale: CGFloat = 1
+    /// Build 23: aperti a voce con «scansione olografica», «mostra le etichette», «aggancia il bersaglio».
+    var oloIniziale = false
+    var etiIniziale = false
+    var agganciaIniziale = false
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -62,6 +76,17 @@ struct Occhi: View {
     @AppStorage("cucinaModo") private var modoCucina = 0
     static let richiesteCucina = ["COSA CUCINO", "CHE PIATTO È", "VALORI"]
     private var tinta: Color { Color.ciano }
+    // BUILD 23 — gli Occhi alla Stark (solo gli Occhi manuali): riconoscimento, ologramma, CERCA
+    @StateObject private var stark = StatoOcchi()
+    @ObservedObject private var guida = GuidaCondivisa.condivisa
+    /// Un avviso di CERCA resta 2 secondi al posto dei conti.
+    @State private var avviso: String?
+    @State private var web: (id: UUID, nome: String, cosa: String, esito: CervelloOcchi.Esito?)?
+    /// I pezzi dell'interfaccia sopra la ripresa (i nomi piccoli non ci vanno sopra).
+    @State private var riservati: [String: CGRect] = [:]
+    /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
+    private var manualeStark: Bool { !automatico && !video && !cucina }
+    private var occupato: Bool { scattando || registrando }
 
     var body: some View {
         ZStack {
@@ -78,8 +103,19 @@ struct Occhi: View {
                         }
                         .onEnded { _ in zoomInizioPizzico = nil }
                 )
+                .onTapGesture(coordinateSpace: .global) { p in      // build 23: un tocco su un oggetto, JARVIS aggancia quello
+                    guard manualeStark, agganciato, !occupato else { return }
+                    stark.tocco(p)
+                }
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { stark.schermo = $0 }
                 .opacity(agganciato && !cambiando ? 1 : 0)
                 .animation(.easeOut(duration: 0.4), value: agganciato && !cambiando)
+            if !cucina {
+                // build 23: il riconoscimento (Occhi manuali) e la freccia della GUIDA di SATELLITE, se è in corso
+                RiconoscimentoHUD(stato: stark, manuale: manualeStark && agganciato && !cambiando, riservati: Array(riservati.values), guida: guida.stato)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
             MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
@@ -107,7 +143,7 @@ struct Occhi: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 14) {
-                HStack {
+                HStack(alignment: manualeStark ? .top : .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("J.A.R.V.I.S.")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -117,9 +153,15 @@ struct Occhi: View {
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .tracking(2)
                             .opacity(0.7)
+                        if manualeStark {
+                            // sotto OCCHI · MANUALE, piccolo, quello che vede (come i sistemi all'avvio)
+                            RigheOcchi(righe: righeInfo)
+                                .animation(.easeOut(duration: 0.35), value: righeInfo.map(\.chiave))
+                        }
                     }
                     .foregroundStyle(tinta)
                     .shadow(color: tinta.opacity(0.6), radius: 6)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["testa"] = $0 }
                     Spacer()
                     Button { Suoni.tocco(); chiudi([]) } label: {
                         Image(systemName: "xmark")
@@ -131,17 +173,20 @@ struct Occhi: View {
                             .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
                     }
                     .accessibilityLabel("Chiudi")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["chiudi"] = $0 }
                 }
                 Spacer()
-                Text(stato)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .tracking(3)
-                    .foregroundStyle(tinta)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Color.black.opacity(0.45))
-                    .clipShape(Capsule())
-                    .contentTransition(.opacity)
+                if !manualeStark {
+                    Text(stato)
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .tracking(3)
+                        .foregroundStyle(tinta)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.black.opacity(0.45))
+                        .clipShape(Capsule())
+                        .contentTransition(.opacity)
+                }
                 if cucina && !video && !registrando {
                     // cosa vuole sapere: si sceglie prima di scattare, e resta ricordato
                     HStack(spacing: 6) {
@@ -159,8 +204,27 @@ struct Occhi: View {
                         }
                     }
                 }
+                if manualeStark {
+                    // le tre icone sopra lo zoom: ETICHETTE, OLOGRAMMA (si accendono e si spengono), CERCA (il solo bersaglio)
+                    HStack(alignment: .top, spacing: 18) {
+                        TastoOcchi(tipo: .etichette, titolo: "ETICHETTE", acceso: stark.eti) {
+                            guard !occupato else { return }
+                            Suoni.tocco(); mettiEtichette(!stark.eti)
+                        }
+                        TastoOcchi(tipo: .ologramma, titolo: "OLOGRAMMA", acceso: stark.olo) {
+                            guard !occupato else { return }
+                            Suoni.tocco(); mettiOlogramma(!stark.olo)
+                        }
+                        TastoOcchi(tipo: .cerca, titolo: "CERCA", acceso: false) {
+                            guard !occupato else { return }
+                            Suoni.tocco(); cerca()
+                        }
+                    }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["icone"] = $0 }
+                }
                 if !video && !davanti && agganciato && (preselezioni.count > 1 || zoomMassimo > 1.05) {
                     selettoreZoom
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["zoom"] = $0 }
                 }
                 if !automatico && !video {
                     HStack(spacing: 34) {
@@ -200,14 +264,94 @@ struct Occhi: View {
                         .disabled(!agganciato || scattando || registrando)
                         .accessibilityLabel("Giro di cinque secondi")
                     }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["tasti"] = $0 }
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+
+            // CERCA: il foglio sale dal basso, la fotocamera resta viva sopra
+            if let w = web {
+                VStack {
+                    Spacer()
+                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito) { withAnimation(.easeOut(duration: 0.25)) { web = nil }; riservati["web"] = nil }
+                        .frame(maxHeight: stark.schermo.height * 0.56)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["web"] = $0 }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .id(w.id)
+            }
         }
         .statusBarHidden()
         .task { await prepara() }
-        .onDisappear { OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; motore.ferma() }
+        .onDisappear {
+            OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; OcchiAperti.stark = nil
+            stark.visore.imposta(attivo: false, olo: false, bersaglio: nil)
+            motore.ferma()
+        }
+    }
+
+    // MARK: Build 23 — riconoscimento, ologramma, CERCA
+
+    /// Le righe sotto OCCHI · MANUALE: l'aggancio, lo scatto, un avviso di CERCA, i conti; se no «INQUADRI E SCATTI».
+    private var righeInfo: [(chiave: String, testo: String)] {
+        if !agganciato || occupato { return [("s", stato)] }
+        if let avviso { return [("s", avviso)] }
+        if stark.eti || stark.olo, !stark.conti.isEmpty { return stark.conti }
+        return [("s", "INQUADRI E SCATTI")]
+    }
+
+    private func mettiOlogramma(_ v: Bool) {
+        stark.olo = v
+        if !stark.olo && !stark.eti { stark.spento() } else { stark.aggiorna() }
+    }
+
+    private func mettiEtichette(_ v: Bool) {
+        stark.eti = v
+        if !stark.olo && !stark.eti { stark.spento() } else { stark.aggiorna() }
+    }
+
+    /// Un avviso di CERCA al posto dei conti per 2 secondi.
+    private func avvisa(_ t: String) {
+        avviso = t
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            if avviso == t { avviso = nil }
+        }
+    }
+
+    /// CERCA: il solo bersaglio (quello col mirino pieno o toccato) va al cervello, che lo cerca sul web e risponde nel foglio,
+    /// con il riassunto e tre fonti. Le persone no (niente ricerca di volti).
+    private func cerca() {
+        guard let o = stark.obiettivo, stark.olo || stark.eti else {
+            avvisa(stark.olo || stark.eti ? "TOCCHI UN OGGETTO DA CERCARE" : "ACCENDA ETICHETTE O OLOGRAMMA")
+            return
+        }
+        if o.tipo == .persona {
+            avvisa("LE PERSONE NON LE CERCO")
+            OcchiAperti.parla?("Le persone non le cerco sul web, Sir.")
+            return
+        }
+        stark.blocca()                                          // il mirino resta su quello cercato
+        let titolo = stark.titolo(o) ?? ""
+        let cosa = titolo.isEmpty ? o.nome : titolo
+        let id = UUID()
+        withAnimation(.easeOut(duration: 0.3)) { web = (id: id, nome: o.nome, cosa: cosa, esito: nil) }
+        Suoni.schedaApre()
+        let visore = stark.visore, box = o.box, nome = o.nome
+        Task {
+            let foto = await Task.detached(priority: .userInitiated) { visore.ritaglio(box, lato: 768) }.value
+            let esito = await CervelloOcchi.cerca(nome: nome, cosa: cosa, immagine: foto)
+            guard web?.id == id, !chiuso else { return }
+            web?.esito = esito
+            switch esito {
+            case .trovato: Suoni.schedaPronta(); OcchiAperti.parla?("Ecco cosa ho trovato, Sir.")
+            case .persona: OcchiAperti.parla?("Le persone non le cerco sul web, Sir.")
+            case .errore: Suoni.errore()
+            }
+        }
     }
 
     // MARK: Lavoro
@@ -219,6 +363,11 @@ struct Occhi: View {
             try? await Task.sleep(for: .seconds(2.5))
             chiudi([])
             return
+        }
+        if manualeStark {
+            // build 23: i fotogrammi piccoli (come l'anteprima) vanno al riconoscimento, sulla coda della fotocamera
+            let visore = stark.visore
+            motore.fotogramma = { px, frontale, fuoco in visore.analizza(px, frontale: frontale, fuoco: fuoco) }
         }
         let pronto = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
             motore.avvia { ok in c.resume(returning: ok) }
@@ -275,6 +424,26 @@ struct Occhi: View {
                 guard agganciato, !scattando, !registrando, !chiuso, !cambiando else { return false }
                 Task { await giro() }
                 return true
+            }
+            if manualeStark {
+                // deciso dal signore (24 ott): all'apertura niente acceso; aperti a voce, acceso solo quello che chiede
+                stark.olo = oloIniziale
+                stark.eti = etiIniziale
+                stark.aggiorna()
+                OcchiAperti.stark = { c in                 // a voce: «mostra le etichette», «scansione olografica»…
+                    guard agganciato, !chiuso else { return false }
+                    switch c {
+                    case .etichette(let v): mettiEtichette(v)
+                    case .ologramma(let v): mettiOlogramma(v); if v { stark.aggancia() }
+                    case .aggancia: mettiOlogramma(true); stark.aggancia()
+                    case .cerca: cerca()
+                    }
+                    return true
+                }
+                if agganciaIniziale {
+                    try? await Task.sleep(for: .milliseconds(900))
+                    if !chiuso { stark.aggancia() }
+                }
             }
         }
     }
@@ -406,6 +575,8 @@ struct Occhi: View {
         OcchiAperti.scatta = nil
         OcchiAperti.giro = nil
         OcchiAperti.comando = nil
+        OcchiAperti.stark = nil
+        stark.visore.imposta(attivo: false, olo: false, bersaglio: nil)
         motore.ferma()
         fine(dati)
     }
@@ -513,10 +684,15 @@ struct AnteprimaOcchi: UIViewRepresentable {
 
 // MARK: - Motore della fotocamera (lavora su una coda sua, fuori dal thread principale)
 
-nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @unchecked Sendable {
+nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     let sessione = AVCaptureSession()
     private let uscita = AVCapturePhotoOutput()
     private let coda = DispatchQueue(label: "it.discosizer.jarvis.occhi")
+    /// Build 23: i fotogrammi per il riconoscimento degli Occhi manuali (piccoli come l'anteprima, BGRA, verticali, non specchiati),
+    /// su una coda loro. Nil (Profiler, Traccia): niente uscita video, la fotocamera è quella di sempre. Va impostato prima di `avvia`.
+    var fotogramma: (@Sendable (CVPixelBuffer, _ frontale: Bool, _ fuoco: Double) -> Void)?
+    private let video = AVCaptureVideoDataOutput()
+    private let codaVideo = DispatchQueue(label: "it.discosizer.jarvis.occhi.video")
     private var configurata = false
     private var consegna: (@Sendable (Data?) -> Void)?
     /// Quale fotocamera è montata: quella dietro (di solito) o quella davanti (selfie nel Profiler).
@@ -579,6 +755,21 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
                     guard self.sessione.canAddOutput(self.uscita) else { self.sessione.commitConfiguration(); pronto(false); return }
                     self.sessione.addOutput(self.uscita)
                 }
+                if self.fotogramma != nil {
+                    // build 23: l'uscita video per il riconoscimento (se non si può aggiungere, gli Occhi restano quelli di sempre)
+                    if !self.sessione.outputs.contains(self.video), self.sessione.canAddOutput(self.video) {
+                        self.video.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                        self.video.alwaysDiscardsLateVideoFrames = true
+                        self.video.automaticallyConfiguresOutputBufferDimensions = false
+                        self.video.deliversPreviewSizedOutputBuffers = true      // piccoli come l'anteprima: veloci per Vision
+                        self.video.setSampleBufferDelegate(self, queue: self.codaVideo)
+                        self.sessione.addOutput(self.video)
+                    }
+                    if let c = self.video.connection(with: .video) {
+                        if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }          // verticale, come lo schermo
+                        if c.isVideoMirroringSupported { c.automaticallyAdjustsVideoMirroring = false; c.isVideoMirrored = false }
+                    }
+                }
                 self.sessione.commitConfiguration()
                 self.montata = posizione
                 self.camera = cam
@@ -611,6 +802,19 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, @u
             if veloce { impostazioni.photoQualityPrioritization = .speed }
             self.uscita.capturePhoto(with: impostazioni, delegate: self)
         }
+    }
+
+    /// Build 23: un fotogramma per il riconoscimento, con la sua focale in pixel (campo visivo e zoom di adesso).
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let f = fotogramma, let px = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let porta = connection.inputPorts.first
+        let frontale = porta?.sourceDevicePosition == .front
+        let lato = max(CVPixelBufferGetWidth(px), CVPixelBufferGetHeight(px))
+        var fuoco = Ottica.fuoco(campo: 70, latoLungo: lato)
+        if let cam = (porta?.input as? AVCaptureDeviceInput)?.device {
+            fuoco = Ottica.fuoco(campo: Ottica.campo(cam), latoLungo: lato, zoom: cam.videoZoomFactor)
+        }
+        f(px, frontale, fuoco)
     }
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: (any Error)?) {

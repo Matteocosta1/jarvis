@@ -206,8 +206,8 @@ enum ComandoVocale: Equatable {
     /// I comandi dentro la Sentinella: gli stessi due tasti in alto.
     enum AzioneSentinella: Equatable { case registro, schermoNero }
     /// I comandi dentro l'Allenatore: i suoi tasti, più le domande sulla serie e la pausa.
-    enum AzioneAllenatore: Equatable { case fineSerie, azzera, ripetizioni, postura, camera, pausa, riprendi, conta(ParteConteggio) }
-    enum ParteConteggio: Equatable { case busto, mani, ginocchia, specchio }
+    enum AzioneAllenatore: Equatable { case fineSerie, azzera, ripetizioni, postura, camera, pausa, riprendi, pronto, conta(ParteConteggio) }
+    enum ParteConteggio: Equatable { case busto, mani, ginocchia, ologramma }
     /// I comandi dentro l'Interprete: i due tasti, la lingua, i turni, «ripeti».
     enum AzioneInterprete: Equatable { case ascoltaMe, ascoltaAltro, lingua(String), sceltaLingua, ripeti, turniAutomatici(Bool) }
     /// I comandi rapidi: la sezione si apre già al lavoro.
@@ -313,7 +313,8 @@ enum ComandoVocale: Equatable {
             if c(" fotocamera ") || c(" girati ") || c(" selfie ") || c(" camera ") { return .allenatore(.camera) }
             if c(" pausa ") || c(" aspetta un attimo ") { return .allenatore(.pausa) }
             if c(" riprendi ") || c(" ripartiamo ") || c(" continua ") || c(" riparti ") { return .allenatore(.riprendi) }
-            if c(" specchio ") { return .allenatore(.conta(.specchio)) }      // build 22: «Jarvis, specchio» dentro l'Allenatore
+            if c(" ologramma ") { return .allenatore(.conta(.ologramma)) }    // build 23: «Jarvis, modalità ologramma» dentro il Trainer
+            if c(" specchio ") { return .allenatore(.pronto) }                // «Jarvis, allenati allo specchio»: come il mockup, «Personal trainer pronto»
             if c(" conta ") || c(" conteggio ") {
                 if c(" mani ") || c(" braccia ") { return .allenatore(.conta(.mani)) }
                 if c(" ginocchia ") || c(" gambe ") { return .allenatore(.conta(.ginocchia)) }
