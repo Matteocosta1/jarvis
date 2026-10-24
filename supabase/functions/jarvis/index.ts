@@ -2726,8 +2726,10 @@ function pulisci(messaggi: any[]) {
 // ───────────────────────── Chiamata ad Anthropic in streaming ─────────────────────────
 const modelliAssenti = new Set<string>();   // modelli che l'account non ha: per questa istanza si saltano
 async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[], suTesto: (d: string) => void): Promise<any> {
-  // in ordine: il modello chiesto, poi le riserve; quelli che l'account non ha si saltano
-  const fila = [modelloChiesto, ...RISERVE.filter((m) => m !== modelloChiesto)].filter((m) => !modelliAssenti.has(m));
+  // in ordine: il modello chiesto, poi le riserve; quelli che l'account non ha si saltano.
+  // Revisione 24 ott: in fondo anche il modello principale. Quasi tutte le domande a voce vanno sulla riserva (Sonnet):
+  // se era proprio lei a essere sovraccarica, prima non c'era nessun altro da provare e il signore sentiva l'errore.
+  const fila = [...new Set([modelloChiesto, ...RISERVE, MODELLO])].filter((m) => !modelliAssenti.has(m));
   if (!fila.length) fila.push(RISERVE.at(-1) ?? modelloChiesto);
   let ultimoErrore: unknown;
   for (const modello of fila) {
