@@ -848,8 +848,9 @@ nonisolated final class CalcoloLidar: @unchecked Sendable {
 
     /// Prende i colori dell'immagine: per il terreno sulle celle vicine, per l'oggetto sui suoi vertici (solo se visibili: profondità).
     func colora(_ f: ARFrame, terreno: Bool) {
-        let immagine = f.capturedImage
-        let profondita = f.sceneDepth?.depthMap
+        // nonisolated(unsafe): le immagini della fotocamera passano alla coda di calcolo e non si toccano più qui (niente avvisi)
+        nonisolated(unsafe) let immagine = f.capturedImage
+        nonisolated(unsafe) let profondita = f.sceneDepth?.depthMap
         let T = f.camera.transform.inverse, K = f.camera.intrinsics, ris = f.camera.imageResolution
         let cam = f.camera.transform.columns.3
         coda.async {

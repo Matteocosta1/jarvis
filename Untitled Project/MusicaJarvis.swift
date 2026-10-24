@@ -577,7 +577,7 @@ struct VistaMusica: View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
     }
 
-    static func mmss(_ s: TimeInterval) -> String {
+    nonisolated static func mmss(_ s: TimeInterval) -> String {      // nonisolated: solo conti, si passa anche a .map
         let t = max(0, Int(s))
         return "\(t / 60):" + String(format: "%02d", t % 60)
     }
