@@ -2962,7 +2962,7 @@ function pulisci(messaggi: any[]) {
 const modelliAssenti = new Set<string>();   // modelli che l'account non ha: per questa istanza si saltano
 // Decisione 4 (24 ott): quando l'app chiude la linea (il signore ha interrotto) il cervello si ferma subito: nessun nuovo giro.
 const LINEA_CHIUSA = "linea chiusa dall'app: il signore ha interrotto";
-async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}, linea?: AbortSignal): Promise<any> {
+async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}, linea?: AbortSignal, voceRapida = false): Promise<any> {
   // in ordine: il modello chiesto, poi le riserve; quelli che l'account non ha si saltano.
   // Revisione 24 ott: in fondo anche il modello principale. Quasi tutte le domande a voce vanno sulla riserva (Sonnet):
   // se era proprio lei a essere sovraccarica, prima non c'era nessun altro da provare e il signore sentiva l'errore.
@@ -2972,7 +2972,7 @@ async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[
   for (const modello of fila) {
     if (linea?.aborted) throw new Error(LINEA_CHIUSA);   // decisione 4: dopo l'interruzione nemmeno il modello di riserva parte
     try {
-      return await chiamaClaudeUnaVolta(messages, modello, tools, suTesto, suStacco, linea);
+      return await chiamaClaudeUnaVolta(messages, modello, tools, suTesto, suStacco, linea, voceRapida);
     } catch (e) {
       // modello non disponibile o sovraccarico prima di aver detto nulla: si prova il successivo
       const m = (e as Error).message;
@@ -3018,17 +3018,30 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
   }, (e) => console.log(`langfuse non raggiungibile: ${(e as Error).message}`)));
 }
 
-// v108: quanto ragiona ogni modello (output_config.effort). Fisso per modello: cambiarlo da una richiesta all'altra
-// invaliderebbe la cache. Sonnet di suo ragiona al massimo («high») anche per «che tempo fa?»: a voce basta «low».
-// Opus resta al suo valore normale («medium», quindi niente parametro). Si spegne con il segreto SFORZO=off.
+// v108: quanto ragiona ogni modello (output_config.effort). Sonnet di suo ragiona al massimo («high») anche per «che tempo fa?»:
+// a voce basta «low». Opus resta al suo valore normale («medium», quindi niente parametro). Si spegne con il segreto SFORZO=off.
+// La cache qui copre solo istruzioni e strumenti (cache_control sul system), non la conversazione: lo sforzo non la tocca.
+// Idea A (25 ott, approvata dal signore): i tempi veri del 24 ott danno Opus a 1,6-13,4 s prima della prima parola (Sonnet 1-2 s).
+// Quando il signore parla a voce (l'app manda «a_voce»), anche Opus ragiona «low»: la prima parola arriva prima. Per le richieste
+// da ragionamento vero (analisi, confronti, decisioni, conti, testi da scrivere, «spiegami bene»…) e per il Wiretap resta «medium».
+// Si spegne da solo con SFORZO=off, oppure solo per Opus con OPUS_VOCE_SFORZO=off.
 const senzaSforzo = new Set<string>();
-const sforzo = (modello: string) =>
-  Deno.env.get("SFORZO") === "off" || senzaSforzo.has(modello) ? null : /haiku|sonnet/i.test(modello) ? "low" : null;
+const sforzo = (modello: string, voceRapida = false) =>
+  Deno.env.get("SFORZO") === "off" || senzaSforzo.has(modello) ? null
+    : /haiku|sonnet/i.test(modello) ? "low"
+    : voceRapida && /opus/i.test(modello) && Deno.env.get("OPUS_VOCE_SFORZO") !== "off" ? "low" : null;
+/// Idea A: le richieste che meritano il ragionamento pieno anche a voce.
+const RAGIONAMENTO = /\b(analizz|confront|ragion|valut|decid|calcol|conti\b|serat|incass|bilanc|progett|strateg|pianific|codice|script|profil|scriv|prepar|propost|riassum|pro e contro|convien|nel dettaglio|nei dettagli|spiegami bene|spiegamelo bene)/;
+function voceRapida(corpo: any, ultimaDomanda: string) {
+  if (corpo?.a_voce !== true) return false;
+  if (typeof corpo.allegato === "string" && corpo.allegato.trim()) return false;   // Wiretap: un verbale da ragionare
+  return !RAGIONAMENTO.test(senzaNoteApp(ultimaDomanda).toLowerCase());
+}
 // Revisione 24 ott: con il segno di vita ({"t":"vivo"} ogni 15 s) l'app non si accorge più di un Anthropic muto
 // (prima ci pensava il suo limite di 120 s). Se per 90 secondi non arriva nemmeno un byte (Anthropic manda i suoi «ping»
 // anche mentre pensa o cerca sul web), la chiamata si chiude e il signore sente «Il mio cervello ci sta mettendo troppo».
 const SILENZIO_ANTHROPIC_MS = 90_000;
-async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}, linea?: AbortSignal) {
+async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}, linea?: AbortSignal, voceRapida = false) {
   if (linea?.aborted) throw new Error(LINEA_CHIUSA);
   const inizio = new Date();
   let primaParola: Date | null = null;
@@ -3054,7 +3067,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
     system: [{ type: "text", text: SISTEMA + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
-    ...(conSforzo && sforzo(modello) ? { output_config: { effort: sforzo(modello) } } : {}),
+    ...(conSforzo && sforzo(modello, voceRapida) ? { output_config: { effort: sforzo(modello, voceRapida) } } : {}),
   });
   const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -3063,7 +3076,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   });
   let r: Response;
   try { r = await conFreno(manda(true)); } catch (e) { fineAttese(); throw e; }
-  if (r.status === 400 && sforzo(modello)) {           // se un giorno il parametro non fosse accettato, si riprova senza e lo si ricorda
+  if (r.status === 400 && sforzo(modello, voceRapida)) {           // se un giorno il parametro non fosse accettato, si riprova senza e lo si ricorda
     const testo = await r.text().catch(() => "");
     if (/effort|output_config/i.test(testo)) {
       senzaSforzo.add(modello); console.log(`effort rifiutato da ${modello}: ${testo.slice(0, 160)}`);
@@ -4044,11 +4057,15 @@ Deno.serve(async (req) => {
       };
       try {
         let lavoro: any[], modello: string, azioni: string[], detto: string;
+        let rapida = false;   // idea A: Opus a voce con sforzo «low» (si porta dietro in tutto il turno, anche dopo gli strumenti del dispositivo)
         if (corpo.continua) {
           // ritorno dal dispositivo con i risultati dei suoi strumenti
           const c = corpo.continua;
           lavoro = Array.isArray(c.lavoro) ? c.lavoro : [];
-          modello = MODELLI.has(c.modello) ? c.modello : MODELLO;
+          // idea A: «modello|voce» è il segno che il turno andava a voce rapida (l'app rimanda il modello così com'era)
+          const [nomeModello, segno] = String(c.modello ?? "").split("|");
+          modello = MODELLI.has(nomeModello) ? nomeModello : MODELLO;
+          rapida = segno === "voce";
           azioni = Array.isArray(c.azioni) ? c.azioni.map(String) : [];
           detto = String(c.detto ?? "");
           const risultati = (Array.isArray(c.risultati) ? c.risultati : []).map((x: any) => {
@@ -4145,6 +4162,7 @@ Deno.serve(async (req) => {
           // decisione 53: «continua» dopo un'interruzione → lo stesso modello della risposta interrotta (con una foto mai il rapido)
           const ripresa = modelloDaRiprendere(scelti.map(({ m, i }) => ({ r: m.role, t: String(m.content), foto: fotoPrima.length > 0 && i === fs?.indice })), dispositivo);
           if (ripresa && !(ripresa === MODELLO_RAPIDO && conImmagine)) modello = ripresa;
+          rapida = voceRapida(corpo, ultimaDomanda);
           lavoro = storia; azioni = []; detto = "";
         }
 
@@ -4155,7 +4173,7 @@ Deno.serve(async (req) => {
           const r = await chiamaClaude(lavoro, modello, tools, (d) => { primaTurno ??= Date.now(); detto += d; invia({ t: "testo", d }); },
             // 24 ott: prima di uno strumento la frase già scritta («Un attimo, controllo.») chiude con uno spazio, così l'app la dice
             // subito invece di tenerla ferma fino alla risposta dello strumento (e non la incolla alla frase dopo)
-            () => { if (detto && !/\s$/.test(detto)) { detto += " "; invia({ t: "testo", d: " " }); } }, linea.signal);
+            () => { if (detto && !/\s$/.test(detto)) { detto += " "; invia({ t: "testo", d: " " }); } }, linea.signal, rapida);
           lavoro.push({ role: "assistant", content: r.content });
           for (const b of r.content) if ((b.type === "server_tool_use" || b.type === "tool_use") && NON_FIDATI.has(b.name)) contaminato = true;
           for (const b of r.content) if (b.type === "server_tool_use") { azioni.push(b.name); invia({ t: "stato", d: STATI[b.name] ?? b.name }); }
@@ -4198,7 +4216,7 @@ Deno.serve(async (req) => {
             // tocca al dispositivo: gli passo il lavoro (thinking firmati compresi) e i risultati già pronti
             segnaEsito({ t: "client" });
             segnaTempi("client");
-            invia({ t: "client", lavoro, richieste, risultati_server: risultatiServer.map((x) => ({ tool_use_id: x.tool_use_id, content: x.content })), modello, azioni, detto });
+            invia({ t: "client", lavoro, richieste, risultati_server: risultatiServer.map((x) => ({ tool_use_id: x.tool_use_id, content: x.content })), modello: rapida ? `${modello}|voce` : modello, azioni, detto });
             chiudi(); return;
           }
           if (!provaGenerale) await registraAzioni(dispositivo, usi, risultatiServer);
