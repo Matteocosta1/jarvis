@@ -631,7 +631,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .satellite(let a): polsoRichiesto = .satellite(a); reparto = .satellite  // build 23: SATELLITE; «guidami a…» fa partire la guida
         case .fermaGuida:                                                             // build 23: la guida vive sull'iPhone: si ferma lì
             Task { @MainActor in
-                await GuidaPolso.condivisa.aggiorna()                                 // lo stato vero, dall'iPhone
+                // lo stato vero, dall'iPhone; se l'iPhone non risponde la guida non si può fermare da qui: lo dice
+                // (prima diceva «Guida fermata, Sir.» anche se il messaggio non era arrivato e la guida continuava)
+                guard await GuidaPolso.condivisa.aggiorna() else { parla("L'iPhone non risponde, Sir: lo tenga vicino."); return }
                 let c_era = GuidaPolso.condivisa.dati != nil
                 GuidaPolso.condivisa.ferma()
                 parla(c_era ? "Guida fermata, Sir." : "Non c'è nessuna guida in corso, Sir.")
