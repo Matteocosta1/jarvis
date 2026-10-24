@@ -3210,6 +3210,9 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string, prima = ""
       await new Promise((ok) => setTimeout(ok, 300 + tentativo * 350 + Math.random() * 600));   // casuale: le frasi non ripartono tutte insieme
       continue;
     }
+    // 24 ott: se ElevenLabs rifiuta il testo di prima (previous_text), la frase si riprova subito senza: meglio una frase
+    // non legata che la voce dell'iPhone a metà risposta
+    if ((r.status === 400 || r.status === 422) && prima) { prima = ""; continue; }
     if (r.status === 400 || r.status === 422) modelloVoce = null; // modello non accettato: al prossimo giro si riprova la scelta
     // credito finito o chiave rifiutata: per 10 minuti si va dritti alla riserva, senza perdere tempo
     if ([401, 402, 403].includes(r.status) || /quota_exceeded|credits/i.test(d)) elevenSospesaFino = Date.now() + 10 * 60_000;
@@ -3272,6 +3275,9 @@ async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string, prim
       await new Promise((ok) => setTimeout(ok, 300 + tentativo * 350 + Math.random() * 600));
       continue;
     }
+    // 24 ott: se ElevenLabs rifiuta il testo di prima (previous_text), la frase si riprova subito senza: meglio una frase
+    // non legata che la voce dell'iPhone a metà risposta
+    if ((r.status === 400 || r.status === 422) && prima) { prima = ""; continue; }
     if (r.status === 400 || r.status === 422) modelloVoce = null;
     if ([401, 402, 403].includes(r.status) || /quota_exceeded|credits/i.test(d)) elevenSospesaFino = Date.now() + 10 * 60_000;
     break;

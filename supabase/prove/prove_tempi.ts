@@ -21,6 +21,7 @@ globalThis.fetch = (async (u: any, o?: any) => {
   if (url.includes("elevenlabs")) {
     if (url.includes("/models")) return new Response("[]", { status: 200 });
     (globalThis as any).__xi = JSON.parse(o.body);
+    if ((globalThis as any).__rifiuta && JSON.parse(o.body).previous_text) { (globalThis as any).__rifiutato = true; return new Response("previous_text too long", { status: 422 }); }
     return new Response(new ReadableStream({ async start(c) { await new Promise((r) => setTimeout(r, 120)); c.enqueue(new Uint8Array([1, 2, 3])); await new Promise((r) => setTimeout(r, 80)); c.enqueue(new Uint8Array([4])); c.close(); } }), { status: 200 });
   }
   if (!url.includes("api.anthropic.com")) return new Response(JSON.stringify({ daily: {}, hourly: {}, current: {} }), { status: 200 });
@@ -80,4 +81,9 @@ await chiedi({ voce: "Accesa, Sir.", flusso: true });
 atteso("voce senza prima: niente previous_text", !("previous_text" in ((globalThis as any).__xi ?? {})), (globalThis as any).__xi);
 await chiedi({ voce: "Dopo.", prima: "x".repeat(900) + " fine." });
 atteso("prima tagliato agli ultimi 300 caratteri", (globalThis as any).__xi?.previous_text?.length <= 300 && (globalThis as any).__xi.previous_text.endsWith("fine."), (globalThis as any).__xi?.previous_text?.length);
+// 8. previous_text rifiutato (422): la frase si riprova senza, con la voce di JARVIS (non la riserva)
+(globalThis as any).__rifiuta = true; (globalThis as any).__rifiutato = false;
+const rif = await C.__servi(new Request("http://x/jarvis", { method: "POST", headers: { "x-jarvis-token": "prova", "content-type": "application/json" }, body: JSON.stringify({ voce: "Le conviene l'ombrello.", flusso: true, prima: "Domani piove." }) }));
+atteso("previous_text rifiutato: riprova senza e risponde con l'audio", (globalThis as any).__rifiutato && rif.status === 200 && !("previous_text" in (globalThis as any).__xi), { st: rif.status, xi: (globalThis as any).__xi });
+await rif.body?.cancel(); (globalThis as any).__rifiuta = false;
 console.log("prove tempi: sbagliate", ko); Deno.exit(ko ? 1 : 0);
