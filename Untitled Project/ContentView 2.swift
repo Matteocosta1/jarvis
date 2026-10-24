@@ -17,6 +17,7 @@ enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
     case github, supabase, archivio, costi, edith
     case scanner
+    case musica                 // build 23: MUSICA, dall'icona in alto prima di SISTEMI
     var id: String { rawValue }
 }
 
@@ -289,6 +290,7 @@ struct ContentView: View {
             case .edith: VistaEdith(chiedi: daScheda)
             case .scanner: VistaScanner(chiedi: daScheda)
             case .bea: VistaBea(chiedi: daScheda)
+            case .musica: VistaMusica()
             }
         }
         .fullScreenCover(isPresented: $jarvis.allenatore) {
@@ -557,11 +559,21 @@ struct ContentView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.3)))
                 .accessibilityLabel("Chiudi la tastiera")
             }
+            // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica } label: {
+                IconaVinile()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(Color.ciano)
+                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .accessibilityLabel("Musica")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, 4)
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -571,7 +583,7 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, 4)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Pulisci la conversazione")
@@ -585,7 +597,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, 4)
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
@@ -961,6 +973,7 @@ struct ContentView: View {
             case .sistemi: withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi = true }
             case .impostazioni: mostraImpostazioni = true
             case .pulisci: svuotaChat()
+            case .musica: scheda = .musica
             }
         }
     }
