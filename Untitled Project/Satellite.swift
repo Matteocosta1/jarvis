@@ -31,6 +31,27 @@ struct MeteoSat: Equatable {
     let gradi: Int
     let cielo: String
     let pioggia: String           // «niente pioggia per 2 ore», «pioggia verso le 18:00»
+    /// Il cielo in italiano, come nel mockup («NUVOLOSO»): `description` di WeatherKit è in inglese («Cloudy»).
+    static func italiano(_ c: WeatherCondition) -> String {
+        switch c {
+        case .clear: return "sereno"
+        case .mostlyClear: return "poco nuvoloso"
+        case .partlyCloudy: return "parzialmente nuvoloso"
+        case .mostlyCloudy, .cloudy: return "nuvoloso"
+        case .foggy: return "nebbia"
+        case .haze: return "foschia"
+        case .drizzle: return "pioviggine"
+        case .rain: return "pioggia"
+        case .heavyRain: return "pioggia forte"
+        case .thunderstorms: return "temporale"
+        case .snow: return "neve"
+        case .heavySnow: return "neve forte"
+        case .sleet: return "nevischio"
+        case .hail: return "grandine"
+        case .windy, .breezy: return "vento"
+        default: return "variabile"
+        }
+    }
     /// In basso a destra sulla mappa: «14° · NUVOLOSO».
     var hud: String { "\(gradi)° · \(cielo.uppercased())" }
     /// La riga Meteo: «14° · niente pioggia per 2 ore».
@@ -51,7 +72,7 @@ struct MeteoSat: Equatable {
             f.dateFormat = "HH:mm"
             pioggia = h.date <= ora ? "pioggia adesso" : "pioggia verso le \(f.string(from: h.date))"
         }
-        return MeteoSat(gradi: Int(adesso.temperature.converted(to: .celsius).value.rounded()), cielo: adesso.condition.description, pioggia: pioggia)
+        return MeteoSat(gradi: Int(adesso.temperature.converted(to: .celsius).value.rounded()), cielo: MeteoSat.italiano(adesso.condition), pioggia: pioggia)
     }
 }
 
@@ -536,10 +557,14 @@ private struct HudSatellite: View {
                     testo(camera.map { Rotta.bussola($0.heading) } ?? "—")
                 }
                 Spacer()
+                // 24 ott, chiesto dal signore: coordinate e quota a destra, più piccole, sopra il meteo;
+                // a sinistra resta libero il marchio di Mappe di Apple
                 HStack(alignment: .bottom) {
-                    testo(coordinate)
                     Spacer()
-                    if let meteo { testo(meteo).foregroundStyle(ColoriHUD.chiaro) }
+                    VStack(alignment: .trailing, spacing: 4) {
+                        testo(coordinate, lato: 9).multilineTextAlignment(.trailing)
+                        if let meteo { testo(meteo).foregroundStyle(ColoriHUD.chiaro) }
+                    }
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
@@ -553,9 +578,9 @@ private struct HudSatellite: View {
         return String(format: "%.4f %@ · %.4f %@", abs(la), la >= 0 ? "N" : "S", abs(lo), lo >= 0 ? "E" : "O") + "\nQUOTA \(quota) m"
     }
 
-    private func testo(_ t: String) -> some View {
+    private func testo(_ t: String, lato: CGFloat = 11) -> some View {
         Text(t)
-            .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1.2)
+            .font(.system(size: lato, weight: .semibold, design: .monospaced)).tracking(1.2)
             .foregroundStyle(Color.ciano.opacity(0.9))
             .shadow(color: Color.ciano.opacity(0.5), radius: 3)
             .lineSpacing(3)
