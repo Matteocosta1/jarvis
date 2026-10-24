@@ -675,6 +675,7 @@ struct CatturaStanza: UIViewRepresentable {
         coordinator.annullata = true
         OcchiLidar.scatta = nil
         if !coordinator.fermata { v.captureSession.stop() }
+        v.captureSession.arSession.pause()             // la fotocamera di RoomPlan si spegne del tutto prima del risultato 3D
     }
 
     /// L'immagine che la fotocamera di LiDAR sta vedendo adesso, dritta (verticale) e in JPEG, lato lungo massimo 1600 px.
