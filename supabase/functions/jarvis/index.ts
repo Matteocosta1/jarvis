@@ -2672,6 +2672,15 @@ const bloccoImmagine = (data: string) => ({ type: "image", source: { type: "base
 const blocchiImmagine = (lista: string[]) =>
   lista.map((d, k) => k === lista.length - 1 ? { ...bloccoImmagine(d), cache_control: { type: "ephemeral" } } : bloccoImmagine(d));
 
+/// La frase del signore senza le note che l'app mette davanti (interruzione, aggiunta, ripresa, foto): per cercare
+/// nella memoria per significato conta solo quello che ha detto lui (le stesse note che toglie scegliModello).
+const senzaNoteApp = (testo: string) => testo
+  .replace(/^\s*\(ti ho interrotto mentre rispondevi a[\s\S]*?senza riprendere la risposta interrotta\)\s*/i, "")
+  .replace(/^\s*\(aggiunta alla mia richiesta precedente, considerala insieme a quella\)\s*/i, "")
+  .replace(/^\s*\(riprendo il discorso:[\s\S]*?rispondi solo a questo\)\s*/i, "")
+  .replace(/^\s*\(il signore ha mandato una foto\)\s*/i, "")
+  .trim();
+
 function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone", chiestoPrima = false) {
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
   // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
@@ -3767,7 +3776,7 @@ Deno.serve(async (req) => {
           // il filo: le battute di questa finestra, così come le ha mandate l'app (senza contesto né foto)
           const battute: Battuta[] = scelti.map(({ m }) => ({ r: m.role, t: String(m.content).slice(0, 4000) }));
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
-          const ultimaDomanda = String(scelti.at(-1)?.m?.content ?? "");
+          const ultimaDomanda = senzaNoteApp(String(scelti.at(-1)?.m?.content ?? ""));   // revisione 24 ott: senza le note dell'app, che col significato non c'entrano
           const [{ data: mem }, fatte, avvisoCr, filo] = await Promise.all([
             db.from("jarvis_memoria").select("id, fatto, categoria").order("categoria").order("creata").limit(80),
             azioniRecenti().catch(() => [] as string[]),
