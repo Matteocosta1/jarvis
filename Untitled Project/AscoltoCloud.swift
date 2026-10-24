@@ -22,8 +22,8 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
     private let silenzioFine: Double = 0.9
     /// Tetto: una domanda non dura più di così.
     private let massimo: Double = 30
-    /// Se non dice niente entro questo tempo, si chiude.
-    private let attesaMassima: Double = 7
+    /// Se non dice niente entro questo tempo, si chiude (7 secondi; dopo «aspetta» meno, vedi `azzera(attesa:)`).
+    private var attesaMassima: Double = 7
 
     /// Chiamato una volta sola (dal thread audio) quando la frase è finita.
     var quandoFinito: (@Sendable () -> Void)? {
@@ -33,10 +33,13 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
 
     var haParlato: Bool { lock.lock(); defer { lock.unlock() }; return parlato }
 
-    func azzera() {
+    /// `attesa`: quanto aspettare che cominci a parlare. Di solito 7 secondi; dopo «aspetta» meno, perché il silenzio dei
+    /// 5 secondi decisi dal signore (24 ott) conta da quando ha smesso di parlare, e la frase è già stata chiusa e trascritta.
+    func azzera(attesa: Double = 7) {
         lock.lock()
         campioni.removeAll(keepingCapacity: true)
         durata = 0; fondo = 0.004; voceDi = 0; parlato = false; ultimaVoce = 0; avvisato = false; piccoVoce = 0
+        attesaMassima = attesa
         lock.unlock()
     }
 
