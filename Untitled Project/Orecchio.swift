@@ -43,6 +43,8 @@ final class Orecchio {
                                      "un attimo", "stop", "ehi", "hey", "bro", "fratello"]
 
     var attivo: Bool { acceso }
+    /// Il signore gli sta parlando sopra e l'orecchio sta raccogliendo la sua frase (difetto 6 del 25 ott: in sottofondo si butta).
+    var raccoglie: Bool { inPresa }
 
     func avvia() {
         voluto = true

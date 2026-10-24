@@ -1916,6 +1916,12 @@ final class Jarvis: NSObject, ObservableObject {
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
+        // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
+        // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello
+        if orecchio.raccoglie {
+            orecchio.ferma()
+            orecchio.testoDetto = ""
+        }
         if fase == .ascolto {
             if ascoltoCloud {                          // Mac: la registrazione da trascrivere non parte più
                 ascoltoCloud = false
