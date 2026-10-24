@@ -1,4 +1,4 @@
-// Decisioni 5, 13, 27, 50 (24 ott): le righe del prompt e i testi fissi cambiati. Si legge il prompt che arriva ad Anthropic
+// Decisioni 5, 13, 27 (annullata il 25 ott), 50 (24 ott): le righe del prompt e i testi fissi cambiati. Si legge il prompt che arriva ad Anthropic
 // e il sorgente di jarvis-briefing (accanto al cervello, nel repository).
 import * as C from "./cervello_test.ts";
 let ko = 0; const atteso = (n: string, v: boolean, info: unknown = "") => { if (!v) { ko++; console.log("✗", n, JSON.stringify(info)); } else console.log("✓", n); };
@@ -23,8 +23,9 @@ atteso("5. confidente, diario e testi richiesti con le loro regole", /Il confide
 atteso("5. la regola dei testi completi in INTELLIGENZA c'è ancora", /scrivilo completo e curato anche se è lungo/.test(sistema), "");
 atteso("5. TONO, IN PRATICA ed ESEMPI non toccati", sistema.includes("TONO, IN PRATICA. Una battuta all'incirca ogni quattro risposte") && sistema.includes("«Accendi la torcia.» → «Accesa, Sir.»"), "");
 const occhi = sistema.split("\n").find((l) => l.startsWith("Occhi:")) ?? "";
-atteso("27. Occhi: niente «persone note»", !/persone note/.test(occhi), occhi);
-atteso("27. Occhi: mai nomi di persone, nemmeno famose", /non dici mai il loro nome, nemmeno se sono famose/.test(occhi), occhi);
+// decisione 27 annullata dal signore (25 ott, 01:45): negli Occhi torna «persone note», la frase sui nomi non c'è più
+atteso("27 annullata. Occhi: di nuovo «persone note»", /testi, marche, persone note\. Se è un disco/.test(occhi), occhi);
+atteso("27 annullata. Occhi: niente frase «non dici mai il loro nome»", !/non dici mai il loro nome/.test(occhi), occhi);
 atteso("27. Profiler invariato", sistema.includes("Non riconoscere né identificare mai una persona dal volto e non tirare a indovinare chi sia"), "");
 atteso("50. la frase dell'invio incerto nel prompt", sistema.includes("«Non so se è partita, Sir: in Inviata non la vedrà.»"), "");
 // il sorgente di jarvis-briefing: argomento, oppure accanto alle prove nel repository (supabase/prove → supabase/functions), oppure S/dcerv
