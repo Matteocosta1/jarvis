@@ -480,13 +480,13 @@ nonisolated struct DatiRadar: Equatable, Sendable {
 
     /// L'avviso in testa al pannello RADAR dell'iPhone.
     var avviso: String {
-        let quando = iniziaMin <= 0 ? "Signore, piove già dove si trova" : "Signore, pioggia \(inizia) dove si trova"
+        let quando = iniziaMin <= 0 ? "Sir, piove già dove si trova" : "Sir, pioggia \(inizia) dove si trova"
         return "\(quando): \(millimetri) mm nella prossima mezz'ora. Prenda l'ombrello."
     }
 
     /// L'avviso sul polso, più corto.
     var avvisoBreve: String {
-        iniziaMin <= 0 ? "Signore, piove già dove si trova. Prenda l'ombrello." : "Signore, pioggia \(inizia) dove si trova. Prenda l'ombrello."
+        iniziaMin <= 0 ? "Sir, piove già dove si trova. Prenda l'ombrello." : "Sir, pioggia \(inizia) dove si trova. Prenda l'ombrello."
     }
 }
 
