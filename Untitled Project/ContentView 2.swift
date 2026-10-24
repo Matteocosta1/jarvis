@@ -97,6 +97,7 @@ struct ContentView: View {
     /// La curva della tastiera di iOS (parte veloce e si posa piano, circa 0,25 s): reattore, riga di stato e chat si muovono con lei.
     static let curvaTastiera: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: 0.25)
     @State private var durataRientro: Double = 0.25      // la durata vera dell'ultima discesa della tastiera (per far scorrere la chat insieme)
+    @State private var salitaTastiera: (quando: Date, durata: Double)?   // l'ultima keyboardWillShow: quando e quanto dura la salita
     /// Il reattore piccolo e il microfono spento mentre si scrive: solo sull'iPhone (iPad e Mac restano come prima).
     private var telefono: Bool { UIDevice.current.userInterfaceIdiom == .phone }
     /// Una schermata aperta da JARVIS o dal Tocco d'aiuto di Bea, non dal signore.
@@ -132,7 +133,7 @@ struct ContentView: View {
                                 .contentShape(Rectangle())
                                 .highPriorityGesture(tiraGiuTendina)
                             Spacer(minLength: 0)
-                            corona
+                            corona()
                                 .frame(width: 430)
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
                                 .frame(width: g.size.width, height: (altezzaCorona + 12) * scala, alignment: .top)
@@ -168,38 +169,52 @@ struct ContentView: View {
                         }
                         // mentre scrive il reattore grande lascia il posto alla chat (resta in piccolo in alto): sopra la tastiera la chat, il testo e il tasto per inviare
                         if reattoreGrande || !telefono {
+                            // con la tastiera le icone delle sezioni e gli archi si spengono e lasciano il posto alla chat (il reattore vola)
                             centroHUD
                                 .contentShape(Rectangle())
                                 .highPriorityGesture(tiraGiuTendina)
-                                .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+                                .transition(.opacity)
                         }
                         registro
                         barraTesto
                     }
+                    // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
+                    .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
                     .onChange(of: tastiera) { _, aperta in
                         guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
                         if aperta {
-                            withAnimation(ContentView.curvaTastiera) { reattoreGrande = false }
+                            // di solito keyboardWillShow è appena arrivata (o arriva subito dopo): il volo parte con la sua durata
+                            if let s = salitaTastiera, Date().timeIntervalSince(s.quando) < 0.2 {
+                                vola(grande: false, durata: s.durata - Date().timeIntervalSince(s.quando))
+                            } else {
+                                // rete di sicurezza (tastiera fisica, nessuna notifica): il volo con la durata di sempre
+                                Task {
+                                    try? await Task.sleep(for: .milliseconds(80))
+                                    if tastiera && reattoreGrande { vola(grande: false, durata: 0.25) }
+                                }
+                            }
                         } else {
                             // rete di sicurezza (tastiera fisica, notifica mancata): di solito il rientro lo fa già keyboardWillHide qui sotto
                             Task {
                                 try? await Task.sleep(for: .milliseconds(60))
-                                if !tastiera && !reattoreGrande { withAnimation(ContentView.curvaTastiera) { reattoreGrande = true } }
+                                if !tastiera && !reattoreGrande { vola(grande: true, durata: 0.25) }
                             }
                         }
                     }
-                    // il reattore cresce mentre la tastiera scende, con la durata e la curva della tastiera stessa (anche nello swipe,
-                    // dove la tastiera è già a metà): un movimento solo, la chat non si allunga prima per poi restringersi (era lo scatto)
+                    // il reattore vola su mentre la tastiera sale, con la durata e la curva della tastiera stessa;
                     // la tastiera ricompare senza che il campo sia cambiato (app riaperta, iPhone girato…): il reattore torna piccolo
-                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                        if telefono && tastiera && reattoreGrande { withAnimation(ContentView.curvaTastiera) { reattoreGrande = false } }
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { n in
+                        let d = ContentView.durataTastiera(n)
+                        salitaTastiera = (Date(), d)
+                        if telefono && tastiera && reattoreGrande { vola(grande: false, durata: d) }
                     }
+                    // il reattore torna giù mentre la tastiera scende, con la durata e la curva della tastiera stessa (anche nello swipe,
+                    // dove la tastiera è già a metà): un movimento solo, la chat non si allunga prima per poi restringersi
                     .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { n in
                         guard telefono, !reattoreGrande else { return }
-                        let d = (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
-                        let curva: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: max(d, 0.2))
-                        durataRientro = max(d, 0.2)
-                        withAnimation(curva) { reattoreGrande = true }
+                        let d = max(ContentView.durataTastiera(n), 0.2)
+                        durataRientro = d
+                        vola(grande: true, durata: d)
                     }
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
                     .onAppear { if telefono { reattoreGrande = !tastiera } }
@@ -520,12 +535,15 @@ struct ContentView: View {
         }
     }
 
-    /// `mini`: con la tastiera aperta (solo iPhone) il reattore, in piccolo, sta qui tra il titolo e i tasti.
+    /// `mini`: con la tastiera aperta (solo iPhone) qui c'è il posto del reattore piccolo, tra il titolo e i tasti: il reattore vero
+    /// ci vola sopra dal centro (`reattoreVolante`). Build 23: le icone sono quattro (MUSICA, SISTEMI, cestino, Impostazioni); come nel
+    /// mockup («.telefono.b23») le icone hanno 1 punto in meno per lato e, con la tastiera aperta, le lettere del titolo 1 punto più vicine:
+    /// così il reattore piccolo non tocca né il titolo né le icone.
     private func intestazione(mini: Bool = false) -> some View {
-        HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VIII», strette tra loro
+        HStack(alignment: .rigaMark, spacing: 0) {          // le icone sulla stessa riga di «MARK VIII», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
-                (Text("J.A.R.V.I.").tracking(5) + Text("S."))
+                (Text("J.A.R.V.I.").tracking(mini ? 4 : 5) + Text("S."))
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
@@ -542,22 +560,16 @@ struct ContentView: View {
             .offset(x: acceso ? 0 : -12)
             Spacer()
             if mini {
-                // il reattore in piccolo, sempre acceso: toccato chiude la tastiera e basta (si torna alla voce di sempre)
+                // il posto del reattore piccolo (34 punti): il reattore vero ci arriva volando e, toccato, chiude la tastiera e basta
                 Button { tastiera = false } label: {
-                    ZStack {
-                        AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
-                        Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
-                    }
-                    .frame(width: 240, height: 240)
-                    .scaleEffect(34.0 / 290.0)
-                    .frame(width: 34, height: 34)
-                    .contentShape(Rectangle())                  // si tocca tutto il quadrato, non solo il disegno
+                    Color.clear
+                        .frame(width: ContentView.latoMini, height: ContentView.latoMini)
+                        .contentShape(Rectangle())                  // si tocca tutto il quadrato, non solo il disegno
                 }
-                .buttonStyle(StileStark())
+                .anchorPreference(key: PostiReattore.self, value: .bounds) { ["piccolo": $0] }
                 .padding(.trailing, 4)
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-                .transition(.opacity.combined(with: .scale(scale: 0.3)))
-                .accessibilityLabel("Chiudi la tastiera")
+                .accessibilityHidden(true)                          // per VoiceOver c'è il reattore stesso («Chiudi la tastiera»)
             }
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
             Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica } label: {
@@ -685,9 +697,10 @@ struct ContentView: View {
     }
 
     /// Il centro del HUD: la corona col reattore, lo stato, la telemetria, la frase in corso e gli avvisi.
+    /// Sull'iPhone il reattore non sta qui dentro ma sopra (`reattoreVolante`): qui c'è solo il suo posto, da cui vola nella barra in alto.
     private var centroHUD: some View {
         VStack(spacing: 0) {
-            corona
+            corona(reattoreFuori: telefono)
                 .padding(.top, 26)        // il reattore più verso il centro dello schermo
             testiHUD
         }
@@ -731,7 +744,8 @@ struct ContentView: View {
         }
     }
 
-    private var corona: some View {
+    /// `reattoreFuori`: il reattore lo disegna `reattoreVolante` (iPhone), qui resta il suo posto (240 × 240), misurato.
+    private func corona(reattoreFuori: Bool = false) -> some View {
         let elenco = tutteLeIcone
         let ang = angoli
         let coda = Avvio.inizioCoda(elenco.map { $0.nome })
@@ -767,18 +781,20 @@ struct ContentView: View {
             .frame(height: ContentView.latoCorona + 80)
             .allowsHitTesting(false)
 
-            // il reattore al centro, della misura di sempre
-            Button { tastiera = false; jarvis.toccaReattore() } label: {
-                ZStack {
-                    AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
-                    Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
-                }
-                .frame(width: 240, height: 240)
+            // il reattore al centro, della misura di sempre (sull'iPhone solo il suo posto: il reattore vola sopra)
+            if reattoreFuori {
+                Color.clear
+                    .frame(width: 240, height: 240)
+                    .anchorPreference(key: PostiReattore.self, value: .bounds) { ["grande": $0] }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            } else {
+                Button { tastiera = false; jarvis.toccaReattore() } label: { reattore }
+                    .buttonStyle(StileStark())
+                    .scaleEffect(acceso ? 1 : 0.7)
+                    .opacity(acceso ? 1 : 0)
+                    .accessibilityLabel("Parla con Jarvis")
             }
-            .buttonStyle(StileStark())
-            .scaleEffect(acceso ? 1 : 0.7)
-            .opacity(acceso ? 1 : 0)
-            .accessibilityLabel("Parla con Jarvis")
 
             // le icone
             ForEach(Array(elenco.enumerated()), id: \.offset) { k, s in
@@ -816,6 +832,52 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity).frame(height: ContentView.latoCorona)          // largo quanto lo schermo: i nomi non vengono tagliati
         .frame(maxWidth: .infinity).frame(height: altezza, alignment: .top)       // sotto resta lo spazio per la chat
+    }
+
+    /// Il reattore: gli anelli (290) e il cuore (220) nel quadrato di 240, come sempre.
+    private var reattore: some View {
+        ZStack {
+            AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
+            Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
+        }
+        .frame(width: 240, height: 240)
+    }
+
+    /// Il lato del reattore piccolo nella barra in alto (tastiera aperta): gli anelli da 290 rimpiccioliti a 34.
+    static let latoMini: CGFloat = 34
+
+    /// Build 23, come nel mockup («vola»): un reattore solo, che con la tastiera vola dal suo posto al centro al posto piccolo nella
+    /// barra in alto (tra «J.A.R.V.I.S.» e le icone) rimpicciolendo, e ritorno, nello stesso tempo e con la stessa curva della
+    /// tastiera di iOS (keyboardWillShow / keyboardWillHide). Solo posizione e scala: non sparisce al centro per ricomparire in alto.
+    @ViewBuilder private func reattoreVolante(_ posti: [String: Anchor<CGRect>]) -> some View {
+        let piccolo = !reattoreGrande
+        GeometryReader { g in
+            if telefono, let posto = posti[piccolo ? "piccolo" : "grande"] {     // iPad e Mac: il reattore resta nella corona
+                let r = g[posto]
+                Button {
+                    tastiera = false                                   // piccolo: chiude la tastiera e basta
+                    if !piccolo { jarvis.toccaReattore() }
+                } label: { reattore }
+                .buttonStyle(StileStark())
+                .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
+                .opacity(acceso ? 1 : 0)
+                .position(x: r.midX, y: r.midY)
+                .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima
+                .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con Jarvis")
+            }
+        }
+    }
+
+    /// Il volo del reattore (e con lui la chat che sale, la riga di stato, le icone che si spengono): la durata della tastiera,
+    /// la curva della tastiera di iOS.
+    private func vola(grande: Bool, durata: Double) {
+        guard reattoreGrande != grande else { return }
+        withAnimation(.timingCurve(0.38, 0.7, 0.125, 1, duration: max(durata, 0.2))) { reattoreGrande = grande }
+    }
+
+    /// La durata dell'animazione della tastiera scritta nella notifica di iOS (di solito 0,25 s).
+    private static func durataTastiera(_ n: Notification) -> Double {
+        (n.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
     }
 
     /// INTELLIGENCE: il reparto speciale, una fila centrata sotto il reattore. Si accende dopo la corona,
@@ -1621,6 +1683,14 @@ struct Fotocamera: UIViewControllerRepresentable {
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { padre.chiudi() }
+    }
+}
+
+/// Build 23: i due posti del reattore, misurati nella schermata (grande al centro, piccolo nella barra in alto con la tastiera aperta).
+nonisolated private struct PostiReattore: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] { [:] }
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
     }
 }
 
