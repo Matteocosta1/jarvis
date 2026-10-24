@@ -245,6 +245,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
+        OcchiAperti.parla = { [weak self] frase in self?.annuncia(frase) }   // build 23: la voce dagli Occhi («Ecco cosa ho trovato, Sir.»)
         // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
         NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
             BattitoMani.tastieraAperta(true)
@@ -631,6 +632,8 @@ final class Jarvis: NSObject, ObservableObject {
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
         // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…): subito, senza cervello, prima delle storpiature
         if let d = ComandoDedicato.riconosci(frase) { eseguiDedicato(d); return true }
+        // build 23: gli Occhi alla Stark («mostra le etichette», «scansione olografica», «cerca questo sul web»…), a frase esatta
+        if !lidarAperto, let o = ComandoOcchi.riconosci(frase) { eseguiOcchi(o); return true }   // dentro LiDAR no: lì la fotocamera è sua
         // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
         if let imparato = Storpiature.cerca(frase) {
             if imparato == "rito" { fraseDiTony(); return true }
@@ -707,6 +710,18 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
+    /// Build 23: un comando degli Occhi. Aperti (manuali) agisce lì e JARVIS dice la sua frase; chiusi, si aprono già così.
+    private func eseguiOcchi(_ c: ComandoOcchi) {
+        chiudiInterruzione()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if occhi != nil, let f = OcchiAperti.stark, f(c) {
+            if let r = c.risposta { annuncia(r) }
+            return
+        }
+        if let r = c.risposta ?? Reparto.occhi.annuncio { annuncia(r) }
+        guardaManuale(iniziale: c)
+    }
+
     /// «Traduci in inglese»: l'Interprete si apre già sulla lingua, senza passare dalla scelta.
     func apriInterprete(_ codice: String) {
         guard !lidarAperto, let l = Lingua.trova(codice) else { return }   // sopra LiDAR non si apre un'altra schermata
@@ -768,7 +783,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Occhi
 
     /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
-    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1) async -> [Data] {
+    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil) async -> [Data] {
         // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
         if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
         // una scheda o un'altra schermata aperta sopra: prima si chiude, se no Occhi non riesce ad aprirsi e JARVIS resterebbe in attesa
@@ -780,7 +795,14 @@ final class Jarvis: NSObject, ObservableObject {
         occhiChiusi([])                        // se ne era rimasta aperta una, si chiude
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c
-            occhi = Occhiata(automatico: automatico, video: video, cucina: cucina, zoom: zoom)
+            var o = Occhiata(automatico: automatico, video: video, cucina: cucina, zoom: zoom)
+            switch iniziale {                  // build 23: aperti a voce, acceso solo quello che chiede
+            case .etichette(true)?: o.eti = true
+            case .ologramma(true)?: o.olo = true
+            case .aggancia?: o.olo = true; o.aggancia = true
+            default: break
+            }
+            occhi = o
         }
     }
 
@@ -805,9 +827,10 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// Icona 👁️: mirino con il tasto, poi JARVIS guarda la foto (comodo per le copertine).
-    func guardaManuale() {
+    /// `iniziale`: aperti a voce con un comando degli Occhi (build 23).
+    func guardaManuale(iniziale: ComandoOcchi? = nil) {
         Task {
-            let dati = await apriOcchi(automatico: false)
+            let dati = await apriOcchi(automatico: false, iniziale: iniziale)
             let detta = prendiDomandaOcchi()
             guard !dati.isEmpty else { return }
             preparaFoto(dati)
@@ -1361,7 +1384,7 @@ final class Jarvis: NSObject, ObservableObject {
         if let c = strumenti.comandoDaEseguire {   // il cervello ha capito un comando storpiato: lo eseguo e lo imparo
             strumenti.comandoDaEseguire = nil
             // i comandi a frase esatta della build 22 non si imparano mai come storpiature
-            if !ultimaFraseAVoce.isEmpty, ComandoDedicato.riconosci(ultimaFraseAVoce) == nil { Storpiature.impara(ultimaFraseAVoce, comando: c) }
+            if !ultimaFraseAVoce.isEmpty, ComandoDedicato.riconosci(ultimaFraseAVoce) == nil, ComandoOcchi.riconosci(ultimaFraseAVoce) == nil { Storpiature.impara(ultimaFraseAVoce, comando: c) }
             if c == "rito" { benvenuto() } else if let r = Reparto(rawValue: c) { apriReparto(r, annuncia: false) }
         }
     }
