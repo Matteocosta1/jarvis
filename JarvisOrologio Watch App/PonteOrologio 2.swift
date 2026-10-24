@@ -16,6 +16,18 @@ final class PonteOrologio: NSObject {
         s.activate()
     }
 
+    /// Dice all'iPhone che il signore sta usando l'orologio: per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
+    /// (deciso dal signore, 24 ott). Messaggio piccolo, senza risposta; al massimo uno ogni 3 secondi (`forza`: la fine, sempre).
+    private var ultimoSegnaleUso = Date.distantPast
+    func segnalaUso(forza: Bool = false) {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        if !forza, Date().timeIntervalSince(ultimoSegnaleUso) < 3 { return }
+        ultimoSegnaleUso = Date()
+        s.sendMessage(["orologio": "in uso"], replyHandler: nil, errorHandler: nil)
+    }
+
     /// Chiede la parola d'ordine all'iPhone. Vero se ne è arrivata una.
     /// `soloDiretta`: salta la consegna già ricevuta (serve quando quella si è rivelata vecchia).
     func chiediToken(soloDiretta: Bool = false) async -> Bool {
