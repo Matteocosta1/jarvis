@@ -145,7 +145,12 @@ enum Reparto: String, Identifiable, Equatable {
         case .serata: return "I conti della serata, Sir."
         case .messaggi: return "Messaggi, Sir. A chi scriviamo?"
         case .telefono: return "Telefono, Sir."
-        case .lidar: return "LiDAR pronto. Muova l'iPhone lungo le pareti, Sir."
+        case .lidar:
+            #if os(iOS)
+            return "LiDAR, Sir."                                // build 23: si apre sul menu dei modi (le frasi dei modi parlano da sé)
+            #else
+            return "LiDAR pronto. Muova l'iPhone lungo le pareti, Sir."
+            #endif
         case .github: return "Il cantiere su GitHub, Sir."
         case .supabase: return "Sala macchine, Sir."
         case .archivio: return "L'archivio, Sir."
@@ -173,8 +178,31 @@ enum ComandoVocale: Equatable {
     case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
     case domanda(String)                    // dentro una scheda: «dimmi», «com'ho dormito?»: chiude la scheda e chiede a JARVIS come il suo tasto
 
-    /// I comandi di LiDAR (21 ott, chiesti dal signore).
-    enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre }
+    /// I comandi di LiDAR (21 ott, chiesti dal signore); `modo`: le frasi del pannello A VOCE di ogni modo (build 23).
+    /// `modo`: il modo di LiDAR (il rawValue di ModoLidar: «Stanza», «Misura»…) e il nome per il gemello digitale («di Marco»).
+    enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre, modo(String, String?) }
+
+    /// LiDAR 23: le frasi dei modi, come le scrive il pannello A VOCE. Aprono LiDAR già sul modo e la scansione parte;
+    /// dentro LiDAR cambiano modo (o, sul risultato dello stesso modo, JARVIS dice i numeri).
+    static func modoLidar(_ t: [String]) -> (String, String?)? {
+        let s = t.joined(separator: " ")
+        let frasi: [(String, [String])] = [
+            ("Stanza", ["mappa la stanza", "scansione ambientale", "dammi la pianta"]),
+            ("Oggetto", ["digitalizza questo oggetto", "acquisisci l oggetto", "dimensioni dell oggetto", "calcola il volume"]),
+            ("Esterno", ["rilievo del terreno", "mappa il perimetro", "misura il giardino", "rilievo della facciata"]),
+            ("Evento", ["setup della sala", "set up della sala", "allestisci la sala", "metti il palco qui", "controlla le vie di fuga"]),
+            ("Corpo", ["analisi biometrica", "scansione postura", "analisi posturale", "misurami le spalle"]),
+            ("Misura", ["metro laser", "quanto e largo quel muro", "misura questa distanza", "quanto e alto il soffitto"]),
+            ("Statua", ["crea il gemello digitale", "gemello digitale", "digitalizza questa persona"]),
+        ]
+        for (m, l) in frasi where l.contains(s) { return (m, nil) }
+        // «gemello digitale di Marco», «crea il gemello digitale di Marco Rossi»: il nome va sul modello
+        if let k = t.firstIndex(of: "gemello"), k + 3 < t.count, t[k + 1] == "digitale", t[k + 2] == "di", t.count - (k + 3) <= 3,
+           t[..<k].allSatisfy({ ["crea", "il", "fai", "fammi", "un"].contains($0) }) {
+            return ("Statua", t[(k + 3)...].map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " "))
+        }
+        return nil
+    }
     /// I comandi dentro la Sentinella: gli stessi due tasti in alto.
     enum AzioneSentinella: Equatable { case registro, schermoNero }
     /// I comandi dentro l'Allenatore: i suoi tasti, più le domande sulla serie e la pausa.
@@ -410,6 +438,11 @@ enum ComandoVocale: Equatable {
         default: break
         }
 
+        // LiDAR 23: le frasi dei modi («metro laser», «analisi posturale», «gemello digitale di Marco»…), da ovunque (solo iPhone)
+        #if os(iOS)
+        if let m = modoLidar(t) { return .lidar(.modo(m.0, m.1)) }
+        #endif
+
         // Interprete già sulla lingua: «traduci in inglese», «interprete spagnolo», «fammi da interprete in francese».
         // Solo frasi corte: «traduci in inglese buongiorno a tutti» resta una domanda per il cervello.
         if t.count <= 5, c(" traduci ") || c(" traduttore ") || c(" interprete "), let l = linguaFinale(t) { return .interprete(l) }
@@ -436,10 +469,20 @@ enum ComandoVocale: Equatable {
         if c(" cucina ") && comanda { return .apri(.cucina) }
         // LiDAR: «scansiona la stanza», «misura la stanza», «planimetria»: prima dello Scanner, che prende «scansiona»
         let verboStanza = c(" scansiona ") || c(" misura ") || c(" scansione ")
+        #if os(iOS)
+        // build 23: la stanza parte già in Interno; «apri LiDAR» apre il menu dei modi
+        if ((c(" planimetria ") || c(" pianta della stanza ")) && (comanda || verboStanza)) || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
+            return .lidar(.modo("Stanza", nil))
+        }
+        if (c(" lidar ") || c(" laidar ") || c(" lai dar ")) && (comanda || verboStanza) {
+            return .apri(.lidar)
+        }
+        #else
         if ((c(" lidar ") || c(" laidar ") || c(" lai dar ") || c(" planimetria ") || c(" pianta della stanza ")) && (comanda || verboStanza))
             || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
             return .apri(.lidar)
         }
+        #endif
         if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && (comanda || c(" scansiona ")) { return .apri(.scanner) }
 
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»

@@ -21,6 +21,8 @@ enum OcchiLidar {
 /// LiDAR aperto: «rifai la scansione» la fa ripartire, e «scansione» non apre lo Scanner dei codici a barre.
 enum LidarAperta {
     static var aperta = false
+    /// Aperta a voce su un modo («Jarvis, metro laser»): LiDAR parte già lì.
+    static var richiesta: (modo: ModoLidar, nome: String?)?
 
     /// «Jarvis, rifai la scansione», «riprova la scansione», «nuova scansione», «ricomincia».
     static func eRifai(_ frase: String) -> Bool {
@@ -47,6 +49,8 @@ extension Notification.Name {
 /// Un tratto sulla pianta, visto dall'alto (metri: x e z del mondo).
 nonisolated struct TrattoPianta: Codable, Hashable, Sendable {
     var ax: Double, az: Double, bx: Double, bz: Double
+    var basso: Double? = nil      // porte e finestre: da che altezza (m dal pavimento)…
+    var alto: Double? = nil       // …a che altezza
     var lunghezza: Double { hypot(bx - ax, bz - az) }
 }
 
@@ -63,6 +67,7 @@ nonisolated struct ScansioneLidar: Codable, Identifiable, Hashable, Sendable {
     var finestre: [TrattoPianta]
     var aperture: [TrattoPianta]
     var oggetti: [String]         // «tavolo», «divano»…
+    var pavimento: [[Double]]? = nil   // il poligono del pavimento (x, z), per il 3D di OLOGRAMMA e TEXTURE
     var volume: Double { area * altezza }
     /// Capienza indicativa: 1,2 persone/m², la densità delle sale da ballo (DM 19/08/1996). Non è la capienza autorizzata.
     var capienza: Int { Int(area * 1.2) }
@@ -83,6 +88,13 @@ nonisolated enum LidarFormato {
     static func n(_ v: Double, _ d: Int = 1) -> String { v.formatted(.number.precision(.fractionLength(d)).locale(Locale(identifier: "it_IT"))) }
     static func m(_ v: Double, _ d: Int = 1) -> String { n(v, d) + " m" }
     static func m2(_ v: Double) -> String { v > 0 ? n(v) + " m²" : "—" }
+    /// «80 cm», «46 cm»: centimetri interi.
+    static func cm(_ metri: Double) -> String { "\(Int((metri * 100).rounded())) cm" }
+    /// «3° DX», «2° SX», «0°»: la rotazione del bacino (+ verso destra).
+    static func bacino(_ gradi: Double) -> String {
+        let g = Int(abs(gradi).rounded())
+        return g == 0 ? "0°" : "\(g)° \(gradi > 0 ? "DX" : "SX")"
+    }
 }
 
 /// L'archivio delle scansioni sul telefono.
@@ -115,44 +127,81 @@ final class ArchivioLidar: ObservableObject {
     private func scrivi() { if let d = try? JSONEncoder().encode(scansioni) { try? d.write(to: indice, options: .atomic) } }
 }
 
-// MARK: - La sezione
+
+// MARK: - La sezione (build 23: il menu dei modi, la scansione, il risultato)
 
 struct VistaLidar: View {
     let chiudi: () -> Void
     let chiedi: (String) -> Void
     @EnvironmentObject var jarvis: Jarvis
     @StateObject private var archivio = ArchivioLidar.condiviso
-    @State private var fase: Fase = LidarSupporto.disponibile ? .scansione : .nonDisponibile
-    @State private var risultato: ScansioneLidar?
+    @State private var fase: Fase = .menu
+    @State private var modo: ModoLidar = .stanza              // ogni volta da Interno…
+    @State private var corpo: CorpoLidar = .postura
+    @State private var stile: StileLidar = .pieno             // …in OLOGRAMMA; la TEXTURE è la seconda scelta
+    @State private var risultato: ScansioneLidar?             // Interno
+    @State private var risultatoModo: RisultatoModo?          // gli altri modi
+    @State private var salvati: Set<UUID> = []
     @State private var vista: Vista = .pianta
     @State private var dalVivo = MisureDalVivo()
+    @State private var allestimentoVivo: Allestimento?
+    @State private var ultimoAllestimento = Date.distantPast
+    @State private var stato = StatoScansione()
     @State private var fermaScansione = false
+    @State private var acceso = false                         // dopo «ACCENSIONE SENSORE…» (0,7 s)
+    @State private var ancora = false                         // «Fine» toccato troppo presto
     @State private var avviso: String?
     @State private var condivisi: [URL] = []
-    @State private var tentativo = 0                         // «Riprova»: una sessione nuova                // pianta PNG + modello 3D, preparati quando si apre una scansione
+    @State private var tentativo = 0
+    @State private var inizioFine = Date()
+    @State private var nomePersona: String?                   // «gemello digitale di Marco»
 
-    enum Fase { case scansione, elaboro, risultato, nonDisponibile }
-    enum Vista: String, CaseIterable { case pianta = "PIANTA", tre = "3D", archivio = "ARCHIVIO" }
+    enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
+    enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
+
+    /// Il modo vero: in Corpo, Postura (lo scheletro) o Texture (la «Statua»).
+    private var vero: ModoLidar { modo == .corpo && corpo == .statua ? .statua : modo }
 
     var body: some View {
         ZStack {
             Color.fondo.ignoresSafeArea()
-            switch fase {
-            case .scansione, .elaboro: schermoScansione
-            case .risultato, .nonDisponibile: schermoRisultato
+            VStack(spacing: 0) {
+                ChiudiLidar { esci() }
+                switch fase {
+                case .menu:
+                    ScrollView {
+                        MenuLidar(modo: $modo, corpo: $corpo, stile: $stile) { avviaScansione() }
+                            .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
+                    }
+                case .scansione, .elaboro:
+                    schermoScansione.padding(.top, 8)
+                case .risultato:
+                    schermoRisultato
+                case .risultatoModo:
+                    if let r = risultatoModo {
+                        ScrollView {
+                            RisultatoModoVista(r: r, stile: $stile, salvato: salvati.contains(r.id),
+                                               salva: { salvaModo(r) },
+                                               altra: { pulisciModo(); risultatoModo = nil; fase = .menu },
+                                               chiedi: { chiedi(r.domanda) })
+                                .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
+                        }
+                    }
+                }
             }
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(fase == .scansione || fase == .elaboro)
-        .onAppear { LidarAperta.aperta = true }
-        .onDisappear { LidarAperta.aperta = false }
-        .onReceive(NotificationCenter.default.publisher(for: .jarvisRifaiLidar)) { _ in   // a voce: come «Riprova», da capo
-            guard LidarSupporto.disponibile else { return }
-            Suoni.tocco()
-            avviso = nil; fermaScansione = false; dalVivo = MisureDalVivo()
-            fase = .scansione; tentativo += 1
+        .onAppear {
+            LidarAperta.aperta = true
+            if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; parti(r.modo, nome: r.nome) }   // aperta a voce già su un modo
         }
-        .aperturaHUD("LiDAR", fotocamera: LidarSupporto.disponibile)
+        .onDisappear { LidarAperta.aperta = false }
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRifaiLidar)) { _ in   // a voce: la scansione da capo, nello stesso modo
+            guard fase != .menu else { return }
+            Suoni.tocco()
+            avviaScansione()
+        }
         .onChange(of: jarvis.azioneLidar) { _, a in
             guard let a else { return }
             jarvis.azioneLidar = nil
@@ -162,103 +211,185 @@ struct VistaLidar: View {
 
     // MARK: Comandi a voce
 
-    /// «Fine scansione», «quanto è grande?», «quante persone ci stanno?», «salva», «mostrami il 3D»: come i tasti.
+    /// «Fine scansione», «quanto è grande?», «quanta gente ci sta?», «salva», «mostrami il 3D», e le frasi dei modi («metro laser»…).
     private func aVoce(_ a: ComandoVocale.AzioneLidar) {
         let inScansione = fase == .scansione || fase == .elaboro
         switch a {
         case .fine:
-            if fase == .scansione && avviso == nil {
-                fase = .elaboro
-                fermaScansione = true
-                jarvis.annuncia("Elaboro la pianta, Sir.")
-            } else if !inScansione, risultato != nil {
-                vista = .pianta
-            }
+            if fase == .scansione { premiFine() } else if fase == .risultato { vista = .pianta }
         case .misure:
-            let area = risultato?.area ?? (inScansione ? dalVivo.area : 0)
+            if fase == .risultatoModo, let r = risultatoModo { jarvis.annuncia(r.annuncio); return }
+            if inScansione && vero != .stanza { jarvis.annuncia("Prima finisca la scansione, Sir."); return }
+            let area = fase == .risultato ? (risultato?.area ?? 0) : (inScansione ? dalVivo.area : 0)
             guard area > 0 else { jarvis.annuncia(inScansione ? "Il pavimento non l'ho ancora preso, Sir: continui lungo le pareti." : "Non ho una scansione aperta, Sir."); return }
             var frase = "Circa \(LidarFormato.n(area)) metri quadri"
-            if let s = risultato, s.altezza > 0 { frase += ", alta \(LidarFormato.n(s.altezza, 2)) metri" }
+            if fase == .risultato, let s = risultato, s.altezza > 0 { frase += ", alta \(LidarFormato.n(s.altezza, 2)) metri" }
             jarvis.annuncia(frase + ", Sir.")
         case .capienza:
-            let area = risultato?.area ?? (inScansione ? dalVivo.area : 0)
+            if fase == .risultatoModo, let c = risultatoModo?.capienza { jarvis.annuncia(c); return }
+            let area = fase == .risultato ? (risultato?.area ?? 0) : (inScansione && vero == .stanza ? dalVivo.area : 0)
             guard area > 0 else { jarvis.annuncia(inScansione ? "Mi serve ancora il pavimento, Sir." : "Non ho una scansione aperta, Sir."); return }
             jarvis.annuncia("Circa \(Int(area * 1.2)) persone, Sir, a 1,2 per metro quadro. Quella vera la fissano uscite e commissione.")
         case .salva:
-            guard let s = risultato, !inScansione else { jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir."); return }
+            if fase == .risultatoModo, let r = risultatoModo {
+                if salvati.contains(r.id) { jarvis.annuncia("È già nell'archivio, Sir."); return }
+                salvaModo(r); jarvis.annuncia("Salvata nell'archivio, Sir."); return
+            }
+            guard fase == .risultato, let s = risultato else { jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir."); return }
             if archivio.contiene(s) { jarvis.annuncia("È già nell'archivio, Sir."); return }
             archivio.salva(s)
             jarvis.annuncia("Salvata nell'archivio, Sir.")
         case .tre:
-            guard let s = risultato, !inScansione else { jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir."); return }
-            guard FileManager.default.fileExists(atPath: s.file3D.path) else { jarvis.annuncia("Il modello 3D non c'è per questa scansione, Sir."); return }
-            vista = .tre
+            if fase == .risultato, risultato != nil { vista = .pieno; return }
+            if fase == .risultatoModo { return }                                   // il modello 3D è già lì
+            jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir.")
+        case .modo(let chiave, let nome):
+            guard let m = ModoLidar(rawValue: chiave) else { return }
+            if fase == .risultatoModo, let r = risultatoModo, r.modo == m { jarvis.annuncia(r.annuncio); return }   // «dimensioni dell'oggetto» sul risultato
+            if fase == .risultato, m == .stanza, risultato != nil { vista = .pianta; return }                    // «dammi la pianta»
+            if inScansione, vero == m { return }                                                                 // già al lavoro
+            parti(m, nome: nome)
+            jarvis.annuncia(m.annuncioVoce)
         }
+    }
+
+    /// Un modo chiesto a voce: si sceglie e parte subito la scansione.
+    private func parti(_ m: ModoLidar, nome: String?) {
+        switch m {
+        case .statua: modo = .corpo; corpo = .statua
+        case .corpo: modo = .corpo; corpo = .postura
+        default: modo = m
+        }
+        nomePersona = nome
+        avviaScansione()
     }
 
     // MARK: Scansione
 
-    private var schermoScansione: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Spacer()
-                Button("Chiudi") { Suoni.tocco(); esci() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
-            }
-            .padding(.horizontal, 20).padding(.top, 8)
-            ZStack(alignment: .bottom) {
-                #if canImport(RoomPlan)
-                CatturaStanza(ferma: $fermaScansione,
-                              aggiorna: { dalVivo = $0 },
-                              finita: { s in mostra(s) },
-                              errore: { e in avviso = e; fase = .scansione })
-                .id(tentativo)
-                #endif
-                VStack(spacing: 10) {
-                    Text(fase == .elaboro ? "ELABORAZIONE PIANTA…" : (avviso ?? "MUOVA L'IPHONE LUNGO LE PARETI"))
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
-                        .foregroundStyle(avviso == nil ? Color.ciano : .orange)
-                        .multilineTextAlignment(.center)
-                    if fase == .scansione && avviso == nil {
-                        Button { Suoni.tocco(); fase = .elaboro; fermaScansione = true } label: {
-                            Text("Fine").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.fondo)
-                                .padding(.horizontal, 28).padding(.vertical, 10).background(Color.ciano).clipShape(Capsule())
-                        }
-                        .buttonStyle(StileStark())
-                    }
-                    if avviso != nil {
-                        Button { Suoni.tocco(); avviso = nil; fermaScansione = false; dalVivo = MisureDalVivo(); fase = .scansione; tentativo += 1 } label: {
-                            Text("Riprova").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.fondo)
-                                .padding(.horizontal, 28).padding(.vertical, 10).background(Color.ciano).clipShape(Capsule())
-                        }
-                        .buttonStyle(StileStark())
-                    }
-                }
-                .padding(.bottom, 16)
-            }
-            .overlay(alignment: .top) { hudDalVivo.padding(12) }
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.ciano.opacity(0.15), lineWidth: 1))
-            .padding(.horizontal, 16).padding(.bottom, 16)
+    /// «Scansiona»: la fotocamera si accende («ACCENSIONE SENSORE…»), dopo 0,7 s il suono della fotocamera e il tasto «Fine».
+    private func avviaScansione() {
+        pulisciModo()
+        risultatoModo = nil
+        avviso = SupportoModi.disponibile(vero) ? nil : SupportoModi.avviso(vero)
+        fermaScansione = false; ancora = false; acceso = false
+        dalVivo = MisureDalVivo(); stato = StatoScansione(); allestimentoVivo = nil
+        fase = .scansione
+        tentativo += 1
+        let mio = tentativo
+        Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            guard mio == tentativo, fase == .scansione else { return }
+            acceso = true
+            if avviso == nil { Suoni.aperturaCamera() }                            // sensore pronto: il suono delle sezioni con fotocamera
         }
     }
 
-    private var hudDalVivo: some View {
-        HStack(spacing: 8) {
-            datoVivo("\(dalVivo.pareti)", "PARETI")
-            datoVivo(dalVivo.area > 0 ? LidarFormato.n(dalVivo.area) : "0,0", "M²")
-            datoVivo(dalVivo.altezza > 0 ? LidarFormato.m(dalVivo.altezza, 2) : "—", "ALTEZZA")
+    private var pronto: Bool {
+        switch vero {
+        case .stanza, .evento: return dalVivo.chiusa
+        default: return stato.pronto
         }
     }
-    private func datoVivo(_ v: String, _ t: String) -> some View {
-        VStack(spacing: 2) {
-            Text(v).font(.system(size: 18, weight: .bold, design: .monospaced)).foregroundStyle(.white).monospacedDigit()
-                .contentTransition(.numericText())
-            Text(t).font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(Color.ciano)
+    /// C'è abbastanza per costruire qualcosa? (il secondo «Fine» prima del «FATTO» vale solo così)
+    private var haDati: Bool {
+        switch vero {
+        case .stanza, .evento: return dalVivo.pareti >= 3
+        case .statua: return (Int(stato.hud.first ?? "") ?? 0) >= 20
+        default: return stato.hud.contains { $0 != "—" }
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 6)
-        .background(Color.fondo.opacity(0.6))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.22), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// «Fine»: se non ha ancora finito, «ANCORA UN ATTIMO…» e si continua; toccato di nuovo, chiude con quello che c'è.
+    private func premiFine() {
+        guard fase == .scansione, acceso, avviso == nil else { return }
+        if pronto || (ancora && haDati) {
+            inizioFine = Date()
+            fase = .elaboro
+            fermaScansione = true
+        } else {
+            ancora = true
+        }
+    }
+
+    private var testoStato: String {
+        if let avviso { return avviso }
+        if fase == .elaboro { return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…" }
+        if !acceso { return "ACCENSIONE SENSORE…" }
+        if pronto { return vero == .stanza ? "SALA CHIUSA · TOCCHI FINE" : "FATTO · TOCCHI FINE" }
+        if ancora { return vero == .stanza ? "ANCORA UN ATTIMO: MANCANO DELLE PARETI" : "ANCORA UN ATTIMO…" }
+        return vero.istruzione
+    }
+
+    private var valoriHUD: [String] {
+        switch vero {
+        case .stanza:
+            return ["\(dalVivo.pareti)", dalVivo.area > 0 ? LidarFormato.n(dalVivo.area) : "0,0", dalVivo.altezza > 0 ? LidarFormato.m(dalVivo.altezza, 2) : "—"]
+        case .evento:
+            guard let a = allestimentoVivo else { return ["—", "—", "—"] }
+            return ["\(a.stand.count)", LidarFormato.m(Allestimento.passaggio), "\(a.uscite.count)"]
+        default:
+            return stato.hud
+        }
+    }
+
+    private var schermoScansione: some View {
+        CorniceScansione(etichette: vero.hud, valori: valoriHUD, stato: testoStato, avviso: avviso != nil,
+                         mostraFine: acceso && fase == .scansione && avviso == nil,
+                         mostraRiprova: avviso != nil && SupportoModi.disponibile(vero),
+                         fine: premiFine, riprova: avviaScansione) {
+            camera.id(tentativo)
+        }
+    }
+
+    @ViewBuilder private var camera: some View {
+        if !SupportoModi.disponibile(vero) {
+            Color.clear
+        } else {
+            switch vero {
+            case .stanza, .evento:
+                #if canImport(RoomPlan)
+                CatturaStanza(ferma: $fermaScansione,
+                              aggiorna: { dalVivo = $0 },
+                              vivo: vero == .evento ? { s in setupVivo(s) } : nil,
+                              finita: { s in finitaStanza(s) },
+                              errore: { e in errore(e) })
+                #else
+                Color.clear
+                #endif
+            case .statua:
+                CatturaStatua(ferma: $fermaScansione, aggiorna: { stato = $0 }, elaboro: { fase = .elaboro },
+                              finita: { mostraModo($0) }, errore: { errore($0) }, nome: nomePersona)
+            default:
+                CatturaAR(modo: vero, ferma: $fermaScansione, aggiorna: { stato = $0 }, finita: { mostraModo($0) }, errore: { errore($0) })
+            }
+        }
+    }
+
+    /// Setup: mentre la stanza si forma, l'allestimento si ricalcola (una volta al secondo).
+    private func setupVivo(_ s: ScansioneLidar) {
+        guard Date().timeIntervalSince(ultimoAllestimento) > 1 else { return }
+        ultimoAllestimento = Date()
+        allestimentoVivo = Allestimento.calcola(StanzaScena(s))
+    }
+
+    private func errore(_ e: String) {
+        avviso = e
+        fase = .scansione
+    }
+
+    /// La stanza è pronta: «ELABORAZIONE PIANTA…» resta almeno 0,9 s (Setup: «ELABORAZIONE…» 0,8 s), come nel mockup.
+    private func finitaStanza(_ s: ScansioneLidar) {
+        let resta = (vero == .evento ? 0.8 : 0.9) - Date().timeIntervalSince(inizioFine)
+        Task {
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard fase == .elaboro else { return }
+            if vero == .evento {
+                try? FileManager.default.removeItem(at: s.file3D)                    // a Setup il modello di Apple non serve
+                mostraModo(RisultatoModo.evento(s))
+            } else {
+                mostra(s)
+            }
+        }
     }
 
     private func mostra(_ s: ScansioneLidar) {
@@ -266,9 +397,26 @@ struct VistaLidar: View {
         withAnimation(.easeOut(duration: 0.3)) { fase = .risultato }
         Suoni.schedaPronta()
     }
+    private func mostraModo(_ r: RisultatoModo) {
+        guard fase == .elaboro || fase == .scansione else { return }
+        risultatoModo = r
+        withAnimation(.easeOut(duration: 0.3)) { fase = .risultatoModo }
+        Suoni.schedaPronta()
+    }
+
+    private func salvaModo(_ r: RisultatoModo) {
+        ArchivioModi.condiviso.salva(r)
+        salvati.insert(r.id)
+    }
+    /// Un modello 3D di Texture non salvato non resta a occupare spazio.
+    private func pulisciModo() {
+        if let r = risultatoModo, !salvati.contains(r.id), let f = r.file { try? FileManager.default.removeItem(at: f) }
+    }
+
     /// Uscendo, il modello 3D di una scansione non salvata si cancella: non resta a occupare spazio.
     private func esci() {
         if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D) }
+        pulisciModo()
         chiudi()
     }
     private func apri(_ s: ScansioneLidar) {
@@ -277,77 +425,39 @@ struct VistaLidar: View {
         condivisi = LidarCondivisione.file(s)
     }
 
-    // MARK: Risultato
+    // MARK: Risultato di Interno (PIANTA · OLOGRAMMA · TEXTURE · ARCHIVIO)
 
     private var schermoRisultato: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button("Chiudi") { Suoni.tocco(); esci() }.font(.body.weight(.semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
-            }
-            .padding(.horizontal, 20).padding(.top, 8)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    testata
-                    HStack(spacing: 6) {
-                        ForEach(Vista.allCases, id: \.self) { v in
-                            Button { Suoni.tocco(); vista = v } label: {
-                                Text(v.rawValue).font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 8)
-                                    .foregroundStyle(vista == v ? Color.fondo : Color.ciano)
-                                    .background(vista == v ? Color.ciano : .clear)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(vista == v ? 1 : 0.3), lineWidth: 1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(StileStark())
-                        }
-                    }
-                    tavola
-                    if let s = risultato, vista != .archivio { pannelli(s) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                TestataScheda(titolo: "LiDAR", sottotitolo: risultato?.nome.lowercased() ?? "archivio", icona: "cube.transparent", tinta: .ciano)
+                HStack(spacing: 6) {
+                    ForEach(Vista.allCases, id: \.self) { v in ChipLidar(testo: v.rawValue, premuto: vista == v) { vista = v } }
                 }
-                .padding(.horizontal, 16).padding(.bottom, 24)
+                TavolaLidar(proporzione: vista == .archivio ? nil : 720 / 560) { tavola }
+                if let s = risultato { pannelli(s) }
             }
+            .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
         }
-    }
-
-    private var testata: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "cube.transparent").font(.system(size: 22)).foregroundStyle(Color.ciano)
-                .frame(width: 52, height: 52)
-                .overlay(Circle().stroke(Color.ciano.opacity(0.25), lineWidth: 1))
-                .shadow(color: .ciano.opacity(0.3), radius: 9)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("LIDAR").font(.system(size: 22, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(.white)
-                Text(risultato?.nome.lowercased() ?? (fase == .nonDisponibile ? "serve un iphone con lidar" : "archivio"))
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
-            }
-        }
-        .padding(.top, 4)
     }
 
     @ViewBuilder private var tavola: some View {
-        Group {
-            switch vista {
-            case .pianta:
-                if let s = risultato { PiantaLidar(scansione: s).frame(height: 280) } else { vuoto("Nessuna scansione aperta.\nNe apra una dall'archivio.") }
-            case .tre:
-                if let s = risultato, FileManager.default.fileExists(atPath: s.file3D.path) {
-                    Ologramma3D(file: s.file3D).frame(height: 280)
-                } else { vuoto("Il modello 3D non c'è per questa scansione.") }
-            case .archivio:
-                archivioVista
-            }
+        switch vista {
+        case .pianta:
+            if let s = risultato { PiantaLidar(scansione: s) } else { vuoto("Nessuna scansione aperta.\nNe apra una dall'archivio.") }
+        case .pieno, .foto:
+            if let s = risultato {
+                Vista3DLidar(modello: .stanza(StanzaScena(s)), fase: .risultato, stile: vista == .foto ? .foto : .pieno).id(s.id)
+            } else { vuoto("Nessuna scansione aperta.\nNe apra una dall'archivio.") }
+        case .archivio:
+            archivioVista
         }
-        .background(Color.ciano.opacity(0.03))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.22), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func vuoto(_ t: String) -> some View {
-        Text(fase == .nonDisponibile && archivio.scansioni.isEmpty
-             ? "La scansione funziona sull'iPhone con il LiDAR (Pro), Sir: qui si vedono le scansioni salvate su questo dispositivo." : t)
+        Text(t)
             .font(.system(size: 13)).foregroundStyle(Color.tenue).multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 160).padding()
+            .frame(maxWidth: .infinity, minHeight: 140).padding()
     }
 
     @ViewBuilder private var archivioVista: some View {
@@ -359,10 +469,10 @@ struct VistaLidar: View {
                     HStack {
                         Button { Suoni.tocco(); apri(s) } label: {
                             HStack {
-                                Text(s.nome).font(.system(size: 14)).foregroundStyle(.white).lineLimit(1)
+                                Text(s.nome).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo).lineLimit(1)
                                 Spacer()
                                 Text("\(LidarFormato.m2(s.area)) · \(s.data.formatted(date: .numeric, time: .shortened))")
-                                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(Color.tenue)
+                                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Color.tenue)
                             }
                         }
                         Button { Suoni.tocco(); if risultato?.id == s.id { risultato = nil }; archivio.cancella(s) } label: {
@@ -374,58 +484,42 @@ struct VistaLidar: View {
                     if s.id != archivio.scansioni.last?.id { Divider().overlay(Color.ciano.opacity(0.12)) }
                 }
             }
+            .frame(minHeight: 140, alignment: .top)
         }
     }
 
     private func pannelli(_ s: ScansioneLidar) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Pannello(titolo: "MISURE", tinta: .ciano) {
-                riga("Superficie", LidarFormato.m2(s.area))
-                riga("Perimetro", LidarFormato.m(s.perimetro))
-                riga("Altezza", LidarFormato.m(s.altezza, 2))
-                riga("Volume", s.area > 0 ? LidarFormato.n(s.volume, 0) + " m³" : "—")
-                riga("Pareti · porte · finestre", "\(s.pareti.count) · \(s.porte.count) · \(s.finestre.count)")
-                if !s.oggetti.isEmpty { riga("Arredi", "\(s.oggetti.count)") }
+                RigaHUD("Superficie", LidarFormato.m2(s.area))
+                RigaHUD("Perimetro", LidarFormato.m(s.perimetro))
+                RigaHUD("Altezza", LidarFormato.m(s.altezza, 2))
+                RigaHUD("Volume", s.area > 0 ? LidarFormato.n(s.volume, 0) + " m³" : "—")
+                RigaHUD("Pareti · porte · finestre", "\(s.pareti.count) · \(s.porte.count) · \(s.finestre.count)")
             }
             Pannello(titolo: "CAPIENZA", tinta: .ciano) {
-                riga("Indicativa, 1,2 persone/m²", s.area > 0 ? "\(s.capienza) persone" : "—")
+                RigaHUD("Indicativa, 1,2 persone/m²", s.area > 0 ? "\(s.capienza) persone" : "—")
                 Text("Densità delle sale da ballo (DM 19/08/1996). La capienza vera la fissano uscite e commissione di vigilanza.")
-                    .font(.system(size: 11)).foregroundStyle(Color.tenue)
+                    .font(.system(size: 11)).foregroundStyle(Color.tenue).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                tasto(archivio.contiene(s) ? "Salvata" : "Salva", attivo: !archivio.contiene(s)) { archivio.salva(s) }
+                TastoLidar(testo: archivio.contiene(s) ? "Salvata" : "Salva", attivo: !archivio.contiene(s)) { archivio.salva(s) }
                 ShareLink(items: condivisi) {
-                    Text("Condividi").font(.system(size: 12, weight: .semibold, design: .monospaced)).tracking(1.5)
-                        .frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(Color.ciano)
+                    Text("CONDIVIDI").font(.system(size: 12, weight: .semibold, design: .monospaced)).tracking(1.5)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity).padding(.vertical, 11).padding(.horizontal, 8).foregroundStyle(Color.ciano)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
                 }
                 .simultaneousGesture(TapGesture().onEnded { Suoni.tocco() })
-                tasto("Chiedi", attivo: true) { chiedi(s.riassunto) }
+                TastoLidar(testo: "Chiedi") { chiedi(s.riassunto) }
             }
         }
     }
-
-    private func riga(_ t: String, _ v: String) -> some View {
-        HStack {
-            Text(t).font(.system(size: 14)).foregroundStyle(Color(white: 0.85))
-            Spacer()
-            Text(v).font(.system(size: 12, design: .monospaced)).foregroundStyle(Color.tenue).monospacedDigit()
-        }
-    }
-
-    private func tasto(_ t: String, attivo: Bool, _ azione: @escaping () -> Void) -> some View {
-        Button { Suoni.tocco(); azione() } label: {
-            Text(t).font(.system(size: 12, weight: .semibold, design: .monospaced)).tracking(1.5)
-                .frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(Color.ciano.opacity(attivo ? 1 : 0.5))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
-        }
-        .buttonStyle(StileStark())
-        .disabled(!attivo)
-    }
 }
 
+
 /// I numeri che salgono mentre scansiona.
-nonisolated struct MisureDalVivo: Equatable, Sendable { var pareti = 0; var area = 0.0; var altezza = 0.0 }
+nonisolated struct MisureDalVivo: Equatable, Sendable { var pareti = 0; var area = 0.0; var altezza = 0.0; var chiusa = false }
 
 enum LidarSupporto {
     static var disponibile: Bool {
@@ -510,63 +604,6 @@ struct PiantaLidar: View {
     }
 }
 
-// MARK: - L'ologramma 3D (SceneKit): il modello della stanza a fil di ferro ciano, che ruota
-
-struct Ologramma3D: UIViewRepresentable {
-    let file: URL
-
-    func makeUIView(context: Context) -> SCNView {
-        let v = SCNView()
-        v.backgroundColor = UIColor(Color.fondo)
-        v.allowsCameraControl = true
-        v.antialiasingMode = .multisampling4X
-        v.scene = Self.scena(file)
-        return v
-    }
-    func updateUIView(_ v: SCNView, context: Context) {}
-
-    static func scena(_ file: URL) -> SCNScene {
-        let scena = SCNScene()
-        guard let modello = try? SCNScene(url: file, options: [.checkConsistency: true]) else { return scena }
-        let perno = SCNNode()
-        for n in modello.rootNode.childNodes { perno.addChildNode(n) }
-        let ciano = UIColor(red: 0.31, green: 0.89, blue: 1, alpha: 1)
-        var conGeometria: [SCNNode] = []
-        perno.enumerateHierarchy { nodo, _ in if nodo.geometry != nil { conGeometria.append(nodo) } }
-        for nodo in conGeometria {
-            guard let g = nodo.geometry else { continue }
-            let filo = SCNMaterial()
-            filo.fillMode = .lines
-            filo.lightingModel = .constant
-            filo.diffuse.contents = ciano
-            filo.emission.contents = ciano
-            filo.isDoubleSided = true
-            g.materials = [filo]
-            // un velo trasparente sotto il filo, come le pareti dell'ologramma
-            let velo = SCNNode(geometry: g.copy() as? SCNGeometry)
-            let m = SCNMaterial()
-            m.lightingModel = .constant
-            m.diffuse.contents = ciano.withAlphaComponent(0.08)
-            m.isDoubleSided = true
-            m.writesToDepthBuffer = false
-            velo.geometry?.materials = [m]
-            nodo.addChildNode(velo)
-        }
-        // al centro, poi gira piano
-        let (lo, hi) = perno.boundingBox
-        let centro = SCNVector3((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2)
-        perno.pivot = SCNMatrix4MakeTranslation(centro.x, centro.y, centro.z)
-        perno.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 24)))
-        scena.rootNode.addChildNode(perno)
-        let raggio = max(hi.x - lo.x, hi.z - lo.z, 1)
-        let camera = SCNNode(); camera.camera = SCNCamera(); camera.camera?.zFar = 500
-        camera.position = SCNVector3(0, raggio * 0.75, raggio * 1.25)
-        camera.look(at: SCNVector3(0, 0, 0))
-        scena.rootNode.addChildNode(camera)
-        return scena
-    }
-}
-
 // MARK: - Condivisione: la pianta in PNG e il modello 3D (USDZ)
 
 enum LidarCondivisione {
@@ -608,10 +645,11 @@ private struct PiantaStatica: View {
 struct CatturaStanza: UIViewRepresentable {
     @Binding var ferma: Bool
     let aggiorna: (MisureDalVivo) -> Void
+    let vivo: ((ScansioneLidar) -> Void)?          // Setup: la stanza com'è adesso, per posare l'allestimento mentre si forma
     let finita: (ScansioneLidar) -> Void
     let errore: (String) -> Void
 
-    func makeCoordinator() -> Regista { Regista(aggiorna: aggiorna, finita: finita, errore: errore) }
+    func makeCoordinator() -> Regista { Regista(aggiorna: aggiorna, vivo: vivo, finita: finita, errore: errore) }
 
     func makeUIView(context: Context) -> RoomCaptureView {
         let v = RoomCaptureView(frame: .zero)
@@ -638,34 +676,36 @@ struct CatturaStanza: UIViewRepresentable {
     /// L'immagine che la fotocamera di LiDAR sta vedendo adesso, dritta (verticale) e in JPEG, lato lungo massimo 1600 px.
     static func fotogramma(_ v: RoomCaptureView) -> Data? {
         guard let frame = v.captureSession.arSession.currentFrame else { return nil }
-        var immagine = CIImage(cvPixelBuffer: frame.capturedImage).oriented(.right)
-        let lato = max(immagine.extent.width, immagine.extent.height)
-        if lato > 1600 { immagine = immagine.transformed(by: CGAffineTransform(scaleX: 1600 / lato, y: 1600 / lato)) }
-        guard let spazio = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
-        return CIContext().jpegRepresentation(of: immagine, colorSpace: spazio,
-                                              options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.8])
+        return LidarFoto.jpeg(frame)
     }
 
     /// Riceve gli aggiornamenti della sessione e il risultato della vista. NSCoding lo chiede il protocollo di Apple.
     @objc(JarvisRegistaLidar)                   // nome stabile: RoomCaptureViewDelegate passa da NSCoding
     nonisolated final class Regista: NSObject, RoomCaptureViewDelegate, RoomCaptureSessionDelegate, @unchecked Sendable {
         let aggiorna: (MisureDalVivo) -> Void
+        let vivo: ((ScansioneLidar) -> Void)?
         let finita: (ScansioneLidar) -> Void
         let errore: (String) -> Void
         weak var vista: RoomCaptureView?
         var fermata = false
         var annullata = false                       // chiusa a metà: niente pianta, niente suono, niente file
 
-        init(aggiorna: @escaping (MisureDalVivo) -> Void, finita: @escaping (ScansioneLidar) -> Void, errore: @escaping (String) -> Void) {
-            self.aggiorna = aggiorna; self.finita = finita; self.errore = errore
+        init(aggiorna: @escaping (MisureDalVivo) -> Void, vivo: ((ScansioneLidar) -> Void)?, finita: @escaping (ScansioneLidar) -> Void,
+             errore: @escaping (String) -> Void) {
+            self.aggiorna = aggiorna; self.vivo = vivo; self.finita = finita; self.errore = errore
         }
         required init?(coder: NSCoder) { nil }
         func encode(with coder: NSCoder) {}
 
         // i numeri dal vivo
         nonisolated func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
-            let m = MisureDalVivo(pareti: room.walls.count, area: Misuratore.area(room), altezza: Misuratore.altezza(room))
-            Task { @MainActor in self.aggiorna(m) }
+            let m = MisureDalVivo(pareti: room.walls.count, area: Misuratore.area(room), altezza: Misuratore.altezza(room),
+                                  chiusa: Misuratore.chiusa(room))
+            let adesso = vivo != nil ? Misuratore.scansione(room) : nil
+            Task { @MainActor in
+                self.aggiorna(m)
+                if let adesso { self.vivo?(adesso) }
+            }
         }
 
         // la scansione è finita: niente schermata finale di Apple, il risultato lo costruisce JARVIS
@@ -694,11 +734,38 @@ struct CatturaStanza: UIViewRepresentable {
 
 /// Le misure da una stanza di RoomPlan, viste dall'alto.
 nonisolated enum Misuratore {
-    static func tratto(_ s: CapturedRoom.Surface) -> TrattoPianta {
+    static func tratto(_ s: CapturedRoom.Surface) -> TrattoPianta { tratto(s, pavimento: nil) }
+    /// Con il pavimento: anche da che altezza a che altezza (porte e finestre).
+    static func tratto(_ s: CapturedRoom.Surface, pavimento: Float?) -> TrattoPianta {
         let t = s.transform, c = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
         let dir = simd_normalize(SIMD3<Float>(t.columns.0.x, t.columns.0.y, t.columns.0.z)), l = s.dimensions.x / 2
         let a = c - dir * l, b = c + dir * l
-        return TrattoPianta(ax: Double(a.x), az: Double(a.z), bx: Double(b.x), bz: Double(b.z))
+        var r = TrattoPianta(ax: Double(a.x), az: Double(a.z), bx: Double(b.x), bz: Double(b.z))
+        if let pavimento, s.dimensions.y > 0 {
+            r.basso = Double(max(0, c.y - s.dimensions.y / 2 - pavimento))
+            r.alto = Double(c.y + s.dimensions.y / 2 - pavimento)
+        }
+        return r
+    }
+    /// L'altezza del pavimento: il suo piano, o il piede più basso delle pareti.
+    static func quotaPavimento(_ r: CapturedRoom) -> Float? {
+        if let f = r.floors.first { return f.transform.columns.3.y }
+        return r.walls.map { $0.transform.columns.3.y - $0.dimensions.y / 2 }.min()
+    }
+    /// La sala è chiusa: almeno tre pareti, e ogni capo di parete tocca (entro 35 cm) il capo di un'altra.
+    static func chiusa(_ r: CapturedRoom) -> Bool {
+        let t = r.walls.map(tratto)
+        guard t.count >= 3 else { return false }
+        let capi = t.enumerated().flatMap { i, w in [(i, SIMD2(w.ax, w.az)), (i, SIMD2(w.bx, w.bz))] }
+        return capi.allSatisfy { i, p in capi.contains { j, q in j != i && simd_distance(p, q) < 0.35 } }
+    }
+    /// Il poligono del pavimento nel mondo (x, z), dal pavimento più grande.
+    static func poligonoPavimento(_ r: CapturedRoom) -> [[Double]]? {
+        let poli = r.floors.map { f in f.polygonCorners.map { v -> [Double] in
+            let w = f.transform * SIMD4<Float>(v.x, v.y, v.z, 1)
+            return [Double(w.x), Double(w.z)]
+        } }.filter { $0.count >= 3 }
+        return poli.max { GeometriaPiana.area($0.map { SIMD2($0[0], $0[1]) }) < GeometriaPiana.area($1.map { SIMD2($0[0], $0[1]) }) }
     }
     /// Superficie del pavimento (m²): i vertici del pavimento portati nel mondo, area col metodo dei lacci.
     static func area(_ r: CapturedRoom) -> Double {
@@ -722,11 +789,12 @@ nonisolated enum Misuratore {
         return h.isEmpty ? 0 : h[h.count / 2]                       // la mediana: un muretto non abbassa la stanza
     }
     static func scansione(_ r: CapturedRoom) -> ScansioneLidar {
-        let pareti = r.walls.map(tratto)
+        let pareti = r.walls.map(tratto), pav = quotaPavimento(r)
         return ScansioneLidar(nome: "Stanza del " + Date().formatted(date: .numeric, time: .shortened),
                               area: area(r), perimetro: pareti.reduce(0) { $0 + $1.lunghezza }, altezza: altezza(r),
-                              pareti: pareti, porte: r.doors.map(tratto), finestre: r.windows.map(tratto),
-                              aperture: r.openings.map(tratto), oggetti: r.objects.map { nome($0.category) })
+                              pareti: pareti, porte: r.doors.map { tratto($0, pavimento: pav) }, finestre: r.windows.map { tratto($0, pavimento: pav) },
+                              aperture: r.openings.map { tratto($0, pavimento: pav) }, oggetti: r.objects.map { nome($0.category) },
+                              pavimento: poligonoPavimento(r))
     }
     static func nome(_ c: CapturedRoom.Object.Category) -> String {
         switch c {
