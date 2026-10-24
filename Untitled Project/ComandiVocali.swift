@@ -473,9 +473,51 @@ enum ComandoVocale: Equatable {
         // solo frasi esatte: «pulisci il bagno» o «cancella la chat con Bea» restano a JARVIS
         if [" pulisci ", " pulisci la chat ", " pulisci tutto ", " pulisci lo schermo ", " svuota la chat ", " svuota la conversazione ",
             " cancella la chat ", " cancella la conversazione ", " cestino ", " svuota il cestino "].contains(where: { s == $0 }) { return .apri(.pulisci) }
-        let mostra = comanda || t.contains(where: { ["mostra", "mostrami", "vedere", "vediamo", "guardiamo", "controlla", "controlliamo"].contains($0) })
-        if mostra {
-            for (reparto, chiavi) in schede where chiavi.contains(where: c) { return .apri(reparto) }
+        // Revisione del dialogo (24 ott): una scheda si apre solo se la frase è davvero un ordine di aprirla, non se la parola
+        // capita in un discorso normale («quanto tempo?», «fai una foto alla lavagna», «fammi il punto sulla serata»,
+        // «metti il cuore in pace», «vai avanti con la spiegazione del database», «che messaggi?»).
+        // Vale se: (1) un verbo d'apertura (apri, mostrami, fammi vedere, inizia…) sta poco prima del nome, con al massimo due
+        // parole in mezzo («fammi vedere le foto di ieri», «apri la mail di Matteo»); (2) un verbo semplice (vai, passa, fammi,
+        // fai, metti, controlla…) sta subito prima del nome, solo con «il», «al», «sulla»… in mezzo, e la frase finisce lì
+        // («vai al meteo», «fammi il briefing», «controlla la posta»); (3) la frase è di una o due parole e non è una domanda
+        // («il cuore», «i vitals», «personal trainer»; «che messaggi?» e «il cuore?» vanno a JARVIS).
+        // «Tempo» apre il Meteo solo come ordine secco («mostrami il tempo», «fammi vedere che tempo fa»): «quanto tempo?»,
+        // «hai tempo?» sono discorso. «Fammi controllare la posta», «fammi sentire Shazam», «fammi guardare le foto» restano ordini.
+        let verbiForti: Set<String> = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "inizia", "modalita", "entra", "mostra", "mostrami",
+                                       "portami", "vediamo", "vedere", "aprire", "controllare", "guardare", "sentire"]
+        let verbiSemplici: Set<String> = ["vai", "passa", "fammi", "fai", "metti", "parti", "controlla", "controlliamo", "guardiamo"]
+        let ponteScheda: Set<String> = ["il", "lo", "la", "l", "i", "gli", "le", "al", "allo", "alla", "all", "ai", "agli", "alle", "su", "sul", "sullo",
+                                        "sulla", "sull", "sui", "sugli", "sulle", "nel", "nello", "nella", "nell", "nei", "negli", "nelle", "a", "in", "con"]
+        let cortesia: Set<String> = ["per", "favore", "sir", "jarvis", "grazie", "pure", "subito", "adesso", "ora", "prego"]
+        var fine = t.count                                   // la frase senza le parole di cortesia in fondo («…il meteo, per favore»)
+        while fine > 1, cortesia.contains(t[fine - 1]) { fine -= 1 }
+        let interrogative: Set<String> = ["che", "quale", "quali", "qual", "quanto", "quanta", "quanti", "quante", "chi", "come", "dove", "quando",
+                                          "perche", "cosa", "hai", "ho", "sai", "c"]
+        let domanda = frase.contains("?") || interrogative.contains(t[0])
+        let breve = t.count <= 2 && !domanda
+        func ordineDiAprire(_ chiave: String, secco: Bool) -> Bool {
+            let k = chiave.split(separator: " ").map(String.init)
+            guard !k.isEmpty, k.count <= t.count else { return false }
+            for i in 0...(t.count - k.count) where Array(t[i..<(i + k.count)]) == k {
+                let inFondo = i + k.count == fine
+                var j = i - 1
+                var inMezzo = 0                               // parole in mezzo che non sono «il», «al», «sulla»…
+                while j >= 0 {
+                    let w = t[j]
+                    if verbiForti.contains(w) { if inMezzo <= (secco ? 0 : 2) { return true }; break }
+                    if secco && w == "che" { j -= 1; continue }       // «fammi vedere che tempo fa», «mostrami che tempo fa»
+                    if verbiSemplici.contains(w) { if inMezzo == 0 && inFondo { return true }; break }
+                    if !ponteScheda.contains(w) { inMezzo += 1; if inMezzo > 2 { break } }
+                    j -= 1
+                }
+            }
+            return false
+        }
+        for (reparto, chiavi) in schede {
+            for chiave in chiavi where c(chiave) {
+                let tempo = chiave == " tempo "
+                if (breve && !tempo) || ordineDiAprire(chiave, secco: tempo) { return .apri(reparto) }
+            }
         }
         return nil
     }
