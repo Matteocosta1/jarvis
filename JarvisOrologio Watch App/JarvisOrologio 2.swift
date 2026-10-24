@@ -120,6 +120,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var fineFrase: CheckedContinuation<Void, Never>?
     private var fraseInVoce = false                    // una frase della coda si sta scaricando o dicendo
     private var orecchioSospeso = false                // Shazam ascolta la musica: niente orecchio per le interruzioni
+    /// Difetto 3 (controllo del 25 ott): la risposta com'era quando il volume l'ha fermata. Se poi nella registrazione non c'è
+    /// nessuna sua parola (una tosse, una porta, una risata vicino), JARVIS riprende da lì invece di dire «Non ho capito».
+    private struct RispostaSospesa {
+        let domanda: String                            // la domanda a cui stava rispondendo
+        let completa: String?                          // la risposta intera, se era già arrivata tutta (senza i toni)
+        let detto: String                              // le frasi già dette per intero
+        let storia: [[String: String]]                 // la cronologia prima del segno d'interruzione
+    }
+    private var sospesa: RispostaSospesa?
 
     override init() {
         super.init()
@@ -281,6 +290,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     func ferma() {
+        sospesa = nil                                  // difetto 3: fermato davvero, niente da riprendere
         inCorso = nil                                  // fermato: quello che dice dopo non è più «la risposta in corso»
         riascolta = false
         compito?.cancel()
@@ -620,6 +630,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return
             }
         }
+        // difetto 3: la frase con cui «l'aveva interrotto» era solo un rumore (dopo aver tolto la voce di JARVIS non resta nessuna
+        // parola): non era il signore. JARVIS riprende la risposta da dove si era fermato
+        if eco != nil, let s = sospesa {
+            sospesa = nil
+            if esito.vuoto || (esito.errore == nil && JarvisOrologio.soloRumore(testo ?? "")) { riprendiRisposta(s); return }
+        }
         if esito.vuoto {
             compito = nil
             fase = .attesa
@@ -675,6 +691,49 @@ final class JarvisOrologio: NSObject, ObservableObject {
             fase = .attesa
             stato = errore ?? "Non ho capito, Sir. Riprovi."
         }
+    }
+
+    /// Difetto 3: nella registrazione non c'è nessuna parola vera, solo rumore (una tosse, una risata trascritta «ahah»).
+    nonisolated static func soloRumore(_ t: String) -> Bool {
+        let parole = t.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init)
+        let versi: Set<String> = ["ah", "ahah", "ahahah", "ahahahah", "haha", "hahaha", "hahahaha", "mh", "mmh", "mm", "hm", "hmm",
+                                  "ehm", "uhm", "coff", "etciù", "etciu"]
+        return parole.allSatisfy { versi.contains($0) }
+    }
+
+    /// Difetto 3: riprende la risposta fermata da un rumore. Se era già arrivata tutta, dice da solo le frasi che mancavano
+    /// (dal punto esatto, `Dialogo.taglio`); se no, chiede al cervello il seguito come un «continua» (decisione 53: stesso
+    /// modello, riparte dal segno d'interruzione). Prima JARVIS scriveva «Non ho capito, Sir.» e la risposta era persa.
+    private func riprendiRisposta(_ s: RispostaSospesa) {
+        compito = nil
+        stato = nil
+        if let completa = s.completa {
+            let detto = TagVoce.togli(s.detto).trimmingCharacters(in: .whitespacesAndNewlines)
+            let resto: String? = detto.isEmpty ? completa : Dialogo.taglio(completa, dopo: detto).map { String(completa[$0...]) }
+            if let resto {
+                storia = s.storia                      // il signore non l'ha interrotto: la risposta resta intera in cronologia
+                daUnire = nil
+                domanda = s.domanda
+                risposta = completa
+                rispostaGrezza = ""
+                rispostaInStoria = true
+                inCorso = s.domanda
+                riascolta = true                       // come a fine risposta: detta tutta, riascolta da solo
+                let r = resto.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !r.isEmpty else { fase = .attesa; dopoRisposta(); return }   // l'aveva già detta tutta
+                iniziaFlussoVoce()
+                dettoFinora = s.detto                  // se poi lo interrompe davvero, il punto del taglio resta giusto
+                accodaPezzo(r)
+                chiudiFlussoVoce()
+                return
+            }
+        }
+        // la risposta era ancora in arrivo (o il punto non si ritrova): il seguito dal cervello, dal segno d'interruzione
+        daUnire = s.domanda
+        quandoDaUnire = Date()
+        chiedi("continua", aVoce: true)
+        domanda = s.domanda                            // a schermo resta la sua domanda (il «continua» non l'ha detto lui)
+        inCorso = s.domanda
     }
 
     /// Le sezioni che al polso non ci sono (servono la fotocamera, il LiDAR o lo schermo dell'iPhone): `VistaOrologio.apri`
@@ -1329,6 +1388,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
 
     private func interrottoAVoce() {
+        // difetto 3: prima di segnare il taglio si ricorda la risposta com'era, per riprenderla se non era lui a parlare
+        let completa: String? = rispostaInStoria && storia.last?["role"] == "assistant" ? storia.last?["content"] : nil
+        sospesa = inCorso.map { RispostaSospesa(domanda: $0, completa: completa, detto: dettoFinora, storia: storia) }
         segnaInterruzione()
         inCorso = nil
         // M7: la frase del signore è già nella registrazione dell'orecchio (insieme alla voce di JARVIS, che poi si toglie):
