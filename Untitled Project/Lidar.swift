@@ -249,7 +249,7 @@ struct VistaLidar: View {
             if fase == .risultato, m == .stanza, risultato != nil { vista = .pianta; return }                    // «dammi la pianta»
             if inScansione, vero == m { return }                                                                 // già al lavoro
             parti(m, nome: nome)
-            jarvis.annuncia(m.annuncioVoce)
+            jarvis.annuncia(SupportoModi.disponibile(m) ? m.annuncioVoce : (Reparto.lidar.annuncio ?? ""))   // senza il sensore: niente «… pronto», c'è la riga arancione
         }
     }
 
