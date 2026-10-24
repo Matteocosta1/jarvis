@@ -186,6 +186,7 @@ final class ScenaLidar: NSObject {
         l.add(to: .main, forMode: .common)
         link = l
         aggiornaCamera(0)
+        pianificaControllo()
     }
     func ferma() { link?.invalidate(); link = nil }
 
@@ -194,6 +195,7 @@ final class ScenaLidar: NSObject {
         guard s != stile else { return }
         stile = s
         if s == nil { applica() } else { materializza() }
+        pianificaControllo()
     }
 
     func ripristina() { yaw = 0.65; inclinazione = inclinazioneBase; zoom = 1 }
@@ -274,7 +276,7 @@ final class ScenaLidar: NSObject {
     /// l'ologramma usa lo stesso shader dell'Organismo (provato dalla build 22) e i solidi nessuno shader: il modello finito
     /// si vede con gli ingredienti più semplici di SceneKit.
     private func attaccaTaglio() {
-        guard !taglioAttivo else { return }
+        guard !taglioAttivo, !semplice else { return }
         taglioAttivo = true
         for o in vociOlo { o.m.shaderModifiers = [.fragment: testoOlo(o.hex, o.alfa, conTaglio: true)] }
         for m in materialiSolidi { mettiTaglioSolido(m) }
@@ -360,7 +362,7 @@ final class ScenaLidar: NSObject {
         m.isDoubleSided = true
         m.blendMode = .add
         m.writesToDepthBuffer = false
-        m.shaderModifiers = [.fragment: testoOlo(hex, alfa, conTaglio: taglioAttivo)]
+        m.shaderModifiers = semplice ? nil : [.fragment: testoOlo(hex, alfa, conTaglio: taglioAttivo)]
         m.setValue(NSNumber(value: Float(1e6)), forKey: "taglio")
         m.setValue(NSNumber(value: Float(1)), forKey: "verso")
         cacheOlo[chiave] = m
@@ -372,7 +374,7 @@ final class ScenaLidar: NSObject {
     private func solido(_ hex: UInt32 = 0xffffff, trama: UIImage? = nil, metri: Float = 1, ruvido: Float = 0.6, metallo: Float = 0,
                         opacita: CGFloat = 1, emissivo: UInt32? = nil, emissione: CGFloat = 0, doppio: Bool = false) -> SCNMaterial {
         let m = SCNMaterial()
-        m.lightingModel = .physicallyBased
+        m.lightingModel = semplice ? .constant : .physicallyBased
         if let trama {
             m.diffuse.contents = trama
             m.diffuse.wrapS = .repeat; m.diffuse.wrapT = .repeat
@@ -435,13 +437,69 @@ final class ScenaLidar: NSObject {
     private var sole = SCNNode()
     private func luci() {
         let amb = SCNLight(); amb.type = .ambient; amb.color = Self.colore(0x87929c); amb.intensity = 500
-        let na = SCNNode(); na.light = amb; scena.rootNode.addChildNode(na)
+        let na = SCNNode(); na.light = amb; scena.rootNode.addChildNode(na); luciNodi.append(na)
         let s = SCNLight(); s.type = .directional; s.color = UIColor.white; s.intensity = 1700
-        sole.light = s; sole.simdPosition = [-6, 10, 7]; sole.simdLook(at: .zero); scena.rootNode.addChildNode(sole)
+        sole.light = s; sole.simdPosition = [-6, 10, 7]; sole.simdLook(at: .zero); scena.rootNode.addChildNode(sole); luciNodi.append(sole)
         let b = SCNLight(); b.type = .directional; b.color = Self.colore(0x6fe9ff); b.intensity = 600
-        let nb = SCNNode(); nb.light = b; nb.simdPosition = [8, 3, -8]; nb.simdLook(at: .zero); scena.rootNode.addChildNode(nb)
-        scena.lightingEnvironment.contents = TrameLidar.studio
-        scena.lightingEnvironment.intensity = 1
+        let nb = SCNNode(); nb.light = b; nb.simdPosition = [8, 3, -8]; nb.simdLook(at: .zero); scena.rootNode.addChildNode(nb); luciNodi.append(nb)
+        // 24 ott sera: niente più «lightingEnvironment». Era l'unica cosa della scena di LiDAR che l'Organismo (che sul suo
+        // iPhone si vede bene) non ha, e il riquadro usciva tutto magenta anche con soli materiali semplici (Postura).
+    }
+    private var luciNodi: [SCNNode] = []
+
+    // MARK: Controllo della resa: se il riquadro esce tutto magenta (SceneKit non riesce a disegnare), modalità semplice
+
+    private var semplice = false
+
+    /// Fra 1,6 s (finita la salita dal basso) si guarda il riquadro disegnato davvero.
+    private func pianificaControllo() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.6))
+            self?.controllaResa()
+        }
+    }
+
+    private func controllaResa() {
+        guard !semplice, let v = vista, v.window != nil, v.bounds.width > 4, v.bounds.height > 4 else { return }
+        guard let cg = v.snapshot().cgImage, Self.tuttoMagenta(cg) else { return }
+        modalitaSemplice()
+    }
+
+    /// Più di metà del riquadro è magenta puro: il colore che SceneKit mette quando non riesce a disegnare.
+    private static func tuttoMagenta(_ img: CGImage) -> Bool {
+        let lato = 16
+        var px = [UInt8](repeating: 0, count: lato * lato * 4)
+        let disegnato: Bool = px.withUnsafeMutableBytes { b in
+            guard let ctx = CGContext(data: b.baseAddress, width: lato, height: lato, bitsPerComponent: 8, bytesPerRow: lato * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.interpolationQuality = .none
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: lato, height: lato))
+            return true
+        }
+        guard disegnato else { return false }
+        var magenta = 0
+        for i in 0..<(lato * lato) {
+            let r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2], a = px[i * 4 + 3]
+            if a > 200 && r > 230 && g < 40 && b > 230 { magenta += 1 }
+        }
+        return magenta * 2 > lato * lato
+    }
+
+    /// La scena con gli ingredienti più semplici: niente luci, niente shader, materiali a colore pieno (le trame restano).
+    private func modalitaSemplice() {
+        semplice = true
+        taglioAttivo = false
+        scena.lightingEnvironment.contents = nil
+        luciNodi.forEach { $0.removeFromParentNode() }
+        semplifica(scena.rootNode)
+    }
+    private func semplifica(_ n: SCNNode) {
+        for m in n.geometry?.materials ?? [] {
+            m.shaderModifiers = nil
+            if m.lightingModel != .constant { m.lightingModel = .constant }
+        }
+        for c in n.childNodes { semplifica(c) }
     }
 
     // MARK: Geometrie (vertici già nel mondo: la nuvola li riusa)
@@ -1172,6 +1230,7 @@ final class ScenaLidar: NSObject {
 
     /// I materiali olografici sono nati prima di conoscere asse e grandezza del modello: si riscrive il loro shader.
     private func rifaiOlografici() {
+        guard !semplice else { return }
         for o in vociOlo { o.m.shaderModifiers = [.fragment: testoOlo(o.hex, o.alfa, conTaglio: taglioAttivo)] }
         // anche il taglio dei solidi va sull'asse giusto (se è montato)
         if taglioAttivo { for m in materialiSolidi { mettiTaglioSolido(m) } }
