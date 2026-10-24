@@ -185,7 +185,8 @@ struct VistaOrologio: View {
             case .sentinella: mostraSentinella = true
             case .confidente: jarvis.chiedi("Modalità confidente. Ho bisogno di parlarti di una cosa.")
             case .interprete: jarvis.chiedi("Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce.")
-            case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea: scheda = r
+            case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea,
+                 .musica: scheda = r                         // build 23: MUSICA, la musica dell'iPhone comandata dal polso
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
             case .allenatore: jarvis.stato = "Trainer: questa sezione vive sull'iPhone, Sir."   // build 22: il nome nuovo, non «Allenatore»
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
@@ -231,6 +232,7 @@ struct VistaOrologio: View {
         case .supabase: VistaSupabaseOrologio()
         case .archivio: VistaArchivioOrologio()
         case .bea: VistaBeaOrologio().aperturaOrologio("Bea")
+        case .musica: VistaMusicaOrologio()
         default: EmptyView()
         }
     }
