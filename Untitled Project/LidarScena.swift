@@ -267,10 +267,10 @@ final class ScenaLidar: NSObject {
     // MARK: Materiali
 
     private static func lineare(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
-    static func rgb(_ hex: UInt32) -> SIMD3<Float> {
+    nonisolated static func rgb(_ hex: UInt32) -> SIMD3<Float> {
         SIMD3(Float((hex >> 16) & 0xff) / 255, Float((hex >> 8) & 0xff) / 255, Float(hex & 0xff) / 255)
     }
-    static func colore(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {
+    nonisolated static func colore(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {      // nonisolated: solo conti e UIColor, si usa anche dentro i blocchi
         let c = rgb(hex); return UIColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: a)
     }
     private static func f(_ x: Double) -> String { String(format: "%.5ff", x) }
@@ -1286,6 +1286,16 @@ enum TrameLidar {
         var seme: UInt64 = 1 + UInt64(nome.count) * 7919
         func r() -> CGFloat { seme = (seme * 16807) % 2147483647; return CGFloat(seme) / 2147483647 }
         let N: CGFloat = nome == "parquet" ? 1024 : 512
+        // fuori dal blocco del renderer: una funzione dichiarata dentro un blocco per Swift non è del thread principale
+        // e non potrebbe usare r() (errore visto dal signore in Xcode)
+        func rumore(_ x: CGContext, _ base: UIColor, _ forza: CGFloat, _ n: Int, _ dim: CGFloat = 2) {
+            x.setFillColor(base.cgColor); x.fill(CGRect(x: 0, y: 0, width: N, height: N))
+            for _ in 0..<n {
+                let v = (r() - 0.5) * forza
+                x.setFillColor(v > 0 ? UIColor(white: 1, alpha: v).cgColor : UIColor(white: 0, alpha: -v).cgColor)
+                x.fill(CGRect(x: r() * N, y: r() * N, width: dim * (0.5 + r()), height: dim * (0.5 + r())))
+            }
+        }
         let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
         let img = UIGraphicsImageRenderer(size: CGSize(width: N, height: N), format: fmt).image { c in
             // il renderer chiama questo blocco subito, sullo stesso thread (il principale): lo si dice a Swift, così il blocco può
@@ -1296,14 +1306,6 @@ enum TrameLidar {
                 let ll = l / 100, ss = s / 100, a = ss * min(ll, 1 - ll)
                 func f(_ n: CGFloat) -> CGFloat { let k = (n + h / 30).truncatingRemainder(dividingBy: 12); return ll - a * max(-1, min(k - 3, 9 - k, 1)) }
                 return UIColor(red: f(0), green: f(8), blue: f(4), alpha: 1)
-            }
-            func rumore(_ base: UIColor, _ forza: CGFloat, _ n: Int, _ dim: CGFloat = 2) {
-                x.setFillColor(base.cgColor); x.fill(CGRect(x: 0, y: 0, width: N, height: N))
-                for _ in 0..<n {
-                    let v = (r() - 0.5) * forza
-                    x.setFillColor(v > 0 ? UIColor(white: 1, alpha: v).cgColor : UIColor(white: 0, alpha: -v).cgColor)
-                    x.fill(CGRect(x: r() * N, y: r() * N, width: dim * (0.5 + r()), height: dim * (0.5 + r())))
-                }
             }
             func hex(_ h: UInt32) -> UIColor { ScenaLidar.colore(h) }
             switch nome {
@@ -1326,7 +1328,7 @@ enum TrameLidar {
                     }
                     x.setFillColor(UIColor(red: 25 / 255, green: 12 / 255, blue: 5 / 255, alpha: 0.5).cgColor); x.fill(CGRect(x: 0, y: CGFloat(i) * riga, width: N, height: 1.5))
                 }
-            case "intonaco": rumore(hex(0xd9d2c4), 0.07, 9000, 3)
+            case "intonaco": rumore(x, hex(0xd9d2c4), 0.07, 9000, 3)
             case "erba":
                 x.setFillColor(hex(0x3f6a2a).cgColor); x.fill(CGRect(x: 0, y: 0, width: N, height: N))
                 for _ in 0..<14000 {
@@ -1341,8 +1343,8 @@ enum TrameLidar {
                     x.setFillColor((r() > 0.5 ? UIColor(red: 200 / 255, green: 180 / 255, blue: 150 / 255, alpha: r() * 0.25) : UIColor(white: 0, alpha: r() * 0.25)).cgColor)
                     x.fill(CGRect(x: r() * N, y: r() * N, width: 2 + r() * 3, height: 2 + r() * 2))
                 }
-            case "laminato": rumore(hex(0x2c3035), 0.16, 26000, 2.2)
-            case "palco": rumore(hex(0x1c1e21), 0.1, 12000, 2)
+            case "laminato": rumore(x, hex(0x2c3035), 0.16, 26000, 2.2)
+            case "palco": rumore(x, hex(0x1c1e21), 0.1, 12000, 2)
             case "noce":
                 for i in 0..<8 {
                     x.setFillColor(hsl(22 + r() * 6, 42 + r() * 10, 22 + r() * 8).cgColor); x.fill(CGRect(x: CGFloat(i) * N / 8, y: 0, width: N / 8, height: N))
@@ -1355,8 +1357,8 @@ enum TrameLidar {
                     }
                     x.setFillColor(UIColor(red: 10 / 255, green: 4 / 255, blue: 0, alpha: 0.6).cgColor); x.fill(CGRect(x: CGFloat(i) * N / 8, y: 0, width: 2, height: N))
                 }
-            case "moquette": rumore(hex(0x55595e), 0.12, 15000, 1.6)
-            default: rumore(hex(0x808080), 0.05, 2000)
+            case "moquette": rumore(x, hex(0x55595e), 0.12, 15000, 1.6)
+            default: rumore(x, hex(0x808080), 0.05, 2000)
             }
             }
         }
