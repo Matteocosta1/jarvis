@@ -98,7 +98,8 @@ struct PannelliTraccia: View {
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.testo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                Text(l.luogo ?? l.quando).font(.system(size: 13)).foregroundStyle(Color(red: 0.56, green: 0.70, blue: 0.74)).lineLimit(1)
+                // sotto il nome la via; se il nome è già la via (un luogo salvato con «Salva»), quando è stato salvato (come nel mockup)
+                Text(l.luogo.flatMap { $0.isEmpty || $0 == l.testo ? nil : $0 } ?? l.quando).font(.system(size: 13)).foregroundStyle(Color(red: 0.56, green: 0.70, blue: 0.74)).lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(metri.map { Rotta.distanza($0) } ?? "—")

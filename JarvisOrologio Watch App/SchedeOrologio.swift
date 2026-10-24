@@ -40,11 +40,16 @@ struct CorniceOrologio<Contenuto: View>: View {
             }
         }
         .navigationTitle(titolo)
-        .onAppear { apertaDa = Date(); WKInterfaceDevice.current().play(.start); if apertura { SuoniOrologio.apertura() } else { SuoniOrologio.schedaApre() } }
+        // già caricata (si torna indietro da Radar o Priorità, aperti da qui): niente caricamento né suoni da capo
+        .onAppear {
+            guard !mostrato else { return }
+            apertaDa = Date(); WKInterfaceDevice.current().play(.start); if apertura { SuoniOrologio.apertura() } else { SuoniOrologio.schedaApre() }
+        }
         .task(id: pronto) {
             guard pronto, !mostrato else { return }
             let resta = 0.9 - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard !Task.isCancelled else { return }       // uscito prima della fine: niente «pronta» a scheda chiusa
             WKInterfaceDevice.current().play(.success)
             SuoniOrologio.schedaPronta()
             mostrato = true
@@ -105,9 +110,12 @@ struct AperturaOrologio: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay { if coperto { ZStack { Color.black.ignoresSafeArea(); CaricamentoOrologio(titolo: titolo) }.transition(.opacity) } }
-            .onAppear { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }
+            // già scoperta (si torna indietro da Organismo, Traccia o Cuore, aperti da qui): niente caricamento né suoni da capo
+            .onAppear { if coperto { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() } }
             .task {
+                guard coperto else { return }
                 try? await Task.sleep(for: .seconds(1.1))
+                guard !Task.isCancelled else { return }   // uscito prima della fine: niente «pronta» a pagina chiusa
                 WKInterfaceDevice.current().play(.success)
                 SuoniOrologio.schedaPronta()
                 withAnimation(.easeOut(duration: 0.4)) { coperto = false }

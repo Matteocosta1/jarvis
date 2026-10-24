@@ -38,7 +38,12 @@ struct PannelloPriorita: View {
     /// La posta che conta, dal cervello.
     static func chiedi() async -> (PostaPriorita?, String?) {
         // la prima lettura dopo posta nuova può essere lunga (intestazioni, testi, riassunti): il cervello la finisce e la tiene pronta
-        guard let o = await VistaVitals.chiama(["posta_priorita": true], attesa: 60) else { return (nil, "Sto ancora leggendo la posta, Sir: riapra tra un minuto.") }
+        // nessuna risposta: dopo l'attesa intera il cervello sta ancora leggendo; prima (niente rete, cervello irraggiungibile)
+        // la posta non si raggiunge, come dice l'elenco qui sotto (prima diceva «sto ancora leggendo» anche senza rete)
+        let inizio = Date()
+        guard let o = await VistaVitals.chiama(["posta_priorita": true], attesa: 60) else {
+            return (nil, Date().timeIntervalSince(inizio) >= 55 ? "Sto ancora leggendo la posta, Sir: riapra tra un minuto." : "Non raggiungo la posta, Sir.")
+        }
         if let e = o["errore"] as? String { return (nil, e) }
         guard let p = PostaPriorita(o) else { return (nil, "La posta non è arrivata come mi aspettavo, Sir.") }
         return (p, nil)

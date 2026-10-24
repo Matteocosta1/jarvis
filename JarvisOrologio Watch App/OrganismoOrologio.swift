@@ -1,5 +1,6 @@
 import SwiftUI
 import SceneKit
+import WatchKit
 
 // BUILD 22 · B — ORGANISMO sul polso (si apre da Vitals).
 /// La stessa persona olografica dell'iPhone, più leggera (meno segmenti, niente nuvola di punti né etichette),
@@ -12,6 +13,7 @@ struct VistaOrganismoOrologio: View {
     @State private var dati = DatiOrganismo()
     @State private var corona = 0.0
     @FocusState private var coronaAttiva: Bool        // la corona arriva solo alla vista che ha il fuoco
+    @State private var mostrato = false               // come nel mockup e nelle altre schermate della 22: prima 0,9 s di caricamento
     private let ciano = TintaOrologio.ciano
     private let tenue = Color(red: 0.30, green: 0.40, blue: 0.44)
 
@@ -52,6 +54,23 @@ struct VistaOrganismoOrologio: View {
         .onDisappear { ologramma.pausa(true) }
         .onAppear { ologramma.pausa(!attivo); coronaAttiva = true }
         .task { await carica() }
+        // il caricamento del mockup (apri «organismo»: 0,9 s con «scheda», poi «schedapronta»), come SchermoPolso:
+        // prima l'Organismo si apriva di colpo, senza caricamento né suoni, unico tra le schermate del polso
+        .overlay {
+            if !mostrato {
+                ZStack { Color.black.ignoresSafeArea(); CaricamentoOrologio(titolo: "ORGANISMO") }
+                    .transition(.opacity)
+            }
+        }
+        .onAppear { if !mostrato { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() } }
+        .task {
+            guard !mostrato else { return }
+            try? await Task.sleep(for: .seconds(0.9))
+            guard !Task.isCancelled else { return }
+            WKInterfaceDevice.current().play(.success)
+            SuoniOrologio.schedaPronta()
+            withAnimation(.easeOut(duration: 0.3)) { mostrato = true }
+        }
     }
 
     /// Gli stessi numeri di Vitals: riepilogo di oggi, storico di Salute (31 giorni) e diario dal cervello.
