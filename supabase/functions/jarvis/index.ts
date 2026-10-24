@@ -16,6 +16,9 @@
 //   {"t":"errore","d":"..."}
 // Voce: { voce: "frase", id_voce?: "..." } → audio/mpeg (ElevenLabs) · { voci: true } → elenco voci dell'account.
 // Push: { registra_push: "<token APNs esadecimale>", dispositivo } → l'iPhone riceverà il briefing del mattino (jarvis-briefing).
+// Occhi (build 23): { occhi_dettaglio: { cosa, immagine, letto? } } → { titolo, misure, dimensione_cm } (il nome preciso del bersaglio)
+//                   { occhi_cerca: { nome, cosa, immagine? } } → { testo, fonti: [{ titolo, dominio, url }] } (CERCA sul web)
+//                   le persone mai: { rifiuto: true }
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -2648,6 +2651,84 @@ async function traduci(testo: string, da: string, a: string) {
   return json({ traduzione: out, da, a });
 }
 
+// ───────── Occhi (build 23): il nome preciso del bersaglio e CERCA sul web. Le persone mai (niente riconoscimento di volti) ─────────
+const PERSONA_OCCHI = /^\s*(persona|persone|person|people|volto|viso|faccia|uomo|donna|ragazz[oa]|bambin[oa])\b/i;
+async function claudeOcchi(corpo: Record<string, unknown>, modelli: string[], attesa: number) {
+  let ultimo = "";
+  for (const model of modelli.filter((m, i) => m && modelli.indexOf(m) === i && !modelliAssenti.has(m))) {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", signal: AbortSignal.timeout(attesa),
+      headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model, ...corpo }),
+    });
+    if (r.ok) return await r.json();
+    ultimo = `${r.status}`;
+    if (r.status !== 404 && r.status !== 529 && r.status !== 503) break;   // solo modello assente o sovraccarico: si prova il prossimo
+  }
+  throw new Error(`il cervello non risponde (${ultimo})`);
+}
+const testoOcchi = (d: any) => (d?.content ?? []).filter((b: any) => b?.type === "text").map((b: any) => String(b.text ?? "")).join("").trim();
+const dominioDi = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, "").toUpperCase(); } catch { return "RICERCA WEB"; } };
+
+/** OLOGRAMMA: dal ritaglio, il nome preciso («Welsh Corgi Pembroke», «Banana · matura»), le misure stimate e la dimensione maggiore. */
+async function occhiDettaglio(d: any) {
+  const cosa = String(d?.cosa ?? "").trim().slice(0, 40);
+  if (PERSONA_OCCHI.test(cosa)) return { rifiuto: true };
+  const img = immaginiValide(d?.immagine, null)[0];
+  if (!img) return { errore: "immagine mancante" };
+  const letto = Array.isArray(d?.letto) ? d.letto.map((x: unknown) => String(x).slice(0, 80)).slice(0, 3) : [];
+  const risposta = await claudeOcchi({
+    max_tokens: 200,
+    system: `Guardi il ritaglio di una foto fatta con l'iPhone: al centro c'è il soggetto che l'iPhone ha riconosciuto. Rispondi SOLO con un oggetto JSON, senza altro testo:
+{"titolo": "...", "misure": "...", "dimensione_cm": numero}
+titolo: il nome preciso in italiano, al massimo 24 caratteri, nella forma «Nome · dettaglio» quando aiuta (esempi: «Welsh Corgi Pembroke», «Banana · matura», «Mouse · cablato, nero», «Acqua · bottiglia PET», «Copertina del libro»). Se c'è un testo leggibile usalo (titolo del libro, marca, modello). Se non sei sicuro del modello resta generico: non inventare.
+misure: le dimensioni reali stimate, «≈ 11 × 6 cm» (larghezza × altezza), «≈ 19 cm» per le cose lunghe e sottili, «≈ 5,3 × 1,9 m» oltre il metro; virgola decimale.
+dimensione_cm: la dimensione maggiore stimata, in centimetri (solo il numero).
+Se il soggetto è una persona o una parte del corpo, rispondi solo {"rifiuto": true}: le persone non si riconoscono mai.`,
+    messages: [{ role: "user", content: [bloccoImmagine(img), { type: "text", text: `Riconosciuto dall'iPhone come: ${cosa || "oggetto"}.${letto.length ? ` Testo letto: ${letto.join(" / ")}.` : ""}` }] }],
+  }, [MODELLO_RAPIDO, MODELLO_RISERVA], 18000);
+  const t = testoOcchi(risposta), m = t.match(/\{[\s\S]*\}/);
+  let o: any = {};
+  try { o = m ? JSON.parse(m[0]) : {}; } catch { o = {}; }
+  if (o?.rifiuto === true) return { rifiuto: true };
+  const titolo = String(o?.titolo ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (!titolo) return { errore: "nessun nome" };
+  const cm = Number(o?.dimensione_cm);
+  return { titolo, misure: String(o?.misure ?? "").replace(/\s+/g, " ").trim().slice(0, 30), dimensione_cm: Number.isFinite(cm) && cm > 0 && cm < 100000 ? cm : null };
+}
+
+/** CERCA: il solo bersaglio, cercato sul web (web_search): un riassunto breve e tre fonti. */
+async function occhiCerca(d: any) {
+  const nome = String(d?.nome ?? "").trim().slice(0, 40), cosa = String(d?.cosa ?? "").trim().slice(0, 80);
+  if (!nome && !cosa) return { errore: "manca cosa cercare" };
+  if (PERSONA_OCCHI.test(nome) || PERSONA_OCCHI.test(cosa)) return { rifiuto: true };
+  const img = immaginiValide(d?.immagine, null)[0];
+  const messaggi: any[] = [{ role: "user", content: [...(img ? [bloccoImmagine(img)] : []),
+    { type: "text", text: `Il signore ha inquadrato questo con l'iPhone e chiede di cercarlo sul web: «${cosa || nome}»${nome && cosa !== nome ? ` (riconosciuto come ${nome})` : ""}.` }] }];
+  const corpo = {
+    max_tokens: 900, tools: [WEB_SEARCH],
+    system: `Sei JARVIS. Il signore ha agganciato un oggetto con gli Occhi dell'iPhone e vuole sapere cos'è e cosa dice il web. Se c'è la foto, guardala per capire il modello preciso; poi fai una o due ricerche web mirate. Rispondi in italiano con al massimo tre frasi brevi e concrete (cos'è, le caratteristiche utili, il prezzo indicativo se ha senso), senza markdown, senza elenchi, senza indirizzi web.
+Le persone non si cercano mai: se il soggetto è una persona o la richiesta è sapere chi è qualcuno, non cercare e rispondi solo con la parola RIFIUTO.`,
+  };
+  let risposta: any = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000);
+  for (let giro = 0; giro < 2 && risposta?.stop_reason === "pause_turn"; giro++) {   // ricerca lunga: il servizio chiede di continuare
+    messaggi.push({ role: "assistant", content: risposta.content });
+    risposta = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000);
+  }
+  const testo = testoOcchi(risposta).replace(/\s+/g, " ").trim();
+  if (/^RIFIUTO\b/i.test(testo)) return { rifiuto: true };
+  if (!testo) return { errore: "nessun risultato" };
+  // le fonti: prima quelle citate nel testo, poi i primi risultati della ricerca; una per indirizzo
+  const fonti: { titolo: string; dominio: string; url: string }[] = [], visti = new Set<string>();
+  const metti = (url: unknown, titolo: unknown) => {
+    const u = String(url ?? ""); if (!/^https?:\/\//.test(u) || visti.has(u) || fonti.length >= 3) return;
+    visti.add(u); fonti.push({ titolo: String(titolo ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || dominioDi(u), dominio: dominioDi(u), url: u });
+  };
+  for (const b of risposta?.content ?? []) if (b?.type === "text") for (const c of b.citations ?? []) metti(c?.url, c?.title);
+  for (const b of risposta?.content ?? []) if (b?.type === "web_search_tool_result" && Array.isArray(b.content)) for (const r of b.content) metti(r?.url, r?.title);
+  return { testo: testo.slice(0, 600), fonti };
+}
+
 async function registraAzioni(dispositivo: string, usi: any[], risultati: any[]) {
   const esiti = new Map(risultati.map((r: any) => [String(r.tool_use_id), r]));
   const righe = usi.filter((b: any) => b?.type === "tool_use" && DA_REGISTRARE.has(b.name)).map((b: any) => {
@@ -3674,6 +3755,12 @@ Deno.serve(async (req) => {
       if (!pos) return json({ errore: "Non so dove si trova, Sir: serve la posizione dell'iPhone." });
       return json(await radarPioggia(pos.lat, pos.lon));
     } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.occhi_dettaglio && typeof corpo.occhi_dettaglio === "object") {              // Occhi › OLOGRAMMA: il nome preciso del bersaglio
+    try { return json(await occhiDettaglio(corpo.occhi_dettaglio)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
+  if (corpo?.occhi_cerca && typeof corpo.occhi_cerca === "object") {                      // Occhi › CERCA: il bersaglio cercato sul web
+    try { return json(await occhiCerca(corpo.occhi_cerca)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
   if (corpo?.radar_avviso === true) {                                                     // pg_cron → jarvis-briefing → qui: avvisare adesso?
     try { return json(await radarAvviso()); } catch (e) { return json({ manda: false, errore: (e as Error).message }); }
