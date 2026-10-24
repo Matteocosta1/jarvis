@@ -75,17 +75,13 @@ nonisolated enum TagVoce {
 
 // MARK: - I comandi a frase esatta
 
-/// I protocolli alla Stark (la tendina PROTOCOLLI), deciso dal signore il 24 ott: l'app Comandi non si vede mai e JARVIS non parla.
-/// «Avvia» accende tutte le luci; ogni luce è un interruttore. I passi del telefono partono in sottofondo: il cervello manda alla
-/// casella iCloud del signore una mail con l'oggetto «<testo> | JARVIS Lavoro | <id>»; l'automazione personale di Comandi passa
-/// <testo> («avvia», «annulla:<chiave>», «rifai:<chiave>») al Comando rapido del protocollo e conferma con l'azione «Conferma protocollo».
+/// I protocolli alla Stark (la tendina PROTOCOLLI), deciso dal signore il 24 ott: solo le luci. «Avvia» le accende tutte,
+/// ogni luce è un interruttore (spenta = quel passo disattivato). L'app Comandi non si apre e JARVIS non parla.
 nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Sendable {
     case lavoro, rientro, notte
     var id: String { rawValue }
     /// Come si legge sulla scheda: LAVORO, RIENTRO, NOTTE.
     var titolo: String { rawValue.uppercased() }
-    /// Il nome del Comando rapido che il signore crea nell'app Comandi.
-    var comandoRapido: String { "JARVIS " + rawValue.capitalized }
 
     /// Un passo del protocollo: `chiave` per il Comando rapido, `testo` sull'iPhone, `breve` sul polso;
     /// `jarvis`: lo fa JARVIS, non il Comando rapido.
@@ -109,34 +105,6 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
                     Passo(chiave: "sveglia", testo: "Sveglia alle 9:30", breve: "Sveglia 9:30", jarvis: false),
                     Passo(chiave: "diario", testo: "Domanda del diario", breve: "Diario", jarvis: true)]
         }
-    }
-
-    /// Il testo per il Comando rapido quando una luce cambia: spenta → «annulla:<chiave>», riaccesa → «rifai:<chiave>».
-    static func testoCambio(_ passo: Passo, acceso: Bool) -> String { "\(acceso ? "rifai" : "annulla"):\(passo.chiave)" }
-
-    /// Un id nuovo per ogni richiesta (lega la conferma dell'automazione alla luce giusta).
-    static func nuovoId() -> String { String(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(10)) }
-
-    /// La richiesta al cervello: lui manda la mail per l'automazione.
-    static func richiesta(_ p: Protocollo, testo: String, id: String) -> [String: Any] {
-        ["protocollo": ["nome": p.rawValue, "testo": testo, "id": id]]
-    }
-
-    /// L'oggetto confermato dall'automazione («annulla:wifi | JARVIS Lavoro | k3f9a2»): protocollo, testo e id.
-    /// Le stesse regole del cervello; un oggetto diverso (o un passo che non c'è) non vale.
-    static func leggi(_ oggetto: String) -> (protocollo: Protocollo, testo: String, id: String)? {
-        let parti = oggetto.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: " | ")
-        guard parti.count == 3, parti[1].hasPrefix("JARVIS "),
-              let p = Protocollo(rawValue: String(parti[1].dropFirst(7)).lowercased()), parti[1] == "JARVIS " + p.rawValue.capitalized else { return nil }
-        let id = parti[2]
-        guard (4...16).contains(id.count), id.allSatisfy({ $0.isASCII && ($0.isLowercase || $0.isNumber) }) else { return nil }
-        let testo = parti[0]
-        if testo != "avvia" {
-            let pezzi = testo.split(separator: ":", maxSplits: 1).map(String.init)
-            guard pezzi.count == 2, pezzi[0] == "annulla" || pezzi[0] == "rifai",
-                  p.passi.contains(where: { $0.chiave == pezzi[1] && !$0.jarvis }) else { return nil }
-        }
-        return (p, testo, id)
     }
 }
 
