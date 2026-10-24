@@ -1903,6 +1903,27 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// `toccato`: il signore ha toccato il reattore per chiudere (non è il silenzio a chiudere l'ascolto).
+    /// 25 ott (deciso dal signore): l'app va in sottofondo. Quello che stava sentendo si butta, non va al cervello, e le frasi
+    /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
+    /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
+    func vaInSottofondo() {
+        if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
+        if fase == .ascolto {
+            if ascoltoCloud {                          // Mac: la registrazione da trascrivere non parte più
+                ascoltoCloud = false
+                turnoAscolto += 1
+                if motore.isRunning { motore.stop() }
+                motore.inputNode.removeTap(onBus: 0)
+                stato = nil
+                fase = .attesa
+            } else {
+                fermaAscolto(invia: false)
+            }
+        }
+        parziale = ""
+        chiudiInterruzione()
+    }
+
     private func fermaAscolto(invia: Bool, toccato: Bool = false) {
         guard fase == .ascolto || !invia else { return }
         ascoltoCloud = false

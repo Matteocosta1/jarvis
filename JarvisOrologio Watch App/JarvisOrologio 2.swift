@@ -547,6 +547,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
+    /// 25 ott, come sull'iPhone: l'app va in sottofondo (polso giù, altra app). La frase che stava registrando si butta,
+    /// non si trascrive al ritorno; anche l'aggiunta dei 2 secondi si chiude.
+    func vaInSottofondo() {
+        chiudiAggiunta(spegniAudio: false)
+        guard fase == .ascolto else { return }
+        chiudiMicrofono()
+        primaParte = nil
+        dopoAspetta = .no
+        fase = .attesa
+        stato = nil
+    }
+
     private func chiudiMicrofono() {
         timerAscolto?.invalidate()
         timerAscolto = nil

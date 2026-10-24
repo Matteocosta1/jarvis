@@ -150,7 +150,7 @@ struct VistaOrologio: View {
             accendi()
         }
         .onChange(of: scena) { _, fase in
-            if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi() }
+            if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi(); jarvis.vaInSottofondo() }
         }
         // comando vocale: «apri il meteo», «fammi vedere la spesa»
         .onChange(of: jarvis.repartoRichiesto) { _, r in

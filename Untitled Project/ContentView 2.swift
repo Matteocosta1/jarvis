@@ -226,7 +226,10 @@ struct ContentView: View {
             .defersSystemGestures(on: .top)                 // il dito che tira giù la tendina non apre il Centro notifiche di iOS
         }
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
-        .onChange(of: scena) { _, fase in if fase != .active && !tendinaAperta { tendinaTrascina = 0 } }
+        .onChange(of: scena) { _, fase in
+            if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
+            if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
+        }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
             chiudiTutto()
