@@ -18,7 +18,7 @@ enum SuoniOrologio {
         return u
     }
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
-    /// Musica d'avvio con una pulsazione per ognuna delle 19 icone del polso («avvioorologio»); se manca, quella dell'iPhone.
+    /// Musica d'avvio con una pulsazione per ognuna delle 20 icone del polso (build 23) («avvioorologio»); se manca, quella dell'iPhone.
     /// `fra`: la musica parte fra tanti secondi, al campione esatto (play(atTime:) sull'orologio dell'audio).
     static func avvio(fra: TimeInterval = 0) {                           // 100%
         if let p = lettoreAvvio {
@@ -188,6 +188,7 @@ struct VistaOrologio: View {
             case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea: scheda = r
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
             case .allenatore: jarvis.stato = "Trainer: questa sezione vive sull'iPhone, Sir."   // build 22: il nome nuovo, non «Allenatore»
+            case .satellite: polso = .satellite(nil)             // build 23: SATELLITE, i luoghi con la distanza
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
             }
         }
@@ -212,6 +213,7 @@ struct VistaOrologio: View {
         case .radar: VistaRadarOrologio()
         case .priorita: VistaPrioritaOrologio()
         case .organismo: VistaOrganismoOrologio()
+        case .satellite(let a): VistaSatelliteOrologio(azione: a)
         }
     }
 
@@ -279,7 +281,7 @@ struct VistaOrologio: View {
                 colpi.append(t / v)
                 t += elenco[k].gruppo == elenco.last?.gruppo ? 0.120 : 0.150
             }
-            // la partitura vera (quella della traccia): le ultime 8 icone sui colpi dello scarico della musica
+            // la partitura vera (quella della traccia): le ultime 9 icone sui colpi dello scarico della musica
             if AvvioOrologio.colpi.count == elenco.count { colpi = AvvioOrologio.colpi.map { $0 / v } }
             // la prima icona deve partire PRIMA della musica (la sua molla arriva sul primo colpo): la musica parte dopo l'anticipo
             let pre = AvvioOrologio.anticipo(0, elenco.count)
@@ -509,6 +511,7 @@ struct VistaOrologio: View {
             ("STRUMENTI", "trash", nil),                       // pulisce la conversazione
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»
+            ("INTELLIGENCE", "satellite", "#satellite"),                         // build 23: SATELLITE prima di Bea, come sull'iPhone
             ("INTELLIGENCE", "link", "#bea"),                                    // 20 ott: Bea passa in INTELLIGENCE, come sull'iPhone
 
             ("SISTEMI", "logo:github-logo", "#github"),          // i loghi veri, come sull'iPhone
@@ -523,6 +526,8 @@ struct VistaOrologio: View {
             Image(String(icona.dropFirst(5))).resizable().renderingMode(.template).scaledToFit().frame(width: 15, height: 15)
         } else if icona == "archivio" {
             IconaArchivioOrologio().scaleEffect(0.75)
+        } else if icona == "satellite" {
+            IconaSatellite(lato: 15)                                    // build 23: disegnata come nel mockup
         } else {
             Image(systemName: icona)
         }
@@ -1111,17 +1116,18 @@ enum AvvioOrologio {
     /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.
     static let attesaApertura = 0.6
     /// La molla di ogni icona, per posto d'accensione: più svelta verso la fine, dove i colpi si avvicinano.
-    /// Le prime 11 (passo 150 ms) 0,32 s come sull'iPhone; le 4 dopo 0,20; le ultime 4 (GIORNATA, passo 120) 0,14.
-    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 8 ? 0.14 : 0.32) / velocita }   // ÷ velocità, come tutto
+    /// Le prime 11 0,32 s come sull'iPhone; le ultime 9 (sullo scarico della musica; build 23: con SATELLITE, prima 8) 0,14.
+    static func molla(_ posto: Int, _ n: Int) -> Double { (posto >= n - 9 ? 0.14 : 0.32) / velocita }   // ÷ velocità, come tutto
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
     static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) }
     /// La partitura del polso (secondi a velocità normale, nell'ordine d'accensione, da Archivio a Briefing): è quella con cui
     /// è montata «avvioorologio». Segue la musica (misurata): le prime 11 da 0 al colpo forte di 2,499 s (passo 250 ms),
-    /// poi la pausa (2,6–2,8 s, il respiro), poi le ultime 8 su tutto lo SCARICO (2,885 → 3,724 s, una ogni 120 ms):
+    /// poi la pausa (2,6–2,8 s, il respiro), poi le ultime 9 su tutto lo SCARICO (2,885 → 3,724 s, una ogni 105 ms):
     /// Briefing si accende sull'ultimo colpo dello scarico, poi la musica sfuma.
+    /// Build 23 (con SATELLITE, 20 icone): le ultime 9 si dividono lo scarico, una ogni 105 ms (la traccia ha un colpo in più).
     static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499,
-                                  2.885, 3.005, 3.125, 3.245, 3.364, 3.484, 3.604, 3.724]
+                                  2.885, 2.990, 3.095, 3.200, 3.304, 3.409, 3.514, 3.619, 3.724]
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
