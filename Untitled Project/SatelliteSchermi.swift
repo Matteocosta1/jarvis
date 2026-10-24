@@ -458,7 +458,7 @@ struct SchermoNaviga: View {
     /// Il percorso da qui al luogo, poi le viste da strada di tutte le tappe per le miniature.
     private func prepara() async {
         MotoreGuida.condiviso.accendi()
-        for _ in 0..<50 where motore.lat == nil {                 // la posizione: fino a 10 secondi
+        for _ in 0..<50 where motore.lat == nil && !motore.posizioneNegata {   // la posizione: fino a 10 secondi (negata: subito la frase)
             try? await Task.sleep(for: .milliseconds(200))
             if Task.isCancelled { return }
         }

@@ -280,9 +280,11 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
 
-    /// Parte la guida verso un luogo (se è già in corso verso lo stesso, continua).
+    /// Parte la guida verso un luogo (se è già in corso verso lo stesso, continua; se lì non era partita, riprova).
     func avvia(_ l: LuogoSat) {
-        if let attuale = luogo, attuale.chiave == l.chiave, !arrivato { return }
+        // la stessa meta: continua solo se la guida c'è (o si sta calcolando). Se non era partita (niente posizione,
+        // niente strada) si riprova: prima restava ferma sull'errore e «guidami allo studio» non faceva più niente
+        if let attuale = luogo, attuale.chiave == l.chiave, !arrivato, percorso != nil || errore == nil { return }
         generazione += 1
         let g = generazione
         luogo = l
@@ -292,6 +294,9 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
         arrivato = false
         errore = nil
         fuoriDa = nil
+        // un'altra meta: la freccia negli Occhi della meta di prima si spegne subito (finché arriva il percorso nuovo;
+        // se il percorso nuovo non si trova, restava accesa verso la meta vecchia). Il percorso è nil: la guida nuova non si ferma
+        if GuidaCondivisa.condivisa.stato != nil { GuidaCondivisa.condivisa.ferma() }
         accendi()
         Task { await calcola(g, da: nil) }
     }
@@ -345,9 +350,15 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
         ferma()
     }
 
+    /// La posizione è negata nelle impostazioni (o bloccata): non arriverà, inutile aspettarla.
+    var posizioneNegata: Bool {
+        let s = gestore.authorizationStatus
+        return s == .denied || s == .restricted
+    }
+
     private func calcola(_ g: Int, da partenza: CLLocationCoordinate2D?) async {
-        // la posizione: fino a 10 secondi
-        for _ in 0..<50 where lat == nil {
+        // la posizione: fino a 10 secondi (negata: la frase subito, invece di 10 secondi di attesa a vuoto)
+        for _ in 0..<50 where lat == nil && !posizioneNegata {
             try? await Task.sleep(for: .milliseconds(200))
             guard g == generazione else { return }
         }
