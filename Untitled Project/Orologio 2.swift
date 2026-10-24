@@ -46,6 +46,9 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
 
     private let chiaveGuida = NSLock()
     private var ultimaGuida: [String: Any]?
+    /// Decisione 39 (24 ott): la guida chiesta dal polso che qui non è partita (niente posizione, niente strada): la meta e il
+    /// motivo, la frase di `ErroreSat` («Non ho la sua posizione, Sir.», «Non trovo una strada a piedi fino a lì, Sir.»).
+    private var erroreGuida: (chiave: String, testo: String)?
 
     /// La GUIDA in corso all'orologio (nil: finita). Va solo se l'orologio è raggiungibile adesso: è uno stato che cambia
     /// di continuo, quello vecchio non serve; all'apertura l'orologio chiede lo stato attuale («guida»: «stato»).
@@ -63,13 +66,24 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         nonisolated(unsafe) let risposta = rispondi
         let cosa = m["guida"] as? String ?? ""
         if cosa == "stato" {
-            chiaveGuida.lock(); let g = ultimaGuida; chiaveGuida.unlock()
+            chiaveGuida.lock(); let g = ultimaGuida; let e = erroreGuida; chiaveGuida.unlock()
+            // decisione 39: nessuna guida in corso, ma quella chiesta dal polso non è partita: il motivo, se vale ancora
+            // (la stessa meta, ancora senza strada e con lo stesso errore sull'iPhone)
+            if g == nil, let e {
+                Task { @MainActor in
+                    let motore = MotoreGuida.condiviso
+                    let vale = motore.luogo?.chiave == e.chiave && motore.percorso == nil && motore.errore == e.testo
+                    risposta(["guida": vale ? ["errore": e.testo] : ["fine": true]])
+                }
+                return
+            }
             risposta(["guida": g ?? ["fine": true]])
             return
         }
         let lat = (m["lat"] as? NSNumber)?.doubleValue, lon = (m["lon"] as? NSNumber)?.doubleValue
         let nome = m["nome"] as? String ?? "", via = m["via"] as? String ?? "", chiave = m["chiave"] as? String ?? ""
         let ricordo = (m["ricordo"] as? NSNumber)?.intValue
+        if cosa == "avvia" || cosa == "ferma" { chiaveGuida.lock(); erroreGuida = nil; chiaveGuida.unlock() }   // il motivo di prima non vale più
         Task { @MainActor in
             if cosa == "ferma" { MotoreGuida.condiviso.ferma(); risposta(["ok": true]); return }
             guard cosa == "avvia", let lat, let lon, !nome.isEmpty else { risposta(["errore": "richiesta non valida"]); return }
@@ -78,10 +92,38 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
             if UIApplication.shared.applicationState == .background && !modi.contains("location") {
                 risposta(["errore": "Apra JARVIS sull'iPhone, Sir: la guida parte da lì."]); return
             }
-            MotoreGuida.condiviso.avvia(LuogoSat(chiave: chiave.isEmpty ? "p\(lat),\(lon)" : chiave, ricordo: ricordo, tipo: "posto", nome: nome,
+            let meta = chiave.isEmpty ? "p\(lat),\(lon)" : chiave
+            // decisione 39: un'altra meta. La guida di prima non vale più per «stato»: prima l'orologio, aprendo GUIDA, riceveva
+            // ancora la freccia e i metri verso la meta vecchia e, se quella nuova non partiva, il motivo restava nascosto
+            if MotoreGuida.condiviso.luogo?.chiave != meta { self.chiaveGuida.lock(); self.ultimaGuida = nil; self.chiaveGuida.unlock() }
+            MotoreGuida.condiviso.avvia(LuogoSat(chiave: meta, ricordo: ricordo, tipo: "posto", nome: nome,
                                                 via: via.isEmpty ? nome : via, persona: nil, lat: lat, lon: lon, quando: ""))
             risposta(["ok": true])
+            await self.seguiGuidaDalPolso(meta: meta)
         }
+    }
+
+    /// Decisione 39 (24 ott): l'«ok» al polso parte subito (la risposta non può aspettare: WatchConnectivity non dice quanto
+    /// tiene aperta una risposta), ma la strada si calcola dopo: fino a 10 secondi per la posizione, poi MapKit. Prima, se la
+    /// guida non partiva, al polso restava «— · Nessuna guida» senza spiegazione. Ora si segue la guida appena chiesta e, se
+    /// non parte, il motivo va al polso, che lo scrive in GUIDA e lo dice. Se parte, la guida arriva già da `inviaPolso`.
+    @MainActor private func seguiGuidaDalPolso(meta: String) async {
+        let motore = MotoreGuida.condiviso
+        for _ in 0..<300 {                                       // al massimo un minuto, poi la guida va per conto suo
+            guard motore.luogo?.chiave == meta, !motore.arrivato, motore.percorso == nil else { return }   // partita, fermata o un'altra meta
+            if let e = motore.errore { inviaErroreGuida(meta: meta, testo: e); return }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+    }
+
+    /// Decisione 39: il motivo per cui la guida chiesta dal polso non è partita, all'orologio (e per «stato», se lo chiede dopo).
+    /// Senza «nome»: un orologio vecchio lo legge come una guida finita, non come una guida a zero metri.
+    nonisolated private func inviaErroreGuida(meta: String, testo: String) {
+        chiaveGuida.lock(); erroreGuida = (meta, testo); chiaveGuida.unlock()
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled, s.isReachable else { return }
+        s.sendMessage(["guida": ["errore": testo]], replyHandler: nil, errorHandler: nil)
     }
 
     nonisolated static func datiDaConsegnare() -> [String: String] {

@@ -757,6 +757,17 @@ final class JarvisOrologio: NSObject, ObservableObject {
         return nil
     }
 
+    /// Decisione 39 (24 ott): la guida chiesta dal polso non è partita sull'iPhone: JARVIS dice il motivo («Non ho la sua
+    /// posizione, Sir.», «Non trovo una strada a piedi fino a lì, Sir.»), che GUIDA intanto scrive. Se sta finendo una frase
+    /// (l'annuncio di SATELLITE) la lascia finire; se il signore sta parlando o ha chiesto altro, il motivo resta solo scritto.
+    func annunciaGuida(_ motivo: String) {
+        Task { @MainActor in
+            for _ in 0..<40 where fase == .parlo { try? await Task.sleep(for: .milliseconds(100)) }   // al massimo 4 secondi
+            guard fase == .attesa else { return }
+            parla(motivo)
+        }
+    }
+
     nonisolated static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (String?, String?) {
         guard !token.isEmpty, let url = URL(string: indirizzo) else { return (nil, "Manca la parola d'ordine, Sir: apra JARVIS sull'iPhone.") }
         var req = URLRequest(url: url)
