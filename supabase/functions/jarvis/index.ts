@@ -2458,12 +2458,22 @@ async function leggiFilo(dispositivo: string, adesso: Battuta[]) {
   return { riassunto: String(data.riassunto ?? ""), uscite: prima.slice(0, k) };
 }
 
+/// Controllo 24 ott: una battuta come la deve leggere il filo. Del signore solo la sua frase (senza le note dell'app);
+/// di JARVIS solo quello che il signore ha sentito davvero: dopo «(qui il signore mi ha interrotto…» c'è il resto mai detto,
+/// che il riassunto altrimenti dava per detto («JARVIS gli ha spiegato…» una cosa che lui non ha mai sentito).
+function battutaPerFilo(b: Battuta): string {
+  if (b.r === "user") return senzaNoteApp(b.t) || b.t;
+  if (/^\s*\(il signore mi ha interrotto prima che cominciassi/i.test(b.t)) return "(interrotto prima di cominciare a rispondere)";
+  const k = b.t.indexOf("(qui il signore mi ha interrotto");
+  return k >= 0 ? `${b.t.slice(0, k).trim()} (qui il signore l'ha interrotto)` : b.t;
+}
+
 /// In sottofondo, a fine turno: unisce le battute uscite al riassunto e salva la finestra di adesso.
 async function aggiornaFilo(dispositivo: string, riassunto: string, uscite: Battuta[], adesso: Battuta[]) {
   let nuovo = riassunto;
   try {
     if (uscite.length) {
-      const righe = uscite.map((b) => `${b.r === "user" ? "SIGNORE" : "JARVIS"}: ${b.t.replace(/\s+/g, " ").slice(0, 1200)}`).join("\n");
+      const righe = uscite.map((b) => `${b.r === "user" ? "SIGNORE" : "JARVIS"}: ${battutaPerFilo(b).replace(/\s+/g, " ").slice(0, 1200)}`).join("\n");
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST", signal: AbortSignal.timeout(20000),
         headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
@@ -2480,7 +2490,7 @@ async function aggiornaFilo(dispositivo: string, riassunto: string, uscite: Batt
     }
   } catch (e) {
     console.log(`filo non riassunto: ${(e as Error).message}`);
-    nuovo = `${riassunto} ${uscite.map((b) => b.t).join(" · ")}`.replace(/\s+/g, " ").trim().slice(-1400);
+    nuovo = `${riassunto} ${uscite.map(battutaPerFilo).join(" · ")}`.replace(/\s+/g, " ").trim().slice(-1400);
   }
   const finestra = adesso.map((b) => ({ r: b.r, t: b.t.slice(0, 1500) }));
   const { error } = await db.from("jarvis_filo").upsert({ dispositivo, riassunto: nuovo, finestra, aggiornato: new Date().toISOString() });
@@ -2505,7 +2515,15 @@ async function memoriaAutomatica(lavoro: any[], risposta: string) {
     if (risposta.trim()) scambi.push(`JARVIS: ${risposta.trim().slice(0, 800)}`);
     const ultimi = scambi.slice(-6);
     const ultimoSignore = [...ultimi].reverse().find((x) => x.startsWith("SIGNORE: ")) ?? "";
-    if (ultimoSignore.length < 25 || NON_MEMORIZZARE.test(ultimoSignore.slice(9))) return;   // niente da imparare da «ok», «grazie», o dalle modalità riservate
+    // controllo 24 ott: la frase del signore senza le note che l'app mette davanti («(riprendo il discorso…)», «(ti ho interrotto…)»):
+    // con la nota davanti «Modalità confidente» non era più in testa e la conversazione riservata finiva nella memoria;
+    // e la sola nota (300 caratteri) faceva passare anche un «ok» dal controllo della lunghezza.
+    const fraseSignore = senzaNoteApp(ultimoSignore.slice(9));
+    // la modalità riservata vale anche quando l'ha aperta JARVIS nel messaggio prima (Confidente «A voce»:
+    // «Modalità confidente. Mi racconti pure, Sir: la ascolto.»), come dice il prompt
+    const k = ultimi.lastIndexOf(ultimoSignore);
+    const primaDiLui = k > 0 && ultimi[k - 1].startsWith("JARVIS: ") ? ultimi[k - 1].slice(8) : "";
+    if (fraseSignore.length < 16 || NON_MEMORIZZARE.test(fraseSignore) || NON_MEMORIZZARE.test(primaDiLui)) return;   // niente da imparare da «ok», «grazie», o dalle modalità riservate
     const { data: mem } = await db.from("jarvis_memoria").select("fatto").limit(120);
     const note = (mem ?? []).map((m: any) => `- ${m.fatto}`).join("\n") || "(vuota)";
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -2948,6 +2966,11 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   const uso = { token_in: 0, token_cache: 0, token_cache_scrittura: 0, token_out: 0 };
   const lettore = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
+  // controllo 24 ott: anche una chiamata che non arriva in fondo (il signore interrompe e l'app chiude la linea, un errore a metà,
+  // il silenzio di 90 s) ha già consumato i token d'ingresso: la sua riga in jarvis_consumi si scrive lo stesso (esito «interrotta»),
+  // altrimenti la stima del credito li perde a ogni interruzione. E la linea con Anthropic si chiude subito, così non continua
+  // a generare (e a farsi pagare) una risposta che nessuno legge.
+  let finita = false, scritti = 0;
   try {
     for (;;) {
       riarma();
@@ -2969,8 +2992,8 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
         } else if (e.type === "content_block_delta") {
           const b = blocchi[e.index], d = e.delta;
           if (!b || !d) continue;
-          if (d.type === "text_delta") { primaParola ??= new Date(); b.text = (b.text ?? "") + d.text; suTesto(d.text); }
-          else if (d.type === "input_json_delta") jsonParziale[e.index] = (jsonParziale[e.index] ?? "") + d.partial_json;
+          if (d.type === "text_delta") { primaParola ??= new Date(); b.text = (b.text ?? "") + d.text; scritti += String(d.text ?? "").length; suTesto(d.text); }
+          else if (d.type === "input_json_delta") { jsonParziale[e.index] = (jsonParziale[e.index] ?? "") + d.partial_json; scritti += String(d.partial_json ?? "").length; }
           else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
           else if (d.type === "signature_delta") b.signature = d.signature;
           else if (d.type === "citations_delta" && d.citation) (b.citations ??= []).push(d.citation);
@@ -2992,7 +3015,20 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
         }
       }
     }
-  } finally { clearTimeout(silenzio); }
+    finita = true;
+  } finally {
+    clearTimeout(silenzio);
+    if (!finita) {
+      try { freno.abort(); } catch { /* già chiusa */ }
+      if (uso.token_in + uso.token_cache + uso.token_cache_scrittura > 0) {
+        // l'uscita vera arriva solo in fondo: qui una stima per difetto dai caratteri già arrivati (circa 3,5 per token)
+        inSottofondo(db.from("jarvis_consumi").insert({
+          servizio: "claude", modello, ...uso, token_out: Math.max(uso.token_out, Math.ceil(scritti / 3.5)), esito: "interrotta",
+          ms_prima_parola: primaParola ? primaParola.getTime() - inizio.getTime() : null, ms_totale: Date.now() - inizio.getTime(),
+        }).then(() => {}, () => {}));
+      }
+    }
+  }
   // il contatore dei consumi: una riga per chiamata, letta dalla scheda Supabase
   // 24 ott: anche i tempi della chiamata (prima parola e totale, in millisecondi)
   inSottofondo(db.from("jarvis_consumi").insert({
@@ -3672,7 +3708,11 @@ Deno.serve(async (req) => {
   if (corpo?.sveglia === true) {                                                            // l'app si è aperta: il cervello si scalda in silenzio
     const chiave = Deno.env.get("ELEVENLABS_API_KEY");
     if (chiave && !modelloVoce) inSottofondo(scegliModelloVoce(chiave).then(() => {}, () => {}));
-    return json({ sveglio: true, voce: voceAttuale() });   // l'app usa l'id della voce per la cache delle frasi
+    // l'app usa questo valore solo come chiave della cache delle frasi (CacheVoce). Controllo 24 ott: con il modello fisso
+    // (ELEVENLABS_MODELLO) dentro c'è anche il modello, così quando si passa a v4 Turbo le frasi in cache fatte con il modello
+    // di prima non si mescolano più a quelle nuove (prima frase dalla cache in v2, le altre in v4: voce che cambia a metà).
+    const fisso = (Deno.env.get("ELEVENLABS_MODELLO") ?? "").trim();
+    return json({ sveglio: true, voce: fisso ? `${voceAttuale()}·${fisso}` : voceAttuale() });
   }
   if (typeof corpo?.traduci === "string") return await traduci(corpo.traduci, String(corpo.da || "it"), String(corpo.a || "en"));   // interprete
   if (corpo?.vitals === true) {                                                             // pagina Vitals dell'app
@@ -3842,7 +3882,11 @@ Deno.serve(async (req) => {
     turno.lat = p.lat; turno.lon = p.lon; if (typeof p.precisione === "number") turno.precisione = p.precisione;
   }
 
+  // controllo 24 ott: l'app chiude la linea quando il signore interrompe JARVIS (o cambia domanda). Non è un errore del cervello:
+  // nei tempi il turno risulta «interrotto», non «errore», e nei log non compare come guasto.
+  let staccato = false;
   const flusso = new ReadableStream({
+    cancel() { staccato = true; },
     async start(ctrl) {
       const cod = new TextEncoder();
       const invia = (o: unknown) => ctrl.enqueue(cod.encode(JSON.stringify(o) + "\n"));
@@ -3941,7 +3985,7 @@ Deno.serve(async (req) => {
           const memOrdinata = [...memoriaTurno].sort((a: any, b: any) => (a.categoria === "profilo" ? 0 : 1) - (b.categoria === "profilo" ? 0 : 1));
           const unaRiga = (t: string) => t.replace(/\s+/g, " ").trim();   // il contesto non deve avere righe vuote dentro (vedi senzaContesto)
           const testoFilo = (filo.riassunto ? `\n[Filo: prima delle battute qui sotto si parlava di: ${unaRiga(filo.riassunto)}]` : "")
-            + (filo.uscite.length ? `\n[Battute appena uscite dalla finestra: ${filo.uscite.map((b) => `${b.r === "user" ? "Signore" : "Tu"}: ${unaRiga(b.t).slice(0, 600)}`).join(" · ")}]` : "");
+            + (filo.uscite.length ? `\n[Battute appena uscite dalla finestra: ${filo.uscite.map((b) => `${b.r === "user" ? "Signore" : "Tu"}: ${unaRiga(battutaPerFilo(b)).slice(0, 600)}`).join(" · ")}]` : "");
           const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${testoFilo}${avvisoCr}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) turno.foto = imgs[0];
@@ -3950,7 +3994,11 @@ Deno.serve(async (req) => {
             ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }
             : { role: "user", content: testoUtente };
           const primaDiLui = storia.at(-2);   // l'ultima risposta di JARVIS: finiva con una domanda?
-          const chiestoPrima = primaDiLui?.role === "assistant" && typeof primaDiLui.content === "string" && /\?[\s»"”')]*$/.test(primaDiLui.content);
+          // controllo 24 ott: se il signore l'ha interrotto, conta anche la parte che ha sentito («La mando? (qui il signore mi ha
+          // interrotto…) …»): la domanda l'ha sentita, e il suo «sì» è il via a un'azione anche se dopo c'era altro non detto
+          const finisceConDomanda = (t: string) => /\?[\s»"”')]*$/.test(t);
+          const chiestoPrima = primaDiLui?.role === "assistant" && typeof primaDiLui.content === "string"
+            && (finisceConDomanda(primaDiLui.content) || finisceConDomanda(primaDiLui.content.split("(qui il signore mi ha interrotto")[0]));
           lavoro = storia; modello = scegliModello(ultimo, imgs.length > 0 || fotoPrima.length > 0, dispositivo, chiestoPrima); azioni = []; detto = "";
         }
 
@@ -4007,8 +4055,9 @@ Deno.serve(async (req) => {
         segnaTempi("passaggi");
       } catch (e) {
         segnaEsito({ t: "errore" });
-        segnaTempi("errore");
+        segnaTempi(staccato ? "interrotto" : "errore");
         const msg = (e as Error).message;
+        if (staccato) { console.log("turno interrotto: l'app ha chiuso la linea"); return; }
         console.log(`errore del turno: ${msg.slice(0, 300)}`);
         // 24 ott: al signore una frase in italiano da dire ad alta voce, mai il messaggio tecnico inglese
         // («Overloaded», «rate_limit_error»…): quello resta nei log e nel campo «tecnico» (per jarvis-deploy)
