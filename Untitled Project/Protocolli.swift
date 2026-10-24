@@ -90,6 +90,7 @@ final class Protocolli: ObservableObject {
         if let chiave = valore("passo") {                     // un passo spento o riacceso dopo l'Avvia
             inCambio = nil
             guard attivo == p, fase == .attivo else { return }
+            nota = nil                                        // il Comando rapido ha risposto: un «non ha risposto» di prima non vale più
             switch esito {
             case "ok":
                 if accesi.contains(chiave) { accesi.remove(chiave) } else { accesi.insert(chiave) }

@@ -187,6 +187,7 @@ struct VistaOrologio: View {
             case .interprete: jarvis.chiedi("Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce.")
             case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea: scheda = r
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
+            case .allenatore: jarvis.stato = "Trainer: questa sezione vive sull'iPhone, Sir."   // build 22: il nome nuovo, non «Allenatore»
             default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
             }
         }
