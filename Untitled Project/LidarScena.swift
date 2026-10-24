@@ -111,8 +111,11 @@ final class ScenaLidar: NSObject {
     private var parti: [Parte] = []
     private var sopra: [SCNNode] = []                // quote, porte, passaggi: solo nel risultato
     private var etichette: [SCNNode] = []
-    private var materialiOlo: [SCNMaterial] = []
+    // gli ologrammi, col loro colore e alfa: il testo dello shader si riscrive quando si conosce il modello e attorno alla materializzazione
+    private struct VoceOlo { let m: SCNMaterial; let hex: UInt32; let alfa: Double }
+    private var vociOlo: [VoceOlo] = []
     private var materialiSolidi: [SCNMaterial] = []
+    private var taglioAttivo = false                 // il taglio della materializzazione è montato sugli shader (solo per 1,1 s)
     private var lineaOlo = SCNMaterial(), lineaScura = SCNMaterial()
     private var triangoli: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)] = []   // per la nuvola di punti
     private var nuvola: SCNNode?
@@ -204,7 +207,7 @@ final class ScenaLidar: NSObject {
             let f = Float(min(1, (ora - t0) / 1.1)), e = 1 - pow(1 - f, 2.4)
             let v = dMin - 0.01 + (dMax - dMin + 0.05) * e
             taglio(v, verso: -1)
-            if f >= 1 { transizione = nil; taglio(1e6, verso: 1); applica() }
+            if f >= 1 { transizione = nil; taglio(1e6, verso: 1); staccaTaglio(); applica() }
         }
         aggiornaCamera(dt)
     }
@@ -214,6 +217,7 @@ final class ScenaLidar: NSObject {
         let aspetto = Float(v.bounds.width / v.bounds.height)
         let vf: Float = 32 * .pi / 180, hf = 2 * atan(tan(vf / 2) * aspetto)
         let d = R / sin(min(vf, hf) / 2) * k * zoom
+        guard d.isFinite, d > 0 else { return }                                   // mai una camera con numeri non validi
         let p = bersaglio + d * SIMD3(cos(inclinazione) * sin(yaw), sin(inclinazione), cos(inclinazione) * cos(yaw))
         camera.simdPosition = p
         camera.simdLook(at: bersaglio)
@@ -255,13 +259,35 @@ final class ScenaLidar: NSObject {
     private func materializza() {
         guard stile != nil else { applica(); return }
         transizione = CACurrentMediaTime()
+        attaccaTaglio()
         taglio(dMin - 0.01, verso: -1)
         applica()
     }
 
     private func taglio(_ v: Float, verso: Float) {
-        for m in materialiOlo { m.setValue(NSNumber(value: v), forKey: "taglio"); m.setValue(NSNumber(value: verso), forKey: "verso") }
-        for m in materialiSolidi { m.setValue(NSNumber(value: v), forKey: "tagS") }
+        let quota: Float = v.isFinite ? v : 1e6, senso: Float = verso < 0 ? -1 : 1
+        for o in vociOlo { o.m.setValue(NSNumber(value: quota), forKey: "taglio"); o.m.setValue(NSNumber(value: senso), forKey: "verso") }
+        for m in materialiSolidi { m.setValue(NSNumber(value: quota), forKey: "tagS") }
+    }
+
+    /// Solo durante la materializzazione (1,1 s) gli shader hanno il taglio con `#pragma arguments`. Fuori dal passaggio
+    /// l'ologramma usa lo stesso shader dell'Organismo (provato dalla build 22) e i solidi nessuno shader: il modello finito
+    /// si vede con gli ingredienti più semplici di SceneKit.
+    private func attaccaTaglio() {
+        guard !taglioAttivo else { return }
+        taglioAttivo = true
+        for o in vociOlo { o.m.shaderModifiers = [.fragment: testoOlo(o.hex, o.alfa, conTaglio: true)] }
+        for m in materialiSolidi { mettiTaglioSolido(m) }
+    }
+    private func staccaTaglio() {
+        guard taglioAttivo else { return }
+        taglioAttivo = false
+        for o in vociOlo { o.m.shaderModifiers = [.fragment: testoOlo(o.hex, o.alfa, conTaglio: false)] }
+        for m in materialiSolidi {
+            var mod = m.shaderModifiers ?? [:]
+            mod[.fragment] = nil
+            m.shaderModifiers = mod.isEmpty ? nil : mod
+        }
     }
 
     // MARK: Materiali
@@ -273,43 +299,72 @@ final class ScenaLidar: NSObject {
     nonisolated static func colore(_ hex: UInt32, _ a: CGFloat = 1) -> UIColor {      // nonisolated: solo conti e UIColor, si usa anche dentro i blocchi
         let c = rgb(hex); return UIColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: a)
     }
-    private static func f(_ x: Double) -> String { String(format: "%.5ff", x) }
+    /// Un numero per il testo Metal: sempre finito e con il punto («nanf» o «inff» non compilerebbero), tra −1e6 e 1e6.
+    private static func f(_ x: Double) -> String {
+        let y = x.isFinite ? min(max(x, -1e6), 1e6) : 0
+        return String(format: "%.5ff", y)
+    }
     private var asseShader: String { "float3(\(Self.f(Double(asse.x))), \(Self.f(Double(asse.y))), \(Self.f(Double(asse.z))))" }
+    private var raggioShader: Double { R.isFinite && R > 0 ? Double(max(R, 0.05)) : 1 }
 
-    /// L'ologramma del mockup (`holo`): bordo luminoso (fresnel), righe di scansione, il filo del taglio; additivo, senza profondità.
+    /// Il testo Metal dell'ologramma del mockup (`holo`): bordo luminoso (fresnel), righe di scansione.
+    /// Senza taglio è riga per riga lo shader dell'Organismo (build 22, provato sull'iPhone): niente `#pragma arguments`,
+    /// niente `discard_fragment()`. Con il taglio (solo nella materializzazione) si aggiungono il filo luminoso e la maschera:
+    /// sopra o sotto il taglio il colore è zero, che con la fusione additiva è come non disegnare (stesso aspetto di prima).
+    private func testoOlo(_ hex: UInt32, _ alfa: Double, conTaglio: Bool) -> String {
+        let c = Self.rgb(hex)
+        let tinta = "float3(\(Self.f(Self.lineare(Double(c.x)))), \(Self.f(Self.lineare(Double(c.y)))), \(Self.f(Self.lineare(Double(c.z)))))"
+        let righe = Self.f(70 / raggioShader), forza = Self.f(alfa)
+        if !conTaglio {
+            return """
+            #pragma transparent
+            #pragma body
+            float3 jvN = normalize(_surface.normal);
+            float jvK = clamp(1.0f - abs(dot(jvN, normalize(_surface.view))), 0.0f, 1.0f);
+            float jvFr = jvK * jvK;
+            float4 jvW = scn_frame.inverseViewTransform * float4(_surface.position, 1.0f);
+            float jvRiga = smoothstep(0.6f, 1.0f, sin(jvW.y * \(righe) - scn_frame.time * 3.0f) * 0.5f + 0.5f);
+            float jvA = clamp((0.05f + jvFr * 0.5f + jvRiga * 0.05f) * \(forza), 0.0f, 1.0f);
+            float3 jvC = \(tinta) * (0.3f + jvFr * 1.5f + jvRiga * 0.3f);
+            _output.color = float4(jvC * jvA, jvA);
+            """
+        }
+        return """
+        #pragma transparent
+        #pragma arguments
+        float taglio;
+        float verso;
+        #pragma body
+        float3 jvN = normalize(_surface.normal);
+        float jvK = clamp(1.0f - abs(dot(jvN, normalize(_surface.view))), 0.0f, 1.0f);
+        float jvFr = jvK * jvK;
+        float4 jvW = scn_frame.inverseViewTransform * float4(_surface.position, 1.0f);
+        float jvD = dot(jvW.xyz, \(asseShader));
+        float jvM = step(0.0f, (taglio - jvD) * verso);
+        float jvRiga = smoothstep(0.6f, 1.0f, sin(jvW.y * \(righe) - scn_frame.time * 3.0f) * 0.5f + 0.5f);
+        float jvFilo = 1.0f - smoothstep(0.0f, \(Self.f(0.03 * raggioShader)), abs(jvD - taglio));
+        float jvA = clamp((0.05f + jvFr * 0.5f + jvRiga * 0.05f + jvFilo) * \(forza), 0.0f, 1.0f);
+        float3 jvC = \(tinta) * (0.3f + jvFr * 1.5f + jvRiga * 0.3f) + float3(0.85f, 0.97f, 1.0f) * jvFilo * 1.5f;
+        _output.color = float4(jvC * jvA, jvA) * jvM;
+        """
+    }
+
+    /// L'ologramma del mockup: additivo, senza profondità; lo shader è `testoOlo`.
     private var cacheOlo: [String: SCNMaterial] = [:]
     private func olo(_ hex: UInt32, _ alfa: Double = 1) -> SCNMaterial {
         let chiave = "\(hex)-\(alfa)"
         if let m = cacheOlo[chiave] { return m }
-        let c = Self.rgb(hex)
         let m = SCNMaterial()
         m.lightingModel = .constant
         m.diffuse.contents = Self.colore(hex)
         m.isDoubleSided = true
         m.blendMode = .add
         m.writesToDepthBuffer = false
-        m.shaderModifiers = [.fragment: """
-        #pragma arguments
-        float taglio;
-        float verso;
-        #pragma transparent
-        #pragma body
-        float4 jvW = scn_frame.inverseViewTransform * float4(_surface.position, 1.0f);
-        float jvD = dot(jvW.xyz, \(asseShader));
-        if ((jvD - taglio) * verso > 0.0f) { discard_fragment(); }
-        float3 jvN = normalize(_surface.normal);
-        float jvK = clamp(1.0f - abs(dot(jvN, normalize(_surface.view))), 0.0f, 1.0f);
-        float jvFr = jvK * jvK;
-        float jvRiga = smoothstep(0.6f, 1.0f, sin(jvW.y * \(Self.f(Double(70 / max(R, 0.05)))) - scn_frame.time * 3.0f) * 0.5f + 0.5f);
-        float jvFilo = 1.0f - smoothstep(0.0f, \(Self.f(Double(0.03 * max(R, 0.05)))), abs(jvD - taglio));
-        float jvA = clamp((0.05f + jvFr * 0.5f + jvRiga * 0.05f + jvFilo) * \(Self.f(alfa)), 0.0f, 1.0f);
-        float3 jvC = float3(\(Self.f(Self.lineare(Double(c.x)))), \(Self.f(Self.lineare(Double(c.y)))), \(Self.f(Self.lineare(Double(c.z))))) * (0.3f + jvFr * 1.5f + jvRiga * 0.3f) + float3(0.85f, 0.97f, 1.0f) * jvFilo * 1.5f;
-        _output.color = float4(jvC * jvA, jvA);
-        """]
+        m.shaderModifiers = [.fragment: testoOlo(hex, alfa, conTaglio: taglioAttivo)]
         m.setValue(NSNumber(value: Float(1e6)), forKey: "taglio")
         m.setValue(NSNumber(value: Float(1)), forKey: "verso")
         cacheOlo[chiave] = m
-        materialiOlo.append(m)
+        vociOlo.append(VoceOlo(m: m, hex: hex, alfa: alfa))
         return m
     }
 
@@ -334,7 +389,14 @@ final class ScenaLidar: NSObject {
         aggiungiTaglio(m)
         return m
     }
+    /// Il solido entra nella materializzazione: lo shader del taglio gli si monta solo durante il passaggio (`attaccaTaglio`).
     private func aggiungiTaglio(_ m: SCNMaterial) {
+        m.setValue(NSNumber(value: Float(1e6)), forKey: "tagS")
+        materialiSolidi.append(m)
+        if taglioAttivo { mettiTaglioSolido(m) }
+    }
+    /// Sopra il taglio il solido non c'è ancora (né colore né profondità).
+    private func mettiTaglioSolido(_ m: SCNMaterial) {
         var mod = m.shaderModifiers ?? [:]
         mod[.fragment] = """
         #pragma arguments
@@ -344,8 +406,6 @@ final class ScenaLidar: NSObject {
         if (dot(jvWs.xyz, \(asseShader)) > tagS) { discard_fragment(); }
         """
         m.shaderModifiers = mod
-        m.setValue(NSNumber(value: Float(1e6)), forKey: "tagS")
-        materialiSolidi.append(m)
     }
 
     private static func linea(_ hex: UInt32, _ alfa: CGFloat, additiva: Bool) -> SCNMaterial {
@@ -1049,8 +1109,10 @@ final class ScenaLidar: NSObject {
     private func inquadra() {
         let (lo, hi) = radice.boundingBox
         let mn = SIMD3<Float>(Float(lo.x), Float(lo.y), Float(lo.z)), mx = SIMD3<Float>(Float(hi.x), Float(hi.y), Float(hi.z))
-        let centro = (mn + mx) / 2
-        R = max(0.1, simd_length(mx - mn) / 2)
+        let finito = mn.x.isFinite && mn.y.isFinite && mn.z.isFinite && mx.x.isFinite && mx.y.isFinite && mx.z.isFinite
+        let centro = finito ? (mn + mx) / 2 : SIMD3<Float>(0, 0, 0)
+        let raggio = finito ? simd_length(mx - mn) / 2 : 1
+        R = raggio.isFinite ? max(0.1, raggio) : 1
         if !bersaglioFisso { bersaglio = centro }
         // dove passa il taglio (sull'asse scelto), per la materializzazione
         var dm: Float = .infinity, dM: Float = -.infinity
@@ -1058,6 +1120,7 @@ final class ScenaLidar: NSObject {
             let v = SIMD3<Float>(i == 0 ? mn.x : mx.x, j == 0 ? mn.y : mx.y, l == 0 ? mn.z : mx.z)
             dm = min(dm, simd_dot(v, asse)); dM = max(dM, simd_dot(v, asse))
         } } }
+        if !finito || !dm.isFinite || !dM.isFinite { dm = -R; dM = R }
         dMin = dm; dMax = dM
         // i materiali olografici già fatti hanno l'asse e la scala del modello di prima: si rifanno con quelli veri
         rifaiOlografici()
@@ -1109,35 +1172,9 @@ final class ScenaLidar: NSObject {
 
     /// I materiali olografici sono nati prima di conoscere asse e grandezza del modello: si riscrive il loro shader.
     private func rifaiOlografici() {
-        let vecchi = cacheOlo
-        cacheOlo = [:]
-        let tenuti = materialiOlo.filter { m in !vecchi.values.contains { $0 === m } }
-        materialiOlo = tenuti
-        for (chiave, m) in vecchi {
-            let parti = chiave.split(separator: "-")
-            guard parti.count == 2, let hex = UInt32(parti[0]), let alfa = Double(parti[1]) else { continue }
-            let nuovo = olo(hex, alfa)
-            m.shaderModifiers = nuovo.shaderModifiers
-            m.setValue(NSNumber(value: Float(1e6)), forKey: "taglio")
-            m.setValue(NSNumber(value: Float(1)), forKey: "verso")
-            materialiOlo.removeAll { $0 === nuovo }
-            materialiOlo.append(m)
-            cacheOlo[chiave] = m
-        }
-        // anche il taglio dei solidi va sull'asse giusto
-        for m in materialiSolidi { aggiungiTaglioSoltanto(m) }
-    }
-    private func aggiungiTaglioSoltanto(_ m: SCNMaterial) {
-        var mod = m.shaderModifiers ?? [:]
-        mod[.fragment] = """
-        #pragma arguments
-        float tagS;
-        #pragma body
-        float4 jvWs = scn_frame.inverseViewTransform * float4(_surface.position, 1.0f);
-        if (dot(jvWs.xyz, \(asseShader)) > tagS) { discard_fragment(); }
-        """
-        m.shaderModifiers = mod
-        m.setValue(NSNumber(value: Float(1e6)), forKey: "tagS")
+        for o in vociOlo { o.m.shaderModifiers = [.fragment: testoOlo(o.hex, o.alfa, conTaglio: taglioAttivo)] }
+        // anche il taglio dei solidi va sull'asse giusto (se è montato)
+        if taglioAttivo { for m in materialiSolidi { mettiTaglioSolido(m) } }
     }
 
     // MARK: La nuvola di punti (anteprima): campionata sulle superfici del modello
@@ -1269,8 +1306,12 @@ enum TrameLidar {
     private static var cache: [String: UIImage] = [:]
 
     /// Lo «studio» per i riflessi: luce bianca in alto, azzurra a sinistra, fondo scuro.
+    /// Gamma normale (8 bit sRGB): sull'iPhone 15 Pro il formato automatico sarebbe «extended» (float a 16 bit), che SceneKit
+    /// per l'illuminazione dell'ambiente non deve ricevere; i colori sono tutti dentro sRGB, quindi l'immagine è la stessa.
     static let studio: UIImage = {
-        let f = UIGraphicsImageRenderer(size: CGSize(width: 256, height: 128))
+        let fmt = UIGraphicsImageRendererFormat.preferred()
+        fmt.preferredRange = .standard
+        let f = UIGraphicsImageRenderer(size: CGSize(width: 256, height: 128), format: fmt)
         return f.image { c in
             let cg = c.cgContext
             let colori = [UIColor(white: 1, alpha: 1).cgColor, UIColor(red: 0.62, green: 0.86, blue: 1, alpha: 1).cgColor,
@@ -1297,6 +1338,7 @@ enum TrameLidar {
             }
         }
         let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
+        fmt.preferredRange = .standard                                       // 8 bit sRGB, come lo «studio» (vedi sopra)
         let img = UIGraphicsImageRenderer(size: CGSize(width: N, height: N), format: fmt).image { c in
             // il renderer chiama questo blocco subito, sullo stesso thread (il principale): lo si dice a Swift, così il blocco può
             // usare r(), hex() e ScenaLidar.colore, che appartengono al thread principale come tutta TrameLidar
