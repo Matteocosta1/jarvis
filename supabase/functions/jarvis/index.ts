@@ -3737,29 +3737,109 @@ async function paginaEdith(c: any, ipChiamante: string) {
 // Il Mac registra la frase (WAV 16 kHz) e la manda qui: ElevenLabs Scribe la trascrive in circa mezzo secondo.
 // Il cervello è quasi sempre già acceso, quindi niente attesa d'avvio. Dentro il piano ElevenLabs (ore di trascrizione incluse).
 async function trascriviVeloce(b64: string) {
+  const t = await trascriviTesto(b64, "wav");
+  return "testo" in t ? json({ testo: t.testo, fonte: t.fonte }) : json({ errore: t.errore }, t.stato);
+}
+
+/// La trascrizione vera: WAV a 16 kHz (Mac) o m4a (orologio, idea D del 25 ott). Usata anche dalla domanda che arriva come audio.
+async function trascriviTesto(b64: string, formato: "wav" | "m4a"): Promise<{ testo: string; fonte: string } | { errore: string; stato: number }> {
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
-  if (!chiave) return json({ errore: "manca ELEVENLABS_API_KEY" }, 503);
-  if (b64.length < 100 || b64.length > 3_000_000) return json({ errore: "audio mancante o troppo lungo" }, 400);
+  if (!chiave) return { errore: "manca ELEVENLABS_API_KEY", stato: 503 };
+  if (b64.length < 100 || b64.length > 3_000_000) return { errore: "audio mancante o troppo lungo", stato: 400 };
   let audio: ReturnType<typeof Uint8Array.from>;                     // il tipo esatto di Uint8Array.from: va bene a Blob con ogni versione di TypeScript
-  try { audio = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); } catch { return json({ errore: "audio non leggibile" }, 400); }
+  try { audio = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); } catch { return { errore: "audio non leggibile", stato: 400 }; }
   let ultimo = "";
   for (const modello of ["scribe_v2", "scribe_v1"]) {
     const f = new FormData();
     f.append("model_id", modello);
     f.append("language_code", "ita");
     f.append("tag_audio_events", "false");
-    f.append("file", new Blob([audio], { type: "audio/wav" }), "voce.wav");
+    f.append("file", new Blob([audio], { type: formato === "m4a" ? "audio/mp4" : "audio/wav" }), formato === "m4a" ? "voce.m4a" : "voce.wav");
     try {
       const r = await fetch(`${XI}/speech-to-text`, { method: "POST", headers: { "xi-api-key": chiave }, body: f, signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const d = await r.json();
-        return json({ testo: String(d.text ?? "").trim(), fonte: modello });
+        return { testo: String(d.text ?? "").trim(), fonte: modello };
       }
       ultimo = `ElevenLabs ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`;
       if (r.status === 401 || r.status === 402 || r.status === 403 || r.status === 429) break;
     } catch (e) { ultimo = `ElevenLabs: ${(e as Error).message}`; }
   }
-  return json({ errore: ultimo }, 502);
+  return { errore: ultimo, stato: 502 };
+}
+
+// ───────────────────────── Un solo JARVIS risponde (idea B del 25 ott) ─────────────────────────
+// iPhone e Mac (o orologio e Mac) sentono la stessa frase e la mandano tutti e due: risponde uno solo, gli altri tacciono
+// e tornano in attesa. Ogni app manda con la frase detta a voce `arbitro: { id, fine }` (l'id della sua installazione e quando
+// il signore ha smesso di parlare, in ms). Il cervello segna ogni frase in jarvis_arbitro; se un altro dispositivo ha mandato
+// una frase quasi uguale nello stesso momento, vince chi l'ha sentita finire per primo (a 0,4 s di precisione), a pari merito
+// chi ne ha sentito di più (più parole). Chi ha già vinto resta vincitore. Con un dispositivo solo non cambia niente: niente
+// attesa e la frase vince subito. Se il database non risponde, o qualcosa non torna, la frase vince (meglio due voci che nessuna).
+/// Idea D: dopo «trascritto» l'app ha questo tempo per chiudere la linea (un suo comando) prima che parta Claude.
+const GRAZIA_AUDIO_MS = 150;
+const ARBITRO_ATTESA_MS = 300;        // se un altro dispositivo era attivo negli ultimi 2 minuti, si aspetta che arrivi anche la sua copia
+const ARBITRO_TETTO_MS = 1200;        // oltre, la frase vince da sola
+const RICHIAMI_ARBITRO = new Set(["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "okay", "senti", "scusa", "allora", "bro", "dai"]);
+/// La frase come la confronta l'arbitro: senza note dell'app, accenti, punteggiatura e il richiamo davanti («Jarvis, …»).
+function normaArbitro(t: string) {
+  const parole = senzaNoteApp(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
+  while (parole.length > 1 && RICHIAMI_ARBITRO.has(parole[0])) parole.shift();
+  return parole.join(" ").slice(0, 400);
+}
+/// Quasi uguali: le due trascrizioni (riconoscitori diversi) hanno in comune, in ordine, almeno tre quarti delle parole.
+function similiArbitro(a: string, b: string) {
+  if (a === b) return true;
+  const x = a.split(" "), y = b.split(" ");
+  if (!x.length || !y.length) return false;
+  const L: number[][] = Array.from({ length: x.length + 1 }, () => new Array(y.length + 1).fill(0));
+  for (let i = x.length - 1; i >= 0; i--) for (let j = y.length - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  return (2 * L[0][0]) / (x.length + y.length) >= 0.75;
+}
+type Concorrente = { id: number; fine: number; parole: number };
+const primaDi = (a: Concorrente, b: Concorrente) =>
+  Math.floor(a.fine / 400) - Math.floor(b.fine / 400) || b.parole - a.parole || a.id - b.id;
+/// Vero: questa copia della frase risponde. Falso: un altro dispositivo risponde alla stessa frase, questa tace.
+async function arbitra(v: any, testo: string, tipo: string): Promise<boolean> {
+  const chi = String(v?.id ?? "");
+  const norma = normaArbitro(testo);
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(chi) || !norma) return true;
+  const adesso = Date.now();
+  const fine = Number.isFinite(Number(v?.fine)) && Math.abs(Number(v.fine) - adesso) < 120_000 ? Number(v.fine) : adesso;
+  const parole = norma.split(" ").length;
+  const decidi = async (): Promise<boolean> => {
+    const { data: ins, error } = await db.from("jarvis_arbitro")
+      .insert({ dispositivo: chi, tipo, testo: norma, fine, parole, creata: new Date(adesso).toISOString() }).select("id").single();
+    const mio = Array.isArray(ins) ? ins[0] : ins;
+    if (error || !mio?.id) return true;
+    const leggi = async () => {
+      const { data } = await db.from("jarvis_arbitro").select("id, dispositivo, testo, fine, parole, creata, vince")
+        .gte("creata", new Date(adesso - 120_000).toISOString()).neq("dispositivo", chi).order("id", { ascending: false }).limit(40);
+      return (data ?? []) as any[];
+    };
+    let altri = await leggi();
+    if (altri.length) {                                 // un altro dispositivo è attivo: la sua copia può essere ancora in viaggio
+      const resta = adesso + ARBITRO_ATTESA_MS - Date.now();
+      if (resta > 0) await new Promise((ok) => setTimeout(ok, resta));
+      altri = await leggi();
+    }
+    const simili = altri.filter((x) => Math.abs((Date.parse(x.creata) || 0) - adesso) <= 15_000
+      && Math.abs(Number(x.fine) - fine) <= 4_000 && similiArbitro(String(x.testo ?? ""), norma));
+    let vince: boolean;
+    if (simili.some((x) => x.vince === true)) vince = false;
+    else {
+      const gara: Concorrente[] = [{ id: Number(mio.id), fine, parole },
+        ...simili.filter((x) => x.vince !== false).map((x) => ({ id: Number(x.id), fine: Number(x.fine), parole: Number(x.parole) || 0 }))];
+      gara.sort(primaDi);
+      vince = gara[0].id === Number(mio.id);
+    }
+    await db.from("jarvis_arbitro").update({ vince }).eq("id", mio.id);
+    return vince;
+  };
+  inSottofondo(Promise.resolve(db.from("jarvis_arbitro").delete().lt("creata", new Date(adesso - 3600_000).toISOString())).then(() => {}, () => {}));
+  try {
+    return await Promise.race([decidi(), new Promise<boolean>((ok) => setTimeout(() => ok(true), ARBITRO_TETTO_MS))]);
+  } catch { return true; }
 }
 
 // ───────────────────────── HTTP ─────────────────────────
@@ -3852,7 +3932,8 @@ Deno.serve(async (req) => {
     // (ELEVENLABS_MODELLO) dentro c'è anche il modello, così quando si passa a v4 Turbo le frasi in cache fatte con il modello
     // di prima non si mescolano più a quelle nuove (prima frase dalla cache in v2, le altre in v4: voce che cambia a metà).
     const fisso = (Deno.env.get("ELEVENLABS_MODELLO") ?? "").trim();
-    return json({ sveglio: true, voce: fisso ? `${voceAttuale()}·${fisso}` : voceAttuale() });
+    // idea D (25 ott): l'app sa che può mandare la domanda come audio insieme alla richiesta (un giro solo)
+    return json({ sveglio: true, voce: fisso ? `${voceAttuale()}·${fisso}` : voceAttuale(), giro_unico: true });
   }
   if (typeof corpo?.traduci === "string") return await traduci(corpo.traduci, String(corpo.da || "it"), String(corpo.a || "en"));   // interprete
   if (corpo?.vitals === true) {                                                             // pagina Vitals dell'app
@@ -3997,22 +4078,30 @@ Deno.serve(async (req) => {
   // senza rifare nulla; se è ancora in lavorazione aspetto un po'; altrimenti la rifaccio da capo.
   const numeroRichiesta = (req.headers.get("x-richiesta") ?? "").trim();
   const richiestaValida = /^[A-Za-z0-9-]{8,64}$/.test(numeroRichiesta);
-  if (richiestaValida) {
-    const { error: dup } = await db.from("jarvis_richieste").insert({ id: numeroRichiesta });
-    if (dup) {
-      for (let i = 0; i < 12; i++) {
-        const { data } = await db.from("jarvis_richieste").select("esito").eq("id", numeroRichiesta).maybeSingle();
-        if (data?.esito?.t === "fine") {
-          const e = data.esito;
-          return new Response(JSON.stringify({ t: "testo", d: e.testo }) + "\n" + JSON.stringify({ t: "fine", testo: e.testo, azioni: e.azioni ?? [] }) + "\n",
-            { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache" } });
-        }
-        if (data?.esito?.t === "client" || data?.esito?.t === "errore") break;   // da rifare: il dispositivo non ha mai avuto il suo turno
-        await new Promise((r) => setTimeout(r, 1500));
+  // Difetto 5 (controllo del 25 ott): il numero della richiesta si registra INSIEME alle altre letture del turno (memoria, filo,
+  // azioni), non prima: alcune decine di millisecondi in meno prima della prima parola. Il risultato si guarda prima di Claude.
+  const registrazione: Promise<{ error: unknown }> = richiestaValida
+    ? Promise.resolve(db.from("jarvis_richieste").insert({ id: numeroRichiesta })).then((x: any) => ({ error: x?.error ?? null }), () => ({ error: null }))
+    : Promise.resolve({ error: null });
+  if (richiestaValida) db.from("jarvis_richieste").delete().lt("creato", new Date(Date.now() - 86400_000).toISOString()).then(() => {}, () => {});
+  /// Richiesta ripetuta (stesso numero): se la risposta era già pronta la rimanda così com'è (vero), se è ancora in lavorazione
+  /// aspetta un po'; se no (falso) il turno si rifà da capo.
+  const giaFatta = async (invia: (o: unknown) => void): Promise<boolean> => {
+    const { error: dup } = await registrazione;
+    if (!dup) return false;
+    for (let i = 0; i < 12; i++) {
+      const { data } = await db.from("jarvis_richieste").select("esito").eq("id", numeroRichiesta).maybeSingle();
+      if (data?.esito?.t === "fine") {
+        const e = data.esito;
+        invia({ t: "testo", d: e.testo });
+        invia({ t: "fine", testo: e.testo, azioni: e.azioni ?? [] });
+        return true;
       }
+      if (data?.esito?.t === "client" || data?.esito?.t === "errore") break;   // da rifare: il dispositivo non ha mai avuto il suo turno
+      await new Promise((r) => setTimeout(r, 1500));
     }
-    db.from("jarvis_richieste").delete().lt("creato", new Date(Date.now() - 86400_000).toISOString()).then(() => {}, () => {});
-  }
+    return false;
+  };
   const segnaEsito = (esito: unknown) => { if (richiestaValida) db.from("jarvis_richieste").update({ esito }).eq("id", numeroRichiesta).then(() => {}, () => {}); };
   const { tools, client } = strumentiPer(Array.isArray(corpo.strumenti_client) ? corpo.strumenti_client.map(String) : [], strumentiDescritti(corpo.strumenti_client_def));
   // posizione dell'iPhone (se l'app la manda) e ultima foto del turno: servono alla seconda memoria
@@ -4047,6 +4136,7 @@ Deno.serve(async (req) => {
       // 24 ott: i tempi del turno, una riga in jarvis_consumi (servizio «turno», o «turno_seguito» quando torna dal dispositivo):
       // ms_prima_parola = dall'arrivo della richiesta alla prima parola mandata all'app; ms_totale = fino alla fine del turno
       let primaTurno: number | null = null, modelloTurno: string | null = null, turnoSegnato = false;
+      let soloTrascritto = false;   // idea D: mandato «trascritto», Claude non ancora partito (se l'app chiude ora era un suo comando)
       const segnaTempi = (esito: string) => {
         if (turnoSegnato || provaGenerale) return;
         turnoSegnato = true;
@@ -4059,6 +4149,7 @@ Deno.serve(async (req) => {
         let lavoro: any[], modello: string, azioni: string[], detto: string;
         let rapida = false;   // idea A: Opus a voce con sforzo «low» (si porta dietro in tutto il turno, anche dopo gli strumenti del dispositivo)
         if (corpo.continua) {
+          if (await giaFatta(invia)) { chiudi(); return; }   // la linea era caduta e la risposta c'era già
           // ritorno dal dispositivo con i risultati dei suoi strumenti
           const c = corpo.continua;
           lavoro = Array.isArray(c.lavoro) ? c.lavoro : [];
@@ -4097,6 +4188,23 @@ Deno.serve(async (req) => {
           // la memoria visiva: la foto vista poco fa torna nel messaggio in cui era stata mandata (indice nella storia dell'app)
           const fs = corpo.foto_storia;
           const fotoPrima = fs && Number.isInteger(fs.indice) ? immaginiValide(null, fs.immagini) : [];
+          // Idea D (25 ott): orologio e Mac mandano la frase come audio insieme alla richiesta della risposta. Il cervello la
+          // trascrive, la rimanda subito all'app («trascritto») e intanto prepara il turno; se l'app vede che è un suo comando
+          // («apri il meteo») chiude la linea entro la breve attesa qui sotto e il cervello si ferma senza chiamare Claude.
+          // Se la trascrizione non riesce, «trascritto» porta l'errore e l'app ripassa dalla strada di prima.
+          let grazia: Promise<unknown> = Promise.resolve();
+          if (typeof corpo.audio_domanda === "string") {
+            const tr = await trascriviTesto(corpo.audio_domanda, corpo.formato_audio === "m4a" ? "m4a" : "wav");
+            fermaSeStaccato();
+            if (!("testo" in tr)) { invia({ t: "trascritto", d: "", errore: tr.errore }); chiudi(); return; }
+            invia({ t: "trascritto", d: tr.testo });
+            if (!tr.testo) { chiudi(); return; }
+            soloTrascritto = true;
+            const prima: any[] = Array.isArray(corpo.messaggi) ? corpo.messaggi : [];
+            const prefisso = typeof corpo.prefisso_domanda === "string" ? corpo.prefisso_domanda : "";
+            corpo.messaggi = [...prima, { role: "user", content: prefisso + tr.testo }];
+            grazia = new Promise((ok) => setTimeout(ok, GRAZIA_AUDIO_MS));
+          }
           const grezzi: any[] = Array.isArray(corpo.messaggi) ? corpo.messaggi : [];
           const scelti = grezzi.map((m: any, i: number) => ({ m, i })).slice(-20)
             .filter(({ m }) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string" && m.content.trim());
@@ -4114,7 +4222,10 @@ Deno.serve(async (req) => {
           const battute: Battuta[] = scelti.map(({ m }) => ({ r: m.role, t: String(m.content).slice(0, 4000) }));
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
           const ultimaDomanda = senzaNoteApp(String(scelti.at(-1)?.m?.content ?? ""));   // revisione 24 ott: senza le note dell'app, che col significato non c'entrano
-          const [{ data: mem }, fatte, avvisoCr, filo] = await Promise.all([
+          // idea B: un solo JARVIS risponde alla stessa frase sentita da più dispositivi (solo le frasi dette a voce, con `arbitro`)
+          const arbitro: Promise<boolean> = corpo.arbitro && !provaGenerale
+            ? arbitra(corpo.arbitro, String(scelti.at(-1)?.m?.content ?? ""), dispositivo) : Promise.resolve(true);
+          const [[{ data: mem }, fatte, avvisoCr, filo], vince, ripetuta] = await Promise.all([Promise.all([
             // decisione 52 (24 ott): oltre 80 fatti si caricano gli 80 più RECENTI (prima erano i più vecchi); i più vecchi che
             // servono li aggiunge qui sotto la ricerca per significato
             db.from("jarvis_memoria").select("id, fatto, categoria, creata").order("creata", { ascending: false }).order("id", { ascending: false }).limit(80),
@@ -4122,7 +4233,16 @@ Deno.serve(async (req) => {
             avvisoCredito(),
             conFilo ? leggiFilo(dispositivo, battute).catch(() => ({ riassunto: "", uscite: [] as Battuta[], ereditate: [] as boolean[] }))
               : Promise.resolve({ riassunto: "", uscite: [] as Battuta[], ereditate: [] as boolean[] }),
-          ]);
+          ]), arbitro, giaFatta(invia), grazia]);
+          if (ripetuta) { chiudi(); return; }            // la linea era caduta e la risposta c'era già: rimandata così com'era
+          fermaSeStaccato();                               // idea D: l'app ha chiuso la linea (era un suo comando): niente Claude
+          soloTrascritto = false;
+          if (!vince) {
+            // idea B: la stessa frase l'ha presa un altro dispositivo, che risponde lui: questo tace e torna in attesa
+            invia({ t: "doppione" });
+            segnaTempi("doppione");
+            chiudi(); return;
+          }
           if (conFilo) inSottofondo(aggiornaFilo(dispositivo, filo.riassunto, filo.uscite, battute, filo.ereditate));
           // memoria lunga (oltre 80 fatti): si aggiungono quelli più vicini per significato a ciò che chiede adesso
           // nel contesto restano nell'ordine di prima: per categoria, poi dal più vecchio al più nuovo
@@ -4227,7 +4347,8 @@ Deno.serve(async (req) => {
         segnaTempi("passaggi");
       } catch (e) {
         segnaEsito({ t: "errore" });
-        segnaTempi(staccato ? "interrotto" : "errore");
+        // idea D: l'app ha chiuso la linea subito dopo «trascritto» perché la frase era un suo comando: non è un turno interrotto
+        if (!(staccato && soloTrascritto)) segnaTempi(staccato ? "interrotto" : "errore");
         const msg = (e as Error).message;
         if (staccato) { console.log("turno interrotto: l'app ha chiuso la linea"); return; }
         console.log(`errore del turno: ${msg.slice(0, 300)}`);
