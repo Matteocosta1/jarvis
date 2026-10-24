@@ -1016,15 +1016,16 @@ struct CatturaStatua: View {
                 if Date().timeIntervalSince(inizio) > 15 { fallita("LA FOTOCAMERA NON PARTE · RIPROVI"); return false }
             case .ready:
                 trovata = nil
-                if s.cameraTracking != .normal {
-                    testo = "MUOVA PIANO L'IPHONE PER PARTIRE"
-                } else {
+                // `if case`: funziona qualunque sia il tipo dello stato di tracciamento (non serve che sia Equatable)
+                if case .normal = s.cameraTracking {
                     // Apple cerca l'oggetto sotto il pallino al centro: se non lo trova risponde false e resta pronta. Si riprova.
                     if Date().timeIntervalSince(ultimaRicerca) > 1.5 {
                         ultimaRicerca = Date()
                         if !s.startDetecting() { mancate += 1 }
                     }
                     testo = consiglio(s) ?? (mancate < 4 ? "CERCO LA PERSONA · LA TENGA AL CENTRO" : "NON LA TROVO · SI AVVICINI E LA TENGA AL CENTRO")
+                } else {
+                    testo = "MUOVA PIANO L'IPHONE PER PARTIRE"
                 }
             case .detecting:
                 mancate = 0
@@ -1043,7 +1044,7 @@ struct CatturaStatua: View {
                 sessione = nil                          // …e la sessione di cattura si libera prima di costruire (campione di Apple)
                 return true
             case .failed(let e):
-                if case ObjectCaptureSession.Error.cancelled = e { return false }
+                if Task.isCancelled { return false }        // chiusa da lei (cancel): non è un errore da mostrare
                 fallita("SCANSIONE INTERROTTA · \(e.localizedDescription.uppercased())")
                 return false
             default:
