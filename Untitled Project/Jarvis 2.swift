@@ -655,6 +655,12 @@ final class Jarvis: NSObject, ObservableObject {
             return true
         case .lidar(let azione)?:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if case .modo(let chiave, let nome) = azione, !lidarAperto, let m = ModoLidar(rawValue: chiave) {   // LiDAR 23: «metro laser» da fuori apre LiDAR già sul modo
+                LidarAperta.richiesta = (m, nome)
+                apriReparto(.lidar, annuncia: false)
+                annuncia(m.annuncioVoce)
+                return true
+            }
             azioneLidar = azione
             return true
         case .interprete(let codice)? where !lidarAperto:
