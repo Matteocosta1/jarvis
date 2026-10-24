@@ -93,12 +93,17 @@ async function jwtApple() {
   return token;
 }
 
+// controllo 24 ott: con i toni della voce accesi (VOCE_TONI=on) il cervello può aprire una frase con «[whispers]» o «[sarcastic]».
+// Sulla notifica (schermata di blocco) non si devono vedere: si tolgono dal testo mostrato. In jarvis_testo restano, perché
+// l'app (build 22 in poi) li toglie dallo schermo da sé e li fa dire alla voce. Stessa forma dei toni del cervello.
+const senzaToni = (t: string) => t.replace(/(^|\s)\[[a-z][a-z \-]{0,23}\](?!\()[ \t]*/g, "$1").replace(/[ \t]+([.,;:!?…])/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+
 async function push(host: string, jwt: string, token: string, titolo: string, testo: string, azione: string) {
   const r = await fetch(`${host}/3/device/${token}`, {
     method: "POST",
     headers: { authorization: `bearer ${jwt}`, "apns-topic": Deno.env.get("JARVIS_BUNDLE_ID") ?? "", "apns-push-type": "alert", "apns-priority": "10", "content-type": "application/json" },
     body: JSON.stringify({
-      aps: { alert: { title: titolo, body: testo.slice(0, 1500) }, sound: "default", "interruption-level": "active" },
+      aps: { alert: { title: titolo, body: senzaToni(testo).slice(0, 1500) }, sound: "default", "interruption-level": "active" },
       jarvis_azione: azione, jarvis_testo: testo.slice(0, 3000),
     }),
   });
