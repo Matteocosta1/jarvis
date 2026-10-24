@@ -120,13 +120,21 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
     case organismo                // «scansione organismo», «stato dell'organismo»: Vitals (sull'orologio l'Organismo)
     case specchio                 // «modalità specchio»: Allenatore, sullo Specchio
     case allenamento              // «allenamento allo specchio»: Allenatore, sullo Specchio
+    case satellite(AzioneSatellite)   // build 23: «guidami allo studio», «mostrami la strada per il locale», «ricognizione su Via Savona», «mostrami lo studio in 3D»
+    case fermaGuida               // build 23: «ferma la guida» (la GUIDA di SATELLITE, anche a Satellite chiuso)
 
     static func riconosci(_ frase: String) -> ComandoDedicato? {
         var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
             .split(separator: " ").map(String.init)
-        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
+        // le stesse parole con gli accenti e le lettere di prima: servono per i nomi e gli indirizzi detti («Via Perù»)
+        var o = frase.lowercased()
+            .replacingOccurrences(of: "[^\\p{L}\\p{N} ]", with: " ", options: .regularExpression)
+            .split(separator: " ").map(String.init)
+        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst(); if !o.isEmpty { o.removeFirst() } }
+        if o.count != t.count { o = t }
+        if let s = satellite(t, originale: o) { return s }
         // «protocollo notte», anche con attiva / avvia / esegui / lancia davanti («avvia il protocollo notte»)
         var p = t
         if let v = p.first, ["attiva", "avvia", "esegui", "lancia"].contains(v) {
@@ -152,6 +160,55 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         case "allenamento allo specchio", "allenati allo specchio": return .allenamento
         default: return nil
         }
+    }
+
+    /// Build 23, SATELLITE: le frasi con un luogo o un indirizzo dentro. `t` sono le parole senza accenti, `o` le stesse
+    /// come sono state dette (per il nome). Solo frasi che cominciano così: il resto della frase è il luogo.
+    private static func satellite(_ t: [String], originale o: [String]) -> ComandoDedicato? {
+        let frase = t.joined(separator: " ")
+        if ["ferma la guida", "ferma guida", "fine guida", "fine della guida", "stop guida", "termina la guida", "interrompi la guida"].contains(frase) {
+            return .fermaGuida
+        }
+        guard t.count >= 2, t.count <= 12 else { return nil }
+        /// Il luogo dopo le prime `da` parole, saltando le preposizioni in `preposizioni` (al massimo due: «fino al»).
+        func luogo(da: Int, preposizioni: Set<String>, fino: Int? = nil) -> String? {
+            var k = da
+            var salti = 0
+            while k < t.count, salti < 2, preposizioni.contains(t[k]) { k += 1; salti += 1 }
+            let f = fino ?? t.count
+            // l'articolo davanti al nome non fa parte del nome («per il locale» → «Locale»)
+            if k + 1 < f, ["il", "lo", "la", "l", "i", "gli", "le"].contains(t[k]) { k += 1 }
+            guard k < f else { return nil }
+            return ComandoDedicato.maiuscole(Array(o[k..<f]))
+        }
+        let verso: Set<String> = ["a", "al", "allo", "alla", "all", "ai", "agli", "alle", "da", "dal", "dallo", "dalla", "dai", "verso", "fino", "per"]
+        // «guidami allo studio», «guidami verso il locale», «guidami fino a Piazza Duomo»
+        if t[0] == "guidami", let n = luogo(da: 1, preposizioni: verso) { return .satellite(.guida(n)) }
+        // «mostrami la strada per il locale», «fammi vedere la strada per lo studio», «mostrami il percorso verso casa di Luca»
+        for inizio in [["mostrami", "la", "strada"], ["fammi", "vedere", "la", "strada"], ["mostrami", "il", "percorso"]] where t.starts(with: inizio) {
+            if let n = luogo(da: inizio.count, preposizioni: verso) { return .satellite(.naviga(n)) }
+        }
+        // «ricognizione su Via Savona», «fai una ricognizione su Via Tortona 12»
+        let sopra: Set<String> = ["su", "sul", "sullo", "sulla", "sull", "sui", "sopra", "a", "al", "alla", "in", "di", "del", "della"]
+        for inizio in [["ricognizione"], ["fai", "una", "ricognizione"], ["fammi", "una", "ricognizione"]] where t.starts(with: inizio) {
+            if let n = luogo(da: inizio.count, preposizioni: sopra) { return .satellite(.ricognizione(n)) }
+        }
+        // «mostrami lo studio in 3D», «fammi vedere il locale in tre D»
+        let fine: [[String]] = [["in", "3d"], ["in", "3", "d"], ["in", "tre", "d"], ["in", "tre", "di"]]
+        for inizio in [["mostrami"], ["fammi", "vedere"]] where t.starts(with: inizio) {
+            for coda in fine where t.count > inizio.count + coda.count && Array(t.suffix(coda.count)) == coda {
+                if let n = luogo(da: inizio.count, preposizioni: [], fino: t.count - coda.count) { return .satellite(.mostra(n)) }
+            }
+        }
+        return nil
+    }
+
+    /// «via savona 20» → «Via Savona 20»: le iniziali maiuscole, tranne le parole piccole in mezzo («Corso di Porta Romana»).
+    static func maiuscole(_ parole: [String]) -> String {
+        let piccole: Set<String> = ["di", "del", "dello", "della", "dei", "degli", "delle", "da", "dal", "dalla", "e", "a", "al", "alla", "in", "su", "sul", "sulla", "con", "per"]
+        return parole.enumerated().map { k, p in
+            (k > 0 && piccole.contains(p)) ? p : p.prefix(1).uppercased() + p.dropFirst()
+        }.joined(separator: " ")
     }
 }
 

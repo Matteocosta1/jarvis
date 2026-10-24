@@ -87,6 +87,7 @@
 				pronto.m4a,
 				ComandiVocali.swift,
 				SaluteStorica.swift,
+				Satellite23.swift,
 				scheda.m4a,
 				schedapronta.m4a,
 				tick.m4a,
