@@ -67,12 +67,12 @@ final class ArchivioFotoSat: ObservableObject {
 
     func url(_ f: FotoSat) -> URL { Self.cartella.appendingPathComponent(f.file) }
 
-    /// L'immagine rimpicciolita (le miniature) o intera.
-    func immagine(_ f: FotoSat, lato: CGFloat? = nil) -> UIImage? {
-        guard let i = UIImage(contentsOfFile: url(f).path) else { return nil }
-        guard let lato else { return i }
-        let s = min(1, lato / max(i.size.width, i.size.height))
-        return i.preparingThumbnail(of: CGSize(width: i.size.width * s, height: i.size.height * s)) ?? i
+    /// L'immagine rimpicciolita (le miniature) o intera. La foto vera è di 12 milioni di pixel: si decodifica fuori dal
+    /// thread principale (byPreparingThumbnail), se no ogni miniatura del DOSSIER bloccava lo schermo per decine di millisecondi.
+    func immagine(_ f: FotoSat, lato: CGFloat? = nil) async -> UIImage? {
+        guard let i = UIImage(contentsOfFile: url(f).path) else { return nil }        // qui non si decodifica ancora niente
+        let s = lato.map { min(1, $0 / max(i.size.width, i.size.height, 1)) } ?? 1
+        return await i.byPreparingThumbnail(ofSize: CGSize(width: i.size.width * s, height: i.size.height * s)) ?? i
     }
 
     private func scrivi() { if let d = try? JSONEncoder().encode(foto) { try? d.write(to: indice, options: .atomic) } }
@@ -305,7 +305,7 @@ struct MiniaturaSat: View {
                     .background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.6)))
                     .padding(5)
             }
-            .task(id: foto.id) { img = ArchivioFotoSat.condiviso.immagine(foto, lato: 360) }
+            .task(id: foto.id) { img = await ArchivioFotoSat.condiviso.immagine(foto, lato: 360) }
     }
 }
 
@@ -358,7 +358,7 @@ struct VistaFotoSat: View {
             }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 22)
         }
-        .task { img = ArchivioFotoSat.condiviso.immagine(foto, lato: 1600) }
+        .task { img = await ArchivioFotoSat.condiviso.immagine(foto, lato: 1600) }
     }
 
     /// Il primo tocco chiede conferma (3 secondi), il secondo elimina.

@@ -458,7 +458,7 @@ struct SchermoNaviga: View {
     /// Il percorso da qui al luogo, poi le viste da strada di tutte le tappe per le miniature.
     private func prepara() async {
         MotoreGuida.condiviso.accendi()
-        for _ in 0..<50 where motore.lat == nil {                 // la posizione: fino a 10 secondi
+        for _ in 0..<50 where motore.lat == nil && !motore.posizioneNegata {   // la posizione: fino a 10 secondi (negata: subito la frase)
             try? await Task.sleep(for: .milliseconds(200))
             if Task.isCancelled { return }
         }
@@ -522,7 +522,7 @@ struct SchermoGuida: View {
         .onAppear { withAnimation(.easeIn(duration: 0.3)) { visibile = true } }
         .preferredColorScheme(.dark)
         .task { await accendiCamera() }
-        .onDisappear { camera?.ferma(); cameraAccesa = false }
+        .onDisappear { camera?.ferma(); cameraAccesa = false; MotoreGuida.condiviso.spegniSeLibero() }   // una guida in corso resta; una mai partita finisce
         // la guida finita (arrivo, «Fine guida», «ferma la guida»): la schermata si chiude
         .onChange(of: motore.luogo?.chiave) { _, k in if k != luogo.chiave { apri(nil) } }
     }

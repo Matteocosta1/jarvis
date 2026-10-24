@@ -715,7 +715,17 @@ final class Jarvis: NSObject, ObservableObject {
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
         // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…): subito, senza cervello, prima delle storpiature
-        if let d = ComandoDedicato.riconosci(frase) { eseguiDedicato(d); return true }
+        if let d = ComandoDedicato.riconosci(frase) {
+            // build 23: dentro LiDAR «mostrami la stanza in 3D» è il 3D di LiDAR (come «mostrami il 3D»), non SATELLITE
+            // che chiude LiDAR e va a cercare un luogo chiamato «Stanza»
+            if lidarAperto, case .satellite(.mostra(_)) = d {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                azioneLidar = .tre
+                return true
+            }
+            eseguiDedicato(d)
+            return true
+        }
         // build 23: gli Occhi alla Stark («mostra le etichette», «scansione olografica», «cerca questo sul web»…), a frase esatta
         if !lidarAperto, let o = ComandoOcchi.riconosci(frase) { eseguiOcchi(o); return true }   // dentro LiDAR no: lì la fotocamera è sua
         // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
@@ -745,7 +755,8 @@ final class Jarvis: NSObject, ObservableObject {
             if case .modo(let chiave, let nome) = azione, !lidarAperto, let m = ModoLidar(rawValue: chiave) {   // LiDAR 23: «metro laser» da fuori apre LiDAR già sul modo
                 LidarAperta.richiesta = (m, nome)
                 apriReparto(.lidar, annuncia: false)
-                annuncia(m.annuncioVoce)
+                // sul Mac (o su un iPhone senza LiDAR) il modo non c'è: niente «Metro pronto…», lo schermo dice «SERVE UN IPHONE CON IL LIDAR»
+                annuncia(SupportoModi.disponibile(m) ? m.annuncioVoce : (Reparto.lidar.annuncio ?? ""))
                 return true
             }
             azioneLidar = azione
