@@ -30,6 +30,48 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         try? s.updateApplicationContext(dati)
     }
 
+    // MARK: Build 23: la GUIDA di SATELLITE al polso
+
+    private let chiaveGuida = NSLock()
+    private var ultimaGuida: [String: Any]?
+
+    /// La GUIDA in corso all'orologio (nil: finita). Va solo se l'orologio è raggiungibile adesso: è uno stato che cambia
+    /// di continuo, quello vecchio non serve; all'apertura l'orologio chiede lo stato attuale («guida»: «stato»).
+    nonisolated func inviaGuida(_ g: GuidaPolsoDati?) {
+        let dati: [String: Any] = g?.dizionario ?? ["fine": true]
+        chiaveGuida.lock(); ultimaGuida = g == nil ? nil : dati; chiaveGuida.unlock()
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled, s.isReachable else { return }
+        s.sendMessage(["guida": dati], replyHandler: nil, errorHandler: nil)
+    }
+
+    /// L'orologio avvia, ferma o chiede la GUIDA (la guida vive sull'iPhone: percorso, GPS, voce).
+    nonisolated private func guidaDalPolso(_ m: [String: Any], rispondi: @escaping ([String: Any]) -> Void) {
+        nonisolated(unsafe) let risposta = rispondi
+        let cosa = m["guida"] as? String ?? ""
+        if cosa == "stato" {
+            chiaveGuida.lock(); let g = ultimaGuida; chiaveGuida.unlock()
+            risposta(["guida": g ?? ["fine": true]])
+            return
+        }
+        let lat = (m["lat"] as? NSNumber)?.doubleValue, lon = (m["lon"] as? NSNumber)?.doubleValue
+        let nome = m["nome"] as? String ?? "", via = m["via"] as? String ?? "", chiave = m["chiave"] as? String ?? ""
+        let ricordo = (m["ricordo"] as? NSNumber)?.intValue
+        Task { @MainActor in
+            if cosa == "ferma" { MotoreGuida.condiviso.ferma(); risposta(["ok": true]); return }
+            guard cosa == "avvia", let lat, let lon, !nome.isEmpty else { risposta(["errore": "richiesta non valida"]); return }
+            // senza la modalità «posizione in sottofondo», con JARVIS chiuso sull'iPhone il GPS non parte
+            let modi = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
+            if UIApplication.shared.applicationState == .background && !modi.contains("location") {
+                risposta(["errore": "Apra JARVIS sull'iPhone, Sir: la guida parte da lì."]); return
+            }
+            MotoreGuida.condiviso.avvia(LuogoSat(chiave: chiave.isEmpty ? "p\(lat),\(lon)" : chiave, ricordo: ricordo, tipo: "posto", nome: nome,
+                                                via: via.isEmpty ? nome : via, persona: nil, lat: lat, lon: lon, quando: ""))
+            risposta(["ok": true])
+        }
+    }
+
     nonisolated static func datiDaConsegnare() -> [String: String] {
         let indirizzo = UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito
         // il numero di Bea: per il «Ti penso» dal polso
@@ -56,6 +98,11 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         // l'orologio parla con la Sentinella: «guarda ora», «disattiva», «a che punto sei»
         if let comando = message["sentinella"] as? String {
             PonteSentinella.ricevi(comando, rispondi: replyHandler)
+            return
+        }
+        // build 23: l'orologio avvia, ferma o chiede la GUIDA di SATELLITE
+        if message["guida"] is String {
+            guidaDalPolso(message, rispondi: replyHandler)
             return
         }
         // l'orologio chiede di cercare tra le foto (stanno sull'iPhone)
