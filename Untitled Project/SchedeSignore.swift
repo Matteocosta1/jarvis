@@ -96,11 +96,15 @@ struct TestataScheda: View {
                 Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(gira ? 360 : 0))
                     .animation(.linear(duration: 3).repeatForever(autoreverses: false), value: gira)
-                Group {
-                    if icona == "satellite" { IconaSatellite(lato: 22) } else { Image(systemName: icona) }   // build 23: disegnata come nel mockup
+                if icona == "satellite" {                   // build 23: disegnata come nel mockup
+                    IconaSatellite(lato: 22).font(.system(size: 20, weight: .medium)).foregroundStyle(tinta)
+                } else if icona == "vinile" {               // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
+                    IconaVinile().frame(width: 22, height: 22).foregroundStyle(tinta)
+                } else {
+                    Image(systemName: icona)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(tinta)
                 }
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(tinta)
             }
             .frame(width: 52, height: 52)
             .shadow(color: tinta.opacity(0.5), radius: 10)

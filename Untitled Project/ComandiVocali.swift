@@ -113,6 +113,8 @@ enum Reparto: String, Identifiable, Equatable {
     case github, supabase, archivio, costi, edith
     // la schermata principale: il menu SISTEMI, le impostazioni, il cestino
     case sistemi, impostazioni, pulisci
+    // build 23: MUSICA, l'icona in alto prima di SISTEMI
+    case musica
     var id: String { rawValue }
 
     /// La frase di JARVIS quando apre il reparto (il Wiretap tace: registrerebbe sé stesso; le schede parlano da sole).
@@ -159,6 +161,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .sistemi: return "Sistemi, Sir."
         case .impostazioni: return "Impostazioni, Sir."
         case .pulisci: return nil                     // parla il cestino: carta appallottolata
+        case .musica: return "La musica, Sir."
         }
     }
 }
@@ -454,6 +457,17 @@ enum ComandoVocale: Equatable {
             if c(" ho bisogno di parlarti ") || c(" devo parlarti ") || c(" ti devo parlare ") || c(" posso parlarti ") { return .rapido(.confidente) }
             if c(" cosa cucino ") || c(" cosa posso cucinare ") || c(" cosa preparo da mangiare ") { return .rapido(.cucina) }
             if c(" registra la riunione ") || c(" registra questa riunione ") || c(" registra la conversazione ") { return .rapido(.riunione) }
+        }
+
+        // build 23, MUSICA: «apri la musica», «mostrami la musica», «fammi vedere la musica», «vai alla musica»: solo così, corto.
+        // «metti la musica», «accendi la musica», «fammi sentire la musica», «chiudi la musica», «apri la musica dei Daft Punk»
+        // restano a JARVIS: la musica la mette e la ferma il cervello (musica_riproduci, musica_controllo), come sempre.
+        if c(" musica "), t.count <= 7 {
+            let verbiMusica: Set<String> = ["apri", "aprimi", "mostra", "mostrami", "portami", "vai", "entra", "vediamo"]
+            let paroleMusica: Set<String> = ["musica", "la", "l", "mia", "su", "a", "alla", "in", "nella", "pagina",
+                                             "per", "favore", "sir", "grazie", "pure", "subito", "adesso", "ora"]
+            let verbo = t.contains(where: { verbiMusica.contains($0) }) || (t.contains("fammi") && t.contains("vedere"))
+            if verbo, t.allSatisfy({ verbiMusica.contains($0) || paroleMusica.contains($0) || $0 == "fammi" || $0 == "vedere" }) { return .apri(.musica) }
         }
 
         let verbi = ["attiva", "apri", "aprimi", "avvia", "accendi", "lancia", "metti", "vai", "passa", "fammi", "fai", "inizia", "modalita", "parti", "entra",

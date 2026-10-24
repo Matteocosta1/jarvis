@@ -17,7 +17,7 @@ nonisolated enum OrologioInUso {
 }
 
 /// Ponte verso l'Apple Watch: consegna all'orologio la parola d'ordine e l'indirizzo del cervello,
-/// cerca le foto per l'orologio e porta all'orologio gli allarmi e le immagini della Sentinella.
+/// cerca le foto per l'orologio e porta all'orologio gli allarmi e le immagini della Sentinella. Build 23: la MUSICA comandata dal polso.
 /// Non legge altro dall'app: funziona anche quando iOS la sveglia in background su richiesta dell'orologio.
 nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked Sendable {
     static let condiviso = PonteTelefono()
@@ -121,6 +121,12 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         // build 23: l'orologio avvia, ferma o chiede la GUIDA di SATELLITE
         if message["guida"] is String {
             guidaDalPolso(message, rispondi: replyHandler)
+            return
+        }
+        // build 23, MUSICA dal polso: «stato», «play», «pausa», «avanti», «indietro» sul lettore dell'iPhone (MusicaJarvis.swift)
+        if let comando = message["musica"] as? String {
+            nonisolated(unsafe) let rispondi = replyHandler
+            Task { @MainActor in rispondi(await PonteMusica.esegui(comando)) }
             return
         }
         // l'orologio chiede di cercare tra le foto (stanno sull'iPhone)

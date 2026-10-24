@@ -112,6 +112,33 @@ final class PonteOrologio: NSObject {
         }
     }
 
+    /// Build 23, MUSICA: quello che suona sull'iPhone (il lettore di Apple Music dell'iPhone).
+    nonisolated struct StatoMusica: Sendable {
+        let titolo: String
+        let artista: String
+        let durata: Double?
+        let tempo: Double
+        let suona: Bool
+        let errore: String?
+    }
+
+    /// Comanda la musica dell'iPhone: «stato», «play», «pausa», «avanti», «indietro». Nil se l'iPhone non risponde.
+    func musica(_ comando: String) async -> StatoMusica? {
+        guard WCSession.isSupported() else { return nil }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return nil }
+        return await withCheckedContinuation { (c: CheckedContinuation<StatoMusica?, Never>) in
+            s.sendMessage(["musica": comando], replyHandler: { @Sendable r in
+                c.resume(returning: StatoMusica(titolo: r["titolo"] as? String ?? "—", artista: r["artista"] as? String ?? "—",
+                                                durata: (r["durata"] as? NSNumber)?.doubleValue, tempo: (r["tempo"] as? NSNumber)?.doubleValue ?? 0,
+                                                suona: r["suona"] as? Bool ?? false, errore: r["errore"] as? String))
+            }, errorHandler: { @Sendable _ in
+                c.resume(returning: nil)
+            })
+        }
+    }
+
     /// Un messaggio della Sentinella arrivato dall'iPhone (allarme o cambio di stato).
     nonisolated static func smistaSentinella(_ d: [String: Any]) {
         guard let tipo = d["sentinella"] as? String else { return }
