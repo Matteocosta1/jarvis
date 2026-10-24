@@ -47,6 +47,23 @@ struct GuardaConJarvis: AppIntent {
     }
 }
 
+/// PROTOCOLLI: l'ultima azione dell'automazione di Comandi (Email con «| JARVIS Lavoro |» nell'oggetto, Esegui subito).
+/// Riceve l'oggetto della mail e dice a JARVIS che il passo è fatto: le luci restano verdi (o grigie), e la mail va nel Cestino.
+/// Non apre l'app: l'iPhone resta dov'è, l'app Comandi non si vede.
+nonisolated struct ConfermaProtocollo: AppIntent {
+    static var title: LocalizedStringResource { "Conferma protocollo" }
+    static var description: IntentDescription { IntentDescription("Per l'automazione dei Protocolli: dice a Jarvis che il passo è fatto. Testo: l'oggetto della mail.") }
+    static var openAppWhenRun: Bool { false }
+
+    @Parameter(title: "Oggetto") var oggetto: String
+
+    func perform() async throws -> some IntentResult {
+        let testo = oggetto
+        await MainActor.run { Protocolli.condiviso.conferma(testo) }
+        return .result()
+    }
+}
+
 /// Frasi per Siri, disponibili subito dopo l'installazione (nessuna configurazione nei Comandi rapidi).
 /// «Ehi Siri, Jarvis» apre l'app già in ascolto; da lì in poi si parla con JARVIS (anche i comandi: «attiva la Sentinella»).
 /// Compaiono anche tra le scelte del tasto Azione.

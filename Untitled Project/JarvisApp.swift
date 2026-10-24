@@ -18,13 +18,11 @@ struct JarvisApp: App {
             ContentView()
                 .environmentObject(jarvis)
                 .preferredColorScheme(.dark)
-                .onOpenURL { url in Protocolli.condiviso.ritorno(url, jarvis: jarvis) }   // Comandi rapidi ha finito il protocollo: tocca a JARVIS
         }
         .onChange(of: fase) { _, nuova in
             if nuova == .active {
                 PonteTelefono.condiviso.invia()   // parola d'ordine sempre aggiornata sull'orologio
                 Posizione.risveglia()             // il GPS si scalda: la prima domanda non aspetta
-                Protocolli.condiviso.inPrimoPiano()   // tornato senza la chiamata di ritorno dei Comandi rapidi: lo dice
             } else {
                 Posizione.dormi()
             }

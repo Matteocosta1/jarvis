@@ -75,9 +75,10 @@ nonisolated enum TagVoce {
 
 // MARK: - I comandi a frase esatta
 
-/// I protocolli alla Stark (la tendina PROTOCOLLI). Sull'iPhone «Avvia» lancia un Comando rapido per protocollo
-/// («JARVIS Lavoro», «JARVIS Rientro», «JARVIS Notte»); poi JARVIS fa le sue parti. Dopo, ogni passo si può spegnere da solo:
-/// lo stesso Comando rapido riceve «annulla:<chiave>» (o «rifai:<chiave>» per riaccenderlo).
+/// I protocolli alla Stark (la tendina PROTOCOLLI), deciso dal signore il 24 ott: l'app Comandi non si vede mai e JARVIS non parla.
+/// «Avvia» accende tutte le luci; ogni luce è un interruttore. I passi del telefono partono in sottofondo: il cervello manda alla
+/// casella iCloud del signore una mail con l'oggetto «<testo> | JARVIS Lavoro | <id>»; l'automazione personale di Comandi passa
+/// <testo> («avvia», «annulla:<chiave>», «rifai:<chiave>») al Comando rapido del protocollo e conferma con l'azione «Conferma protocollo».
 nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Sendable {
     case lavoro, rientro, notte
     var id: String { rawValue }
@@ -110,29 +111,32 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
         }
     }
 
-    /// Le frasi per il cervello, come se le dicesse il signore.
-    static let fraseLavoro = "Protocollo lavoro: dimmi gli impegni di oggi e le mail importanti."
-    static let fraseRientro = "Protocollo rientro: dimmi se ci sono messaggi da leggere e che tempo farà domani."
+    /// Il testo per il Comando rapido quando una luce cambia: spenta → «annulla:<chiave>», riaccesa → «rifai:<chiave>».
+    static func testoCambio(_ passo: Passo, acceso: Bool) -> String { "\(acceso ? "rifai" : "annulla"):\(passo.chiave)" }
 
-    /// La frase per il cervello con le sole parti di JARVIS ancora accese (una luce spenta prima che JARVIS parli = parte saltata).
-    /// Tutte accese: le frasi di sempre. Nessuna: nil (JARVIS non dice niente).
-    static func frase(_ p: Protocollo, accese: Set<String>) -> String? {
-        switch p {
-        case .lavoro:
-            let impegni = accese.contains("impegni"), posta = accese.contains("posta")
-            if impegni && posta { return fraseLavoro }
-            if impegni { return "Protocollo lavoro: dimmi gli impegni di oggi." }
-            if posta { return "Protocollo lavoro: dimmi le mail importanti." }
-            return nil
-        case .rientro:
-            let messaggi = accese.contains("messaggi"), meteo = accese.contains("meteo")
-            if messaggi && meteo { return fraseRientro }
-            if messaggi { return "Protocollo rientro: dimmi se ci sono messaggi da leggere." }
-            if meteo { return "Protocollo rientro: dimmi che tempo farà domani." }
-            return nil
-        case .notte:
-            return nil                                        // NOTTE: la domanda del diario la fa l'app, non il cervello
+    /// Un id nuovo per ogni richiesta (lega la conferma dell'automazione alla luce giusta).
+    static func nuovoId() -> String { String(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(10)) }
+
+    /// La richiesta al cervello: lui manda la mail per l'automazione.
+    static func richiesta(_ p: Protocollo, testo: String, id: String) -> [String: Any] {
+        ["protocollo": ["nome": p.rawValue, "testo": testo, "id": id]]
+    }
+
+    /// L'oggetto confermato dall'automazione («annulla:wifi | JARVIS Lavoro | k3f9a2»): protocollo, testo e id.
+    /// Le stesse regole del cervello; un oggetto diverso (o un passo che non c'è) non vale.
+    static func leggi(_ oggetto: String) -> (protocollo: Protocollo, testo: String, id: String)? {
+        let parti = oggetto.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: " | ")
+        guard parti.count == 3, parti[1].hasPrefix("JARVIS "),
+              let p = Protocollo(rawValue: String(parti[1].dropFirst(7)).lowercased()), parti[1] == "JARVIS " + p.rawValue.capitalized else { return nil }
+        let id = parti[2]
+        guard (4...16).contains(id.count), id.allSatisfy({ $0.isASCII && ($0.isLowercase || $0.isNumber) }) else { return nil }
+        let testo = parti[0]
+        if testo != "avvia" {
+            let pezzi = testo.split(separator: ":", maxSplits: 1).map(String.init)
+            guard pezzi.count == 2, pezzi[0] == "annulla" || pezzi[0] == "rifai",
+                  p.passi.contains(where: { $0.chiave == pezzi[1] && !$0.jarvis }) else { return nil }
         }
+        return (p, testo, id)
     }
 }
 

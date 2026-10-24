@@ -120,13 +120,15 @@ private func etichettaPolso(_ t: String) -> Text {
 
 // MARK: - PROTOCOLLI
 
-/// I tre protocolli e i loro passi. Dal polso i Comandi rapidi dell'iPhone non partono: i passi dell'iPhone restano
-/// segnati «iPhone», quelli di JARVIS si spuntano e JARVIS lo dice a voce (JarvisOrologio.protocolloDalPolso).
+/// I tre protocolli e i loro passi, come sull'iPhone (deciso dal signore il 24 ott): le luci si accendono una alla volta,
+/// JARVIS non parla, e ogni riga è un interruttore (✓ acceso, ○ spento). I passi del telefono partono in sottofondo
+/// anche dal polso: il cervello manda la mail che l'automazione di Comandi dell'iPhone esegue (vedi Protocollo).
 struct VistaProtocolliOrologio: View {
     var avvia: Protocollo? = nil
-    @EnvironmentObject var jarvis: JarvisOrologio
     @State private var scelto: Protocollo?
     @State private var mostrati = 0
+    @State private var spenti: Set<String> = []
+    @State private var nota: String?
     @State private var giro = 0
 
     var body: some View {
@@ -140,11 +142,19 @@ struct VistaProtocolliOrologio: View {
             if let p = scelto {
                 VStack(spacing: 3) {
                     ForEach(Array(p.passi.prefix(mostrati).enumerated()), id: \.offset) { _, passo in
-                        RigaPolso(etichetta: passo.breve, valore: passo.jarvis ? "✓" : "iPhone",
-                                  colore: passo.jarvis ? ColoriPolso.verde : ColoriPolso.tenue)
+                        let on = !spenti.contains(passo.chiave)
+                        Button { cambia(p, passo) } label: {
+                            RigaPolso(etichetta: passo.breve, valore: on ? "✓" : "○", colore: on ? ColoriPolso.verde : ColoriPolso.tenue)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(on ? "acceso" : "spento")
                     }
                 }
                 .padding(.top, 2)
+            }
+            if let n = nota {
+                Text(n).font(.system(size: 9)).foregroundStyle(.orange).multilineTextAlignment(.center)
             }
         }
         .task {
@@ -160,17 +170,37 @@ struct VistaProtocolliOrologio: View {
         let mio = giro
         scelto = p
         mostrati = 0
+        spenti = []
+        nota = nil
+        manda(p, testo: "avvia", giro: mio)
         Task { @MainActor in
             for k in p.passi.indices {
-                try? await Task.sleep(for: .milliseconds(300))
+                try? await Task.sleep(for: .milliseconds(320))
                 guard giro == mio else { return }
                 mostrati = k + 1
-                if p.passi[k].jarvis { SuoniOrologio.clickTesta() }   // il click delle icone in alto, solo sui passi di JARVIS (✓)
+                SuoniOrologio.clickTesta()                         // il click delle icone in alto, a ogni luce
             }
-            SuoniOrologio.fatto()                                 // e alla fine sempre «pronto»
-            try? await Task.sleep(for: .milliseconds(400))      // i suoni finiscono prima della voce
-            guard giro == mio else { return }
-            jarvis.protocolloDalPolso(p)
+            SuoniOrologio.fatto()                                 // e alla fine «pronto»
+        }
+    }
+
+    /// Dopo l'avvio: un tocco spegne (○) o riaccende (✓) quel passo; quelli del telefono partono in sottofondo.
+    private func cambia(_ p: Protocollo, _ passo: Protocollo.Passo) {
+        guard scelto == p, mostrati == p.passi.count else { return }
+        let ora = spenti.contains(passo.chiave)                   // era spento: si riaccende
+        if ora { spenti.remove(passo.chiave) } else { spenti.insert(passo.chiave) }
+        SuoniOrologio.clickTesta()
+        nota = nil
+        if !passo.jarvis { manda(p, testo: Protocollo.testoCambio(passo, acceso: ora), giro: giro) }
+    }
+
+    /// Il cervello manda la mail per l'automazione dell'iPhone; se non risponde, lo dice sotto le luci.
+    private func manda(_ p: Protocollo, testo: String, giro mio: Int) {
+        Task { @MainActor in
+            let r = await VistaVitalsOrologio.chiama(Protocollo.richiesta(p, testo: testo, id: Protocollo.nuovoId()), attesa: 30)
+            guard giro == mio, r?["ok"] as? Bool != true else { return }
+            nota = (r?["errore"] as? String) ?? "Non raggiungo il cervello, Sir: i passi dell'iPhone non sono partiti."
+            WKInterfaceDevice.current().play(.failure)
         }
     }
 }

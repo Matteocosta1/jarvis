@@ -412,7 +412,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let reparto: Reparto?
         switch d {
         case .protocollo(let p):
-            polsoRichiesto = .protocolli(p)    // parla la schermata dei protocolli, quando parte
+            polsoRichiesto = .protocolli(p)    // la schermata dei protocolli si apre e parte da sola (JARVIS non parla)
             fase = .attesa
             return
         case .traccia, .guida: polsoRichiesto = .traccia; reparto = .ricordi   // sul polso niente fotocamera: la bussola
@@ -431,22 +431,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
         daUnire = nil
         parla(testo)
         dopoAnnuncio = poi                     // dopo parla(): parla() azzera tutto quello che era in sospeso
-    }
-
-    /// Dal polso i Comandi rapidi dell'iPhone non partono: watchOS non li lancia, e l'app dell'iPhone svegliata in sottofondo
-    /// non può aprire l'app Comandi. L'orologio fa solo le parti di JARVIS e lo dice chiaramente.
-    func protocolloDalPolso(_ p: Protocollo) {
-        switch p {
-        case .lavoro:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion e Wi-Fi li lanci dall'iPhone. Intanto, impegni e posta.",
-                     poi: Protocollo.fraseLavoro)
-        case .rientro:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion e Wi-Fi li lanci dall'iPhone. Intanto, messaggi e meteo.",
-                     poi: Protocollo.fraseRientro)
-        case .notte:
-            annuncia("Dal polso non posso avviare i Comandi rapidi, Sir: Full immersion, Bluetooth e sveglia li lanci dall'iPhone. Intanto, il diario.",
-                     poi: "Jarvis, voglio scrivere il diario di oggi.")
-        }
     }
 
     nonisolated static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (String?, String?) {
