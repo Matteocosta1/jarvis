@@ -1159,7 +1159,7 @@ final class Jarvis: NSObject, ObservableObject {
                 }
             }
             idTurno = nil
-            concludi(id: id, testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni: [])
+            concludi(id: id, testo: "Sir, mi sono perso in troppi passaggi. Riformuli pure.", azioni: [])
         } catch is CancellationError {
             rimuoviSeVuoto(id)              // interrotto dal signore: niente da dire
         } catch let e as URLError where e.code == .cancelled {
@@ -1246,7 +1246,7 @@ final class Jarvis: NSObject, ObservableObject {
 
         let (righe, resp) = try await URLSession.shared.bytes(for: req)
         let codice = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        if codice == 401 { return .errore("La parola d'ordine non coincide, signore. La controlli nelle impostazioni.") }
+        if codice == 401 { return .errore("La parola d'ordine non coincide, Sir. La controlli nelle impostazioni.") }
         guard codice == 200 else { return .errore("Il mio cervello ha risposto con un errore (codice \(codice)).") }
 
         for try await riga in righe.lines {
@@ -1266,12 +1266,12 @@ final class Jarvis: NSObject, ObservableObject {
             case "client":
                 return .client(e)
             case "errore":
-                return .errore(e["d"] as? String ?? "Un intoppo tecnico, signore.")
+                return .errore(e["d"] as? String ?? "Un intoppo tecnico, Sir.")
             default:
                 break
             }
         }
-        return .errore("La risposta si è interrotta a metà, signore. Riprovi.")
+        return .errore("La risposta si è interrotta a metà, Sir. Riprovi.")
     }
 
     /// Nella chat, la domanda che ha fatto aprire gli occhi prende l'icona 📷.
