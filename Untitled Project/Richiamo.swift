@@ -447,11 +447,11 @@ final class Richiamo {
 ///  • Il «ciac» delle mani ha il corpo fra 700 e 2500 Hz: il clic di un tasto sta quasi tutto sopra i 4 kHz,
 ///    un tonfo sul tavolo o un dito sul telefono sotto i 500 Hz. È rumore, non una nota: un tavolo bussato,
 ///    un legnetto, un bicchiere «suonano» (si misura col tono, l'autocorrelazione a 0,5–2 ms) e non passano.
-///  • Nessun altro colpo dentro il battito (il rilascio del tasto), nessun colpo fra i due battiti e nessuno nei 100 ms
+///  • Nessun altro colpo dentro il battito (il rilascio del tasto), nessun colpo fra i due battiti e nessuno nei 120 ms
 ///    dopo il secondo: chi scrive preme e rilascia, le mani no.
 ///  • È più forte dei suoni non-battito degli ultimi secondi: l'asticella si alza a ogni tasto, parola o colpo che non era
-///    un battito e cala piano (1,5 dB al secondo). Chi smette di scrivere e batte le mani passa, i tasti di chi scrive no.
-///  • 0,15–0,8 secondi fra l'uno e l'altro; il secondo si decide 100 ms dopo il suo attacco (prima 130 ms), poi due
+///    un battito e cala piano (1 dB al secondo). Chi smette di scrivere e batte le mani passa, i tasti di chi scrive no.
+///  • 0,15–0,8 secondi fra l'uno e l'altro; il secondo si decide 120 ms dopo il suo attacco (prima 130 ms), poi due
 ///    secondi di pausa: il terzo battito cade nella pausa, come prima.
 /// Nessun logaritmo e nessuna allocazione sul thread audio: solo energie, rapporti e memoria preparata all'inizio.
 /// Il modello riga per riga di questo codice, con il banco di prova, è in battiti-banco/b4 (banco4.c).
@@ -519,12 +519,12 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     private let sopraFondo = BattitoMani.dB(12)           // …e +12 dB sul fondo della stanza
     private let riparti = BattitoMani.dB(9)               // un attacco +9 dB più forte durante la misura: il colpo vero è quello
     private let contrasto = BattitoMani.dB(20)            // il colpo almeno +20 dB sul fondo
-    private let quotaMedie: Float = 0.15                  // parte dell'energia del colpo fra 700 e 2500 Hz: almeno
-    private let quotaAlte: Float = 0.40                   // sopra i 4 kHz (il clic dei tasti): al massimo
-    private let quotaBasse: Float = 0.50                  // sotto i 500 Hz (tonfi, dita sul telefono): al massimo
-    private let tonoMassimo: Float = 0.69                 // oltre, il colpo «suona una nota» (tavolo, legno, vetro)
-    private let margineMemoria = BattitoMani.dB(6)        // il colpo +6 dB sopra i suoni non-battito recenti…
-    private static let calaMemoriaPerSecondo = 1.5        // …che calano di 1,5 dB al secondo
+    private let quotaMedie: Float = 0.10                  // parte dell'energia del colpo fra 700 e 2500 Hz: almeno
+    private let quotaAlte: Float = 0.60                   // sopra i 4 kHz (il clic dei tasti): al massimo
+    private let quotaBasse: Float = 0.55                  // sotto i 500 Hz (tonfi, dita sul telefono): al massimo
+    private let tonoMassimo: Float = 0.72                 // oltre, il colpo «suona una nota» (tavolo, legno, vetro)
+    private let margineMemoria = BattitoMani.dB(9)        // il colpo +9 dB sopra i suoni non-battito recenti…
+    private static let calaMemoriaPerSecondo = 1.0        // …che calano di 1 dB al secondo
 
     private var hzFiltri: Double = 0
     private var pa = Filtro(), basse = Filtro(), medieDa = Filtro(), medieA = Filtro(), alte = Filtro()
@@ -553,7 +553,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     private var primo = false
     private var k1: Int64 = 0
     // in fettine
-    private var jp = 4, js = 6, jr = 8, jd = 80, jv = 40
+    private var jp = 4, js = 6, jr = 8, jd = 96, jv = 40
     private var imin: Int64 = 120, imax: Int64 = 640, riposo: Int64 = 1600
     private var aRec: Float = 0.083333336
     private var saleFondo: Float = 1.0017285
@@ -585,7 +585,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
         let dt = Double(lunghezza) / hz
         func f(_ s: Double) -> Int { Int((s / dt).rounded()) }
         jp = f(0.005); js = f(0.0075); jr = f(0.010)
-        jd = f(0.100); jv = f(0.050)
+        jd = f(0.120); jv = f(0.050)
         imin = Int64(f(0.15)); imax = Int64(f(0.80)); riposo = Int64(f(2.0))
         aRec = Float(dt / 0.015)
         saleFondo = Float(pow(10.0, 6.0 * dt / 10.0))
