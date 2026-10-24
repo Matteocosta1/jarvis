@@ -313,9 +313,13 @@ struct VistaLidar: View {
 
     private var testoStato: String {
         if let avviso { return avviso }
-        if fase == .elaboro { return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…" }
+        if fase == .elaboro {
+            if vero == .statua, let t = stato.testo, t.hasPrefix("ELABORAZIONE") { return t }            // Texture: «ELABORAZIONE… 40%» mentre l'iPhone costruisce il modello
+            return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…"
+        }
         if !acceso { return "ACCENSIONE SENSORE…" }
         if pronto { return vero == .stanza ? "SALA CHIUSA · TOCCHI FINE" : "FATTO · TOCCHI FINE" }
+        if let t = stato.testo { return t }                                    // cosa sta succedendo: «CERCO LA PERSONA…», «INQUADRI ANCHE I PIEDI»…
         if ancora { return vero == .stanza ? "ANCORA UN ATTIMO: MANCANO DELLE PARETI" : "ANCORA UN ATTIMO…" }
         return vero.istruzione
     }

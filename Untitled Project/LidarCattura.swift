@@ -9,6 +9,7 @@ import simd
 import CoreVideo
 import CoreImage
 import ImageIO
+import AVFoundation         // Texture: il permesso della fotocamera (AVCaptureDevice)
 
 // MARK: - LiDAR 23 · le catture dei modi nuovi (la stanza resta RoomPlan, in Lidar.swift)
 // Esterno, Oggetto, Misura: ARKit con la ricostruzione della scena (maglia del LiDAR) o i piani; Postura: ARKit col corpo
@@ -19,6 +20,8 @@ import ImageIO
 nonisolated struct StatoScansione: Equatable, Sendable {
     var hud: [String] = ["—", "—", "—"]
     var pronto = false
+    /// Cosa sta succedendo, al posto dell'istruzione del modo («CERCO LA PERSONA…», «INQUADRI ANCHE I PIEDI»…). nil: l'istruzione.
+    var testo: String? = nil
 }
 
 /// Chi può fare cosa su questo iPhone (iPhone 15 Pro: tutto).
@@ -135,6 +138,8 @@ final class RegistaAR: NSObject, ARSessionDelegate {
     private var campioni: [[String: SIMD3<Float>]] = []
     private var inizioCorpo: TimeInterval?
     private var pavimentoCorpo: Float?
+    private var primoFotogramma: TimeInterval?
+    private var ultimoCorpoVisto: TimeInterval?             // l'ultima volta che ARKit ha seguito davvero una persona
 
     init(modo: ModoLidar, aggiorna: @escaping (StatoScansione) -> Void, finita: @escaping (RisultatoModo) -> Void, errore: @escaping (String) -> Void) {
         self.modo = modo; self.aggiorna = aggiorna; self.finita = finita; self.errore = errore
@@ -257,8 +262,24 @@ final class RegistaAR: NSObject, ARSessionDelegate {
             if t - ultimoColore > 0.5 { ultimoColore = t; calcolo.colora(f, terreno: false) }
         case .misura:
             if t - ultimoLavoro > 0.1 { ultimoLavoro = t; misuraParete(f, posizione) }
+        case .corpo:
+            // nessuna persona seguita da più di 1 s (passato il primo secondo e mezzo): lo si dice, invece di restare muti
+            let t0 = primoFotogramma ?? t
+            primoFotogramma = t0
+            let persa = ultimoCorpoVisto.map { t - $0 > 1 } ?? true
+            if t - t0 > 1.5, persa {
+                if !disegni.childNodes.isEmpty { disegni.childNodes.forEach { $0.removeFromParentNode() } }   // niente scheletro rimasto appeso
+                avvisaCorpo("NON VEDO LA PERSONA · LA INQUADRI DALLA TESTA AI PIEDI")
+            }
         default: break
         }
+    }
+
+    /// Postura: la riga di stato dice cosa manca; i numeri dell'HUD restano quelli presi finora.
+    private func avvisaCorpo(_ testo: String) {
+        var s = stato
+        s.testo = testo
+        stato = s
     }
 
     /// Esterno: il giro è chiuso quando si torna a meno di 1,5 m dal punto di partenza dopo almeno 6 m.
@@ -376,9 +397,15 @@ final class RegistaAR: NSObject, ARSessionDelegate {
             let p = b.transform * m[i].columns.3
             mondo[k] = SIMD3(p.x, p.y, p.z)
         }
-        guard let bac = mondo["bac"], mondo["testa"] != nil, mondo["piSx"] != nil, mondo["piDx"] != nil else { return }
+        guard let bac = mondo["bac"], let testa = mondo["testa"], let piSx = mondo["piSx"], let piDx = mondo["piDx"] else { return }
+        let piedi = min(piSx.y, piDx.y)
+        // uno scheletro vero: la testa almeno 80 cm sopra i piedi (giunture tutte ferme in un punto = nessuna persona)
+        guard testa.y - piedi > 0.8 else { return }
+        ultimoCorpoVisto = t
+        if t - ultimoDisegno > 0.06 { ultimoDisegno = t; disegnaScheletro(mondo) }   // lo scheletro si vede anche se la persona non è tutta dentro
+        // la persona tutta nell'immagine, dalla testa ai piedi, e a una distanza giusta: se no lo si dice e il campione non vale
+        if let manca = inquadratura(testa: testa, piSx: piSx, piDx: piDx, bacino: bac, f, v) { avvisaCorpo(manca); return }
         // il pavimento: il piano orizzontale più basso sotto i piedi, se no 7 cm sotto la caviglia
-        let piedi = min(mondo["piSx"]?.y ?? 0, mondo["piDx"]?.y ?? 0)
         let piani = f.anchors.compactMap { $0 as? ARPlaneAnchor }.filter { $0.alignment == .horizontal }
             .map { ($0.transform * SIMD4<Float>($0.center.x, $0.center.y, $0.center.z, 1)).y }.filter { $0 < piedi && $0 > piedi - 0.3 }
         let pav = piani.max() ?? (piedi - 0.07)
@@ -397,7 +424,31 @@ final class RegistaAR: NSObject, ARSessionDelegate {
         let p = Postura(medie)
         let pronto = campioni.count >= 60 && t - (inizioCorpo ?? t) >= 2.5
         stato = StatoScansione(hud: [LidarFormato.m(Double(p.altezza), 2), LidarFormato.cm(Double(p.spalle)), pronto ? "OK" : "—"], pronto: pronto)
-        if t - ultimoDisegno > 0.06 { ultimoDisegno = t; disegnaScheletro(mondo) }
+    }
+
+    /// Postura: cosa manca perché la persona sia misurabile (nil: va bene). Testa e piedi devono cadere dentro l'immagine;
+    /// a meno di 1,2 m una persona in piedi non ci sta, oltre 5 m lo scheletro è poco preciso.
+    private func inquadratura(testa: SIMD3<Float>, piSx: SIMD3<Float>, piDx: SIMD3<Float>, bacino: SIMD3<Float>, _ f: ARFrame, _ v: ARSCNView) -> String? {
+        let lato = v.bounds.size
+        guard lato.width > 0, lato.height > 0 else { return nil }
+        let verso = v.window?.windowScene?.interfaceOrientation ?? .portrait
+        let c = f.camera.transform.columns.3
+        let distanza = simd_distance(SIMD2<Float>(c.x, c.z), SIMD2<Float>(bacino.x, bacino.z))
+        let testaDentro = nellImmagine(testa, f, verso, lato)
+        let piediDentro = nellImmagine(piSx, f, verso, lato) && nellImmagine(piDx, f, verso, lato)
+        if (!testaDentro && !piediDentro) || distanza < 1.2 { return "SI ALLONTANI · DEVO VEDERLA DALLA TESTA AI PIEDI" }
+        if !testaDentro { return "INQUADRI ANCHE LA TESTA" }
+        if !piediDentro { return "INQUADRI ANCHE I PIEDI" }
+        if distanza > 5 { return "SI AVVICINI A 2-3 METRI" }
+        return nil
+    }
+
+    /// Un punto del mondo cade dentro l'immagine che si vede sullo schermo (e davanti all'iPhone)?
+    private func nellImmagine(_ p: SIMD3<Float>, _ f: ARFrame, _ verso: UIInterfaceOrientation, _ lato: CGSize) -> Bool {
+        let c = f.camera.transform.inverse * SIMD4<Float>(p.x, p.y, p.z, 1)
+        guard c.z < 0 else { return false }                                         // dietro l'iPhone
+        let q = f.camera.projectPoint(p, orientation: verso, viewportSize: lato)
+        return q.x >= 0 && q.y >= 0 && q.x <= lato.width && q.y <= lato.height
     }
 
     /// Lo scheletro sopra la persona inquadrata: ossa ciano, giunture chiare.
@@ -858,6 +909,10 @@ nonisolated final class CalcoloLidar: @unchecked Sendable {
 }
 
 // MARK: - Corpo › Texture: il gemello digitale con Object Capture (giro intorno alla persona, poi il modello sull'iPhone)
+// Come il campione di Apple «GuidedCapture»: la sessione parte, si cerca la persona al centro (startDetecting, che può dire di no:
+// allora si riprova), il riquadro, gli scatti automatici (startCapturing), «Fine» (finish), e a .completed la sessione di cattura
+// si libera PRIMA di costruire il modello (memoria e GPU), con la stessa cartella dei punti (checkpointDirectory).
+// Lo stato si legge 4 volte al secondo da `state`: non dipende da cosa ripetono o no gli aggiornamenti a cui ci si iscrive.
 
 struct CatturaStatua: View {
     @Binding var ferma: Bool
@@ -871,51 +926,156 @@ struct CatturaStatua: View {
     @State private var cartella: URL?
     @State private var foto = 0
     @State private var giro = false
-    @State private var finito = false
-    @State private var lavoro: Task<Void, Never>?
-    @State private var ascolti: [Task<Void, Never>] = []
+    @State private var finito = false                 // foto prese: la fotocamera si toglie, si costruisce il modello
+    @State private var avviata = false
+    @State private var regia: Task<Void, Never>?
 
     var body: some View {
         ZStack {
+            Color.clear                               // la cornice è piena anche prima che la sessione esista, come negli altri modi
             if let s = sessione, !finito { ObjectCaptureView(session: s) }
         }
         .onAppear(perform: avvia)
-        .onDisappear { OcchiLidar.scatta = nil; lavoro?.cancel(); ascolti.forEach { $0.cancel() }; sessione?.cancel(); pulisci(soloFoto: false) }
+        .onDisappear(perform: chiudi)
         .onChange(of: ferma) { _, f in if f { concludi() } }
     }
 
     private func avvia() {
+        guard !avviata else { return }
+        avviata = true
         guard SupportoModi.oggettoFoto else { errore(SupportoModi.avviso(.statua)); return }
+        OcchiLidar.scatta = { nil }            // la fotocamera è di Object Capture: «guarda» non apre Occhi (le ruberebbe la fotocamera)
+        UIApplication.shared.isIdleTimerDisabled = true   // un minuto di giro e due di elaborazione senza toccare lo schermo
+        regia = Task { @MainActor in
+            // la fotocamera di prima (un'altra scansione, Occhi) ha il tempo di liberarsi; intanto c'è «ACCENSIONE SENSORE…»
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            guard await permessoFotocamera() else { errore("SERVE IL PERMESSO DELLA FOTOCAMERA · IMPOSTAZIONI › JARVIS"); return }
+            guard !Task.isCancelled, apri() else { return }
+            if await segui() { await ricostruisci() }
+        }
+    }
+
+    private func chiudi() {
+        regia?.cancel()
+        sessione?.cancel()
+        sessione = nil
+        OcchiLidar.scatta = nil
+        UIApplication.shared.isIdleTimerDisabled = false
+        pulisci()
+    }
+
+    /// Il permesso della fotocamera: se non è mai stato chiesto lo chiede adesso; se è stato negato lo si dice (niente schermo nero).
+    private func permessoFotocamera() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+        default: return false
+        }
+    }
+
+    /// Le cartelle (Images, Snapshots) e la sessione di Apple. Se la sessione fallisce subito, lo si dice (come il campione di Apple).
+    private func apri() -> Bool {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("LiDAR-texture-\(UUID().uuidString)", isDirectory: true)
         let immagini = base.appendingPathComponent("Images/", isDirectory: true), punti = base.appendingPathComponent("Snapshots/", isDirectory: true)
-        try? FileManager.default.createDirectory(at: immagini, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(at: punti, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: immagini, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: punti, withIntermediateDirectories: true)
+        } catch {
+            errore("NON RIESCO A PREPARARE LE FOTO · RIPROVI")
+            return false
+        }
         cartella = base
         let s = ObjectCaptureSession()
         var c = ObjectCaptureSession.Configuration()
         c.checkpointDirectory = punti
         s.start(imagesDirectory: immagini, configuration: c)
-        sessione = s
-        OcchiLidar.scatta = { nil }            // la fotocamera è di Object Capture: «guarda» non apre Occhi (le ruberebbe la fotocamera)
-        ascolti = [Task { @MainActor in for await n in s.numberOfShotsTakenUpdates { foto = n; manda() } },
-                   Task { @MainActor in for await g in s.userCompletedScanPassUpdates { giro = g; manda() } }]
-        lavoro = Task { @MainActor in
-            // gli stati: pronta → cerca la persona al centro → dopo 2 s di riquadro comincia a scattare da sola
-            for await st in s.stateUpdates {
-                switch st {
-                case .ready: _ = s.startDetecting()
-                case .detecting:
-                    try? await Task.sleep(for: .seconds(2))
-                    if case .detecting = s.state { s.startCapturing() }
-                case .completed: await ricostruisci()
-                case .failed(let e): errore("SCANSIONE INTERROTTA · \(e.localizedDescription.uppercased())")
-                default: break
-                }
-            }
+        if case .failed(let e) = s.state {
+            errore("SCANSIONE INTERROTTA · \(e.localizedDescription.uppercased())")
+            return false
         }
+        sessione = s
+        return true
     }
 
-    private func manda() { aggiorna(StatoScansione(hud: [foto > 0 ? "\(foto)" : "—", "—", giro ? "360°" : "—"], pronto: giro)) }
+    /// La regia, 4 volte al secondo: guarda lo stato della sessione, le dà i comandi al momento giusto e scrive nella riga di stato
+    /// cosa sta succedendo. true quando le foto sono prese (.completed) e si può costruire il modello.
+    private func segui() async -> Bool {
+        let inizio = Date()
+        var ultimaRicerca = Date.distantPast            // l'ultimo startDetecting()
+        var mancate = 0                                 // le ricerche andate a vuoto (la persona non è al centro o è lontana)
+        var trovata: Date?                              // da quando c'è il riquadro sulla persona
+        var ultimoAvvio = Date.distantPast              // l'ultimo startCapturing()
+        var inviato: StatoScansione?
+        while !Task.isCancelled {
+            guard let s = sessione else { return false }
+            var testo: String?
+            switch s.state {
+            case .initializing:
+                testo = "ACCENSIONE SENSORE…"
+                if Date().timeIntervalSince(inizio) > 15 { fallita("LA FOTOCAMERA NON PARTE · RIPROVI"); return false }
+            case .ready:
+                trovata = nil
+                if s.cameraTracking != .normal {
+                    testo = "MUOVA PIANO L'IPHONE PER PARTIRE"
+                } else {
+                    // Apple cerca l'oggetto sotto il pallino al centro: se non lo trova risponde false e resta pronta. Si riprova.
+                    if Date().timeIntervalSince(ultimaRicerca) > 1.5 {
+                        ultimaRicerca = Date()
+                        if !s.startDetecting() { mancate += 1 }
+                    }
+                    testo = consiglio(s) ?? (mancate < 4 ? "CERCO LA PERSONA · LA TENGA AL CENTRO" : "NON LA TROVO · SI AVVICINI E LA TENGA AL CENTRO")
+                }
+            case .detecting:
+                mancate = 0
+                let t0 = trovata ?? Date()
+                trovata = t0
+                testo = "PERSONA TROVATA · UN ATTIMO…"
+                // il riquadro è sulla persona: dopo 2 s gli scatti partono da soli (se non partono, si richiede ogni 2 s)
+                if Date().timeIntervalSince(t0) >= 2, Date().timeIntervalSince(ultimoAvvio) > 2 {
+                    ultimoAvvio = Date()
+                    s.startCapturing()
+                }
+            case .capturing:
+                testo = consiglio(s)                    // nil: «LA PERSONA STIA FERMA · LE GIRI INTORNO», poi «FATTO · TOCCHI FINE»
+            case .completed:
+                finito = true                           // via la fotocamera…
+                sessione = nil                          // …e la sessione di cattura si libera prima di costruire (campione di Apple)
+                return true
+            case .failed(let e):
+                if case ObjectCaptureSession.Error.cancelled = e { return false }
+                fallita("SCANSIONE INTERROTTA · \(e.localizedDescription.uppercased())")
+                return false
+            default:
+                break                                   // .finishing dopo «Fine»: la riga dice «ELABORAZIONE…»
+            }
+            let n = s.numberOfShotsTaken, g = s.userCompletedScanPass
+            if n != foto { foto = n }
+            if g != giro { giro = g }
+            let nuovo = StatoScansione(hud: [n > 0 ? "\(n)" : "—", "—", g ? "360°" : "—"], pronto: g && n >= 20, testo: testo)
+            if nuovo != inviato { inviato = nuovo; aggiorna(nuovo) }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return false
+    }
+
+    /// I consigli di Object Capture (quelli che mostra anche il campione di Apple), in parole nostre.
+    private func consiglio(_ s: ObjectCaptureSession) -> String? {
+        let f = s.feedback
+        if f.contains(.environmentTooDark) || f.contains(.environmentLowLight) { return "SERVE PIÙ LUCE" }
+        if f.contains(.objectTooFar) { return "SI AVVICINI" }
+        if f.contains(.objectTooClose) { return "SI ALLONTANI UN PO'" }
+        if f.contains(.movingTooFast) { return "PIÙ PIANO" }
+        if f.contains(.outOfFieldOfView) { return "INQUADRI LA PERSONA" }
+        return nil
+    }
+
+    /// Un errore: la sessione si ferma (la fotocamera si libera) e la riga arancione dice cosa è successo, con «Riprova».
+    private func fallita(_ testo: String) {
+        sessione?.cancel()
+        sessione = nil
+        errore(testo)
+    }
 
     private func concludi() {
         guard let s = sessione, !finito else { return }
@@ -925,20 +1085,26 @@ struct CatturaStatua: View {
         s.finish()                                                                 // → .finishing → .completed → ricostruisci()
     }
 
-    /// Il modello sull'iPhone (dettaglio ridotto, quello di iOS): USDZ con la texture fotografica.
+    /// Il modello sull'iPhone (dettaglio ridotto, quello di iOS): USDZ con la texture fotografica. La percentuale va nella riga di stato.
     private func ricostruisci() async {
         guard let base = cartella else { return }
-        finito = true
         let inizio = Date()
         let uscita = ArchivioLidar.cartella.appendingPathComponent("texture-\(UUID().uuidString).usdz")
+        let hud = [foto > 0 ? "\(foto)" : "—", "—", giro ? "360°" : "—"]
+        var conf = PhotogrammetrySession.Configuration()
+        conf.checkpointDirectory = base.appendingPathComponent("Snapshots/", isDirectory: true)   // i dati della cattura: si fa prima
         do {
-            let p = try PhotogrammetrySession(input: base.appendingPathComponent("Images/", isDirectory: true))
+            let p = try PhotogrammetrySession(input: base.appendingPathComponent("Images/", isDirectory: true), configuration: conf)
             try p.process(requests: [.modelFile(url: uscita)])
+            var ultimo = -1
             for try await o in p.outputs {
                 if Task.isCancelled { p.cancel(); return }
                 switch o {
+                case .requestProgress(_, fractionComplete: let x):
+                    let pc = min(99, max(0, Int(x * 100)))
+                    if pc != ultimo { ultimo = pc; aggiorna(StatoScansione(hud: hud, pronto: true, testo: "ELABORAZIONE… \(pc)%")) }
                 case .processingComplete:
-                    pulisci(soloFoto: true)
+                    pulisci()
                     let minuti = Date().timeIntervalSince(inizio) / 60
                     finita(RisultatoModo.statua(file: uscita, foto: foto, minuti: minuti, nome: nome))
                     return
@@ -953,10 +1119,11 @@ struct CatturaStatua: View {
         }
     }
 
-    private func pulisci(soloFoto: Bool) {
+    /// Le foto servono solo per costruire il modello: poi si cancellano.
+    private func pulisci() {
         guard let base = cartella else { return }
-        try? FileManager.default.removeItem(at: base)                              // le foto servono solo per costruire il modello
-        if !soloFoto { cartella = nil }
+        try? FileManager.default.removeItem(at: base)
+        cartella = nil
     }
 }
 #endif
