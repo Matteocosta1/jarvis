@@ -213,11 +213,13 @@ struct VistaTracciaOrologio: View {
         .task {
             // i posti arrivano dal più recente: il primo luogo salvato (o vecchio parcheggio) con le coordinate
             if let o = await VistaVitalsOrologio.chiama(["ricordi": true]),
-               let pk = (o["posti"] as? [[String: Any]] ?? []).first(where: { ["posto", "parcheggio"].contains($0["tipo"] as? String ?? "") }),
+               let pk = (o["posti"] as? [[String: Any]] ?? []).first(where: {
+                   ["posto", "parcheggio"].contains($0["tipo"] as? String ?? "") && $0["lat"] is NSNumber && $0["lon"] is NSNumber   // come l'iPhone
+               }),
                let lat = (pk["lat"] as? NSNumber)?.doubleValue, let lon = (pk["lon"] as? NSNumber)?.doubleValue {
                 let testo = (pk["testo"] as? String) ?? "Luogo", via = (pk["luogo"] as? String) ?? ""
                 luogo = Luogo(lat: lat, lon: lon, nome: via.isEmpty || via == testo ? testo : "\(testo) · \(via)")
-                bussola.accendi()
+                if !Task.isCancelled { bussola.accendi() }      // pagina già chiusa mentre arrivavano i luoghi: il GPS resta spento
             }
             caricato = true
         }

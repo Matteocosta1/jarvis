@@ -36,7 +36,9 @@ struct VistaRicordi: View {
                     if let d = dati, scheda == .traccia {
                         // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
                         ScrollView {
-                            PannelliTraccia(luoghi: d.posti.filter { $0.tipo == "posto" || $0.tipo == "parcheggio" }, ultimi: Array(d.ricordi.prefix(3)),
+                            // solo i luoghi con le coordinate: la freccia punta il più recente che si può raggiungere
+                            PannelliTraccia(luoghi: d.posti.filter { ($0.tipo == "posto" || $0.tipo == "parcheggio") && $0.lat != nil && $0.lon != nil },
+                                            ultimi: Array(d.ricordi.prefix(3)),
                                             guida: $guidaAccesa, salvaSubito: $salvaDaFare, ricarica: { await carica() })
                                 .padding(16)
                                 .padding(.bottom, 30)
