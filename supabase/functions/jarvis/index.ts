@@ -1200,7 +1200,7 @@ async function emailLeggi(i: Record<string, any>) {
         oggetto: intestazione(intest, "Subject").slice(0, 200) || "(senza oggetto)",
         letta: /\\Seen/i.test(flag),
       };
-    }).filter((e) => e.uid && (e.quando_ms >= da.getTime() || !e.quando_ms));
+    }).filter((e) => e.uid && (e.quando_ms >= da.getTime() || !e.quando_ms) && !ePerProtocollo(e.oggetto));   // le mail dei protocolli no
     if (cerca) email = email.filter((e) => `${e.da} ${e.a} ${e.oggetto}`.toLowerCase().includes(cerca));
     email.sort((a, b) => b.quando_ms - a.quando_ms);
     // nelle cartelle in uscita (Inviata, Bozze) conta il destinatario; nelle altre il mittente
@@ -1303,7 +1303,7 @@ async function postaPriorita(forza = false) {
       return { uid: Number(d.UID), da: daChi, oggetto: intestazione(intest, "Subject") || "(senza oggetto)", quando, automatica,
         letta: /\\Seen/i.test(Array.isArray(d.FLAGS) ? d.FLAGS.join(" ") : String(d.FLAGS ?? "")),
         risposto: /\\Answered/i.test(Array.isArray(d.FLAGS) ? d.FLAGS.join(" ") : String(d.FLAGS ?? "")), parte: parteTesto(d.BODYSTRUCTURE), testo: "" };
-    }).filter((m) => m.uid);
+    }).filter((m) => m.uid && !ePerProtocollo(m.oggetto));   // le mail dei protocolli (vanno nel Cestino da sole) non sono posta
     // il testo solo delle mail scritte da persone (le automatiche bastano mittente e oggetto), al massimo 12
     for (const m of mail.filter((x) => !x.automatica && x.parte).slice(0, 12)) {
       try {
@@ -1545,6 +1545,70 @@ async function postaRispondi(i: Record<string, any>, dallApp = false) {
     if ((e as any).incerto) return { ok: false, incerto: true, errore: "Non so se è partita, Sir: iCloud non ha confermato l'invio. Controlli in Inviata prima di rimandarla." };
     return { ok: false, errore: (e as Error).message };
   } finally { if (s) await s.chiudi(); }
+}
+
+// ───────── PROTOCOLLI (build 22): i passi del telefono senza mai mostrare l'app Comandi ─────────
+// L'app non può accendere Full immersion, Wi-Fi o Bluetooth da sola, e aprire un Comando rapido mostra l'app Comandi.
+// Così il cervello manda alla casella iCloud del signore una mail con l'oggetto «<testo> | JARVIS Lavoro | <id>»: sull'iPhone
+// un'automazione personale di Comandi (Email, oggetto che contiene «| JARVIS Lavoro |», Esegui subito, senza notifica) passa
+// <testo> al Comando rapido «JARVIS Lavoro» e conferma a JARVIS con l'oggetto intero (l'azione «Conferma protocollo» dell'app).
+// Vale anche dal polso. Dopo la conferma la mail si sposta nel Cestino; in PRIORITÀ e nella posta non compare mai.
+const OGGETTO_PROTOCOLLO = /^(avvia|annulla:[a-z0-9-]{1,40}|rifai:[a-z0-9-]{1,40}) \| JARVIS (Lavoro|Rientro|Notte) \| ([a-z0-9]{4,16})$/;
+const ePerProtocollo = (oggetto: string) => OGGETTO_PROTOCOLLO.test(oggetto.trim());
+
+async function protocolloInvia(i: Record<string, any>) {
+  if (!ICLOUD_EMAIL || !ICLOUD_PASS) return { ok: false, errore: "La posta iCloud non è collegata, Sir: senza, i passi del telefono non partono." };
+  const nome = String(i.nome ?? "").toLowerCase();
+  const titolo = ({ lavoro: "Lavoro", rientro: "Rientro", notte: "Notte" } as Record<string, string>)[nome];
+  const oggetto = `${String(i.testo ?? "")} | JARVIS ${titolo} | ${String(i.id ?? "")}`;
+  if (!titolo || !ePerProtocollo(oggetto)) return { ok: false, errore: "Richiesta di protocollo non valida." };
+  const righe = [
+    `From: ${nomeIntestazione(NOME)} <${ICLOUD_EMAIL}>`,
+    `To: <${ICLOUD_EMAIL}>`,
+    `Subject: ${oggetto}`,
+    `Date: ${new Date().toUTCString().replace("GMT", "+0000")}`,
+    `Message-ID: <jarvis.protocollo.${String(i.id)}.${Date.now().toString(36)}@${ICLOUD_EMAIL.split("@")[1] || "icloud.com"}>`,
+    "X-Jarvis: protocollo",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64Righe(new TextEncoder().encode("Passo di un protocollo di JARVIS: la esegue l'automazione di Comandi, poi JARVIS la sposta nel Cestino.")),
+  ];
+  try { await smtpManda(ICLOUD_EMAIL, righe.join("\r\n")); }
+  catch (e) {
+    // silenzio dopo il testo: la mail potrebbe arrivare lo stesso, e allora l'automazione conferma come sempre
+    if ((e as any).incerto) return { ok: true, incerto: true };
+    return { ok: false, errore: `Non riesco a mandare il passo al telefono, Sir: ${(e as Error).message}` };
+  }
+  return { ok: true };
+}
+
+/// Dopo la conferma: le mail dei protocolli (di quell'id, o tutte se manca) dall'Arrivo al Cestino.
+async function protocolloPulisci(id: string) {
+  if (!ICLOUD_EMAIL || !ICLOUD_PASS) return { ok: true, spostate: 0 };
+  const s = await imapApri();
+  try {
+    await s.comando("SELECT INBOX");
+    const r0 = await s.comando(`UID SEARCH FROM ${imapStringa(ICLOUD_EMAIL)} SUBJECT ${imapStringa("| JARVIS ")}`);
+    const uid = (r0.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim().split(/\s+/).filter(Boolean).map(Number).slice(-40);
+    if (!uid.length) return { ok: true, spostate: 0 };
+    const r1 = await s.comando(`UID FETCH ${uid.join(",")} (UID BODY.PEEK[HEADER.FIELDS (SUBJECT X-JARVIS)])`);
+    const mie = imapFetch(r1).filter((d) => {
+      const intest = campoFetch(d, "BODY[HEADER");
+      const m = intestazione(intest, "Subject").trim().match(OGGETTO_PROTOCOLLO);
+      return m && /protocollo/i.test(intestazione(intest, "X-Jarvis")) && (!id || m[3] === id);
+    }).map((d) => Number(d.UID));
+    if (!mie.length) return { ok: true, spostate: 0 };
+    const cestino = await nomeCartella(s, "cestino");
+    try { await s.comando(`UID MOVE ${mie.join(",")} ${imapStringa(cestino)}`); }
+    catch {
+      await s.comando(`UID COPY ${mie.join(",")} ${imapStringa(cestino)}`);
+      await s.comando(`UID STORE ${mie.join(",")} +FLAGS.SILENT (\\Deleted)`);
+      await s.comando(`UID EXPUNGE ${mie.join(",")}`);
+    }
+    return { ok: true, spostate: mie.length };
+  } finally { await s.chiudi(); }
 }
 
 // ───────── RADAR (build 22): la pioggia nelle prossime 2 ore, a quarti d'ora, dove si trova il signore ─────────
@@ -3469,6 +3533,13 @@ Deno.serve(async (req) => {
   }
   if (corpo?.archivio_carica && typeof corpo.archivio_carica === "object") {               // caricamento di un file dall'app
     try { return json(await archivioSalva(corpo.archivio_carica, {})); } catch (e) { return json({ errore: (e as Error).message }); }
+  }
+  if (corpo?.protocollo && typeof corpo.protocollo === "object") {                         // Protocolli: un passo al telefono, via mail
+    try { return json(await protocolloInvia(corpo.protocollo)); } catch (e) { return json({ ok: false, errore: (e as Error).message }); }
+  }
+  if (typeof corpo?.protocollo_pulisci === "string") {                                     // confermato: la mail del passo nel Cestino
+    try { return json(await protocolloPulisci(/^[a-z0-9]{4,16}$/.test(corpo.protocollo_pulisci) ? corpo.protocollo_pulisci : "")); }
+    catch (e) { return json({ ok: false, errore: (e as Error).message }); }
   }
   if (typeof corpo?.archivio_link === "string") return json(await archivioLink(corpo.archivio_link));
   if (typeof corpo?.archivio_elimina === "string") { try { return json(await archivioElimina(corpo.archivio_elimina)); } catch (e) { return json({ errore: (e as Error).message }); } }
