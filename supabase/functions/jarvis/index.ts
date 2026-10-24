@@ -997,6 +997,9 @@ function decodificaMime(t: string) {
 // Una sessione IMAP con iCloud. Si legge in latin1 (un carattere per byte): così le lunghezze dei «letterali» IMAP
 // ({123} seguito da 123 byte) tornano giuste anche con accenti ed emoji; i testi si ridecodificano dopo, con il loro charset.
 const latinoInByte = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 255);
+/// I byte del socket in latin1 vero (byte 0x80 → «\u0080»). Non TextDecoder("iso-8859-1"): per lo standard del web quel nome
+/// vale windows-1252, che cambia i byte 0x80…0x9F («’», «€», «–», i pezzi delle emoji in UTF-8) e i testi non tornano più giusti.
+const byteInLatino = (b: Uint8Array) => { let s = ""; for (let k = 0; k < b.length; k += 8192) s += String.fromCharCode(...b.subarray(k, k + 8192)); return s; };
 const daUtf8 = (s: string) => { try { return new TextDecoder("utf-8", { fatal: true }).decode(latinoInByte(s)); } catch { return s; } };
 
 /// Una lettura dal socket che non resta mai appesa (una read di Deno non ha un suo limite): allo scadere si chiude la connessione.
@@ -1021,7 +1024,7 @@ async function apriTls(hostname: string, port: number, ms: number, cosa: string)
 
 async function imapApri() {
   const conn = await apriTls("imap.mail.me.com", 993, 10000, "iCloud non risponde");
-  const enc = new TextEncoder(), dec = new TextDecoder("iso-8859-1");
+  const enc = new TextEncoder();
   const buf = new Uint8Array(65536);
   let n = 0;
   const leggiFino = async (fine: RegExp, ms = 15000) => {
@@ -1031,7 +1034,7 @@ async function imapApri() {
       if (Date.now() > limite) throw new Error("iCloud non risponde");
       const letti = await leggiConLimite(conn, buf, limite - Date.now(), "iCloud non risponde");
       if (letti === null) throw new Error("connessione chiusa da iCloud");
-      testo += dec.decode(buf.subarray(0, letti), { stream: true });
+      testo += byteInLatino(buf.subarray(0, letti));
     }
     return testo;
   };
@@ -1538,6 +1541,8 @@ async function postaRispondi(i: Record<string, any>, dallApp = false) {
     return { ok: true, a, oggetto, ...(avvisi.length ? { nota: avvisi.join("; ") } : {}) };
   } catch (e) {
     if (chiaveInvio) await db.from("jarvis_cache").delete().eq("chiave", chiaveInvio).then(() => {}, () => {});   // fermata prima dell'invio
+    // esito incerto (silenzio o linea caduta dopo il testo): mai «non è partita», potrebbe esserlo; un nuovo tentativo non la rimanda
+    if ((e as any).incerto) return { ok: false, incerto: true, errore: "Non so se è partita, Sir: iCloud non ha confermato l'invio. Controlli in Inviata prima di rimandarla." };
     return { ok: false, errore: (e as Error).message };
   } finally { if (s) await s.chiudi(); }
 }
