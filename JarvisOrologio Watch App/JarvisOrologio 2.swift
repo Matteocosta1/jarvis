@@ -627,6 +627,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: polsoRichiesto = .organismo; reparto = .vitals   // direttamente l'Organismo, non l'elenco di Vitals
         case .specchio, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // l'Allenatore vive sull'iPhone: lo scrive la schermata
+        case .satellite(let a): polsoRichiesto = .satellite(a); reparto = .satellite  // build 23: SATELLITE; «guidami a…» fa partire la guida
+        case .fermaGuida:                                                             // build 23: la guida vive sull'iPhone: si ferma lì
+            Task { @MainActor in
+                await GuidaPolso.condivisa.aggiorna()                                 // lo stato vero, dall'iPhone
+                let c_era = GuidaPolso.condivisa.dati != nil
+                GuidaPolso.condivisa.ferma()
+                parla(c_era ? "Guida fermata, Sir." : "Non c'è nessuna guida in corso, Sir.")
+            }
+            return
         }
         if let a = reparto?.annuncio { parla(a) } else { fase = .attesa }
     }

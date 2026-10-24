@@ -91,6 +91,27 @@ final class PonteOrologio: NSObject {
         }
     }
 
+    /// Build 23: la risposta dell'iPhone sulla GUIDA di SATELLITE.
+    nonisolated struct RispostaGuida: Sendable {
+        let errore: String?
+        let guida: GuidaPolsoDati?
+    }
+
+    /// Build 23: avvia, ferma o chiede la GUIDA sull'iPhone ({ guida: "avvia" | "ferma" | "stato", … }). nil se l'iPhone non risponde.
+    func guida(_ messaggio: [String: Any]) async -> RispostaGuida? {
+        guard WCSession.isSupported() else { return nil }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return nil }
+        return await withCheckedContinuation { (c: CheckedContinuation<RispostaGuida?, Never>) in
+            s.sendMessage(messaggio, replyHandler: { @Sendable r in
+                c.resume(returning: RispostaGuida(errore: r["errore"] as? String, guida: (r["guida"] as? [String: Any]).flatMap { GuidaPolsoDati($0) }))
+            }, errorHandler: { @Sendable _ in
+                c.resume(returning: nil)
+            })
+        }
+    }
+
     /// Un messaggio della Sentinella arrivato dall'iPhone (allarme o cambio di stato).
     nonisolated static func smistaSentinella(_ d: [String: Any]) {
         guard let tipo = d["sentinella"] as? String else { return }
@@ -156,10 +177,12 @@ extension PonteOrologio: WCSessionDelegate {
     // la Sentinella sull'iPhone: allarmi (subito, oppure in coda se l'app dormiva) e cambi di stato
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         PonteOrologio.smistaSentinella(message)
+        GuidaPolso.ricevi(message)                  // build 23: la GUIDA di SATELLITE in corso sull'iPhone
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
         PonteOrologio.smistaSentinella(message)
+        GuidaPolso.ricevi(message)
         replyHandler([:])
     }
 

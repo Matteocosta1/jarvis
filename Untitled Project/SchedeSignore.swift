@@ -96,7 +96,9 @@ struct TestataScheda: View {
                 Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(gira ? 360 : 0))
                     .animation(.linear(duration: 3).repeatForever(autoreverses: false), value: gira)
-                Image(systemName: icona)
+                Group {
+                    if icona == "satellite" { IconaSatellite(lato: 22) } else { Image(systemName: icona) }   // build 23: disegnata come nel mockup
+                }
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(tinta)
             }

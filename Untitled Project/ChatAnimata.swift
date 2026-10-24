@@ -40,10 +40,11 @@ enum Avvio {
     static let mollaCoda = 0.12
     /// L'indice della prima icona della coda: da Ricordi (tutte le icone dello scarico).
     static func inizioCoda(_ nomi: [String]) -> Int { nomi.firstIndex(of: "Ricordi") ?? nomi.count }
-    /// La partitura dell'iPhone (secondi a velocità normale, 26 icone): è quella con cui è montata «avvio».
-    /// Le prime 16 al passo di sempre (SENSI chiude sul colpo forte di 2,5 s); STRUMENTI e INTELLIGENCE (10 icone)
-    /// distribuite su tutto lo SCARICO della musica, 2,885 → 3,724 s; Bea sull'ultimo colpo (scelto sul mock, «Dopo»).
-    static let colpi: [Double] = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 1.01, 1.16, 1.31, 1.46, 1.61, 1.87, 2.02, 2.17, 2.32, 2.47, 2.885, 2.978, 3.071, 3.165, 3.258, 3.351, 3.444, 3.538, 3.631, 3.724] 
+    /// La partitura dell'iPhone (secondi a velocità normale, 27 icone dalla build 23, con SATELLITE): è quella con cui è montata
+    /// «avvio». Le prime 16 al passo di sempre (SENSI chiude sul colpo forte di 2,5 s); STRUMENTI e INTELLIGENCE (11 icone,
+    /// prima 10) distribuite su tutto lo SCARICO della musica, 2,885 → 3,724 s; Bea sull'ultimo colpo (scelto sul mock, «Dopo»).
+    static let colpi: [Double] = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 1.01, 1.16, 1.31, 1.46, 1.61, 1.87, 2.02, 2.17, 2.32, 2.47,
+                                  2.885, 2.969, 3.053, 3.137, 3.220, 3.304, 3.388, 3.472, 3.556, 3.640, 3.724]
 }
 
 enum TempiChat {

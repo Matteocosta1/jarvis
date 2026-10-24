@@ -7,6 +7,7 @@ nonisolated enum SchermataPolso: Hashable, Sendable {
     case protocolli(Protocollo?)        // con un protocollo: detto a voce, parte da solo
     case traccia, radar, priorita
     case organismo                      // «scansione organismo», «stato dell'organismo»: VistaOrganismoOrologio
+    case satellite(AzioneSatellite?)    // build 23: SATELLITE (i luoghi con la distanza); a voce «guidami allo studio» parte la guida
 }
 
 /// I colori del mockup sul polso.

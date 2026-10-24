@@ -17,6 +17,7 @@ enum SchedaApp: String, Identifiable {
     case diario, sonno, cuore, briefing, meteo, email, spesa, shazam, foto, serata, messaggi, telefono, bea
     case github, supabase, archivio, costi, edith
     case scanner
+    case satellite                                  // build 23: INTELLIGENCE › SATELLITE
     var id: String { rawValue }
 }
 
@@ -289,6 +290,7 @@ struct ContentView: View {
             case .edith: VistaEdith(chiedi: daScheda)
             case .scanner: VistaScanner(chiedi: daScheda)
             case .bea: VistaBea(chiedi: daScheda)
+            case .satellite: VistaSatellite(parla: { [jarvis] frase in jarvis.annuncia(frase) })
             }
         }
         .fullScreenCover(isPresented: $jarvis.allenatore) {
@@ -324,6 +326,7 @@ struct ContentView: View {
         }
         .onAppear {
             Aptica.prepara()
+            MotoreGuida.condiviso.parla = { [jarvis] frase in jarvis.annuncia(frase) }   // build 23: la GUIDA di SATELLITE parla
             accendi()
             if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
             if primaApertura {
@@ -778,7 +781,7 @@ struct ContentView: View {
                     s.azione()
                 } label: {
                     Group {
-                        if s.icona == "profiler" { IconaProfiler() } else { Image(systemName: s.icona) }
+                        if s.icona == "profiler" { IconaProfiler() } else if s.icona == "satellite" { IconaSatellite(lato: 18) } else { Image(systemName: s.icona) }
                     }
                         .font(.system(size: 15))
                         .symbolRenderingMode(.monochrome)                 // tutte dello stesso colore (Serata e Shazam compresi)
@@ -813,6 +816,7 @@ struct ContentView: View {
             ("dot.radiowaves.left.and.right", "Sentinella", { tastiera = false; jarvis.interrompi(); mostraSentinella = true }),
             ("profiler", "Profiler", { tastiera = false; jarvis.interrompi(); profiler() }),
             ("waveform.and.mic", "Wiretap", { tastiera = false; jarvis.interrompi(); mostraWiretap = true }),
+            ("satellite", "Satellite", { tastiera = false; scheda = .satellite }),   // build 23: SATELLITE prima di Bea (Bea sull'ultimo colpo)
             ("link", "Bea", { tastiera = false; scheda = .bea }),                    // 20 ott: Bea passa in INTELLIGENCE
         ]
     }
@@ -948,6 +952,7 @@ struct ContentView: View {
             case .confidente: mostraConfidente = true
             case .allenatore: jarvis.allenatore = true
             case .bea: scheda = .bea
+            case .satellite: scheda = .satellite
             case .ricordi:                                         // build 22: TRACCIA per prima, come nel mockup
                 guidaRicordi = jarvis.guidaTraccia                 // con la Guida solo se è stato «portami al luogo»
                 salvaRicordi = jarvis.salvaTraccia                 // e salva subito solo se è stato «ricorda questo luogo»

@@ -103,6 +103,7 @@ enum Seguito {
 enum Reparto: String, Identifiable, Equatable {
     // INTELLIGENCE e sensi
     case sentinella, occhi, giro, profiler, wiretap, cucina, scanner
+    case satellite                       // build 23: SATELLITE, in INTELLIGENCE prima di Bea
     // le schede della corona
     case diario, sonno, cuore, vitals, confidente, allenatore, bea
     case briefing, meteo, email, spesa
@@ -124,6 +125,7 @@ enum Reparto: String, Identifiable, Equatable {
         case .cucina: return "Cucina. Inquadri frigo, dispensa o piatto, Sir."
         case .scanner: return "Scanner pronto. Inquadri il codice a barre, Sir."
         case .wiretap: return nil
+        case .satellite: return "Satellite, Sir."
         case .diario: return "Il diario, Sir."
         case .sonno: return "Il suo sonno, Sir."
         case .cuore: return "Il suo cuore, Sir."
@@ -252,7 +254,8 @@ enum ComandoVocale: Equatable {
                                         "impostazioni", "sistemi", "costi", "edith", "edit", "diario", "sonno", "cuore", "vitals", "briefing", "posta",
                                         "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
                                         "confidente", "github", "supabase", "archivio", "scanner", "profiler",
-                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner", "personal"]
+                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner", "personal",
+                                        "satellite"]
             if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) { return .torna }
         }
         // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
@@ -449,6 +452,7 @@ enum ComandoVocale: Equatable {
             (.messaggi, [" messaggi ", " whatsapp ", " imessage "]), (.telefono, [" telefono ", " tastiera ", " rubrica "]),
             (.github, [" github ", " git hub ", " ghitab ", " repository ", " cantiere "]), (.supabase, [" supabase ", " supa base ", " sala macchine ", " database "]),
             (.archivio, [" archivio ", " cloud ", " disco rigido "]),
+            (.satellite, [" satellite "]),                        // build 23
         ]
         // le sezioni nuove solo con un verbo: «apri i costi», «mostrami EDITH», «vai alle impostazioni» («che costi?» resta a JARVIS)
         let nuove: [(Reparto, [String])] = [

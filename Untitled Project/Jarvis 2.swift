@@ -775,6 +775,14 @@ final class Jarvis: NSObject, ObservableObject {
             MotoreAllenatore.specchioRichiesto = true
             NotificationCenter.default.post(name: .jarvisSpecchio, object: nil)
             apriReparto(.allenatore)
+        case .satellite(let a):                   // build 23: SATELLITE si apre e fa la sua cosa (guida, naviga, ricognizione, 3D)
+            RichiestaSatellite.condivisa.azione = a
+            apriReparto(.satellite)
+        case .fermaGuida:                         // build 23: la GUIDA di SATELLITE si ferma, anche a Satellite chiuso
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            let c_era = MotoreGuida.condiviso.attiva
+            MotoreGuida.condiviso.ferma()
+            annuncia(c_era ? "Guida fermata, Sir." : "Non c'è nessuna guida in corso, Sir.")
         }
     }
 
