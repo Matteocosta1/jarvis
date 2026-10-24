@@ -632,7 +632,7 @@ async function vitals(giorniRichiesti: number) {
   const media = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
   const serie = [...perGiorno.values()].map((g) => ({
     giorno: g.giorno, umore: g.umore ?? null, punteggio: media(g.punteggi), energia: media(g.energie),
-    sonno_ore: g.sonno_min ? Math.round(g.sonno_min / 6) / 10 : null, battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set(g.temi)],
+    sonno_ore: g.sonno_min ? Math.round(g.sonno_min / 6) / 10 : null, battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set<string>(g.temi)],
   }));
   const conPunteggio = serie.filter((s) => s.punteggio != null);
   const meta = Math.floor(conPunteggio.length / 2);
@@ -3374,7 +3374,7 @@ async function trascriviVeloce(b64: string) {
   const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
   if (!chiave) return json({ errore: "manca ELEVENLABS_API_KEY" }, 503);
   if (b64.length < 100 || b64.length > 3_000_000) return json({ errore: "audio mancante o troppo lungo" }, 400);
-  let audio: Uint8Array;
+  let audio: ReturnType<typeof Uint8Array.from>;                     // il tipo esatto di Uint8Array.from: va bene a Blob con ogni versione di TypeScript
   try { audio = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)); } catch { return json({ errore: "audio non leggibile" }, 400); }
   let ultimo = "";
   for (const modello of ["scribe_v2", "scribe_v1"]) {
