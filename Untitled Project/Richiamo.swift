@@ -307,13 +307,20 @@ final class Richiamo {
                     // e subito dopo una richiesta, il seguito della frase vale anche se è una parola sola; così pure appena
                     // finita una risposta («Perché?»), ma non in mezzo alla folla
                     let affollato = AmbienteSonoro.condiviso.affollato
-                    if !t.isEmpty, adesso < liberoFinoA || (adesso < seguitoFinoA && !affollato) || voceConfermata || Benvenuto.eFraseDiTony(t)
+                    // difetto 4 (controllo del 25 ott): anche i 2 secondi dell'aggiunta dopo la domanda seguono la regola della
+                    // folla, come il seguito. Con gente o TV intorno l'aggiunta vale con «Jarvis» o con la sua voce riconosciuta;
+                    // prima qualsiasi frase di chiunque («sì sì» del vicino) fermava la risposta e si univa alla domanda
+                    let inAggiunta = adesso < liberoFinoA
+                    if !t.isEmpty, (inAggiunta && (!affollato || voceConfermata)) || (adesso < seguitoFinoA && !affollato) || voceConfermata
+                        || Benvenuto.eFraseDiTony(t)
                         || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
-                    } else if !t.isEmpty, Impostazioni.ascoltoSempre, affollato, VoceDelSignore.attiva {
+                    } else if !t.isEmpty, Impostazioni.ascoltoSempre || inAggiunta, affollato, VoceDelSignore.attiva {
                         // in mezzo alla gente: risponde solo alla voce del signore. Se stiamo già parlando (fiducia di
                         // conversazione) passa anche un «sì»; altrimenti si controlla l'impronta su una frase vera.
-                        if VoceDelSignore.inFiducia && (parole.count >= 2 || breve) {
+                        // Nei 2 secondi dell'aggiunta niente scorciatoia della fiducia: la fiducia l'ha appena data «Jarvis»
+                        // della domanda, e il «sì» lì è proprio quello del vicino (difetto 4); serve la voce riconosciuta
+                        if !inAggiunta && VoceDelSignore.inFiducia && (parole.count >= 2 || breve) {
                             trovato = t; soloDopoNome = false
                         } else if parole.count >= 2 && !controlloInCorso {
                             controllaVoce(turno: mio)
