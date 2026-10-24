@@ -174,6 +174,9 @@ final class Jarvis: NSObject, ObservableObject {
     private var frasiVive: [ObjectIdentifier: AVSpeechUtterance] = [:]   // tenute in vita finché il delegato risponde (id mai riciclati)
     private var flussoFinito = true
     private var rispostaIniziata = false     // la voce ha già cominciato a dire la risposta in corso
+    /// Le frasi della risposta in corso già mandate alla voce (24 ott, punto 4): le ultime vanno a ElevenLabs come «prima»,
+    /// così ogni frase continua l'intonazione di quella prima e la risposta suona come un discorso unico.
+    private var frasiVoce: [String] = []
     private var compitoRete: Task<Void, Never>?
     private let cloud = VoceCloud()
     private var vocePerCloud = false    // decisa a inizio discorso: tutte le frasi passano dalla stessa voce, in ordine
@@ -1020,6 +1023,7 @@ final class Jarvis: NSObject, ObservableObject {
 
         ultimoInvio = Date()
         rispostaIniziata = false
+        frasiVoce = []
         dettoRisposta = (risposta.id, "")
         richiamo.liberoFinoA = Date().addingTimeInterval(Dialogo.finestraAggiunta)   // nei primi 2 secondi può continuare a parlare senza dire «Jarvis»
         richiamo.seguitoFinoA = .distantPast
@@ -1414,7 +1418,14 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.usaAscoltoCloud { dettoMac += " " + frase; dettoMacFino = Date().addingTimeInterval(30) }
         if conOrecchio, !orecchio.attivo { orecchio.avvia() }
         if vocePerCloud {
-            cloud.accoda(u)                 // voce di JARVIS dal cloud; se fallisce, legge questa stessa frase con la voce dell'iPhone
+            // solo le frasi della risposta portano il loro «prima» (le ultime due, fino a 300 caratteri); frasi ponte e annunci no
+            var prima: String?
+            if risposta != nil {
+                let p = frasiVoce.suffix(2).joined(separator: " ")
+                if !p.isEmpty { prima = String(p.suffix(300)) }
+                frasiVoce.append(detta)
+            }
+            cloud.accoda(u, prima: prima)   // voce di JARVIS dal cloud; se fallisce, legge questa stessa frase con la voce dell'iPhone
         } else {
             sintesi.speak(u)
         }
@@ -1952,7 +1963,9 @@ final class VoceCloud: NSObject {
         riserva.delegate = self
     }
 
-    func accoda(_ u: AVSpeechUtterance) {
+    /// `prima`: le frasi già dette della stessa risposta (punto 4). Con `prima` la frase non passa dalla cache:
+    /// l'intonazione dipende da quello che la precede, quindi la cache resta per le frasi dette da sole.
+    func accoda(_ u: AVSpeechUtterance, prima: String? = nil) {
         let testo = u.speechString
         let token = Portachiavi.leggi()
         let id = Impostazioni.idVoceCloud
@@ -1960,14 +1973,14 @@ final class VoceCloud: NSObject {
         let audio = Task { [weak self] () async -> Sorgente? in
             guard let url, let self else { return nil }
             // le frasi già dette una volta sono in cache: partono subito, senza rete e senza consumare credito
-            if let pronta = CacheVoce.leggi(testo, id: id) { return .intero(pronta) }
+            if prima == nil, let pronta = CacheVoce.leggi(testo, id: id) { return .intero(pronta) }
             // al massimo 2 frasi scaricate insieme: ElevenLabs ne accetta poche in parallelo,
             // e se si esagera alcune frasi tornano con la voce dell'iPhone (voce che cambia a metà)
             while self.inDownload >= 2 && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(60)) }
             if Task.isCancelled { return nil }
             self.inDownload += 1
             // in streaming: la voce comincia mentre ElevenLabs sta ancora generando il resto della frase
-            let a = VoceCloud.avviaFlusso(testo, id: id, url: url, token: token)
+            let a = VoceCloud.avviaFlusso(testo, id: id, url: url, token: token, prima: prima)
             self.flussi.append(a)
             Task { @MainActor [weak self] in
                 await a.attendiFine()
@@ -1975,7 +1988,7 @@ final class VoceCloud: NSObject {
                 self.inDownload -= 1
                 self.flussi.removeAll { $0 === a }
                 if let codice = a.codiceErrore, codice == 503 || codice == 401 { self.sospesaFino = Date().addingTimeInterval(300) }
-                if let d = a.perCache() { CacheVoce.salva(d, testo: testo, id: id) }   // la prossima volta parte dalla cache
+                if prima == nil, let d = a.perCache() { CacheVoce.salva(d, testo: testo, id: id) }   // la prossima volta parte dalla cache
             }
             switch await a.attendiInizio() {
             case .pcm: return .flusso(a)
@@ -2139,7 +2152,7 @@ final class VoceCloud: NSObject {
     }
 
     /// Avvia lo streaming di una frase: la richiesta parte subito, l'audio si accumula in `AudioInArrivo` mentre arriva.
-    nonisolated static func avviaFlusso(_ testo: String, id: String, url: URL, token: String) -> AudioInArrivo {
+    nonisolated static func avviaFlusso(_ testo: String, id: String, url: URL, token: String, prima: String? = nil) -> AudioInArrivo {
         let a = AudioInArrivo()
         let lavoro = Task.detached(priority: .userInitiated) {
             var req = URLRequest(url: url)
@@ -2149,6 +2162,7 @@ final class VoceCloud: NSObject {
             req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
             var corpo: [String: Any] = ["voce": testo, "flusso": true]
             if !id.isEmpty { corpo["id_voce"] = id }
+            if let prima, !prima.isEmpty { corpo["prima"] = prima }   // punto 4: l'intonazione continua dalla frase prima
             req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
             do {
                 let (byte, r) = try await URLSession.shared.bytes(for: req)

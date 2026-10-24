@@ -109,6 +109,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var colpiVoce = 0
     // Voce a frasi: la prima frase si dice mentre il resto della risposta sta ancora arrivando
     private var bufferFrase = ""
+    private var frasiVoce: [String] = []   // le frasi della risposta già mandate alla voce (punto 4: il «prima» della frase dopo)
     private var codaVoce: [(testo: String, audio: Task<Data?, Never>)] = []
     private var lettoreCoda: Task<Void, Never>?
     private var flussoAperto = false                   // il cervello sta ancora scrivendo
@@ -966,6 +967,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         giaParlato = false
         flussoAperto = true
         dettoFinora = ""
+        frasiVoce = []
     }
 
     /// Ogni pezzo di testo in arrivo: appena c'è una frase completa (almeno 20 caratteri), parte la sua voce.
@@ -996,7 +998,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func accodaFrase(_ frase: String) {
         let token = PortachiaviOrologio.leggi()
         let indirizzo = ImpostazioniOrologio.indirizzo
-        let audio = Task { await JarvisOrologio.scaricaVoce(frase, token: token, indirizzo: indirizzo) }   // si scarica subito, in parallelo
+        // punto 4 (24 ott): le ultime due frasi già dette della risposta, così l'intonazione continua come sull'iPhone
+        let p = frasiVoce.suffix(2).joined(separator: " ")
+        let prima: String? = p.isEmpty ? nil : String(p.suffix(300))
+        frasiVoce.append(frase)
+        let audio = Task { await JarvisOrologio.scaricaVoce(frase, token: token, indirizzo: indirizzo, prima: prima) }   // si scarica subito, in parallelo
         codaVoce.append((frase, audio))
         if !giaParlato {
             giaParlato = true
@@ -1140,14 +1146,16 @@ final class JarvisOrologio: NSObject, ObservableObject {
         if let preso, preso.isRecording { continuaAscolto(preso, eco: eco) } else { Task { await self.ascolta() } }
     }
 
-    nonisolated static func scaricaVoce(_ testo: String, token: String, indirizzo: String) async -> Data? {
+    nonisolated static func scaricaVoce(_ testo: String, token: String, indirizzo: String, prima: String? = nil) async -> Data? {
         guard !token.isEmpty, let url = URL(string: indirizzo) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.timeoutInterval = 10
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["voce": testo])
+        var corpo: [String: Any] = ["voce": testo]
+        if let prima, !prima.isEmpty { corpo["prima"] = prima }       // punto 4: l'intonazione continua dalla frase prima
+        req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
         guard let (d, r) = try? await URLSession.shared.data(for: req),
               let http = r as? HTTPURLResponse, http.statusCode == 200,
               (http.value(forHTTPHeaderField: "Content-Type") ?? "").contains("audio"), !d.isEmpty else { return nil }
