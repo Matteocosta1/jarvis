@@ -1018,17 +1018,25 @@ const daUtf8 = (s: string) => { try { return new TextDecoder("utf-8", { fatal: t
 /// Una lettura dal socket che non resta mai appesa (una read di Deno non ha un suo limite): allo scadere si chiude la connessione.
 async function leggiConLimite(conn: Deno.Conn, buf: Uint8Array, ms: number, cosa: string) {
   let timer: number | undefined;
-  const lettura = conn.read(buf);
+  // revisione 24 ott: anche una linea caduta («connection reset», «broken pipe») arriva come frase italiana; il dettaglio va nei log
+  const lettura = conn.read(buf).catch((e) => { console.log(`${cosa}: ${(e as Error).message}`); throw new Error(cosa); });
   lettura.catch(() => {});                       // chiusa allo scadere: il suo errore non deve restare senza padrone
   const scaduto = new Promise<never>((_, no) => {
     timer = setTimeout(() => { try { conn.close(); } catch { /* già chiusa */ } no(new Error(cosa)); }, Math.max(1, ms));
   });
   try { return await Promise.race([lettura, scaduto]); } finally { clearTimeout(timer); }
 }
+/// Scrive tutti i byte: una write di Deno può scriverne solo una parte (una mail lunga resterebbe a metà e il server
+/// aspetterebbe il resto fino allo scadere). Se la linea cade, la frase italiana `cosa` (il dettaglio nei log). Revisione 24 ott.
+async function scriviTutto(conn: Deno.Conn, dati: Uint8Array, cosa: string) {
+  try { for (let k = 0; k < dati.length;) k += await conn.write(dati.subarray(k)); }
+  catch (e) { console.log(`${cosa}: ${(e as Error).message}`); throw new Error(cosa); }
+}
 /// Una connessione TLS con il suo limite (Deno.connectTls non ne ha uno): se arriva tardi, si chiude da sola.
 async function apriTls(hostname: string, port: number, ms: number, cosa: string) {
   let timer: number | undefined;
-  const p = Deno.connectTls({ hostname, port });
+  // revisione 24 ott: rete assente, nome che non si risolve o TLS rifiutato → la stessa frase italiana (il dettaglio nei log)
+  const p = Deno.connectTls({ hostname, port }).catch((e) => { console.log(`${cosa}: ${(e as Error).message}`); throw new Error(cosa); });
   const scaduto = new Promise<never>((_, no) => {
     timer = setTimeout(() => { p.then((c) => { try { c.close(); } catch { /* */ } }, () => {}); no(new Error(cosa)); }, ms);
   });
@@ -1053,7 +1061,7 @@ async function imapApri() {
   };
   const comando = async (c: string | Uint8Array, ms = 15000) => {
     const tag = `j${++n}`;
-    await conn.write(typeof c === "string" ? enc.encode(`${tag} ${c}\r\n`) : c);
+    await scriviTutto(conn, typeof c === "string" ? enc.encode(`${tag} ${c}\r\n`) : c, "connessione chiusa da iCloud");
     const r = await leggiFino(new RegExp(`(^|\\r\\n)${tag} (OK|NO|BAD)[^\\r\\n]*\\r\\n$`), ms);
     const esito = r.match(new RegExp(`(?:^|\\r\\n)${tag} (OK|NO|BAD)([^\\r\\n]*)\\r\\n$`));
     if (esito?.[1] !== "OK") throw new Error(`iCloud: ${esito?.[2]?.trim() || "errore"}`);
@@ -1071,11 +1079,11 @@ async function imapApri() {
   /// Aggiunge un messaggio intero a una cartella (APPEND con letterale: si aspetta il «+» di iCloud prima di mandarlo).
   const aggiungi = async (cartella: string, flag: string, messaggio: Uint8Array) => {
     const tag = `j${++n}`;
-    await conn.write(enc.encode(`${tag} APPEND ${imapStringa(cartella)} (${flag}) {${messaggio.length}}\r\n`));
+    await scriviTutto(conn, enc.encode(`${tag} APPEND ${imapStringa(cartella)} (${flag}) {${messaggio.length}}\r\n`), "connessione chiusa da iCloud");
     const pronto = await leggiFino(/(^|\r\n)(\+[^\r\n]*|\S+ (NO|BAD)[^\r\n]*)\r\n$/);
     if (!/(^|\r\n)\+/.test(pronto)) throw new Error(`iCloud non accetta il messaggio in ${cartella}`);
-    await conn.write(messaggio);
-    await conn.write(enc.encode("\r\n"));
+    await scriviTutto(conn, messaggio, "connessione chiusa da iCloud");
+    await scriviTutto(conn, enc.encode("\r\n"), "connessione chiusa da iCloud");
     const r = await leggiFino(new RegExp(`(^|\\r\\n)${tag} (OK|NO|BAD)[^\\r\\n]*\\r\\n$`));
     if (!new RegExp(`(^|\\r\\n)${tag} OK`).test(r)) throw new Error(`iCloud non ha salvato il messaggio in ${cartella}`);
   };
@@ -1418,7 +1426,7 @@ async function smtpManda(a: string | null, messaggio: string | null) {
     return { codice: Number(t.match(/(?:^|\r\n)(\d{3}) [^\r\n]*\r\n$/)![1]), testo: t.trim() };
   };
   const passo = async (riga: string | null, atteso: number[], cosa: string) => {
-    if (riga !== null) await conn.write(enc.encode(riga + "\r\n"));
+    if (riga !== null) await scriviTutto(conn, enc.encode(riga + "\r\n"), "il server di posta iCloud ha chiuso la connessione");
     const r = await leggi();
     if (!atteso.includes(r.codice)) throw new Error(`iCloud ha rifiutato ${cosa}: ${r.testo.split("\r\n").at(-1)?.slice(0, 160)}`);
     return r;
