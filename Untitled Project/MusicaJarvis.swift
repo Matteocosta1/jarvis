@@ -17,6 +17,10 @@ final class LettoreMusica: ObservableObject {
     @Published private(set) var casuale = false
     @Published private(set) var ripeti = false
     @Published var errore: String?
+    /// Decisione 33: la qualità vera del brano per «APPLE MUSIC · …» («DOLBY ATMOS», «HI-RES LOSSLESS», «LOSSLESS»);
+    /// nil quando non si sa (radio, video, nessuna risposta): allora solo «APPLE MUSIC».
+    @Published private(set) var qualita: String?
+    private var qualitaDi: MusicItemID?    // il brano di cui si è chiesta la qualità
     private var angoloFermo = 0.0          // il disco: dove si è fermato (radianti)
     private var angoloDa: Date?            // da quando gira
 
@@ -32,7 +36,7 @@ final class LettoreMusica: ObservableObject {
 
     func aggiorna() {
         let e = lettore.queue.currentEntry
-        if e?.id != voce?.id || e?.title != voce?.title { voce = e }
+        if e?.id != voce?.id || e?.title != voce?.title { voce = e; leggiQualita() }
         let s = lettore.state.playbackStatus == .playing
         if s != suona {
             let ora = Date()
@@ -43,6 +47,35 @@ final class LettoreMusica: ObservableObject {
         if c != casuale { casuale = c }
         let r = lettore.state.repeatMode == MusicPlayer.RepeatMode.one
         if r != ripeti { ripeti = r }
+    }
+
+    // MARK: la qualità (decisione 33)
+
+    /// Il brano è cambiato: si chiede ad Apple Music in che qualità c'è (una volta per brano). Finché non risponde, e se non
+    /// risponde, la scritta è solo «APPLE MUSIC».
+    private func leggiQualita() {
+        guard let s = brano else { qualitaDi = nil; qualita = nil; return }
+        guard s.id != qualitaDi else { return }
+        qualitaDi = s.id
+        qualita = nil
+        Task {
+            let q = await LettoreMusica.qualita(di: s)
+            guard self.qualitaDi == s.id else { return }               // nel frattempo è partito un altro brano
+            self.qualita = q
+        }
+    }
+
+    /// Come i bollini dell'app Musica: Dolby Atmos prima di tutto, poi Hi-Res Lossless, poi Lossless (nil: nessuno dei tre o
+    /// non si sa). Le varianti sono un attributo «esteso» di Apple Music: se il brano non le ha già, si chiedono al catalogo
+    /// (anche per i brani della libreria, che hanno il loro gemello nel catalogo).
+    nonisolated static func qualita(di s: Song) async -> String? {
+        var varianti = s.audioVariants
+        if varianti == nil, let pieno = try? await s.with([.audioVariants], preferredSource: .catalog) { varianti = pieno.audioVariants }
+        guard let v = varianti else { return nil }
+        if v.contains(.dolbyAtmos) { return "DOLBY ATMOS" }
+        if v.contains(.highResolutionLossless) { return "HI-RES LOSSLESS" }
+        if v.contains(.lossless) { return "LOSSLESS" }
+        return nil
     }
 
     // MARK: cosa suona
@@ -135,6 +168,8 @@ final class LettoreMusica: ObservableObject {
 /// Le richieste di MusicKit per le quattro schede: OGGI (ascoltati di recente, «Per lei», brani del momento), RADIO, LIBRERIA, CERCA.
 nonisolated enum CatalogoMusica {
     static let senzaPermesso = "Per la musica serve il permesso ad Apple Music: Impostazioni › Jarvis › Contenuti multimediali e Apple Music."
+    /// Decisione 34: Apple Music non ha dato niente (senza rete, o MusicKit non attivo per l'app): OGGI non resta vuoto in silenzio.
+    static let nonRisponde = "Apple Music non risponde, Sir: riprovi tra poco."
 
     static func autorizzato() async -> Bool {
         if MusicAuthorization.currentStatus == .authorized { return true }
@@ -287,7 +322,8 @@ nonisolated enum RaccoltaMusica: Hashable, Sendable {
 // MARK: - La sezione
 
 /// MUSICA: in alto il disco che suona (copertina che gira, anello a tacche, spettro intorno), titolo, artista, album, la barra del tempo,
-/// casuale · precedente · play · successivo · ripeti e «APPLE MUSIC · LOSSLESS»; sotto le schede OGGI · RADIO · LIBRERIA · CERCA.
+/// casuale · precedente · play · successivo · ripeti e «APPLE MUSIC · LOSSLESS» (la qualità vera del brano, decisione 33);
+/// sotto le schede OGGI · RADIO · LIBRERIA · CERCA.
 /// Non è una sezione con la fotocamera: si chiude con «Chiudi» in alto a destra (CorniceScheda).
 struct VistaMusica: View {
     private enum Scheda: String, CaseIterable, Identifiable {
@@ -597,6 +633,11 @@ struct VistaMusica: View {
         perLeiAlbum = pp.album
         radioSuggerite = pp.radio
         momento = mm
+        // decisione 34: niente di niente, nemmeno la classifica del suo Paese (che c'è sempre quando Apple Music risponde):
+        // Apple Music non ha risposto. Lo dice il riquadro arancione, come il permesso e l'abbonamento mancanti
+        if avviso == nil, rr.isEmpty, pp.playlist.isEmpty, pp.album.isEmpty, pp.radio.isEmpty, mm.isEmpty {
+            avviso = CatalogoMusica.nonRisponde
+        }
         pronto = true
     }
 
@@ -678,7 +719,7 @@ struct CopertinaMusica: View {
 
 // MARK: - Il riquadro di quello che suona
 
-/// Il riquadro in alto: disco, titolo, artista, album, il tempo, i cinque tasti e «APPLE MUSIC · LOSSLESS».
+/// Il riquadro in alto: disco, titolo, artista, album, il tempo, i cinque tasti e «APPLE MUSIC · LOSSLESS» (la qualità vera).
 struct PannelloOraMusica: View {
     @ObservedObject var lettore: LettoreMusica
     @State private var largo: CGFloat = 333
@@ -713,7 +754,8 @@ struct PannelloOraMusica: View {
                 tasto(.successivo, "Brano successivo") { Task { await lettore.avanti() } }
                 tasto(.ripeti, "Ripeti", premuto: lettore.ripeti) { lettore.cambiaRipeti() }
             }
-            Text("APPLE MUSIC · LOSSLESS")
+            // decisione 33: la qualità vera del brano che suona (Lossless, Hi-Res Lossless, Dolby Atmos); se non si sa, solo APPLE MUSIC
+            Text(lettore.qualita.map { "APPLE MUSIC · \($0)" } ?? "APPLE MUSIC")
                 .font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(2)
                 .foregroundStyle(Color.tenue)
         }

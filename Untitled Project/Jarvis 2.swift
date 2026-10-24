@@ -803,9 +803,17 @@ final class Jarvis: NSObject, ObservableObject {
         case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
         case .organismo: apriReparto(.vitals)
         case .ologramma:                          // build 23: il Trainer già sull'Ologramma (a mano si apre sul Busto)
+            let giaAperto = allenatore            // il Trainer era già aperto: passa all'Ologramma e basta
             MotoreAllenatore.ologrammaRichiesto = true
             NotificationCenter.default.post(name: .jarvisOlogramma, object: nil)
-            apriReparto(.allenatore)
+            if giaAperto {
+                // decisione 28: «modalità ologramma» detto dentro il Trainer risponde «Ologramma, Sir.» (non «Personal trainer pronto»)
+                apriReparto(.allenatore, annuncia: false)
+                flussoFinito = true               // una frase sola: finita quella, JARVIS torna in attesa (come gli annunci)
+                accodaVoce("Ologramma, Sir.", forza: true)
+            } else {
+                apriReparto(.allenatore)
+            }
         case .allenamento:                        // «allenati allo specchio»: il Trainer, come il mockup 23
             apriReparto(.allenatore)
         case .satellite(let a):                   // build 23: SATELLITE si apre e fa la sua cosa (guida, naviga, ricognizione, 3D)

@@ -73,9 +73,9 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         Task { @MainActor in
             if cosa == "ferma" { MotoreGuida.condiviso.ferma(); risposta(["ok": true]); return }
             guard cosa == "avvia", let lat, let lon, !nome.isEmpty else { risposta(["errore": "richiesta non valida"]); return }
-            // senza la modalità «posizione in sottofondo», con JARVIS chiuso sull'iPhone il GPS non parte
-            let modi = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
-            if UIApplication.shared.applicationState == .background && !modi.contains("location") {
+            // con JARVIS chiuso sull'iPhone il GPS parte solo con la modalità «posizione in sottofondo» e il permesso «Sempre»
+            // (con «Durante l'uso» iOS non dà la posizione a un'app in sottofondo che non l'aveva già accesa)
+            if UIApplication.shared.applicationState == .background && !MotoreGuida.condiviso.puoPartireInSottofondo {
                 risposta(["errore": "Apra JARVIS sull'iPhone, Sir: la guida parte da lì."]); return
             }
             MotoreGuida.condiviso.avvia(LuogoSat(chiave: chiave.isEmpty ? "p\(lat),\(lon)" : chiave, ricordo: ricordo, tipo: "posto", nome: nome,

@@ -20,6 +20,9 @@ final class GuidaCondivisa: ObservableObject {
         var destinazione: CLLocationCoordinate2D
         var svolta: Svolta                // la prossima svolta
         var istruzione: String            // «A destra in Via Tortona» (le istruzioni di Apple, in italiano)
+        /// Decisione 21: la via della prossima svolta («Via Tortona»), per la freccia degli Occhi «↱ VIA TORTONA · 80 m» come il
+        /// mockup. nil quando l'istruzione di Apple non ha il nome di una via: allora gli Occhi scrivono l'istruzione intera.
+        var via: String?
         var metriSvolta: Double           // metri alla prossima svolta
         var metriArrivo: Double           // metri all'arrivo
         /// Il rilevamento (gradi dal nord, 0–360) verso il prossimo punto del percorso: gli Occhi lo confrontano con la bussola.
@@ -27,8 +30,8 @@ final class GuidaCondivisa: ObservableObject {
 
         static func == (a: Stato, b: Stato) -> Bool {
             a.luogo == b.luogo && a.destinazione.latitude == b.destinazione.latitude && a.destinazione.longitude == b.destinazione.longitude
-                && a.svolta == b.svolta && a.istruzione == b.istruzione && a.metriSvolta == b.metriSvolta && a.metriArrivo == b.metriArrivo
-                && a.rilevamento == b.rilevamento
+                && a.svolta == b.svolta && a.istruzione == b.istruzione && a.via == b.via && a.metriSvolta == b.metriSvolta
+                && a.metriArrivo == b.metriArrivo && a.rilevamento == b.rilevamento
         }
     }
 

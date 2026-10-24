@@ -155,6 +155,7 @@ struct VistaLidar: View {
     @State private var tentativo = 0
     @State private var inizioFine = Date()
     @State private var nomePersona: String?                   // «gemello digitale di Marco»
+    @State private var elaborato: Double?                     // decisione 24: Texture, quanto è fatto il modello (0…1)
 
     enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
     enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
@@ -271,7 +272,7 @@ struct VistaLidar: View {
         pulisciModo()
         risultatoModo = nil
         avviso = SupportoModi.disponibile(vero) ? nil : SupportoModi.avviso(vero)
-        fermaScansione = false; ancora = false; acceso = false
+        fermaScansione = false; ancora = false; acceso = false; elaborato = nil
         dalVivo = MisureDalVivo(); stato = StatoScansione(); allestimentoVivo = nil
         fase = .scansione
         tentativo += 1
@@ -313,7 +314,11 @@ struct VistaLidar: View {
 
     private var testoStato: String {
         if let avviso { return avviso }
-        if fase == .elaboro { return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…" }
+        if fase == .elaboro {
+            // decisione 24: in Texture il modello si costruisce sull'iPhone (1-3 minuti): la percentuale vera di Apple
+            if vero == .statua, let e = elaborato { return "ELABORAZIONE… \(Int((min(1, max(0, e)) * 100).rounded(.down)))%" }
+            return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…"
+        }
         if !acceso { return "ACCENSIONE SENSORE…" }
         if pronto { return vero == .stanza ? "SALA CHIUSA · TOCCHI FINE" : "FATTO · TOCCHI FINE" }
         if ancora { return vero == .stanza ? "ANCORA UN ATTIMO: MANCANO DELLE PARETI" : "ANCORA UN ATTIMO…" }
@@ -358,7 +363,8 @@ struct VistaLidar: View {
                 #endif
             case .statua:
                 CatturaStatua(ferma: $fermaScansione, aggiorna: { stato = $0 }, elaboro: { fase = .elaboro },
-                              finita: { mostraModo($0) }, errore: { errore($0) }, nome: nomePersona)
+                              finita: { mostraModo($0) }, errore: { errore($0) }, nome: nomePersona,
+                              avanzamento: { elaborato = $0 })
             default:
                 CatturaAR(modo: vero, ferma: $fermaScansione, aggiorna: { stato = $0 }, finita: { mostraModo($0) }, errore: { errore($0) })
             }
@@ -374,6 +380,7 @@ struct VistaLidar: View {
 
     private func errore(_ e: String) {
         avviso = e
+        elaborato = nil
         fase = .scansione
     }
 

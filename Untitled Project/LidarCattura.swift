@@ -865,6 +865,8 @@ struct CatturaStatua: View {
     let finita: (RisultatoModo) -> Void
     let errore: (String) -> Void
     var nome: String? = nil
+    /// Decisione 24: quanto è fatto il modello durante «ELABORAZIONE…» (0…1, dal PhotogrammetrySession di Apple).
+    var avanzamento: (Double) -> Void = { _ in }
 
     @State private var sessione: ObjectCaptureSession?
     @State private var cartella: URL?
@@ -930,12 +932,17 @@ struct CatturaStatua: View {
         finito = true
         let inizio = Date()
         let uscita = ArchivioLidar.cartella.appendingPathComponent("texture-\(UUID().uuidString).usdz")
+        var percento = -1                                                          // l'ultimo per cento mandato
         do {
             let p = try PhotogrammetrySession(input: base.appendingPathComponent("Images/", isDirectory: true))
             try p.process(requests: [.modelFile(url: uscita)])
             for try await o in p.outputs {
                 if Task.isCancelled { p.cancel(); return }
                 switch o {
+                case .requestProgress(_, let fatto):
+                    // decisione 24: la percentuale sotto «ELABORAZIONE…», solo quando cambia di un punto (Apple ne manda tanti)
+                    let n = Int((min(1, max(0, fatto)) * 100).rounded(.down))
+                    if n != percento { percento = n; avanzamento(fatto) }
                 case .processingComplete:
                     pulisci(soloFoto: true)
                     let minuti = Date().timeIntervalSince(inizio) / 60

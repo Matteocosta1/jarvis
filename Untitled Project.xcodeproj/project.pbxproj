@@ -504,8 +504,8 @@
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova e per la guida a piedi, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova e per la guida a piedi, Sir.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";
@@ -563,8 +563,8 @@
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "JARVIS usa Face ID per sbloccare il browser privato.\n";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "JARVIS legge sonno, battito e allenamenti per il briefing del mattino.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "JARVIS non scrive dati in Salute: li legge soltanto per il briefing.\n";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova, Sir.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Per avvisarla quando sta per piovere dove si trova e per la guida a piedi, anche con l'app chiusa: JARVIS manda la posizione al suo cervello solo quando lei si sposta di parecchio, Sir.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove si trova e per la guida a piedi, Sir.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "JARVIS la ascolta quando tocca il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarle le sue foto, Sir.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";

@@ -211,13 +211,17 @@ struct FrecceNaviga: View {
     let testo: String
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
-            Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
+        // a tutto schermo (chi la usa ignora la zona sicura): i bordi sicuri servono a tenere dentro il cartellino (decisione 42)
+        GeometryReader { g in
+            let bordi = g.safeAreaInsets
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+                Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate, bordi: bordi) }
+            }
         }
         .allowsHitTesting(false)
     }
 
-    private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double) {
+    private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double, bordi: EdgeInsets) {
         let W = Double(size.width), H = Double(size.height)
         let giro: Double = svolta == .destra ? 1 : svolta == .sinistra ? -1 : 0
         let arrivo = svolta == .arrivo
@@ -264,7 +268,7 @@ struct FrecceNaviga: View {
         var a = luce
         a.opacity = 0.45
         a.stroke(asta, with: .color(ciano), lineWidth: 2)
-        disegnaCartellino(gc, testo: testo, x: fine.x, y: fine.y - H * 0.22 - 4, W: W, acceso: arrivo)
+        disegnaCartellino(gc, testo: testo, x: fine.x, y: fine.y - H * 0.22 - 4, schermo: size, bordi: bordi, acceso: arrivo)
     }
 }
 
@@ -277,13 +281,17 @@ struct FrecceGuida: View {
     let arrivato: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
-            Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
+        // a tutto schermo (chi la usa ignora la zona sicura): i bordi sicuri servono a tenere dentro il cartellino (decisione 42)
+        GeometryReader { g in
+            let bordi = g.safeAreaInsets
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+                Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate, bordi: bordi) }
+            }
         }
         .allowsHitTesting(false)
     }
 
-    private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double) {
+    private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double, bordi: EdgeInsets) {
         let W = Double(size.width), H = Double(size.height)
         let s = W / 390
         let ciano = Color.ciano
@@ -322,24 +330,29 @@ struct FrecceGuida: View {
         asta.move(to: CGPoint(x: bx, y: by))
         asta.addLine(to: CGPoint(x: bx, y: by - 150 * s))
         luce.stroke(asta, with: .color(ciano), lineWidth: 2)
-        disegnaCartellino(gc, testo: testo, x: bx, y: by - 154 * s, W: W, acceso: arrivato)
+        disegnaCartellino(gc, testo: testo, x: bx, y: by - 154 * s, schermo: size, bordi: bordi, acceso: arrivato)
     }
 }
 
-/// Il cartellino olografico sopra la meta (.nav-et del mockup), tenuto dentro lo schermo.
-private func disegnaCartellino(_ gc: GraphicsContext, testo: String, x: Double, y: Double, W: Double, acceso: Bool) {
+/// Il cartellino olografico sopra la meta (.nav-et del mockup), poggiato sul punto (x, y) in cima all'asta.
+/// Decisione 42: sempre tutto dentro lo schermo visibile (la zona sicura, a 6 punti dal bordo): a destra, a sinistra, in alto
+/// e in basso. Prima si teneva dentro solo ai lati, e senza contare la Dynamic Island in orizzontale.
+private func disegnaCartellino(_ gc: GraphicsContext, testo: String, x: Double, y: Double, schermo: CGSize, bordi: EdgeInsets, acceso: Bool) {
     guard !testo.isEmpty else { return }
     let scritta = gc.resolve(Text(testo).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(acceso ? Color.white : ColoriHUD.chiaro))
     let m = scritta.measure(in: CGSize(width: 1000, height: 100))
     let w = Double(m.width) + 14, h = Double(m.height) + 6
-    let cx = min(max(x, w / 2 + 6), W - w / 2 - 6)
-    let r = CGRect(x: cx - w / 2, y: y - h, width: w, height: h)
+    let sx = Double(bordi.leading) + 6, dx = Double(schermo.width - bordi.trailing) - 6
+    let su = Double(bordi.top) + 6, giu = Double(schermo.height - bordi.bottom) - 6
+    let cx = min(max(x, sx + w / 2), max(sx + w / 2, dx - w / 2))
+    let basso = min(max(y, su + h), max(su + h, giu))                  // il lato basso del cartellino
+    let r = CGRect(x: cx - w / 2, y: basso - h, width: w, height: h)
     let forma = Path(roundedRect: r, cornerRadius: 6)
     var g = gc
     if acceso { g.addFilter(.shadow(color: Color.ciano.opacity(0.5), radius: 6)) }
     g.fill(forma, with: .color(Color(red: 0.02, green: 0.03, blue: 0.035).opacity(0.8)))
     g.stroke(forma, with: .color(Color.ciano.opacity(acceso ? 1 : 0.6)), lineWidth: 1)
-    gc.draw(scritta, at: CGPoint(x: cx, y: y - h / 2), anchor: .center)
+    gc.draw(scritta, at: CGPoint(x: cx, y: basso - h / 2), anchor: .center)
 }
 
 // MARK: - NAVIGA
@@ -373,12 +386,12 @@ struct SchermoNaviga: View {
                              : "\(t.svolta.freccia) \(t.via.uppercased()) · \(Rotta.distanza(t.metri))")
                     .ignoresSafeArea()
             }
-            VStack(spacing: 0) {
-                TestaSat(sotto: "NAVIGA · \(luogo.nome.uppercased())", bussola: tappa?.rotta.map { Rotta.bussola($0) } ?? "N · 0°") {
-                    Suoni.tocco(); apri(nil)
-                }
-                Spacer(minLength: 0)
-                giu
+            // decisione 16: sugli iPhone da 375 punti girati in orizzontale (12/13 mini: 354 punti d'altezza utile) la colonna
+            // (circa 368 punti) non ci stava e la testata si tagliava. Solo quando non ci sta si stringono gli spazi tra i pezzi
+            // (10 → 6) e il margine in fondo (22 → 14): niente tolto. Dove ci sta (il 15 Pro, 372 punti) resta identica
+            ViewThatFits(in: .vertical) {
+                colonna(stretta: false)
+                colonna(stretta: true)
             }
             LampoSat(acceso: $lampo)
         }
@@ -390,8 +403,19 @@ struct SchermoNaviga: View {
         .onDisappear { MotoreGuida.condiviso.spegniSeLibero() }        // senza una guida in corso il GPS si spegne
     }
 
-    private var giu: some View {
-        VStack(spacing: 10) {
+    /// La testata in alto e i comandi in fondo. `stretta`: gli spazi più piccoli, solo se così non ci sta (decisione 16).
+    private func colonna(stretta: Bool) -> some View {
+        VStack(spacing: 0) {
+            TestaSat(sotto: "NAVIGA · \(luogo.nome.uppercased())", bussola: tappa?.rotta.map { Rotta.bussola($0) } ?? "N · 0°") {
+                Suoni.tocco(); apri(nil)
+            }
+            Spacer(minLength: 0)
+            giu(stretta: stretta)
+        }
+    }
+
+    private func giu(stretta: Bool) -> some View {
+        VStack(spacing: stretta ? 6 : 10) {
             ScattoSat(luogo: luogo, da: "naviga", lampo: $lampo) { davanti in await ScattoVeloce.foto(davanti: davanti) }
             HStack(spacing: 12) {
                 Text(tappa?.svolta.freccia ?? "↑")
@@ -428,7 +452,7 @@ struct SchermoNaviga: View {
                 TastoSat(testo: "Guida", pieno: true, alto: 48) { Suoni.tocco(); apri(.guida(luogo)) }
             }
         }
-        .padding(.horizontal, 16).padding(.bottom, 22)
+        .padding(.horizontal, 16).padding(.bottom, stretta ? 14 : 22)
     }
 
     private var sottoIstruzione: String {

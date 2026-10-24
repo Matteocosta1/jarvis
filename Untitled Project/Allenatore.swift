@@ -704,7 +704,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             case .busto: frase = "Conto il busto, Sir."
             case .mani: frase = "Conto le mani, Sir."
             case .ginocchia: frase = "Conto le ginocchia, Sir."
-            case .ologramma: frase = "Personal trainer pronto, Sir."      // come il mockup: «modalità ologramma» detto dentro il Trainer
+            case .ologramma: frase = "Ologramma, Sir."                    // decisione 28: «… ologramma» detto dentro il Trainer
             }
             Task { await parla(frase) }
         }
