@@ -381,8 +381,11 @@ const STRUMENTI_CLIENT: Record<string, any> = {
     input_schema: { type: "object", properties: { ore: { type: "number", description: "finestra in ore, default 3" } } } },
   mac_comando: { description: "Solo sul Mac: comanda il Mac tramite il Comando rapido «JARVIS Mac». volume (valore 0-100: «alza» ≈ 75, «abbassa» ≈ 30, a metà 50), muto, musica (valore play | pausa | avanti | indietro: Spotify se è aperto, altrimenti Musica), apri (valore: nome esatto dell'app, es. Spotify, Safari, Mail, Xcode, Finder), cartella (valore: nome di una cartella sulla Scrivania), scura (valore on | off), blocca (blocca lo schermo), screenshot (salvato sulla Scrivania), riordina_scrivania (screenshot, immagini, documenti, video, audio e archivi nelle loro cartelle; le cartelle lotto-* dentro «Lotti»), ordina_download (lo stesso per Download), svuota_cestino. Rispondi con una frase brevissima.",
     input_schema: { type: "object", properties: { comando: { type: "string", enum: ["volume", "muto", "musica", "apri", "cartella", "scura", "blocca", "screenshot", "riordina_scrivania", "ordina_download", "svuota_cestino"] }, valore: { type: "string" } }, required: ["comando"] } },
-  comando_app: { description: "Esegue un comando dell'app JARVIS quando la frase del signore, storpiata dal riconoscimento vocale, era chiaramente quel comando e non una domanda. «rito»: il rito di Tony Stark, cioè «Wake up, daddy's home» (il riconoscimento italiano lo scrive anche «backup daddy», «wake up dady», «uei cap daddy», «daddy's home»…): partono i Clash e poi il saluto, quindi tu rispondi soltanto «Subito, Sir.». Gli altri valori aprono quella sezione dell'app («attiva la sentinella», «apri il diario», «fammi vedere il sonno»…), con una frase brevissima. Il dispositivo impara la frase così come l'ha sentita: la volta dopo il comando parte da solo, senza passare da te. Nel dubbio non usarlo: una domanda vera resta una domanda.",
-    input_schema: { type: "object", properties: { comando: { type: "string", enum: ["rito", "sentinella", "occhi", "giro", "profiler", "wiretap", "cucina", "scanner", "diario", "sonno", "cuore", "vitals", "confidente", "allenatore", "bea", "briefing", "meteo", "email", "spesa", "shazam", "foto", "ricordi", "interprete", "browser", "serata", "messaggi", "telefono", "github", "supabase", "archivio"] } }, required: ["comando"] } },
+  comando_app: { description: "Esegue un comando dell'app JARVIS quando la frase del signore, storpiata dal riconoscimento vocale, era chiaramente quel comando e non una domanda. «rito»: il rito di Tony Stark, cioè «Wake up, daddy's home» (il riconoscimento italiano lo scrive anche «backup daddy», «wake up dady», «uei cap daddy», «daddy's home»…): partono i Clash e poi il saluto, quindi tu rispondi soltanto «Subito, Sir.». Gli altri valori aprono quella sezione dell'app («attiva la sentinella», «apri il diario», «fammi vedere il sonno»…), con una frase brevissima. «musica» apre soltanto la sezione MUSICA: per far suonare un brano usa musica_riproduci. Le sezioni che il dispositivo non ha rispondono con un errore: allora digli in una frase che su questo dispositivo non c'è. Il dispositivo impara la frase così come l'ha sentita: la volta dopo il comando parte da solo, senza passare da te. Nel dubbio non usarlo: una domanda vera resta una domanda.",
+    input_schema: { type: "object", properties: { comando: { type: "string", enum: ["rito", "sentinella", "occhi", "giro", "profiler", "wiretap", "cucina", "scanner", "diario", "sonno", "cuore", "vitals", "confidente", "allenatore", "bea", "briefing", "meteo", "email", "spesa", "shazam", "foto", "ricordi", "interprete", "browser", "serata", "messaggi", "telefono", "github", "supabase", "archivio",
+      // controllo 24 ott: anche le sezioni delle build 22 e 23 (enum Reparto dell'app): prima il cervello non le poteva aprire
+      // quando il riconoscimento storpiava la frase. «pulisci» no: per la chat c'è conversazione_pulisci.
+      "lidar", "costi", "edith", "sistemi", "impostazioni", "satellite", "musica"] } }, required: ["comando"] } },
 };
 
 // Strumenti che un dispositivo descrive da sé (per funzioni nuove senza ripubblicare il cervello).
@@ -2680,11 +2683,18 @@ async function traduci(testo: string, da: string, a: string) {
 
 // ───────── Occhi (build 23): il nome preciso del bersaglio e CERCA sul web. Le persone mai (niente riconoscimento di volti) ─────────
 const PERSONA_OCCHI = /^\s*(persona|persone|person|people|volto|viso|faccia|uomo|donna|ragazz[oa]|bambin[oa])\b/i;
-async function claudeOcchi(corpo: Record<string, unknown>, modelli: string[], attesa: number) {
+// Controllo 24 ott: l'app aspetta al massimo 20 s il nome preciso e 50 s CERCA (VistaVitals.chiama, OcchiStark.swift:569/581),
+// poi dice che non ha trovato niente. Prima il cervello poteva lavorare molto di più (CERCA: tre giri da 45 s = 135 s; il nome
+// preciso: 18 s per modello, due modelli), e la risposta arrivava quando l'app aveva già rinunciato. `scadenza` è il limite
+// del lavoro intero: ogni chiamata ha solo il tempo che resta.
+const OCCHI_DETTAGLIO_MS = 17_000, OCCHI_CERCA_MS = 44_000;
+async function claudeOcchi(corpo: Record<string, unknown>, modelli: string[], attesa: number, scadenza = Date.now() + attesa) {
   let ultimo = "";
   for (const model of modelli.filter((m, i) => m && modelli.indexOf(m) === i && !modelliAssenti.has(m))) {
+    const resta = Math.min(attesa, scadenza - Date.now());
+    if (resta < 2000) { ultimo = "tempo scaduto"; break; }
     const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST", signal: AbortSignal.timeout(attesa),
+      method: "POST", signal: AbortSignal.timeout(resta),
       headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
       body: JSON.stringify({ model, ...corpo }),
     });
@@ -2713,7 +2723,7 @@ misure: le dimensioni reali stimate, «≈ 11 × 6 cm» (larghezza × altezza), 
 dimensione_cm: la dimensione maggiore stimata, in centimetri (solo il numero).
 Se il soggetto è una persona o una parte del corpo, rispondi solo {"rifiuto": true}: le persone non si riconoscono mai.`,
     messages: [{ role: "user", content: [bloccoImmagine(img), { type: "text", text: `Riconosciuto dall'iPhone come: ${cosa || "oggetto"}.${letto.length ? ` Testo letto: ${letto.join(" / ")}.` : ""}` }] }],
-  }, [MODELLO_RAPIDO, MODELLO_RISERVA], 18000);
+  }, [MODELLO_RAPIDO, MODELLO_RISERVA], 18000, Date.now() + OCCHI_DETTAGLIO_MS);
   const t = testoOcchi(risposta), m = t.match(/\{[\s\S]*\}/);
   let o: any = {};
   try { o = m ? JSON.parse(m[0]) : {}; } catch { o = {}; }
@@ -2737,10 +2747,12 @@ async function occhiCerca(d: any) {
     system: `Sei JARVIS. Il signore ha agganciato un oggetto con gli Occhi dell'iPhone e vuole sapere cos'è e cosa dice il web. Se c'è la foto, guardala per capire il modello preciso; poi fai una o due ricerche web mirate. Rispondi in italiano con al massimo tre frasi brevi e concrete (cos'è, le caratteristiche utili, il prezzo indicativo se ha senso), senza markdown, senza elenchi, senza indirizzi web.
 Le persone non si cercano mai: se il soggetto è una persona o la richiesta è sapere chi è qualcuno, non cercare e rispondi solo con la parola RIFIUTO.`,
   };
-  let risposta: any = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000);
-  for (let giro = 0; giro < 2 && risposta?.stop_reason === "pause_turn"; giro++) {   // ricerca lunga: il servizio chiede di continuare
+  const scadenza = Date.now() + OCCHI_CERCA_MS;
+  let risposta: any = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000, scadenza);
+  // ricerca lunga: il servizio chiede di continuare; un altro giro solo se c'è ancora tempo prima che l'app smetta di aspettare
+  for (let giro = 0; giro < 2 && risposta?.stop_reason === "pause_turn" && scadenza - Date.now() > 12_000; giro++) {
     messaggi.push({ role: "assistant", content: risposta.content });
-    risposta = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000);
+    risposta = await claudeOcchi({ ...corpo, messages: messaggi }, [MODELLO_RISERVA, MODELLO], 45000, scadenza);
   }
   const testo = testoOcchi(risposta).replace(/\s+/g, " ").trim();
   if (/^RIFIUTO\b/i.test(testo)) return { rifiuto: true };

@@ -95,5 +95,29 @@ await new Response((await richiesta({ messaggi: [{ role: "user", content: "accen
   dispositivo: "iphone", strumenti_client: [], senza_filo: true })).body).text();
 atteso("E. «grazie» dopo una conferma: resta il modello rapido", modelli[0] === "claude-haiku-5-5", modelli);
 
+// F ─ comando_app: le sezioni delle build 22 e 23 ci sono nello strumento
+const strumenti: any[] = [];
+const fetchPrima = globalThis.fetch;
+globalThis.fetch = (async (u: any, o?: any) => { const c = JSON.parse(o?.body ?? "{}"); if (c.tools) strumenti.push(...c.tools); return fetchPrima(u, o); }) as typeof fetch;
+scena = "breve";
+await new Response((await richiesta({ messaggi: [{ role: "user", content: "apri il satellite" }], dispositivo: "iphone", strumenti_client: ["comando_app"], senza_filo: true })).body).text();
+const valori: string[] = strumenti.find((t) => t.name === "comando_app")?.input_schema?.properties?.comando?.enum ?? [];
+atteso("F. comando_app conosce satellite, lidar, musica, edith, costi, sistemi, impostazioni", ["satellite", "lidar", "musica", "edith", "costi", "sistemi", "impostazioni"].every((v) => valori.includes(v)), valori);
+atteso("F. ma non «pulisci» (c'è conversazione_pulisci)", !valori.includes("pulisci"), valori);
+
+// G ─ CERCA finisce prima che l'app smetta di aspettare (50 s): Anthropic lento che chiede sempre di continuare
+let giriCerca = 0;
+globalThis.fetch = (async (u: any, o?: any) => {
+  if (!String(u?.url ?? u).includes("api.anthropic.com")) return new Response("{}", { status: 200 });
+  giriCerca++;
+  await pausa(16_000);
+  return new Response(JSON.stringify({ stop_reason: "pause_turn", content: [{ type: "text", text: "Una lampada da tavolo in ottone, sui quaranta euro." }] }), { status: 200 });
+}) as typeof fetch;
+const t0 = Date.now();
+const cerca = await (await richiesta({ occhi_cerca: { nome: "lampada", cosa: "lampada da tavolo" } })).json();
+const durata = Date.now() - t0;
+atteso("G. CERCA risponde entro i 50 s dell'app", durata < 46_000 && typeof cerca.testo === "string", { durata, cerca, giriCerca });
+console.log("   (CERCA:", Math.round(durata / 1000), "s,", giriCerca, "giri)");
+
 console.log("prove controllo: sbagliate", ko);
 Deno.exit(ko ? 1 : 0);
