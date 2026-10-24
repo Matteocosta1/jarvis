@@ -14,16 +14,31 @@ enum ColoriHUD {
 struct RigaHUD: View {
     let etichetta: String
     let valore: String
-    init(_ etichetta: String, _ valore: String) { self.etichetta = etichetta; self.valore = valore }
+    /// Decisione 45 (Ricordi › ULTIMI): il valore a destra (la data o il posto) resta su UNA riga, rimpicciolito se serve;
+    /// il testo a sinistra si tronca al suo posto. Spento (tutte le altre righe): come sempre.
+    var valoreSuUnaRiga = false
+    init(_ etichetta: String, _ valore: String, valoreSuUnaRiga: Bool = false) {
+        self.etichetta = etichetta; self.valore = valore; self.valoreSuUnaRiga = valoreSuUnaRiga
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(etichetta).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+            if valoreSuUnaRiga {
+                // a sinistra almeno 100 punti: un posto lunghissimo non si mangia tutto il testo del ricordo
+                Text(etichetta).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                    .lineLimit(1)
+                    .frame(minWidth: 100, alignment: .leading)
+            } else {
+                Text(etichetta).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+            }
             Spacer(minLength: 8)
             Text(valore)
                 .font(.system(size: 12, weight: .medium, design: .monospaced)).monospacedDigit()
                 .foregroundStyle(Color.tenue)
                 .multilineTextAlignment(.trailing)
+                .lineLimit(valoreSuUnaRiga ? 1 : nil)
+                .minimumScaleFactor(valoreSuUnaRiga ? 0.75 : 1)
+                .layoutPriority(valoreSuUnaRiga ? 1 : 0)        // il valore prende il suo posto per primo
         }
     }
 }

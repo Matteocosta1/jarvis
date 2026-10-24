@@ -157,7 +157,7 @@ struct ContentView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        intestazione(mini: telefono && !reattoreGrande)
+                        intestazione(mini: telefono && !reattoreGrande, stretta: g.size.width < ContentView.larghezzaStretta)
                             .contentShape(Rectangle())
                                 .highPriorityGesture(tiraGiuTendina)
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
@@ -347,6 +347,11 @@ struct ContentView: View {
         .onChange(of: schermataDaSola) { _, aperta in
             if aperta && telefono { tastiera = false }
         }
+        // decisione 15 (24 ott): JARVIS apre una schermata da solo (Occhi, pagina web, Interprete, l'SOS di Bea, qualsiasi foglio
+        // o schermata intera): la tendina PROTOCOLLI risale da sola, anche se era solo tirata a metà
+        .onChange(of: qualcosaAperto || schermataDaSola) { _, aperta in
+            if aperta && (tendinaAperta || tendinaTrascina != 0) { chiudiTendina() }
+        }
         .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
             try? await Task.sleep(for: .seconds(8))
             await caricaStatoSistemi()
@@ -354,6 +359,7 @@ struct ContentView: View {
         .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
             guard si else { return }
             jarvis.chiudiChiesto = false
+            if tendinaAperta { chiudiTendina() }               // decisione 15: «Jarvis, chiudi» manda su anche la tendina PROTOCOLLI
             chiudiTutto()
         }
     }
@@ -518,15 +524,24 @@ struct ContentView: View {
         }
     }
 
+    /// Decisione 16 (24 ott): sotto questa larghezza (iPhone da 375 punti: SE 2ª e 3ª gen., 12 e 13 mini; 320 con lo Zoom
+    /// dello schermo) la barra in alto con la tastiera aperta si stringe come nel pannello «tastiera» del mockup: lettere di
+    /// J.A.R.V.I.S. a 4 invece di 5, icone a 4 punti per lato invece di 5. Da 390 punti in su (15 Pro compreso) resta tutto com'era.
+    static let larghezzaStretta: CGFloat = 385
+
     /// `mini`: con la tastiera aperta (solo iPhone) il reattore, in piccolo, sta qui tra il titolo e i tasti.
-    private func intestazione(mini: Bool = false) -> some View {
+    /// `stretta`: schermo più stretto di `larghezzaStretta` (decisione 16): il titolo non va mai a capo e non tocca le icone.
+    private func intestazione(mini: Bool = false, stretta: Bool = false) -> some View {
         HStack(alignment: .rigaMark, spacing: 0) {          // le tre icone sulla stessa riga di «MARK VIII», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
-                (Text("J.A.R.V.I.").tracking(5) + Text("S."))
+                (Text("J.A.R.V.I.").tracking(mini && stretta ? 4 : 5) + Text("S."))
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
+                    // schermo stretto: mai a capo; se non ci sta nemmeno così (320 punti) si rimpicciolisce quanto basta
+                    .lineLimit(stretta ? 1 : nil)
+                    .minimumScaleFactor(stretta ? 0.7 : 1)
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)
@@ -561,7 +576,7 @@ struct ContentView: View {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, mini && stretta ? 4 : 5)
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -571,7 +586,7 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, mini && stretta ? 4 : 5)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .accessibilityLabel("Pulisci la conversazione")
@@ -585,7 +600,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 5)
+                    .padding(.vertical, 8).padding(.horizontal, mini && stretta ? 4 : 5)
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
@@ -1448,7 +1463,7 @@ struct ImpostazioniView: View {
                     Toggle("Silenzioso (solo testo)", isOn: $muto)
                     Toggle("In ascolto appena si apre", isOn: $ascoltaApertura)
                     Button("Prova la voce") {
-                        Task { await jarvis.parla("Buonasera signore. Sistemi in linea, e pronto a servirla.") }
+                        Task { await jarvis.parla("Buonasera, Sir. Sistemi in linea, e pronto a servirla.") }
                     }
                 }
 

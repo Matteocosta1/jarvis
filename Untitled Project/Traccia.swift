@@ -77,7 +77,7 @@ struct PannelliTraccia: View {
                 if ultimi.isEmpty {
                     Text("Ancora nessun ricordo, Sir.").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
-                ForEach(ultimi) { r in RigaHUD(r.testo, r.luogo ?? r.quando) }
+                ForEach(ultimi) { r in RigaHUD(r.testo, r.luogo ?? r.quando, valoreSuUnaRiga: true) }   // decisione 45: la data su una riga
             }
             PannelloAVoce(frasi: ["«Jarvis, traccia il luogo»", "«Jarvis, portami al luogo»",
                                   "«Jarvis, ricorda questo luogo»", "«Jarvis, dove ho messo le chiavi?»"])
