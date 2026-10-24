@@ -522,7 +522,7 @@ struct SchermoGuida: View {
         .onAppear { withAnimation(.easeIn(duration: 0.3)) { visibile = true } }
         .preferredColorScheme(.dark)
         .task { await accendiCamera() }
-        .onDisappear { camera?.ferma(); cameraAccesa = false }
+        .onDisappear { camera?.ferma(); cameraAccesa = false; MotoreGuida.condiviso.spegniSeLibero() }   // una guida in corso resta; una mai partita finisce
         // la guida finita (arrivo, «Fine guida», «ferma la guida»): la schermata si chiude
         .onChange(of: motore.luogo?.chiave) { _, k in if k != luogo.chiave { apri(nil) } }
     }

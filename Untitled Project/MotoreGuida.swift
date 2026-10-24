@@ -330,8 +330,11 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
         if CLLocationManager.headingAvailable() { gestore.startUpdatingHeading() }
     }
 
-    /// Le schermate si chiudono: se non c'è una guida in corso, il GPS si spegne.
+    /// Le schermate si chiudono: se non c'è una guida in corso, il GPS si spegne. Una guida che non è mai partita
+    /// (niente posizione o niente strada: c'è solo l'errore) non è «in corso»: finisce anche lei, se no il GPS restava
+    /// acceso a vuoto finché lei diceva «ferma la guida».
     func spegniSeLibero() {
+        if luogo != nil, percorso == nil, errore != nil { ferma(); return }
         guard luogo == nil else { return }
         spegniPosizione()
     }
