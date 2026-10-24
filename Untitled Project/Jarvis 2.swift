@@ -2382,7 +2382,10 @@ nonisolated enum CacheVoce {
     private static let massimoFile = 400
 
     private static func file(_ testo: String, id: String) -> URL? {
-        let voce = id.isEmpty ? (UserDefaults.standard.string(forKey: "vocePredefinitaCloud") ?? "") : id
+        // «vocePredefinitaCloud» arriva dal cervello all'avvio: voce, e con il modello fisso «voce·modello» (24 ott). Entra nella
+        // chiave anche quando il signore ha scelto una voce, così al cambio di modello (v4 Turbo) le frasi si rifanno con la voce nuova
+        let predefinita = UserDefaults.standard.string(forKey: "vocePredefinitaCloud") ?? ""
+        let voce = id.isEmpty ? predefinita : "\(id)|\(predefinita)"
         let chiave = "\(voce)|\(testo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
         let hash = SHA256.hash(data: Data(chiave.utf8)).map { String(format: "%02x", $0) }.joined()
         return cartella?.appendingPathComponent(hash + ".mp3")
