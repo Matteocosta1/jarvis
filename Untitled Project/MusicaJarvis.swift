@@ -13,7 +13,7 @@ final class LettoreMusica: ObservableObject {
     static let condiviso = LettoreMusica()
 
     private let lettore = SystemMusicPlayer.shared
-    @Published private(set) var voce: MusicPlayer.Queue.Entry?     // il brano in coda adesso
+    @Published private(set) var voce: MusicKit.MusicPlayer.Queue.Entry?     // il brano in coda adesso
     @Published private(set) var suona = false
     @Published private(set) var casuale = false
     @Published private(set) var ripeti = false
@@ -40,9 +40,9 @@ final class LettoreMusica: ObservableObject {
             if s { angoloDa = ora } else { angoloFermo = angolo(ora); angoloDa = nil }
             suona = s
         }
-        let c = lettore.state.shuffleMode == MusicPlayer.ShuffleMode.songs
+        let c = lettore.state.shuffleMode == MusicKit.MusicPlayer.ShuffleMode.songs
         if c != casuale { casuale = c }
-        let r = lettore.state.repeatMode == MusicPlayer.RepeatMode.one
+        let r = lettore.state.repeatMode == MusicKit.MusicPlayer.RepeatMode.one
         if r != ripeti { ripeti = r }
     }
 
@@ -99,13 +99,13 @@ final class LettoreMusica: ObservableObject {
     }
 
     func cambiaCasuale() {
-        lettore.state.shuffleMode = casuale ? MusicPlayer.ShuffleMode.off : MusicPlayer.ShuffleMode.songs
+        lettore.state.shuffleMode = casuale ? MusicKit.MusicPlayer.ShuffleMode.off : MusicKit.MusicPlayer.ShuffleMode.songs
         aggiorna()
     }
 
     /// Ripeti = lo stesso brano da capo (come nel mockup).
     func cambiaRipeti() {
-        lettore.state.repeatMode = ripeti ? MusicPlayer.RepeatMode.none : MusicPlayer.RepeatMode.one
+        lettore.state.repeatMode = ripeti ? MusicKit.MusicPlayer.RepeatMode.none : MusicKit.MusicPlayer.RepeatMode.one
         aggiorna()
     }
 

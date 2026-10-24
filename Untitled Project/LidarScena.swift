@@ -593,7 +593,7 @@ final class ScenaLidar: NSObject {
                 let x0 = tagli[k], x1 = tagli[k + 1], mid = (x0 + x1) / 2
                 guard x1 - x0 > 0.005 else { continue }
                 let ap = aperture.first { mid > $0.da && mid < $0.da + $0.l }
-                let fasce: [(Float, Float)] = ap.map { [(0, $0.y0), ($0.y1, h)] } ?? [(0, h)]
+                let fasce: [(Float, Float)] = ap.map { (a: Apertura) -> [(Float, Float)] in [(Float(0), a.y0), (a.y1, h)] } ?? [(Float(0), h)]
                 let p2 = a + u * mid + nrm * (t / 2)
                 for (y0, y1) in fasce where y1 - y0 > 0.01 {
                     let r = scatolaParte(SIMD3(p2.x, (y0 + y1) / 2, p2.y), SIMD3(x1 - x0, y1 - y0, t), asseX: SIMD3(u.x, 0, u.y), foto: mF, pieno: mP, in: gruppo)
@@ -1288,6 +1288,9 @@ enum TrameLidar {
         let N: CGFloat = nome == "parquet" ? 1024 : 512
         let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
         let img = UIGraphicsImageRenderer(size: CGSize(width: N, height: N), format: fmt).image { c in
+            // il renderer chiama questo blocco subito, sullo stesso thread (il principale): lo si dice a Swift, così il blocco può
+            // usare r(), hex() e ScenaLidar.colore, che appartengono al thread principale come tutta TrameLidar
+            MainActor.assumeIsolated {
             let x = c.cgContext
             func hsl(_ h: CGFloat, _ s: CGFloat, _ l: CGFloat) -> UIColor {
                 let ll = l / 100, ss = s / 100, a = ss * min(ll, 1 - ll)
@@ -1354,6 +1357,7 @@ enum TrameLidar {
                 }
             case "moquette": rumore(hex(0x55595e), 0.12, 15000, 1.6)
             default: rumore(hex(0x808080), 0.05, 2000)
+            }
             }
         }
         cache[nome] = img

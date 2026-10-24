@@ -4,6 +4,7 @@ import UIKit
 import ARKit
 import SceneKit
 import RealityKit
+import Metal                // le maglie del LiDAR: MTLBuffer.contents() e MTLVertexFormat
 import simd
 import CoreVideo
 import CoreImage
@@ -761,7 +762,7 @@ nonisolated final class CalcoloLidar: @unchecked Sendable {
                 let alto = (s.punti.map(\.y).max() ?? appoggio) - appoggio
                 m = MisureOggetto(largo: b.largo, profondo: b.profondo, alto: alto)
             }
-            Task { @MainActor in self.lavori -= 1; fatto(m) }
+            Task { @MainActor [m] in self.lavori -= 1; fatto(m) }     // [m]: la copia; una var catturata non si legge da un Task
         }
     }
 
