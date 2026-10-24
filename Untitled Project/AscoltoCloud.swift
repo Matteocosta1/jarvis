@@ -391,8 +391,9 @@ nonisolated final class Segmentatore: @unchecked Sendable {
 @MainActor
 final class AttesaMac {
     var applauso: (() -> Void)?
-    /// Il testo trascritto e il momento in cui il signore ha cominciato a dirlo. Restituisce vero se era solo l'eco di JARVIS.
-    var frase: ((String, Date) -> Bool)?
+    /// Il testo trascritto, il momento in cui il signore ha cominciato a dirlo e quello in cui ha smesso.
+    /// Restituisce vero se era solo l'eco di JARVIS.
+    var frase: ((String, Date, Date) -> Bool)?
     private let motore: AVAudioEngine          // lo stesso motore dell'ascolto (sul Mac funziona già quello: niente secondo motore)
     private let mani = BattitoMani()
     private let segmenti = Segmentatore()
@@ -542,7 +543,7 @@ final class AttesaMac {
             self.inViaggio = false
             self.ultimaSentita = testo.map { $0.isEmpty ? "(niente)" : $0 } ?? (errore ?? "errore")
             if self.voluto, let testo, !testo.isEmpty {
-                let soloEco = self.frase?(testo, inizio) ?? false
+                let soloEco = self.frase?(testo, inizio, eco.fine) ?? false
                 // difetto 2: un pezzo sentito tutto mentre JARVIS parlava ed era solo la sua eco non conta nel tetto delle 40
                 // trascrizioni, e insegna quanto forte il microfono sente JARVIS (la prossima volta non va in cloud)
                 if soloEco && eco.candidato {

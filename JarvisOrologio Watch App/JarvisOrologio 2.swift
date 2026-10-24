@@ -8,6 +8,14 @@ import WatchKit
 // MARK: - Impostazioni e portachiavi dell'orologio
 
 enum ImpostazioniOrologio {
+    /// Idea B (25 ott): un numero per questa installazione, così il cervello capisce quando orologio e Mac (o iPhone) gli mandano
+    /// la stessa frase e fa rispondere uno solo.
+    static var idDispositivo: String {
+        if let id = UserDefaults.standard.string(forKey: "idDispositivoJarvis"), !id.isEmpty { return id }
+        let nuovo = UUID().uuidString
+        UserDefaults.standard.set(nuovo, forKey: "idDispositivoJarvis")
+        return nuovo
+    }
     static let indirizzoPredefinito = "https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis"
     static var indirizzo: String { UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito }
     /// Mentre JARVIS parla, il microfono resta in ascolto: se il signore inizia a parlare, JARVIS tace e lo ascolta.
@@ -120,6 +128,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var fineFrase: CheckedContinuation<Void, Never>?
     private var fraseInVoce = false                    // una frase della coda si sta scaricando o dicendo
     private var orecchioSospeso = false                // Shazam ascolta la musica: niente orecchio per le interruzioni
+    /// Idea A e B (25 ott): la domanda in corso è stata detta a voce (non un tasto): il cervello lo sa, e se anche un altro
+    /// dispositivo l'ha sentita risponde uno solo.
+    private var domandaAVoce = false
     /// Difetto 3 (controllo del 25 ott): la risposta com'era quando il volume l'ha fermata. Se poi nella registrazione non c'è
     /// nessuna sua parola (una tosse, una porta, una risata vicino), JARVIS riprende da lì invece di dire «Non ho capito».
     private struct RispostaSospesa {
@@ -274,6 +285,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         inCorso = testo
         storia = Array(storia.suffix(12))
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
+        domandaAVoce = aVoce
         compito = Task { await self.turno(nuovoTentativo: true) }
     }
 
@@ -851,7 +863,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Dialogo con il cervello
 
-    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]) }
+    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione }
 
     /// Strumenti che l'orologio sa eseguire per il cervello.
     static let strumenti = ["salute_battito", "salute_riepilogo", "riconosci_musica", "meteo_qui", "foto_cerca"]
@@ -924,6 +936,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         do {
             var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti]
+            if domandaAVoce {
+                // idea B: se anche il Mac (o l'iPhone) ha sentito la stessa frase, il cervello fa rispondere uno solo
+                corpo["a_voce"] = true
+                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
+            }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
             iniziaFlussoVoce()
@@ -949,6 +966,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     return
                 case .errore(let messaggio):
                     fallisci(messaggio)
+                    return
+                case .doppione:
+                    doppione()                                   // idea B: risponde un altro dispositivo
                     return
                 case .client(let e):
                     // il cervello chiede all'orologio di eseguire uno strumento (es. leggere i battiti)
@@ -1076,11 +1096,28 @@ final class JarvisOrologio: NSObject, ObservableObject {
             case "client":
                 diciPrimaDelloStrumento()                                    // punto 1: tocca all'orologio eseguire uno strumento
                 return .client(e)
+            case "doppione":
+                return .doppione
             default:
                 break
             }
         }
         return .errore("La risposta si è interrotta a metà, Sir. Riprovi.")
+    }
+
+    /// Idea B (25 ott): la stessa frase l'ha sentita anche un altro dispositivo e risponde lui: l'orologio tace e torna in attesa.
+    private func doppione() {
+        guard !Task.isCancelled else { return }
+        inCorso = nil
+        compito = nil
+        stato = nil
+        if storia.last?["role"] == "user" { storia.removeLast() }   // la domanda la tiene chi risponde
+        domanda = ""
+        risposta = ""
+        rispostaGrezza = ""
+        riascolta = false
+        zittisci()
+        fase = .attesa
     }
 
     private func fallisci(_ messaggio: String) {
