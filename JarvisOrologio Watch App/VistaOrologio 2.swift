@@ -11,6 +11,24 @@ import AVFoundation
 enum SuoniOrologio {
     private static var lettori: [AVAudioPlayer] = []
     private static var cache: [String: URL?] = [:]
+
+    /// Decisione 37 (24 ott): i suoni non cambiano più la sessione audio mentre JARVIS parla o ascolta.
+    /// Prima ogni suono metteva la categoria `.ambient` anche sulla sessione attiva di JARVIS (`.playAndRecord` mentre ascolta
+    /// e mentre parla con l'orecchio acceso, `.playback` senza orecchio). Cambiare categoria a sessione attiva vale subito:
+    /// `.ambient` non registra, quindi microfono, aggiunta e orecchio delle interruzioni restavano sordi; e `.ambient` segue la
+    /// modalità silenziosa, quindi con il Watch in silenzioso la voce di JARVIS poteva ammutolire a metà frase.
+    /// Ora, finché l'audio è di JARVIS (anche Shazam e la voce dell'allarme della Sentinella), il suono suona nella sessione
+    /// così com'è, senza toccarla; gli altri momenti restano come prima (`.ambient`). Nessun suono cambia: cambia solo il canale.
+    static weak var jarvis: JarvisOrologio?
+    private static var audioDiJarvis: Bool {
+        (jarvis?.usaAudio ?? false) || Musica.inAscolto || SentinellaOrologio.condiviso.parla
+    }
+    /// La categoria dei suoni (`.ambient`), solo se l'audio non è di JARVIS. Vero se l'ha messa.
+    @discardableResult private static func sessioneSuoni() -> Bool {
+        guard !audioDiJarvis else { return false }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        return true
+    }
     private static func file(_ nome: String) -> URL? {
         if let u = cache[nome] { return u }
         let u = ["m4a", "mp3", "wav", "caf"].lazy.compactMap { Bundle.main.url(forResource: nome, withExtension: $0) }.first
@@ -31,8 +49,9 @@ enum SuoniOrologio {
     /// L'avvio si carica prima: quando parte, parte all'istante (le icone sono agganciate alla musica).
     static func preparaAvvio() {
         guard let url = file("avvioorologio") ?? file("avvio"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        try? AVAudioSession.sharedInstance().setActive(true)            // l'audio è dell'app prima che suoni: la corona lo regola
+        if sessioneSuoni() {                                             // decisione 37: non sulla sessione di JARVIS
+            try? AVAudioSession.sharedInstance().setActive(true)        // l'audio è dell'app prima che suoni: la corona lo regola
+        }
         p.volume = 1.0
         p.prepareToPlay()
         lettoreAvvio = p
@@ -51,7 +70,7 @@ enum SuoniOrologio {
     /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
     static func apertura() {
         guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        sessioneSuoni()                                                   // decisione 37: .ambient solo se JARVIS non usa l'audio
         p.volume = 1.0
         lettoreScheda?.stop()
         lettoreScheda = p
@@ -60,7 +79,7 @@ enum SuoniOrologio {
     /// Una sezione si apre (caricamento) e quando è pronta: «scheda» e «schedapronta», come sull'iPhone.
     static func schedaApre() {
         guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        sessioneSuoni()                                                   // decisione 37: .ambient solo se JARVIS non usa l'audio
         p.volume = 1.0                                                    // schede: 100%
         lettoreScheda?.stop()
         lettoreScheda = p
@@ -73,7 +92,7 @@ enum SuoniOrologio {
     private static var lettoreScheda: AVAudioPlayer?
     private static func suona(_ url: URL?, volume: Float) {
         guard let url, let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+        sessioneSuoni()                                                   // decisione 37: .ambient solo se JARVIS non usa l'audio
         p.volume = volume
         lettori.removeAll { !$0.isPlaying }
         lettori.append(p)
@@ -156,6 +175,7 @@ struct VistaOrologio: View {
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
             jarvis.repartoRichiesto = nil
+            jarvis.diciSeSoloIPhone(r)          // decisione 36: «… vive sull'iPhone, Sir.» anche a voce (le altre: niente)
             apri(r)
         }
         // build 22, comando a frase esatta: «protocollo notte», «traccia il luogo», «radar pioggia», «rapporto posta»
