@@ -695,7 +695,8 @@ struct RiconoscimentoHUD: View {
         }
         let metri = g.svolta == .arrivo ? g.metriArrivo : g.metriSvolta
         let m = metri < 1000 ? "\(Int(metri.rounded())) m" : DisegnoOlo.nf(metri / 1000, 1) + " km"
-        let testo = "\(g.svolta.freccia) \(g.svolta == .arrivo ? g.luogo.uppercased() : g.istruzione.uppercased()) · \(m)"
+        // come il mockup: «↱ VIA TORTONA · 80 m» (decisione 21); senza il nome della via, l'istruzione intera di Apple
+        let testo = "\(g.svolta.freccia) \(g.svolta == .arrivo ? g.luogo.uppercased() : (g.via ?? g.istruzione).uppercased()) · \(m)"
         let r = gc.resolve(Text(testo).font(DisegnoOlo.mono(11 * k, .bold)).foregroundStyle(Color.white))
         let w = min(W - 16 * k, r.measure(in: CGSize(width: 10_000, height: 100)).width + 20 * k)
         let ly = base - 158 * k                                       // il cartellino sopra la freccia (sotto ci sono lo stato e i tasti)
@@ -868,6 +869,8 @@ struct FoglioWebOcchi: View {
     let nome: String
     let cosa: String
     let esito: CervelloOcchi.Esito?
+    /// Decisione 29: una fonte toccata si apre nel browser di JARVIS.
+    var apri: (URL) -> Void = { _ in }
     let chiudi: () -> Void
     @State private var punti = 1
 
@@ -912,15 +915,15 @@ struct FoglioWebOcchi: View {
                 Text(testo).font(.system(size: 14)).lineSpacing(3).foregroundStyle(.white).padding(.top, 12).padding(.bottom, 10)
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(fonti) { f in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(f.titolo).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                            Text(f.dominio).font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1).foregroundStyle(Color.ciano)
+                        // decisione 29: la fonte con il suo indirizzo si tocca e si apre nel browser di JARVIS (stesso aspetto).
+                        // Solo indirizzi web: il browser di Safari si chiude di colpo con altri tipi di indirizzo
+                        if let u = f.url, ["http", "https"].contains(u.scheme?.lowercased() ?? "") {
+                            Button { apri(u) } label: { rigaFonte(f) }
+                                .buttonStyle(StileStark())
+                                .accessibilityHint("Apre la pagina")
+                        } else {
+                            rigaFonte(f)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 11).padding(.vertical, 9)
-                        .background(Color.ciano.opacity(0.07))
-                        .overlay(alignment: .leading) { Rectangle().fill(Color.ciano).frame(width: 2) }
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
             case .persona?:
@@ -931,6 +934,20 @@ struct FoglioWebOcchi: View {
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Una fonte: il titolo e il sito, con la riga ciano a sinistra (come il mockup).
+    private func rigaFonte(_ f: CervelloOcchi.Fonte) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(f.titolo).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+            Text(f.dominio).font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1).foregroundStyle(Color.ciano)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 11).padding(.vertical, 9)
+        .background(Color.ciano.opacity(0.07))
+        .overlay(alignment: .leading) { Rectangle().fill(Color.ciano).frame(width: 2) }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

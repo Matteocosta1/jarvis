@@ -4,6 +4,7 @@ import MapKit
 import CoreLocation
 import WeatherKit
 import Combine
+import UIKit
 
 /// Build 23 · INTELLIGENCE › SATELLITE, come il mockup approvato: la città 3D di Apple (satellite con il rilievo) con i suoi
 /// luoghi sulle aste olografiche, la camera che gira piano intorno al luogo scelto e ci vola sopra quando se ne sceglie
@@ -73,6 +74,31 @@ struct MeteoSat: Equatable {
             pioggia = h.date <= ora ? "pioggia adesso" : "pioggia verso le \(f.string(from: h.date))"
         }
         return MeteoSat(gradi: Int(adesso.temperature.converted(to: .celsius).value.rounded()), cielo: MeteoSat.italiano(adesso.condition), pioggia: pioggia)
+    }
+}
+
+/// Decisione 19 (obbligo di WeatherKit): dove si mostrano i dati di Apple Meteo, il marchio « Meteo» e il link alle fonti dei
+/// dati, presi da `WeatherService.shared.attribution` (il marchio per il fondo scuro: le schede di JARVIS sono sempre scure).
+/// Piccolo, a destra, come l'attribuzione già nella scheda Meteo.
+struct AttribuzioneMeteo: View {
+    @State private var marchio: URL?
+    @State private var legale: URL?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer(minLength: 0)
+            AsyncImage(url: marchio) { img in img.resizable().scaledToFit() } placeholder: {
+                Text("\u{F8FF} Meteo").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.tenue)
+            }
+            .frame(height: 12)
+            .accessibilityLabel("Apple Meteo")
+            if let legale { Link("Fonti dei dati", destination: legale).font(.system(size: 10)).tint(Color.tenue) }
+        }
+        .task {
+            guard marchio == nil, let a = try? await WeatherService.shared.attribution else { return }
+            marchio = a.combinedMarkDarkURL
+            legale = a.legalPageURL
+        }
     }
 }
 
@@ -214,6 +240,8 @@ struct VistaSatellite: View {
             RigaHUD("Distanza", scelto.flatMap { metri($0) }.map { Rotta.distanza($0) } ?? "—")
             RigaHUD("A piedi", scelto.flatMap { metri($0) }.map { Rotta.aPiedi($0) } ?? "—")
             RigaHUD("Meteo", meteo?.riga ?? "—")
+            // decisione 19: il meteo (qui e sulla mappa) è di Apple Meteo, che chiede il suo marchio e il link alle fonti
+            if meteo != nil { AttribuzioneMeteo() }
             HStack(spacing: 8) {
                 TastoComando(testo: "Guida", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.guida(l)) } }
                 TastoComando(testo: "Naviga", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.naviga(l)) } }
@@ -459,42 +487,63 @@ struct MappaSatellite: View {
     @State private var ultimoTocco = Date.distantPast
     @State private var dito: CGFloat?
     @State private var prima = Date()
+    @State private var lato: CGSize = .zero                 // la misura della mappa (i cartellini restano dentro, decisione 42)
 
     /// Come il mockup: a 560 m dal luogo, inclinata di 37° (la camera sta a 53° sopra l'orizzonte).
     private let distanza = 560.0
     private let inclinazione = 37.3
+    fileprivate static let spazio = "mappaSatellite"
+
+    /// Decisione 42: di quanto spostare il cartellino in cima a un'asta perché resti tutto dentro la mappa (a 4 punti dal bordo).
+    /// Il cartellino resta nell'asta (MapKit lo tiene attaccato al luogo, anche sul rilievo): qui si calcola solo lo
+    /// spostamento, dal punto del luogo sullo schermo (la camera vera della mappa) e dalla misura del cartellino. Lontano dai
+    /// bordi lo spostamento è zero: il cartellino sta esattamente dov'era.
+    private func sposta(_ mappa: MapProxy, _ c: CLLocationCoordinate2D, alta: CGFloat, testo: String) -> CGSize {
+        guard lato.width > 0, lato.height > 0, let p = mappa.convert(c, to: .named(MappaSatellite.spazio)) else { return .zero }
+        let m: CGFloat = 4
+        let d = MisuraCartellino.di(testo)
+        let basso = p.y - alta                                       // dove poggia il cartellino: la cima dell'asta
+        let x = min(max(p.x, m + d.width / 2), max(m + d.width / 2, lato.width - m - d.width / 2))
+        let y = min(max(basso, m + d.height), max(m + d.height, lato.height - m))
+        return CGSize(width: x - p.x, height: y - basso)
+    }
 
     var body: some View {
-        ZStack {
-            Map(position: $posizione, interactionModes: []) {
-                ForEach(luoghi) { l in
-                    if visibili.contains(l.chiave) {
-                        Annotation("", coordinate: l.coordinata, anchor: .bottom) {
-                            AstaSat(testo: etichetta(l), scelta: l.chiave == scelto?.chiave)
+        MapReader { mappa in
+            ZStack {
+                Map(position: $posizione, interactionModes: []) {
+                    ForEach(luoghi) { l in
+                        if visibili.contains(l.chiave) {
+                            Annotation("", coordinate: l.coordinata, anchor: .bottom) {
+                                AstaSat(testo: etichetta(l), scelta: l.chiave == scelto?.chiave,
+                                        sposta: sposta(mappa, l.coordinata, alta: AstaSat.alta, testo: etichetta(l)))
+                            }
                         }
                     }
+                    if let lei {
+                        Annotation("", coordinate: lei, anchor: .bottom) { PuntoLei(sposta: sposta(mappa, lei, alta: PuntoLei.alto + 4, testo: "LEI")) }
+                    }
                 }
-                if let lei {
-                    Annotation("", coordinate: lei, anchor: .bottom) { PuntoLei() }
-                }
+                .mapStyle(.imagery(elevation: .realistic))
+                .mapControls { MapCompass().mapControlVisibility(.hidden) }
+                .onMapCameraChange(frequency: .continuous) { ctx in camera = ctx.camera }
+                // il dito in orizzontale fa girare la camera (come il mockup: −0,008 rad per punto); in verticale la pagina scorre
+                Color.clear
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 4)
+                            .onChanged { g in
+                                let x = g.location.x
+                                if let d = dito { giro += Double(d - x) * 0.008 * 180 / .pi }
+                                dito = x
+                                ultimoTocco = Date()
+                            }
+                            .onEnded { _ in dito = nil; ultimoTocco = Date() }
+                    )
+                HudSatellite(camera: camera, meteo: meteo).allowsHitTesting(false)
             }
-            .mapStyle(.imagery(elevation: .realistic))
-            .mapControls { MapCompass().mapControlVisibility(.hidden) }
-            .onMapCameraChange(frequency: .continuous) { ctx in camera = ctx.camera }
-            // il dito in orizzontale fa girare la camera (come il mockup: −0,008 rad per punto); in verticale la pagina scorre
-            Color.clear
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 4)
-                        .onChanged { g in
-                            let x = g.location.x
-                            if let d = dito { giro += Double(d - x) * 0.008 * 180 / .pi }
-                            dito = x
-                            ultimoTocco = Date()
-                        }
-                        .onEnded { _ in dito = nil; ultimoTocco = Date() }
-                )
-            HudSatellite(camera: camera, meteo: meteo).allowsHitTesting(false)
+            .coordinateSpace(.named(MappaSatellite.spazio))
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { lato = $0 }
         }
         .onChange(of: scelto?.chiave, initial: true) { _, _ in
             guard let a = scelto?.coordinata else { return }
@@ -607,15 +656,20 @@ struct CartellinoSat: View {
 }
 
 /// L'asta olografica di un luogo: il cartellino in cima, l'asta luminosa, l'anello a terra che pulsa.
+/// Decisione 42: `sposta` spinge il cartellino dentro la mappa quando vicino al bordo uscirebbe (lontano dal bordo è zero).
 private struct AstaSat: View {
     let testo: String
     let scelta: Bool
-    private static let arancio = Color(red: 1.0, green: 0.706, blue: 0.353)        // #ffb45a
+    var sposta: CGSize = .zero
+    static let arancio = Color(red: 1.0, green: 0.706, blue: 0.353)        // #ffb45a
+    /// Dalla base (il luogo) alla cima dell'asta, dove poggia il cartellino: l'anello (12) e l'asta (64).
+    static let alta: CGFloat = 12 + 64
 
     var body: some View {
         let tinta = scelta ? AstaSat.arancio : Color.ciano
         VStack(spacing: 0) {
             CartellinoSat(testo: testo, tinta: tinta, scritta: scelta ? Color(red: 1, green: 0.85, blue: 0.66) : ColoriHUD.chiaro, alone: scelta)
+                .offset(sposta)
             Rectangle().fill(tinta.opacity(0.85)).frame(width: 2.2, height: 64).shadow(color: tinta, radius: 4)
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
                 let p = (ctx.date.timeIntervalSinceReferenceDate * 0.8).truncatingRemainder(dividingBy: 1)
@@ -631,12 +685,16 @@ private struct AstaSat: View {
     }
 }
 
-/// Dove si trova lui: il punto verde con l'anello che pulsa e LEI.
+/// Dove si trova lui: il punto verde con l'anello che pulsa e LEI (spinto dentro la mappa vicino al bordo, decisione 42).
 private struct PuntoLei: View {
+    var sposta: CGSize = .zero
     private static let verde = Color(red: 0.47, green: 0.90, blue: 0.59)          // #78e696
+    /// Il punto con l'anello sotto il cartellino LEI (che poggia 4 punti più su).
+    static let alto: CGFloat = 30
     var body: some View {
         VStack(spacing: 4) {
             CartellinoSat(testo: "LEI", tinta: PuntoLei.verde, scritta: Color(red: 0.79, green: 0.96, blue: 0.84))
+                .offset(sposta)
             ZStack {
                 TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
                     let p = (ctx.date.timeIntervalSinceReferenceDate * 0.9).truncatingRemainder(dividingBy: 1)
@@ -645,9 +703,26 @@ private struct PuntoLei: View {
                 }
                 Circle().fill(PuntoLei.verde).frame(width: 11, height: 11)
             }
-            .frame(width: 50, height: 30)
+            .frame(width: 50, height: PuntoLei.alto)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Decisione 42: la misura di un cartellino della mappa senza disegnarlo (stesso carattere di `CartellinoSat`: SF Mono 10
+/// grassetto, spaziatura 1, margini 7 ai lati e 3 sopra e sotto), per sapere se vicino al bordo uscirebbe. Ricordata per testo.
+@MainActor
+enum MisuraCartellino {
+    private static var fatte: [String: CGSize] = [:]
+
+    static func di(_ testo: String) -> CGSize {
+        if let s = fatte[testo] { return s }
+        let carattere = UIFont.monospacedSystemFont(ofSize: 10, weight: .bold)
+        let t = (testo as NSString).size(withAttributes: [.font: carattere, .kern: 1])
+        let s = CGSize(width: ceil(t.width) + 14, height: ceil(t.height) + 6)
+        if fatte.count > 300 { fatte.removeAll() }                 // i metri cambiano: niente elenco che cresce per sempre
+        fatte[testo] = s
+        return s
     }
 }
 #endif

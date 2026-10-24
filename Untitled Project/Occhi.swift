@@ -9,7 +9,7 @@ import CoreMedia
 
 /// Gli occhi di JARVIS: la fotocamera posteriore con un mirino da HUD.
 /// Automatico: si apre, aggancia e scatta da solo dopo poco più di un secondo («Jarvis, cosa sto guardando?»).
-/// Manuale: mirino con il tasto di scatto (icona 👁️, comodo per le copertine dei dischi).
+/// Manuale: il tasto di scatto (icona 👁️, comodo per le copertine dei dischi); dalla build 23 senza mirino, come il mockup.
 /// Giro (video): 5 secondi mentre il signore muove il telefono, 4 fotogrammi ben distanziati
 /// («fai un giro», scaffali, file di dischi, stanze). Si avvia a voce o con il tasto REC del mirino manuale.
 /// Le foto escono già ridotte (lato massimo 1280 px, 1024 nel giro, JPEG) e vanno al cervello, che le guarda e risponde a voce.
@@ -82,6 +82,8 @@ struct Occhi: View {
     /// Un avviso di CERCA resta 2 secondi al posto dei conti.
     @State private var avviso: String?
     @State private var web: (id: UUID, nome: String, cosa: String, esito: CervelloOcchi.Esito?)?
+    /// Decisione 29: la fonte di CERCA toccata, aperta nel browser interno di JARVIS (sopra gli Occhi, che restano accesi sotto).
+    @State private var fonte: PaginaWeb?
     /// I pezzi dell'interfaccia sopra la ripresa (i nomi piccoli non ci vanno sopra).
     @State private var riservati: [String: CGRect] = [:]
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
@@ -116,9 +118,13 @@ struct Occhi: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
             }
-            MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+            // decisione 26: negli Occhi MANUALE niente mirino (angoli, reticolo, riga di scansione), come il mockup 23;
+            // l'automatico, il giro e la Cucina lo tengono
+            if !manualeStark {
+                MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
             if registrando {
                 VStack {
                     HStack(spacing: 8) {
@@ -274,7 +280,9 @@ struct Occhi: View {
             if let w = web {
                 VStack {
                     Spacer()
-                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito) { withAnimation(.easeOut(duration: 0.25)) { web = nil }; riservati["web"] = nil }
+                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito, apri: { u in Suoni.tocco(); fonte = PaginaWeb(url: u) }) {
+                        withAnimation(.easeOut(duration: 0.25)) { web = nil }; riservati["web"] = nil
+                    }
                         .frame(maxHeight: stark.schermo.height * 0.56)
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["web"] = $0 }
                 }
@@ -285,6 +293,7 @@ struct Occhi: View {
             }
         }
         .statusBarHidden()
+        .sheet(item: $fonte) { p in BrowserInterno(url: p.url).ignoresSafeArea() }      // decisione 29: come «Apri la pagina» della galleria
         .task { await prepara() }
         .onDisappear {
             OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; OcchiAperti.stark = nil

@@ -89,7 +89,7 @@ final class ArchivioFotoSat: ObservableObject {
 
 // MARK: - Il DOSSIER
 
-/// La scheda del luogo a tutto schermo, come nel mockup: DOSSIER, il nome e la categoria, la X nel cerchio; la vista da
+/// La scheda del luogo a tutto schermo, come nel mockup: DOSSIER, il nome e la categoria, «Chiudi» (decisione 41); la vista da
 /// strada (Look Around), FOTO · ARCHIVIO con le foto (toccata: a grande), Luogo, Distanza, Visite, Note; Foto · Ricorda,
 /// Naviga · Guida.
 struct SchermoDossier: View {
@@ -273,13 +273,14 @@ struct SchermoDossier: View {
             }
             .foregroundStyle(Color.ciano)
             Spacer(minLength: 4)
+            // decisione 41: il DOSSIER non apre la fotocamera, quindi si chiude con la parola «Chiudi» (la regola di chiusura),
+            // nello stesso posto in alto a destra; scritta come il «Chiudi» delle altre schede (17 punti, semibold, ciano)
             Button(action: chiudi) {
-                Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                    .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(StileStark())
-            .accessibilityLabel("Chiudi")
         }
         .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 10)
     }

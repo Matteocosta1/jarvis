@@ -319,15 +319,30 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// La posizione e la bussola, anche senza guida (le schermate NAVIGA e GUIDA le usano per i metri e le frecce).
     func accendi() {
         if gestore.authorizationStatus == .notDetermined { gestore.requestWhenInUseAuthorization() }
-        // con la modalità «posizione in sottofondo» nell'Info.plist la guida continua anche a telefono bloccato
-        // (senza, impostarla farebbe chiudere l'app: si controlla prima)
-        let modi = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
-        if modi.contains("location") {
+        // con la modalità «posizione in sottofondo» nell'Info.plist (build 23, decisione 17) la guida continua anche a telefono
+        // bloccato, con la freccia blu di iOS (senza la modalità, impostarla farebbe chiudere l'app: si controlla prima).
+        // Solo con una guida in corso: NAVIGA e GUIDA aperte senza guida restano «solo con JARVIS aperto»
+        if Self.posizioneInSottofondo {
             gestore.allowsBackgroundLocationUpdates = luogo != nil
             gestore.showsBackgroundLocationIndicator = true
         }
+        // con una guida in corso iOS non deve mettere in pausa il GPS quando lei si ferma (a un semaforo, a parlare):
+        // a telefono bloccato una pausa non si riprende più da sola e la guida resterebbe ferma
+        gestore.pausesLocationUpdatesAutomatically = luogo == nil
         gestore.startUpdatingLocation()
         if CLLocationManager.headingAvailable() { gestore.startUpdatingHeading() }
+    }
+
+    /// La modalità «posizione in sottofondo» (UIBackgroundModes › location) è nell'Info.plist dell'app.
+    static var posizioneInSottofondo: Bool {
+        (Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []).contains("location")
+    }
+
+    /// La guida può partire con JARVIS in sottofondo (chiesta dall'orologio con l'iPhone in tasca): serve la modalità
+    /// «posizione in sottofondo» e il permesso «Sempre». Con «Durante l'uso» iOS dà la posizione solo se la guida è partita
+    /// con JARVIS aperto (poi continua anche a telefono bloccato, con la freccia blu).
+    var puoPartireInSottofondo: Bool {
+        Self.posizioneInSottofondo && gestore.authorizationStatus == .authorizedAlways
     }
 
     /// Le schermate si chiudono: se non c'è una guida in corso, il GPS si spegne. Una guida che non è mai partita
@@ -431,8 +446,11 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func pubblica() {
         guard let p = percorso, let l = luogo, !arrivato, !p.tappe.isEmpty else { return }
         let prossima = p.tappe[min(indice + 1, p.tappe.count - 1)]
+        // la via della svolta (decisione 21): solo se l'istruzione di Apple ne ha una («… in Via Tortona»); se no
+        // TappaSat.via è l'istruzione intera, e gli Occhi scrivono quella come prima
+        let via = prossima.svolta != .arrivo && !prossima.via.isEmpty && prossima.via != prossima.testo ? prossima.via : nil
         GuidaCondivisa.condivisa.stato = GuidaCondivisa.Stato(
-            luogo: l.nome, destinazione: l.coordinata, svolta: prossima.svolta, istruzione: prossima.testo,
+            luogo: l.nome, destinazione: l.coordinata, svolta: prossima.svolta, istruzione: prossima.testo, via: via,
             metriSvolta: mancaTappa ?? 0, metriArrivo: manca ?? 0, rilevamento: rilevamento)
     }
 
