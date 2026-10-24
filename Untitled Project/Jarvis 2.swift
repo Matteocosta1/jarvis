@@ -108,6 +108,7 @@ final class Jarvis: NSObject, ObservableObject {
         didSet {
             guard fase != oldValue else { return }
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio (e sul Mac la sua voce) non è «confusione»
+            BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
             aggiornaRichiamo()
         }
     }

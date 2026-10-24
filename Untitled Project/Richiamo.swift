@@ -442,9 +442,19 @@ final class Richiamo {
 }
 
 /// Due battiti di mani, come Tony Stark. Gira sul thread audio, tutto sul telefono (o sul Mac), senza rete.
-/// Un battito è un colpo secco: sale di colpo molto sopra il rumore di fondo e si spegne entro un decimo di secondo
-/// (la voce e la musica invece restano accese). Ne servono due, a distanza di 0,15–0,8 secondi; poi due secondi di pausa.
-/// Con musica, folla o TV intorno (l'analisi dell'ambiente) non scatta: un colpo di batteria non deve svegliare JARVIS.
+/// Build 23 (24 ott, i tasti del Mac scambiati per battiti): il suono si guarda a fettine da 1,25 ms e in tre bande,
+/// e ogni colpo deve essere un battito VERO.
+///  • Il «ciac» delle mani ha il corpo fra 700 e 2500 Hz: il clic di un tasto sta quasi tutto sopra i 4 kHz,
+///    un tonfo sul tavolo o un dito sul telefono sotto i 500 Hz. È rumore, non una nota: un tavolo bussato,
+///    un legnetto, un bicchiere «suonano» (si misura col tono, l'autocorrelazione a 0,5–2 ms) e non passano.
+///  • Nessun altro colpo dentro il battito (il rilascio del tasto), nessun colpo fra i due battiti e nessuno nei 100 ms
+///    dopo il secondo: chi scrive preme e rilascia, le mani no.
+///  • È più forte dei suoni non-battito degli ultimi secondi: l'asticella si alza a ogni tasto, parola o colpo che non era
+///    un battito e cala piano (1,5 dB al secondo). Chi smette di scrivere e batte le mani passa, i tasti di chi scrive no.
+///  • 0,15–0,8 secondi fra l'uno e l'altro; il secondo si decide 100 ms dopo il suo attacco (prima 130 ms), poi due
+///    secondi di pausa: il terzo battito cade nella pausa, come prima.
+/// Nessun logaritmo e nessuna allocazione sul thread audio: solo energie, rapporti e memoria preparata all'inizio.
+/// Il modello riga per riga di questo codice, con il banco di prova, è in battiti-banco/b4 (banco4.c).
 nonisolated final class BattitoMani: @unchecked Sendable {
     private let lock = NSLock()
     private var avviso: (@Sendable () -> Void)?
@@ -453,13 +463,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
         get { lock.lock(); defer { lock.unlock() }; return avviso }
         set { lock.lock(); avviso = newValue; lock.unlock() }
     }
-    private var fondo: Float = 0.01          // il rumore di fondo (media lenta)
-    private var campioni: Int64 = 0          // il tempo, in campioni dall'accensione
-    private var candidato: (inizio: Int64, energia: Float, coda: Float, finestre: Int)?
-    private var primoBattito: Int64 = -1
-    private var pausaFino: Int64 = 0
-    private let finestra = 256
-    /// Il colpo minimo per un battito. Sull'iPhone resta 0,08; il Mac (microfono più lontano e più basso) lo abbassa.
+    /// Il colpo minimo per un battito (il campione più alto). Sull'iPhone resta 0,08; il Mac (microfono più lontano e più basso) lo abbassa.
     var minimoPicco: Float = 0.08
 
     /// I suoni dell'app (tick, plim, avvio) non devono sembrare battiti: per un attimo si ignora tutto.
@@ -468,63 +472,261 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     static func ignora(per secondi: TimeInterval) {
         lockIgnora.lock(); ignoraFino = max(ignoraFino, Date().addingTimeInterval(secondi)); lockIgnora.unlock()
     }
-    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino || tastiera }
+    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino || tastiera || voceJarvis }
+
+    /// Mac: l'attesa ascolta anche mentre JARVIS parla, e la sua voce rientra dal microfono. Come i suoni dell'app,
+    /// mentre parla (e per un secondo dopo) non conta: le sue parole non alzano l'asticella e non fanno da primo battito.
+    private nonisolated(unsafe) static var voceJarvis = false
+    static func jarvisParla(_ parla: Bool) {
+        lockIgnora.lock()
+        if voceJarvis && !parla { ignoraFino = max(ignoraFino, Date().addingTimeInterval(1.0)) }
+        voceJarvis = parla
+        lockIgnora.unlock()
+    }
 
     /// Tastiera aperta: i suoi click dall'altoparlante sembrano battiti di mani, quindi finché si scrive non contano.
     private nonisolated(unsafe) static var tastiera = false
     static func tastieraAperta(_ aperta: Bool) { lockIgnora.lock(); tastiera = aperta; lockIgnora.unlock() }
 
+    /// Un filtro biquad (RBJ, Q 0,707), forma diretta II trasposta, in Float come il modello del banco.
+    nonisolated struct Filtro {
+        var b0: Float = 0, b1: Float = 0, b2: Float = 0, a1: Float = 0, a2: Float = 0
+        var z0: Float = 0, z1: Float = 0
+        init() {}
+        init(hz: Double, taglio: Double, passaAlto: Bool) {
+            let w0 = 2.0 * Double.pi * min(taglio, 0.45 * hz) / hz, cw = cos(w0), sw = sin(w0)
+            let alfa = sw / (2.0 * 0.7071067811865476), a0 = 1.0 + alfa
+            let c0: Double, c1: Double, c2: Double
+            if passaAlto { c0 = (1.0 + cw) / 2.0; c1 = -(1.0 + cw); c2 = (1.0 + cw) / 2.0 }
+            else { c0 = (1.0 - cw) / 2.0; c1 = 1.0 - cw; c2 = (1.0 - cw) / 2.0 }
+            b0 = Float(c0 / a0); b1 = Float(c1 / a0); b2 = Float(c2 / a0)
+            a1 = Float(-2.0 * cw / a0); a2 = Float((1.0 - alfa) / a0)
+        }
+        mutating func filtra(_ x: Float) -> Float {
+            let y = b0 * x + z0
+            z0 = b1 * x - a1 * y + z1
+            z1 = b2 * x - a2 * y
+            return y
+        }
+    }
+
+    /// Un rapporto di energie da decibel (calcolato una volta, alla creazione: mai sul thread audio).
+    private static func dB(_ d: Double) -> Float { Float(pow(10.0, d / 10.0)) }
+
+    // Le soglie (tarate sul banco: battiti veri e di sintesi contro tastiera, tocchi, rumori di casa, percussioni)
+    private static let storiaN = 128                      // campioni ricordati per il tono
+    private let salto = BattitoMani.dB(9)                 // un attacco: +9 dB sul livello recente…
+    private let sopraFondo = BattitoMani.dB(12)           // …e +12 dB sul fondo della stanza
+    private let riparti = BattitoMani.dB(9)               // un attacco +9 dB più forte durante la misura: il colpo vero è quello
+    private let contrasto = BattitoMani.dB(20)            // il colpo almeno +20 dB sul fondo
+    private let quotaMedie: Float = 0.15                  // parte dell'energia del colpo fra 700 e 2500 Hz: almeno
+    private let quotaAlte: Float = 0.40                   // sopra i 4 kHz (il clic dei tasti): al massimo
+    private let quotaBasse: Float = 0.50                  // sotto i 500 Hz (tonfi, dita sul telefono): al massimo
+    private let tonoMassimo: Float = 0.69                 // oltre, il colpo «suona una nota» (tavolo, legno, vetro)
+    private let margineMemoria = BattitoMani.dB(6)        // il colpo +6 dB sopra i suoni non-battito recenti…
+    private static let calaMemoriaPerSecondo = 1.5        // …che calano di 1,5 dB al secondo
+
+    private var hzFiltri: Double = 0
+    private var pa = Filtro(), basse = Filtro(), medieDa = Filtro(), medieA = Filtro(), alte = Filtro()
+    private var lunghezza = 60                  // campioni per fettina
+    private var sE: Float = 0, sB: Float = 0, sM: Float = 0, sA: Float = 0, sP: Float = 0
+    private var nf = 0
+    private var k: Int64 = 0                    // fettine dall'accensione
+    private var rec: Float = 1e-10, fondo: Float = 1e-7
+    private var memoria: Float = 0              // il colpo più forte fra i suoni recenti che NON erano battiti
+    private var calaMemoria: Float = 1
+    private var pausaFino: Int64 = 0
+    // l'attacco in misura
+    private var misura = false, mod2 = false
+    private var k0: Int64 = 0
+    private var pk: Float = 0, picco: Float = 0, eb: Float = 0, bb: Float = 0, mb: Float = 0, ab: Float = 0, f0: Float = 0
+    private var riattacco = false
+    private var pE: Float = 0, pB: Float = 0, pM: Float = 0, pA: Float = 0, pP: Float = 0
+    // il tono
+    private let storia: UnsafeMutablePointer<Float>
+    private let acc: UnsafeMutablePointer<Float>
+    private let accq: UnsafeMutablePointer<Float>
+    private var pos = 0
+    private var r0: Float = 0
+    private var lmin = 24, lmax = 96, ta = 2, tb = 23
+    // il primo battito, armato
+    private var primo = false
+    private var k1: Int64 = 0
+    // in fettine
+    private var jp = 4, js = 6, jr = 8, jd = 80, jv = 40
+    private var imin: Int64 = 120, imax: Int64 = 640, riposo: Int64 = 1600
+    private var aRec: Float = 0.083333336
+    private var saleFondo: Float = 1.0017285
+
+    init() {
+        let n = BattitoMani.storiaN
+        let s = UnsafeMutablePointer<Float>.allocate(capacity: n); s.initialize(repeating: 0, count: n)
+        let c = UnsafeMutablePointer<Float>.allocate(capacity: n); c.initialize(repeating: 0, count: n)
+        let q = UnsafeMutablePointer<Float>.allocate(capacity: n); q.initialize(repeating: 0, count: n)
+        storia = s; acc = c; accq = q
+    }
+
+    deinit {
+        storia.deallocate(); acc.deallocate(); accq.deallocate()
+    }
+
     /// Microfono appena riacceso: si riparte puliti (niente colpi a metà rimasti dalla volta prima).
-    func azzera() { lock.lock(); candidato = nil; primoBattito = -1; pausaFino = 0; lock.unlock() }
+    func azzera() { lock.lock(); misura = false; primo = false; pausaFino = 0; memoria = 0; lock.unlock() }
+
+    /// Filtri e misure per la frequenza del microfono (una volta, o quando cambia): si riparte da zero.
+    private func configura(_ hz: Double) {
+        hzFiltri = hz
+        pa = Filtro(hz: hz, taglio: 150, passaAlto: true)
+        basse = Filtro(hz: hz, taglio: 500, passaAlto: false)
+        medieDa = Filtro(hz: hz, taglio: 700, passaAlto: true)
+        medieA = Filtro(hz: hz, taglio: 2500, passaAlto: false)
+        alte = Filtro(hz: hz, taglio: 4000, passaAlto: true)
+        lunghezza = max(8, Int((hz * 0.00125).rounded()))
+        let dt = Double(lunghezza) / hz
+        func f(_ s: Double) -> Int { Int((s / dt).rounded()) }
+        jp = f(0.005); js = f(0.0075); jr = f(0.010)
+        jd = f(0.100); jv = f(0.050)
+        imin = Int64(f(0.15)); imax = Int64(f(0.80)); riposo = Int64(f(2.0))
+        aRec = Float(dt / 0.015)
+        saleFondo = Float(pow(10.0, 6.0 * dt / 10.0))
+        calaMemoria = Float(pow(10.0, -BattitoMani.calaMemoriaPerSecondo * dt / 10.0))
+        lmax = min(Int((0.002 * hz).rounded()), BattitoMani.storiaN - 1); lmin = min(Int((0.0005 * hz).rounded()), lmax)
+        ta = f(0.0025); tb = f(0.030) - 1
+        sE = 0; sB = 0; sM = 0; sA = 0; sP = 0; nf = 0
+        k = 0; rec = 1e-10; fondo = 1e-7; memoria = 0; pausaFino = 0
+        misura = false; primo = false; pos = 0
+        pE = 0; pB = 0; pM = 0; pA = 0; pP = 0
+        storia.update(repeating: 0, count: BattitoMani.storiaN)
+    }
 
     func analizza(_ b: AVAudioPCMBuffer) {
         guard UserDefaults.standard.object(forKey: "battitoMani") as? Bool ?? true,
               let dati = b.floatChannelData?[0] else { return }
-        let n = Int(b.frameLength), hz = Int64(b.format.sampleRate)
+        let n = Int(b.frameLength), hz = b.format.sampleRate
         guard n > 0, hz > 0 else { return }
+        let ignora = BattitoMani.daIgnorare          // un suono dell'app (o la tastiera dell'iPhone): vale per tutto il pacchetto
         var sentito = false
         lock.lock()
-        var i = 0
-        while i + finestra <= n {
-            var picco: Float = 0, somma: Float = 0
-            for k in i..<(i + finestra) { let v = abs(dati[k]); picco = max(picco, v); somma += v * v }
-            let energia = (somma / Float(finestra)).squareRoot()
-            let ora = campioni + Int64(i)
-            if var c = candidato {
-                // dopo il colpo: quanto resta acceso fra 50 e 130 millisecondi
-                let dopo = ora - c.inizio
-                if dopo < hz * 50 / 1000 { c.energia = max(c.energia, energia); candidato = c }      // il colpo vero, al suo massimo
-                else if dopo <= hz * 130 / 1000 { c.coda += energia; c.finestre += 1; candidato = c }
-                else if dopo > hz * 130 / 1000 {
-                    let media = c.finestre > 0 ? c.coda / Float(c.finestre) : 0
-                    candidato = nil
-                    if media < c.energia * 0.4 {                  // si è spento subito: è un battito
-                        if primoBattito >= 0, c.inizio - primoBattito >= hz * 150 / 1000, c.inizio - primoBattito <= hz * 800 / 1000 {
-                            primoBattito = -1
-                            pausaFino = ora + hz * 2
-                            sentito = true
-                        } else {
-                            primoBattito = c.inizio
-                        }
-                    } else {
-                        primoBattito = -1                         // suono lungo (voce, musica): non conta
-                    }
-                }
-            } else if ora >= pausaFino, picco > max(minimoPicco, fondo * 10), energia > fondo * 5 {
-                if BattitoMani.daIgnorare {
-                    primoBattito = -1                             // un suono dell'app: non conta
-                } else {
-                    candidato = (ora, energia, 0, 0)
-                }
-            }
-            if candidato == nil { fondo = fondo * 0.995 + energia * 0.005 }
-            if primoBattito >= 0, ora - primoBattito > hz { primoBattito = -1 }   // il secondo non è arrivato
-            i += finestra
+        if hz != hzFiltri { configura(hz) }
+        for i in 0..<n {
+            if campione(dati[i], ignora: ignora) == 1 { sentito = true }
         }
-        campioni += Int64(n)
         let avvisa = sentito ? avviso : nil
         lock.unlock()
         avvisa?()
+    }
+
+    /// Un campione: filtri, storia per il tono, somme della fettina; a fettina piena, la macchina a stati.
+    private func campione(_ v: Float, ignora: Bool) -> Int {
+        let f = pa.filtra(v)
+        let fb = basse.filtra(f)
+        let f7 = medieDa.filtra(f)
+        let fm = medieA.filtra(f7)
+        let fa = alte.filtra(f)
+        pos = (pos + 1) & (BattitoMani.storiaN - 1)
+        storia[pos] = f7
+        if misura {
+            let j = k - k0                                   // la fettina che si sta riempiendo
+            if j >= Int64(ta) && j <= Int64(tb) {
+                r0 += f7 * f7
+                for l in lmin...lmax {
+                    let w = storia[(pos - l) & (BattitoMani.storiaN - 1)]
+                    acc[l] += f7 * w
+                    accq[l] += w * w
+                }
+            }
+        }
+        sE += f * f; sB += fb * fb; sM += fm * fm; sA += fa * fa
+        let av = abs(v); if av > sP { sP = av }
+        nf += 1
+        if nf < lunghezza { return 0 }
+        let inv = 1 / Float(lunghezza)
+        let r = fettina(sE * inv, sB * inv, sM * inv, sA * inv, sP, ignora: ignora)
+        sE = 0; sB = 0; sM = 0; sA = 0; sP = 0; nf = 0
+        return r
+    }
+
+    /// Quanto il colpo «suona una nota»: la massima autocorrelazione normalizzata (0–1) a 0,5–2 ms.
+    private func tono() -> Float {
+        var m: Float = 0
+        for l in lmin...lmax {
+            let q = r0 * accq[l]
+            if q > 0 { let v = abs(acc[l]) / q.squareRoot(); if v > m { m = v } }
+        }
+        return m
+    }
+
+    /// È un colpo secco di mani? (vale per tutti e due i battiti)
+    private func buonColpo(_ qb: Float, _ qm: Float, _ qa: Float, _ to: Float) -> Bool {
+        to <= tonoMassimo && picco >= minimoPicco && pk >= f0 * contrasto
+            && qm >= quotaMedie && qa <= quotaAlte && qb <= quotaBasse && !riattacco
+            && pk >= memoria * margineMemoria
+    }
+
+    /// Una fettina finita: e (banda piena), b, m, a (bande), p (campione più alto). 1 = i due battiti, 2 = primo armato.
+    private func fettina(_ e: Float, _ b: Float, _ m: Float, _ a: Float, _ p: Float, ignora: Bool) -> Int {
+        memoria *= calaMemoria
+        let recPrima = rec
+        rec += (e - rec) * aRec
+        let attacco = e >= recPrima * salto && e >= fondo * sopraFondo
+        var esito = 0
+        if misura && attacco && e >= pk * riparti {
+            misura = false                                   // il colpo vero arriva adesso: quello di prima era solo un preavviso
+            if pk > memoria { memoria = pk }
+        }
+        if misura {
+            let j = Int(k - k0)
+            if j <= jp { if e > pk { pk = e }; if p > picco { picco = p } }
+            if j <= js { eb += e; bb += b; mb += m; ab += a }
+            if j >= jr && attacco { riattacco = true }       // un altro colpo dentro questo (il rilascio di un tasto)
+            if j == jp && primo && !mod2 { primo = false }   // un altro colpo subito dopo il primo battito
+            if misura && j == jd && mod2 {
+                let qb = bb / eb, qm = mb / eb, qa = ab / eb
+                let inter = k0 - k1
+                let ok = buonColpo(qb, qm, qa, tono()) && inter >= imin && inter <= imax
+                if ok && !ignora {
+                    esito = 1
+                    misura = false; primo = false
+                    pausaFino = k + riposo
+                } else {
+                    primo = false                            // non era il secondo: può ancora essere un primo
+                }
+            }
+            if misura && j == (mod2 && jd > jv ? jd : jv) {   // un secondo mancato si giudica da primo dopo la sua decisione
+                let qb = bb / eb, qm = mb / eb, qa = ab / eb
+                let ok = buonColpo(qb, qm, qa, tono())
+                misura = false
+                if ok && !ignora {
+                    primo = true; k1 = k0
+                    if esito == 0 { esito = 2 }
+                } else if pk > memoria {
+                    memoria = pk                             // non era un battito (un tasto, una parola): alza l'asticella
+                }
+            }
+        }
+        if !misura {
+            // il fondo della stanza: scende svelto, sale piano (al massimo 6 dB al secondo)
+            if e < fondo { fondo += (e - fondo) * 0.1 }
+            else { let su = fondo + (e - fondo) * 0.05; let tetto = fondo * saleFondo; fondo = su < tetto ? su : tetto }
+            if primo && k - k1 > imax { primo = false }      // il secondo non è arrivato
+            if attacco && k >= pausaFino {
+                if ignora {
+                    primo = false                            // un suono dell'app: non conta
+                } else {
+                    misura = true; k0 = k; mod2 = primo && k - k1 >= imin
+                    pk = e > pE ? e : pE; picco = p > pP ? p : pP
+                    eb = pE + e; bb = pB + b; mb = pM + m; ab = pA + a
+                    riattacco = false
+                    f0 = fondo
+                    r0 = 0
+                    acc.update(repeating: 0, count: BattitoMani.storiaN)
+                    accq.update(repeating: 0, count: BattitoMani.storiaN)
+                }
+            }
+        }
+        pE = e; pB = b; pM = m; pA = a; pP = p
+        k += 1
+        return esito
     }
 }
 
