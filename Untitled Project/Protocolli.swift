@@ -7,7 +7,8 @@ import UIKit
 /// («JARVIS Lavoro», «JARVIS Rientro», «JARVIS Notte») con il testo «avvia» e il ritorno automatico in JARVIS (x-callback-url).
 /// Tornato qui le luci dei passi si accendono verdi una alla volta e JARVIS fa le sue parti: LAVORO impegni e posta, RIENTRO messaggi
 /// e meteo di domani (chiesti al cervello), NOTTE la domanda del diario. Dopo, un tocco su una luce verde spegne solo quel passo:
-/// lo stesso Comando rapido riceve «annulla:<chiave>» (un altro tocco: «rifai:<chiave>»). I passi di JARVIS non hanno niente da spegnere.
+/// lo stesso Comando rapido riceve «annulla:<chiave>» (un altro tocco: «rifai:<chiave>»). Un passo di JARVIS spento prima che lui parli
+/// viene saltato; dopo, cambia solo la luce. Se il Comando rapido ha riaperto JARVIS da chiuso, JARVIS parla a musica d'avvio finita.
 @MainActor
 final class Protocolli: ObservableObject {
     static let condiviso = Protocolli()
@@ -37,6 +38,8 @@ final class Protocolli: ObservableObject {
     }
 
     func avvia(_ p: Protocollo) {
+        // un secondo tocco su «…» mentre il protocollo sta già partendo non lo rilancia (il tasto resta uguale)
+        guard !(attivo == p && fase == .inCorso) else { return }
         giro += 1
         attivo = p
         fase = .inCorso
@@ -51,7 +54,7 @@ final class Protocolli: ObservableObject {
         guard attivo == p, fase == .attivo, inCambio == nil else { return }
         nota = nil
         let acceso = accesi.contains(passo.chiave)
-        if passo.jarvis {                                     // le parti di JARVIS sono già fatte: cambia solo la luce
+        if passo.jarvis {                                     // spenta prima che JARVIS parli: quella parte la salta; dopo, cambia solo la luce
             if acceso { accesi.remove(passo.chiave) } else { accesi.insert(passo.chiave) }
             Suoni.clickTesta()
             return
@@ -144,17 +147,28 @@ final class Protocolli: ObservableObject {
             }
             Suoni.fatto()
             self.fase = .attivo
+            // il Comando rapido ha riaperto JARVIS da chiuso: prima finisce la musica d'avvio, poi parla JARVIS (niente sovrapposizioni)
+            var attesa = 0
+            while jarvis.avvioInCorso, attesa < 150 {               // al massimo 15 s, poi si va comunque
+                try? await Task.sleep(for: .milliseconds(100))
+                guard self.giro == mio else { return }
+                attesa += 1
+            }
             try? await Task.sleep(for: .milliseconds(500))
             guard self.giro == mio else { return }
             self.parteDiJarvis(p, jarvis: jarvis)
         }
     }
 
+    /// Le parti di JARVIS, solo quelle con la luce ancora verde (spenta prima che parli = saltata).
     private func parteDiJarvis(_ p: Protocollo, jarvis: Jarvis) {
         switch p {
-        case .lavoro: Task { await jarvis.invia(Protocollo.fraseLavoro) }
-        case .rientro: Task { await jarvis.invia(Protocollo.fraseRientro) }
-        case .notte: jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")   // come «A voce» nel Diario
+        case .lavoro, .rientro:
+            guard let frase = Protocollo.frase(p, accese: accesi) else { return }
+            Task { await jarvis.invia(frase) }
+        case .notte:
+            guard accesi.contains("diario") else { return }
+            jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")   // come «A voce» nel Diario
         }
     }
 

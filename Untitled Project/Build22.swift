@@ -113,6 +113,27 @@ nonisolated enum Protocollo: String, CaseIterable, Identifiable, Hashable, Senda
     /// Le frasi per il cervello, come se le dicesse il signore.
     static let fraseLavoro = "Protocollo lavoro: dimmi gli impegni di oggi e le mail importanti."
     static let fraseRientro = "Protocollo rientro: dimmi se ci sono messaggi da leggere e che tempo farà domani."
+
+    /// La frase per il cervello con le sole parti di JARVIS ancora accese (una luce spenta prima che JARVIS parli = parte saltata).
+    /// Tutte accese: le frasi di sempre. Nessuna: nil (JARVIS non dice niente).
+    static func frase(_ p: Protocollo, accese: Set<String>) -> String? {
+        switch p {
+        case .lavoro:
+            let impegni = accese.contains("impegni"), posta = accese.contains("posta")
+            if impegni && posta { return fraseLavoro }
+            if impegni { return "Protocollo lavoro: dimmi gli impegni di oggi." }
+            if posta { return "Protocollo lavoro: dimmi le mail importanti." }
+            return nil
+        case .rientro:
+            let messaggi = accese.contains("messaggi"), meteo = accese.contains("meteo")
+            if messaggi && meteo { return fraseRientro }
+            if messaggi { return "Protocollo rientro: dimmi se ci sono messaggi da leggere." }
+            if meteo { return "Protocollo rientro: dimmi che tempo farà domani." }
+            return nil
+        case .notte:
+            return nil                                        // NOTTE: la domanda del diario la fa l'app, non il cervello
+        }
+    }
 }
 
 /// I comandi a frase esatta (dopo «Jarvis»): riconosciuti sul dispositivo prima di ogni altro comando e prima delle
