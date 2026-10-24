@@ -249,7 +249,6 @@ struct DatiRicordi {
     let spesa: [Riga]
     let posti: [Riga]
     let ricordi: [Riga]
-    let parcheggio: Riga?          // l'ultimo «parcheggio» (build 22: TRACCIA)
 
     init(_ o: [String: Any]) {
         func riga(_ r: [String: Any]) -> Riga? {
@@ -262,7 +261,6 @@ struct DatiRicordi {
         posti = (o["posti"] as? [[String: Any]] ?? []).compactMap(riga)
         spesa = (o["spesa"] as? [[String: Any]] ?? []).compactMap(riga)
         ricordi = (o["ricordi"] as? [[String: Any]] ?? []).compactMap(riga)
-        parcheggio = (o["parcheggio"] as? [String: Any]).flatMap(riga)
     }
 }
 #endif
