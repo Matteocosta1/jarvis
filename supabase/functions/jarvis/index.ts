@@ -2745,7 +2745,7 @@ function pulisci(messaggi: any[]) {
 
 // ───────────────────────── Chiamata ad Anthropic in streaming ─────────────────────────
 const modelliAssenti = new Set<string>();   // modelli che l'account non ha: per questa istanza si saltano
-async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[], suTesto: (d: string) => void): Promise<any> {
+async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}): Promise<any> {
   // in ordine: il modello chiesto, poi le riserve; quelli che l'account non ha si saltano.
   // Revisione 24 ott: in fondo anche il modello principale. Quasi tutte le domande a voce vanno sulla riserva (Sonnet):
   // se era proprio lei a essere sovraccarica, prima non c'era nessun altro da provare e il signore sentiva l'errore.
@@ -2754,7 +2754,7 @@ async function chiamaClaude(messages: any[], modelloChiesto: string, tools: any[
   let ultimoErrore: unknown;
   for (const modello of fila) {
     try {
-      return await chiamaClaudeUnaVolta(messages, modello, tools, suTesto);
+      return await chiamaClaudeUnaVolta(messages, modello, tools, suTesto, suStacco);
     } catch (e) {
       // modello non disponibile o sovraccarico prima di aver detto nulla: si prova il successivo
       const m = (e as Error).message;
@@ -2810,7 +2810,7 @@ const sforzo = (modello: string) =>
 // (prima ci pensava il suo limite di 120 s). Se per 90 secondi non arriva nemmeno un byte (Anthropic manda i suoi «ping»
 // anche mentre pensa o cerca sul web), la chiamata si chiude e il signore sente «Il mio cervello ci sta mettendo troppo».
 const SILENZIO_ANTHROPIC_MS = 90_000;
-async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void) {
+async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void, suStacco: () => void = () => {}) {
   const inizio = new Date();
   let primaParola: Date | null = null;
   const freno = new AbortController();
@@ -2875,7 +2875,7 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
           uso.token_in = num(u.input_tokens); uso.token_cache = num(u.cache_read_input_tokens); uso.token_cache_scrittura = num(u.cache_creation_input_tokens);
         } else if (e.type === "content_block_start") {
           blocchi[e.index] = structuredClone(e.content_block);
-          if (e.content_block.type === "tool_use" || e.content_block.type === "server_tool_use") jsonParziale[e.index] = "";
+          if (e.content_block.type === "tool_use" || e.content_block.type === "server_tool_use") { jsonParziale[e.index] = ""; suStacco(); }   // 24 ott: la frase scritta prima dello strumento si stacca e si dice subito
         } else if (e.type === "content_block_delta") {
           const b = blocchi[e.index], d = e.delta;
           if (!b || !d) continue;
@@ -2904,7 +2904,11 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
     }
   } finally { clearTimeout(silenzio); }
   // il contatore dei consumi: una riga per chiamata, letta dalla scheda Supabase
-  inSottofondo(db.from("jarvis_consumi").insert({ servizio: "claude", modello, ...uso }).then(() => {}, () => {}));
+  // 24 ott: anche i tempi della chiamata (prima parola e totale, in millisecondi)
+  inSottofondo(db.from("jarvis_consumi").insert({
+    servizio: "claude", modello, ...uso,
+    ms_prima_parola: primaParola ? primaParola.getTime() - inizio.getTime() : null, ms_totale: Date.now() - inizio.getTime(),
+  }).then(() => {}, () => {}));
   langfuse(modello, inizio, primaParola, uso, stop, blocchi);
   return { content: blocchi.filter(Boolean), stop_reason: stop };
 }
@@ -3025,6 +3029,7 @@ async function prendiPosto(limiteMs: number) {
 }
 
 async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
+  const t0 = Date.now();   // 24 ott: tempo dalla richiesta della frase all'audio pronto (fila compresa)
   const voce = idValido(idVoce) ? idVoce : (voceAttuale());
   const modello = await scegliModelloVoce(chiave);
   let ultimo = "";
@@ -3050,7 +3055,8 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
       // audio intero (non in streaming): così il posto in fila si libera solo a lavoro finito
       const audio = new Uint8Array(await r.arrayBuffer());
       inCorsoEleven--;
-      inSottofondo(db.from("jarvis_consumi").insert({ servizio: "voce", modello, caratteri: t.length }).then(() => {}, () => {}));
+      const ms = Date.now() - t0;   // audio intero: l'iPhone può suonarlo solo adesso, quindi primo suono = totale
+      inSottofondo(db.from("jarvis_consumi").insert({ servizio: "voce", modello, caratteri: t.length, ms_primo_suono: ms, ms_totale: ms }).then(() => {}, () => {}));
       return new Response(audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store", "x-modello-voce": modello } });
     }
     inCorsoEleven--;
@@ -3072,6 +3078,7 @@ async function voceEleven(t: string, idVoce: unknown, chiave: string): Promise<R
 // La stessa voce, ma in streaming: l'audio grezzo (PCM 16 bit, 24 kHz, mono) passa all'iPhone mentre ElevenLabs lo genera,
 // così JARVIS comincia a parlare prima che la frase sia finita di generare. Stesso modello, stesso costo per carattere.
 async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Promise<Response | { errore: string }> {
+  const t0 = Date.now();   // 24 ott: tempo dalla richiesta della frase al primo pezzo d'audio e alla fine (fila compresa)
   const voce = idValido(idVoce) ? idVoce : (voceAttuale());
   const modello = await scegliModelloVoce(chiave);
   let ultimo = "";
@@ -3094,11 +3101,20 @@ async function voceElevenFlusso(t: string, idVoce: unknown, chiave: string): Pro
       continue;
     }
     if (r.ok && r.body) {
-      inSottofondo(db.from("jarvis_consumi").insert({ servizio: "voce", modello, caratteri: t.length }).then(() => {}, () => {}));
-      // il posto in fila si libera quando lo streaming è finito (o l'iPhone lo interrompe)
-      let liberato = false;
-      const libera = () => { if (!liberato) { liberato = true; inCorsoEleven--; } };
-      const passa = new TransformStream<Uint8Array, Uint8Array>({ flush() { libera(); } });
+      // il posto in fila si libera quando lo streaming è finito (o l'iPhone lo interrompe); allora si scrive anche la riga dei consumi
+      let liberato = false, primoPezzo: number | null = null;
+      const libera = () => {
+        if (liberato) return;
+        liberato = true; inCorsoEleven--;
+        inSottofondo(db.from("jarvis_consumi").insert({
+          servizio: "voce", modello, caratteri: t.length,
+          ms_primo_suono: primoPezzo ? primoPezzo - t0 : null, ms_totale: Date.now() - t0,
+        }).then(() => {}, () => {}));
+      };
+      const passa = new TransformStream<Uint8Array, Uint8Array>({
+        transform(pezzo, c) { primoPezzo ??= Date.now(); c.enqueue(pezzo); },
+        flush() { libera(); },
+      });
       r.body.pipeTo(passa.writable).catch(() => {}).finally(libera);
       return new Response(passa.readable, {
         headers: { "content-type": "audio/pcm;rate=24000", "cache-control": "no-store", "x-modello-voce": modello },
@@ -3492,6 +3508,7 @@ const STATI: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
+  const arrivo = Date.now();   // 24 ott: da qui si misura il turno (prima parola e totale)
   if (req.method !== "POST") return json({ errore: "metodo non ammesso" }, 405);
   const segreto = Deno.env.get("JARVIS_TOKEN") ?? "";
   if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) {
@@ -3730,6 +3747,17 @@ Deno.serve(async (req) => {
       // 24 ott: un segno di vita ogni 15 secondi mentre il cervello lavora in silenzio (ricerche lunghe, strumenti lenti):
       // senza, dopo 120 secondi muti l'app crede la linea caduta e rifà tutta la richiesta. Le app ignorano «vivo».
       const battito = setInterval(() => { try { invia({ t: "vivo" }); } catch { clearInterval(battito); } }, 15_000);
+      // 24 ott: i tempi del turno, una riga in jarvis_consumi (servizio «turno», o «turno_seguito» quando torna dal dispositivo):
+      // ms_prima_parola = dall'arrivo della richiesta alla prima parola mandata all'app; ms_totale = fino alla fine del turno
+      let primaTurno: number | null = null, modelloTurno: string | null = null, turnoSegnato = false;
+      const segnaTempi = (esito: string) => {
+        if (turnoSegnato || provaGenerale) return;
+        turnoSegnato = true;
+        inSottofondo(db.from("jarvis_consumi").insert({
+          servizio: corpo.continua ? "turno_seguito" : "turno", modello: modelloTurno, esito,
+          ms_prima_parola: primaTurno ? primaTurno - arrivo : null, ms_totale: Date.now() - arrivo,
+        }).then(() => {}, () => {}));
+      };
       try {
         let lavoro: any[], modello: string, azioni: string[], detto: string;
         if (corpo.continua) {
@@ -3825,8 +3853,12 @@ Deno.serve(async (req) => {
         }
 
         let contaminato = turnoContaminato(lavoro);
+        modelloTurno = modello;
         for (let giro = 0; giro < 10; giro++) {
-          const r = await chiamaClaude(lavoro, modello, tools, (d) => { detto += d; invia({ t: "testo", d }); });
+          const r = await chiamaClaude(lavoro, modello, tools, (d) => { primaTurno ??= Date.now(); detto += d; invia({ t: "testo", d }); },
+            // 24 ott: prima di uno strumento la frase già scritta («Un attimo, controllo.») chiude con uno spazio, così l'app la dice
+            // subito invece di tenerla ferma fino alla risposta dello strumento (e non la incolla alla frase dopo)
+            () => { if (detto && !/\s$/.test(detto)) { detto += " "; invia({ t: "testo", d: " " }); } });
           lavoro.push({ role: "assistant", content: r.content });
           for (const b of r.content) if ((b.type === "server_tool_use" || b.type === "tool_use") && NON_FIDATI.has(b.name)) contaminato = true;
           for (const b of r.content) if (b.type === "server_tool_use") { azioni.push(b.name); invia({ t: "stato", d: STATI[b.name] ?? b.name }); }
@@ -3838,6 +3870,7 @@ Deno.serve(async (req) => {
               : "Signore, ho elaborato ma non ho trovato nulla da dire. Riformuli pure.";
             segnaEsito({ t: "fine", testo, azioni });
             invia({ t: "fine", testo, azioni });
+            segnaTempi("fine");
             // la prova generale non lascia ricordi; un turno che ha letto testo altrui (web, email, trascrizioni) nemmeno
             if (!provaGenerale && !contaminato) inSottofondo(memoriaAutomatica(lavoro, testo));
             if (!provaGenerale) inSottofondo(completaVettori());   // le righe nuove di memoria, ricordi, note e diario prendono il loro vettore
@@ -3860,6 +3893,7 @@ Deno.serve(async (req) => {
           if (richieste.length) {
             // tocca al dispositivo: gli passo il lavoro (thinking firmati compresi) e i risultati già pronti
             segnaEsito({ t: "client" });
+            segnaTempi("client");
             invia({ t: "client", lavoro, richieste, risultati_server: risultatiServer.map((x) => ({ tool_use_id: x.tool_use_id, content: x.content })), modello, azioni, detto });
             ctrl.close(); return;
           }
@@ -3868,8 +3902,10 @@ Deno.serve(async (req) => {
         }
         segnaEsito({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
         invia({ t: "fine", testo: "Signore, mi sono perso in troppi passaggi. Riformuli pure.", azioni });
+        segnaTempi("passaggi");
       } catch (e) {
         segnaEsito({ t: "errore" });
+        segnaTempi("errore");
         const msg = (e as Error).message;
         console.log(`errore del turno: ${msg.slice(0, 300)}`);
         // 24 ott: al signore una frase in italiano da dire ad alta voce, mai il messaggio tecnico inglese
