@@ -2672,7 +2672,7 @@ const bloccoImmagine = (data: string) => ({ type: "image", source: { type: "base
 const blocchiImmagine = (lista: string[]) =>
   lista.map((d, k) => k === lista.length - 1 ? { ...bloccoImmagine(d), cache_control: { type: "ephemeral" } } : bloccoImmagine(d));
 
-function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone") {
+function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone", chiestoPrima = false) {
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
   // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
   // la frase oltre i 140 caratteri e ogni interruzione finiva su Opus, il più lento.
@@ -2685,6 +2685,7 @@ function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphon
     .replace(/^\s*\(aggiunta alla mia richiesta precedente, considerala insieme a quella\)\s*/i, "")
     .replace(/^\s*\(riprendo il discorso:[\s\S]*?rispondi solo a questo\)\s*/i, "")
     .replace(/^\s*\(il signore ha mandato una foto\)\s*/i, "")
+    .replace(/^\s*(?:ehi\s+)?jarvis(?=$|[\s,.!?;:])[\s,.!?;:]*/i, "")   // revisione 24 ott: «Jarvis, che ore sono?» è come «che ore sono?»
     .trim().toLowerCase();
   // «\b» in JavaScript vale solo per le lettere senza accento: «sì» non lo passava mai. La fine della parola si guarda a mano.
   // 24 ott: la frase deve essere TUTTA di cortesia («sì», «no grazie», «va bene, grazie Sir»): prima bastava l'inizio,
@@ -2695,7 +2696,9 @@ function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphon
   // Dopo un'interruzione «avanti» vuol dire «continua il discorso»: lì serve il cervello vero.
   const media = parole <= 3 && (/^(pausa|stop|play|avanti|indietro|prossim[a-z]*|alza|abbassa|volume|metti in pausa|riprendi la musica|riprendi la canzone)(?=$|[\s,.!?;:])/.test(t) || /^riprendi[\s,.!?;:]*$/.test(t));
   const orario = /^(che ore sono|che ora è|che giorno è|che data è)(?: oggi| domani)?(?:[\s,.!?;:]+(?:sir|jarvis))*[\s,.!?;:]*$/.test(t);
-  const secco = t.length <= 30 && (cortesia.test(t) || (!dopoInterruzione && (media || orario)));
+  // Revisione 24 ott: se JARVIS ha appena fatto una domanda («La mando?», «Lo chiamo?»), «sì», «va bene», «ok» sono il via
+  // a un'azione (una mail, un messaggio, una chiamata): li fa il modello di riserva, non quello rapido.
+  const secco = t.length <= 30 && ((cortesia.test(t) && !chiestoPrima) || (!dopoInterruzione && (media || orario)));
   if (secco && !conImmagine) return MODELLO_RAPIDO;
   // al polso conta la prontezza: risposte di una frase, il modello veloce basta e risponde in metà tempo
   if (dispositivo === "orologio" && MODELLO_RISERVA) return MODELLO_RISERVA;
@@ -3799,7 +3802,9 @@ Deno.serve(async (req) => {
           storia[storia.length - 1] = imgs.length
             ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }
             : { role: "user", content: testoUtente };
-          lavoro = storia; modello = scegliModello(ultimo, imgs.length > 0 || fotoPrima.length > 0, dispositivo); azioni = []; detto = "";
+          const primaDiLui = storia.at(-2);   // l'ultima risposta di JARVIS: finiva con una domanda?
+          const chiestoPrima = primaDiLui?.role === "assistant" && typeof primaDiLui.content === "string" && /\?[\s»"”')]*$/.test(primaDiLui.content);
+          lavoro = storia; modello = scegliModello(ultimo, imgs.length > 0 || fotoPrima.length > 0, dispositivo, chiestoPrima); azioni = []; detto = "";
         }
 
         let contaminato = turnoContaminato(lavoro);
