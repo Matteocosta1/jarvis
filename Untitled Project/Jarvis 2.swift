@@ -58,7 +58,9 @@ enum Impostazioni {
     /// In attesa, con l'app aperta, basta dire «Jarvis» per parlargli: niente tocco.
     static var richiamo: Bool { UserDefaults.standard.object(forKey: "richiamo") as? Bool ?? true }
     /// In attesa risponde a qualsiasi frase del signore, senza bisogno di «Jarvis» (spento: solo «Jarvis», «ehi», «bro»…).
-    static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? !ProcessInfo.processInfo.isiOSAppOnMac }
+    /// Difetto 7 (controllo del 25 ott): vale anche sul Mac e parte acceso anche lì. Prima sul Mac partiva spento ma non contava:
+    /// il Mac rispondeva comunque a qualsiasi frase. Acceso di partenza, oggi non cambia niente; spento, il Mac vuole «Jarvis».
+    static var ascoltoSempre: Bool { UserDefaults.standard.object(forKey: "ascoltoSempre") as? Bool ?? true }
     /// La stessa app gira anche sul Mac (chip Apple): il cervello lo sa e risponde da Mac.
     nonisolated static var dispositivo: String { ProcessInfo.processInfo.isiOSAppOnMac ? "mac" : "iphone" }
 }
@@ -117,6 +119,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard fase != oldValue else { return }
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio (e sul Mac la sua voce) non è «confusione»
             BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
+            EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
             aggiornaRichiamo()
         }
     }
@@ -144,7 +147,7 @@ final class Jarvis: NSObject, ObservableObject {
         let a = AttesaMac(motore: motore)          // un solo motore audio sul Mac, quello che funziona già per il tocco
         a.applauso = { [weak self, weak a] in a?.segnaBattiti(); self?.applaudito() }
         a.diagnosi = { [weak self] riga in self?.diagnosiMac = riga }
-        a.frase = { [weak self] testo, inizio in self?.fraseSentitaMac(testo, inizio: inizio) }
+        a.frase = { [weak self] testo, inizio in self?.fraseSentitaMac(testo, inizio: inizio) ?? false }
         return a
     }()
     /// Sul Mac, subito dopo una risposta: per qualche secondo si può continuare a parlare senza dire «Jarvis».
@@ -1684,37 +1687,76 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Mac: una frase sentita in attesa (già trascritta). La prende se c'è «Jarvis», se è la frase di Tony,
     /// o se arriva subito dopo una risposta (il seguito del discorso); il resto della stanza non è per lui.
-    private func fraseSentitaMac(_ testo: String, inizio: Date) {
-        guard fase == .attesa || fase == .elaboro || fase == .parlo else { return }
+    /// Restituisce vero se era soltanto l'eco della voce di JARVIS (difetto 2: non conta nel tetto delle trascrizioni).
+    @discardableResult
+    private func fraseSentitaMac(_ sentito: String, inizio: Date) -> Bool {
+        guard fase == .attesa || fase == .elaboro || fase == .parlo else { return false }
         if Date() > dettoMacFino { dettoMac = "" }
-        if Jarvis.eEco(testo, detto: dettoMac) { return }                 // è la sua stessa voce: non è il signore
+        // difetto 2 (controllo del 25 ott), come sull'orologio: il pezzo di audio contiene anche la voce di JARVIS, prima e dopo
+        // le parole del signore. Si tolgono le sue parole in testa e in coda e resta solo il signore: «basta», «muto», «aspetta»
+        // detti sopra di lui non finiscono più buttati come eco, e una domanda detta sopra non arriva mescolata alle sue parole
+        let testo = Dialogo.togliEcoAiBordi(sentito, detto: dettoMac)
+        if testo.isEmpty { return true }                                   // era tutta la sua voce
+        if testo == sentito {
+            // nessun pezzo della sua voce ai bordi: come prima, quasi tutte parole sue = eco. Mai però con una sua parola d'ordine
+            if Jarvis.eEco(testo, detto: dettoMac), !Jarvis.haParolaDOrdine(testo) { return true }
+        } else if Jarvis.eResiduoDiEco(testo, detto: dettoMac) {
+            return true                                                    // un pezzetto della sua voce rimasto in mezzo («Sir»)
+        }
         // musica, TV o gente intorno: vale solo una frase col suo nome (o la frase di Tony); il resto della stanza non è per lui
         if AmbienteSonoro.condiviso.affollato {
             let basso = testo.lowercased()
-            guard Richiamo.nomi.contains(where: { basso.contains($0) }) || Benvenuto.eFraseDiTony(testo) else { return }
+            guard Richiamo.nomi.contains(where: { basso.contains($0) }) || Benvenuto.eFraseDiTony(testo) else { return false }
         }
         if Jarvis.eSoloSilenzio(testo) {                                   // «Jarvis, muto», «basta», «stop»: tace e resta in attesa
             if fase != .attesa { mettiInAttesa() }
-            return
+            return false
         }
         if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
             interrottoAVoce(testo)
-            return
+            return false
         }
         // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto
         let conNome = Richiamo.dopoRichiamo(testo) != nil
         let dopo = Richiamo.dopoRichiamo(testo) ?? testo
+        // difetto 7 (controllo del 25 ott): l'interruttore «Risponde a qualsiasi frase» vale anche sul Mac, come sull'iPhone.
+        // Spento: in attesa e mentre pensa serve «Jarvis» (o «ehi», «bro»…) o la frase di Tony, tranne nel seguito subito dopo una
+        // risposta (8 secondi) e nei 2 secondi dell'aggiunta dopo la domanda. Acceso (di partenza): come prima, qualsiasi frase
+        if !Impostazioni.ascoltoSempre, !conNome, !Benvenuto.eFraseDiTony(testo) {
+            let adesso = Date()
+            guard adesso < liberoMacFinoA || adesso < richiamo.liberoFinoA else { return false }
+        }
         liberoMacFinoA = .distantPast
         if fase == .elaboro { segnaInterruzione(); interrompi() }   // stava pensando: lo fermo, come sull'iPhone
         avviso = nil
         parziale = ""
-        if conNome && dopo.isEmpty { Task { await avviaAscolto(bip: true) }; return }   // solo «Jarvis»: apro il microfono
+        if conNome && dopo.isEmpty { Task { await avviaAscolto(bip: true) }; return false }   // solo «Jarvis»: apro il microfono
         // «piano»/«voce normale» per primo: cambia solo il volume, non è né il rito né una domanda
         let senzaSottovoce = sottovoce(dopo)
-        if senzaSottovoce.isEmpty { return }                              // solo «piano» o «voce normale»: fatto, niente rito
-        if Benvenuto.eFraseDiTony(senzaSottovoce) { fraseDiTony(); return }
-        if foto == nil, eseguiComando(senzaSottovoce) { return }
+        if senzaSottovoce.isEmpty { return false }                        // solo «piano» o «voce normale»: fatto, niente rito
+        if Benvenuto.eFraseDiTony(senzaSottovoce) { fraseDiTony(); return false }
+        if foto == nil, eseguiComando(senzaSottovoce) { return false }
         Task { await instrada(senzaSottovoce) }
+        return false
+    }
+
+    /// C'è una parola con cui il signore ferma o chiama JARVIS («basta», «muto», «aspetta», «Jarvis»…): mai eco (difetto 2).
+    nonisolated static func haParolaDOrdine(_ frase: String) -> Bool {
+        let parole = frase.lowercased().split(whereSeparator: { !$0.isLetter && $0 != "'" }).map(String.init)
+        let ordini: Set<String> = ["muto", "muta", "zitto", "zitta", "basta", "stop", "fermati", "fermo", "silenzio", "taci",
+                                   "aspetta", "aspetti", "ascoltami"]
+        return parole.contains { p in ordini.contains(p) || Richiamo.nomi.contains(where: { p.hasPrefix($0) }) }
+    }
+
+    /// Difetto 2: tolta l'eco ai bordi resta una o due parole che JARVIS ha appena detto (non un suo ordine): è eco anche quello.
+    nonisolated static func eResiduoDiEco(_ resto: String, detto: String) -> Bool {
+        func parole(_ t: String) -> [String] {
+            t.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
+        }
+        let r = parole(resto), d = Set(parole(detto))
+        guard !r.isEmpty, r.count <= 2, !haParolaDOrdine(resto) else { return false }
+        return r.allSatisfy { d.contains($0) }
     }
 
     /// Registra la frase; quando il signore ha finito (o tocca il reattore) la trascrive in cloud e la manda come sull'iPhone.
@@ -2242,7 +2284,10 @@ final class VoceCloud: NSObject {
     }
 
     nonisolated private static func seguiVolume(_ m: AVAudioEngine) {
-        m.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { b, _ in Volume.voce.misura(b) }   // il reattore segue la voce
+        m.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { b, _ in
+            Volume.voce.misura(b)                       // il reattore segue la voce
+            if Jarvis.usaAscoltoCloud { EcoMac.condivisa.misura(b) }   // difetto 2: sul Mac quanto forte esce, per riconoscere la sua eco
+        }
     }
 
     nonisolated private static func programma(_ n: AVAudioPlayerNode, _ b: AVAudioPCMBuffer, _ c: Contatore) {
@@ -2310,6 +2355,7 @@ final class VoceCloud: NSObject {
         p.volume = Jarvis.volumeVoce                   // sottovoce anche per le frasi già pronte
         lettore = p
         Volume.segui(p)
+        if Jarvis.usaAscoltoCloud { EcoMac.segui(p) }  // difetto 2: sul Mac quanto forte esce, per riconoscere la sua eco
         return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
             attesa = c
             attuale = ObjectIdentifier(p)

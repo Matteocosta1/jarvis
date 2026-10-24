@@ -1498,7 +1498,7 @@ struct ImpostazioniView: View {
     @AppStorage("idVoceCloud") private var idVoceCloud = ""
     @AppStorage("interruzioneVocale") private var interruzioneVocale = true
     @AppStorage("richiamo") private var richiamo = true
-    @AppStorage("ascoltoSempre") private var ascoltoSempre = !ProcessInfo.processInfo.isiOSAppOnMac
+    @AppStorage("ascoltoSempre") private var ascoltoSempre = true   // difetto 7 (25 ott): acceso anche sul Mac, come si comportava già
     @AppStorage("battitoMani") private var battitoMani = true
     @AppStorage("suoni") private var suoni = true
     @AppStorage("suonoAvvio") private var suonoAvvio = "hud"

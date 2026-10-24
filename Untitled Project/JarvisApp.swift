@@ -7,9 +7,15 @@ struct JarvisApp: App {
     @Environment(\.scenePhase) private var fase
 
     init() {
-        // sul Mac (app dell'iPhone) «risponde a qualsiasi frase» parte spento: lì intorno ci sono riunioni e video
+        // difetto 7 (controllo del 25 ott): «risponde a qualsiasi frase» parte acceso anche sul Mac, perché il Mac rispondeva già a
+        // qualsiasi frase (l'interruttore non contava). Una volta sola, sul Mac, si torna al valore di partenza: un «spento» rimasto
+        // da quando l'interruttore non faceva niente non deve cambiare all'improvviso come risponde il Mac. Da qui in poi conta davvero.
+        if ProcessInfo.processInfo.isiOSAppOnMac, !UserDefaults.standard.bool(forKey: "ascoltoSempreMac25ott") {
+            UserDefaults.standard.removeObject(forKey: "ascoltoSempre")
+            UserDefaults.standard.set(true, forKey: "ascoltoSempreMac25ott")
+        }
         UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true,
-                                                  "ascoltoSempre": !ProcessInfo.processInfo.isiOSAppOnMac])
+                                                  "ascoltoSempre": true])
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
     }
 

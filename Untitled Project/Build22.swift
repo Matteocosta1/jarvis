@@ -158,6 +158,69 @@ nonisolated enum Dialogo {
         return String(sentito[s[fine].startIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // MARK: L'eco sul Mac (difetto 2 del controllo del 25 ott)
+
+    /// Le parole che dicono al signore «fermati» o «ascoltami»: non si scambiano mai per eco di JARVIS, nemmeno capite a metà.
+    private static let paroleSue: Set<String> = ["muto", "muta", "zitto", "zitta", "basta", "stop", "fermati", "fermo", "silenzio", "taci",
+                                                 "aspetta", "aspetti", "ascoltami", "ascolta", "senti", "scusa", "ehi", "hey"]
+    private static func sua(_ p: String) -> Bool {
+        paroleSue.contains(p) || ["jarvi", "giarvi", "jervis", "charvis", "jarves", "jarbis"].contains(where: { p.hasPrefix($0) })
+    }
+
+    /// Mac: il microfono resta acceso mentre JARVIS parla, senza cancellazione dell'eco, e il pezzo di audio contiene le parole di
+    /// JARVIS prima e dopo quelle del signore («…piove dalle tre basta il sole tornerà…»). Toglie l'eco in testa e in coda: le
+    /// parole che sono un pezzo (almeno due di fila) di quello che JARVIS ha appena detto. Resta quello che ha detto il signore,
+    /// così com'è stato trascritto. Le sue parole d'ordine («basta», «muto», «aspetta», «Jarvis») non si tolgono mai come eco.
+    /// Vuoto: era tutta eco. Uguale a `sentito`: nessun pezzo dell'eco ai bordi.
+    static func togliEcoAiBordi(_ sentito: String, detto: String) -> String {
+        func norma(_ s: Substring) -> String {
+            s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+        }
+        let separa: (Character) -> Bool = { !$0.isLetter && !$0.isNumber && $0 != "'" }
+        let d = Array(TagVoce.togli(detto).split(whereSeparator: separa).map(norma).suffix(150))
+        let s = sentito.split(whereSeparator: separa)
+        guard !d.isEmpty, !s.isEmpty else { return sentito }
+        let sn = s.map(norma)
+        let inTesta = ecoInTesta(sn, d)
+        guard inTesta < s.count else { return "" }
+        // in coda almeno tre parole: JARVIS continua a parlare finché la frase non è trascritta, quindi l'eco dopo il signore è lunga;
+        // due parole sole in fondo sono più spesso le sue («e a Roma?» dopo «…a Roma sole»), tranne subito dopo una sua parola
+        // d'ordine («basta tornerà già»)
+        let coda = ecoInTesta(Array(sn[inTesta...].reversed()), Array(d.reversed()))
+        let primaDellaCoda = s.count - 1 - coda
+        let inCoda = coda >= 3 || (coda > 0 && primaDellaCoda >= inTesta && primaDellaCoda >= 0 && (coda == 1 || sua(sn[primaDellaCoda]))) ? coda : 0
+        guard inTesta + inCoda < s.count else { return "" }
+        guard inTesta > 0 || inCoda > 0 else { return sentito }
+        let da = s[inTesta].startIndex, a = s[s.count - 1 - inCoda].endIndex
+        return String(sentito[da..<a]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Quante parole all'inizio di `s` sono un pezzo di `d` (almeno due di fila, in ordine; una parola dell'eco capita male si
+    /// salta se quella dopo torna a combaciare, ma mai una parola del signore come «basta»). Il pezzo può cominciare ovunque in `d`.
+    /// `minimo`: quante parole di fila servono perché sia eco.
+    static func ecoInTesta(_ s: [String], _ d: [String], minimo: Int = 2) -> Int {
+        guard let primo = s.first, !sua(primo) else { return 0 }
+        var migliore = 0
+        for a in d.indices where d[a] == primo {
+            var i = 0, j = a, fine = 0, saltata = false
+            while i < s.count, j < d.count {
+                if !sua(s[i]), let k = d[j..<min(d.count, j + 3)].firstIndex(of: s[i]) {
+                    j = k + 1; i += 1; fine = i; saltata = false
+                    continue
+                }
+                if !saltata, !sua(s[i]), i + 1 < s.count, !sua(s[i + 1]), d[j..<min(d.count, j + 4)].contains(s[i + 1]) {
+                    saltata = true; i += 1
+                    continue
+                }
+                break
+            }
+            if fine >= minimo { migliore = max(migliore, fine) }
+        }
+        // una parola sola dell'eco attaccata a una sua parola d'ordine («…pomeriggio aspetta…»): si toglie anche lei
+        if migliore == 0, s.count >= 2, sua(s[1]), d.contains(primo) { migliore = 1 }
+        return migliore
+    }
+
     // MARK: Sottovoce
 
     enum CambioVoce: Equatable { case sottovoce, normale }
