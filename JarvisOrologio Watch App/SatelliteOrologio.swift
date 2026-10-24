@@ -1,5 +1,6 @@
 import SwiftUI
 import WatchKit
+import Combine
 
 /// Build 23, SATELLITE al polso (come il mockup): sul polso niente 3D (watchOS non lo permette), i luoghi con la
 /// distanza; un tocco su un luogo fa partire la GUIDA sull'iPhone e al polso compare la guida in corso

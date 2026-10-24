@@ -2,6 +2,7 @@
 import SwiftUI
 import MusicKit
 import MediaPlayer
+import Combine
 
 // MARK: - MUSICA (build 23, MARK IX): il suo Apple Music dentro JARVIS, come nel mockup approvato (#23)
 

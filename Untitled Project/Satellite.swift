@@ -3,6 +3,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import WeatherKit
+import Combine
 
 /// Build 23 · INTELLIGENCE › SATELLITE, come il mockup approvato: la città 3D di Apple (satellite con il rilievo) con i suoi
 /// luoghi sulle aste olografiche, la camera che gira piano intorno al luogo scelto e ci vola sopra quando se ne sceglie

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import MapKit
+import Combine
 
 // MARK: - Le foto dei luoghi
 
