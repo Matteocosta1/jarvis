@@ -18,6 +18,9 @@ enum ImpostazioniOrologio {
     }
     static let indirizzoPredefinito = "https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis"
     static var indirizzo: String { UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito }
+    /// Idea D (25 ott): il cervello sa ricevere la frase come audio insieme alla richiesta della risposta (lo dice la sveglia).
+    /// Finché non l'ha detto, l'orologio usa la strada di prima: trascrizione e poi risposta.
+    static var giroUnico: Bool { UserDefaults.standard.bool(forKey: "giroUnicoCervello") }
     /// Mentre JARVIS parla, il microfono resta in ascolto: se il signore inizia a parlare, JARVIS tace e lo ascolta.
     static var interruzioneVocale: Bool { UserDefaults.standard.object(forKey: "interruzioneVocaleOrologio") as? Bool ?? true }
 }
@@ -131,6 +134,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Idea A e B (25 ott): la domanda in corso è stata detta a voce (non un tasto): il cervello lo sa, e se anche un altro
     /// dispositivo l'ha sentita risponde uno solo.
     private var domandaAVoce = false
+    /// Idea D: la frase partita col giro unico, la cui trascrizione arriva dentro la risposta (nil: strada di prima).
+    private var canaleUnico: CanaleUnico?
     /// Difetto 3 (controllo del 25 ott): la risposta com'era quando il volume l'ha fermata. Se poi nella registrazione non c'è
     /// nessuna sua parola (una tosse, una porta, una risata vicino), JARVIS riprende da lì invece di dire «Non ho capito».
     private struct RispostaSospesa {
@@ -214,10 +219,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     // MARK: Interazione
 
     func controllaCollegamento() {
-        guard PortachiaviOrologio.leggi().isEmpty else { return }
+        let indirizzo = ImpostazioniOrologio.indirizzo
+        let gia = PortachiaviOrologio.leggi()
+        // idea D: il cervello si sveglia (come sull'iPhone) e dice se sa ricevere la frase come audio insieme alla risposta
+        if !gia.isEmpty { Task { await JarvisOrologio.riscalda(token: gia, indirizzo: indirizzo) } }
+        guard gia.isEmpty else { return }
         stato = "Mi collego all'iPhone…"
         Task {
             let ok = await PonteOrologio.condiviso.chiediToken()
+            if ok { await JarvisOrologio.riscalda(token: PortachiaviOrologio.leggi(), indirizzo: indirizzo) }
             if fase == .attesa { stato = ok ? nil : "Apra JARVIS sull'iPhone vicino a me, Sir: così ricevo la parola d'ordine." }
         }
     }
@@ -269,9 +279,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // M7: la nota sta in testa al messaggio, come sull'iPhone (il cervello la riconosce lì); la domanda interrotta resta
         // al suo posto nella cronologia, con la risposta per quanto l'aveva sentita.
         var perCervello: String?
-        if let prima {
-            perCervello = "(ti ho interrotto mentre rispondevi a «\(prima)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) \(testo)"
-        }
+        if let prima { perCervello = JarvisOrologio.notaInterruzione(prima) + testo }
         domanda = testo
         risposta = ""
         rispostaGrezza = ""
@@ -287,6 +295,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
         domandaAVoce = aVoce
         compito = Task { await self.turno(nuovoTentativo: true) }
+    }
+
+    /// La nota che va davanti alla frase quando il signore aveva interrotto la risposta a `prima` (il cervello la riconosce lì).
+    nonisolated static func notaInterruzione(_ prima: String) -> String {
+        "(ti ho interrotto mentre rispondevi a «\(prima)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) "
     }
 
     /// Come sull'iPhone: la frase è solo un ordine di silenzio.
@@ -493,8 +506,20 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let prima = primaParte                          // c'era una frase prima, e questa è la sua aggiunta
         primaParte = nil
         let token = PortachiaviOrologio.leggi()
-        let base = ImpostazioniOrologio.indirizzo
-        let indirizzo = base.hasSuffix("/jarvis") ? base + "-ascolto" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-ascolto")
+        canaleUnico = nil
+        // Idea D (25 ott): una frase normale (non un'interruzione sopra JARVIS, non l'aggiunta a una frase di prima) va al cervello
+        // in una richiesta sola, l'audio insieme alla domanda: il cervello la trascrive, la rimanda subito e intanto prepara la
+        // risposta. Un giro di rete in meno al polso. Se il cervello non lo sa fare, o la trascrizione non riesce, la strada di prima.
+        if ImpostazioniOrologio.giroUnico, eco == nil, prima == nil, !token.isEmpty, let audio, audio.count > 1_000 {
+            let canale = CanaleUnico()
+            canale.prima = Date().timeIntervalSince(quandoDaUnire) < Dialogo.validitaInterruzione ? daUnire : nil
+            canaleUnico = canale
+            ultimaTrascrizione = Task { await canale.attendi() }
+            compito = Task { await self.turno(nuovoTentativo: true, unico: (audio: audio, canale: canale)) }
+            ascoltaAggiunta(fondo: fondoStanza)          // M7: per 2 secondi il microfono resta aperto per un'aggiunta
+            return
+        }
+        let indirizzo = JarvisOrologio.indirizzoAscolto
         let trascrizione = Task { () -> TrascrittoOrologio in
             guard let audio, audio.count > 1_000 else { return TrascrittoOrologio(testo: nil, errore: nil, vuoto: true) }
             let (testo, errore) = await JarvisOrologio.trascrivi(audio, token: token, indirizzo: indirizzo)
@@ -570,8 +595,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
         } else {
             primaParte = ultimaTrascrizione              // ancora in trascrizione: partirà insieme a questa
         }
-        compito?.cancel()
-        compito = nil
+        if let c = canaleUnico, c.esito == nil {
+            // idea D: la prima frase è ancora in trascrizione dentro il giro unico. La richiesta non si chiude: serve il suo testo,
+            // che partirà insieme a questa aggiunta; appena arriva, il giro unico si ferma da solo (prima che parta Claude)
+            c.soloTesto = true
+            compito = nil
+        } else {
+            compito?.cancel()
+            compito = nil
+        }
         zittisci()
         continuaAscolto(r)
     }
@@ -863,7 +895,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Dialogo con il cervello
 
-    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione }
+    /// `lascia`, `soloTesto`, `ripiega`: idea D, il giro unico si ferma dopo la trascrizione (comando dell'app, testo per
+    /// l'aggiunta, trascrizione fallita nel cervello).
+    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione, lascia(String), soloTesto, ripiega }
 
     /// Strumenti che l'orologio sa eseguire per il cervello.
     static let strumenti = ["salute_battito", "salute_riepilogo", "riconosci_musica", "meteo_qui", "foto_cerca"]
@@ -923,7 +957,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
-    private func turno(nuovoTentativo: Bool) async {
+    /// `unico`: idea D, la frase parte come audio in questa stessa richiesta (la trascrizione arriva con «trascritto»).
+    private func turno(nuovoTentativo: Bool, unico: (audio: Data, canale: CanaleUnico)? = nil) async {
+        // idea D: chi aspetta il testo della frase (l'aggiunta) non resta mai appeso, qualunque cosa succeda qui
+        defer { unico?.canale.consegna(TrascrittoOrologio(testo: nil, errore: nil, vuoto: false)) }
         var token = PortachiaviOrologio.leggi()
         if token.isEmpty {
             stato = "Chiedo la parola d'ordine all'iPhone…"
@@ -936,16 +973,24 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         do {
             var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti]
-            if domandaAVoce {
+            if let u = unico {
+                // idea D: la cronologia come la preparerebbe `chiedi`, senza la domanda nuova (la aggiunge il cervello con la nota)
+                corpo["messaggi"] = storiaSenzaDomanda(prima: u.canale.prima)
+                corpo["audio_domanda"] = u.audio.base64EncodedString()
+                corpo["formato_audio"] = "m4a"
+                corpo["prefisso_domanda"] = u.canale.prima.map { JarvisOrologio.notaInterruzione($0) } ?? ""
+                corpo["a_voce"] = true
+                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
+            } else if domandaAVoce {
                 // idea B: se anche il Mac (o l'iPhone) ha sentito la stessa frase, il cervello fa rispondere uno solo
                 corpo["a_voce"] = true
                 corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
-            iniziaFlussoVoce()
+            if unico == nil { iniziaFlussoVoce() }               // col giro unico la voce si prepara quando la frase è accettata
             for _ in 0..<5 {
-                switch try await flussoConRitentativi(token: token, corpo: corpo, richiesta: UUID().uuidString) {
+                switch try await flussoConRitentativi(token: token, corpo: corpo, richiesta: UUID().uuidString, canale: unico?.canale) {
                 case .fine(let testo):
                     guard !Task.isCancelled else { return }
                     risposta = TagVoce.togli(testo)                               // i toni della voce non si vedono
@@ -959,7 +1004,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     return
                 case .nonAutorizzato:
                     if nuovoTentativo, await PonteOrologio.condiviso.chiediToken(soloDiretta: true) {
-                        await turno(nuovoTentativo: false)       // l'iPhone aveva una parola d'ordine più recente
+                        await turno(nuovoTentativo: false, unico: unico)   // l'iPhone aveva una parola d'ordine più recente
                     } else {
                         fallisci("La parola d'ordine non coincide, Sir. La controlli nell'app JARVIS sull'iPhone.")
                     }
@@ -969,6 +1014,22 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     return
                 case .doppione:
                     doppione()                                   // idea B: risponde un altro dispositivo
+                    return
+                case .lascia(let testo):
+                    // idea D: la frase è un comando dell'orologio (o va detta diversamente): la richiesta è già chiusa, si fa
+                    // come con la strada di prima, con il testo già trascritto
+                    await dopoTrascrizione(Task { TrascrittoOrologio(testo: testo, errore: nil, vuoto: false) }, eco: nil, prima: nil)
+                    return
+                case .soloTesto:
+                    return                                       // idea D: il testo serviva all'aggiunta, che riparte da sé
+                case .ripiega:
+                    // idea D: il cervello non è riuscito a trascrivere: la strada di prima (le orecchie in cloud, più servizi in gara)
+                    guard let u = unico else { fallisci("Non sono riuscito a trascrivere, Sir. Riprovi."); return }
+                    let (testo, errore) = await JarvisOrologio.trascrivi(u.audio, token: token, indirizzo: JarvisOrologio.indirizzoAscolto)
+                    let esito = TrascrittoOrologio(testo: testo, errore: errore, vuoto: false)
+                    u.canale.consegna(esito)
+                    if u.canale.soloTesto { return }
+                    await dopoTrascrizione(Task { esito }, eco: nil, prima: nil)
                     return
                 case .client(let e):
                     // il cervello chiede all'orologio di eseguire uno strumento (es. leggere i battiti)
@@ -1000,11 +1061,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// Se la linea cade (o scade il tempo), riprova da sola fino a quattro volte (pause 1, 2, 4 s) con lo stesso numero di richiesta,
     /// così il cervello riconosce il doppione. Al secondo inciampo JARVIS lo dice a voce.
-    private func flussoConRitentativi(token: String, corpo: [String: Any], richiesta: String) async throws -> Esito {
+    private func flussoConRitentativi(token: String, corpo: [String: Any], richiesta: String, canale: CanaleUnico? = nil) async throws -> Esito {
         var tentativo = 0
         while true {
             do {
-                return try await flusso(token: token, corpo: corpo, richiesta: richiesta)
+                return try await flusso(token: token, corpo: corpo, richiesta: richiesta, canale: canale)
             } catch let e as URLError where JarvisOrologio.lineaCaduta(e) && tentativo < 3 {
                 tentativo += 1
                 risposta = ""                                 // quello arrivato a metà si butta: la risposta ricomincia intera
@@ -1052,7 +1113,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         sintesiInciso.speak(u)
     }
 
-    private func flusso(token: String, corpo: [String: Any], richiesta: String) async throws -> Esito {
+    private func flusso(token: String, corpo: [String: Any], richiesta: String, canale: CanaleUnico? = nil) async throws -> Esito {
         guard let url = URL(string: ImpostazioniOrologio.indirizzo) else { return .errore("Indirizzo del cervello non valido.") }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -1062,10 +1123,13 @@ final class JarvisOrologio: NSObject, ObservableObject {
         req.setValue(richiesta, forHTTPHeaderField: "x-richiesta")
         req.httpBody = try JSONSerialization.data(withJSONObject: corpo)
 
-        let (righe, resp) = try await URLSession.shared.bytes(for: req)
+        let (righe, resp) = try await URLSession.shared.bytes(for: req, delegate: canale?.presa)
         let codice = (resp as? HTTPURLResponse)?.statusCode ?? 0
         if codice == 401 { return .nonAutorizzato }
-        guard codice == 200 else { return .errore("Il cervello ha risposto con un errore (codice \(codice)).") }
+        guard codice == 200 else {
+            if let canale, canale.esito == nil { canale.presa.chiudi(); return .ripiega }   // idea D: la strada di prima
+            return .errore("Il cervello ha risposto con un errore (codice \(codice)).")
+        }
 
         for try await riga in righe.lines {
             try Task.checkCancellation()
@@ -1098,11 +1162,101 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return .client(e)
             case "doppione":
                 return .doppione
+            case "trascritto":
+                // idea D: la frase detta, trascritta dal cervello dentro questa stessa richiesta
+                guard let canale, canale.esito == nil else { break }   // un nuovo tentativo dopo la linea caduta: già fatto
+                let t = (e["d"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if t.isEmpty, e["errore"] != nil { canale.presa.chiudi(); return .ripiega }
+                canale.consegna(TrascrittoOrologio(testo: t, errore: nil, vuoto: false))
+                if canale.soloTesto { canale.presa.chiudi(); return .soloTesto }
+                guard accettaUnico(t, canale: canale) else { canale.presa.chiudi(); return .lascia(t) }
             default:
                 break
             }
         }
         return .errore("La risposta si è interrotta a metà, Sir. Riprovi.")
+    }
+
+    // MARK: Idea D (25 ott): la frase in audio insieme alla richiesta della risposta
+
+    /// Le orecchie in cloud della strada di prima (la funzione jarvis-ascolto).
+    static var indirizzoAscolto: String {
+        let base = ImpostazioniOrologio.indirizzo
+        return base.hasSuffix("/jarvis") ? base + "-ascolto" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-ascolto")
+    }
+
+    /// Il cervello si sveglia (la prima domanda non paga l'avvio) e dice se sa fare il giro unico.
+    nonisolated static func riscalda(token: String, indirizzo: String) async {
+        guard !token.isEmpty, let url = URL(string: indirizzo) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 10
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["sveglia": true])
+        guard let (d, r) = try? await URLSession.shared.data(for: req), (r as? HTTPURLResponse)?.statusCode == 200,
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return }
+        UserDefaults.standard.set(o["giro_unico"] as? Bool ?? false, forKey: "giroUnicoCervello")
+    }
+
+    /// La cronologia che `chiedi` manderebbe, senza la domanda nuova: il cervello la aggiunge con la nota, uguale.
+    private func storiaSenzaDomanda(prima: String?) -> [[String: String]] {
+        var base = storia
+        if base.last?["role"] == "user", prima == nil { base.removeLast() }
+        base.append(["role": "user", "content": ""])
+        base = Array(base.suffix(12))
+        while base.first?["role"] == "assistant" { base.removeFirst() }
+        base.removeLast()
+        return base
+    }
+
+    /// La frase trascritta va al cervello così com'è (come `dopoTrascrizione` → `chiedi(testo, aVoce: true)`)? Non se è un
+    /// comando dell'orologio, una frase dell'iPhone, l'interprete, «piano»/«voce normale», un ordine di silenzio o solo «aspetta».
+    private func eDomandaSemplice(_ testo: String) -> Bool {
+        guard !testo.isEmpty else { return false }
+        if let d = ComandoDedicato.riconosci(testo), d != .salvaLuogo { return false }
+        if JarvisOrologio.fraseDellIPhone(testo) != nil { return false }
+        var comando = ComandoVocale.riconosci(testo)
+        if case .rapido(let a)? = comando {
+            switch a {
+            case .diario, .confidente: return false
+            case .cucina, .riunione: comando = nil
+            }
+        }
+        if case .apri(_)? = comando { return false }
+        if case .interprete(let codice)? = comando,
+           ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first != nil { return false }
+        if Dialogo.volume(testo).cambio != nil { return false }
+        if Self.eSoloSilenzio(testo) || Seguito.soloAspetta(testo) { return false }
+        return true
+    }
+
+    /// Idea D: la frase arrivata con «trascritto» è una domanda normale: la si accetta come farebbe `chiedi(testo, aVoce: true)`,
+    /// ma senza un'altra richiesta, perché la risposta sta già arrivando in questa. Falso: si chiude e si fa come prima.
+    private func accettaUnico(_ testo: String, canale: CanaleUnico) -> Bool {
+        guard fase == .elaboro, eDomandaSemplice(testo) else { return false }
+        let prima = Date().timeIntervalSince(quandoDaUnire) < Dialogo.validitaInterruzione ? daUnire : nil
+        guard prima == canale.prima else { return false }   // nel frattempo è cambiata la domanda interrotta: la strada di prima
+        sospesa = nil
+        riascolta = false
+        dopoAspetta = .no
+        daUnire = nil
+        zittisci()
+        domanda = testo
+        risposta = ""
+        rispostaGrezza = ""
+        immagini = []
+        stato = nil
+        fase = .elaboro
+        rispostaInStoria = false
+        if storia.last?["role"] == "user", prima == nil { storia.removeLast() }
+        storia.append(["role": "user", "content": prima.map { JarvisOrologio.notaInterruzione($0) + testo } ?? testo])
+        inCorso = testo
+        storia = Array(storia.suffix(12))
+        while storia.first?["role"] == "assistant" { storia.removeFirst() }
+        domandaAVoce = true
+        iniziaFlussoVoce()
+        return true
     }
 
     /// Idea B (25 ott): la stessa frase l'ha sentita anche un altro dispositivo e risponde lui: l'orologio tace e torna in attesa.
@@ -1478,6 +1632,33 @@ extension JarvisOrologio: AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
 
 /// Una frase registrata sull'orologio, trascritta in cloud (M7: la trascrizione si può aspettare da due punti).
 nonisolated struct TrascrittoOrologio: Sendable { let testo: String?; let errore: String?; let vuoto: Bool }
+
+/// Idea D (25 ott): la frase partita col giro unico. La sua trascrizione arriva dentro la risposta del cervello: qui la
+/// aspetta chi ne ha bisogno (l'aggiunta dei 2 secondi), e qui c'è la presa per chiudere la richiesta.
+@MainActor
+final class CanaleUnico {
+    private(set) var esito: TrascrittoOrologio?
+    private var attese: [CheckedContinuation<TrascrittoOrologio, Never>] = []
+    /// La domanda interrotta quando la frase è partita (la sua nota va davanti alla frase).
+    var prima: String?
+    /// Il signore ha aggiunto subito un'altra frase: questa serve solo come testo, la risposta non si aspetta.
+    var soloTesto = false
+    let presa = PresaRichiesta()
+
+    func attendi() async -> TrascrittoOrologio {
+        if let esito { return esito }
+        return await withCheckedContinuation { (c: CheckedContinuation<TrascrittoOrologio, Never>) in attese.append(c) }
+    }
+
+    /// La trascrizione (la prima che arriva vale; le altre si ignorano).
+    func consegna(_ e: TrascrittoOrologio) {
+        guard esito == nil else { return }
+        esito = e
+        let chi = attese
+        attese = []
+        for c in chi { c.resume(returning: e) }
+    }
+}
 
 /// Un'immagine sull'orologio: dal web (url) oppure una miniatura arrivata dall'iPhone (dati).
 nonisolated struct FotoOrologio: Identifiable, Hashable, Sendable {

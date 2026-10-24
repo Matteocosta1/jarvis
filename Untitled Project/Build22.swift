@@ -75,6 +75,32 @@ nonisolated enum TagVoce {
 
 // MARK: - Il dialogo: le regole in comune tra iPhone e orologio (revisione del dialogo, 24 ott)
 
+/// Idea D (25 ott): la richiesta di rete di un turno, per chiuderla all'istante quando la frase trascritta dal cervello risulta un
+/// comando dell'app («apri il meteo»): la linea si chiude e il cervello si ferma prima di chiamare Claude. `URLSession.bytes` non
+/// dà il suo task: lo prende questo delegato quando nasce (iOS 16 e watchOS 9 in su). Vale anche per i nuovi tentativi.
+nonisolated final class PresaRichiesta: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: URLSessionTask?
+    private var chiusa = false
+
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        lock.lock()
+        self.task = task
+        let giaChiusa = chiusa
+        lock.unlock()
+        if giaChiusa { task.cancel() }
+    }
+
+    /// Chiude la richiesta (e quelle che nasceranno dopo con questa presa).
+    func chiudi() {
+        lock.lock()
+        chiusa = true
+        let t = task
+        lock.unlock()
+        t?.cancel()
+    }
+}
+
 nonisolated enum Dialogo {
     /// La nota «ti ho interrotto mentre rispondevi a…» vale due minuti, poi sparisce (deciso dal signore, 24 ott):
     /// passato quel tempo, quello che dice è una domanda nuova.
