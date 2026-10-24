@@ -62,6 +62,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     @Published private(set) var storia: [[String: String]] = [] { didSet { salvaStoria() } }   // ultimi scambi, solo testo
     private var compito: Task<Void, Never>?
     private let sintesi = AVSpeechSynthesizer()
+    /// L'avviso detto mentre lavora («la linea fa i capricci»): sintesi a parte, senza delegato. Prima usava `sintesi`, e la sua
+    /// fine (`didFinish` → `voceFinita`) faceva passare la coda alla frase dopo mentre la frase della risposta stava suonando.
+    private let sintesiInciso = AVSpeechSynthesizer()
     private var lettore: AVAudioPlayer?
     private var turnoVoce = 0                         // ogni risposta detta ha il suo numero
     private var registratore: AVAudioRecorder?
@@ -850,7 +853,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         u.voice = AVSpeechSynthesisVoice(language: "it-IT")
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
         u.volume = volumeVoce
-        sintesi.speak(u)
+        sintesiInciso.speak(u)
     }
 
     private func flusso(token: String, corpo: [String: Any], richiesta: String) async throws -> Esito {
@@ -964,6 +967,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         lettore?.stop()
         lettore = nil
         sintesi.stopSpeaking(at: .immediate)
+        sintesiInciso.stopSpeaking(at: .immediate)
         if fase == .parlo { fase = .attesa }
     }
 
@@ -1095,6 +1099,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             defer { if mio == turnoVoce { fraseInVoce = false } }
             let audio = await scarico.value
             guard mio == turnoVoce else { return }
+            if sintesiInciso.isSpeaking { sintesiInciso.stopSpeaking(at: .immediate) }   // arriva la risposta: l'avviso tace
             var partito = false
             if let audio, let p = try? AVAudioPlayer(data: audio) {
                 p.delegate = self
