@@ -2771,9 +2771,23 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
 const senzaSforzo = new Set<string>();
 const sforzo = (modello: string) =>
   Deno.env.get("SFORZO") === "off" || senzaSforzo.has(modello) ? null : /haiku|sonnet/i.test(modello) ? "low" : null;
+// Revisione 24 ott: con il segno di vita ({"t":"vivo"} ogni 15 s) l'app non si accorge più di un Anthropic muto
+// (prima ci pensava il suo limite di 120 s). Se per 90 secondi non arriva nemmeno un byte (Anthropic manda i suoi «ping»
+// anche mentre pensa o cerca sul web), la chiamata si chiude e il signore sente «Il mio cervello ci sta mettendo troppo».
+const SILENZIO_ANTHROPIC_MS = 90_000;
 async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any[], suTesto: (d: string) => void) {
   const inizio = new Date();
   let primaParola: Date | null = null;
+  const freno = new AbortController();
+  let silenzio: number | undefined;
+  const riarma = () => { clearTimeout(silenzio); silenzio = setTimeout(() => freno.abort(), SILENZIO_ANTHROPIC_MS); };
+  const conFreno = async <T>(p: Promise<T>): Promise<T> => {
+    try { return await p; } catch (e) {
+      if (!freno.signal.aborted) throw e;
+      throw new Error(`timeout: Anthropic (${modello}) in silenzio da ${SILENZIO_ANTHROPIC_MS / 1000} s`);
+    }
+  };
+  riarma();
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: pulisci(messages),
     system: [{ type: "text", text: SISTEMA + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
@@ -2782,15 +2796,21 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
-    body: corpo(conSforzo),
+    body: corpo(conSforzo), signal: freno.signal,
   });
-  let r = await manda(true);
+  let r: Response;
+  try { r = await conFreno(manda(true)); } catch (e) { clearTimeout(silenzio); throw e; }
   if (r.status === 400 && sforzo(modello)) {           // se un giorno il parametro non fosse accettato, si riprova senza e lo si ricorda
     const testo = await r.text().catch(() => "");
-    if (/effort|output_config/i.test(testo)) { senzaSforzo.add(modello); console.log(`effort rifiutato da ${modello}: ${testo.slice(0, 160)}`); r = await manda(false); }
+    if (/effort|output_config/i.test(testo)) {
+      senzaSforzo.add(modello); console.log(`effort rifiutato da ${modello}: ${testo.slice(0, 160)}`);
+      riarma();
+      try { r = await conFreno(manda(false)); } catch (e) { clearTimeout(silenzio); throw e; }
+    }
     else r = new Response(testo, { status: 400, headers: { "content-type": "application/json" } });
   }
   if (!r.ok || !r.body) {
+    clearTimeout(silenzio);
     const d = await r.json().catch(() => ({}));
     const err: any = new Error(`${d?.error?.type ?? ""} ${d?.error?.message || `Errore API ${r.status}`} (${r.status})`.trim());
     err.primaDiParlare = true;
@@ -2803,48 +2823,51 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   const uso = { token_in: 0, token_cache: 0, token_cache_scrittura: 0, token_out: 0 };
   const lettore = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = "";
-  for (;;) {
-    const { value, done } = await lettore.read();
-    if (done) break;
-    buf += value.replace(/\r\n/g, "\n");
-    let k;
-    while ((k = buf.indexOf("\n\n")) >= 0) {
-      const evento = buf.slice(0, k); buf = buf.slice(k + 2);
-      const riga = evento.split("\n").find((l) => l.startsWith("data:"));
-      if (!riga) continue;
-      let e: any; try { e = JSON.parse(riga.slice(5).trim()); } catch { continue; }
-      if (e.type === "message_start") {
-        const u = e.message?.usage ?? {};
-        uso.token_in = num(u.input_tokens); uso.token_cache = num(u.cache_read_input_tokens); uso.token_cache_scrittura = num(u.cache_creation_input_tokens);
-      } else if (e.type === "content_block_start") {
-        blocchi[e.index] = structuredClone(e.content_block);
-        if (e.content_block.type === "tool_use" || e.content_block.type === "server_tool_use") jsonParziale[e.index] = "";
-      } else if (e.type === "content_block_delta") {
-        const b = blocchi[e.index], d = e.delta;
-        if (!b || !d) continue;
-        if (d.type === "text_delta") { primaParola ??= new Date(); b.text = (b.text ?? "") + d.text; suTesto(d.text); }
-        else if (d.type === "input_json_delta") jsonParziale[e.index] = (jsonParziale[e.index] ?? "") + d.partial_json;
-        else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
-        else if (d.type === "signature_delta") b.signature = d.signature;
-        else if (d.type === "citations_delta" && d.citation) (b.citations ??= []).push(d.citation);
-      } else if (e.type === "content_block_stop") {
-        if (e.index in jsonParziale) {
-          const s = jsonParziale[e.index].trim();
-          blocchi[e.index].input = s ? JSON.parse(s) : {};
-          delete jsonParziale[e.index];
+  try {
+    for (;;) {
+      riarma();
+      const { value, done } = await conFreno(lettore.read());
+      if (done) break;
+      buf += value.replace(/\r\n/g, "\n");
+      let k;
+      while ((k = buf.indexOf("\n\n")) >= 0) {
+        const evento = buf.slice(0, k); buf = buf.slice(k + 2);
+        const riga = evento.split("\n").find((l) => l.startsWith("data:"));
+        if (!riga) continue;
+        let e: any; try { e = JSON.parse(riga.slice(5).trim()); } catch { continue; }
+        if (e.type === "message_start") {
+          const u = e.message?.usage ?? {};
+          uso.token_in = num(u.input_tokens); uso.token_cache = num(u.cache_read_input_tokens); uso.token_cache_scrittura = num(u.cache_creation_input_tokens);
+        } else if (e.type === "content_block_start") {
+          blocchi[e.index] = structuredClone(e.content_block);
+          if (e.content_block.type === "tool_use" || e.content_block.type === "server_tool_use") jsonParziale[e.index] = "";
+        } else if (e.type === "content_block_delta") {
+          const b = blocchi[e.index], d = e.delta;
+          if (!b || !d) continue;
+          if (d.type === "text_delta") { primaParola ??= new Date(); b.text = (b.text ?? "") + d.text; suTesto(d.text); }
+          else if (d.type === "input_json_delta") jsonParziale[e.index] = (jsonParziale[e.index] ?? "") + d.partial_json;
+          else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
+          else if (d.type === "signature_delta") b.signature = d.signature;
+          else if (d.type === "citations_delta" && d.citation) (b.citations ??= []).push(d.citation);
+        } else if (e.type === "content_block_stop") {
+          if (e.index in jsonParziale) {
+            const s = jsonParziale[e.index].trim();
+            blocchi[e.index].input = s ? JSON.parse(s) : {};
+            delete jsonParziale[e.index];
+          }
+        } else if (e.type === "message_delta") {
+          if (e.delta?.stop_reason) stop = e.delta.stop_reason;
+          if (e.usage?.output_tokens) uso.token_out = num(e.usage.output_tokens);
+        } else if (e.type === "error") {
+          // 24 ott: un «Overloaded» a metà flusso ma prima della prima parola vale come un errore prima di parlare:
+          // il signore non ha sentito niente, quindi si passa al modello di riserva invece di arrendersi
+          const err: any = new Error(`${e.error?.type ?? ""} ${e.error?.message || "errore nello streaming"}`.trim());
+          if (!primaParola) err.primaDiParlare = true;
+          throw err;
         }
-      } else if (e.type === "message_delta") {
-        if (e.delta?.stop_reason) stop = e.delta.stop_reason;
-        if (e.usage?.output_tokens) uso.token_out = num(e.usage.output_tokens);
-      } else if (e.type === "error") {
-        // 24 ott: un «Overloaded» a metà flusso ma prima della prima parola vale come un errore prima di parlare:
-        // il signore non ha sentito niente, quindi si passa al modello di riserva invece di arrendersi
-        const err: any = new Error(`${e.error?.type ?? ""} ${e.error?.message || "errore nello streaming"}`.trim());
-        if (!primaParola) err.primaDiParlare = true;
-        throw err;
       }
     }
-  }
+  } finally { clearTimeout(silenzio); }
   // il contatore dei consumi: una riga per chiamata, letta dalla scheda Supabase
   inSottofondo(db.from("jarvis_consumi").insert({ servizio: "claude", modello, ...uso }).then(() => {}, () => {}));
   langfuse(modello, inizio, primaParola, uso, stop, blocchi);
