@@ -73,7 +73,7 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
                 Task { @MainActor in
                     let motore = MotoreGuida.condiviso
                     let vale = motore.luogo?.chiave == e.chiave && motore.percorso == nil && motore.errore == e.testo
-                    risposta(["guida": vale ? ["errore": e.testo] : ["fine": true]])
+                    risposta(["guida": vale ? (["errore": e.testo] as [String: Any]) : (["fine": true] as [String: Any])])   // tipi scritti: i due rami sono dizionari diversi
                 }
                 return
             }

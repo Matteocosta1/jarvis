@@ -1643,7 +1643,7 @@ final class CanaleUnico {
     var prima: String?
     /// Il signore ha aggiunto subito un'altra frase: questa serve solo come testo, la risposta non si aspetta.
     var soloTesto = false
-    let presa = PresaRichiesta()
+    let presa = PresaRete()
 
     func attendi() async -> TrascrittoOrologio {
         if let esito { return esito }

@@ -115,7 +115,7 @@ final class GiroUnicoMac {
     let origine: Origine
     let prefisso: String
     let fine: Date
-    let presa = PresaRichiesta()
+    let presa = PresaRete()
     var gestito = false                   // «trascritto» già arrivato (un nuovo tentativo dopo la linea caduta lo ripete)
     private var fatto: (() -> Void)?      // l'attesa del Mac può mandare la frase che aspettava
 

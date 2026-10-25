@@ -78,7 +78,8 @@ nonisolated enum TagVoce {
 /// Idea D (25 ott): la richiesta di rete di un turno, per chiuderla all'istante quando la frase trascritta dal cervello risulta un
 /// comando dell'app («apri il meteo»): la linea si chiude e il cervello si ferma prima di chiamare Claude. `URLSession.bytes` non
 /// dà il suo task: lo prende questo delegato quando nasce (iOS 16 e watchOS 9 in su). Vale anche per i nuovi tentativi.
-nonisolated final class PresaRichiesta: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+/// Si chiama `PresaRete` perché `PresaRichiesta` c'è già nell'app dell'iPhone (Wiretap.swift, la richiesta del riconoscimento).
+nonisolated final class PresaRete: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var task: URLSessionTask?
     private var chiusa = false
