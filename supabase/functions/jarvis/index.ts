@@ -163,6 +163,7 @@ Email: per «rapporto posta», «cosa c'è di importante?» usa posta_priorita (
 Chat: se il signore chiede di cancellare o pulire la conversazione usa conversazione_pulisci (memoria e note restano) e conferma in poche parole.
 Scanner: il signore scansiona i prodotti dalla voce Scanner dell'app; se ti scrive «Ho scansionato …» o ti detta un codice a barre, usa prodotto_scansiona. Rispondi come Yuka ma da JARVIS: il voto e il giudizio, poi in una o due frasi cosa pesa (additivi a rischio, zuccheri, sale, grassi saturi, ultra-trasformato) e, se il voto è basso, che tipo di alternativa cercare. Il voto è nostro, i dati sono di Open Food Facts: non sono consigli medici.
 Credito: JARVIS funziona con il credito delle API di Anthropic, ricaricato a mano dal signore (mai automatico). «Ho ricaricato 50 dollari» → credito ricarica con importo 50; «il saldo nella Console è 42» → credito saldo; «quanto credito ho?», «quanto mi resta?» → credito stato, e rispondi con il residuo stimato in una frase («circa 31 dollari su 50, Sir; è una stima»). Se il signore parla di euro, usa il numero com'è e ricordagli che la Console conta in dollari. Se il contesto contiene [Avviso credito …], dillo in una frase all'inizio della risposta.
+Impegni della notte: se il contesto contiene [Impegni da confermare …], sono cose che il signore ha detto ieri di passaggio, trovate di notte; il briefing del mattino gli ha già chiesto se segnarle. Non riproporle tu di tua iniziativa. Quando ne parla o risponde («sì», «segnali», «il primo sì, il secondo no», «quello di Matteo mettilo alle 18»), usa impegni_conferma con i numeri giusti: segna diventa una promessa con l'avviso, scarta la toglie. Poi conferma in una frase.
 Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti», «funziona tutto?» o lamenta che qualcosa non va senza sapere cosa, usa diagnostica. Riferisci in poche frasi: prima ciò che NON funziona o sta per finire (crediti voce quasi esauriti, chiave rifiutata, servizio che non risponde) con il rimedio in parole semplici; se è tutto a posto dillo in una frase e aggiungi i crediti voce rimasti. Non elencare i servizi che vanno bene uno per uno.
 Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando.
 Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa immagini_cerca; per dischi, copertine ed etichette preferisci discogs_cerca. Le immagini compaiono da sole in una galleria nell'app: non elencarle e non leggere indirizzi, di' solo in una frase cosa hai trovato.
@@ -256,6 +257,10 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { da: { type: "string", description: "inizio del periodo, ISO 8601 (es. 2026-10-19T06:00:00+02:00)" }, a: { type: "string", description: "fine del periodo, ISO 8601; se manca, adesso" } }, required: ["da"] } },
   { name: "credito", description: "Il credito delle API di Anthropic che fa funzionare JARVIS (stima dai token consumati, in dollari). azione stato: quanto resta. azione ricarica: il signore ha appena ricaricato «importo» dollari (si somma al residuo). azione saldo: il signore legge dalla Console il saldo esatto «importo» (riparte da lì).",
     input_schema: { type: "object", properties: { azione: { type: "string", enum: ["stato", "ricarica", "saldo"] }, importo: { type: "number" } }, required: ["azione"] } },
+  { name: "impegni_conferma", description: "La notte di JARVIS: gli impegni detti ieri di passaggio, trovati di notte, che il briefing ha chiesto di segnare (sono nel contesto, [Impegni da confermare], col loro numero). segna: diventano promesse con l'avviso (quando, se il signore indica un orario diverso da quello proposto). scarta: il signore non li vuole.",
+    input_schema: { type: "object", properties: {
+      segna: { type: "array", items: { type: "object", properties: { id: { type: "integer" }, quando: { type: "string", description: "nuovo orario ISO 8601 con fuso di Roma, solo se il signore lo cambia" } }, required: ["id"] } },
+      scarta: { type: "array", items: { type: "integer" } } } } },
   { name: "diagnostica", description: "Controlla in pochi secondi tutti i collegamenti di JARVIS: voce ElevenLabs (crediti rimasti e scadenza), Gemini, Google Immagini (Serper), Discogs, posta iCloud, SMS e chiamate ClickSend (saldo), WhatsApp d'emergenza, database. Restituisce per ciascuno ok / problema / non configurato con il dettaglio.",
     input_schema: { type: "object", properties: {} } },
   { name: "edith_porte", description: "EDITH, sicurezza: cosa si vede da internet di un indirizzo IP (porte aperte, servizi, vulnerabilità note, da Shodan InternetDB). Senza ip controlla la rete da cui il signore sta usando JARVIS adesso (casa, ufficio). Utile per router, DVR delle telecamere, NAS, PC esposti.",
@@ -461,6 +466,7 @@ async function eseguiConLimite(nome: string, i: Record<string, any>, turno: Turn
 async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
   switch (nome) {
     case "credito": return await credito(i);
+    case "impegni_conferma": return await impegniConferma(i);
     case "costi": return await costiPeriodo(i);
     case "prodotto_scansiona": return await prodotto(String(i.codice ?? ""));
     case "memoria_salva": {
@@ -2630,6 +2636,53 @@ Rispondi SOLO con un array JSON di oggetti {"fatto": "...", "categoria": "profil
     console.log(`memoria automatica: ${nuovi.length} fatti nuovi`);
   } catch (e) { console.log(`memoria automatica non riuscita: ${(e as Error).message}`); }
 }
+// ───────────────────────── La notte di JARVIS (25 ott, approvata dal signore) ─────────────────────────
+// Ogni frase del signore (con l'inizio della risposta) finisce in jarvis_giornata, così di notte jarvis-briefing può trovare gli
+// impegni detti di passaggio. Mai le modalità riservate (stessa regola dell'archivista), mai la prova generale; in un turno che
+// ha letto testo altrui (web, email) si salva solo la frase del signore. Le frasi restano al massimo 3 giorni.
+async function registraGiornata(lavoro: any[], risposta: string, dispositivo: string, contaminato: boolean) {
+  try {
+    let k = -1;
+    for (let j = lavoro.length - 1; j >= 0; j--) if (utenteVero(lavoro[j])) { k = j; break; }
+    if (k < 0) return;
+    const frase = senzaNoteApp(senzaContesto(testoDi(lavoro[k].content))).trim();
+    const prima = k > 0 && lavoro[k - 1]?.role === "assistant" ? testoDi(lavoro[k - 1].content) : "";
+    if (frase.length < 8 || NON_MEMORIZZARE.test(frase) || NON_MEMORIZZARE.test(prima)) return;
+    await db.from("jarvis_giornata").insert({ dispositivo, signore: frase.slice(0, 1500), jarvis: contaminato ? null : risposta.trim().slice(0, 400) || null });
+  } catch (e) { console.log(`giornata non registrata: ${(e as Error).message}`); }
+}
+
+/// Le proposte della notte ancora senza risposta, per il contesto del turno (vuoto se non ce ne sono: niente in più nel turno).
+async function impegniDaConfermare(): Promise<string> {
+  try {
+    const { data } = await db.from("jarvis_impegni").select("id, testo, persona, quando").eq("stato", "proposto").gte("giorno", oggiRoma()).order("id").limit(5);
+    if (!data?.length) return "";
+    return `\n[Impegni da confermare (detti ieri di passaggio, chiesti dal briefing): ${data.map((r: any) =>
+      `#${r.id} ${r.testo}${r.quando ? ` (${fmtQuando.format(new Date(r.quando))})` : ""}`).join(" · ")}]`;
+  } catch { return ""; }
+}
+
+async function impegniConferma(i: any) {
+  const segna: any[] = Array.isArray(i.segna) ? i.segna : [];
+  const scarta: number[] = Array.isArray(i.scarta) ? i.scarta.map((x: any) => num(x)) : [];
+  const fatti: string[] = [];
+  for (const s of segna) {
+    const { data: r } = await db.from("jarvis_impegni").select("id, testo, persona, quando, stato").eq("id", num(s?.id)).maybeSingle();
+    if (!r || r.stato !== "proposto") continue;
+    let quando = r.quando as string | null;
+    if (s?.quando) { const d = new Date(String(s.quando)); if (!isNaN(d.getTime())) quando = d.toISOString(); }
+    const { data: ric, error } = await db.from("jarvis_ricordi").insert({ tipo: "promessa", testo: r.testo, persona: r.persona, quando }).select("id").single();
+    if (error) throw error;
+    await db.from("jarvis_impegni").update({ stato: "segnato", ricordo: ric.id }).eq("id", r.id);
+    fatti.push(`segnato: ${r.testo}${quando ? ` (avviso ${fmtQuando.format(new Date(quando))})` : " (senza orario: niente avviso)"}`);
+  }
+  if (scarta.length) {
+    const { data } = await db.from("jarvis_impegni").update({ stato: "scartato" }).in("id", scarta).eq("stato", "proposto").select("testo");
+    for (const r of data ?? []) fatti.push(`scartato: ${r.testo}`);
+  }
+  return fatti.length ? { ok: true, fatti } : { ok: false, nota: "nessun impegno in attesa con quei numeri" };
+}
+
 const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch { /* si lascia correre */ } };
 
 // ───────────────────────── Registro delle azioni ─────────────────────────
@@ -2637,7 +2690,7 @@ const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRu
 // le azioni fatte e finisce per dubitarne o rifarle. Qui si annotano quelle che cambiano qualcosa.
 const DA_REGISTRARE = new Set(["invia_messaggio", "messaggio", "telefono_comando", "chiama", "calendario_crea", "promemoria_crea", "naviga",
   "musica_riproduci", "apri_apple_music", "apri_pagina", "note_salva", "note_completa", "memoria_salva", "memoria_dimentica",
-  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto"]);
+  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto", "impegni_conferma"]);
 
 // ───────── Reparto Bea: la scheda di Beatrice e il suo gestionale del pilates ─────────
 // Il gestionale sta in un altro progetto Supabase: si legge (solo lettura) con la chiave nel segreto GESTIONALE_BEA_KEY.
@@ -3855,7 +3908,7 @@ const STATI: Record<string, string> = {
   web_search: "cerco sul web", meteo: "guardo il meteo", serata_riepilogo: "faccio i conti della serata", dati_leggi: "consulto le serate",
   bar_magazzino: "controllo bar e magazzino", immagini_cerca: "cerco le immagini", diagnostica: "controllo tutti i collegamenti",
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
-  credito: "controllo il credito", prodotto_scansiona: "leggo l'etichetta", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
+  credito: "controllo il credito", impegni_conferma: "segno gli impegni", prodotto_scansiona: "leggo l'etichetta", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
   posta_priorita: "smisto la posta", posta_rispondi: "spedisco la risposta", radar_pioggia: "guardo il radar",
   discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
 };
@@ -4227,7 +4280,7 @@ Deno.serve(async (req) => {
           // idea B: un solo JARVIS risponde alla stessa frase sentita da più dispositivi (solo le frasi dette a voce, con `arbitro`)
           const arbitro: Promise<boolean> = corpo.arbitro && !provaGenerale
             ? arbitra(corpo.arbitro, String(scelti.at(-1)?.m?.content ?? ""), dispositivo) : Promise.resolve(true);
-          const [[{ data: mem }, fatte, avvisoCr, filo], vince, ripetuta] = await Promise.all([Promise.all([
+          const [[{ data: mem }, fatte, avvisoCr, filo, impegniCr], vince, ripetuta] = await Promise.all([Promise.all([
             // decisione 52 (24 ott): oltre 80 fatti si caricano gli 80 più RECENTI (prima erano i più vecchi); i più vecchi che
             // servono li aggiunge qui sotto la ricerca per significato
             db.from("jarvis_memoria").select("id, fatto, categoria, creata").order("creata", { ascending: false }).order("id", { ascending: false }).limit(80),
@@ -4235,6 +4288,7 @@ Deno.serve(async (req) => {
             avvisoCredito(),
             conFilo ? leggiFilo(dispositivo, battute).catch(() => ({ riassunto: "", uscite: [] as Battuta[], ereditate: [] as boolean[] }))
               : Promise.resolve({ riassunto: "", uscite: [] as Battuta[], ereditate: [] as boolean[] }),
+            provaGenerale ? Promise.resolve("") : impegniDaConfermare(),   // la notte di JARVIS
           ]), arbitro, giaFatta(invia), grazia]);
           if (ripetuta) { chiudi(); return; }            // la linea era caduta e la risposta c'era già: rimandata così com'era
           fermaSeStaccato();                               // idea D: l'app ha chiuso la linea (era un suo comando): niente Claude
@@ -4271,7 +4325,7 @@ Deno.serve(async (req) => {
           const unaRiga = (t: string) => t.replace(/\s+/g, " ").trim();   // il contesto non deve avere righe vuote dentro (vedi senzaContesto)
           const testoFilo = (filo.riassunto ? `\n[Filo: prima delle battute qui sotto si parlava di: ${unaRiga(filo.riassunto)}]` : "")
             + (filo.uscite.length ? `\n[Battute appena uscite dalla finestra: ${filo.uscite.map((b) => `${b.r === "user" ? "Signore" : "Tu"}: ${unaRiga(battutaPerFilo(b)).slice(0, 600)}`).join(" · ")}]` : "");
-          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${testoFilo}${avvisoCr}\n\n${ultimo}`;
+          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${testoFilo}${avvisoCr}${impegniCr}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) turno.foto = imgs[0];
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
@@ -4314,6 +4368,8 @@ Deno.serve(async (req) => {
             segnaTempi("fine");
             // la prova generale non lascia ricordi; un turno che ha letto testo altrui (web, email, trascrizioni) nemmeno
             if (!provaGenerale && !contaminato) inSottofondo(memoriaAutomatica(lavoro, testo));
+            // la notte di JARVIS: solo le frasi del signore (il briefing chiede al cervello con senza_filo: non è lui che parla)
+            if (!provaGenerale && corpo.senza_filo !== true) inSottofondo(registraGiornata(lavoro, testo, dispositivo, contaminato));
             if (!provaGenerale) inSottofondo(completaVettori());   // le righe nuove di memoria, ricordi, note e diario prendono il loro vettore
             chiudi(); return;
           }
