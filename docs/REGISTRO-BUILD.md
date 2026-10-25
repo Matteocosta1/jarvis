@@ -41,7 +41,17 @@ Punto fermo: la conversazione era perfetta prima della modifica del volume (403c
 Dopo la 8.0 (5), se il dialogo va, si rimettono uno alla volta: volume all'avvio, comandi LiDAR/Sentinella/Wiretap,
 comandi Allenatore/Interprete/rapidi — una build per pezzo, provata ogni volta.
 
+## Stato al 25 ott 2026, 03:15 (passaggio a una chat nuova)
+
+- **Rami:** app su `claude/build-23` (il ramo del suo Xcode; `claude/build-24` uguale) · cervello vivo = `jarvis` **v113** da `claude/decisioni-cervello` @ 86ed032 (sha256 index.ts ab6e8b2b…), tabella `jarvis_arbitro` creata · `jarvis-briefing` v21 · archivio del codice della 23: `claude/archivio-9.0-23`.
+- **Build:** 26 = buona (LiDAR «eccellente») · 27 = iPhone bene, polso crash, Mac male · 28 = crash del polso corretto · **29 = Mac rifatto** (da caricare e provare: vedi `docs/controlli/MAC-29.md`).
+- **Regola del signore:** il cervello attuale funziona benissimo; non cambiarlo per il Mac (rischio per l'iPhone). Ogni build: Pull + Archive + TestFlight sullo stesso ramo; numero chiesto a lui; controllare import (Combine) e i limiti dell'orologio (Int a 32 bit su arm64_32).
+- **Prove da fare:** 29 sul Mac (silenzio 2 min senza risposte; una risposta sola; «Jarvis, muto» sopra la sua voce; mezz'ora senza perdere frasi) · 28/29 al polso (la domanda arriva? `jarvis_arbitro` tipo «orologio») · test della 27 su iPhone (un solo JARVIS iPhone+Mac, impronta che ferma, Opus rapido: già misurato 1,5–3 s alla prima parola).
+- **Aperti:** indicatore «ti ascolto» sul Mac (proposta di design da approvare) · soglia d'inizio del Mac da tarare dal vivo · proposte cervello (a)/(b) in `MAC-29.md`, solo se lui le chiede · decisioni del mockup e del battito di mani ancora da chiedere · DA CHIEDERE vecchi (guida a telefono bloccato ecc.).
+- **Rapporti:** `docs/controlli/` (DIALOGO-27, AUDIT-DIALOGO-25OTT, DECISIONI-24OTT, MAC-29).
+
 ## Apprendimenti
+- **25 ott:** l'Apple Watch SE 2 (arm64_32) ha `Int` a 32 bit: `Int(ms dal 1970)` chiude l'app → usare `Int64` per tempi in millisecondi; i log dei dispositivi si riconoscono dallo user agent (`…/NN` = numero di build installato).
 
 Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiornato a ogni sessione.
 
