@@ -971,6 +971,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return
             }
         }
+        // 25 ott, crash della 27: l'orologio (arm64_32) ha Int a 32 bit; i millisecondi dal 1970 (~1,76 bilioni) non ci stanno
+        // e Int(...) chiudeva l'app appena preparata la domanda. Per «fine» si usa Int64.
         do {
             var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti]
             if let u = unico {
@@ -980,11 +982,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 corpo["formato_audio"] = "m4a"
                 corpo["prefisso_domanda"] = u.canale.prima.map { JarvisOrologio.notaInterruzione($0) } ?? ""
                 corpo["a_voce"] = true
-                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
+                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int64(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             } else if domandaAVoce {
                 // idea B: se anche il Mac (o l'iPhone) ha sentito la stessa frase, il cervello fa rispondere uno solo
                 corpo["a_voce"] = true
-                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
+                corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int64(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
