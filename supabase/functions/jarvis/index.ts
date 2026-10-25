@@ -3775,8 +3775,9 @@ async function trascriviTesto(b64: string, formato: "wav" | "m4a"): Promise<{ te
 // una frase quasi uguale nello stesso momento, vince chi l'ha sentita finire per primo (a 0,4 s di precisione), a pari merito
 // chi ne ha sentito di più (più parole). Chi ha già vinto resta vincitore. Con un dispositivo solo non cambia niente: niente
 // attesa e la frase vince subito. Se il database non risponde, o qualcosa non torna, la frase vince (meglio due voci che nessuna).
-/// Idea D: dopo «trascritto» l'app ha questo tempo per chiudere la linea (un suo comando) prima che parta Claude.
-const GRAZIA_AUDIO_MS = 150;
+/// Idea D: dopo «trascritto» l'app ha questo tempo per chiudere la linea (un suo comando) prima che parta Claude. All'orologio
+/// di più: la sua rete passa spesso dall'iPhone e il giro andata e ritorno è più lungo. Le letture del turno vanno intanto.
+const graziaAudio = (dispositivo: string) => dispositivo === "orologio" ? 300 : 150;
 const ARBITRO_ATTESA_MS = 300;        // se un altro dispositivo era attivo negli ultimi 2 minuti, si aspetta che arrivi anche la sua copia
 const ARBITRO_TETTO_MS = 1200;        // oltre, la frase vince da sola
 const RICHIAMI_ARBITRO = new Set(["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "okay", "senti", "scusa", "allora", "bro", "dai"]);
@@ -4137,6 +4138,7 @@ Deno.serve(async (req) => {
       // ms_prima_parola = dall'arrivo della richiesta alla prima parola mandata all'app; ms_totale = fino alla fine del turno
       let primaTurno: number | null = null, modelloTurno: string | null = null, turnoSegnato = false;
       let soloTrascritto = false;   // idea D: mandato «trascritto», Claude non ancora partito (se l'app chiude ora era un suo comando)
+      let filoDopo: (() => void) | null = null;   // idea D: l'aggiornamento del filo, dopo il primo giro con Claude
       const segnaTempi = (esito: string) => {
         if (turnoSegnato || provaGenerale) return;
         turnoSegnato = true;
@@ -4203,7 +4205,7 @@ Deno.serve(async (req) => {
             const prima: any[] = Array.isArray(corpo.messaggi) ? corpo.messaggi : [];
             const prefisso = typeof corpo.prefisso_domanda === "string" ? corpo.prefisso_domanda : "";
             corpo.messaggi = [...prima, { role: "user", content: prefisso + tr.testo }];
-            grazia = new Promise((ok) => setTimeout(ok, GRAZIA_AUDIO_MS));
+            grazia = new Promise((ok) => setTimeout(ok, graziaAudio(dispositivo)));
           }
           const grezzi: any[] = Array.isArray(corpo.messaggi) ? corpo.messaggi : [];
           const scelti = grezzi.map((m: any, i: number) => ({ m, i })).slice(-20)
@@ -4243,7 +4245,10 @@ Deno.serve(async (req) => {
             segnaTempi("doppione");
             chiudi(); return;
           }
-          if (conFilo) inSottofondo(aggiornaFilo(dispositivo, filo.riassunto, filo.uscite, battute, filo.ereditate));
+          // idea D: con la frase in audio il filo si aggiorna solo quando Claude è partito davvero (se l'app chiude la linea dopo
+          // la breve attesa perché era un suo comando, «apri il meteo» non finisce nel filo come una domanda senza risposta)
+          const filo0 = () => { if (conFilo) inSottofondo(aggiornaFilo(dispositivo, filo.riassunto, filo.uscite, battute, filo.ereditate)); };
+          if (typeof corpo.audio_domanda === "string") filoDopo = filo0; else filo0();
           // memoria lunga (oltre 80 fatti): si aggiungono quelli più vicini per significato a ciò che chiede adesso
           // nel contesto restano nell'ordine di prima: per categoria, poi dal più vecchio al più nuovo
           let memoriaTurno: any[] = [...(mem ?? [])].sort((a: any, b: any) => String(a.categoria ?? "").localeCompare(String(b.categoria ?? ""))
@@ -4295,6 +4300,7 @@ Deno.serve(async (req) => {
             // subito invece di tenerla ferma fino alla risposta dello strumento (e non la incolla alla frase dopo)
             () => { if (detto && !/\s$/.test(detto)) { detto += " "; invia({ t: "testo", d: " " }); } }, linea.signal, rapida);
           lavoro.push({ role: "assistant", content: r.content });
+          if (filoDopo) { filoDopo(); filoDopo = null; }
           for (const b of r.content) if ((b.type === "server_tool_use" || b.type === "tool_use") && NON_FIDATI.has(b.name)) contaminato = true;
           for (const b of r.content) if (b.type === "server_tool_use") { azioni.push(b.name); invia({ t: "stato", d: STATI[b.name] ?? b.name }); }
           if (r.stop_reason === "pause_turn") continue; // ricerca web lunga: si rimanda il messaggio così com'è

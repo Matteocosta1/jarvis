@@ -117,4 +117,19 @@ const [r8a, r8b] = await Promise.all([righe(await richiesta(domanda, { "x-richie
   pausa(200).then(async () => righe(await richiesta(domanda, { "x-richiesta": num8 })))]);
 atteso("8. la ripetuta in lavorazione aspetta e rimanda la risposta pronta", r8b.at(-1)?.t === "fine" && r8b.at(-1)?.testo === r8a.at(-1)?.testo, { r8a: r8a.map((e) => e.t), r8b });
 atteso("8. Claude chiamato una volta sola", anthropic.length === 1, anthropic.length);
+// 9 ─ il filo: col comando chiuso dall'app non si scrive niente; con la domanda vera sì (dopo il primo giro con Claude)
+azzera();
+trascrizione.testo = "apri il meteo";
+const r9 = await C.__servi(new Request("http://x/jarvis", { method: "POST", headers: { "x-jarvis-token": "prova", "content-type": "application/json" },
+  body: JSON.stringify({ dispositivo: "orologio", strumenti_client: [], audio_domanda: audio, formato_audio: "m4a", messaggi: [] }) }));
+const rd9 = r9.body!.getReader();
+for (;;) { const x = await rd9.read(); if (x.done) break; if (new TextDecoder().decode(x.value).includes("trascritto")) { await rd9.cancel(); break; } }
+await pausa(700);
+atteso("9. comando chiuso dall'app: nessuna chiamata a Claude", anthropic.length === 0, anthropic.length);
+atteso("9. comando chiuso dall'app: il filo non si tocca", !(g.__tab.jarvis_filo ?? []).length, g.__tab.jarvis_filo);
+azzera();
+await righe(await C.__servi(new Request("http://x/jarvis", { method: "POST", headers: { "x-jarvis-token": "prova", "content-type": "application/json" },
+  body: JSON.stringify({ dispositivo: "orologio", strumenti_client: [], audio_domanda: audio, formato_audio: "m4a", messaggi: [] }) })));
+await pausa(300);
+atteso("9. domanda vera in audio: il filo si aggiorna", (g.__tab.jarvis_filo ?? []).length === 1 && anthropic.length >= 1, { filo: g.__tab.jarvis_filo, claude: anthropic.length });
 console.log("prove giro unico: sbagliate", ko);
