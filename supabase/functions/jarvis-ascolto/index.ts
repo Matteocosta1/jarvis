@@ -1,7 +1,10 @@
 // JARVIS — orecchie in cloud: riceve un audio (base64) dall'orologio e restituisce il testo.
 // POST, header x-jarvis-token. Corpo: { audio: base64, formato?: "m4a" }  →  { testo: "..." }
-// Prova insieme Groq (Whisper), Google Gemini ed ElevenLabs e usa la prima trascrizione pronta: basta che una delle chiavi funzioni.
-// Segreti: JARVIS_TOKEN e almeno uno tra GROQ_API_KEY, GEMINI_API_KEY, ELEVENLABS_API_KEY.
+// 25 ott (v32): prima ElevenLabs Scribe, come il cervello (stessi parametri, ~0,6 s): la sua risposta vale subito, anche vuota
+// (rumore, niente parole). Groq e Gemini restano solo di riserva, se Scribe non risponde. Prima erano tutti in gara e una
+// risposta vuota non vinceva: si aspettava fino a 20 s e alla fine vinceva Whisper con «Sottotitoli a cura di QTSS»
+// (la sua frase inventata sull'audio senza voce, 53 byte): l'orologio la mandava al cervello come domanda.
+// Segreti: JARVIS_TOKEN e almeno uno tra ELEVENLABS_API_KEY, GROQ_API_KEY, GEMINI_API_KEY.
 // Facoltativi: GROQ_STT_MODELLO, GEMINI_STT_MODELLO, ELEVENLABS_STT_MODELLO.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
@@ -90,13 +93,13 @@ async function conGemini(audio: Uint8Array, formato: string, chiave: string) {
   return { errore: ultimo };
 }
 
-// ───────── ElevenLabs (riserva) ─────────
+// ───────── ElevenLabs Scribe (il primo, come nel cervello) ─────────
 let modelloBuono: string | null = null;
 async function conElevenLabs(audio: Uint8Array, formato: string, chiave: string) {
   const fisso = Deno.env.get("ELEVENLABS_STT_MODELLO");
   const tentativi: [string, boolean][] = fisso ? [[fisso, true], [fisso, false]]
     : modelloBuono ? [[modelloBuono, true], [modelloBuono, false]]
-    : [["scribe_v2", true], ["scribe_v1", true], ["scribe_v1", false]];
+    : [["scribe_v2", true], ["scribe_v1", true]];
   let ultimo = "";
   for (const [modello, lingua] of tentativi) {
     const f = new FormData();
@@ -106,8 +109,8 @@ async function conElevenLabs(audio: Uint8Array, formato: string, chiave: string)
     f.append("file", new Blob([audio], { type: tipoAudio(formato) }), `voce.${formato}`);
     let r: Response;
     try {
-      r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": chiave }, body: f, signal: AbortSignal.timeout(9000) });
-    } catch (e) { ultimo = `ElevenLabs: ${(e as Error).message}`; break; }
+      r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": chiave }, body: f, signal: AbortSignal.timeout(8000) });
+    } catch (e) { ultimo = `ElevenLabs: ${(e as Error).message}`; continue; }
     if (r.ok) {
       const d = await r.json();
       modelloBuono = modello;
@@ -118,6 +121,9 @@ async function conElevenLabs(audio: Uint8Array, formato: string, chiave: string)
   }
   return { errore: ultimo };
 }
+
+/// Le frasi che Whisper inventa sull'audio senza voce (sottotitoli dei video su cui è stato addestrato): non sono il signore.
+const ALLUCINAZIONI = /^\s*(sottotitoli|sottotitolato|sottotitoli creati|grazie per la visione|grazie a tutti per la visione|a cura di qtss|iscriviti al canale)\b/i;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ errore: "metodo non ammesso" }, 405);
@@ -134,22 +140,35 @@ Deno.serve(async (req) => {
   try { audio = Uint8Array.from(atob(corpo.audio), (c) => c.charCodeAt(0)); } catch { return json({ errore: "audio non leggibile" }, 400); }
   const formato = corpo.formato === "wav" ? "wav" : "m4a";
 
-  // Tutti i servizi disponibili in gara, insieme: vince il primo che trascrive. Così se uno è lento o fermo
-  // l'orologio non lo aspetta (prima si provavano uno dopo l'altro e un servizio bloccato faceva scadere il tempo).
+  const t0 = Date.now();
+  // 1) Scribe, come il cervello: la sua risposta (anche vuota) è quella buona
+  if (eleven) {
+    const e = await conElevenLabs(audio, formato, eleven);
+    if (!("errore" in e)) {
+      console.log(`ascolto: elevenlabs ${Date.now() - t0} ms, ${e.testo.length} caratteri, audio ${audio.length} byte`);
+      return json(e);
+    }
+    console.log(`ascolto: elevenlabs non riuscito (${Date.now() - t0} ms): ${e.errore}`);
+  }
+  // 2) riserva: Groq e Gemini in gara; vince il primo che trascrive. Una risposta vuota vale come «niente parole».
   const errori: string[] = [];
   const gara: Promise<any>[] = [];
-  let vuoto: any = null;                  // una trascrizione vuota non vince: magari un altro servizio ha sentito qualcosa
+  let vuoto: any = null;
   const iscrivi = (p: Promise<any>) => gara.push(p.then((e) => {
     if (e.errore) { errori.push(e.errore); throw new Error(e.errore); }
-    if (!e.testo) { vuoto = e; throw new Error("vuoto"); }
+    if (!e.testo || ALLUCINAZIONI.test(e.testo)) { vuoto = { testo: "", fonte: e.fonte }; throw new Error("vuoto"); }
     return e;
   }));
   if (groq) iscrivi(conGroq(audio, formato, groq));
   if (gemini) iscrivi(conGemini(audio, formato, gemini));
-  if (eleven) iscrivi(conElevenLabs(audio, formato, eleven));
-  const scadenza = new Promise((_, no) => setTimeout(() => no(new Error("tempo scaduto")), 20000));   // l'orologio aspetta al massimo 30 s
-  try { return json(await Promise.race([Promise.any(gara), scadenza])); } catch { /* nessuno ha trascritto qualcosa in tempo */ }
-  if (!vuoto && !errori.length) errori.push("nessun servizio di trascrizione ha risposto entro 20 secondi");
+  const scadenza = new Promise((_, no) => setTimeout(() => no(new Error("tempo scaduto")), 10000));
+  try {
+    const e = await Promise.race([Promise.any(gara), scadenza]);
+    console.log(`ascolto: riserva ${(e as any).fonte} ${Date.now() - t0} ms`);
+    return json(e);
+  } catch { /* nessuno ha trascritto qualcosa in tempo */ }
+  console.log(`ascolto: nessun testo dalla riserva (${Date.now() - t0} ms) ${errori.join(" · ").slice(0, 300)}`);
   if (vuoto) return json(vuoto);
+  if (!errori.length) errori.push("nessun servizio di trascrizione ha risposto in tempo");
   return json({ errore: errori.join(" · ") }, 502);
 });

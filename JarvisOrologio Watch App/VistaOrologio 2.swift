@@ -172,6 +172,7 @@ struct VistaOrologio: View {
             GuidaPolso.condivisa.annuncia = { [weak j] motivo in j?.annunciaGuida(motivo) }
         }
         .onChange(of: scena) { _, fase in
+            jarvis.scenaCambiata(attiva: fase == .active)       // build 30: fuori schermo niente ascolti da soli
             if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi(); jarvis.vaInSottofondo() }
         }
         // comando vocale: «apri il meteo», «fammi vedere la spesa»
