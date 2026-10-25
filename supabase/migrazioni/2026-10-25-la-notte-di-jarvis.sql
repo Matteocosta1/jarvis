@@ -44,6 +44,7 @@ begin
     body := '{"notte": true}'::jsonb,
     timeout_milliseconds := 120000);
 end; $function$;
+revoke all on function public.sveglia_jarvis_notte() from public, anon, authenticated;
 
 select cron.unschedule('jarvis-notte') where exists (select 1 from cron.job where jobname = 'jarvis-notte');
 select cron.schedule('jarvis-notte', '0 2,3 * * *', 'select public.sveglia_jarvis_notte()');
