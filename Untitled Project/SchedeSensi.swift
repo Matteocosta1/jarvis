@@ -240,6 +240,9 @@ struct VistaFotoScheda: View {
                                 .frame(minHeight: 104, maxHeight: 104)
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                                // la foto riempita sborda dal quadratino: senza questa riga il tocco prendeva anche la parte tagliata
+                                // (che copriva il campo «Cerca» sopra la prima riga)
+                                .contentShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
                     }
