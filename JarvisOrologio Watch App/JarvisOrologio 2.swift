@@ -57,7 +57,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
     enum Fase { case attesa, ascolto, elaboro, parlo }
 
     @Published var fase: Fase = .attesa {
-        didSet { if fase != oldValue { segnalaUso() } }
+        didSet {
+            if fase != oldValue { segnalaUso() }
+            // build 31: in attesa il microfono resta acceso come sull'iPhone (`apriAttesa`); fuori dall'attesa si chiude
+            if fase == .attesa { if oldValue != .attesa { programmaAttesa() } } else { chiudiAttesa() }
+        }
     }
     @Published var domanda = ""
     @Published var risposta = ""
@@ -125,6 +129,21 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var contaVoce = 0
     private var livelloUltimaFrase: Float?             // da imparare solo se la trascrizione ha parole vere
     private var ascoltoDaAggiunta = false              // l'ascolto in corso è il seguito di un'aggiunta: dopo, niente altra aggiunta
+    // Build 31 (25 ott, chiesto dal signore: «come l'iPhone»): in attesa il microfono resta acceso, JARVIS sembra in attesa
+    // e quando il signore ricomincia a parlare lo prende dalla prima parola (lo stesso registratore continua come ascolto).
+    // Solo con la schermata principale davanti e il polso alzato; mai con il microfono spento a mano o «Riascolto» spento.
+    private var attesaRec: AVAudioRecorder?
+    private var timerAttesa: Timer?
+    private var inizioAttesa = Date()
+    private var livelloAttesa: Float?
+    private var fondoAttesa: Float?
+    private var colpiAttesa = 0
+    private var attesaProgrammata: Task<Void, Never>?
+    private var avvioFinito = false                    // l'attesa col microfono parte solo finita la musica d'avvio
+    /// La schermata principale di JARVIS è quella davanti (nessuna sezione aperta): la imposta `VistaOrologio`.
+    var principaleVisibile = true {
+        didSet { if principaleVisibile { programmaAttesa() } else { chiudiAttesa() } }
+    }
     /// Quanto forte arriva di solito la voce del signore al microfono del polso (dB), imparato dalle sue frasi vere.
     private static var voceNota: Float? {
         get { UserDefaults.standard.object(forKey: "voceNotaOrologio") as? Float }
@@ -200,7 +219,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// mentre ascolta, l'ascolto si chiude senza mandare niente. A chiamata finita non c'è niente da riaccendere: al polso non
     /// c'è il «Jarvis» in attesa dell'iPhone, e il prossimo tocco (o la complicazione) riapre l'audio da capo.
     private func audioInterrotto(iniziato: Bool) {
-        guard iniziato else { return }
+        guard iniziato else { programmaAttesa(); return }   // build 31: finita la telefonata (o Siri) torna in ascolto d'attesa
+        chiudiAttesa()
         switch fase {
         case .parlo, .elaboro:
             segnaInterruzione()
@@ -389,7 +409,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// 24 ott, come sull'iPhone: in attesa il tocco sul reattore spegne il microfono (niente ascolto da solo dopo le risposte);
     /// il tocco dopo lo riaccende e ascolta subito. Riaprendo l'app riparte acceso.
-    @Published var micSpento = false
+    @Published var micSpento = false {
+        didSet { if micSpento { chiudiAttesa() } else if fase == .attesa { programmaAttesa() } }   // build 31
+    }
 
     func toccaReattore() {
         switch fase {
@@ -416,20 +438,16 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// Fine dell'avvio: JARVIS si mette in ascolto da solo, come col tocco sul reattore.
     func ascoltaDopoAvvio() {
-        guard fase == .attesa else { return }
-        Task { await ascolta(automatico: true) }
+        avvioFinito = true
+        programmaAttesa()                                   // build 31: in attesa col microfono acceso, come sull'iPhone
     }
 
     /// Detta la risposta: riascolta da solo (se il signore tace, il microfono si chiude dopo 2 secondi).
     private func dopoRisposta() {
-        guard riascolta else { return }
+        // build 31: detta la risposta JARVIS torna in attesa col microfono acceso (`apriAttesa`, come sull'iPhone): non serve
+        // più l'ascolto da solo di 2 secondi che poi si chiudeva
         riascolta = false
-        guard UserDefaults.standard.object(forKey: ImpostazioniPolso.riascolto) as? Bool ?? true else { return }   // build 30: spento in IMPOSTAZIONI
-        Task {
-            try? await Task.sleep(for: .milliseconds(250))     // la coda della voce non entra nel microfono
-            guard fase == .attesa else { return }
-            await ascolta(automatico: true)
-        }
+        programmaAttesa()
     }
 
     /// `limiteInizio`: quanto aspettare che cominci a parlare; `aspetta`: ascolto dopo «aspetta» (se tace: «Mi dica, Sir»)
@@ -446,6 +464,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         PosizioneOrologio.scalda()                          // difetto 5: il GPS si sveglia mentre il signore parla
         zittisci()
         chiudiAggiunta(spegniAudio: false)
+        chiudiAttesa()
         limiteInizio = limite
         dopoAspetta = aspetta
         voceSentita = 0
@@ -702,6 +721,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         primoPiano = false
         riascolta = false                                // build 30: tornando non riparte un ascolto da solo
         chiudiAggiunta(spegniAudio: false)
+        chiudiAttesa()
         guard fase == .ascolto else { return }
         chiudiMicrofono()
         primaParte = nil
@@ -714,7 +734,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// ascolto partito da solo in cui il signore non ha ancora parlato; niente nuovi ascolti da soli finché non torna attiva.
     func scenaCambiata(attiva: Bool) {
         primoPiano = attiva
-        guard !attiva else { return }
+        guard !attiva else { programmaAttesa(); return }   // build 31: polso alzato, di nuovo in ascolto d'attesa
+        chiudiAttesa()
+        if fase == .attesa { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
         chiudiAggiunta(spegniAudio: fase != .elaboro)
         if fase == .ascolto, automatico, !parlatoRilevato {
             chiudiMicrofono()
@@ -722,6 +744,95 @@ final class JarvisOrologio: NSObject, ObservableObject {
             fase = .attesa
             stato = nil
         }
+    }
+
+    // MARK: Build 31: in attesa col microfono acceso, come sull'iPhone
+
+    /// Si può ascoltare in attesa? Schermata principale davanti, polso alzato, microfono non spento a mano, «Riascolto» acceso,
+    /// nessun altro che usa l'audio (Shazam, la voce della Sentinella, l'avviso della linea).
+    private var attesaPossibile: Bool {
+        avvioFinito && fase == .attesa && primoPiano && principaleVisibile && !micSpento
+            && (UserDefaults.standard.object(forKey: ImpostazioniPolso.riascolto) as? Bool ?? true)
+            && !Musica.inAscolto && !SentinellaOrologio.condiviso.parla && !sintesiInciso.isSpeaking
+            && AVAudioApplication.shared.recordPermission == .granted
+    }
+
+    /// L'attesa col microfono si apre poco dopo (la coda della voce di JARVIS o del suono non entra nel microfono).
+    func programmaAttesa() {
+        attesaProgrammata?.cancel()
+        attesaProgrammata = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard !Task.isCancelled else { return }
+            self?.apriAttesa()
+        }
+    }
+
+    private func registratoreAttesa() -> AVAudioRecorder? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("attesa.m4a")
+        try? FileManager.default.removeItem(at: url)
+        let impostazioni: [String: Any] = [AVFormatIDKey: Int(kAudioFormatMPEG4AAC), AVSampleRateKey: 16_000,
+                                           AVNumberOfChannelsKey: 1, AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue]
+        guard let r = try? AVAudioRecorder(url: url, settings: impostazioni) else { return nil }
+        r.isMeteringEnabled = true
+        return r.record() ? r : nil
+    }
+
+    private func apriAttesa() {
+        guard attesaRec == nil, attesaPossibile else { return }
+        let s = AVAudioSession.sharedInstance()
+        do {
+            try s.setCategory(.playAndRecord, mode: .default)
+            try s.setActive(true)
+        } catch { return }
+        guard let r = registratoreAttesa() else { return }
+        attesaRec = r
+        inizioAttesa = Date()
+        livelloAttesa = nil
+        fondoAttesa = fondo
+        colpiAttesa = 0
+        timerAttesa = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.controllaAttesa() }
+        }
+    }
+
+    private func controllaAttesa() {
+        guard let r = attesaRec else { return }
+        guard attesaPossibile else { chiudiAttesa(); return }
+        r.updateMeters()
+        let grezzo = r.averagePower(forChannel: 0)
+        let l = livelloAttesa.map { $0 * 0.6 + grezzo * 0.4 } ?? grezzo
+        livelloAttesa = l
+        fondoAttesa = min(l, (fondoAttesa ?? l) + 0.08)
+        let trascorso = Date().timeIntervalSince(inizioAttesa)
+        guard trascorso > 0.3 else { return }               // l'avvio del registratore
+        // la stessa regola dell'inizio frase: sopra la soglia (rumore +9 e vicino alla sua voce abituale) per 0,4 s di fila
+        if l > sogliaVoce(fondo: fondoAttesa!, margine: 9) { colpiAttesa += 1 } else { colpiAttesa = 0 }
+        if colpiAttesa >= 2 {
+            // il signore parla: lo stesso registratore (che l'ha preso dall'inizio) continua come ascolto normale
+            timerAttesa?.invalidate()
+            timerAttesa = nil
+            attesaRec = nil
+            fondo = fondoAttesa
+            dopoAspetta = .no
+            WKInterfaceDevice.current().play(.start)
+            continuaAscolto(r)
+            return
+        }
+        // niente voce da 6 secondi: il silenzio registrato si butta e si riparte, così quando parla va solo la sua frase
+        if trascorso > 6, colpiAttesa == 0 {
+            r.stop()
+            r.deleteRecording()
+            if let nuovo = registratoreAttesa() { attesaRec = nuovo; inizioAttesa = Date() } else { chiudiAttesa() }
+        }
+    }
+
+    private func chiudiAttesa() {
+        attesaProgrammata?.cancel()
+        attesaProgrammata = nil
+        timerAttesa?.invalidate()
+        timerAttesa = nil
+        if let r = attesaRec { r.stop(); r.deleteRecording() }
+        attesaRec = nil
     }
 
     private func chiudiMicrofono() {
@@ -889,7 +1000,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// frase che si sta scaricando), l'aggiunta dei 2 secondi dopo la domanda, Shazam dentro una risposta, l'avviso
     /// «la linea fa i capricci».
     var usaAudio: Bool {
-        fase == .ascolto || fase == .parlo || aggiunta != nil || orecchioSospeso || fraseInVoce || sintesiInciso.isSpeaking
+        fase == .ascolto || fase == .parlo || aggiunta != nil || attesaRec != nil || orecchioSospeso || fraseInVoce || sintesiInciso.isSpeaking
     }
 
     // MARK: Build 22: comandi a frase esatta

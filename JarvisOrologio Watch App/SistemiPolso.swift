@@ -143,7 +143,7 @@ struct VistaImpostazioniOrologio: View {
             }
             .tint(ciano)
             Toggle(isOn: $riascolto) {
-                etichetta("Riascolto", riascolto ? "dopo ogni risposta" : "solo col tocco")
+                etichetta("Riascolto", riascolto ? "sempre in ascolto" : "solo col tocco")
             }
             .tint(ciano)
             VStack(alignment: .leading, spacing: 2) {

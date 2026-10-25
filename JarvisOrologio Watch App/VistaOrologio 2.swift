@@ -128,6 +128,8 @@ struct VistaOrologio: View {
     var body: some View {
         NavigationStack {
             principale
+                .onAppear { jarvis.principaleVisibile = true }       // build 31: in attesa ascolta solo dalla schermata principale
+                .onDisappear { jarvis.principaleVisibile = false }
                 .navigationDestination(isPresented: $mostraVitals) { VistaVitalsOrologio() }
                 .navigationDestination(isPresented: $mostraSentinella) { VistaSentinellaOrologio() }
                 .navigationDestination(item: $scheda) { r in paginaScheda(r) }
