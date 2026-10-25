@@ -222,6 +222,56 @@ nonisolated enum Dialogo {
         return String(sentito[da..<a]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Mac (prova della 27): la frase sentita è, parola per parola, un pezzo di quello che JARVIS ha appena detto (almeno tre parole
+    /// di fila, nello stesso ordine), anche se dentro c'è una parola d'ordine («…se intende zittirmi, basta dirlo e taccio»): è la
+    /// sua voce che rientra dal microfono, non il signore. Un «basta» o un «Jarvis, basta» detti dal signore restano suoi.
+    static func eFraseDiJarvis(_ sentito: String, detto: String) -> Bool {
+        func norma(_ s: Substring) -> String {
+            s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+        }
+        let separa: (Character) -> Bool = { !$0.isLetter && !$0.isNumber && $0 != "'" }
+        let d = Array(TagVoce.togli(detto).split(whereSeparator: separa).map(norma).suffix(150))
+        let s = sentito.split(whereSeparator: separa).map(norma)
+        guard s.count >= 3, d.count >= s.count else { return false }
+        for a in 0...(d.count - s.count) where d[a] == s[0] {
+            if Array(d[a..<(a + s.count)]) == s { return true }
+        }
+        return false
+    }
+
+    /// Mac (prova della 27): fra due parole del signore può restare dentro una frase intera di JARVIS («…Jarvis muto [ma di che si
+    /// tratta? Un disco, un film…] muto»). Toglie anche in mezzo i pezzi di almeno quattro parole di fila appena dette da JARVIS,
+    /// nello stesso ordine; mai le parole d'ordine del signore. Uguale a `sentito`: nessun pezzo così.
+    static func togliEcoDentro(_ sentito: String, detto: String) -> String {
+        func norma(_ s: Substring) -> String {
+            s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+        }
+        let separa: (Character) -> Bool = { !$0.isLetter && !$0.isNumber && $0 != "'" }
+        let d = Array(TagVoce.togli(detto).split(whereSeparator: separa).map(norma).suffix(150))
+        let s = sentito.split(whereSeparator: separa)
+        guard d.count >= 4, s.count >= 4 else { return sentito }
+        let sn = s.map(norma)
+        var pezzi: [String] = []          // le parti del signore, ognuna com'era scritta (punteggiatura compresa)
+        var inizio: Int? = nil
+        var tolto = false
+        var i = 0
+        while i < s.count {
+            let n = ecoInTesta(Array(sn[i...]), d, minimo: 4)
+            if n >= 4 {
+                if let a = inizio { pezzi.append(String(sentito[s[a].startIndex..<s[i - 1].endIndex])) }
+                inizio = nil
+                tolto = true
+                i += n
+            } else {
+                if inizio == nil { inizio = i }
+                i += 1
+            }
+        }
+        guard tolto else { return sentito }
+        if let a = inizio { pezzi.append(String(sentito[s[a].startIndex..<s[s.count - 1].endIndex])) }
+        return pezzi.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Quante parole all'inizio di `s` sono un pezzo di `d` (almeno due di fila, in ordine; una parola dell'eco capita male si
     /// salta se quella dopo torna a combaciare, ma mai una parola del signore come «basta»). Il pezzo può cominciare ovunque in `d`.
     /// `minimo`: quante parole di fila servono perché sia eco.

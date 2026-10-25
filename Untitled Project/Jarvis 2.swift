@@ -1466,9 +1466,16 @@ final class Jarvis: NSObject, ObservableObject {
 
     // MARK: Idea D (25 ott): sul Mac la frase in un giro solo
 
+    /// Prova della 27: il giro unico sul Mac è spento (vedi `partiGiroUnico`). Orologio e iPhone non cambiano.
+    private static let giroUnicoMac = false
+
     /// Fa partire la frase del Mac come audio dentro la richiesta della risposta. Falso: non si può (cervello di prima, una
     /// foto in giro, Occhi o LiDAR aperti…) e si fa come prima, trascrizione e poi risposta.
+    /// Prova della 27 sul Mac (25 ott): spento (`giroUnicoMac`). Quando l'app chiude la richiesta (eco, comando, «Jarvis» da solo,
+    /// interruttore…) il cervello non se ne accorge in tempo e risponde lo stesso: un turno fantasma e, con la strada di prima, due
+    /// risposte alla stessa frase. Sul Mac la frase torna a fare due giri: prima il testo e i controlli dell'app, poi la risposta.
     private func partiGiroUnico(_ audio: Data, origine: GiroUnicoMac.Origine, fine: Date, fatto: (() -> Void)?) -> Bool {
+        guard Jarvis.giroUnicoMac else { return false }
         guard Jarvis.usaAscoltoCloud, UserDefaults.standard.bool(forKey: "giroUnicoCervello"), !micSpento,
               foto == nil, fotoGiro.isEmpty, allegato == nil, occhi == nil, !lidarAperto, !LidarAperta.aperta, !BrowserVoce.aperto,
               ConfidenteAperto.domanda == nil, audio.count > 1_000 else { return false }
@@ -1927,7 +1934,10 @@ final class Jarvis: NSObject, ObservableObject {
         // difetto 2 (controllo del 25 ott), come sull'orologio: il pezzo di audio contiene anche la voce di JARVIS, prima e dopo
         // le parole del signore. Si tolgono le sue parole in testa e in coda e resta solo il signore: «basta», «muto», «aspetta»
         // detti sopra di lui non finiscono più buttati come eco, e una domanda detta sopra non arriva mescolata alle sue parole
-        let testo = Dialogo.togliEcoAiBordi(sentito, detto: dettoMac)
+        // prova della 27: una sua frase ripresa parola per parola è eco anche con dentro «basta» o «aspetta» (prima lo fermava e
+        // diventava una domanda: JARVIS rispondeva a se stesso); anche una sua frase rimasta in mezzo (almeno quattro parole) si toglie
+        if Dialogo.eFraseDiJarvis(sentito, detto: dettoMac) { return true }
+        let testo = Dialogo.togliEcoDentro(Dialogo.togliEcoAiBordi(sentito, detto: dettoMac), detto: dettoMac)
         if testo.isEmpty { return true }                                   // era tutta la sua voce
         if testo == sentito {
             // nessun pezzo della sua voce ai bordi: come prima, quasi tutte parole sue = eco. Mai però con una sua parola d'ordine
@@ -1940,17 +1950,23 @@ final class Jarvis: NSObject, ObservableObject {
             let basso = testo.lowercased()
             guard Richiamo.nomi.contains(where: { basso.contains($0) }) || Benvenuto.eFraseDiTony(testo) else { return false }
         }
-        if Jarvis.eSoloSilenzio(testo) {                                   // «Jarvis, muto», «basta», «stop»: tace e resta in attesa
+        // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto
+        let conNome = Richiamo.dopoRichiamo(testo) != nil
+        let dopo = Richiamo.dopoRichiamo(testo) ?? testo
+        // «Jarvis, muto», «basta», «stop»: tace e resta in attesa. Prova della 27: vale anche se prima di «Jarvis» c'è altro
+        // («…no no, Jarvis muto»), perché sul Mac il pezzo contiene spesso anche la voce di JARVIS
+        if Jarvis.eSoloSilenzio(testo) || (conNome && Jarvis.eSoloSilenzio(dopo)) {
             if fase != .attesa { mettiInAttesa() }
             return false
         }
         if fase == .parlo {                                                // gli parla sopra: tace subito e ascolta, come sull'iPhone
+            // come l'orecchio dell'iPhone: sopra la sua voce serve una parola d'ordine o almeno due parole. Una parola sola
+            // (la sua voce o un rumore capiti male dalla trascrizione) non lo ferma
+            let quante = testo.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).count
+            guard quante >= 2 || conNome || Jarvis.haParolaDOrdine(testo) else { return false }
             interrottoAVoce(testo)
             return false
         }
-        // «Jarvis…», ma anche «ehi», «senti», «ascolta», «bro»: si toglie il richiamo e resta il resto
-        let conNome = Richiamo.dopoRichiamo(testo) != nil
-        let dopo = Richiamo.dopoRichiamo(testo) ?? testo
         // difetto 7 (controllo del 25 ott): l'interruttore «Risponde a qualsiasi frase» vale anche sul Mac, come sull'iPhone.
         // Spento: in attesa e mentre pensa serve «Jarvis» (o «ehi», «bro»…) o la frase di Tony, tranne nel seguito subito dopo una
         // risposta (8 secondi) e nei 2 secondi dell'aggiunta dopo la domanda. Acceso (di partenza): come prima, qualsiasi frase

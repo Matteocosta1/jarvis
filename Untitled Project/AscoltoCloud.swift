@@ -286,6 +286,13 @@ nonisolated final class Segmentatore: @unchecked Sendable {
     private var segSopra: Double = 0      // secondi in cui il microfono era più forte dell'eco: c'è il signore
     private var segDopoSopra: Double = 0  // secondi tornati al livello dell'eco dopo il signore
     private var segFineVoce = Date()
+    /// Prova della 27 (25 ott, «alza la soglia», deciso dal signore): secondi del pezzo con voce sopra la soglia d'inizio. Rumori e
+    /// voci lontane della stanza (trascritti da Scribe come parole inventate) non arrivano a tanto e non vanno più in cloud.
+    private var forteDi: Double = 0
+    /// Il pezzo comincia solo con una voce chiara: almeno 4 volte il silenzio della stanza e mai sotto 0,009 (prima 3 volte e 0,006).
+    /// La fine della frase segue ancora la soglia di prima, così le ultime sillabe dette piano non si tagliano.
+    private static let inizioMinimo: Float = 0.009
+    private static let forteMinimo: Double = 0.3
 
     var quandoFrase: (@Sendable (Data, Date, EcoPezzo) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return avviso }
@@ -323,13 +330,15 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         ultimoLivello = energia
         ultimoBuffer = Date()
         let soglia = max(fondo * 3, 0.006)          // il microfono del Mac è più basso di quello dell'iPhone
+        let sogliaInizio = max(fondo * 4, Segmentatore.inizioMinimo)   // prova della 27: il pezzo parte solo con una voce chiara
         if !inVoce {
             prima.append(contentsOf: pezzo)
             if prima.count > 6_400 { prima.removeFirst(prima.count - 6_400) }
-            if energia > soglia {
+            if energia > sogliaInizio {
                 voceDi += secondi
                 if voceDi >= 0.15 {
                     inVoce = true; campioni = prima; durata = voceDi; silenzioDi = 0; inizio = Date().addingTimeInterval(-voceDi); cominciata = true
+                    forteDi = voceDi
                     segDurante = true; segIncerti = 0; segRapporto = 0; segSopra = 0; segDopoSopra = 0; segFineVoce = Date()
                     segnaEco(eco, sogliaEco, energia: energia, soglia: soglia, secondi: secondi)
                 }
@@ -340,6 +349,7 @@ nonisolated final class Segmentatore: @unchecked Sendable {
         } else {
             campioni.append(contentsOf: pezzo)
             durata += secondi
+            if energia > sogliaInizio { forteDi += secondi }
             silenzioDi = energia > soglia ? 0 : silenzioDi + secondi
             if energia > soglia { segFineVoce = Date() }
             segnaEco(eco, sogliaEco, energia: energia, soglia: soglia, secondi: secondi)
@@ -353,7 +363,8 @@ nonisolated final class Segmentatore: @unchecked Sendable {
                 fondo = max(fondo, energia / 3)
                 inVoce = false; voceDi = 0; silenzioDi = 0; durata = 0; prima.removeAll(); campioni.removeAll()
             } else if silenzioDi >= 0.7 || durata >= 10 || finitoSopraEco {
-                if durata - silenzioDi >= 0.5 {                            // un colpo o un «bip» non sono una frase
+                // un colpo o un «bip» non sono una frase; prova della 27: nemmeno un rumore o una voce lontana (poca voce chiara)
+                if durata - silenzioDi >= 0.5 && forteDi >= Segmentatore.forteMinimo {
                     pronta = campioni
                     info.candidato = segDurante && segIncerti < 0.1
                     info.soloEco = info.candidato && sogliaEco != nil && segSopra < 0.1
@@ -373,7 +384,9 @@ nonisolated final class Segmentatore: @unchecked Sendable {
 
     /// Difetto 2: un pezzo di microfono dentro la frase, rispetto alla voce di JARVIS che esce adesso (sotto il lucchetto).
     private func segnaEco(_ eco: (attiva: Bool, rif: Float?), _ sogliaEco: Float?, energia: Float, soglia: Float, secondi: Double) {
-        guard eco.attiva else { segDurante = false; return }
+        // prova della 27: solo la voce sentita mentre JARVIS tace toglie il «tutto mentre parlava»; il silenzio dopo la sua ultima
+        // parola no (prima il pezzo, che si chiude 0,7 s dopo, non era quasi mai candidato e la soglia non si imparava)
+        guard eco.attiva else { if energia > soglia { segDurante = false }; return }
         guard let rif = eco.rif else {
             if energia > soglia { segIncerti += secondi }          // voce mentre JARVIS tace fra due frasi: probabilmente lui
             return
@@ -553,8 +566,10 @@ final class AttesaMac {
                 let soloEco = self.frase?(testo, inizio, eco.fine) ?? false
                 // difetto 2: un pezzo sentito tutto mentre JARVIS parlava ed era solo la sua eco non conta nel tetto delle 40
                 // trascrizioni, e insegna quanto forte il microfono sente JARVIS (la prossima volta non va in cloud)
-                if soloEco && eco.candidato {
-                    EcoMac.condivisa.impara(eco.rapporto)
+                // prova della 27: ogni pezzo risultato eco esce dal tetto (prima solo quelli «candidati»: gli altri, a ogni risposta,
+                // consumavano le 40 trascrizioni e dopo un po' il Mac non mandava più niente, nemmeno le frasi del signore)
+                if soloEco {
+                    if eco.candidato { EcoMac.condivisa.impara(eco.rapporto) }
                     if let i = self.invii.lastIndex(of: adesso) { self.invii.remove(at: i) }
                 }
             }
