@@ -118,7 +118,7 @@ struct VistaOrologio: View {
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
     @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
-    @State private var barraInFondo = false                // avvio: la barra parte dall'ultima icona (Archivio)
+    @State private var barraInFondo = false                // avvio: la barra parte dall'ultima icona (Bea)
     @State private var scorriA: Int?                       // avvio: l'icona che sta per accendersi, che la barra porta sul bordo sinistro
     @State private var passoBarra = 0.15                   // quanto dura ogni scorrimento (il tempo fino al colpo dopo)
     @AppStorage("vibrazioni") private var vibrazioni = true   // al posto dei suoni dell'iPhone: tocchi sul polso
@@ -210,7 +210,8 @@ struct VistaOrologio: View {
             case .confidente: jarvis.chiedi("Modalità confidente. Ho bisogno di parlarti di una cosa.")
             case .interprete: jarvis.chiedi("Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce.")
             case .diario, .sonno, .cuore, .briefing, .meteo, .email, .spesa, .shazam, .serata, .ricordi, .github, .supabase, .archivio, .bea,
-                 .musica: scheda = r                         // build 23: MUSICA, la musica dell'iPhone comandata dal polso
+                 .musica,                                    // build 23: MUSICA, la musica dell'iPhone comandata dal polso
+                 .sistemi, .impostazioni, .costi: scheda = r  // build 30: SISTEMI, IMPOSTAZIONI e COSTI anche al polso
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
             case .allenatore: jarvis.stato = "Trainer: questa sezione vive sull'iPhone, Sir."   // build 22: il nome nuovo, non «Allenatore»
             case .satellite: polso = .satellite(nil)             // build 23: SATELLITE, i luoghi con la distanza
@@ -259,6 +260,9 @@ struct VistaOrologio: View {
         case .archivio: VistaArchivioOrologio()
         case .bea: VistaBeaOrologio().aperturaOrologio("Bea")
         case .musica: VistaMusicaOrologio()
+        case .sistemi: VistaSistemiOrologio()
+        case .impostazioni: VistaImpostazioniOrologio()
+        case .costi: VistaCostiOrologio()
         default: EmptyView()
         }
     }
@@ -297,7 +301,7 @@ struct VistaOrologio: View {
             try? await Task.sleep(for: .seconds(AvvioOrologio.attesaApertura))   // finita l'animazione d'apertura del Watch
             withAnimation(.spring(duration: 0.36 / v, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
             try? await Task.sleep(for: .seconds(0.4 / v))
-            // al polso le icone si accendono al contrario: da Archivio a Briefing, la barra scorre all'indietro con loro
+            // al polso le icone si accendono al contrario: da Bea a Supabase, la barra scorre all'indietro con loro
             // e la sequenza finisce sulle prime icone, cioè dove la barra resta a riposo
             let elenco = AvvioOrologio.ordine(scorciatoie.count).map { scorciatoie[$0] }
             // la partitura (150 ms, 110 tra i gruppi, l'ultimo gruppo 120, tutto ÷ velocità): è quella con cui è montata «avvioorologio»
@@ -512,12 +516,21 @@ struct VistaOrologio: View {
     }
 
     /// Scorciatoie: un tocco e JARVIS fa la domanda. Per aggiungerne una basta una riga.
-    /// Stessi gruppi dell'iPhone: GIORNATA · SIGNORE · SENSI · STRUMENTI, separati da una linea sottile.
-    /// Come sull'iPhone: GIORNATA · SIGNORE · SENSI · STRUMENTI.
+    /// Build 30 (deciso dal signore, 25 ott): in testa, cioè quelle che restano sullo schermo dopo l'avvio, SISTEMI:
+    /// Supabase · GitHub · Archivio · Cestino · Musica · Impostazioni · Sistemi. Poi per tipo come sull'iPhone:
+    /// GIORNATA · SIGNORE · SENSI · STRUMENTI · INTELLIGENCE, separati da una linea sottile.
     /// Occhi, Cucina e Allenatore restano solo sull'iPhone (servono la fotocamera); la Foto e il Browser pure.
     /// frase "#vitals" apre la pagina Vitals, "#sentinella" la Sentinella; frase nil pulisce la conversazione.
     private var scorciatoie: [(gruppo: String, icona: String, frase: String?)] {
         [
+            ("SISTEMI", "logo:supabase-logo", "#supabase"),      // i loghi veri, come sull'iPhone
+            ("SISTEMI", "logo:github-logo", "#github"),
+            ("SISTEMI", "archivio", "#archivio"),                // la cartella con la nuvola
+            ("SISTEMI", "trash", nil),                           // pulisce la conversazione
+            ("SISTEMI", "vinile", "#musica"),                    // MUSICA: il vinile olografico dell'iPhone
+            ("SISTEMI", "gearshape", "#impostazioni"),
+            ("SISTEMI", "server.rack", "#sistemi"),              // la pagina SISTEMI, come il menu dell'iPhone
+
             ("GIORNATA", "sun.horizon", "#briefing"),
             ("GIORNATA", "cloud.sun", "#meteo"),
             ("GIORNATA", "envelope", "#email"),
@@ -534,15 +547,10 @@ struct VistaOrologio: View {
             ("STRUMENTI", "brain.head.profile", "#ricordi"),
             ("STRUMENTI", "globe.europe.africa", "Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce."),
             ("STRUMENTI", "music.note.list", "#serata"),
-            ("STRUMENTI", "trash", nil),                       // pulisce la conversazione
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»
             ("INTELLIGENCE", "satellite", "#satellite"),                         // build 23: SATELLITE prima di Bea, come sull'iPhone
             ("INTELLIGENCE", "link", "#bea"),                                    // 20 ott: Bea passa in INTELLIGENCE, come sull'iPhone
-
-            ("SISTEMI", "logo:github-logo", "#github"),          // i loghi veri, come sull'iPhone
-            ("SISTEMI", "logo:supabase-logo", "#supabase"),
-            ("SISTEMI", "archivio", "#archivio"),                // la cartella con la nuvola
         ]
     }
 
@@ -554,6 +562,8 @@ struct VistaOrologio: View {
             IconaArchivioOrologio().scaleEffect(0.75)
         } else if icona == "satellite" {
             IconaSatellite(lato: 15)                                    // build 23: disegnata come nel mockup
+        } else if icona == "vinile" {
+            IconaVinileOrologio().frame(width: 16, height: 16)          // build 30: lo stesso disegno della MUSICA dell'iPhone
         } else {
             Image(systemName: icona)
         }
@@ -1147,13 +1157,16 @@ enum AvvioOrologio {
     /// Una molla con rimbalzo 0,25 raggiunge il 90% della sua misura al 44,5% della durata: lì l'occhio la vede arrivata.
     /// L'icona parte con questo anticipo sul suo colpo, così l'arrivo cade sul beep.
     static func anticipo(_ posto: Int, _ n: Int) -> Double { 0.445 * molla(posto, n) }
-    /// La partitura del polso (secondi a velocità normale, nell'ordine d'accensione, da Archivio a Briefing): è quella con cui
+    /// La partitura del polso (secondi a velocità normale, nell'ordine d'accensione, da Bea a Supabase): è quella con cui
     /// è montata «avvioorologio». Segue la musica (misurata): le prime 11 da 0 al colpo forte di 2,499 s (passo 250 ms),
     /// poi la pausa (2,6–2,8 s, il respiro), poi le ultime 9 su tutto lo SCARICO (2,885 → 3,724 s, una ogni 105 ms):
     /// Briefing si accende sull'ultimo colpo dello scarico, poi la musica sfuma.
     /// Build 23 (con SATELLITE, 20 icone): le ultime 9 si dividono lo scarico, una ogni 105 ms (la traccia ha un colpo in più).
-    static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499,
-                                  2.885, 2.990, 3.095, 3.200, 3.304, 3.409, 3.514, 3.619, 3.724]
+    /// Build 30 (23 icone: Musica, Impostazioni e Sistemi in testa, scelto dal signore): la traccia è rimontata con 3 colpi in
+    /// più prima del colpo forte (le tre battute che lo precedono, ripetute): 14 colpi da 250 ms (0 → 3,249 s), il respiro,
+    /// poi lo scarico come prima, spostato di 0,75 s (3,635 → 4,474 s). Verificato sulla traccia: 22 colpi su 22 entro 30 ms.
+    static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499, 2.749, 2.999, 3.249,
+                                  3.635, 3.740, 3.845, 3.950, 4.054, 4.159, 4.264, 4.369, 4.474]
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 

@@ -265,7 +265,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Sottovoce («sbatti, …»): come sull'iPhone, risponde a voce bassissima per 10 minuti; «voce normale» torna come prima
     private var sottovoceFino = Date.distantPast
-    private var volumeVoce: Float { Date() < sottovoceFino ? 0.05 : 1 }   // sottovoce: appena udibile
+    /// Build 30: il volume della voce scelto in IMPOSTAZIONI (20–100%, di base 100%); sottovoce resta appena udibile.
+    private var volumeVoce: Float {
+        Date() < sottovoceFino ? 0.05 : Float(UserDefaults.standard.object(forKey: ImpostazioniPolso.volume) as? Double ?? 1)
+    }
+    /// Build 30, IMPOSTAZIONI: sottovoce acceso a mano vale 10 minuti, come «piano» detto a voce.
+    var sottovoce: Bool {
+        get { Date() < sottovoceFino }
+        set { sottovoceFino = newValue ? Date().addingTimeInterval(600) : .distantPast }
+    }
 
     /// Revisione del dialogo (24 ott, M1): la stessa regola dell'iPhone (`Dialogo.volume`): «qual è il piano per stasera?» e
     /// «ma è una voce normale?» sono domande, non ordini.
@@ -416,6 +424,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func dopoRisposta() {
         guard riascolta else { return }
         riascolta = false
+        guard UserDefaults.standard.object(forKey: ImpostazioniPolso.riascolto) as? Bool ?? true else { return }   // build 30: spento in IMPOSTAZIONI
         Task {
             try? await Task.sleep(for: .milliseconds(250))     // la coda della voce non entra nel microfono
             guard fase == .attesa else { return }
@@ -858,7 +867,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private static func soloIPhone(_ r: Reparto) -> Bool {
         switch r {
         case .occhi, .giro, .profiler, .wiretap, .cucina, .scanner, .foto, .browser, .messaggi, .telefono, .lidar,
-             .costi, .edith, .sistemi, .impostazioni, .allenatore:
+             .edith, .allenatore:                             // build 30: Sistemi, Impostazioni e Costi ora ci sono anche al polso
             return true
         default:
             return false
