@@ -95,7 +95,8 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
             let meta = chiave.isEmpty ? "p\(lat),\(lon)" : chiave
             // decisione 39: un'altra meta. La guida di prima non vale più per «stato»: prima l'orologio, aprendo GUIDA, riceveva
             // ancora la freccia e i metri verso la meta vecchia e, se quella nuova non partiva, il motivo restava nascosto
-            if MotoreGuida.condiviso.luogo?.chiave != meta { self.chiaveGuida.lock(); self.ultimaGuida = nil; self.chiaveGuida.unlock() }
+            // withLock: dentro un Task (contesto async) lock()/unlock() a mano danno l'avviso di Xcode
+            if MotoreGuida.condiviso.luogo?.chiave != meta { self.chiaveGuida.withLock { self.ultimaGuida = nil } }
             MotoreGuida.condiviso.avvia(LuogoSat(chiave: meta, ricordo: ricordo, tipo: "posto", nome: nome,
                                                 via: via.isEmpty ? nome : via, persona: nil, lat: lat, lon: lon, quando: ""))
             risposta(["ok": true])
