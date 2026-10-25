@@ -4341,6 +4341,8 @@ Deno.serve(async (req) => {
           // decisione 53: «continua» dopo un'interruzione → lo stesso modello della risposta interrotta (con una foto mai il rapido)
           const ripresa = modelloDaRiprendere(scelti.map(({ m, i }) => ({ r: m.role, t: String(m.content), foto: fotoPrima.length > 0 && i === fs?.indice })), dispositivo);
           if (ripresa && !(ripresa === MODELLO_RAPIDO && conImmagine)) modello = ripresa;
+          // 25 ott (chiesto dal signore): il briefing del mattino con il modello che spende meno (prima finiva su Opus: «briefing», «email»)
+          if (corpo.briefing === true) modello = MODELLO_RAPIDO;
           rapida = voceRapida(corpo, ultimaDomanda);
           lavoro = storia; azioni = []; detto = "";
         }

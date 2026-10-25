@@ -63,7 +63,7 @@ async function chiediAlCervello(richiesta: string) {
   const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jarvis`, {
     method: "POST", signal: AbortSignal.timeout(80_000),
     headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
-    body: JSON.stringify({ messaggi: [{ role: "user", content: richiesta }], dispositivo: "iphone", strumenti_client: [], senza_filo: true }),   // il briefing non tocca il filo della chat
+    body: JSON.stringify({ messaggi: [{ role: "user", content: richiesta }], dispositivo: "iphone", strumenti_client: [], senza_filo: true, briefing: true }),   // il briefing non tocca il filo della chat
   });
   if (!r.ok || !r.body) throw new Error(`cervello: ${r.status}`);
   let testo = "", resto = "";
