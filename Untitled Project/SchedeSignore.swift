@@ -150,7 +150,8 @@ struct TestataScheda: View {
                         .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 27 ott: nome della sezione più piccolo (prima 24)
                         .foregroundStyle(titoloColorato ? tinta : .white)
                 }
-                Text(sottotitolo.uppercased())
+                // 27 ott (il signore): la scritta sotto il nome si decodifica come le lettere della chat (effetto codici)
+                TestoCodice(testo: sottotitolo.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
                     .foregroundStyle(tinta)
             }
@@ -926,6 +927,38 @@ nonisolated enum Salute {
             }
             negozio.execute(q)
         }
+    }
+}
+/// Un testo che compare decodificandosi, come le lettere della chat: da sinistra a destra i simboli diventano lettere (0,6 s),
+/// di nuovo a ogni cambio (es. «ACQUISIZIONE DATI» → «PRONTA»). Finito, si ferma: niente lavoro inutile.
+struct TestoCodice: View {
+    let testo: String
+    @State private var inizio = Date()
+    @State private var fermo = false
+    private static let simboli = Array("ABCDEF0123456789#%&*<>/=+")
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: fermo)) { t in
+            Text(fermo ? testo : TestoCodice.mescola(testo, min(1, t.date.timeIntervalSince(inizio) / 0.6)))
+        }
+        .onAppear { parti() }
+        .onChange(of: testo) { parti() }
+    }
+
+    private func parti() {
+        inizio = Date(); fermo = false
+        let mio = inizio
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            if inizio == mio { fermo = true }
+        }
+    }
+
+    private static func mescola(_ s: String, _ p: Double) -> String {
+        let c = Array(s), n = max(1, c.count)
+        return String(c.enumerated().map { i, ch in
+            ch == " " || Double(i) / Double(n) < p ? ch : simboli.randomElement() ?? ch
+        })
     }
 }
 #endif
