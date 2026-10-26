@@ -402,13 +402,15 @@ struct PaginaBrowser: View {
             WebVista(web: nav.web)
                 .overlay {
                     if nav.indirizzo.isEmpty && !nav.carica {          // niente pagina bianca: il visore spento, in attesa
+                        // 27 ott (il signore): come il mockup, la pagina tutta nera con il globo olografico che gira
                         ZStack {
                             Color.fondo
-                            RadialGradient(colors: [accento.opacity(0.14), .clear], center: .center, startRadius: 0, endRadius: 260)
-                            VStack(spacing: 10) {
-                                Image(systemName: "globe").font(.system(size: 34, weight: .light)).foregroundStyle(accento.opacity(0.8))
-                                Text("CERCHI O SCRIVA UN INDIRIZZO").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                            VStack(spacing: 14) {
+                                GloboOlo(tinta: accento).frame(width: 120, height: 120)
+                                Text(incognito ? "INCOGNITO" : "BROWSER PRIVATO").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(3)
                                     .foregroundStyle(accento)
+                                Text(incognito ? "Niente cronologia, cookie o accessi salvati: sparisce tutto alla chiusura." : "Cerchi o scriva un indirizzo. VIDEO cerca direttamente su YouTube.")
+                                    .font(.system(size: 13)).foregroundStyle(ColoriHUD.testo).multilineTextAlignment(.center).padding(.horizontal, 40)
                             }
                         }
                     }
@@ -671,6 +673,30 @@ struct AngoliOlo: View {
             .stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
             .shadow(color: tinta.opacity(0.7), radius: 4)
         }
+    }
+}
+/// Il globo olografico del Browser (come il mockup): meridiani che ruotano e paralleli, linee sottili del colore del Browser.
+struct GloboOlo: View {
+    let tinta: Color
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30)) { t in
+            Canvas { gc, size in
+                let r = min(size.width, size.height) / 2 - 1, c = CGPoint(x: size.width / 2, y: size.height / 2)
+                let giro = t.date.timeIntervalSinceReferenceDate * 0.6
+                let tratto = GraphicsContext.Shading.color(tinta.opacity(0.75))
+                gc.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)), with: tratto, lineWidth: 1)
+                for k in 0..<6 {                                            // i meridiani: ellissi che si stringono e si allargano girando
+                    let a = giro + Double(k) * .pi / 6, w = r * abs(cos(a))
+                    gc.stroke(Path(ellipseIn: CGRect(x: c.x - w, y: c.y - r, width: 2 * w, height: 2 * r)), with: .color(tinta.opacity(0.35 + 0.35 * abs(sin(a)))), lineWidth: 0.8)
+                }
+                for lat in [-60.0, -30, 0, 30, 60] {                          // i paralleli
+                    let y = c.y + r * sin(lat * .pi / 180), w = r * cos(lat * .pi / 180)
+                    gc.stroke(Path(ellipseIn: CGRect(x: c.x - w, y: y - w * 0.12, width: 2 * w, height: w * 0.24)), with: .color(tinta.opacity(0.45)), lineWidth: 0.8)
+                }
+            }
+            .shadow(color: tinta.opacity(0.6), radius: 6)
+        }
+        .accessibilityHidden(true)
     }
 }
 #endif
