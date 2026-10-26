@@ -943,7 +943,7 @@ struct TestoCodice: View {
     var body: some View {
         Text(mostrato)
             .opacity(dentro ? 1 : 0)
-            .offset(x: dentro ? 0 : (daSinistra ? 14 : -14))      // entra da sinistra, esce scorrendo a destra
+            .offset(x: dentro ? 0 : (daSinistra ? 60 : -40))      // entra da sinistra, poi scorre via a destra
             .onAppear { mostra(testo, attesa: 0) }
             .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
     }
@@ -955,8 +955,8 @@ struct TestoCodice: View {
             guard nuovo == voluta else { return }                      // nel frattempo è cambiata ancora: vale l'ultima
             if !mostrato.isEmpty {                                     // la vecchia continua a scorrere a destra, sfumando
                 daSinistra = true
-                withAnimation(.easeIn(duration: 0.15)) { dentro = false }
-                try? await Task.sleep(for: .milliseconds(160))
+                withAnimation(.easeIn(duration: 0.3)) { dentro = false }
+                try? await Task.sleep(for: .milliseconds(300))
                 guard nuovo == voluta else { return }
             }
             var t = Transaction(); t.disablesAnimations = true
