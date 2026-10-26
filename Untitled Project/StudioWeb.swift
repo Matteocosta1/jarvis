@@ -115,8 +115,6 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         conf.mediaTypesRequiringUserActionForPlayback = []    // i suoni del banco partono subito, come nel mockup
         let ponte = WKUserContentController()
         ponte.add(PonteDebole(self), name: "jarvis")
-        ponte.addUserScript(WKUserScript(source: RegiaStudio.copioneInizio(archivio), injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        ponte.addUserScript(WKUserScript(source: RegiaStudio.copioneFine(apertura), injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         conf.userContentController = ponte
         let w = WKWebView(frame: .zero, configuration: conf)
         w.isOpaque = false
@@ -127,7 +125,16 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         w.navigationDelegate = self
         w.isInspectable = true
         web = w
-        if let u = URL(string: "\(Self.schema)://app/markx.html") { w.load(URLRequest(url: u)) }
+        // 26 ott sera (il signore: «Social e Studio non sono fluide»): preparare la pagina (l'archivio, la foto in JPEG) e caricarla
+        // occupava il telefono proprio mentre la scheda saliva, e la salita scattava. Ora la scheda sale libera (sopra c'è il
+        // caricamento, come in tutte le altre) e la pagina si prepara e si carica appena la salita è finita (0,45 s).
+        Task { @MainActor [weak self, weak w] in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard let self, let w else { return }
+            ponte.addUserScript(WKUserScript(source: RegiaStudio.copioneInizio(self.archivio), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            ponte.addUserScript(WKUserScript(source: RegiaStudio.copioneFine(self.apertura), injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+            if let u = URL(string: "\(Self.schema)://app/markx.html") { w.load(URLRequest(url: u)) }
+        }
         return w
     }
 

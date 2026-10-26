@@ -160,3 +160,6 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Contiene tutto della 8 più: schede a pagina piena con swipe giù (9bdbb9a), Studio/Social chiusura senza nero (7bb5e9e, dfab9f8).
 - La 8 installata (video 21:06) era stata compilata prima di queste correzioni.
 - 21:40 (dopo il video 21:29 della 9): Studio/Social chiusura con copia immediata dello schermo (snapshotView) al posto di takeSnapshot; schede: pagina larga quanto lo schermo, niente scorrimento di lato (Satellite).
+
+## 10.0 (10) — 26 ott 21:50
+- Dalla 9: Studio/Social chiusura con copia immediata dello schermo (niente nero); la pagina si prepara dopo la salita (apertura fluida); tendina Protocolli del mockup nascosta in Studio/Social; Satellite e schede senza scorrimento laterale; swipe giù dalla fascia dell'ora apre i Protocolli.
