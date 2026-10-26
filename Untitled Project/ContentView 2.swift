@@ -239,7 +239,7 @@ struct ContentView: View {
                 tendina(g)
                 // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
                 // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
-                // scendono con la curva del mockup e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
+                // scendono come le altre schede e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
                 if let a = aperturaPagina {
                     StratoPagina(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) },
                                  chiudi: { durata in abbassaPagina(durata) },
@@ -288,7 +288,7 @@ struct ContentView: View {
             Task { @MainActor in
                 if aperturaPagina != nil {                         // ce n'è già una aperta: scende, poi sale la nuova
                     abbassaPagina()
-                    try? await Task.sleep(for: .milliseconds(400))
+                    try? await Task.sleep(for: .milliseconds(450))
                 }
                 for _ in 0..<60 {
                     if PaginaMarkX.schermoLibero() { break }
@@ -1155,20 +1155,21 @@ struct ContentView: View {
         jarvis.occhiChiusi([])
     }
 
-    /// 26 ott sera: Studio o Social salgono come strato sopra JARVIS (StratoPagina), con la curva del mockup. A salita finita
-    /// JARVIS sotto è tutto coperto e le sue animazioni si fermano (jarvisCoperto).
+    /// 26 ott sera: Studio o Social salgono come strato sopra JARVIS (StratoPagina), con la salita delle altre schede. A salita
+    /// finita (la molla si posa in ~0,5 s) JARVIS sotto è tutto coperto e le sue animazioni si fermano (jarvisCoperto).
     private func alzaPagina(_ a: AperturaPagina) {
-        withAnimation(StratoPagina.curva()) { aperturaPagina = a }
+        withAnimation(StratoPagina.salita) { aperturaPagina = a }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(400))
+            try? await Task.sleep(for: .milliseconds(600))
             if aperturaPagina?.id == a.id { stratoCopre = true }
         }
     }
 
-    /// Lo strato di Studio o Social scende e poi sparisce; JARVIS sotto riparte subito, così scendendo si vede vivo.
+    /// Lo strato di Studio o Social scende come le altre schede e poi sparisce; JARVIS sotto riparte subito, così scendendo
+    /// si vede vivo.
     private func abbassaPagina(_ durata: Double = 0.35) {
         stratoCopre = false
-        withAnimation(StratoPagina.curva(durata)) { aperturaPagina = nil }
+        withAnimation(StratoPagina.discesa(durata)) { aperturaPagina = nil }
     }
 
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.

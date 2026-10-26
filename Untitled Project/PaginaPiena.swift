@@ -74,8 +74,8 @@ enum FasciaAlta {
 // Le schede a pagina piena sono schermate di iOS: mentre sono aperte iOS toglie JARVIS dallo schermo e alla chiusura lo deve
 // ridisegnare da capo. Studio e Social, chiudendosi, buttano via anche la pagina web con il 3D, che è pesante: per quell'attimo
 // non c'era niente da mostrare, e si vedeva nero. Ora Studio e Social sono uno STRATO dentro la schermata di JARVIS: salgono e
-// scendono con la curva del mockup (.foglio: 0,35 s, cubic-bezier(.2,.8,.2,1)) e JARVIS sotto non viene mai tolto, quindi
-// scendendo si vede sempre lui. Si chiudono con «Chiudi» (della pagina) o trascinando giù dalla fascia dell'ora, come le schede.
+// scendono come le altre schede (stesse curve, vedi salita e discesa) e JARVIS sotto non viene mai tolto, quindi scendendo si
+// vede sempre lui. Si chiudono con «Chiudi» (della pagina) o trascinando giù dalla fascia dell'ora, come le schede.
 // La pagina web si butta solo quando lo strato è già sotto lo schermo.
 
 private struct ChiaveJarvisCoperto: EnvironmentKey { static let defaultValue = false }
@@ -100,10 +100,13 @@ struct StratoPagina: View {
     @State private var scesa: CGFloat = 0
     @State private var chiusa = false                    // già in discesa: un secondo «Chiudi» non fa niente
 
-    /// La curva del mockup (.foglio: 0,35 s, cubic-bezier(.2,.8,.2,1)); dopo il trascinamento col dito è più breve e frena e basta,
-    /// il dito l'ha già portata giù.
-    static func curva(_ durata: Double = 0.35) -> Animation {
-        durata > 0.3 ? .timingCurve(0.2, 0.8, 0.2, 1, duration: durata) : .easeOut(duration: durata)
+    /// 26 ott sera (il signore: «Studio e Social uguali alle altre schede»): la salita e la discesa delle altre schede, misurate
+    /// fotogramma per fotogramma sul suo video delle 21:58 (SATELLITE, 60 fotogrammi al secondo): salita ~0,3 s che frena in
+    /// fondo, discesa ~0,35 s che parte piano e si posa piano. Sono le molle di iOS che le ricalcano (scarto sotto l'1%).
+    static let salita: Animation = .spring(response: 0.34, dampingFraction: 0.9)
+    /// Dopo il trascinamento col dito: 0,22 s e frena, come le altre schede (PaginaPiena), il dito l'ha già portata giù.
+    static func discesa(_ durata: Double = 0.35) -> Animation {
+        durata > 0.3 ? .spring(response: 0.33, dampingFraction: 1) : .easeOut(duration: durata)
     }
 
     var body: some View {
