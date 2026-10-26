@@ -17,6 +17,7 @@ struct JarvisApp: App {
         UserDefaults.standard.register(defaults: ["ascoltaApertura": true, "voceCloud": true, "interruzioneVocale": true, "suoni": true, "richiamo": true,
                                                   "ascoltoSempre": true])
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
+        TocchiSchermo.prepara()                // 26 ott sera: i tocchi sul vetro non sono battiti di mani
         IsolaJarvis.prepara()                  // 26 ott sera: i tasti della Dynamic Island e l'isola della PIOGGIA ad app chiusa
     }
 

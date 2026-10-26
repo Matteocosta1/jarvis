@@ -654,7 +654,7 @@ struct ContentView: View {
             }
             .opacity(acceso ? 1 : 0)
             .offset(x: acceso ? 0 : -12)
-            Spacer()
+            Spacer(minLength: 0)
             if mini {
                 // il posto del reattore piccolo (34 punti): il reattore vero ci arriva volando e, toccato, chiude la tastiera e basta
                 Button { tastiera = false } label: {
@@ -671,7 +671,7 @@ struct ContentView: View {
             Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); aperturaPagina = AperturaPagina(sezione: "Social") } label: {
                 IconaSocial()
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -682,7 +682,7 @@ struct ContentView: View {
                 IconaVinile()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -693,7 +693,7 @@ struct ContentView: View {
                 IconaStudio()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -703,7 +703,7 @@ struct ContentView: View {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -714,7 +714,7 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
@@ -729,7 +729,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
@@ -740,6 +740,12 @@ struct ContentView: View {
         .buttonStyle(StileStark())
         .padding(.horizontal, 16)
         .padding(.top, 8)
+        // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
+        // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
+        // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
+        // (20 punti, ne servivano ~16), e tutto scivola insieme. Il titolo resta identico al mockup b32 (lettere e spaziatura uguali);
+        // ViewThatFits resta solo per gli iPhone più stretti (SE).
+        .animation(.easeOut(duration: 0.25), value: mini)
     }
 
     /// Scorciatoie in alto: per aggiungere una funzione nuova basta una riga in più qui.

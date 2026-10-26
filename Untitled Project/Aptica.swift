@@ -67,6 +67,7 @@ enum Aptica {
     /// Click: la selezione fine di iOS.
     static func click() {
         guard disponibile, libero() else { return }
+        BattitoMani.ignora(per: 0.5)                     // la vibrazione arriva al microfono come un battito
         selezione.selectionChanged()
         selezione.prepare()
     }
@@ -74,6 +75,7 @@ enum Aptica {
     /// La fotocamera è pronta: un «clack» medio e secco, insieme al suono.
     static func fotocamera() {
         guard disponibile, libero() else { return }
+        BattitoMani.ignora(per: 0.5)
         if let m = accendi(), let p = try? m.makePlayer(with: pattern(transitori: [(0, 0.8, 0.9)])) {
             try? p.start(atTime: CHHapticTimeImmediate)
         } else {
@@ -84,6 +86,7 @@ enum Aptica {
     /// Fatto: la notifica di successo di Apple.
     static func pronto() {
         guard disponibile, libero() else { return }
+        BattitoMani.ignora(per: 0.8)
         notifica.notificationOccurred(.success)
         notifica.prepare()
     }
@@ -92,6 +95,7 @@ enum Aptica {
     static func svuota(durata: Double) {
         guard disponibile, let m = accendi() else { return }
         let d = max(0.3, durata)
+        BattitoMani.ignora(per: d + 0.5)
         let evento = CHHapticEvent(eventType: .hapticContinuous,
                                    parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5),
                                                 CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)],
@@ -115,6 +119,7 @@ enum Aptica {
     /// Forti (0,9) e l'ultimo, INTELLIGENCE, al massimo (1,0) con una coda piena: il colpo finale (20 ott, «aptica forte»).
     static func avvio(tempi: [Double]) {
         guard disponibile, let m = accendi(), !tempi.isEmpty else { return }
+        BattitoMani.ignora(per: (tempi.max() ?? 0) + 0.6)
         try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
         var eventi: [CHHapticEvent] = []
         for (k, t) in tempi.enumerated() {
