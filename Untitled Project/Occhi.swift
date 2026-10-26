@@ -208,6 +208,8 @@ struct Occhi: View {
 
             VStack(spacing: 14) {
                 HStack(alignment: manualeStark ? .top : .center) {
+                    // 26 ott notte: l'icona con l'anello che gira, come nelle altre schede
+                    AnelloOcchi(icona: cucina ? "fork.knife" : "eye", tinta: tinta)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("J.A.R.V.I.S.")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -1190,6 +1192,23 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AV
             self.consegna = nil
             f?(dati)
         }
+    }
+}
+/// L'icona della sezione dentro l'anello che gira (come TestataScheda), per gli Occhi e la Cucina.
+private struct AnelloOcchi: View {
+    let icona: String
+    let tinta: Color
+    var body: some View {
+        ZStack {
+            Circle().stroke(tinta.opacity(0.25), lineWidth: 1)
+            TimelineView(.animation) { t in
+                Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
+            }
+            Image(systemName: icona).font(.system(size: 18, weight: .medium)).foregroundStyle(tinta)
+        }
+        .frame(width: 44, height: 44)
+        .shadow(color: tinta.opacity(0.5), radius: 10)
     }
 }
 #endif
