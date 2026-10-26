@@ -531,6 +531,7 @@ struct VistaOrologio: View {
             ("SISTEMI", "logo:github-logo", "#github"),
             ("SISTEMI", "archivio", "#archivio"),                // la cartella con la nuvola
             ("SISTEMI", "trash", nil),                           // pulisce la conversazione
+            ("SISTEMI", "logo:GlifoInstagram", "@social"),       // MARK X: SOCIAL, il glifo Instagram dell'iPhone, prima di MUSICA come lì
             ("SISTEMI", "vinile", "#musica"),                    // MUSICA: il vinile olografico dell'iPhone
             ("SISTEMI", "gearshape", "#impostazioni"),
             ("SISTEMI", "server.rack", "#sistemi"),              // la pagina SISTEMI, come il menu dell'iPhone
@@ -590,7 +591,8 @@ struct VistaOrologio: View {
                     }
                     Button {
                         vibra(.click); SuoniOrologio.tick()
-                        if let f = s.frase, f.hasPrefix("#"), let r = Reparto(rawValue: String(f.dropFirst())) { apri(r) }
+                        if s.frase == "@social" { apriPolso(.social(nil)) }
+                        else if let f = s.frase, f.hasPrefix("#"), let r = Reparto(rawValue: String(f.dropFirst())) { apri(r) }
                         else if let frase = s.frase { iconaAttiva = k; jarvis.chiedi(frase) }
                         else { chiediPulizia = true }
                     } label: {
@@ -1170,7 +1172,7 @@ enum AvvioOrologio {
     /// più prima del colpo forte (le tre battute che lo precedono, ripetute): 14 colpi da 250 ms (0 → 3,249 s), il respiro,
     /// poi lo scarico come prima, spostato di 0,75 s (3,635 → 4,474 s). Verificato sulla traccia: 22 colpi su 22 entro 30 ms.
     static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499, 2.749, 2.999, 3.249,
-                                  3.635, 3.740, 3.845, 3.950, 4.054, 4.159, 4.264, 4.369, 4.474]
+                                  3.635, 3.728, 3.821, 3.915, 4.008, 4.101, 4.194, 4.288, 4.381, 4.474]   // MARK X: 10 icone (c'è SOCIAL) alla stessa distanza tra il primo e l'ultimo colpo dello scarico, come la testata dell'iPhone
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 

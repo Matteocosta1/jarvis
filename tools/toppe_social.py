@@ -7,7 +7,7 @@ def toppe_social(s, toppa):
     s = toppa(s, "<small>INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO</small>",
               "<small data-soc=\"sotto\">${window.JARVIS_APP ? \"INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…\" : \"INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO\"}</small>")
     s = toppa(s, '  function pagina() { giro++; contaPosta();',
-              '  if (window.JARVIS_APP) { window.__socRidisegna = () => { if (!A.isConnected) return; const v = SOC.vero; if (v) { const f = A.querySelector(\'[data-soc="follower"]\'); if (f) f.textContent = v.profilo ? v.profilo.followerTesto : "—"; '
+              '  if (window.JARVIS_APP) { window.__socRidisegna = () => { if (!A.isConnected) return; const v = SOC.vero; if (v) { const f = A.querySelector(\'[data-soc="follower"]\'); if (f) f.textContent = v.profilo ? v.profilo.followerTesto : "—"; const av = A.querySelector(".sc-avatar"); if (av && v.profilo?.foto && !av.querySelector("img")) { const im = new Image(); im.alt = ""; im.style.cssText = "position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px);border-radius:50%;object-fit:cover"; im.onload = () => { const b = av.querySelector("b"); if (b) b.style.visibility = "hidden"; }; im.src = v.profilo.foto; av.appendChild(im); } '
               'const so = A.querySelector(\'[data-soc="sotto"]\'); if (so) so.innerHTML = v.errore ? "INSTAGRAM · " + escSd(v.errore).toUpperCase() : "INSTAGRAM · ACCOUNT&nbsp;CREATOR"; } const f = document.activeElement; if (f && P.contains(f) && /TEXTAREA|INPUT/.test(f.tagName)) contaPosta(); else pagina(); }; '
               'window.__socFonte = (im, k, v) => { fonte = { k: k || "galleria", img: im, video: !!v }; if (v) formato = "REEL"; if (!didascalia) didascalia = DIDA[k === "studio" ? 0 : 1]; pagina(); }; '
               'window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialStato" }); }\n  function pagina() { giro++; contaPosta();')
@@ -74,4 +74,9 @@ def toppe_social(s, toppa):
     s = toppa(s, '${SOC.vero?.report ? (SOC.vero.report.top ?', '${SOC.vero?.report || window.JARVIS_APP ? (SOC.vero?.report?.top ?')
     s = toppa(s, '"Dalle statistiche ufficiali di Instagram." : "Numeri d\'esempio. Nell\'app arrivano dalle statistiche ufficiali di Instagram."',
               '"Dalle statistiche ufficiali di Instagram." : window.JARVIS_APP ? (SOC.vero?.errore ? "Instagram non risponde: " + escSd(SOC.vero.errore) + "." : "Carico le statistiche di Instagram…") : "Numeri d\'esempio. Nell\'app arrivano dalle statistiche ufficiali di Instagram."')
+    # IGNORA nell'app: il commento o messaggio ignorato non torna alla prossima apertura (si ricorda sull'iPhone)
+    s = toppa(s, 'if (b.dataset.ignora) { suona("aTick"); SOC.posta.splice(+b.dataset.ignora, 1); pagina(); return; }',
+              'if (b.dataset.ignora) { suona("aTick"); const ig = SOC.posta[+b.dataset.ignora]; if (window.JARVIS_APP && ig?.id) { let l = []; try { l = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} l.push(ig.id); try { localStorage.setItem("jarvisSocialIgnorati", JSON.stringify(l.slice(-300))); } catch {} } SOC.posta.splice(+b.dataset.ignora, 1); pagina(); return; }')
+    s = toppa(s, 'SOC.vero = r; SOC.posta = r.posta || [];',
+              'SOC.vero = r; let ign = []; try { ign = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} SOC.posta = (r.posta || []).filter((m) => !ign.includes(m.id));')
     return s

@@ -131,6 +131,24 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
         case "foto":
             scatta()
+        case "video360":                                                 // CONDIVIDI › VIDEO 360°: l'MP4 vero del giro del banco
+            let nome = (o["nome"] as? String ?? "Studio") + ".mp4"
+            let fotogrammi = (o["fotogrammi"] as? [String] ?? []).compactMap { Data(base64Encoded: $0) }
+            Task {
+                guard fotogrammi.count >= 2, let u = try? await Video360.crea(fotogrammi), let d = try? Data(contentsOf: u) else {
+                    self.rispondi(id, (nil, "errore")); return
+                }
+                try? FileManager.default.removeItem(at: u)
+                self.condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
+            }
+        case "modelloAR":                                                // CONDIVIDI › MODELLO AR: l'USDZ vero del pezzo, misura vera
+            let nome = (o["nome"] as? String ?? "Studio") + ".usdz"
+            let stl = o["stl"] as? String ?? ""
+            Task {
+                guard let u = await ModelloAR.crea(stl), let d = try? Data(contentsOf: u) else { self.rispondi(id, (nil, "errore")); return }
+                try? FileManager.default.removeItem(at: u)
+                self.condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
+            }
         case "copia":                                                    // CONDIVIDI › Copia: l'immagine del banco negli appunti
             if let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64), let img = UIImage(data: d) { UIPasteboard.general.image = img }
         case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone

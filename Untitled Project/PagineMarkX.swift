@@ -3,6 +3,8 @@ import SwiftUI
 import UIKit
 import AVFoundation
 import CoreVideo
+import SceneKit
+import simd
 
 // MARK: - MARK X · le pagine del mockup nell'app (STUDIO e SOCIAL) e i collegamenti verso di loro
 // Studio e Social sono la pagina del mockup approvato (Studio3D/markx.html) dentro VistaStudio. Ci si arriva dall'icona in alto,
@@ -143,6 +145,58 @@ struct TastiMandaOcchi: View {
     }
 }
 
+// MARK: - CONDIVIDI dello Studio: VIDEO 360° (i fotogrammi del giro del banco → MP4) e MODELLO AR (l'STL del pezzo → USDZ)
+
+nonisolated enum Video360 {
+    /// I fotogrammi JPEG del giro (dalla pagina) → MP4 H.264 largo 1080, `fps` al secondo. Si decodifica un fotogramma alla volta.
+    @concurrent static func crea(_ fotogrammi: [Data], fps: Int32 = 12) async throws -> URL {
+        guard let primo = fotogrammi.first.flatMap({ UIImage(data: $0)?.cgImage }) else { throw ReelDaFoto.Guasto.immagine }
+        let W = 1080, H = max(2, Int((Double(primo.height) / Double(primo.width) * 1080 / 2).rounded()) * 2)
+        return try await ReelDaFoto.scrivi(larghezza: W, altezza: H, fps: fps, fotogrammi: fotogrammi.count) { i, ctx in
+            guard let img = UIImage(data: fotogrammi[i])?.cgImage else { return }
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: W, height: H))
+        }
+    }
+}
+
+nonisolated enum ModelloAR {
+    /// L'STL ASCII del pezzo (millimetri, Z in alto) → USDZ in metri, Y in alto, base a terra e centrato: in AR ha la misura vera.
+    @concurrent static func crea(_ stl: String) async -> URL? {
+        var v: [SCNVector3] = []
+        for riga in stl.split(separator: "\n") {
+            let t = riga.split(separator: " ", omittingEmptySubsequences: true)
+            guard t.count == 4, t[0] == "vertex", let x = Float(t[1]), let y = Float(t[2]), let z = Float(t[3]) else { continue }
+            v.append(SCNVector3(x * 0.001, z * 0.001, -y * 0.001))          // Z in alto (stampa) → Y in alto (AR)
+        }
+        guard v.count >= 3 else { return nil }
+        v.removeLast(v.count % 3)
+        let xs = v.map(\.x), ys = v.map(\.y), zs = v.map(\.z)
+        let cx = ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2, cz = ((zs.min() ?? 0) + (zs.max() ?? 0)) / 2, y0 = ys.min() ?? 0
+        v = v.map { SCNVector3($0.x - cx, $0.y - y0, $0.z - cz) }
+        var n: [SCNVector3] = []
+        n.reserveCapacity(v.count)
+        var k = 0
+        while k + 2 < v.count {
+            let a = SIMD3(v[k].x, v[k].y, v[k].z), b = SIMD3(v[k + 1].x, v[k + 1].y, v[k + 1].z), c = SIMD3(v[k + 2].x, v[k + 2].y, v[k + 2].z)
+            let f = simd_cross(b - a, c - a), l = simd_length(f), u = l > 0 ? f / l : SIMD3<Float>(0, 1, 0)
+            for _ in 0..<3 { n.append(SCNVector3(u.x, u.y, u.z)) }
+            k += 3
+        }
+        let indici = (0..<Int32(v.count)).map { $0 }
+        let g = SCNGeometry(sources: [SCNGeometrySource(vertices: v), SCNGeometrySource(normals: n)],
+                            elements: [SCNGeometryElement(indices: indici, primitiveType: .triangles)])
+        let m = SCNMaterial()
+        m.lightingModel = .physicallyBased
+        m.diffuse.contents = UIColor(white: 0.86, alpha: 1)
+        m.roughness.contents = 0.55
+        g.materials = [m]
+        let scena = SCNScene()
+        scena.rootNode.addChildNode(SCNNode(geometry: g))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ar-\(UUID().uuidString).usdz")
+        return scena.write(to: url, options: nil, delegate: nil, progressHandler: nil) ? url : nil
+    }
+}
+
 // MARK: - Il Reel da una foto (il pezzo dello Studio, una foto): 6 secondi in H.264, 1080×1920, con un lento avvicinamento.
 // Lo fa l'iPhone (AVAssetWriter), così Instagram riceve un MP4 vero, non un video registrato dal browser.
 
@@ -151,8 +205,19 @@ nonisolated enum ReelDaFoto {
 
     @concurrent static func crea(_ jpg: Data, secondi: Double = 6) async throws -> URL {
         guard let img = UIImage(data: jpg)?.cgImage else { throw Guasto.immagine }
-        let W = 1080, H = 1920, fps: Int32 = 30
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("reel-\(UUID().uuidString).mp4")
+        let W = 1080, H = 1920, fps: Int32 = 30, n = Int(secondi * Double(fps))
+        let iw = Double(img.width), ih = Double(img.height)
+        return try await scrivi(larghezza: W, altezza: H, fps: fps, fotogrammi: n) { i, ctx in
+            let z = 1 + 0.06 * Double(i) / Double(max(1, n - 1))               // il lento avvicinamento dell'anteprima del mockup
+            let k = max(Double(W) / iw, Double(H) / ih) * z
+            ctx.draw(img, in: CGRect(x: (Double(W) - iw * k) / 2, y: (Double(H) - ih * k) / 2, width: iw * k, height: ih * k))
+        }
+    }
+
+    /// Lo scrittore MP4 (H.264) comune: `disegna(i, contesto)` disegna il fotogramma i su fondo scuro.
+    static func scrivi(larghezza W: Int, altezza H: Int, fps: Int32, fotogrammi n: Int,
+                       disegna: (Int, CGContext) -> Void) async throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("video-\(UUID().uuidString).mp4")
         let w = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let ingresso = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: W, AVVideoHeightKey: H,
@@ -167,7 +232,6 @@ nonisolated enum ReelDaFoto {
         w.add(ingresso)
         guard w.startWriting() else { throw w.error ?? Guasto.scrittura }
         w.startSession(atSourceTime: .zero)
-        let iw = Double(img.width), ih = Double(img.height), n = Int(secondi * Double(fps))
         let spazio = CGColorSpaceCreateDeviceRGB()
         for i in 0..<n {
             while !ingresso.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(4)) }
@@ -182,9 +246,7 @@ nonisolated enum ReelDaFoto {
                 ctx.setFillColor(CGColor(red: 0.008, green: 0.04, blue: 0.055, alpha: 1))
                 ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
                 ctx.interpolationQuality = .high
-                let z = 1 + 0.06 * Double(i) / Double(max(1, n - 1))           // il lento avvicinamento dell'anteprima del mockup
-                let k = max(Double(W) / iw, Double(H) / ih) * z
-                ctx.draw(img, in: CGRect(x: (Double(W) - iw * k) / 2, y: (Double(H) - ih * k) / 2, width: iw * k, height: ih * k))
+                disegna(i, ctx)
             }
             CVPixelBufferUnlockBaseAddress(b, [])
             guard adattatore.append(b, withPresentationTime: CMTime(value: Int64(i), timescale: fps)) else { throw w.error ?? Guasto.scrittura }

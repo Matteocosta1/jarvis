@@ -75,4 +75,29 @@ def toppe_lidar(s, toppa):
     #  · CONDIVIDI › Copia nell'app: copia davvero l'immagine del banco negli appunti dell'iPhone
     s = toppa(s, 'else notifica("Copiato, Sir.", { titolo: "Studio" }); }));',
               'else { if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "copia", b64: B.istantanea(true).split(",")[1] }); notifica("Copiato, Sir.", { titolo: "Studio" }); } }));')
+    #  · CONDIVIDI › le app (AirDrop, Messaggi, Mail, WhatsApp, Telegram): nell'app il file vero del formato scelto (immagine, video 360°
+    #    montato dall'iPhone, modello AR USDZ, STL) e il foglio di condivisione di iOS, dove si tocca l'app. Nel mockup resta la prova.
+    s = toppa(s, '  // ── CONDIVIDI: il foglio di iOS.',
+              '''  // APP · CONDIVIDI vero: il file del formato scelto, poi il foglio di condivisione di iOS
+  async function condividiVero(o, fmt) {
+    const nome = o.nome.replace(/[^\\w-]+/g, "_"), chiedi = window.__jarvisChiedi;
+    if (fmt === "img") return scarica(B.istantanea(true), `${nome}.jpg`);
+    if (fmt === "3d") return scarica(B.stl(o, B.stampaInfo(o).m), `${nome}.stl`);
+    if (fmt === "ar") return chiedi("modelloAR", { nome, stl: B.stl(o) }).then(() => "ok").catch((e) => e?.code || "errore");
+    const fot = []; for (let k = 0; k < 72; k++) { fot.push(B.fotogramma360(k / 72 * Math.PI * 2).split(",")[1]); if (k % 6 === 5) await attesa(0); }
+    return chiedi("video360", { nome, fotogrammi: fot }).then(() => "ok").catch((e) => e?.code || "errore");
+  }
+  // ── CONDIVIDI: il foglio di iOS.''')
+    s = toppa(s, '      if (!(await prepara())) return; suona("aPronto"); notifica(`${{ img: "Immagine", video: "Video a 360°", ar: "Modello AR", "3d": "File per la stampa" }[fmt]} di «${o.nome}» inviato con ${b.dataset.app}.`, { titolo: "Studio" }); F.querySelector("[data-chiudi]").click(); }));',
+              '      if (window.JARVIS_APP) { const bar = F.querySelector(".sd-barra"); if (bar && fmt === "video") bar.hidden = false; const r = await condividiVero(o, fmt); if (bar) bar.hidden = true; if (r === "ok") suona("aPronto");'
+              ' notifica(esitoSalva(r, `${{ img: "Immagine", video: "Video a 360°", ar: "Modello AR", "3d": "File per la stampa" }[fmt]} di «${o.nome}» pronto`), { titolo: "Studio" }); if (F.isConnected) F.querySelector("[data-chiudi]").click(); return; }\n'
+              '      if (!(await prepara())) return; suona("aPronto"); notifica(`${{ img: "Immagine", video: "Video a 360°", ar: "Modello AR", "3d": "File per la stampa" }[fmt]} di «${o.nome}» inviato con ${b.dataset.app}.`, { titolo: "Studio" }); F.querySelector("[data-chiudi]").click(); }));')
+    # il fotogramma del giro: la camera a un angolo preciso attorno al pezzo, poi l'immagine (per il VIDEO 360° vero)
+    s = toppa(s, '    giro360() { giroT = performance.now(); },',
+              '    giro360() { giroT = performance.now(); },\n    fotogramma360(a) { const R = raggio, t = teta + a; cam.position.set(bersaglio.x + R * Math.sin(fi) * Math.sin(t), bersaglio.y + R * Math.cos(fi), bersaglio.z + R * Math.sin(fi) * Math.cos(t)); cam.lookAt(bersaglio); ren.render(scena, cam); return ren.domElement.toDataURL("image/jpeg", .82); },')
+    #  · Salva in Foto / Salva su File col formato VIDEO 360° o MODELLO AR: il file vero di quel formato (prima salvava una foto)
+    s = toppa(s, 'if (b.dataset.az === "foto") { const r = await scarica(B.istantanea(true), `${o.nome}.jpg`);',
+              'if (b.dataset.az === "foto") { const r = window.JARVIS_APP && fmt === "video" ? await condividiVero(o, "video") : await scarica(B.istantanea(true), `${o.nome}.jpg`);')
+    s = toppa(s, 'else if (b.dataset.az === "file") { const r = fmt === "3d"',
+              'else if (b.dataset.az === "file") { const r = window.JARVIS_APP && (fmt === "video" || fmt === "ar") ? await condividiVero(o, fmt) : fmt === "3d"')
     return s
