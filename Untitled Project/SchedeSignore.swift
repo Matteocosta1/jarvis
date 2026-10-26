@@ -41,11 +41,11 @@ struct CorniceScheda<Contenuto: View>: View {
                         if marchio {
                             // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
                             HStack(alignment: .center) {
-                                TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta, marchio: true)
+                                TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
                                 Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(tinta)
                             }
                         } else {
-                            TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta)
+                            TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
                         }
                         if mostrato {
                             contenuto()
@@ -204,7 +204,8 @@ private struct SfondoBarra: ViewModifier {
 struct CaricamentoHUD: View {
     let titolo: String
     let tinta: Color
-    private let sistemi = ["COLLEGAMENTO AL CERVELLO", "LETTURA SENSORI", "ANALISI", "COMPILAZIONE SCHEDA"]
+    // 27 ott (il signore): la prima voce è quella della sezione (TestiCaricamento), poi i sistemi di sempre
+    private var sistemi: [String] { [TestiCaricamento.di(titolo).uppercased(), "LETTURA SENSORI", "ANALISI", "COMPILAZIONE SCHEDA"] }
     @State private var inizio = Date()
 
     var body: some View {
@@ -966,5 +967,24 @@ struct TestoCodice: View {
             if nuovo == voluta { lettaDa = Date() }
         }
     }
+}
+/// 27 ott (il signore: «testi cool per il caricamento di ogni sezione»): cosa sta facendo JARVIS mentre apre ogni sezione.
+/// Sotto il nome della sezione (al posto di «acquisizione dati») e prima voce dei sistemi nel caricamento.
+enum TestiCaricamento {
+    private static let testi: [String: String] = [
+        "meteo": "aggancio satelliti meteo", "email": "decrittazione posta", "messaggi": "intercettazione canali",
+        "diario": "apertura archivio personale", "sonno": "lettura cicli notturni", "cuore": "sincronizzazione battito",
+        "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "calibrazione microfoni",
+        "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
+        "bea": "canale protetto", "github": "sincronizzazione repository", "supabase": "interrogazione database",
+        "archivio": "accesso al caveau", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
+        "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "allineamento canali audio",
+        "vitals": "lettura parametri vitali", "ricordi": "richiamo memoria", "confidente": "canale riservato",
+        "wiretap": "microfoni in ascolto", "interprete": "caricamento dizionari", "trainer": "calibrazione scheletro",
+        "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "accensione sensore",
+        "sentinella": "armamento perimetro", "profiler": "riconoscimento soggetto", "browser": "connessione cifrata",
+        "studio": "proiettori olografici", "social": "collegamento instagram",
+    ]
+    static func di(_ sezione: String) -> String { testi[sezione.lowercased()] ?? "acquisizione dati" }
 }
 #endif
