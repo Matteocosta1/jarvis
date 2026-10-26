@@ -36,6 +36,8 @@ struct ContentView: View {
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
     @State private var sottotitolo = "AVVIO SISTEMI"
+    @State private var testaArrivate = 0         // MARK X: quante icone in alto sono già arrivate (da destra, una alla volta, a tempo con l'avvio)
+    @State private var bagliore = false          // MARK X: a «SISTEMI IN LINEA» il titolo prende un leggero bagliore bianco, poi resta fermo
     @State private var iconaAttiva: Int?         // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var scegliLingua = false       // icona Interprete: scelta della lingua
     @State private var accese = 0                 // quante icone si sono già accese all'avvio (plim, plim, plim…)
@@ -418,6 +420,18 @@ struct ContentView: View {
             let ritardoAudio = AVAudioSession.sharedInstance().outputLatency   // il suono arriva all'altoparlante un attimo dopo
             let zero = CACurrentMediaTime() + ritardoAudio
             Aptica.avvio(tempi: tempiAptica.map { $0 + ritardoAudio })
+            // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta e alla STESSA distanza fra loro:
+            // la prima si posa sul colpo della prima icona della corona, l'ultima sul colpo dell'ultima. Partono 110 ms prima del colpo.
+            let colpoVero = { (k: Int) in colpi[k] - (k >= coda ? Avvio.anticipoCoda : 0) }
+            let nTesta = ContentView.postoTesta.totale, primoColpo = colpoVero(0), ultimoColpo = colpoVero(elenco.count - 1)
+            Task { @MainActor in
+                for j in 0..<nTesta {
+                    let posa = primoColpo + Double(j) * (ultimoColpo - primoColpo) / Double(max(1, nTesta - 1))
+                    let manca = zero + posa - 0.110 - CACurrentMediaTime()
+                    if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
+                    withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = j + 1 }
+                }
+            }
             var prima = 0.0
             for k in 0..<elenco.count {                             // la corona e, in fondo, INTELLIGENCE sulla curva
                 // da Interprete in poi l'icona parte 110 ms prima del colpo (SINCRO): la molla svelta arriva sul beep
@@ -433,6 +447,8 @@ struct ContentView: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
+            testaArrivate = ContentView.postoTesta.totale                 // per sicurezza: a sistemi in linea ci sono tutte
+            withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
             if chatDaCaricare {
                 try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
                 await caricaChat()
@@ -447,7 +463,7 @@ struct ContentView: View {
                 jarvis.ascoltaSubito()
             }
             try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
-            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = "MARK IX" }   // build 23: MARK IX (deciso dal signore il 24 ott, mockup #23)
+            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = ContentView.marca }   // MARK X (deciso dal signore il 26 ott)
         }
     }
 
@@ -552,6 +568,10 @@ struct ContentView: View {
     /// dello schermo) il titolo con la tastiera aperta non va mai a capo e non tocca le icone (rete di sicurezza sul titolo).
     /// Da 390 punti in su (15 Pro compreso) resta tutto com'era.
     static let larghezzaStretta: CGFloat = 385
+    /// MARK X (26 ott): il nome della versione sotto il titolo.
+    static let marca = "MARK X"
+    /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra). Studio e Social arrivano con le tappe 2 e 3.
+    enum postoTesta { static let musica = 0, sistemi = 1, cestino = 2, impostazioni = 3, totale = 4 }
 
     /// `mini`: con la tastiera aperta (solo iPhone) qui c'è il posto del reattore piccolo, tra il titolo e i tasti: il reattore vero
     /// ci vola sopra dal centro (`reattoreVolante`). Build 23: le icone sono quattro (MUSICA, SISTEMI, cestino, Impostazioni); come nel
@@ -566,13 +586,15 @@ struct ContentView: View {
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
+                    .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
+                    .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
                     // schermo stretto: mai a capo; se non ci sta nemmeno così (320 punti) si rimpicciolisce quanto basta
                     .lineLimit(stretta ? 1 : nil)
                     .minimumScaleFactor(stretta ? 0.7 : 1)
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)
-                    .foregroundStyle(sottotitolo == "MARK IX" ? Color.tenue : Color.ciano)
+                    .foregroundStyle(sottotitolo == ContentView.marca ? Color.tenue : Color.ciano)
                     .contentTransition(.numericText())
                     .id(sottotitolo)
                     .transition(.opacity)
@@ -602,6 +624,7 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
             .accessibilityLabel("Musica")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
@@ -612,6 +635,7 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate)
             .accessibilityLabel("Sistemi")
             Button { Suoni.clickTesta(); chiediPulizia = true } label: {
                 Image(systemName: "trash")
@@ -620,6 +644,7 @@ struct ContentView: View {
                     .padding(.vertical, 8).padding(.horizontal, 4)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
                 Button("Pulisci", role: .destructive) { svuotaChat() }
@@ -636,6 +661,7 @@ struct ContentView: View {
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
             .accessibilityLabel("Impostazioni")
         }
         .buttonStyle(StileStark())
@@ -1374,7 +1400,7 @@ struct TelemetriaHUD: View {
             let k = Int(ctx.date.timeIntervalSinceReferenceDate / 2.5)
             let ora = Date().formatted(.dateTime.hour().minute().second())
             let voci = ["SISTEMI NOMINALI", "VOCE \(Impostazioni.voceCloud ? "CLOUD" : "LOCALE")", "ORECCHIO \(Impostazioni.interruzioneVocale ? "ATTIVO" : "SPENTO")",
-                        "MEMORIA SINCRONIZZATA", "T \(ora)", "MARK IX · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
+                        "MEMORIA SINCRONIZZATA", "T \(ora)", "\(ContentView.marca) · BUILD \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")"]
             let riga = fase == .elaboro ? "ELABORAZIONE IN CORSO" : (fase == .ascolto ? "CANALE AUDIO APERTO" : voci[k % voci.count])
             Text(riga)
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
@@ -1725,4 +1751,21 @@ extension VerticalAlignment {
         static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
     }
     nonisolated static let rigaMark = VerticalAlignment(RigaMark.self)
+}
+
+
+// MARK: - MARK X · arrivo delle icone in alto
+private struct ArrivoTesta: ViewModifier {
+    let posto: Int, arrivate: Int
+    func body(content: Content) -> some View {
+        let dentro = posto < arrivate
+        content
+            .opacity(dentro ? 1 : 0)
+            .offset(x: dentro || UIAccessibility.isReduceMotionEnabled ? 0 : 28)   // da destra; con «Riduci movimento» solo dissolvenza
+            .allowsHitTesting(dentro)
+    }
+}
+extension View {
+    /// L'icona in alto arriva da destra quando tocca a lei (vedi `accendi()`).
+    func arrivoTesta(_ posto: Int, arrivate: Int) -> some View { modifier(ArrivoTesta(posto: posto, arrivate: arrivate)) }
 }
