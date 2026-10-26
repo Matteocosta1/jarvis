@@ -5,6 +5,7 @@ import WebKit
 import Combine
 import AVFoundation
 import UniformTypeIdentifiers
+import SafariServices
 
 // MARK: - STUDIO e SOCIAL (MARK X): il banco olografico per modellare in 3D e stampare, e Instagram, IDENTICI al mockup approvato.
 // La pagina è il mockup stesso («Studio3D/markx.html», generata da tools/studio_app.py) con three.js 0.160 nel pacchetto
@@ -149,6 +150,10 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
                 try? FileManager.default.removeItem(at: u)
                 self.condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
             }
+        case "apriURL":                                                  // SERVICE: la pagina di stampa 3D di Vectorealism, dentro l'app
+            guard let t = o["url"] as? String, let u = URL(string: t), u.scheme == "https", u.host?.hasSuffix("vectorealism.com") == true,
+                  let sopra = RegiaStudio.inCima(web) else { return }
+            sopra.present(SFSafariViewController(url: u), animated: true)
         case "copia":                                                    // CONDIVIDI › Copia: l'immagine del banco negli appunti
             if let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64), let img = UIImage(data: d) { UIPasteboard.general.image = img }
         case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone

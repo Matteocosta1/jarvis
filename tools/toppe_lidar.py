@@ -100,4 +100,12 @@ def toppe_lidar(s, toppa):
               'if (b.dataset.az === "foto") { const r = window.JARVIS_APP && fmt === "video" ? await condividiVero(o, "video") : await scarica(B.istantanea(true), `${o.nome}.jpg`);')
     s = toppa(s, 'else if (b.dataset.az === "file") { const r = fmt === "3d"',
               'else if (b.dataset.az === "file") { const r = window.JARVIS_APP && (fmt === "video" || fmt === "ar") ? await condividiVero(o, fmt) : fmt === "3d"')
+    #  · SERVICE nell'app: Vectorealism (Milano; scelto dal signore il 26 ott). Non ha un'API: l'STL va su File (zip sopra i 9 MB:
+    #    il loro limite è 10 MB) e si apre la loro pagina di stampa 3D, dove lo si carica, si sceglie materiale e colore e si fa il preventivo.
+    s = toppa(s, 'F.querySelector(\'[data-st="servizio"]\').addEventListener("click", () => { suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF',
+              'F.querySelector(\'[data-st="servizio"]\').addEventListener("click", async () => { if (window.JARVIS_APP) { suona("aTick"); '
+              'parlaMock("Salvo il file e apro Vectorealism, Sir: lo carichi lì, scelga materiale e colore e tocchi Calcola il preventivo.", 4200); '
+              'let st = B.stl(o, pi.m), nm = `${o.nome.replace(/[^\\w-]+/g, "_")}.stl`; if (st.length > 9e6) { st = zipUno(nm, new TextEncoder().encode(st)); nm = nm.replace(/\\.stl$/i, ".zip"); } '
+              'const r = await scarica(st, nm); if (r === "ok") window.webkit.messageHandlers.jarvis.postMessage({ tipo: "apriURL", url: "https://www.vectorealism.com/it/stampa-3d/" }); '
+              'else notifica(esitoSalva(r, ""), { titolo: "Studio" }); return; } suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF')
     return s
