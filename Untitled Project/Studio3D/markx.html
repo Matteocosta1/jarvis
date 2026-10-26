@@ -174,10 +174,11 @@ header .icona.testa.carica { animation: icoCarica .5s ease-out; }
 #sezione.camera #chiudiSez { width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(79,227,255,.5); font-size: 17px; display: grid; place-items: center; }
 .corpo { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 24px; position: relative; display: grid; align-content: start; gap: 16px; }
 .testata { display: flex; align-items: center; gap: 14px; }
-.anello { width: 52px; height: 52px; border-radius: 50%; position: relative; display: grid; place-items: center; color: var(--ciano); box-shadow: 0 0 18px rgba(79,227,255,.3); flex: none; }
+.anello { width: 40px; height: 40px; border-radius: 50%; position: relative; display: grid; place-items: center; color: var(--ciano); box-shadow: 0 0 18px rgba(79,227,255,.3); flex: none; }
 .anello::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(79,227,255,.25); }
 .anello::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--ciano); animation: gira 3s linear infinite; }
-.anello svg { width: 22px; height: 22px; }
+.anello svg { width: 17px; height: 17px; }
+.sd-su > .anello, .sc-su > .anello { flex: none; display: grid; }   /* Studio e Social: l'icona animata come tutte le sezioni */
 @keyframes gira { to { transform: rotate(360deg); } }
 .testata b { display: block; font: 700 22px var(--mono); letter-spacing: 3px; color: #fff; }
 .testata small { font: 600 9px var(--mono); letter-spacing: 2px; color: var(--ciano); text-transform: uppercase; }
@@ -5583,7 +5584,7 @@ function social(ok) {
   const DIDA = ["Uscito ora dal banco olografico di JARVIS: progettato in 3D, stampato in PLA. Dite la vostra 👇\n\n#3dprinting #kingrusto #design #madeinitaly",
     "Dal muro allo Studio: lo stencil diventa un pezzo vero. Chi lo vuole? Commentate LISTA.\n\n#kingrusto #graffiti #customdenim #3dprint",
     "Nuovo drop in arrivo. Questo è il prototipo: ditemi colore e misura.\n\n#kingrusto #streetart #drop"];
-  A.innerHTML = `<div class="sc-su"><div><b>J.A.R.V.I.S.</b><small>SOCIAL · @KINGRUSTO</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>J.A.R.V.I.S.</b><small>SOCIAL · @KINGRUSTO</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
     <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["griglia", "GRIGLIA"], ["piano", "PIANO"], ["report", "REPORT"], ["orari", "ORARI"], ["rivali", "RIVALI"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
@@ -6121,7 +6122,7 @@ function studio(ok) {
   corpo.hidden = true; sezione.classList.add("pieno");
   const A = document.createElement("div"); A.className = "allen sd";
   const rail = (lista) => lista.map(([k, n]) => `<button type="button" data-sdt="${k}" aria-pressed="false" aria-label="${n}"><i>${SD_ICO[k]}</i>${n}</button>`).join("");
-  A.innerHTML = `<div class="sd-su"><div><b>J.A.R.V.I.S.</b><small data-sd="prog">STUDIO · BANCO OLOGRAFICO</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>J.A.R.V.I.S.</b><small data-sd="prog">STUDIO · BANCO OLOGRAFICO</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
     <div class="sd-vista"><div class="sd-modi">${[["solido", "SOLIDO"], ["reticolo", "WIREFRAME"], ["raggi", "RAGGI X"]].map(([k, n], i) => `<button type="button" data-sdv="${k}" aria-pressed="${!i}">${n}</button>`).join("")}<button type="button" data-sdg aria-pressed="true">SNAP 5</button></div>
       <div class="sd-storia"><button type="button" data-sda="annulla" aria-label="Annulla" class="spento">${SD_ICO.annulla}</button><button type="button" data-sda="ripeti" aria-label="Ripeti" class="spento">${SD_ICO.ripeti}</button></div></div>
     <div class="sd-banco"><div class="sd-angoli"></div>
