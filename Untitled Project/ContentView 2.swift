@@ -223,6 +223,18 @@ struct ContentView: View {
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
                     .onAppear { if telefono { reattoreGrande = !tastiera } }
                 }
+                // 26 ott sera (foto del signore, 21:42): lo swipe giù partito dal bordo in alto (sopra l'ora) non trovava nessuno che lo
+                // prendesse: iOS mostrava la sua linguetta e restava lì, la tendina non scendeva. Ora anche la fascia dell'ora tira giù
+                // la tendina PROTOCOLLI, come nel mockup (lo swipe dall'alto apre i protocolli).
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: g.safeAreaInsets.top + 8)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(tiraGiuTendina)
+                    Spacer(minLength: 0)
+                }
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(!tendinaAperta && tendinaLibera)
                 tendina(g)
             }
             .frame(width: g.size.width, height: g.size.height)
