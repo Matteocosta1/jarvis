@@ -31,6 +31,8 @@ struct ContentView: View {
     @State private var mostraBrowser = false
     @State private var aperturaPagina: AperturaPagina?   // MARK X: STUDIO e SOCIAL, la pagina del mockup (icone in alto, voce, Occhi)
     @State private var stratoCopre = false               // Studio o Social su del tutto: JARVIS sotto si ferma (vedi jarvisCoperto)
+    @State private var postoTitolo: CGFloat = 0           // il posto libero per J.A.R.V.I.S. accanto alle icone in alto
+    @State private var larghezzeTitolo: [CGFloat] = Array(repeating: 0, count: 7)   // una per ognuna di misureTitolo
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
@@ -655,7 +657,17 @@ struct ContentView: View {
     /// mockup («.telefono.b23») le icone hanno 1 punto in meno per lato e, con la tastiera aperta, le lettere del titolo 1 punto più vicine:
     /// così il reattore piccolo non tocca né il titolo né le icone.
     /// `stretta`: schermo più stretto di `larghezzaStretta` (decisione 16): il titolo non va mai a capo e non tocca le icone.
-    /// Il titolo su una riga, a misura fissa (lo sceglie `ViewThatFits`): l'ultimo punto attaccato alla S.
+    /// Il titolo su una riga, a misura fissa (la sceglie `sceltaTitolo`): l'ultimo punto attaccato alla S.
+    ///
+    /// Le misure del titolo J.A.R.V.I.S., dalla più larga: prima si stringe solo lo spazio tra le lettere, poi il testo.
+    private static let misureTitolo: [(spazio: CGFloat, misura: CGFloat)] = [(5, 22), (4, 22), (3, 22), (2, 22), (2, 20), (1.5, 18), (1, 16)]
+
+    /// La più larga che entra nel posto libero accanto alle icone; finché non sono misurate, la più larga (come prima).
+    private var sceltaTitolo: Int {
+        guard postoTitolo > 0, larghezzeTitolo.count == ContentView.misureTitolo.count, !larghezzeTitolo.contains(0) else { return 0 }
+        return larghezzeTitolo.firstIndex { $0 <= postoTitolo } ?? ContentView.misureTitolo.count - 1
+    }
+
     private func titoloJarvis(spazio: CGFloat, misura: CGFloat) -> some View {
         (Text("J.A.R.V.I.").tracking(spazio) + Text("S."))
             .font(.system(size: misura, weight: .bold, design: .monospaced))
@@ -670,15 +682,23 @@ struct ContentView: View {
                 // 26 ott (foto del signore): con la tastiera aperta e 7 icone in testata, sul 15 Pro restano ~192 punti e il titolo ne
                 // vuole ~208: la «S.» andava a capo. Ora prima si stringe solo lo spazio tra le lettere (le lettere restano uguali, come il
                 // mockup b32), poi, solo se ancora non ci sta, il testo; sempre su una riga, mai tagliato.
-                ViewThatFits(in: .horizontal) {
-                    titoloJarvis(spazio: 5, misura: 22)
-                    titoloJarvis(spazio: 4, misura: 22)
-                    titoloJarvis(spazio: 3, misura: 22)
-                    titoloJarvis(spazio: 2, misura: 22)
-                    titoloJarvis(spazio: 2, misura: 20)
-                    titoloJarvis(spazio: 1.5, misura: 18)
-                    titoloJarvis(spazio: 1, misura: 16)
-                }
+                // 26 ott notte (video del signore 23:03: «la scritta JARVIS che vola»): chiusa la tastiera, il titolo saltava fin
+                // sotto l'ora per 1,5 s mentre MARK X e le icone restavano al loro posto. Lo spostava ViewThatFits, che cambiando
+                // misura (stretta con la tastiera, larga senza) rimetteva il titolo fuori dall'area sicura in alto. Ora il titolo è
+                // un testo solo, sempre lo stesso: le misure possibili si contano a parte (nascoste) e si sceglie la più larga che
+                // entra nel posto libero accanto alle icone. Stesse misure e stesso ordine di prima.
+                titoloJarvis(spazio: ContentView.misureTitolo[sceltaTitolo].spazio, misura: ContentView.misureTitolo[sceltaTitolo].misura)
+                    .background(alignment: .leading) {
+                        ZStack(alignment: .leading) {
+                            ForEach(ContentView.misureTitolo.indices, id: \.self) { i in
+                                titoloJarvis(spazio: ContentView.misureTitolo[i].spazio, misura: ContentView.misureTitolo[i].misura)
+                                    .hidden()
+                                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in
+                                        if larghezzeTitolo.indices.contains(i), larghezzeTitolo[i] != w { larghezzeTitolo[i] = w }
+                                    }
+                            }
+                        }
+                    }
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
@@ -692,9 +712,10 @@ struct ContentView: View {
                     .transition(.opacity)
                     .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)          // tutto il posto libero accanto alle icone (prima: lo Spacer)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in if postoTitolo != w { postoTitolo = w } }
             .opacity(acceso ? 1 : 0)
             .offset(x: acceso ? 0 : -12)
-            Spacer(minLength: 0)
             if mini {
                 // il posto del reattore piccolo (34 punti): il reattore vero ci arriva volando e, toccato, chiude la tastiera e basta
                 Button { tastiera = false } label: {

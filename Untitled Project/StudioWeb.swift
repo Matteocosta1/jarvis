@@ -604,6 +604,27 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             aperta = false; clearTimeout(via); via = null;
             post({ tipo: 'chiudi' });
           }, true);
+          // 26 ott notte (video del signore 23:03, ancora nero alla chiusura): il «Chiudi» che lui tocca in Studio e in Social non è
+          // #chiudiSez (a pagina piena è nascosto) ma quello della testata della sezione (.sd-chiudi, .sc-chiudi), che chiama
+          // $("chiudiSez").click() da programma: il tocco qui sopra non lo vedeva, la pagina si chiudeva da sola, si nascondeva
+          // (nero) e l'app chiudeva 750 ms dopo, nera. Ora: tocco su quel «Chiudi» (Studio anche dopo «Salvare in archivio?»,
+          // non con ANNULLA) → quando la pagina preme #chiudiSez, lo strato di JARVIS scende subito con la pagina com'è.
+          // I passaggi dentro la pagina (Studio → Social, LiDAR → Studio) restano come prima.
+          var chiedeChiusura = 0;
+          window.addEventListener('click', function(e){
+            if (!e.isTrusted || !e.target || !e.target.closest) return;
+            if (e.target.closest('.sd-su .sd-chiudi, .sc-su .sc-chiudi')) chiedeChiusura = performance.now();
+            else if (e.target.closest('.sd-chiedi [data-esci="annulla"]')) chiedeChiusura = 0;
+          }, true);
+          var tastoChiudi = document.getElementById('chiudiSez');
+          if (tastoChiudi) tastoChiudi.click = function(){
+            if (aperta && chiedeChiusura && performance.now() - chiedeChiusura < 60000) {
+              chiedeChiusura = 0; aperta = false; clearTimeout(via); via = null;
+              post({ tipo: 'chiudi' });
+              return;
+            }
+            return HTMLElement.prototype.click.call(tastoChiudi);
+          };
           // 26 ott sera: si chiude trascinando giù come le altre schede, ma non se il dito lavora dentro la pagina (banco 3D, schizzo,
           // cursori, griglia del PIANO, campi di testo) o se tocca una parte già scorsa giù (lì trascinare giù vuol dire risalire)
           var presaOn = false;
