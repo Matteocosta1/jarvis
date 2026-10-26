@@ -360,26 +360,25 @@ struct VistaSentinella: View {
                 .allowsHitTesting(false)
 
             VStack {
-                // 26 ott notte: i tasti in alto a destra, sotto la testata delle altre schede (come LiDAR: con il titolo grande
-                // e tre tasti sulla stessa riga non ci stava), del colore della sentinella: ciano, verde in visione notturna
-                HStack(spacing: 8) {
-                    Spacer()
+                // 27 ott: come il mockup, la testata (icona animata, del colore della sentinella) e i tre tasti sulla stessa riga:
+                // con il nome della sezione a 18 punti ci stanno
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "sorveglianza attiva",
+                                      icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
+                        TimelineView(.periodic(from: .now, by: 1)) { t in
+                            Text(t.date.formatted(date: .omitted, time: .standard))
+                                .font(.system(size: 10, design: .monospaced)).opacity(0.7)
+                        }
+                        .foregroundStyle(colore)
+                        .shadow(color: colore.opacity(0.6), radius: 6)
+                    }
                     Button { Suoni.tocco(); registro = true } label: { tasto("list.bullet.rectangle") }
                         .accessibilityLabel("Registro")
                     Button { Suoni.tocco(); oscurato = true } label: { tasto("moon.fill") }
                         .accessibilityLabel("Schermo nero")
                     Button { Suoni.tocco(); s.ferma(); chiudi() } label: { tasto("xmark") }
                         .accessibilityLabel("Disattiva la sentinella")
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "sorveglianza attiva",
-                                  icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
-                    TimelineView(.periodic(from: .now, by: 1)) { t in
-                        Text(t.date.formatted(date: .omitted, time: .standard))
-                            .font(.system(size: 10, design: .monospaced)).opacity(0.7)
-                    }
-                    .foregroundStyle(colore)
-                    .shadow(color: colore.opacity(0.6), radius: 6)
                 }
                 Spacer()
                 Text(s.violato ? "PERIMETRO VIOLATO" : (s.bersagli.isEmpty ? "PERIMETRO SICURO" : "SOGGETTI IN VISTA · \(s.bersagli.count)"))
