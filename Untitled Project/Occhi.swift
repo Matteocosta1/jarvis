@@ -213,13 +213,12 @@ struct Occhi: View {
                     VStack(alignment: .leading, spacing: 2) {
                         // 27 ott: il nome della sezione (niente J.A.R.V.I.S.), sotto il modo
                         Text(cucina ? "CUCINA" : "OCCHI")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .tracking(4)
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .tracking(3)
                         Text(cucina ? (video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])
                                     : (video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE"))
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .tracking(2)
-                            .opacity(0.7)
                         if manualeStark {
                             // sotto OCCHI · MANUALE, piccolo, quello che vede (come i sistemi all'avvio)
                             RigheOcchi(righe: righeInfo)
@@ -1210,6 +1209,7 @@ struct AnelloOcchi: View {
         }
         .frame(width: 40, height: 40)
         .shadow(color: tinta.opacity(0.5), radius: 10)
+        .padding(.trailing, 6)
     }
 }
 #endif

@@ -71,7 +71,7 @@ struct VistaProfiler: View {
             AnelloOcchi(icona: "person.text.rectangle", tinta: Color.ciano)     // 26 ott notte: l'icona animata come le altre sezioni
             VStack(alignment: .leading, spacing: 2) {
                 Text("PROFILER")                                   // 27 ott: il nome della sezione, niente J.A.R.V.I.S.
-                    .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
+                    .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)
                 Text(foto != nil ? "SCHEDA SOGGETTO" : davanti ? "SELFIE" : "SOGGETTO")
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.75)
             }

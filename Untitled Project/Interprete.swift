@@ -57,10 +57,10 @@ struct Interprete: View {
                 HStack {
                     AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("J.A.R.V.I.S.")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                        Text("INTERPRETE · \(lin.nome.uppercased())")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.7)
+                        Text("INTERPRETE")
+                            .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)
+                        Text(lin.nome.uppercased())
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer()
