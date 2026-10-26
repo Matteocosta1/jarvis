@@ -10,7 +10,7 @@ import Combine
 // Sei schede: MEZZI (Transitous, gratis: il percorso vero con le linee, i cambi e gli orari), TRENI (ViaggiaTreno: le partenze
 // vere della stazione più vicina, con ritardo e binario), VOLI (AviationStack dal cervello, «travel-voli»: il volo del signore),
 // PIEDI (Apple Mappe: tempo e strada, poi la GUIDA di Satellite), BICI (BikeMi, dati aperti: bici, elettriche e posti liberi),
-// TAXI (il radiotaxi 02 4040). «Avvisami» mette l'avviso 5 minuti prima di uscire e il conto alla rovescia nella Dynamic Island.
+// TAXI (radiotaxi 02 8585 e l'app inTaxi, scelti dal signore il 26 ott). «Avvisami» mette l'avviso 5 minuti prima di uscire e il conto alla rovescia nella Dynamic Island.
 
 /// Solo iPhone: usa l'indirizzo del cervello e il portachiavi (isolati sul MainActor), come RegiaStudio.
 @MainActor
@@ -469,15 +469,15 @@ struct SchermoTravel: View {
     // TAXI
 
     @ViewBuilder private var taxi: some View {
-        Button { Suoni.tocco(); if let u = URL(string: "tel:024040") { UIApplication.shared.open(u) } } label: {
+        Button { Suoni.tocco(); if let u = URL(string: "tel:028585") { UIApplication.shared.open(u) } } label: {
             Text("Chiama il radiotaxi").font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Color(red: 0, green: 24 / 255, blue: 31 / 255))
                 .frame(maxWidth: .infinity, minHeight: 56)
                 .background(RoundedRectangle(cornerRadius: 12).fill(ciano))
         }
         .buttonStyle(StileStark())
-        TastoComando(testo: "Apri l'app taxi su «\(luogo.nome)»") { Suoni.tocco(); apriAppTaxi() }
-        Text("Radiotaxi 02 4040 · \(auto.map { "stima del tragitto: \(Int($0 / 60)) min" } ?? "stima del tragitto…")")
+        TastoComando(testo: "Apri inTaxi") { Suoni.tocco(); apriAppTaxi() }
+        Text("Radiotaxi 02 8585 · \(auto.map { "stima del tragitto: \(Int($0 / 60)) min" } ?? "stima del tragitto…")")
             .font(.system(size: 11, design: .monospaced)).foregroundStyle(grigio)
     }
 
@@ -533,10 +533,13 @@ struct SchermoTravel: View {
         m.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit])
     }
 
+    /// inTaxi (scelta del signore, 26 ott): si apre l'app; se non risponde al suo indirizzo, la sua pagina nell'App Store
+    /// (lì «Apri» o «Ottieni»). L'indirizzo per la meta l'app non lo accetta dall'esterno: la meta si sceglie dentro inTaxi.
     private func apriAppTaxi() {
-        let m = MKMapItem(placemark: MKPlacemark(coordinate: luogo.coordinata))
-        m.name = luogo.nome
-        m.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+        guard let app = URL(string: "intaxi://"), let negozio = URL(string: "https://apps.apple.com/it/app/id1258614882") else { return }
+        UIApplication.shared.open(app, options: [:]) { aperta in
+            if !aperta { UIApplication.shared.open(negozio) }
+        }
     }
 }
 
@@ -578,6 +581,102 @@ enum AvvisoTravel {
         UserDefaults.standard.removeObject(forKey: "travelAvviso")
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["travel-avviso"])
         IsolaJarvis.fineTravel()
+    }
+}
+// MARK: - TRAVEL al polso (mockup approvato 26 ott sera): l'orologio chiede, l'iPhone calcola e risponde
+
+/// L'orologio manda { travel: "dati" | "avvisa", scheda, meta, metaLat, metaLon, lat?, lon?, volo? }; l'iPhone calcola con gli stessi
+/// dati veri della schermata TRAVEL (Transitous, ViaggiaTreno, AviationStack dal cervello, Apple Mappe, BikeMi) e risponde con un JSON
+/// piccolo, solo quello che il polso mostra. La posizione è quella dell'orologio (se ce l'ha), se no quella dell'iPhone.
+@MainActor
+enum PonteTravel {
+    static func perPolso(_ m: [String: Any]) async -> [String: Any] {
+        func n(_ k: String) -> Double? { (m[k] as? NSNumber)?.doubleValue }
+        let cosa = m["travel"] as? String ?? "dati"
+        let scheda = SchedaTravel(rawValue: m["scheda"] as? String ?? "") ?? .mezzi
+        let meta = m["meta"] as? String ?? ""
+        var lei = n("lat").flatMap { la in n("lon").map { CLLocationCoordinate2D(latitude: la, longitude: $0) } }
+        if lei == nil, let p = await Posizione.attuale(), let la = p["lat"] as? Double, let lo = p["lon"] as? Double {
+            lei = CLLocationCoordinate2D(latitude: la, longitude: lo)
+        }
+        let dove = n("metaLat").flatMap { la in n("metaLon").map { CLLocationCoordinate2D(latitude: la, longitude: $0) } }
+        var r: [String: Any] = [:]
+        if let v = m["volo"] as? String, !v.isEmpty { VoloSalvato.numero = v }
+
+        if cosa == "avvisa" {                              // AVVISAMI dal polso: lo stesso avviso dell'iPhone, con la Dynamic Island
+            if AvvisoTravel.attivo != nil {
+                AvvisoTravel.spegni()
+                r["avviso"] = 0
+            } else if let lei, let dove, let p = await DatiTravel.percorso(da: lei, a: dove, meta: meta) {
+                AvvisoTravel.accendi(p, meta: meta)
+                r["avviso"] = p.esci.addingTimeInterval(-300).timeIntervalSince1970
+            } else {
+                r["errore"] = lei == nil ? "Non ho la sua posizione, Sir." : "Nessun percorso con i mezzi adesso, Sir."
+            }
+            return risposta(r)
+        }
+
+        switch scheda {
+        case .mezzi:
+            guard let lei, let dove else { r["errore"] = lei == nil ? "Non ho la sua posizione, Sir." : "Nessun luogo, Sir."; break }
+            guard let p = await DatiTravel.percorso(da: lei, a: dove, meta: meta) else { r["errore"] = "Nessun percorso con i mezzi adesso, Sir."; break }
+            var righe: [[String: Any]] = p.tratte.filter { $0.tipo == .mezzo }.prefix(3).map { t -> [String: Any] in
+                ["s": t.sigla ?? "", "c": t.coloreHex ?? "", "t": t.da.isEmpty ? t.titolo : "\(t.da) → \(t.a)", "o": DatiTravel.ora(t.ora)]
+            }
+            if righe.isEmpty, let primo = p.tratte.first { righe.append(["s": "", "c": "", "t": primo.titolo, "o": DatiTravel.ora(primo.ora)]) }
+            righe.append(["s": "", "c": "", "t": "Arrivo · \(meta)", "o": DatiTravel.ora(p.arrivo)])
+            r["esci"] = p.esci.timeIntervalSince1970
+            r["righe"] = righe
+            r["avviso"] = AvvisoTravel.attivo.map { $0.addingTimeInterval(-300).timeIntervalSince1970 } ?? 0
+        case .treni:
+            let st = await DatiTravel.stazioneVicina(lei)
+            guard let t = await DatiTravel.partenze(st.codice) else { r["errore"] = "ViaggiaTreno non risponde adesso, Sir."; break }
+            r["stazione"] = st.nome
+            r["letti"] = DatiTravel.ora(Date())
+            r["partenze"] = t.prefix(5).map { ["o": DatiTravel.ora($0.ora), "d": $0.destinazione, "b": $0.binario, "r": $0.ritardo] as [String: Any] }
+        case .voli:
+            guard let numero = VoloSalvato.numero else { r["errore"] = "Nessun volo salvato, Sir: mi dica il numero del volo."; break }
+            let (v, e) = await DatiTravel.volo(numero)
+            guard let v else { r["errore"] = e == "volo non trovato" ? "Il volo \(numero) oggi non lo trovo, Sir." : "Non leggo il volo adesso, Sir."; break }
+            r["volo"] = v.volo
+            r["tratta"] = "\(v.daSigla) → \(v.aSigla)"
+            r["parte"] = v.parte ?? "—"
+            r["gate"] = v.gate ?? "—"
+            let stato: (String, String) = {
+                switch v.stato {
+                case "landed": return ("ATTERRATO", "ver")
+                case "active": return ("IN VOLO", "cia")
+                case "cancelled": return ("CANCELLATO", "ros")
+                case "diverted": return ("DIROTTATO", "amb")
+                case "incident": return ("PROBLEMA", "ros")
+                default: return (v.ritardo.map { $0 > 5 ? "RITARDO +\($0)′" : "IN ORARIO" } ?? "IN ORARIO", (v.ritardo ?? 0) > 5 ? "amb" : "ver")
+                }
+            }()
+            r["stato"] = stato.0
+            r["colore"] = stato.1
+            if let a = DatiTravel.aeroporti[v.daSigla], let parte = v.parteData, parte > Date(), let lei,
+               let p = await DatiTravel.percorso(da: lei, a: a.c, meta: a.nome, arrivoEntro: parte.addingTimeInterval(-a.anticipo)),
+               let l = p.primaLinea, let f = p.primaFermata {
+                r["verso"] = "Per \(a.nome): \(l) da \(f) · esci alle \(DatiTravel.ora(p.esci))"
+            }
+        case .piedi:
+            guard let lei, let dove, let p = await DatiTravel.aPiedi(da: lei, a: dove) else { r["errore"] = "Apple Mappe non trova la strada a piedi, Sir."; break }
+            r["minuti"] = Int((p.secondi / 60).rounded())
+            r["km"] = String(format: "%.1f", p.metri / 1000).replacingOccurrences(of: ".", with: ",")
+            r["arrivo"] = DatiTravel.ora(Date().addingTimeInterval(p.secondi))
+        case .bici:
+            guard let dove, let b = await DatiTravel.bici(lei: lei, meta: dove) else { r["errore"] = "BikeMi non risponde adesso, Sir."; break }
+            r["stazioni"] = b.map { ["n": DatiTravel.nome($0.nome), "m": $0.vicinoMeta ? "vicino a \(meta)" : "\(Int($0.metri.rounded())) m",
+                                     "b": $0.bici, "e": $0.elettriche] as [String: Any] }
+        case .taxi:
+            if let lei, let dove, let s = await DatiTravel.inAuto(da: lei, a: dove) { r["minuti"] = Int((s / 60).rounded()) }
+        }
+        return risposta(r)
+    }
+
+    private static func risposta(_ r: [String: Any]) -> [String: Any] {
+        let json = (try? JSONSerialization.data(withJSONObject: r)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        return ["travel": json]
     }
 }
 #endif

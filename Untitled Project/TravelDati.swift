@@ -3,8 +3,9 @@ import CoreLocation
 import SwiftUI
 
 // MARK: - MARK X · TRAVEL, i dati veri (iPhone e orologio): i tipi, il percorso dei mezzi (Transitous), le partenze dei treni
-// (ViaggiaTreno) e le bici (BikeMi). La schermata è in Travel.swift (solo iPhone: al polso TRAVEL non c'è, come nel mockup).
-// Il file è anche nell'orologio perché i comandi a voce (Build22.swift) usano DatiTravel.numeroVolo.
+// (ViaggiaTreno) e le bici (BikeMi). La schermata dell'iPhone è in Travel.swift, quella del polso in TravelOrologio.swift.
+// Il file è anche nell'orologio: i comandi a voce (Build22.swift) usano DatiTravel.numeroVolo, TRAVEL al polso usa i tipi.
+// TRAVEL al polso (26 ott sera, mockup approvato): i dati li calcola l'iPhone (PonteTravel, Travel.swift), il polso li mostra.
 
 nonisolated enum SchedaTravel: String, CaseIterable, Identifiable, Sendable {
     case mezzi, treni, voli, piedi, bici, taxi
@@ -23,6 +24,10 @@ nonisolated struct TrattaTravel: Identifiable, Sendable {
     let titolo: String
     let dettaglio: String
     let ora: Date
+    /// Per il polso (TRAVEL al polso, 26 ott sera): il colore della linea in esadecimale e la fermata di partenza e di arrivo.
+    var coloreHex: String? = nil
+    var da: String = ""
+    var a: String = ""
 }
 
 nonisolated struct PercorsoTravel: Sendable {
@@ -173,7 +178,7 @@ nonisolated enum DatiTravel {
             let testo = colore(l["routeTextColor"] as? String) ?? .white
             tratte.append(TrattaTravel(tipo: .mezzo, sigla: sigla, colore: col, coloreTesto: testo, titolo: "\(mezzo) → \(a)",
                                        dettaglio: "\(direzione.isEmpty ? "" : "direzione \(direzione) · ")\(fermate) \(fermate == 1 ? "fermata" : "fermate") · \(max(durata, 1)) min",
-                                       ora: inizio))
+                                       ora: inizio, coloreHex: l["routeColor"] as? String, da: da, a: a))
             if primaLinea == nil { primaLinea = sigla; primaFermata = da }
             pezziIsola.append(pezziIsola.isEmpty ? "\(da) \(sigla) → \(a)" : "\(sigla) → \(a)")
         }

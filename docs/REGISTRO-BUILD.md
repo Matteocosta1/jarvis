@@ -125,3 +125,12 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 18. **Mai inventare una schermata che il mockup non ha**: TRAVEL al polso non c'è nel mockup → al polso JARVIS dice che vive sull'iPhone (decisione 36), niente schermata nuova senza mockup approvato.
 19. **Un'API prima di usarla si prova dal cervello** (pg_net): `online_followers` dà le ore del Pacifico, `is_comment_enabled` e le statistiche per post funzionano, la modifica della didascalia e l'ordine della griglia no.
 
+### 26 ott, 17:40 — aggiunte alla 10.0 (7) (decisioni del signore delle 17:15)
+- **Taxi**: radiotaxi 02 8585 (prima 02 4040) e tasto «Apri inTaxi» (prova `intaxi://`, se non risponde la pagina App Store id1258614882; l'indirizzo dell'app non è verificato: da provare).
+- **Social › OCCHI**: apre gli Occhi di JARVIS in modo «SCATTI: LA FOTO VA A SOCIAL», lo scatto torna a Social (prima la fotocamera di sistema).
+- **«Bentornato a casa» da solo (1:37 del video, senza battiti)**: lo scatto del microfono che riparte (chiudendo LiDAR) contava come battiti → 1 s di pausa dei battiti a ogni riaccensione; e i suoni di Studio/Social (Web Audio) non contano più.
+- **TRAVEL al polso** (mockup approvato): 6 pagine verticali (corona o dito), a voce sulla pagina chiesta; i dati li calcola l'iPhone (PonteTravel) con la posizione dell'orologio; AVVISAMI accende anche l'isola sull'iPhone; GUIDA parte dal polso.
+- **Dynamic Island VOCE, REC, PIOGGIA** (sì del signore): modalità «audio» in sottofondo. VOCE: se esce mentre ci parla (non in attesa o meno di 20 s dall'ultimo passaggio) la conversazione continua fuori, si spegne dopo 30 s di attesa (10 min se muto) o con Fine; Muto = JARVIS ignora tutto ma il microfono resta aperto (iOS non lo lascia riaccendere da fuori: il pallino arancione resta). Altrimenti come il 25 ott: uscendo non ascolta. REC: il Wiretap continua fuori, Pausa (niente nel testo, il tempo non conta) e Stop. PIOGGIA: `jarvis-briefing` v27 accende l'isola con push-to-start (tabella `jarvis_isola`, gettone mandato dall'app all'avvio, iOS 17.2+), oltre alla notifica di sempre.
+- **Repo allineato**: `jarvis-briefing` nel repo era fermo al 21 ott (la v26 pubblicata aveva radar e notte): ricostruito dalla v26 + l'isola.
+- **Da provare**: VOCE uscendo a metà risposta e col telefono bloccato; Muto/Fine dall'isola; REC fuori dall'app con Pausa/Stop; inTaxi; Social › OCCHI; TRAVEL al polso (con l'iPhone vicino). La PIOGGIA si vede solo quando piove davvero.
+

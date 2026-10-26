@@ -243,6 +243,7 @@ struct VistaOrologio: View {
         case .organismo: VistaOrganismoOrologio()
         case .satellite(let a): VistaSatelliteOrologio(azione: a)
         case .social(let k): VistaSocialOrologio(scheda: k)
+        case .travel(let n, let k): VistaTravelOrologio(detto: n, iniziale: k)
         }
     }
 

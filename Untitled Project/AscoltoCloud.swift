@@ -488,6 +488,7 @@ final class AttesaMac {
             // difetto 5 (25 ott): la frase comincia, il GPS si sveglia mentre il signore parla (la domanda non lo aspetta)
             segmenti.quandoComincia = { Task { @MainActor in Posizione.scalda() } }
             mani.azzera()
+            BattitoMani.ignora(per: 1.0)            // 26 ott: lo scatto del microfono che riparte non è un battito
             segmenti.azzera()
             if motore.isRunning { motore.stop() }   // qui si arriva solo in attesa: l'ascolto vero è già chiuso
             motore.reset()                          // riparte pulito dopo la voce di JARVIS o i Clash

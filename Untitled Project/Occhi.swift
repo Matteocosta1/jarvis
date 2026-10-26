@@ -24,6 +24,8 @@ enum OcchiAperti {
     static var parla: ((String) -> Void)?
     /// 26 ott: aperti dallo Studio (tasto OCCHI): STUDIO già acceso, inquadra e scatta e la foto torna nello Studio.
     static var studioAcceso = false
+    /// 26 ott sera: aperti da Social (riquadro OCCHI di PUBBLICA): lo scatto torna a Social, pronto da pubblicare.
+    static var socialAcceso = false
 }
 
 struct Occhiata: Identifiable {
@@ -103,6 +105,8 @@ struct Occhi: View {
     @State private var campoAereo: Double = 70
     /// 26 ott: STUDIO acceso (da solo, senza ETICHETTE né OLOGRAMMA): il prossimo scatto va allo Studio.
     @State private var modoStudio = false
+    /// 26 ott sera: aperti da Social › OCCHI: il prossimo scatto torna a Social.
+    @State private var modoSocial = false
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
     private var manualeStark: Bool { !automatico && !video && !cucina }
     private var occupato: Bool { scattando || registrando }
@@ -260,7 +264,7 @@ struct Occhi: View {
                         }
                         TastoOcchiStudio(acceso: modoStudio) {   // MARK X: STUDIO si accende; poi lo scatto va sul banco dello Studio
                             guard !occupato else { return }
-                            Suoni.tocco(); modoStudio.toggle()
+                            Suoni.tocco(); modoStudio.toggle(); modoSocial = false
                             if modoStudio { avvisa("SCATTI: LA FOTO VA ALLO STUDIO") }
                         }
                     }
@@ -485,6 +489,7 @@ struct Occhi: View {
                 return
             }
             modoStudio = false
+            modoSocial = false
             Suoni.schedaPronta()
             OcchiAperti.parla?(k == "studio" ? "\(nome.prefix(1).uppercased() + nome.dropFirst()): lo mando allo Studio, Sir." : "La preparo per Instagram, Sir.")
             chiudi([])
@@ -605,6 +610,10 @@ struct Occhi: View {
                     OcchiAperti.studioAcceso = false
                     modoStudio = true
                     avvisa("SCATTI: LA FOTO VA ALLO STUDIO")
+                } else if OcchiAperti.socialAcceso {         // da Social › OCCHI: lo scatto torna a Social
+                    OcchiAperti.socialAcceso = false
+                    modoSocial = true
+                    avvisa("SCATTI: LA FOTO VA A SOCIAL")
                 }
                 OcchiAperti.stark = { c in                 // a voce: «mostra le etichette», «scansione olografica»…
                     guard agganciato, !chiuso else { return false }
@@ -709,6 +718,7 @@ struct Occhi: View {
     private func scatta() {
         guard agganciato, !scattando, !chiuso, !cambiando else { return }
         if modoStudio && manualeStark { manda("studio"); return }   // STUDIO acceso: lo scatto va allo Studio
+        if modoSocial && manualeStark { manda("social"); return }   // aperti da Social: lo scatto torna a Social
         scattando = true
         stato = "ACQUISIZIONE"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()

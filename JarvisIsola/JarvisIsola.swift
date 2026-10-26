@@ -1,11 +1,14 @@
 import SwiftUI
 import WidgetKit
 import ActivityKit
+import AppIntents
 
 // MARK: - MARK X · DYNAMIC ISLAND di JARVIS (mockup approvato, build 32), disegnata da iOS fuori dall'app.
-// Compatta: a sinistra la linea (TRAVEL) o la freccia con la via (GUIDA), a destra «esci 4′» o i metri, in ciano.
+// Compatta: a sinistra la linea (TRAVEL), la freccia con la via (GUIDA), il reattore (VOCE), il punto rosso (REC) o la nuvola
+// (PIOGGIA); a destra in ciano «esci 4′», i metri, la fase, il tempo registrato o i minuti alla pioggia.
 // Grande (tocco lungo): il numero grande, la riga ciano in maiuscolo, la riga bianca e i due tasti (il secondo rosso).
-// Nella schermata bloccata la stessa cosa della grande. I tasti aprono JARVIS con il comando (it.discosizer.jarvis://isola/…).
+// Nella schermata bloccata la stessa cosa della grande. I tasti che aprono JARVIS sono collegamenti (it.discosizer.jarvis://isola/…),
+// gli altri (Muto, Fine, Pausa, Stop, Ok, Basta avvisi, Ferma guida) li esegue l'app senza aprirsi (ComandoIsola).
 
 @main
 struct IsolaJarvisBundle: WidgetBundle {
@@ -14,6 +17,7 @@ struct IsolaJarvisBundle: WidgetBundle {
 
 private let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
 private let rossoTasto = Color(red: 1, green: 138 / 255, blue: 138 / 255)
+private let rossoRec = Color(red: 1, green: 59 / 255, blue: 48 / 255)
 
 private func colore(_ hex: String?) -> Color {
     guard let hex, hex.count == 6, let v = UInt32(hex, radix: 16) else { return Color(red: 200 / 255, green: 0, blue: 26 / 255) }
@@ -21,6 +25,9 @@ private func colore(_ hex: String?) -> Color {
 }
 
 private func comando(_ c: String) -> URL { URL(string: "it.discosizer.jarvis://isola/\(c)") ?? URL(fileURLWithPath: "/") }
+
+/// «00:12:43»
+private func hms(_ s: Int) -> String { String(format: "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60) }
 
 struct IsolaJarvisWidget: Widget {
     var body: some WidgetConfiguration {
@@ -47,17 +54,81 @@ struct IsolaJarvisWidget: Widget {
     }
 }
 
-/// A sinistra nell'isola stretta: il bollino della linea con l'ora del mezzo (TRAVEL), la freccia e la via (GUIDA).
+/// Il reattore piccolo di JARVIS (anelli ciano), come nell'isola del mockup.
+private struct Reattore: View {
+    var lato: CGFloat = 22
+    var spento = false
+    var body: some View {
+        ZStack {
+            Circle().stroke(ciano.opacity(spento ? 0.25 : 0.45), lineWidth: lato * 0.06)
+            Circle().trim(from: 0.08, to: 0.92).stroke(ciano.opacity(spento ? 0.3 : 0.9), style: StrokeStyle(lineWidth: lato * 0.09, lineCap: .round))
+                .rotationEffect(.degrees(-90)).padding(lato * 0.16)
+            Circle().fill(spento ? ciano.opacity(0.3) : ciano).frame(width: lato * 0.28, height: lato * 0.28)
+                .shadow(color: ciano, radius: spento ? 0 : lato * 0.18)
+        }
+        .frame(width: lato, height: lato)
+    }
+}
+
+/// Le quattro barre della voce (ascolto e parlo).
+private struct Barre: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 1.5) {
+            ForEach([0.45, 0.9, 0.6, 0.8], id: \.self) { h in
+                Capsule().fill(ciano).frame(width: 2, height: 10 * h)
+            }
+        }
+    }
+}
+
+private struct PuntoRec: View {
+    var pausa = false
+    var body: some View {
+        Circle().fill(pausa ? rossoRec.opacity(0.4) : rossoRec).frame(width: 8, height: 8)
+            .shadow(color: rossoRec, radius: pausa ? 0 : 3)
+    }
+}
+
+private struct Nuvola: View {
+    var body: some View {
+        Image(systemName: "cloud.rain").font(.system(size: 13, weight: .semibold)).foregroundStyle(ciano)
+    }
+}
+
+/// VOCE: la parola corta della fase («ASCOLTO», «PENSO», «PARLO», «ATTESA»).
+private func faseCorta(_ f: String?) -> String {
+    switch f {
+    case "LA ASCOLTO": return "ASCOLTO"
+    case "ELABORO": return "PENSO"
+    case "PARLO": return "PARLO"
+    default: return "ATTESA"
+    }
+}
+
+/// A sinistra nell'isola stretta.
 private struct SinistraCompatta: View {
     let stato: AttivitaJarvis.ContentState
     var body: some View {
-        if stato.tipo == "travel" {
+        switch stato.tipo {
+        case "travel":
             HStack(spacing: 6) {
                 Text(stato.sigla ?? "").font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(.white)
                     .frame(width: 24, height: 24).background(Circle().fill(colore(stato.coloreSigla)))
                 Text(stato.oraMezzo ?? "").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
             }
-        } else {
+        case "voce":
+            Reattore(lato: 22, spento: stato.muto == true)
+        case "rec":
+            HStack(spacing: 5) {
+                PuntoRec(pausa: stato.pausaSecondi != nil)
+                Text(stato.pausaSecondi != nil ? "PAUSA" : "REC").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
+            }
+        case "pioggia":
+            HStack(spacing: 5) {
+                Nuvola()
+                Text("Pioggia").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            }
+        default:
             HStack(spacing: 6) {
                 Text(stato.freccia ?? "↑").font(.system(size: 16, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
                 Text((stato.via ?? "").replacingOccurrences(of: "Via ", with: "")).font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -67,19 +138,37 @@ private struct SinistraCompatta: View {
     }
 }
 
-/// A destra: «esci 4′» (il conto alla rovescia lo tiene iOS) o i metri alla svolta.
+/// A destra: «esci 4′» (il conto alla rovescia lo tiene iOS), i metri, la fase, il tempo del REC, i minuti alla pioggia.
 private struct DestraCompatta: View {
     let stato: AttivitaJarvis.ContentState
     var body: some View {
-        if stato.tipo == "travel", let e = stato.esci {
-            if e > Date() {
+        switch stato.tipo {
+        case "travel", "pioggia":
+            if let e = stato.esci, e > Date() {
                 Text(timerInterval: Date()...e, countsDown: true, showsHours: false)
                     .font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
                     .frame(maxWidth: 46)
             } else {
-                Text("ESCI").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
+                Text(stato.tipo == "travel" ? "ESCI" : "ORA").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
             }
-        } else {
+        case "voce":
+            if stato.muto == true {
+                Text("MUTO").font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(rossoTasto)
+            } else {
+                HStack(spacing: 4) {
+                    Text(faseCorta(stato.fase)).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
+                    if stato.fase == "LA ASCOLTO" || stato.fase == "PARLO" { Barre() }
+                }
+            }
+        case "rec":
+            if let p = stato.pausaSecondi {
+                Text(hms(p)).font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
+            } else if let i = stato.inizio {
+                Text(timerInterval: i...Date.distantFuture, countsDown: false, showsHours: true)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
+                    .frame(maxWidth: 64)
+            }
+        default:
             Text("\(stato.metri ?? 0) m").font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
         }
     }
@@ -92,45 +181,108 @@ private struct Grande: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 14) {
-                if stato.tipo == "travel" {
-                    Text(stato.esci.map { $0.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)) } ?? "—")
-                        .font(.system(size: 30, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
-                } else {
-                    Text(stato.freccia ?? "↑").font(.system(size: 44, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
-                }
+                sinistra
                 VStack(alignment: .leading, spacing: 4) {
-                    if stato.tipo == "travel", let e = stato.esci {
-                        HStack(spacing: 0) {
-                            Text(e > Date() ? "TRAVEL · ESCI FRA " : "TRAVEL · ESCA ADESSO")
-                            if e > Date() { Text(timerInterval: Date()...e, countsDown: true, showsHours: false).monospacedDigit() }
-                        }
+                    titolo
                         .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(ciano).lineLimit(1)
-                    } else {
-                        Text("GUIDA · \((stato.via ?? meta).uppercased()) · \(stato.metri ?? 0) M")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(ciano).lineLimit(1)
-                    }
                     Text(stato.riga).font(.system(size: 14)).foregroundStyle(.white).lineLimit(2)
                 }
             }
-            HStack(spacing: 8) {
-                if stato.tipo == "travel" {
-                    tasto("Percorso", comando("percorso"), rosso: false)
-                    tasto("Basta avvisi", comando("basta"), rosso: true)
-                } else {
-                    tasto("Apri", comando("guida"), rosso: false)
-                    tasto("Ferma guida", comando("ferma"), rosso: true)
-                }
-            }
-            .padding(.top, 4)
+            HStack(spacing: 8) { tasti }
+                .padding(.top, 4)
         }
     }
 
-    private func tasto(_ t: String, _ u: URL, rosso: Bool) -> some View {
-        Link(destination: u) {
-            Text(t).font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundStyle(rosso ? rossoTasto : ciano)
-                .frame(maxWidth: .infinity).padding(.vertical, 9)
-                .background(Capsule().fill(rosso ? Color(red: 1, green: 90 / 255, blue: 90 / 255).opacity(0.18) : ciano.opacity(0.16)))
+    @ViewBuilder private var sinistra: some View {
+        switch stato.tipo {
+        case "travel":
+            Text(stato.esci.map { $0.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)) } ?? "—")
+                .font(.system(size: 30, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
+        case "voce":
+            Reattore(lato: 52, spento: stato.muto == true)
+        case "rec":
+            Group {
+                if let p = stato.pausaSecondi {
+                    Text(hms(p))
+                } else if let i = stato.inizio {
+                    Text(timerInterval: i...Date.distantFuture, countsDown: false, showsHours: true)
+                }
+            }
+            .font(.system(size: 30, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
+            .frame(maxWidth: 150, alignment: .leading)
+        case "pioggia":
+            Group {
+                if let e = stato.esci, e > Date() {
+                    Text(timerInterval: Date()...e, countsDown: true, showsHours: false)
+                } else {
+                    Text("ORA")
+                }
+            }
+            .font(.system(size: 38, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
+            .frame(maxWidth: 120, alignment: .leading)
+        default:
+            Text(stato.freccia ?? "↑").font(.system(size: 44, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
         }
+    }
+
+    @ViewBuilder private var titolo: some View {
+        switch stato.tipo {
+        case "travel":
+            if let e = stato.esci {
+                HStack(spacing: 0) {
+                    Text(e > Date() ? "TRAVEL · ESCI FRA " : "TRAVEL · ESCA ADESSO")
+                    if e > Date() { Text(timerInterval: Date()...e, countsDown: true, showsHours: false).monospacedDigit() }
+                }
+            }
+        case "voce":
+            Text("J.A.R.V.I.S. · \(stato.muto == true ? "MICROFONO SPENTO" : (stato.fase ?? "IN ATTESA"))")
+        case "rec":
+            HStack(spacing: 6) {
+                PuntoRec(pausa: stato.pausaSecondi != nil)
+                Text("WIRETAP · \(stato.pausaSecondi != nil ? "IN PAUSA" : "REGISTRO")")
+            }
+        case "pioggia":
+            Text(stato.esci.map { $0 > Date() } == true ? "RADAR · PIOGGIA IN ARRIVO" : "RADAR · STA PIOVENDO")
+        default:
+            Text("GUIDA · \((stato.via ?? meta).uppercased()) · \(stato.metri ?? 0) M")
+        }
+    }
+
+    @ViewBuilder private var tasti: some View {
+        switch stato.tipo {
+        case "travel":
+            collegamento("Percorso", "percorso")
+            azione("Basta avvisi", "basta", rosso: true)
+        case "voce":
+            if stato.muto == true { azione("Riattiva", "riattiva", rosso: false) } else { azione("Muto", "muto", rosso: false) }
+            azione("Fine", "fine", rosso: true)
+        case "rec":
+            if stato.pausaSecondi != nil { azione("Riprendi", "riprendi", rosso: false) } else { azione("Pausa", "pausa", rosso: false) }
+            azione("Stop", "stoprec", rosso: true)
+        case "pioggia":
+            collegamento("Radar", "radar")
+            azione("Ok", "ok", rosso: true)
+        default:
+            collegamento("Apri", "guida")
+            azione("Ferma guida", "ferma", rosso: true)
+        }
+    }
+
+    private func etichetta(_ t: String, rosso: Bool) -> some View {
+        Text(t).font(.system(size: 12, weight: .semibold, design: .monospaced))
+            .foregroundStyle(rosso ? rossoTasto : ciano)
+            .frame(maxWidth: .infinity).padding(.vertical, 9)
+            .background(Capsule().fill(rosso ? Color(red: 1, green: 90 / 255, blue: 90 / 255).opacity(0.18) : ciano.opacity(0.16)))
+    }
+
+    /// Un tasto che apre JARVIS sulla cosa giusta.
+    private func collegamento(_ t: String, _ c: String) -> some View {
+        Link(destination: comando(c)) { etichetta(t, rosso: false) }
+    }
+
+    /// Un tasto che l'app esegue senza aprirsi.
+    private func azione(_ t: String, _ c: String, rosso: Bool) -> some View {
+        Button(intent: ComandoIsola(c)) { etichetta(t, rosso: rosso) }
+            .buttonStyle(.plain)
     }
 }

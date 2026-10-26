@@ -99,6 +99,23 @@ final class PonteOrologio: NSObject {
         var nonPartita: String? = nil
     }
 
+    /// TRAVEL al polso (26 ott sera): i dati di una pagina (o «avvisa») calcolati dall'iPhone. nil se l'iPhone non risponde.
+    func travel(_ messaggio: [String: Any]) async -> [String: Any]? {
+        guard WCSession.isSupported() else { return nil }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return nil }
+        let testo: String? = await withCheckedContinuation { (c: CheckedContinuation<String?, Never>) in
+            s.sendMessage(messaggio, replyHandler: { @Sendable r in
+                c.resume(returning: r["travel"] as? String)
+            }, errorHandler: { @Sendable _ in
+                c.resume(returning: nil)
+            })
+        }
+        guard let testo, let d = testo.data(using: .utf8) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
+    }
+
     /// Build 23: avvia, ferma o chiede la GUIDA sull'iPhone ({ guida: "avvia" | "ferma" | "stato", … }). nil se l'iPhone non risponde.
     func guida(_ messaggio: [String: Any]) async -> RispostaGuida? {
         guard WCSession.isSupported() else { return nil }

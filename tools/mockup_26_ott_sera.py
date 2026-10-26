@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TRAVEL al polso (proposta 26 ott sera, da approvare): nel mockup JARVIS Mark X, sezione «BUILD 22 · POLSO», un tasto TRAVEL
+"""Mockup, decisioni del 26 ott sera. TRAVEL al polso: nel mockup JARVIS Mark X, sezione «BUILD 22 · POLSO», un tasto TRAVEL
 e la schermata del polso. Sei pagine come l'iPhone (MEZZI · TRENI · VOLI · PIEDI · BICI · TAXI), una per volta: si passa
 dall'una all'altra con la Digital Crown o col dito in su e in giù (le pagine verticali di watchOS), i puntini a destra dicono
 dove si è. A voce si apre già sulla pagina chiesta («come arrivo da Bea?» → MEZZI, «a che ora parte il treno?» → TRENI…).
@@ -56,7 +56,7 @@ SCHERMO = r"""      } else if (k === "travel") {                                
             <button class="wb" type="button" data-wtv="guida">GUIDA<span>›</span></button>`;
           else if (p === "bici") x += `<div class="wl">${[["[Stazione 1]", "120 m", 6, 2], ["[Stazione 2]", "350 m", 1, 0], ["[Stazione arrivo]", "da Bea", 3, 4]].map(([n, d, b, e]) => `<div><span>${n} <small style="color:var(--tenue)">${d}</small></span><em>${b} · ${e}⚡</em></div>`).join("")}</div>
             <div class="ws">bici · elettriche ⚡ · BikeMi</div>`;
-          else x += `<div class="ws">RADIOTAXI</div><div class="wtv-ora" style="font-size:28px">02 4040</div><div class="ws">15 min in auto fino da Bea</div>
+          else x += `<div class="ws">RADIOTAXI</div><div class="wtv-ora" style="font-size:28px">02 8585</div><div class="ws">15 min in auto fino da Bea</div>
             <button class="wb" type="button" data-wtv="taxi">CHIAMA<span>›</span></button>`;
           S.innerHTML = `<div class="wpag">${P.map((_, i) => `<i data-wpg="${i}" class="${i === pg ? "on" : ""}"></i>`).join("")}</div><div class="wtv">${x}</div>`;
           if (verso) S.querySelector(".wtv").animate([{ transform: `translateY(${verso * 26}px)`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" });
@@ -71,10 +71,27 @@ SCHERMO = r"""      } else if (k === "travel") {                                
           const a = e.target.closest("[data-wtv]")?.dataset.wtv; if (!a) return; suona("aTick");
           if (a === "avvisa") { window.DI_TRAVEL = !window.DI_TRAVEL; if (window.DI_TRAVEL) { suona("aPronto"); notifica("Le dico io quando uscire, Sir: alle 19:17. Il conto alla rovescia è anche nella Dynamic Island.", { titolo: "Travel" }); } pagina(0); }
           else if (a === "guida") { guidaSat(0, () => true, true); mostra("guida"); }
-          else if (a === "taxi") notifica("Chiamo il radiotaxi, Sir: 02 4040.", { titolo: "Travel" }); };
+          else if (a === "taxi") notifica("Chiamo il radiotaxi, Sir: 02 8585.", { titolo: "Travel" }); };
         const giro = setInterval(() => { if (id !== gen || !S.isConnected) { clearInterval(giro); S.onwheel = S.onpointerdown = S.onpointerup = S.onclick = null; return; } secondi = secondi > 0 ? secondi - 1 : 12 * 60; conta(); }, 1000);
 """
 sost('      } else if (k === "social") {', SCHERMO + '      } else if (k === "social") {')
+
+
+# ── TAXI (scelto dal signore il 26 ott sera): radiotaxi 02 8585 e l'app inTaxi ──
+sost('<button type="button" class="comando" data-tv-az="app">Apri l\'app taxi su «Bea»</button><div class="tv-nota">Stima: 15 min · numero del radiotaxi [da scegliere]</div>',
+     '<button type="button" class="comando" data-tv-az="app">Apri inTaxi</button><div class="tv-nota">Radiotaxi 02 8585 · stima del tragitto: 15 min</div>')
+sost('notifica(a === "taxi" ? "Chiamo il radiotaxi, Sir." : "Apro l\'app dei taxi con l\'indirizzo di Bea, Sir.")',
+     'notifica(a === "taxi" ? "Chiamo il radiotaxi, Sir: 02 8585." : "Apro inTaxi, Sir.")')
+
+# ── SOCIAL › OCCHI (sì del signore, 26 ott sera): apre gli Occhi di JARVIS; lo scatto torna a Social ──
+sost('else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock(',
+     'else if (k === "occhi" && !SOC.daOcchi && !window.JARVIS_APP) { window.OCCHI_PER_SOCIAL = true; parlaMock("Apro gli Occhi, Sir: inquadri e scatti, la foto torna qui.", 2600); $("chiudiSez").click(); await attesa(450); apriSezione("Occhi"); return; }\n      '
+     'else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock(')
+sost("A.querySelector('[data-oc=\"scatta\"]').addEventListener(\"click\", async () => { if (occupato) return; occupato = true;",
+     "A.querySelector('[data-oc=\"scatta\"]').addEventListener(\"click\", async () => { if (occupato) return; if (window.OCCHI_PER_SOCIAL) { OCCHI_ATTIVI.social(); return; } occupato = true;")
+
+sost('parlaMock("Scattata, Sir: la preparo per Instagram.", 1800); window.SOCIAL_DA = { foto: f.foto, da: "occhi" }; await attesa(500);',
+     'parlaMock("Scattata, Sir: la preparo per Instagram.", 1800); window.OCCHI_PER_SOCIAL = false; window.SOCIAL_DA = { foto: f.foto, da: "occhi" }; await attesa(500);')
 
 open(dst, "w", encoding="utf-8").write(h)
 print("ok", len(h))

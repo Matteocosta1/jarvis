@@ -16,6 +16,11 @@ final class Wiretap: ObservableObject {
     @Published private(set) var livello: Float = 0            // 0…1, per l'onda sullo schermo
     @Published private(set) var inizio: Date?
     @Published var problema: String?
+    /// 26 ott sera (REC nella Dynamic Island): in pausa il microfono resta aperto (da fuori iOS non lo lascia riaccendere) ma niente
+    /// finisce nel testo; il tempo registrato non conta le pause.
+    @Published private(set) var inPausa = false
+    private var pausaDa: Date?
+    private var pause: TimeInterval = 0
     /// Un comando detto durante la registrazione («Jarvis, torna», «Jarvis, apri la Sentinella»): non finisce nel verbale.
     var comando: ((ComandoVocale) -> Void)?
 
@@ -28,7 +33,36 @@ final class Wiretap: ObservableObject {
     var testo: String {
         (confermato + (parziale.isEmpty ? [] : [parziale])).joined(separator: " ")
     }
-    var minuti: Int { inizio.map { max(1, Int(Date().timeIntervalSince($0) / 60 + 0.5)) } ?? 0 }
+    var minuti: Int { inizio == nil ? 0 : max(1, Int(Double(secondi()) / 60 + 0.5)) }
+
+    /// I secondi registrati fino a `adesso`, senza le pause.
+    func secondi(_ adesso: Date = Date()) -> Int {
+        guard let inizio else { return 0 }
+        let fermo = pause + (pausaDa.map { adesso.timeIntervalSince($0) } ?? 0)
+        return max(0, Int(adesso.timeIntervalSince(inizio) - fermo))
+    }
+
+    /// Pausa: la frase a metà si tiene, poi più niente nel testo finché non riprende.
+    func pausa() {
+        guard attivo, !inPausa else { return }
+        inPausa = true
+        pausaDa = Date()
+        turno += 1
+        let chiuso = parziale.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !chiuso.isEmpty { confermato.append(chiuso) }
+        parziale = ""
+        presa.metti(nil)?.endAudio()
+        compito?.finish()
+        compito = nil
+    }
+
+    func riprendi() {
+        guard attivo, inPausa else { return }
+        if let p = pausaDa { pause += Date().timeIntervalSince(p) }
+        pausaDa = nil
+        inPausa = false
+        nuovaFrase()
+    }
 
     func avvia() async {
         guard !attivo else { return }
@@ -63,6 +97,9 @@ final class Wiretap: ObservableObject {
         confermato = []
         parziale = ""
         inizio = Date()
+        inPausa = false
+        pausaDa = nil
+        pause = 0
         attivo = true
         UIApplication.shared.isIdleTimerDisabled = true      // una riunione lunga: lo schermo resta acceso
         nuovaFrase()
@@ -104,6 +141,9 @@ final class Wiretap: ObservableObject {
 
     func ferma() {
         guard attivo else { return }
+        if let p = pausaDa { pause += Date().timeIntervalSince(p) }
+        pausaDa = nil
+        inPausa = false
         attivo = false
         turno += 1
         presa.metti(nil)?.endAudio()
@@ -188,6 +228,7 @@ struct VistaWiretap: View {
 
     @StateObject private var w = Wiretap()
     @State private var copiato = false
+    @Environment(\.scenePhase) private var scena
 
     var body: some View {
         ZStack {
@@ -218,7 +259,7 @@ struct VistaWiretap: View {
                 HStack(spacing: 10) {
                     if let i = w.inizio {
                         TimelineView(.periodic(from: i, by: 1)) { t in
-                            let s = Int((w.attivo ? t.date : Date()).timeIntervalSince(i))
+                            let s = w.secondi(w.attivo ? t.date : Date())
                             Text(String(format: "%02d:%02d", s / 60, s % 60))
                                 .font(.system(size: 28, weight: .light, design: .monospaced))
                                 .foregroundStyle(.white)
@@ -300,6 +341,17 @@ struct VistaWiretap: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
+            let registratore = w
+            IsolaJarvis.rec = { [weak registratore] a in
+                guard let w = registratore else { return }
+                switch a {
+                case "pausa": w.pausa()
+                case "riprendi": w.riprendi()
+                case "stoprec": w.ferma(); IsolaJarvis.fineRec(); return
+                default: return
+                }
+                isolaRec(w)
+            }
             w.comando = { c in
                 w.ferma()
                 let testo = w.testo
@@ -313,8 +365,23 @@ struct VistaWiretap: View {
                 }
             }
         }
-        .onDisappear { chiusa = true; w.ferma() }
+        .onDisappear { chiusa = true; w.ferma(); IsolaJarvis.fineRec(); IsolaJarvis.rec = nil }
+        // 26 ott sera: REC nella Dynamic Island. Fuori dall'app la registrazione continua e l'isola mostra il tempo, Pausa e Stop;
+        // tornando in JARVIS l'isola si spegne (qui si vede tutto)
+        .onChange(of: scena) { _, f in
+            if f == .background, w.attivo { isolaRec() } else if f == .active { IsolaJarvis.fineRec() }
+        }
         .aperturaHUD("Wiretap")
+    }
+}
+
+extension VistaWiretap {
+    /// L'isola REC: da quando conta (spostato delle pause) o, in pausa, i secondi registrati.
+    fileprivate func isolaRec(_ r: Wiretap? = nil) {
+        let w = r ?? self.w
+        guard w.attivo else { IsolaJarvis.fineRec(); return }
+        let s = w.secondi()
+        IsolaJarvis.aggiornaRec(inizio: Date().addingTimeInterval(-Double(s)), pausaSecondi: w.inPausa ? s : nil)
     }
 }
 

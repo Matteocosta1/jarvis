@@ -136,6 +136,9 @@ final class Richiamo {
                     Task { @MainActor in richiamo.applauso?() }
                 }
                 mani.azzera()
+                // 26 ott («Bentornato a casa» partito da solo chiudendo LiDAR, senza battiti): il microfono che si riaccende fa
+                // un fruscio/scatto d'avvio (sul polso misurato: ~0,6 s) che può sembrare due battiti. Per 1 s non conta.
+                BattitoMani.ignora(per: 1.0)
                 try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
                 try motore.start()
@@ -493,7 +496,7 @@ nonisolated final class BattitoMani: @unchecked Sendable {
     static func ignora(per secondi: TimeInterval) {
         lockIgnora.lock(); ignoraFino = max(ignoraFino, Date().addingTimeInterval(secondi)); lockIgnora.unlock()
     }
-    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino || tastiera || voceJarvis }
+    private static var daIgnorare: Bool { lockIgnora.lock(); defer { lockIgnora.unlock() }; return Date() < ignoraFino || tastiera || voceJarvis || pagina }
 
     /// Mac: l'attesa ascolta anche mentre JARVIS parla, e la sua voce rientra dal microfono. Come i suoni dell'app,
     /// mentre parla (e per un secondo dopo) non conta: le sue parole non alzano l'asticella e non fanno da primo battito.
@@ -502,6 +505,16 @@ nonisolated final class BattitoMani: @unchecked Sendable {
         lockIgnora.lock()
         if voceJarvis && !parla { ignoraFino = max(ignoraFino, Date().addingTimeInterval(1.0)) }
         voceJarvis = parla
+        lockIgnora.unlock()
+    }
+
+    /// 26 ott: Studio e Social (le pagine del mockup) suonano con Web Audio, che non passa da `Suoni`: finché sono aperte
+    /// (e per 2 s dopo la chiusura) i loro tick non devono sembrare battiti di mani.
+    private nonisolated(unsafe) static var pagina = false
+    static func paginaAperta(_ aperta: Bool) {
+        lockIgnora.lock()
+        if pagina && !aperta { ignoraFino = max(ignoraFino, Date().addingTimeInterval(2.0)) }
+        pagina = aperta
         lockIgnora.unlock()
     }
 

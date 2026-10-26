@@ -166,6 +166,13 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
             guidaDalPolso(message, rispondi: replyHandler)
             return
         }
+        // TRAVEL al polso (26 ott sera): l'orologio chiede, l'iPhone calcola con i dati veri e risponde
+        if message["travel"] is String {
+            nonisolated(unsafe) let rispondi = replyHandler
+            nonisolated(unsafe) let m = message
+            Task { @MainActor in rispondi(await PonteTravel.perPolso(m)) }
+            return
+        }
         // build 23, MUSICA dal polso: «stato», «play», «pausa», «avanti», «indietro» sul lettore dell'iPhone (MusicaJarvis.swift)
         if let comando = message["musica"] as? String {
             nonisolated(unsafe) let rispondi = replyHandler

@@ -1040,11 +1040,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .priorita: polsoRichiesto = .priorita; reparto = .email
         case .organismo: polsoRichiesto = .organismo; reparto = .vitals   // direttamente l'Organismo, non l'elenco di Vitals
         case .ologramma, .allenamento: repartoRichiesto = .allenatore; reparto = nil   // il Trainer vive sull'iPhone: lo scrive la schermata
-        case .satellite(.travel):
-            // MARK X · TRAVEL: nel mockup approvato TRAVEL c'è solo sull'iPhone (al polso nessuna schermata): come le altre
-            // sezioni dell'iPhone (decisione 36) JARVIS lo dice, invece di aprire SATELLITE come se fosse un'altra cosa
-            stato = "Travel: questa sezione vive sull'iPhone, Sir."
-            parla("Travel: questa sezione vive sull'iPhone, Sir.")
+        case .satellite(.travel(let n, let k)):
+            // TRAVEL al polso (mockup approvato 26 ott sera): la pagina chiesta, con la frase dell'iPhone
+            polsoRichiesto = .travel(n, k)
+            parla(k == "voli" ? "Il suo volo, Sir." : k == "treni" ? "Le partenze, Sir." : k == "bici" ? "Le bici qui vicino, Sir."
+                  : k == "taxi" ? "Il radiotaxi, Sir." : k == "piedi" ? "A piedi, Sir." : "Ecco come arrivare, Sir.")
             return
         case .satellite(let a): polsoRichiesto = .satellite(a); reparto = .satellite  // build 23: SATELLITE; «guidami a…» fa partire la guida
         case .fermaGuida:                                                             // build 23: la guida vive sull'iPhone: si ferma lì

@@ -2,17 +2,57 @@
 import Foundation
 import ActivityKit
 import Combine
+import UIKit
 
 // MARK: - MARK X · DYNAMIC ISLAND: l'app accende, aggiorna e spegne l'attività di JARVIS (la disegna l'estensione JarvisIsola).
 // TRAVEL: dopo «Avvisami» fino all'ora di uscire (+10 min). GUIDA: finché la guida di SATELLITE è accesa, aggiornata alla svolta.
+// 26 ott sera (sì del signore): VOCE (esce da JARVIS mentre ci parla: la conversazione continua fuori), REC (il Wiretap registra
+// anche fuori dall'app), PIOGGIA (la accende il cervello col radar, anche ad app chiusa: push-to-start).
 // Dentro JARVIS iOS non mostra la sua stessa attività: si vede quando lei esce dall'app o blocca il telefono.
 
 @MainActor
 enum IsolaJarvis {
     private static var attivita: Activity<AttivitaJarvis>?
     private static var guardiaGuida: AnyCancellable?
+    /// VOCE e REC: chi esegue i tasti dell'isola (li imposta Jarvis e il Wiretap).
+    static var voce: ((String) -> Void)?
+    static var rec: ((String) -> Void)?
 
     private static var permesso: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
+
+    /// All'avvio dell'app: i tasti dell'isola che non aprono JARVIS (ComandoIsola) passano da qui; il cervello riceve il
+    /// gettone per accendere l'isola della PIOGGIA anche ad app chiusa.
+    static func prepara() {
+        ComandiIsola.esegui = { a in
+            switch a {
+            case "basta": AvvisoTravel.spegni()
+            case "ferma": MotoreGuida.condiviso.ferma(); chiudi()
+            case "muto", "riattiva", "fine": voce?(a)
+            case "pausa", "riprendi", "stoprec": rec?(a)
+            case "ok": chiudiPioggia()
+            default: break
+            }
+        }
+        if #available(iOS 17.2, *) {
+            Task {
+                for await dati in Activity<AttivitaJarvis>.pushToStartTokenUpdates {
+                    await inviaGettone(dati.map { String(format: "%02x", $0) }.joined())
+                }
+            }
+        }
+    }
+
+    /// Il gettone per accendere l'isola da remoto (PIOGGIA): va al cervello (funzione jarvis-briefing, tabella jarvis_isola).
+    private static func inviaGettone(_ hex: String) async {
+        let base = Impostazioni.indirizzo.replacingOccurrences(of: "/functions/v1/jarvis", with: "/functions/v1/jarvis-briefing")
+        guard let url = URL(string: base) else { return }
+        var req = URLRequest(url: url, timeoutInterval: 20)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["isola_gettone": hex])
+        _ = try? await URLSession.shared.data(for: req)
+    }
 
     /// TRAVEL: il conto alla rovescia per uscire e la linea da prendere.
     static func travel(esci: Date, linea: String, ora: String, percorso: String, meta: String, coloreLinea: String? = nil) {
@@ -58,11 +98,55 @@ enum IsolaJarvis {
         if attivita?.content.state.tipo == "guida" { chiudi() }
     }
 
+    // MARK: VOCE (26 ott sera)
+
+    /// La conversazione continua fuori da JARVIS: la fase e quello che sente o risponde. Accende l'isola se non c'è.
+    static func aggiornaVoce(fase: Fase, testo: String, muto: Bool) {
+        let s = AttivitaJarvis.ContentState(tipo: "voce", esci: nil, sigla: nil, coloreSigla: nil, oraMezzo: nil, freccia: nil, via: nil, metri: nil,
+                                            riga: muto ? "Non la ascolto finché non riattiva." : (testo.isEmpty ? "Mi dica pure, Sir: la ascolto." : testo),
+                                            fase: fase.rawValue, muto: muto)
+        if let a = attivita, a.content.state.tipo == "voce" {
+            guard a.content.state != s else { return }
+            Task { await a.update(ActivityContent(state: s, staleDate: Date().addingTimeInterval(900))) }
+        } else {
+            avvia(s, meta: "JARVIS", fine: Date().addingTimeInterval(900))
+        }
+    }
+
+    static func fineVoce() {
+        if attivita?.content.state.tipo == "voce" { chiudi() }
+    }
+
+    // MARK: REC (26 ott sera)
+
+    /// Il Wiretap registra fuori dall'app: il tempo (iOS lo fa contare da solo) o, in pausa, quello registrato fin lì.
+    static func aggiornaRec(inizio: Date, pausaSecondi: Int?) {
+        let s = AttivitaJarvis.ContentState(tipo: "rec", esci: nil, sigla: nil, coloreSigla: nil, oraMezzo: nil, freccia: nil, via: nil, metri: nil,
+                                            riga: "Riunione · microfono dell'iPhone", inizio: inizio, pausaSecondi: pausaSecondi)
+        if let a = attivita, a.content.state.tipo == "rec" {
+            Task { await a.update(ActivityContent(state: s, staleDate: nil)) }
+        } else {
+            avvia(s, meta: "Wiretap", fine: nil)
+        }
+    }
+
+    static func fineRec() {
+        if attivita?.content.state.tipo == "rec" { chiudi() }
+    }
+
+    // MARK: PIOGGIA (26 ott sera): la accende il cervello; qui solo «Ok»
+
+    static func chiudiPioggia() {
+        for a in Activity<AttivitaJarvis>.activities where a.content.state.tipo == "pioggia" {
+            Task { await a.end(nil, dismissalPolicy: .immediate) }
+        }
+    }
+
     // MARK: Accendere e spegnere
 
     private static func avvia(_ s: AttivitaJarvis.ContentState, meta: String, fine: Date?) {
         guard permesso else { return }
-        if let a = attivita {                      // una sola attività di JARVIS alla volta: quella nuova prende il posto
+        if let a = attivita {                      // una sola attività di JARVIS alla volta (della pioggia a parte): quella nuova prende il posto
             let vecchia = a
             Task { await vecchia.end(nil, dismissalPolicy: .immediate) }
             attivita = nil
@@ -76,7 +160,8 @@ enum IsolaJarvis {
         Task { await a.end(nil, dismissalPolicy: .immediate) }
     }
 
-    /// I tasti dell'isola aprono JARVIS con il comando (it.discosizer.jarvis://isola/…): «basta» e «ferma» spengono subito.
+    /// I tasti dell'isola che aprono JARVIS (it.discosizer.jarvis://isola/…): «percorso», «guida», «radar», «apri».
+    /// «basta» e «ferma» restano per le isole accese dalla build di prima (prima tutti i tasti aprivano l'app).
     static func comando(_ url: URL) -> String? {
         guard url.host == "isola" else { return nil }
         let c = url.lastPathComponent

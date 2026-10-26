@@ -25,6 +25,8 @@ struct VistaStudio: View {
             .background(Color.fondo)
             .ignoresSafeArea()
             .statusBarHidden(false)
+            .onAppear { BattitoMani.paginaAperta(true) }       // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+            .onDisappear { BattitoMani.paginaAperta(false) }
     }
 }
 
@@ -208,7 +210,14 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             let didascalia = o["didascalia"] as? String ?? "", b64 = o["media"] as? String ?? "", mime = o["mime"] as? String ?? "image/jpeg"
             Task { let r = await self.pubblica(formato: formato, quando: quando, didascalia: didascalia, b64: b64, mime: mime); self.rispondi(id, (r, nil)) }
         case "socialFoto":
-            scegli(per: o["da"] as? String == "occhi" ? "occhi" : "galleria")
+            if o["da"] as? String == "occhi" {                           // 26 ott sera: OCCHI apre gli Occhi di JARVIS, lo scatto torna qui
+                OcchiAperti.socialAcceso = true
+                parla("Apro gli Occhi, Sir: inquadri e scatti, la foto torna a Social.")
+                salvaOra()
+                NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": "occhi"])
+            } else {
+                scegli(per: "galleria")
+            }
         case "ascolta":
             Task { await self.dettatura.avvia() }
         case "ferma":
