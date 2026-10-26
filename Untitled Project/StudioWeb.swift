@@ -25,8 +25,12 @@ struct VistaStudio: View {
     /// caricava (un lampo bianco, poi nero). Il caricamento resta almeno quanto nelle altre schede e finché la pagina non è pronta.
     @State private var coperto = true
     @State private var apertaDa = Date()
+    /// 26 ott sera (il signore: «si devono chiudere come le altre»): si chiude trascinando giù come Meteo o Posta, tranne quando
+    /// il dito sta lavorando dentro la pagina (banco 3D, schizzo, cursori, PIANO) o la pagina è scorsa giù: lì il trascinamento
+    /// è della pagina. Lo dice la pagina al tocco (messaggio «presa»).
+    @State private var presa = false
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: { chiudi() }, pronta: { scopri() })
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: { chiudi() }, pronta: { scopri() }, presa: { presa = $0 })
             .background(Color.fondo)
             .ignoresSafeArea()
             .overlay {
@@ -39,6 +43,7 @@ struct VistaStudio: View {
                 }
             }
             .statusBarHidden(false)
+            .interactiveDismissDisabled(presa)
             .onAppear {
                 BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
                 apertaDa = Date()
@@ -68,7 +73,8 @@ private struct PaginaStudio: UIViewRepresentable {
     let parla: (String) -> Void
     let chiudi: () -> Void
     let pronta: () -> Void
-    func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta) }
+    let presa: (Bool) -> Void
+    func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta, presa: presa) }
     func makeUIView(context: Context) -> WKWebView { context.coordinator.costruisci() }
     func updateUIView(_ uiView: WKWebView, context: Context) {}
     static func dismantleUIView(_ uiView: WKWebView, coordinator: RegiaStudio) { coordinator.smonta() }
@@ -80,6 +86,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private let parla: (String) -> Void
     private let chiudi: () -> Void
     private let pronta: () -> Void
+    private let presa: (Bool) -> Void
     private weak var web: WKWebView?
     private var archivio: [String: String] = RegiaStudio.leggiArchivio()
     private var salvataggio: Task<Void, Never>?
@@ -89,11 +96,13 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private var perChi = "studio"                    // a chi va la foto scelta: "studio", "galleria" o "occhi" (Social)
     private var videoScelto: URL?                    // Social: il video scelto dalla galleria (lo carica l'app, non la pagina)
 
-    init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {}) {
+    init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {},
+         presa: @escaping (Bool) -> Void = { _ in }) {
         self.apertura = apertura
         self.parla = parla
         self.chiudi = chiudi
         self.pronta = pronta
+        self.presa = presa
         self.videoScelto = apertura.video                // 26 ott sera: il video degli Occhi (lo carica l'app, alla pagina va la copertina)
         super.init()
     }
@@ -161,6 +170,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             salvaOra(); chiudi()
         case "pronta":                                                   // la sezione è aperta e disegnata: via il caricamento
             pronta()
+        case "presa":                                                    // il dito lavora nella pagina: niente chiusura trascinando
+            presa(o["on"] as? Bool ?? false)
         case "ls":                                                       // l'archivio dei progetti (localStorage del mockup)
             guard let k = o["k"] as? String else { return }
             if let v = o["v"] as? String { archivio[k] = v } else { archivio[k] = nil }
@@ -572,6 +583,19 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             aperta = false; clearTimeout(via); via = null;
             post({ tipo: 'chiudi' });
           }, true);
+          // 26 ott sera: si chiude trascinando giù come le altre schede, ma non se il dito lavora dentro la pagina (banco 3D, schizzo,
+          // cursori, griglia del PIANO, campi di testo) o se tocca una parte già scorsa giù (lì trascinare giù vuol dire risalire)
+          var presaOn = false;
+          var dentro = function(t){
+            if (!t || !t.closest) return false;
+            if (t.closest('canvas, .sd-banco, .sd-schizzo, input, textarea, .sc-g, .sc-piano, [draggable="true"]')) return true;
+            for (var e = t; e && e !== document.body; e = e.parentElement) { if (e.scrollTop > 0 && e.scrollHeight > e.clientHeight) return true; }
+            return false;
+          };
+          var mettiPresa = function(v){ if (v === presaOn) return; presaOn = v; post({ tipo: 'presa', on: v }); };
+          document.addEventListener('pointerdown', function(e){ mettiPresa(dentro(e.target)); }, true);
+          document.addEventListener('pointerup', function(){ setTimeout(function(){ mettiPresa(false); }, 300); }, true);
+          document.addEventListener('pointercancel', function(){ mettiPresa(false); }, true);
           // 26 ott sera: l'apertura la fa l'app (caricamento e suoni come le altre schede): i suoni d'apertura della pagina tacciono
           var zitto = performance.now() + 2500;
           if (typeof window.suona === 'function') { var s0 = window.suona; window.suona = function(id){ if ((id === 'aPronta' || id === 'aScheda') && performance.now() < zitto) return; return s0.apply(this, arguments); }; }

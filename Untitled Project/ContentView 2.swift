@@ -253,11 +253,10 @@ struct ContentView: View {
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         // 26 ott sera (il signore: «devono chiudersi come le altre»): Studio e Social sono schede come Meteo, Posta, Diario: si aprono e
-        // si chiudono scorrendo, con JARVIS sotto. A tutto schermo (fullScreenCover) alla chiusura iOS rimetteva sotto la schermata di
-        // JARVIS solo alla fine e per un attimo si vedeva nero. Niente chiusura trascinando: il dito sul banco 3D e il PIANO trascinano.
+        // si chiudono scorrendo (anche trascinando giù), con JARVIS sotto. A tutto schermo (fullScreenCover) alla chiusura iOS rimetteva
+        // sotto la schermata di JARVIS solo alla fine e per un attimo si vedeva nero.
         .sheet(item: $aperturaPagina) { a in
             VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) })
-                .interactiveDismissDisabled()
         }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
