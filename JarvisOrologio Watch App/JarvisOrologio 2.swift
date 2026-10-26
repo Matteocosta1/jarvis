@@ -592,7 +592,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         daAttesa = false
         if silenzioso, !(ImpostazioniOrologio.giroUnico && ecoDaTogliere == nil && primaParte == nil && !PortachiaviOrologio.leggi().isEmpty
                          && (audio?.count ?? 0) > 1_000) { trascriviInSilenzio(audio); return }
-        if !silenzioso { WKInterfaceDevice.current().play(.stop) }
+        // 26 ott sera (il signore: «troppi bip»): l'unico suono del dialogo è quello d'inizio ascolto; il resto lo dice il reattore
         fase = .elaboro
         stato = silenzioso ? nil : "Trascrivo…"
         let eco = ecoDaTogliere
@@ -736,7 +736,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
             compito = nil
         }
         zittisci()
-        WKInterfaceDevice.current().play(.stop)
         fase = .elaboro
         stato = "Trascrivo…"
         let testo = t
@@ -939,7 +938,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return
             }
             self.chiudiAttesa()
-            WKInterfaceDevice.current().play(.stop)
             self.fase = .elaboro
             self.stato = "Trascrivo…"
             let prima = self.primaParte
@@ -1010,7 +1008,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
             // al polso la schermata scrive «… vive sull'iPhone, Sir.», come per «apri gli occhi»; prima andavano al cervello
             if let r = JarvisOrologio.fraseDellIPhone(testo) {
                 compito = nil
-                WKInterfaceDevice.current().play(.click)
                 repartoRichiesto = r
                 daUnire = nil
                 inCorso = nil
@@ -1032,14 +1029,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 compito = nil
                 daUnire = nil
                 inCorso = nil
-                WKInterfaceDevice.current().play(.click)
                 if sezione == "Social" { polsoRichiesto = .social(scheda); parla("Instagram, Sir.") }
                 else { stato = "Studio: questa sezione vive sull'iPhone, Sir."; fase = .attesa }
                 return
             }
             if case .apri(let reparto)? = comando {
                 compito = nil
-                WKInterfaceDevice.current().play(.click)
                 repartoRichiesto = reparto
                 daUnire = nil                          // un comando è un'azione nuova: la domanda interrotta non si porta dietro
                 inCorso = nil
@@ -1050,7 +1045,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
             }
             // «traduci in inglese»: come la sezione Interprete dell'orologio, già sulla lingua
             if case .interprete(let codice)? = comando, let lingua = ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first {
-                WKInterfaceDevice.current().play(.click)
                 chiedi("Fammi da interprete in \(lingua): ti dirò una frase, tu traducila in \(lingua) e dimmela ad alta voce.")
                 return
             }
@@ -1144,7 +1138,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
         daUnire = nil                          // un comando è un'azione nuova: la domanda interrotta non si porta dietro
         inCorso = nil
         stato = nil
-        WKInterfaceDevice.current().play(.click)
         let reparto: Reparto?
         switch d {
         case .protocollo(let p):
@@ -1367,7 +1360,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     if u.canale.silenzioso {                     // partita da sola: solo con parole vere
                         guard errore == nil, JarvisOrologio.paroleVere(testo ?? "") else { u.canale.consegna(esito); tornaInAttesaMuto(); return }
                         u.canale.silenzioso = false
-                        WKInterfaceDevice.current().play(.stop)
                     }
                     u.canale.consegna(esito)
                     if u.canale.soloTesto { return }
@@ -1512,7 +1504,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 if canale.silenzioso {                                 // partita da sola in attesa: si va avanti solo con parole vere
                     guard JarvisOrologio.paroleVere(t) else { livelloUltimaFrase = nil; canale.consegna(TrascrittoOrologio(testo: nil, errore: nil, vuoto: true)); canale.presa.chiudi(); return .silenzio }
                     canale.silenzioso = false
-                    WKInterfaceDevice.current().play(.stop)
                 }
                 imparaVoce(t)                                          // build 30: parole vere → la sua voce abituale
                 canale.consegna(TrascrittoOrologio(testo: t, errore: nil, vuoto: false))
@@ -1945,7 +1936,6 @@ final class JarvisOrologio: NSObject, ObservableObject {
         compito?.cancel()
         compito = nil
         fase = .attesa
-        WKInterfaceDevice.current().play(.click)
         stato = "La ascolto, Sir…"
         if let preso, preso.isRecording { continuaAscolto(preso, eco: eco) } else { Task { await self.ascolta() } }
     }

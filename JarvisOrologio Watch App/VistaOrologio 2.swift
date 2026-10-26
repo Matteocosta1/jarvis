@@ -192,8 +192,7 @@ struct VistaOrologio: View {
         }
         .onChange(of: jarvis.fase) { vecchia, nuova in
             // vibrazioni alla Stark: risposta in arrivo e risposta finita
-            if vecchia == .elaboro && nuova == .parlo { vibra(.directionUp) }
-            if vecchia == .parlo && nuova == .attesa { vibra(.success) }
+            // 26 ott sera (il signore: «troppi bip, si perde la naturalezza»): niente vibrazione quando comincia e finisce di parlare
             if nuova == .attesa { iconaAttiva = nil }
         }
     }
@@ -413,7 +412,7 @@ struct VistaOrologio: View {
                     .id(titolo)
                     .transition(.opacity)
                     .opacity(acceso ? 1 : 0)
-                Button { vibra(.click); jarvis.toccaReattore() } label: { reattore }
+                Button { jarvis.toccaReattore() } label: { reattore }   // 26 ott sera: niente click in più, la vibrazione d'inizio ascolto basta
                     .buttonStyle(StileStarkOrologio())
                     .scaleEffect(acceso ? 1 : 0.6)
                     .opacity(acceso ? 1 : 0)
