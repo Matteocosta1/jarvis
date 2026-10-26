@@ -20,13 +20,46 @@ struct VistaStudio: View {
     var apertura = AperturaPagina(sezione: "Studio")
     let parla: (String) -> Void
     @Environment(\.dismiss) private var chiudi
+    /// 26 ott sera (il signore: «si devono aprire come le altre app»): l'apertura di tutte le schede di JARVIS (il caricamento
+    /// con anelli e mirino, i suoni di apertura e di pronta), poi la pagina già disegnata. Prima si vedeva la pagina mentre si
+    /// caricava (un lampo bianco, poi nero). Il caricamento resta almeno quanto nelle altre schede e finché la pagina non è pronta.
+    @State private var coperto = true
+    @State private var apertaDa = Date()
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: { chiudi() })
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: { chiudi() }, pronta: { scopri() })
             .background(Color.fondo)
             .ignoresSafeArea()
+            .overlay {
+                if coperto {
+                    ZStack {
+                        Color.fondo.ignoresSafeArea()
+                        CaricamentoHUD(titolo: apertura.sezione, tinta: .ciano)
+                    }
+                    .transition(.opacity)
+                }
+            }
             .statusBarHidden(false)
-            .onAppear { BattitoMani.paginaAperta(true) }       // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+            .onAppear {
+                BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+                apertaDa = Date()
+                Suoni.schedaApre()
+            }
+            .task {                                              // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
+                try? await Task.sleep(for: .seconds(4))
+                scopri()
+            }
             .onDisappear { BattitoMani.paginaAperta(false) }
+    }
+
+    private func scopri() {
+        guard coperto else { return }
+        Task { @MainActor in
+            let resta = 1.1 - Date().timeIntervalSince(apertaDa)        // come AperturaHUD delle altre schede
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard coperto else { return }
+            Suoni.schedaPronta()
+            withAnimation(.easeOut(duration: 0.4)) { coperto = false }
+        }
     }
 }
 
@@ -34,7 +67,8 @@ private struct PaginaStudio: UIViewRepresentable {
     let apertura: AperturaPagina
     let parla: (String) -> Void
     let chiudi: () -> Void
-    func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi) }
+    let pronta: () -> Void
+    func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta) }
     func makeUIView(context: Context) -> WKWebView { context.coordinator.costruisci() }
     func updateUIView(_ uiView: WKWebView, context: Context) {}
     static func dismantleUIView(_ uiView: WKWebView, coordinator: RegiaStudio) { coordinator.smonta() }
@@ -45,6 +79,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     static let schema = "jarvis3d"
     private let parla: (String) -> Void
     private let chiudi: () -> Void
+    private let pronta: () -> Void
     private weak var web: WKWebView?
     private var archivio: [String: String] = RegiaStudio.leggiArchivio()
     private var salvataggio: Task<Void, Never>?
@@ -54,10 +89,11 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private var perChi = "studio"                    // a chi va la foto scelta: "studio", "galleria" o "occhi" (Social)
     private var videoScelto: URL?                    // Social: il video scelto dalla galleria (lo carica l'app, non la pagina)
 
-    init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void) {
+    init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {}) {
         self.apertura = apertura
         self.parla = parla
         self.chiudi = chiudi
+        self.pronta = pronta
         super.init()
     }
 
@@ -126,6 +162,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if let t = o["testo"] as? String, !t.isEmpty { parla(t) }
         case "chiudi":
             salvaOra(); chiudi()
+        case "pronta":                                                   // la sezione è aperta e disegnata: via il caricamento
+            pronta()
         case "ls":                                                       // l'archivio dei progetti (localStorage del mockup)
             guard let k = o["k"] as? String else { return }
             if let v = o["v"] as? String { archivio[k] = v } else { archivio[k] = nil }
@@ -536,7 +574,11 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             aperta = false; clearTimeout(via); via = null;
             post({ tipo: 'chiudi' });
           }, true);
-          var apri = function(){ if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; } };
+          // 26 ott sera: l'apertura la fa l'app (caricamento e suoni come le altre schede): i suoni d'apertura della pagina tacciono
+          var zitto = performance.now() + 2500;
+          if (typeof window.suona === 'function') { var s0 = window.suona; window.suona = function(id){ if ((id === 'aPronta' || id === 'aScheda') && performance.now() < zitto) return; return s0.apply(this, arguments); }; }
+          var apri = function(){ if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; }
+            requestAnimationFrame(function(){ requestAnimationFrame(function(){ post({ tipo: 'pronta' }); }); }); };
           setTimeout(function(){ if (!via) radice.style.visibility = ''; }, 1500);   // per sicurezza: mai una pagina che resta nera
           \(arrivo)
           var foto = \(foto);
