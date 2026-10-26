@@ -37,7 +37,15 @@ struct CorniceScheda<Contenuto: View>: View {
                     .ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta, marchio: marchio)
+                        if marchio {
+                            // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
+                            HStack(alignment: .center) {
+                                TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta, marchio: true)
+                                Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(tinta)
+                            }
+                        } else {
+                            TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta)
+                        }
                         if mostrato {
                             contenuto()
                                 .mask(alignment: .top) {
@@ -77,6 +85,7 @@ struct CorniceScheda<Contenuto: View>: View {
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .modifier(SfondoBarra(attivo: barraDalloScorrimento, visibile: scorsa))
+            .toolbar(marchio ? .hidden : .automatic, for: .navigationBar)   // marchio: «Chiudi» è nella testata, come Studio e Social
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) }
             }
