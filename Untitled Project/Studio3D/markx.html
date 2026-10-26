@@ -6181,7 +6181,7 @@ function studio(ok) {
 
   // ── creare un oggetto: arriva sul tavolo con l'animazione ──
   function nuovo(tipo, p, nome, opz = {}) {
-    memorizza();
+    if (!opz.senzaStoria) memorizza();
     if (opz.geo) { p.k = "g" + (++num) + Date.now().toString(36); STL_GEO.set(p.k, opz.geo); }
     const c = opz.come, o = { id: "o" + (++num), tipo, p, nome, pos: opz.pos || { x: 0, z: 0 }, rotY: c?.rotY || 0, scala: c?.scala || 1, specchio: !!c?.specchio, foro: !!c?.foro };
     oggetti.push(o); B?.aggiungi(o, opz.anim ?? "vacuform", !opz.pos); seleziona(o, true);
@@ -6323,8 +6323,8 @@ function studio(ok) {
     else if (b.dataset.vai) b.onclick?.();
   });
   function serie(o, n) {
-    if (!o) return; const passo = B.ingombro(o).l + 10;
-    for (let k = 1; k < n; k++) setTimeout(() => { if (vivo()) nuovo(o.tipo, JSON.parse(JSON.stringify(o.p)), nomeLibero(o.nome.replace(/ #\d+$/, "")), { pos: { x: o.pos.x + passo * k, z: o.pos.z, y: o.pos.y || 0 }, anim: "vola", come: o }); }, k * 260);
+    if (!o) return; const passo = B.ingombro(o).l + 10; memorizza();          // tutta la serie è un passo solo: ANNULLA la toglie intera
+    for (let k = 1; k < n; k++) setTimeout(() => { if (vivo()) nuovo(o.tipo, JSON.parse(JSON.stringify(o.p)), nomeLibero(o.nome.replace(/ #\d+$/, "")), { pos: { x: o.pos.x + passo * k, z: o.pos.z, y: o.pos.y || 0 }, anim: "vola", come: o, senzaStoria: true }); }, k * 260);
   }
   let strumentoPrima = "seleziona";
   function taglioSez(on) {
