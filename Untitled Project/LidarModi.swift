@@ -522,6 +522,7 @@ struct RisultatoModoVista: View {
     let salva: () -> Void
     let altra: () -> Void
     let chiedi: () -> Void
+    var studio: (() -> Void)? = nil                    // MARK X: STUDIO, la scansione vera sul banco dello Studio
 
     private var conStile: Bool { r.modo != .corpo && r.modo != .misura }
     private var stile3D: StileLidar? { r.modo == .corpo ? nil : (r.modo == .misura ? .foto : stile) }
@@ -545,6 +546,7 @@ struct RisultatoModoVista: View {
             }
             HStack(spacing: 8) {
                 TastoLidar(testo: salvato ? "Salvata" : "Salva", attivo: !salvato, azione: salva)
+                if let studio { TastoLidarStudio(azione: studio) }      // come il mockup: Salva · Studio · Modalità · Chiedi
                 TastoLidar(testo: "Modalità", azione: altra)
                 TastoLidar(testo: "Chiedi", azione: chiedi)
             }

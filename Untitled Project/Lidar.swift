@@ -155,6 +155,7 @@ struct VistaLidar: View {
     @State private var tentativo = 0
     @State private var inizioFine = Date()
     @State private var nomePersona: String?                   // «gemello digitale di Marco»
+    @State private var mandando = false                       // MARK X: la scansione sta andando allo Studio
 
     enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
     enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
@@ -183,7 +184,8 @@ struct VistaLidar: View {
                             RisultatoModoVista(r: r, stile: $stile, salvato: salvati.contains(r.id),
                                                salva: { salvaModo(r) },
                                                altra: { pulisciModo(); risultatoModo = nil; fase = .menu },
-                                               chiedi: { chiedi(r.domanda) })
+                                               chiedi: { chiedi(r.domanda) },
+                                               studio: { alloStudio(r.modello, modo: r.modo) })
                                 .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
                         }
                     }
@@ -417,6 +419,26 @@ struct VistaLidar: View {
         if let r = risultatoModo, !salvati.contains(r.id), let f = r.file { try? FileManager.default.removeItem(at: f) }
     }
 
+    /// MARK X · STUDIO: la scansione vera va sul banco dello Studio (LidarStudio.swift): plastico della sala, terreno, oggetto,
+    /// statuina, sagoma. Si legge tutto prima di uscire (uscendo, il modello di Texture non salvato si cancella), poi LiDAR si chiude.
+    private func alloStudio(_ m: ModelloScena, modo: ModoLidar) {
+        guard modo != .misura else { jarvis.annuncia(LidarAlloStudio.frase(.misura)); return }
+        guard !mandando else { return }
+        mandando = true
+        Task {
+            let esito = await Task.detached(priority: .userInitiated) { LidarAlloStudio.dati(m) }.value
+            mandando = false
+            guard case .success(let json) = esito else {
+                jarvis.annuncia("Questa scansione non basta per lo Studio, Sir: la rifaccia più completa.")
+                return
+            }
+            jarvis.annuncia(LidarAlloStudio.frase(modo))
+            esci()
+            try? await Task.sleep(for: .milliseconds(650))          // il tempo che LiDAR si chiuda
+            PaginaMarkX.apri(AperturaPagina(sezione: "Studio", lidar: json))
+        }
+    }
+
     /// Uscendo, il modello 3D di una scansione non salvata si cancella: non resta a occupare spazio.
     private func esci() {
         if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D) }
@@ -515,6 +537,7 @@ struct VistaLidar: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
                 }
                 .simultaneousGesture(TapGesture().onEnded { Suoni.tocco() })
+                TastoLidarStudio { alloStudio(.stanza(StanzaScena(s)), modo: .stanza) }     // MARK X: la sala vera diventa un plastico
                 TastoLidar(testo: "Chiedi") { chiedi(s.riassunto) }
             }
         }

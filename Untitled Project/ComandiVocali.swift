@@ -180,6 +180,52 @@ enum ComandoVocale: Equatable {
     case scheda(AzioneScheda)               // dentro una scheda: i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…)
     case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
     case domanda(String)                    // dentro una scheda: «dimmi», «com'ho dormito?»: chiude la scheda e chiede a JARVIS come il suo tasto
+    case pagina(sezione: String, voce: String?, scheda: String?)   // MARK X: STUDIO («crea una piastra…») e SOCIAL («apri Instagram»)
+
+    /// MARK X · le frasi di STUDIO e SOCIAL (VOCI del mockup). Studio: «apri lo studio», «apri l'archivio dello studio», «fai il plastico
+    /// della stanza», «porta il giardino nello studio», «crea/fammi/progettami» + un oggetto da stampare (o «in 3D», «da stampare»).
+    /// Social: «apri Instagram», «leggimi i messaggi di Instagram», «com'è andata la settimana su Instagram?», «cosa ho in programma su
+    /// Instagram?», «pubblica il pezzo dello Studio su Instagram». «Fammi un profilo», «fai un giro», «crea un promemoria» restano agli altri.
+    static func paginaMarkX(_ t: [String]) -> ComandoVocale? {
+        guard let primo = t.first else { return nil }
+        let s = " " + t.joined(separator: " ") + " "
+        func c(_ x: String) -> Bool { s.contains(x) }
+        let insta = c(" instagram ") || c(" insta ") || c(" social ")
+        if insta, t.count <= 10 {
+            if c(" pubblica ") && c(" studio ") { return .pagina(sezione: "Social", voce: nil, scheda: "STUDIO") }
+            if c(" messaggi ") || c(" commenti ") || c(" direct ") || c(" dm ") || c(" posta ") { return .pagina(sezione: "Social", voce: nil, scheda: "POSTA") }
+            if c(" settimana ") || c(" report ") || c(" statistiche ") || c(" com e andata ") || c(" follower ") || c(" numeri ") {
+                return .pagina(sezione: "Social", voce: nil, scheda: "REPORT")
+            }
+            if c(" in programma ") || c(" calendario ") || c(" programmati ") { return .pagina(sezione: "Social", voce: nil, scheda: "CALENDARIO") }
+            if t.count <= 4, t == ["instagram"] || t == ["social"] || ["apri", "aprimi", "vai", "mostrami", "portami"].contains(primo) {
+                return .pagina(sezione: "Social", voce: nil, scheda: nil)
+            }
+            return nil
+        }
+        let verbi: Set<String> = ["crea", "creami", "fammi", "modella", "modellami", "progetta", "progettami", "stampami", "disegnami"]
+        guard c(" studio ") || c(" plastico ") || verbi.contains(primo) else { return nil }
+        let detta = t.joined(separator: " ")
+        if t == ["studio"] || (t.count <= 4 && ["apri", "aprimi", "mostrami"].contains(primo) && c(" studio ") && !c(" archivio "))   // «portami allo studio» è SATELLITE {
+            return .pagina(sezione: "Studio", voce: nil, scheda: nil)
+        }
+        if c(" studio ") && c(" archivio ") && t.count <= 7 { return .pagina(sezione: "Studio", voce: detta, scheda: nil) }
+        if c(" plastico ") || (c(" nello studio ") && ["porta", "portami", "manda", "metti"].contains(primo)) { return .pagina(sezione: "Studio", voce: detta, scheda: nil) }
+        // «crea …», «fammi …»: solo per un oggetto da stampare (o detto «in 3D», «da stampare»)
+        let stampa = c(" 3d ") || c(" tre d ") || c(" da stampare ") || c(" stampabile ")
+        guard verbi.contains(primo), t.count >= 3,
+              stampa || ["un", "una", "uno", "il", "la", "lo", "l", "dei", "degli", "delle", "due", "tre", "quattro", "cinque", "sei"].contains(t[1]) else { return nil }
+        let oggetti: Set<String> = ["casa", "casetta", "piastra", "piastrina", "scatola", "scatolina", "supporto", "ingranaggio", "ingranaggi", "vaso", "portapenne",
+            "gancio", "staffa", "cubo", "sfera", "cilindro", "cono", "piramide", "anello", "ruota", "mensola", "tazza", "coperchio", "contenitore", "vassoio",
+            "targa", "targhetta", "portachiavi", "statua", "statuetta", "modellino", "distanziale", "boccola", "perno", "manopola", "maniglia", "cornice",
+            "ciotola", "bicchiere", "lampada", "paralume", "organizer", "stand", "dock", "custodia", "cassetta", "fioriera", "sottobicchiere", "segnalibro",
+            "ciondolo", "robot", "pupazzo", "razzo", "castello", "torre", "tappo", "clip", "fermacavo", "passacavo", "piedino", "adattatore", "raccordo",
+            "alloggiamento", "piedistallo", "trofeo", "medaglia", "pedina", "prototipo", "pezzo", "oggetto", "portacellulare", "portatelefono", "reggilibri"]
+        if stampa || t.contains(where: { oggetti.contains($0) }) {
+            return .pagina(sezione: "Studio", voce: detta, scheda: nil)
+        }
+        return nil
+    }
 
     /// I comandi di LiDAR (21 ott, chiesti dal signore); `modo`: le frasi del pannello A VOCE di ogni modo (build 23).
     /// `modo`: il modo di LiDAR (il rawValue di ModoLidar: «Stanza», «Misura»…) e il nome per il gemello digitale («di Marco»).
@@ -262,6 +308,9 @@ enum ComandoVocale: Equatable {
             t.remove(at: k)
             if k > 0, ["la", "le", "nella", "alla", "in"].contains(t[k - 1]) { t.remove(at: k - 1) }
         }
+        // MARK X · STUDIO e SOCIAL (le frasi del mockup, anche lunghe: «crea una piastra 80 per 40 per 4 con 4 fori»)
+        if let p = paginaMarkX(t) { return p }
+        #if os(iOS)
         // MARK X · BROWSER VIDEO: «fammi vedere dei video di Daft Punk dal vivo», «cercami i video del Milan» (anche frasi lunghe)
         if let k = t.firstIndex(where: { $0 == "video" || $0 == "filmati" }), k + 1 < t.count, t[..<k].contains(where: { ["fammi", "cercami", "cerca", "mostrami", "trovami", "metti", "voglio"].contains($0) }) {
             var resto = Array(t[(k + 1)...])
@@ -273,6 +322,7 @@ enum ComandoVocale: Equatable {
                 return .apri(.browser)
             }
         }
+        #endif                                                  // (il Browser è solo dell'iPhone: l'orologio non conosce CercaVideo)
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }

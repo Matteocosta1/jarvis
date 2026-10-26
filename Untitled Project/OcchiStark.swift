@@ -871,6 +871,8 @@ struct FoglioWebOcchi: View {
     let esito: CervelloOcchi.Esito?
     /// Decisione 29: una fonte toccata si apre nel browser di JARVIS.
     var apri: (URL) -> Void = { _ in }
+    /// MARK X: MANDA ALLO STUDIO, PUBBLICA SU SOCIAL (sotto le fonti, come il mockup).
+    var manda: ((String) -> Void)? = nil
     let chiudi: () -> Void
     @State private var punti = 1
 
@@ -926,6 +928,7 @@ struct FoglioWebOcchi: View {
                         }
                     }
                 }
+                if let manda { TastiMandaOcchi(studio: { manda("studio") }, social: { manda("social") }) }
             case .persona?:
                 Text("Le persone non le cerco sul web, Sir.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
             case .errore?:
@@ -960,6 +963,17 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     case ologramma(Bool)
     case aggancia
     case cerca
+    case studio                         // MARK X: «manda questo pezzo allo Studio»
+    case social                         // MARK X: «pubblica questa foto su Instagram»
+
+    /// Con gli Occhi chiusi, la frase quando si aprono per mandare la foto (come il mockup).
+    var annuncioApertura: String? {
+        switch self {
+        case .studio: return "Gli occhi, Sir: inquadri il pezzo."
+        case .social: return "Gli occhi, Sir: inquadri la foto."
+        default: return nil
+        }
+    }
 
     /// La risposta di JARVIS (come il mockup); CERCA risponde quando ha trovato.
     var risposta: String? {
@@ -969,7 +983,7 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         case .ologramma(true): return "Scansione olografica, Sir."
         case .ologramma(false): return "Ologramma disattivato, Sir."
         case .aggancia: return "Bersaglio agganciato, Sir."
-        case .cerca: return nil
+        case .cerca, .studio, .social: return nil
         }
     }
 
@@ -986,6 +1000,9 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         case "disattiva l ologramma": return .ologramma(false)
         case "aggancia il bersaglio": return .aggancia
         case "cerca questo sul web": return .cerca
+        case "manda questo pezzo allo studio", "manda questo allo studio", "mandalo allo studio", "manda allo studio", "portalo nello studio": return .studio
+        case "pubblica questa foto su instagram", "pubblicala su instagram", "metti questa foto su instagram", "pubblica questa foto sul social",
+             "pubblica questa foto su social": return .social
         default: return nil
         }
     }

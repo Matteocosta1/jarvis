@@ -5453,6 +5453,8 @@ var SOC = { verificato: true /* impostato a mano: l'API di Instagram non dà la 
   { tipo: "dm", chi: "utente_esempio_2", verificato: true /* is_verified_user dell'API messaggi */, testo: "Ciao King, fai custom anche su commissione? Ho un jeans da fare.", su: "Messaggio · 2 h fa", bozza: "Ciao! Sì, faccio custom su commissione: mandami una foto del jeans e l'idea, ti rispondo con tempi e prezzo." },
   { tipo: "commento", chi: "utente_esempio_3", testo: "LISTA", su: "Post · drop di sabato", bozza: "Automazione: link del drop mandato in DM ✓", auto: true },
   { tipo: "dm", chi: "utente_esempio_4", testo: "Quando esce il prossimo drop?", su: "Messaggio · ieri (oltre 24 h)", bozza: "", scaduto: true }], auto: { on: true, parola: "LISTA", testo: "Ecco il link del drop di sabato 👉 kingrusto.it/drop" } };
+if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.auto = { on: false, parola: "LISTA", testo: "" }; }
+window.__socStato = (r) => { if (!r || r.errore) { SOC.vero = { errore: (r && r.errore) || "non risponde" }; } else { SOC.vero = r; SOC.posta = r.posta || []; SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; if (r.auto) SOC.auto = r.auto; } window.__socRidisegna && window.__socRidisegna(); if (window.__socRiassunto) { window.__socRiassunto = false; if (SOC.vero.report) parlaMock(SOC.vero.report.riassunto, 6000); else parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); } };
 CONTENUTI.Social = `<div id="social"></div>`;
 const SC_SPUNTA = '<svg class="sc-spunta" viewBox="0 0 24 24" aria-label="Verificato" role="img"><path fill="#0098fd" stroke="#0098fd" stroke-width="1.1" stroke-linejoin="round" d="M12.00 1.40L13.74 3.27L16.06 2.21L16.94 4.60L19.50 4.50L19.40 7.06L21.79 7.94L20.73 10.26L22.60 12.00L20.73 13.74L21.79 16.06L19.40 16.94L19.50 19.50L16.94 19.40L16.06 21.79L13.74 20.73L12.00 22.60L10.26 20.73L7.94 21.79L7.06 19.40L4.50 19.50L4.60 16.94L2.21 16.06L3.27 13.74L1.40 12.00L3.27 10.26L2.21 7.94L4.60 7.06L4.50 4.50L7.06 4.60L7.94 2.21L10.26 3.27z"/><path d="M7.7 12.2l2.9 2.9 5.7-5.9" fill="none" stroke="#04090c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // l'ultimo pezzo dello Studio con la sua miniatura (archivio: il progetto attivo, se no l'ultimo salvato)
@@ -5465,7 +5467,7 @@ function social(ok) {
     "Dal muro allo Studio: lo stencil diventa un pezzo vero. Chi lo vuole? Commentate LISTA.\n\n#kingrusto #graffiti #customdenim #3dprint",
     "Nuovo drop in arrivo. Questo è il prototipo: ditemi colore e misura.\n\n#kingrusto #streetart #drop"];
   A.innerHTML = `<div class="sc-su"><div><b>J.A.R.V.I.S.</b><small>SOCIAL · @KINGRUSTO</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
-    <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small>INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO</small></div><div class="sc-num"><b>12,4K</b><small>FOLLOWER</small></div></div>
+    <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["calendario", "CALENDARIO"], ["report", "REPORT"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
   sezione.appendChild(A);
@@ -5481,6 +5483,7 @@ function social(ok) {
       if (fonte?.img) { const u = (t * .35) % 1; x.fillStyle = "rgba(79,227,255,.07)"; x.fillRect(0, u * H, W, 3);
       x.fillStyle = "rgba(255,255,255,.9)"; x.font = "600 22px Inter, system-ui, sans-serif"; x.fillText("@kingrusto", 26, H - 70); x.font = "18px Inter, system-ui, sans-serif"; x.fillStyle = "rgba(255,255,255,.75)"; x.fillText((didascalia || "").split("\n")[0].slice(0, 34) + "…", 26, H - 40); }
       requestAnimationFrame(f); })(performance.now()); }
+  if (window.JARVIS_APP) { window.__socRidisegna = () => { if (!A.isConnected) return; const v = SOC.vero; if (v) { const f = A.querySelector('[data-soc="follower"]'); if (f) f.textContent = v.profilo ? v.profilo.followerTesto : "—"; const so = A.querySelector('[data-soc="sotto"]'); if (so) so.innerHTML = v.errore ? "INSTAGRAM · " + escSd(v.errore).toUpperCase() : "INSTAGRAM · ACCOUNT&nbsp;CREATOR"; } const f = document.activeElement; if (f && P.contains(f) && /TEXTAREA|INPUT/.test(f.tagName)) contaPosta(); else pagina(); }; window.__socFonte = (im, k, v) => { fonte = { k: k || "galleria", img: im, video: !!v }; if (v) formato = "REEL"; if (!didascalia) didascalia = DIDA[k === "studio" ? 0 : 1]; pagina(); }; window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialStato" }); }
   function pagina() { giro++; contaPosta();
     if (scheda === "pubblica") {
       P.innerHTML = `<div class="sc-blocco"><small class="sc-et">DA DOVE PARTIAMO</small><div class="sc-fonti">${[["galleria", ICONE.Foto || ICONE.Ricordi, "GALLERIA", "FOTO E VIDEO"], ["occhi", ICONE.Occhi || ICONE.Profiler || ICONE.Studio, "OCCHI", "SCATTA ORA"], ["studio", ICONE.Studio, "STUDIO", "PEZZO 3D"]].map(([k, ic, n, sot]) => `<button type="button" data-fonte="${k}" aria-pressed="${fonte?.k === k}"><i>${ic}</i>${n}<small>${sot}</small></button>`).join("")}</div></div>
@@ -5492,29 +5495,29 @@ function social(ok) {
         <p class="sc-nota">JARVIS pubblica solo dopo il suo sì. L'API di Instagram pubblica foto, caroselli, Reel e storie (fino a 100 al giorno); la musica del Reel si sceglie nell'app di Instagram.</p>`;
       anteprimaReel(P.querySelector("canvas")); P.querySelector("#scDida").addEventListener("input", (e) => { didascalia = e.target.value; }); return; }
     if (scheda === "posta") { P.innerHTML = `<div class="sc-lista">${SOC.posta.map((m, i) => `<div class="sc-msg${m.fatto ? " fatto" : ""}" style="animation-delay:${i * 60}ms"><div class="sc-msg-su"><span class="sc-badge">${m.tipo === "dm" ? "DM" : "COMMENTO"}</span><b class="sc-nome">@${m.chi}${m.verificato ? SC_SPUNTA : ""}</b><small>${m.su}</small></div>
-        <p class="sc-testo">${escSd(m.testo)}</p>${m.scaduto ? `<p class="sc-nota">Oltre 24 ore: Instagram non permette più di rispondere da qui. Si risponde dall'app.</p>` : m.auto ? `<p class="sc-auto">${m.bozza}</p>` : m.fatto ? `<p class="sc-auto">Risposta inviata ✓</p>` : `<div class="sc-bozza"><small>RISPOSTA DI JARVIS</small><textarea data-bozza="${i}" rows="2">${escSd(m.bozza)}</textarea></div><div class="sc-riga"><button type="button" class="chip acceso" data-invia="${i}">INVIA</button><button type="button" class="chip" data-ignora="${i}">IGNORA</button></div>`}</div>`).join("")}</div><p class="sc-nota">Commenti e messaggi arrivano subito (webhook). Ai messaggi si risponde entro 24 ore, regola di Instagram.</p>`; return; }
+        <p class="sc-testo">${escSd(m.testo)}</p>${m.scaduto ? `<p class="sc-nota">Oltre 24 ore: Instagram non permette più di rispondere da qui. Si risponde dall'app.</p>` : m.auto ? `<p class="sc-auto">${m.bozza}</p>` : m.fatto ? `<p class="sc-auto">Risposta inviata ✓</p>` : `<div class="sc-bozza"><small>RISPOSTA DI JARVIS</small><textarea data-bozza="${i}" rows="2">${escSd(m.bozza)}</textarea></div><div class="sc-riga"><button type="button" class="chip acceso" data-invia="${i}">INVIA</button><button type="button" class="chip" data-ignora="${i}">IGNORA</button></div>`}</div>`).join("")}</div><p class="sc-nota">${window.JARVIS_APP ? "Commenti e messaggi degli ultimi 5 post e della chat, aggiornati a ogni apertura. Finché l’app Meta è in sviluppo, Instagram mostra solo quelli degli account di prova. Ai messaggi si risponde entro 24 ore." : "Commenti e messaggi arrivano subito (webhook). Ai messaggi si risponde entro 24 ore, regola di Instagram."}</p>`; return; }
     if (scheda === "calendario") { const tutti = [...SOC.coda.map((c) => ({ ...c, stato: "PROGRAMMATO" })), ...SOC.pubblicati.map((c) => ({ ...c, stato: "PUBBLICATO" }))];
       P.innerHTML = tutti.length ? `<div class="sc-lista">${tutti.map((c, i) => `<div class="sc-cal"><div class="sc-cal-d"><b>${c.quando.split(" ")[0]}</b><small>${c.quando.split(" ")[1] || ""}</small></div><div><b>${escSd(c.titolo)}</b><small>${c.tipo} · ${c.stato}</small></div>${c.stato === "PROGRAMMATO" ? `<button type="button" class="sc-mini" data-annulla="${i}">ANNULLA</button>` : `<span class="sc-ok">✓</span>`}</div>`).join("")}</div>` : `<p class="sc-nota">Niente in programma.</p>`; return; }
-    if (scheda === "report") { P.innerHTML = `<div class="sc-numeri">${[["FOLLOWER", "12,4K", "+184 in 7 giorni"], ["COPERTURA", "38,2K", "account raggiunti · 7 giorni"], ["INTERAZIONI", "4,1K", "like, commenti, salvataggi"], ["ORARIO MIGLIORE", "LUN 12", "quando i suoi follower sono online"]].map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><span>${c}</span></div>`).join("")}</div>
+    if (scheda === "report") { P.innerHTML = `<div class="sc-numeri">${(SOC.vero?.report?.numeri || [["FOLLOWER", "12,4K", "+184 in 7 giorni"], ["COPERTURA", "38,2K", "account raggiunti · 7 giorni"], ["INTERAZIONI", "4,1K", "like, commenti, salvataggi"], ["ORARIO MIGLIORE", "LUN 12", "quando i suoi follower sono online"]]).map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><span>${c}</span></div>`).join("")}</div>
         <div class="sc-blocco"><small class="sc-et">COPERTURA · ULTIMI 7 GIORNI</small><canvas id="scGraf" width="640" height="220"></canvas></div>
-        <div class="sc-blocco"><small class="sc-et">IL PIÙ VISTO</small><div class="sc-cal"><div class="sc-cal-d"><b>REEL</b></div><div><b>Giacca custom · stencil KR</b><small>14,8K visualizzazioni · 1,2K like · 86 commenti</small></div></div></div>
-        <button type="button" class="sc-vai" data-az="riassunto">COM'È ANDATA?</button><p class="sc-nota">Numeri d'esempio. Nell'app arrivano dalle statistiche ufficiali di Instagram.</p>`;
-      const c = P.querySelector("#scGraf"), x = c.getContext("2d"), v = [3.1, 4.4, 3.8, 9.6, 5.2, 6.9, 5.2], mx = 10, t0 = performance.now();
+        <div class="sc-blocco"><small class="sc-et">IL PIÙ VISTO</small>${SOC.vero?.report ? (SOC.vero.report.top ? `<div class="sc-cal"><div class="sc-cal-d"><b>${SOC.vero.report.top.tipo}</b></div><div><b>${escSd(SOC.vero.report.top.titolo)}</b><small>${SOC.vero.report.top.dettaglio}</small></div></div>` : `<p class="sc-nota">Ancora niente da mostrare.</p>`) : `<div class="sc-cal"><div class="sc-cal-d"><b>REEL</b></div><div><b>Giacca custom · stencil KR</b><small>14,8K visualizzazioni · 1,2K like · 86 commenti</small></div></div>`}</div>
+        <button type="button" class="sc-vai" data-az="riassunto">COM'È ANDATA?</button><p class="sc-nota">${SOC.vero?.report ? "Dalle statistiche ufficiali di Instagram." : "Numeri d'esempio. Nell'app arrivano dalle statistiche ufficiali di Instagram."}</p>`;
+      const c = P.querySelector("#scGraf"), x = c.getContext("2d"), v = SOC.vero?.report?.giorni?.length ? SOC.vero.report.giorni : [3.1, 4.4, 3.8, 9.6, 5.2, 6.9, 5.2], mx = Math.max(1, ...v) * 1.08, t0 = performance.now();
       (function f(ts) { if (!c.isConnected) return; const k = Math.min(1, (ts - t0) / 700); x.clearRect(0, 0, c.width, c.height);
-        v.forEach((n, i) => { const w = c.width / 7, h = (c.height - 40) * n / mx * k, X = i * w + w * .2; const g = x.createLinearGradient(0, c.height - 24 - h, 0, c.height - 24); g.addColorStop(0, "rgba(79,227,255,.9)"); g.addColorStop(1, "rgba(79,227,255,.15)");
-          x.fillStyle = g; x.fillRect(X, c.height - 24 - h, w * .6, h); x.fillStyle = "#9fb3b9"; x.font = "600 18px ui-monospace, monospace"; x.fillText(["L", "M", "M", "G", "V", "S", "D"][i], X + w * .2, c.height - 4); if (k === 1) { x.fillStyle = "#e6f4f8"; x.fillText(String(n).replace(".", ","), X, c.height - 30 - h); } });
+        v.forEach((n, i) => { const w = c.width / v.length, h = (c.height - 40) * n / mx * k, X = i * w + w * .2; const g = x.createLinearGradient(0, c.height - 24 - h, 0, c.height - 24); g.addColorStop(0, "rgba(79,227,255,.9)"); g.addColorStop(1, "rgba(79,227,255,.15)");
+          x.fillStyle = g; x.fillRect(X, c.height - 24 - h, w * .6, h); x.fillStyle = "#9fb3b9"; x.font = "600 18px ui-monospace, monospace"; x.fillText((SOC.vero?.report?.etichette || ["L", "M", "M", "G", "V", "S", "D"])[i] || "", X + w * .2, c.height - 4); if (k === 1) { x.fillStyle = "#e6f4f8"; x.fillText(String(n).replace(".", ","), X, c.height - 30 - h); } });
         if (k < 1) requestAnimationFrame(f); })(t0); return; }
     if (scheda === "automazioni") { const a = SOC.auto; P.innerHTML = `<div class="sc-blocco sc-auto-b"><div class="sc-et-r"><small class="sc-et">COMMENTA → LINK IN DM</small><button type="button" class="sc-int${a.on ? " on" : ""}" data-az="auto" aria-pressed="${a.on}" aria-label="Attiva"><i></i></button></div>
         <label class="sc-campo"><span>PAROLA</span><input id="scParola" value="${escSd(a.parola)}" maxlength="20"></label><label class="sc-campo"><span>MESSAGGIO</span><textarea id="scAutoT" rows="3">${escSd(a.testo)}</textarea></label>
         <p class="sc-nota">Chi commenta «${escSd(a.parola)}» sotto un post riceve il messaggio in DM, una volta sola. È la funzione che Buzzfy fa pagare 39 $ al mese: qui è compresa.</p></div>`;
-      P.querySelector("#scParola").addEventListener("input", (e) => { a.parola = e.target.value.toUpperCase(); e.target.value = a.parola; }); P.querySelector("#scAutoT").addEventListener("input", (e) => { a.testo = e.target.value; }); }
+      P.querySelector("#scParola").addEventListener("input", (e) => { a.parola = e.target.value.toUpperCase(); e.target.value = a.parola; window.JARVIS_APP && window.__socAuto(); }); P.querySelector("#scAutoT").addEventListener("input", (e) => { a.testo = e.target.value; window.JARVIS_APP && window.__socAuto(); }); }
   }
   A.addEventListener("click", async (e) => { const b = e.target.closest("button"); if (!b || !A.contains(b)) return;
     if (b.dataset.sc) { suona("aTick"); scheda = b.dataset.sc; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pagina(); return; }
     if (b.dataset.fonte) { suona("aTick"); const k = b.dataset.fonte;
       if (k === "studio") { fonte = { k, img: null }; const pz = pezzoStudio(); if (pz) { const im = new Image(); im.onload = () => { if (fonte?.k === "studio") { fonte.img = im; pagina(); } }; im.src = pz.mini; parlaMock(`${pz.nome}: l'ultimo pezzo dello Studio, Sir.`, 2600); } else parlaMock("Il banco dello Studio è vuoto, Sir: crei un pezzo in Studio, poi CONDIVIDI › SOCIAL.", 3600); }
-      else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock("Nessuna foto da Occhi, Sir: in Occhi, CERCA › PUBBLICA SU SOCIAL la manda qui.", 3200); }
-      else { const c = document.createElement("canvas"); c.width = 360; c.height = 640; anteprima(c, "galleria" + Date.now()); fonte = { k, img: c }; }
+      else if (k === "occhi" && window.JARVIS_APP && !SOC.daOcchi) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFoto", da: "occhi" }); return; } else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock("Nessuna foto da Occhi, Sir: in Occhi, CERCA › PUBBLICA SU SOCIAL la manda qui.", 3200); }
+      else if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFoto", da: "galleria" }); return; } else { const c = document.createElement("canvas"); c.width = 360; c.height = 640; anteprima(c, "galleria" + Date.now()); fonte = { k, img: c }; }
       if (!didascalia) didascalia = DIDA[0]; pagina(); return; }
     if (b.dataset.formato) { suona("aTick"); formato = b.dataset.formato; pagina(); return; }
     if (b.dataset.quando) { suona("aTick"); quando = b.dataset.quando; pagina(); return; }
@@ -5526,16 +5529,29 @@ function social(ok) {
       A.appendChild(F); requestAnimationFrame(() => F.classList.add("su"));
       F.addEventListener("click", async (ev) => { const k = ev.target.closest("[data-ok]")?.dataset.ok; if (!k) return; suona("aTick"); F.remove(); if (k === "no") return;
         const titolo = (didascalia || "Nuovo contenuto").split(/[.!\n]/)[0].slice(0, 40);
+        if (window.JARVIS_APP) { const L = document.createElement("div"); L.className = "sc-carica"; L.innerHTML = `<i></i><b>PREPARO IL ${formato}</b><span></span>`; A.appendChild(L);
+          const media = await window.__socMedia(fonte, formato); L.querySelector("b").textContent = quando === "ORA" ? "CARICO SU INSTAGRAM" : "PROGRAMMO";
+          const r = await window.__jarvisChiedi("socialPubblica", { formato: media.formato, quando, didascalia, media: media.b64, mime: media.mime }).then((t) => JSON.parse(t)).catch((e) => ({ errore: e.message || String(e) }));
+          L.remove(); if (!ok()) return;
+          if (r.errore) { parlaMock("Non è andata, Sir: " + r.errore, 4200); return; }
+          suona("aPronto"); parlaMock(r.programmato ? `Programmato per ${r.programmato}, Sir: è l'orario migliore.` : (media.nota || "Pubblicato su @kingrusto, Sir."), 3200); fonte = null; didascalia = "";
+          window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialStato" }); return; }
         if (quando !== "ORA") { SOC.coda.unshift({ quando: "LUN 12:00", titolo, tipo: formato }); parlaMock("Programmato per lunedì alle 12, Sir: è l'orario in cui i suoi follower sono più attivi.", 3000); scheda = "calendario"; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.sc === "calendario")); pagina(); return; }
         const L = document.createElement("div"); L.className = "sc-carica"; L.innerHTML = `<i></i><b>CARICO</b><span></span>`; A.appendChild(L);
         for (const [t, ms] of [["CARICO IL " + formato, 900], ["INSTAGRAM ELABORA", 1100], ["PUBBLICATO", 700]]) { L.querySelector("b").textContent = t; L.classList.toggle("ok", t === "PUBBLICATO"); await attesa(ms); if (!ok()) return; }
         suona("aPronto"); L.remove(); SOC.pubblicati.unshift({ quando: "OGGI " + new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }), titolo, tipo: formato });
         parlaMock(`Pubblicato su @kingrusto, Sir. Le dico i primi numeri fra un'ora.`, 2800); fonte = null; didascalia = ""; pagina(); }); return; }
+    if (b.dataset.invia && window.JARVIS_APP) { const i = +b.dataset.invia, m = SOC.posta[i]; m.bozza = A.querySelector(`[data-bozza="${i}"]`)?.value || m.bozza; if (!m.bozza.trim()) { parlaMock("La risposta è vuota, Sir.", 1800); return; } b.textContent = "…";
+      const r = await window.__jarvisChiedi("socialRispondi", { tipoMsg: m.tipo, idMsg: m.id, a: m.a || "", testo: m.bozza }).then((t) => JSON.parse(t)).catch((e) => ({ errore: e.message || String(e) }));
+      if (r.errore) { b.textContent = "INVIA"; parlaMock("Non è partita, Sir: " + r.errore, 3600); return; } suona("aPronto"); m.fatto = true; parlaMock(`Risposta mandata a @${m.chi}, Sir.`, 2000); pagina(); return; }
     if (b.dataset.invia) { const i = +b.dataset.invia, m = SOC.posta[i]; m.bozza = A.querySelector(`[data-bozza="${i}"]`)?.value || m.bozza; if (!m.bozza.trim()) { parlaMock("La risposta è vuota, Sir.", 1800); return; } suona("aPronto"); m.fatto = true; parlaMock(`Risposta mandata a @${m.chi}, Sir.`, 2000); pagina(); return; }
     if (b.dataset.ignora) { suona("aTick"); SOC.posta.splice(+b.dataset.ignora, 1); pagina(); return; }
+    if (b.dataset.annulla && window.JARVIS_APP) { suona("aTick"); const c = SOC.coda[+b.dataset.annulla]; if (c?.id) window.__jarvisChiedi("socialAnnulla", { idCoda: c.id }).catch(() => {}); SOC.coda.splice(+b.dataset.annulla, 1); parlaMock("Tolto dal calendario, Sir.", 1800); pagina(); return; }
     if (b.dataset.annulla) { suona("aTick"); SOC.coda.splice(+b.dataset.annulla, 1); parlaMock("Tolto dal calendario, Sir.", 1800); pagina(); return; }
+    if (b.dataset.az === "riassunto" && SOC.vero?.report) { suona("aTick"); parlaMock(SOC.vero.report.riassunto, 6000); return; }
+    if (b.dataset.az === "riassunto" && window.JARVIS_APP) { suona("aTick"); if (SOC.vero?.errore) parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); else { window.__socRiassunto = true; parlaMock("Leggo le statistiche, Sir: un attimo.", 2000); } return; }
     if (b.dataset.az === "riassunto") { suona("aTick"); parlaMock("Settimana buona, Sir: 38 mila account raggiunti e 184 follower in più. Il Reel della giacca custom ha fatto quasi 15 mila visualizzazioni: giovedì è il giorno forte. Lunedì a mezzogiorno pubblico il prossimo?", 6000); return; }
-    if (b.dataset.az === "auto") { suona("aTick"); SOC.auto.on = !SOC.auto.on; b.classList.toggle("on", SOC.auto.on); b.setAttribute("aria-pressed", SOC.auto.on); parlaMock(SOC.auto.on ? `Attiva, Sir: chi commenta «${SOC.auto.parola}» riceve il link in DM.` : "Automazione spenta, Sir.", 2400); } });
+    if (b.dataset.az === "auto") { suona("aTick"); SOC.auto.on = !SOC.auto.on; if (window.JARVIS_APP) window.__socAuto(); b.classList.toggle("on", SOC.auto.on); b.setAttribute("aria-pressed", SOC.auto.on); parlaMock(SOC.auto.on ? `Attiva, Sir: chi commenta «${SOC.auto.parola}» riceve il link in DM.` : "Automazione spenta, Sir.", 2400); } });
   // arrivi: dallo Studio (il pezzo per un Reel), da Occhi (la foto), a voce
   const da = window.SOCIAL_DA; window.SOCIAL_DA = null;
   if (da?.foto) { SOC.daOcchi = da.foto; fonte = { k: da.da || "occhi", img: da.foto }; didascalia = DIDA[1]; formato = da.da === "studio" ? "REEL" : "POST"; }
@@ -5950,6 +5966,7 @@ function studio(ok) {
       caricando = true; for (const o of prima.oggetti) { await attesa(220); if (!vivo()) { caricando = false; return; } oggetti.push(o); B.aggiungi(o, "vacuform"); }
       caricando = false; seleziona(oggetti[oggetti.length - 1], true); azioni(); info(["BANCO OLOGRAFICO · ONLINE", `${oggetti.length} ${oggetti.length === 1 ? "PEZZO RIPRESO" : "PEZZI RIPRESI"}`, "PRONTO A COSTRUIRE"]); }
     if (window.STUDIO_DA?.foto) { const f = window.STUDIO_DA; window.STUDIO_DA = null; await attesa(700); info([`DA OCCHI · ${f.nome.toUpperCase()}`]); leggiFoto(f.foto, `da Occhi · ${f.nome}`, "oggetto"); }
+    else if (window.STUDIO_DA?.lidarVero) { const d = window.STUDIO_DA.lidarVero; window.STUDIO_DA = null; await attesa(700); lidarVero(d); }
     else if (window.STUDIO_DA?.lidar) { const k = window.STUDIO_DA.lidar; window.STUDIO_DA = null; await attesa(700); if (k === "statua") leggiFoto(sagomaStatua(), "corpo dal LiDAR", "oggetto"); else if (["stanza", "esterno", "setup"].includes(k)) plastico(k); else scansioneLidar(k); }
     else if (window.STUDIO_DA === "occhi") { window.STUDIO_DA = null; await attesa(700); daOcchi(); }
     else if (window.STUDIO_DA === "lidar") { window.STUDIO_DA = null; await attesa(700); scansioneLidar(); }
@@ -6285,18 +6302,46 @@ function studio(ok) {
     pupazzo: { nome: "Pupazzo di neve", pezzi: [{ forma: "sfera", misure: { d: 44 }, pos: [0, 21, 0] }, { forma: "sfera", misure: { d: 32 }, pos: [0, 54, 0] }, { forma: "sfera", misure: { d: 22 }, pos: [0, 78, 0] }, { forma: "cono", misure: { d: 5, h: 12 }, pos: [0, 78, 15], rot: [90, 0, 0] }, { forma: "cilindro", misure: { d: 20, h: 3 }, pos: [0, 89, 0] }, { forma: "cilindro", misure: { d: 13, h: 12 }, pos: [0, 96, 0] }] },
     portapenne: { nome: "Portapenne", pezzi: [{ forma: "cilindro", misure: { d: 70, h: 6 }, pos: [0, 3, 0] }, { forma: "cilindro", misure: { d: 30, h: 90 }, pos: [-14, 45, 0] }, { forma: "cilindro", misure: { d: 24, h: 70 }, pos: [16, 35, -6] }, { forma: "cilindro", misure: { d: 26, h: 90 }, pos: [-14, 51, 0], foro: true }, { forma: "cilindro", misure: { d: 20, h: 70 }, pos: [16, 41, -6], foro: true }] },
   };
+  // APP · la scansione vera del LiDAR dell'iPhone (LidarStudio.swift): sala e allestimento → plastico; terreno, oggetto, persona → maglia; postura → sagoma
+  function lidarVero(d) {
+    if (!B || !d) return;
+    if (d.tipo === "stanza" || d.tipo === "setup") { plastico(d.tipo, d); return; }
+    if (d.tipo === "maglia") { const f = (x) => new Float32Array(Uint8Array.from(atob(x), (c) => c.charCodeAt(0)).buffer);
+      const kk = "l" + Date.now().toString(36); GEO_DATI.set(kk, { pos: f(d.pos), norm: f(d.norm) });
+      const o = nuovo("unito", { k: kk }, nomeLibero(d.nome), { anim: "vacuform" }), g = B.ingombro(o), ch = B.chiuso(o);
+      info([...d.righe, `${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM · ${ch ? "STAMPABILE" : "DA CONTROLLARE"}`]);
+      parlaMock(d.parla.replace("{L}", mm(g.l)).replace("{P}", mm(g.p)).replace("{H}", mm(g.h)) + (ch ? "" : " La scansione ha dei buchi: prima di stampare va controllata."), 4200); return; }
+    if (d.tipo === "corpo") leggiFoto(sagomaVera(d), "corpo dal LiDAR", "oggetto");
+  }
+  window.__lidarVero = (d) => vivo() && lidarVero(d);
+  // la sagoma con le giunture vere (vista di fronte): come sagomaStatua, ma con le proporzioni e la posa della scansione
+  function sagomaVera(d) {
+    const c = document.createElement("canvas"); c.width = 300; c.height = 600; const x = c.getContext("2d"); x.fillStyle = "#101418"; x.fillRect(0, 0, 300, 600);
+    const J = d.giunture || {}, ks = Object.keys(J); if (!ks.length) return sagomaStatua();
+    const xs = ks.map((k) => J[k][0]), xc = (Math.min(...xs) + Math.max(...xs)) / 2, s = 540 / Math.max(1, d.altezza || 1.78), Q = (k) => J[k] && [150 + (J[k][0] - xc) * s, 580 - J[k][1] * s];
+    const g = x.createLinearGradient(60, 0, 240, 0); g.addColorStop(0, "#8d969b"); g.addColorStop(.5, "#e9eef0"); g.addColorStop(1, "#7d868b"); x.fillStyle = g; x.strokeStyle = g; x.lineCap = "round"; x.lineJoin = "round";
+    const busto = ["spSx", "spDx", "anDx", "anSx"].map(Q); if (busto.every(Boolean)) { x.beginPath(); busto.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.closePath(); x.lineWidth = .12 * s; x.stroke(); x.fill(); }
+    const spessore = { collo: .1, spSx: .09, spDx: .09, goSx: .07, goDx: .07, bac: .2, anSx: .15, anDx: .15, giSx: .11, giDx: .11 };
+    (d.ossa || []).forEach(([a, b]) => { const p = Q(a), q = Q(b); if (!p || !q) return; x.lineWidth = (spessore[a] ?? .08) * s; x.beginPath(); x.moveTo(...p); x.lineTo(...q); x.stroke(); });
+    const t = Q("testa"); if (t) { x.beginPath(); x.ellipse(t[0], t[1] - .02 * s, .1 * s, .125 * s, 0, 0, Math.PI * 2); x.fill(); }
+    return c;
+  }
   // ── PLASTICI dal LiDAR: la sala (pareti, porte, finestre), il terreno, l'allestimento, in scala per la stampa ──
-  function plastico(k) {
-    const S = SALA, sc = 10, sp = 3, H = S.h * sc, pz = [];                              // 1:100 → 10 mm al metro; pareti 3 mm (30 cm veri)
+  function plastico(k, vero) {
+    const S = vero?.sala || SALA, sc = vero?.sc || 10, sp = 3, H = S.h * sc, pz = [];                              // 1:100 → 10 mm al metro; pareti 3 mm (30 cm veri)
     const cx = Math.max(...S.p.map((q) => q[0])) / 2, cz = Math.max(...S.p.map((q) => q[1])) / 2, P = (x, z) => [(x - cx) * sc, (z - cz) * sc];
     const sala = () => { pz.push({ forma: "profilo", punti: S.p.map(([x, z]) => P(x, z)), misure: { h: 2 }, pos: [0, 1, 0] });
       S.p.forEach((a, i) => { const b = S.p[(i + 1) % S.p.length], [ax, az] = P(...a), [bx, bz] = P(...b), L = Math.hypot(bx - ax, bz - az), ang = -Math.atan2(bz - az, bx - ax) * 180 / Math.PI;
         const ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz * sp / 2, nz = ux * sp / 2;
         pz.push({ forma: "scatola", misure: { l: L + sp, p: sp, h: H }, pos: [(ax + bx) / 2 + nx, 2 + H / 2, (az + bz) / 2 + nz], rot: [0, ang, 0] });
-        S.porte.filter((d) => d.w === i).forEach((d) => { const t = d.da * sc + d.l * sc / 2; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: 21 }, pos: [ax + ux * t + nx, 2 + 10.5, az + uz * t + nz], rot: [0, ang, 0], foro: true }); });
-        S.finestre.filter((d) => d.w === i).forEach((d) => { const t = d.da * sc + d.l * sc / 2; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: 12 }, pos: [ax + ux * t + nx, 2 + 9 + 6, az + uz * t + nz], rot: [0, ang, 0], foro: true }); }); }); };
+        S.porte.filter((d) => d.w === i).forEach((d) => { const t = d.da * sc + d.l * sc / 2; const hh = ((d.alto ?? 2.1) - (d.basso ?? 0)) * sc, yb = (d.basso ?? 0) * sc; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: hh }, pos: [ax + ux * t + nx, 2 + yb + hh / 2, az + uz * t + nz], rot: [0, ang, 0], foro: true }); });
+        S.finestre.filter((d) => d.w === i).forEach((d) => { const t = d.da * sc + d.l * sc / 2; const hh = ((d.alto ?? 2.1) - (d.basso ?? 0.9)) * sc, yb = (d.basso ?? 0.9) * sc; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: hh }, pos: [ax + ux * t + nx, 2 + yb + hh / 2, az + uz * t + nz], rot: [0, ang, 0], foro: true }); }); }); };
     let nome, righe;
-    if (k === "stanza") { sala(); nome = "Plastico sala 1:100"; righe = [`${String(S.h).replace(".", ",")} M D'ALTEZZA · ${S.porte.length} PORTE · ${S.finestre.length} FINESTRE`]; }
+    if (vero) { sala(); nome = vero.nome; righe = vero.righe;
+      const R2 = (r, h, y0 = 2) => { const [x, z] = P(r.c[0], r.c[1]); return { forma: "scatola", misure: { l: r.l * sc, p: r.p * sc, h }, pos: [x, y0 + h / 2, z], rot: [0, -Math.atan2(r.u[1], r.u[0]) * 180 / Math.PI, 0] }; };
+      (vero.posati || []).forEach((r) => pz.push(R2(r, r.h * sc)));
+      (vero.stand || []).forEach((r) => { pz.push(R2(r, 1)); const n = [-r.u[1], r.u[0]], v = r.verso ?? -1, o = r.p / 2 - .075; pz.push(R2({ c: [r.c[0] + n[0] * v * o, r.c[1] + n[1] * v * o], u: r.u, l: r.l, p: .15 }, 2.5 * sc)); }); }
+    else if (k === "stanza") { sala(); nome = "Plastico sala 1:100"; righe = [`${String(S.h).replace(".", ",")} M D'ALTEZZA · ${S.porte.length} PORTE · ${S.finestre.length} FINESTRE`]; }
     else if (k === "setup") { sala(); const [px, pzz] = P(14.2, 2.2), [bx2, bz2] = P(15.6, 10.6), [cx2, cz2] = P(14.2, 4.6);
       pz.push({ forma: "scatola", misure: { l: 60, p: 30, h: 8 }, pos: [px, 2 + 4, pzz] }, { forma: "scatola", misure: { l: 18, p: 8, h: 10 }, pos: [cx2, 2 + 9, cz2] }, { forma: "scatola", misure: { l: 40, p: 9, h: 11 }, pos: [bx2, 2 + 5.5, bz2] });
       [[2.5, 2.5], [2.5, 6.5], [7.5, 6.5], [9.8, 2.5], [9.8, 6.5]].forEach(([x, z]) => { const [sx, sz] = P(x + 1.5, z + 1.5); pz.push({ forma: "scatola", misure: { l: 30, p: 30, h: 1 }, pos: [sx, 2.5, sz] }, { forma: "scatola", misure: { l: 30, p: 1.5, h: 25 }, pos: [sx, 2 + 12.5, sz - 14.25] }); });
@@ -6309,7 +6354,7 @@ function studio(ok) {
     const kk = "p" + Date.now().toString(36); GEO_DATI.set(kk, { pos: R.pos, norm: R.norm });
     const o = nuovo("unito", { k: kk }, nomeLibero(nome), { anim: "vacuform" }), g = B.ingombro(o);
     info([`LIDAR · ${nome.toUpperCase()}`, ...righe, `${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM · ${B.chiuso(o) ? "STAMPABILE" : "DA CONTROLLARE"}`]);
-    parlaMock(`Ecco il plastico, Sir: ${mm(g.l)} per ${mm(g.p)} millimetri. ${k === "esterno" ? "Scala 1 a 50." : "Scala 1 a 100: pareti, porte e finestre sono quelle scansionate."}`, 3600);
+    parlaMock(`Ecco il plastico, Sir: ${mm(g.l)} per ${mm(g.p)} millimetri. ${vero ? `Scala ${vero.scala.replace(":", " a ")}: pareti, porte e finestre sono quelle scansionate.` : k === "esterno" ? "Scala 1 a 50." : "Scala 1 a 100: pareti, porte e finestre sono quelle scansionate."}`, 3600);
   }
   let inventando = false;
   async function inventa(desc) {
@@ -6340,7 +6385,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     t = inCifre(t.replace(/[«»"!?;]/g, " ").replace(/(\D)\.|\.(\D)/g, "$1 $2").replace(/\s+/g, " ").replace(/^(?:jarvis|ok jarvis|ehi jarvis)\b,?\s*/, "").trim());
     if (!t) return null;
     // il plastico dalla scansione LiDAR: la sala (1:100), il giardino (1:50), l'allestimento dell'evento
-    if (/\bplastic|\b(porta|portami|manda|mandami)\b.*\b(stanza|sala|salotto|giardino|terreno|evento|allestimento|palco)\b/.test(t)) { plastico(/giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"); return ""; }
+    if (/\bplastic|\b(porta|portami|manda|mandami)\b.*\b(stanza|sala|salotto|giardino|terreno|evento|allestimento|palco)\b/.test(t)) { const kp = /giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"; if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "plastico", k: kp }); else plastico(kp); return ""; }
     // crea un pezzo nuovo se lo nomina con un verbo o un articolo («crea un cubo», «un cilindro», «cubo da 30»); altrimenti la frase cambia il pezzo selezionato
     const creare = SD_OGG.test(t) && (!sel || /^(crea|creami|crei|fammi|fai|faccia|costruisci|costruiscimi|disegnami|modella|modellami|genera|realizza|prepara|preparami|stampami|voglio|vorrei|mi serve|mi servirebbe|serve|aggiungi|aggiungimi|metti|mettimi|un|una|uno|un'|altro|un altro|un'altra|nuovo|nuova)\b/.test(t) || SD_RE_OGG.test(t));
     // modifiche all'oggetto selezionato

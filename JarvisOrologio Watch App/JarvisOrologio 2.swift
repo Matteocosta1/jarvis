@@ -904,6 +904,16 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 case .cucina, .riunione: comando = nil            // vivono sull'iPhone: la frase va al cervello
                 }
             }
+            // MARK X: «apri Instagram», «leggimi i messaggi di Instagram»: SOCIAL al polso; lo Studio vive sull'iPhone
+            if case .pagina(let sezione, _, let scheda)? = comando {
+                compito = nil
+                daUnire = nil
+                inCorso = nil
+                WKInterfaceDevice.current().play(.click)
+                if sezione == "Social" { polsoRichiesto = .social(scheda); parla("Instagram, Sir.") }
+                else { stato = "Studio: questa sezione vive sull'iPhone, Sir."; fase = .attesa }
+                return
+            }
             if case .apri(let reparto)? = comando {
                 compito = nil
                 WKInterfaceDevice.current().play(.click)
@@ -1048,7 +1058,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
             .split(separator: " ").map(String.init)
         while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
         let occhi: Set<String> = ["mostra le etichette", "togli le etichette", "scansione olografica", "disattiva l ologramma",
-                                  "aggancia il bersaglio", "cerca questo sul web"]
+                                  "aggancia il bersaglio", "cerca questo sul web",
+                                  "manda questo pezzo allo studio", "pubblica questa foto su instagram"]   // MARK X
         if occhi.contains(t.joined(separator: " ")) { return .occhi }
         if ComandoVocale.modoLidar(t) != nil { return .lidar }
         return nil
@@ -1419,6 +1430,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             }
         }
         if case .apri(_)? = comando { return false }
+        if case .pagina? = comando { return false }                 // MARK X: Studio e Social
         if case .interprete(let codice)? = comando,
            ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first != nil { return false }
         if Dialogo.volume(testo).cambio != nil { return false }

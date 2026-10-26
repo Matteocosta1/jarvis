@@ -29,7 +29,7 @@ struct ContentView: View {
     @State private var testo = ""
     @State private var mostraImpostazioni = false
     @State private var mostraBrowser = false
-    @State private var mostraStudio = false      // MARK X: STUDIO, il banco olografico (icona in alto dopo MUSICA)
+    @State private var aperturaPagina: AperturaPagina?   // MARK X: STUDIO e SOCIAL, la pagina del mockup (icone in alto, voce, Occhi)
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
@@ -252,10 +252,16 @@ struct ContentView: View {
         }) { ImpostazioniView().environmentObject(jarvis) }
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
-        .fullScreenCover(isPresented: $mostraStudio) { VistaStudio(parla: { [jarvis] frase in jarvis.annuncia(frase) }) }
+        .fullScreenCover(item: $aperturaPagina) { a in VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }) }
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
+            guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
+            if aperturaPagina == nil { aperturaPagina = a; return }
+            aperturaPagina = nil                                   // ce n'è già una aperta: si chiude e si riapre con la nuova
+            Task { @MainActor in try? await Task.sleep(for: .milliseconds(650)); aperturaPagina = a }
+        }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
             Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
-                  oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia) { dati in jarvis.occhiChiusi(dati) }
+                  oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda) { dati in jarvis.occhiChiusi(dati) }
         }
         .fullScreenCover(item: $jarvis.interprete) { l in
             Interprete(lingua: l) { jarvis.interprete = nil }
@@ -573,7 +579,7 @@ struct ContentView: View {
     /// MARK X (26 ott): il nome della versione sotto il titolo.
     static let marca = "MARK X"
     /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra). Studio e Social arrivano con le tappe 2 e 3.
-    enum postoTesta { static let musica = 0, studio = 1, sistemi = 2, cestino = 3, impostazioni = 4, totale = 5 }
+    enum postoTesta { static let social = 0, musica = 1, studio = 2, sistemi = 3, cestino = 4, impostazioni = 5, totale = 6 }
 
     /// `mini`: con la tastiera aperta (solo iPhone) qui c'è il posto del reattore piccolo, tra il titolo e i tasti: il reattore vero
     /// ci vola sopra dal centro (`reattoreVolante`). Build 23: le icone sono quattro (MUSICA, SISTEMI, cestino, Impostazioni); come nel
@@ -584,7 +590,7 @@ struct ContentView: View {
         HStack(alignment: .rigaMark, spacing: 0) {          // le icone sulla stessa riga di «MARK VIII», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
-                (Text("J.A.R.V.I.").tracking(mini ? 4 : 5) + Text("S."))
+                (Text("J.A.R.V.I.").tracking(5) + Text("S."))   // MARK X (mockup b32): con la tastiera le lettere restano uguali
                     .font(.system(size: 22, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
@@ -609,31 +615,41 @@ struct ContentView: View {
                 // il posto del reattore piccolo (34 punti): il reattore vero ci arriva volando e, toccato, chiude la tastiera e basta
                 Button { tastiera = false } label: {
                     Color.clear
-                        .frame(width: ContentView.latoMini, height: ContentView.latoMini)
+                        .frame(width: 22, height: 34)               // MARK X (mockup b32): della misura delle icone, 5 dal titolo e 2 dalle icone
                         .contentShape(Rectangle())                  // si tocca tutto il quadrato, non solo il disegno
                 }
                 .anchorPreference(key: PostiReattore.self, value: .bounds) { ["piccolo": $0] }
-                .padding(.trailing, 4)
+                .padding(.leading, 5).padding(.trailing, 2)
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
                 .accessibilityHidden(true)                          // per VoiceOver c'è il reattore stesso («Chiudi la tastiera»)
             }
+            // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); aperturaPagina = AperturaPagina(sezione: "Social") } label: {
+                IconaSocial()
+                    .foregroundStyle(Color.ciano)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
+                    .contentShape(Rectangle())
+            }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate)
+            .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
             Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica } label: {
                 IconaVinile()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); mostraStudio = true } label: {
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); aperturaPagina = AperturaPagina(sezione: "Studio") } label: {
                 IconaStudio()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -643,7 +659,7 @@ struct ContentView: View {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
                     .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -654,7 +670,7 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
@@ -669,7 +685,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .padding(.vertical, 8).padding(.horizontal, 2)   // MARK X: 6 icone, 2 per lato (mockup b32)
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
@@ -905,7 +921,7 @@ struct ContentView: View {
     }
 
     /// Il lato del reattore piccolo nella barra in alto (tastiera aperta): gli anelli da 290 rimpiccioliti a 34.
-    static let latoMini: CGFloat = 34
+    static let latoMini: CGFloat = 18                  // MARK X (mockup b32): 18 come le icone (prima 34)
 
     /// Build 23, come nel mockup («vola»): un reattore solo, che con la tastiera vola dal suo posto al centro al posto piccolo nella
     /// barra in alto (tra «J.A.R.V.I.S.» e le icone) rimpicciolendo, e ritorno, nello stesso tempo e con la stessa curva della
@@ -921,6 +937,7 @@ struct ContentView: View {
                 } label: { reattore }
                 .buttonStyle(StileStark())
                 .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
+                .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
                 .opacity(acceso ? 1 : 0)
                 .position(x: r.midX, y: r.midY)
                 .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima

@@ -1,0 +1,55 @@
+# ── LiDAR → STUDIO nell'app: la scansione vera dell'iPhone al posto dei dati d'esempio (incluse da studio_app.py) ──
+# L'app manda window.STUDIO_DA = { lidarVero: {...} } (LidarStudio.swift):
+#   · tipo "stanza" / "setup": la sala vera (poligono, porte e finestre sulle pareti, altezza) e l'allestimento calcolato → plastico()
+#   · tipo "maglia": terreno (già solido), oggetto o persona (Object Capture), in millimetri e in scala → un pezzo «unito» sul banco
+#   · tipo "corpo": le giunture vere della postura → la sagoma con quelle proporzioni → ologramma (come la sagoma del mockup)
+# Nel mockup (senza JARVIS_APP) non arriva mai lidarVero: tutto resta com'era.
+
+def toppe_lidar(s, toppa):
+    s = toppa(s, '  function plastico(k) {\n    const S = SALA, sc = 10, sp = 3, H = S.h * sc, pz = [];',
+              '  function plastico(k, vero) {\n    const S = vero?.sala || SALA, sc = vero?.sc || 10, sp = 3, H = S.h * sc, pz = [];')
+    s = toppa(s, 'pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: 21 }, pos: [ax + ux * t + nx, 2 + 10.5, az + uz * t + nz], rot: [0, ang, 0], foro: true }); });',
+              'const hh = ((d.alto ?? 2.1) - (d.basso ?? 0)) * sc, yb = (d.basso ?? 0) * sc; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: hh }, pos: [ax + ux * t + nx, 2 + yb + hh / 2, az + uz * t + nz], rot: [0, ang, 0], foro: true }); });')
+    s = toppa(s, 'pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: 12 }, pos: [ax + ux * t + nx, 2 + 9 + 6, az + uz * t + nz], rot: [0, ang, 0], foro: true }); }); }); };',
+              'const hh = ((d.alto ?? 2.1) - (d.basso ?? 0.9)) * sc, yb = (d.basso ?? 0.9) * sc; pz.push({ forma: "scatola", misure: { l: d.l * sc, p: sp * 3, h: hh }, pos: [ax + ux * t + nx, 2 + yb + hh / 2, az + uz * t + nz], rot: [0, ang, 0], foro: true }); }); }); };')
+    s = toppa(s, '    if (k === "stanza") { sala(); nome = "Plastico sala 1:100";',
+              '''    if (vero) { sala(); nome = vero.nome; righe = vero.righe;
+      const R2 = (r, h, y0 = 2) => { const [x, z] = P(r.c[0], r.c[1]); return { forma: "scatola", misure: { l: r.l * sc, p: r.p * sc, h }, pos: [x, y0 + h / 2, z], rot: [0, -Math.atan2(r.u[1], r.u[0]) * 180 / Math.PI, 0] }; };
+      (vero.posati || []).forEach((r) => pz.push(R2(r, r.h * sc)));
+      (vero.stand || []).forEach((r) => { pz.push(R2(r, 1)); const n = [-r.u[1], r.u[0]], v = r.verso ?? -1, o = r.p / 2 - .075; pz.push(R2({ c: [r.c[0] + n[0] * v * o, r.c[1] + n[1] * v * o], u: r.u, l: r.l, p: .15 }, 2.5 * sc)); }); }
+    else if (k === "stanza") { sala(); nome = "Plastico sala 1:100";''')
+    s = toppa(s, 'parlaMock(`Ecco il plastico, Sir: ${mm(g.l)} per ${mm(g.p)} millimetri. ${k === "esterno" ? "Scala 1 a 50." : "Scala 1 a 100: pareti, porte e finestre sono quelle scansionate."}`, 3600);',
+              'parlaMock(`Ecco il plastico, Sir: ${mm(g.l)} per ${mm(g.p)} millimetri. ${vero ? `Scala ${vero.scala.replace(":", " a ")}: pareti, porte e finestre sono quelle scansionate.` : k === "esterno" ? "Scala 1 a 50." : "Scala 1 a 100: pareti, porte e finestre sono quelle scansionate."}`, 3600);')
+    # la scansione vera arriva sul banco
+    s = toppa(s, '    else if (window.STUDIO_DA?.lidar) {',
+              '    else if (window.STUDIO_DA?.lidarVero) { const d = window.STUDIO_DA.lidarVero; window.STUDIO_DA = null; await attesa(700); lidarVero(d); }\n    else if (window.STUDIO_DA?.lidar) {')
+    s = toppa(s, '  // ── PLASTICI dal LiDAR: la sala (pareti, porte, finestre), il terreno, l\'allestimento, in scala per la stampa ──',
+              '''  // APP · la scansione vera del LiDAR dell'iPhone (LidarStudio.swift): sala e allestimento → plastico; terreno, oggetto, persona → maglia; postura → sagoma
+  function lidarVero(d) {
+    if (!B || !d) return;
+    if (d.tipo === "stanza" || d.tipo === "setup") { plastico(d.tipo, d); return; }
+    if (d.tipo === "maglia") { const f = (x) => new Float32Array(Uint8Array.from(atob(x), (c) => c.charCodeAt(0)).buffer);
+      const kk = "l" + Date.now().toString(36); GEO_DATI.set(kk, { pos: f(d.pos), norm: f(d.norm) });
+      const o = nuovo("unito", { k: kk }, nomeLibero(d.nome), { anim: "vacuform" }), g = B.ingombro(o), ch = B.chiuso(o);
+      info([...d.righe, `${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM · ${ch ? "STAMPABILE" : "DA CONTROLLARE"}`]);
+      parlaMock(d.parla.replace("{L}", mm(g.l)).replace("{P}", mm(g.p)).replace("{H}", mm(g.h)) + (ch ? "" : " La scansione ha dei buchi: prima di stampare va controllata."), 4200); return; }
+    if (d.tipo === "corpo") leggiFoto(sagomaVera(d), "corpo dal LiDAR", "oggetto");
+  }
+  window.__lidarVero = (d) => vivo() && lidarVero(d);
+  // la sagoma con le giunture vere (vista di fronte): come sagomaStatua, ma con le proporzioni e la posa della scansione
+  function sagomaVera(d) {
+    const c = document.createElement("canvas"); c.width = 300; c.height = 600; const x = c.getContext("2d"); x.fillStyle = "#101418"; x.fillRect(0, 0, 300, 600);
+    const J = d.giunture || {}, ks = Object.keys(J); if (!ks.length) return sagomaStatua();
+    const xs = ks.map((k) => J[k][0]), xc = (Math.min(...xs) + Math.max(...xs)) / 2, s = 540 / Math.max(1, d.altezza || 1.78), Q = (k) => J[k] && [150 + (J[k][0] - xc) * s, 580 - J[k][1] * s];
+    const g = x.createLinearGradient(60, 0, 240, 0); g.addColorStop(0, "#8d969b"); g.addColorStop(.5, "#e9eef0"); g.addColorStop(1, "#7d868b"); x.fillStyle = g; x.strokeStyle = g; x.lineCap = "round"; x.lineJoin = "round";
+    const busto = ["spSx", "spDx", "anDx", "anSx"].map(Q); if (busto.every(Boolean)) { x.beginPath(); busto.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.closePath(); x.lineWidth = .12 * s; x.stroke(); x.fill(); }
+    const spessore = { collo: .1, spSx: .09, spDx: .09, goSx: .07, goDx: .07, bac: .2, anSx: .15, anDx: .15, giSx: .11, giDx: .11 };
+    (d.ossa || []).forEach(([a, b]) => { const p = Q(a), q = Q(b); if (!p || !q) return; x.lineWidth = (spessore[a] ?? .08) * s; x.beginPath(); x.moveTo(...p); x.lineTo(...q); x.stroke(); });
+    const t = Q("testa"); if (t) { x.beginPath(); x.ellipse(t[0], t[1] - .02 * s, .1 * s, .125 * s, 0, 0, Math.PI * 2); x.fill(); }
+    return c;
+  }
+  // ── PLASTICI dal LiDAR: la sala (pareti, porte, finestre), il terreno, l'allestimento, in scala per la stampa ──''')
+    # «fai il plastico della stanza» detto nello Studio dell'app: la sala la dà l'app (l'ultima scansione salvata), non quella d'esempio
+    s = toppa(s, '{ plastico(/giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"); return ""; }',
+              '{ const kp = /giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"; if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "plastico", k: kp }); else plastico(kp); return ""; }')
+    return s

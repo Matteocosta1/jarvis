@@ -8,6 +8,7 @@ nonisolated enum SchermataPolso: Hashable, Sendable {
     case traccia, radar, priorita
     case organismo                      // «scansione organismo», «stato dell'organismo»: VistaOrganismoOrologio
     case satellite(AzioneSatellite?)    // build 23: SATELLITE (i luoghi con la distanza); a voce «guidami allo studio» parte la guida
+    case social(String?)                // MARK X: SOCIAL al polso («apri Instagram», «messaggi di Instagram»: la scheda in cima)
 }
 
 /// I colori del mockup sul polso.

@@ -35,6 +35,8 @@ struct Occhiata: Identifiable {
     var olo = false
     var eti = false
     var aggancia = false
+    /// MARK X, aperti a voce: «manda questo pezzo allo Studio» / «pubblica questa foto su Instagram» → a fuoco, poi parte da sola.
+    var manda: String? = nil
 }
 
 struct Occhi: View {
@@ -48,6 +50,8 @@ struct Occhi: View {
     var oloIniziale = false
     var etiIniziale = false
     var agganciaIniziale = false
+    /// MARK X: aperti a voce per mandare la foto allo Studio o a Social ("studio" / "social").
+    var mandaIniziale: String? = nil
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -225,6 +229,10 @@ struct Occhi: View {
                             guard !occupato else { return }
                             Suoni.tocco(); cerca()
                         }
+                        TastoOcchiStudio {                  // MARK X: STUDIO, il bersaglio (o l'inquadratura) va sul banco dello Studio
+                            guard !occupato else { return }
+                            Suoni.tocco(); manda("studio")
+                        }
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["icone"] = $0 }
                 }
@@ -280,7 +288,8 @@ struct Occhi: View {
             if let w = web {
                 VStack {
                     Spacer()
-                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito, apri: { u in Suoni.tocco(); fonte = PaginaWeb(url: u) }) {
+                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito, apri: { u in Suoni.tocco(); fonte = PaginaWeb(url: u) },
+                                   manda: { k in manda(k) }) {
                         withAnimation(.easeOut(duration: 0.25)) { web = nil }; riservati["web"] = nil
                     }
                         .frame(maxHeight: stark.schermo.height * 0.56)
@@ -328,6 +337,28 @@ struct Occhi: View {
         Task {
             try? await Task.sleep(for: .seconds(2))
             if avviso == t { avviso = nil }
+        }
+    }
+
+    /// MARK X · STUDIO e PUBBLICA SU SOCIAL (come il mockup): il bersaglio con un po' di margine (o tutta l'inquadratura, se non
+    /// c'è un bersaglio) va alla pagina dello Studio, che ne fa un ologramma 3D, o a Social, pronto da pubblicare. Gli Occhi si chiudono.
+    private func manda(_ k: String) {
+        guard agganciato, !chiuso, !scattando else { OcchiAperti.parla?("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco."); return }
+        let o = stark.obiettivo
+        let box = o?.box ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+        let nome = o.map { stark.titolo($0) ?? $0.nome.lowercased() } ?? "inquadratura"
+        let visore = stark.visore
+        Task {
+            let dati = await Task.detached(priority: .userInitiated) { visore.ritaglio(box, lato: 1600) }.value
+            guard !chiuso, let dati, let img = UIImage(data: dati) else {
+                if !chiuso { OcchiAperti.parla?("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco.") }
+                return
+            }
+            Suoni.schedaPronta()
+            OcchiAperti.parla?(k == "studio" ? "\(nome.prefix(1).uppercased() + nome.dropFirst()): lo mando allo Studio, Sir." : "La preparo per Instagram, Sir.")
+            chiudi([])
+            try? await Task.sleep(for: .milliseconds(650))          // il tempo che gli Occhi si chiudano
+            PaginaMarkX.apri(AperturaPagina(sezione: k == "studio" ? "Studio" : "Social", foto: img, nomeFoto: nome))
         }
     }
 
@@ -446,12 +477,18 @@ struct Occhi: View {
                     case .ologramma(let v): mettiOlogramma(v); if v { stark.aggancia() }
                     case .aggancia: mettiOlogramma(true); stark.aggancia()
                     case .cerca: cerca()
+                    case .studio: manda("studio")
+                    case .social: manda("social")
                     }
                     return true
                 }
                 if agganciaIniziale {
                     try? await Task.sleep(for: .milliseconds(900))
                     if !chiuso { stark.aggancia() }
+                }
+                if let k = mandaIniziale {                   // come il mockup: aspetta che la fotocamera sia a fuoco, poi parte
+                    try? await Task.sleep(for: .milliseconds(2700))
+                    if !chiuso { manda(k) }
                 }
             }
         }

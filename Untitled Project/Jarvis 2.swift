@@ -821,6 +821,25 @@ final class Jarvis: NSObject, ObservableObject {
             }
             azioneLidar = azione
             return true
+        case .pagina(let sezione, let voce, let scheda)?:     // MARK X: STUDIO e SOCIAL, la pagina del mockup
+            chiudiInterruzione()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            var a = AperturaPagina(sezione: sezione, voce: voce, scheda: scheda)
+            if sezione == "Studio", let v = voce, v.contains("plastico") || v.contains("nello studio") {   // la sala vera, non quella d'esempio
+                let p = PaginaMarkX.plasticoDaArchivio(PaginaMarkX.tipoPlastico(v))
+                annuncia(p.frase)
+                guard let json = p.json else { return true }
+                a = AperturaPagina(sezione: "Studio", lidar: json)
+            } else {
+                annuncia(PaginaMarkX.annuncio(a))
+            }
+            let coperta = occhi != nil || schermataAperta
+            if occhi != nil { occhiChiusi([]) } else if schermataAperta { chiudiChiesto = true }
+            Task { @MainActor in
+                if coperta { try? await Task.sleep(for: .milliseconds(700)) }   // il tempo che la schermata sopra si chiuda
+                PaginaMarkX.apri(a)
+            }
+            return true
         case .interprete(let codice)? where !lidarAperto:
             apriInterprete(codice)
             return true
@@ -895,7 +914,7 @@ final class Jarvis: NSObject, ObservableObject {
             if let r = c.risposta { annuncia(r) }
             return
         }
-        if let r = c.risposta ?? Reparto.occhi.annuncio { annuncia(r) }
+        if let r = c.risposta ?? c.annuncioApertura ?? Reparto.occhi.annuncio { annuncia(r) }
         guardaManuale(iniziale: c)
     }
 
@@ -978,6 +997,8 @@ final class Jarvis: NSObject, ObservableObject {
             case .etichette(true)?: o.eti = true
             case .ologramma(true)?: o.olo = true
             case .aggancia?: o.olo = true; o.aggancia = true
+            case .studio?: o.manda = "studio"          // MARK X: a fuoco e parte da sola verso lo Studio
+            case .social?: o.manda = "social"
             default: break
             }
             occhi = o
