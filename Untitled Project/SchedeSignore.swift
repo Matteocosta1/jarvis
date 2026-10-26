@@ -929,9 +929,9 @@ nonisolated enum Salute {
         }
     }
 }
-/// 27 ott (il signore: «più alla Stark, scritte che arrivano in trasparenza dal lato»): la scritta sotto il nome della sezione
-/// entra da destra, sfocata e trasparente, e si posa nitida (0,35 s); quella di prima resta leggibile almeno 0,7 s, poi esce a
-/// sinistra sfumando e arriva la nuova. Poi si ferma.
+/// 27 ott (il signore): la scritta sotto il nome della sezione scorre veloce da sinistra, da trasparente al colore pieno (0,35 s);
+/// quella di prima resta leggibile almeno 0,7 s, poi continua a scorrere a destra tornando trasparente, e arriva la nuova allo
+/// stesso modo. Poi si ferma.
 struct TestoCodice: View {
     let testo: String
     @State private var mostrato = ""                 // la scritta che si vede (la nuova arriva solo dopo che la vecchia si è letta)
@@ -943,8 +943,7 @@ struct TestoCodice: View {
     var body: some View {
         Text(mostrato)
             .opacity(dentro ? 1 : 0)
-            .offset(x: dentro ? 0 : (daSinistra ? -10 : 14))
-            .blur(radius: dentro ? 0 : 2.5)
+            .offset(x: dentro ? 0 : (daSinistra ? 14 : -14))      // entra da sinistra, esce scorrendo a destra
             .onAppear { mostra(testo, attesa: 0) }
             .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
     }
@@ -954,14 +953,14 @@ struct TestoCodice: View {
         Task { @MainActor in
             if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
             guard nuovo == voluta else { return }                      // nel frattempo è cambiata ancora: vale l'ultima
-            if !mostrato.isEmpty {                                     // la vecchia esce a sinistra, sfumando
+            if !mostrato.isEmpty {                                     // la vecchia continua a scorrere a destra, sfumando
                 daSinistra = true
                 withAnimation(.easeIn(duration: 0.15)) { dentro = false }
                 try? await Task.sleep(for: .milliseconds(160))
                 guard nuovo == voluta else { return }
             }
             var t = Transaction(); t.disablesAnimations = true
-            withTransaction(t) { mostrato = nuovo; daSinistra = false; dentro = false }   // pronta fuori, a destra
+            withTransaction(t) { mostrato = nuovo; daSinistra = false; dentro = false }   // pronta fuori, a sinistra
             withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { dentro = true }
             try? await Task.sleep(for: .milliseconds(360))
             if nuovo == voluta { lettaDa = Date() }
