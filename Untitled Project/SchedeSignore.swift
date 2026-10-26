@@ -33,6 +33,7 @@ struct CorniceScheda<Contenuto: View>: View {
         NavigationStack {
             ZStack {
                 Color.fondo.ignoresSafeArea()
+                GrigliaSfumata()
                 RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
                     .ignoresSafeArea()
                 ScrollView {

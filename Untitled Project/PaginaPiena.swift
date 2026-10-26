@@ -150,4 +150,23 @@ struct StratoPagina: View {
             }
     }
 }
+/// 27 ott (il signore): la quadrettatura della pagina d'avvio anche sullo sfondo di ogni sezione, più leggera e sfumata verso i bordi:
+/// «si vede e non si vede», dà profondità. Ferma (non scorre come quella dell'avvio).
+struct GrigliaSfumata: View {
+    var body: some View {
+        Canvas { gc, size in
+            let passo: CGFloat = 28
+            var g = Path()
+            var x: CGFloat = 0
+            while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
+            var y: CGFloat = 0
+            while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
+            gc.stroke(g, with: .color(Color.ciano.opacity(0.03)), lineWidth: 0.5)
+        }
+        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 520))
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
 #endif

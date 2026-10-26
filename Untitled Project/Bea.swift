@@ -34,6 +34,7 @@ struct VistaBea: View {
         NavigationStack {
             ZStack {
                 Color.fondo.ignoresSafeArea()
+                GrigliaSfumata()
                 RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420).ignoresSafeArea()   // 26 ott notte: ciano come le altre
                 List {
                     Section {

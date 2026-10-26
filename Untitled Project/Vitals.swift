@@ -21,6 +21,7 @@ struct VistaVitals: View {
         NavigationStack {
             ZStack {
                 Color.fondo.ignoresSafeArea()
+                GrigliaSfumata()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         // 26 ott notte: la testata delle altre schede (icona con l'anello che gira), niente titolo di iOS

@@ -26,6 +26,7 @@ struct VistaRicordi: View {
         NavigationStack {
             ZStack {
                 Color.fondo.ignoresSafeArea()
+                GrigliaSfumata()
                 VStack(spacing: 0) {
                     // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e le schede con i tasti ciano del Satellite
                     TestataScheda(titolo: scheda.rawValue, sottotitolo: "seconda memoria", icona: "brain.head.profile", tinta: Color.ciano)
