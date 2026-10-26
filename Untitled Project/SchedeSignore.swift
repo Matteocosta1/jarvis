@@ -150,7 +150,7 @@ struct TestataScheda: View {
                         .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 27 ott: nome della sezione più piccolo (prima 24)
                         .foregroundStyle(titoloColorato ? tinta : .white)
                 }
-                // 27 ott (il signore): la scritta sotto il nome si decodifica come le lettere della chat (effetto codici)
+                // 27 ott (il signore): la scritta sotto il nome arriva dal lato in trasparenza (TestoCodice)
                 TestoCodice(testo: sottotitolo.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
                     .foregroundStyle(tinta)
