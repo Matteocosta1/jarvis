@@ -933,24 +933,29 @@ nonisolated enum Salute {
 /// di nuovo a ogni cambio (es. «ACQUISIZIONE DATI» → «PRONTA»). Finito, si ferma: niente lavoro inutile.
 struct TestoCodice: View {
     let testo: String
+    @State private var mostrato = ""                 // la scritta che si vede (la nuova arriva solo dopo che la vecchia si è letta)
     @State private var inizio = Date()
     @State private var fermo = false
+    @State private var lettaDa = Date.distantPast    // da quando la scritta mostrata è tutta leggibile
     private static let simboli = Array("ABCDEF0123456789#%&*<>/=+")
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: fermo)) { t in
-            Text(fermo ? testo : TestoCodice.mescola(testo, min(1, t.date.timeIntervalSince(inizio) / 0.35)))
+            Text(fermo ? mostrato : TestoCodice.mescola(mostrato, min(1, t.date.timeIntervalSince(inizio) / 0.35)))
         }
-        .onAppear { parti() }
-        .onChange(of: testo) { parti() }
+        .onAppear { mostra(testo, attesa: 0) }
+        // 27 ott (il signore): prima si deve leggere la scritta di prima (almeno 0,7 s ferma), poi la nuova si decodifica e si ferma
+        .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
     }
 
-    private func parti() {
-        inizio = Date(); fermo = false
-        let mio = inizio
+    private func mostra(_ nuovo: String, attesa: Double) {
         Task { @MainActor in
+            if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
+            guard nuovo == testo else { return }                       // nel frattempo è cambiata ancora: vale l'ultima
+            mostrato = nuovo; inizio = Date(); fermo = false
+            let mio = inizio
             try? await Task.sleep(for: .milliseconds(400))
-            if inizio == mio { fermo = true }
+            if inizio == mio { fermo = true; lettaDa = Date() }
         }
     }
 
