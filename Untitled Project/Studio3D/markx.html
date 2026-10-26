@@ -165,6 +165,7 @@ header .icona.testa.carica { animation: icoCarica .5s ease-out; }
 
 .foglio { position: absolute; inset: 0; background: var(--fondo); z-index: 12; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .35s cubic-bezier(.2,.8,.2,1); }
 .foglio.su { transform: none; }
+.foglio::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-image: linear-gradient(rgba(79,227,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(79,227,255,.03) 1px, transparent 1px); background-size: 22px 22px; mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); -webkit-mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); }   /* 10.0 (12): la quadrettatura sfumata dell'avvio, più leggera, in ogni sezione */
 .foglio.scheda::before { content: ""; position: absolute; inset: 0 0 auto; height: 380px; background: radial-gradient(ellipse at top, rgba(79,227,255,.16), transparent 70%); pointer-events: none; }
 .barra-su { display: flex; justify-content: space-between; align-items: center; padding: 50px 16px 0; position: relative; z-index: 2; }
 .barra-su h2 { margin: 0; font: 600 17px var(--sans); }
@@ -178,10 +179,25 @@ header .icona.testa.carica { animation: icoCarica .5s ease-out; }
 .anello::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(79,227,255,.25); }
 .anello::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--ciano); animation: gira 3s linear infinite; }
 .anello svg { width: 17px; height: 17px; }
+.pannello.olo-p, .olo-box { position: relative; } .pannello.olo-p::after, .olo-box::after { content: ""; position: absolute; inset: -1px; pointer-events: none; border-radius: inherit; background:
+  linear-gradient(var(--ciano), var(--ciano)) top left / 18px 2px no-repeat, linear-gradient(var(--ciano), var(--ciano)) top left / 2px 18px no-repeat,
+  linear-gradient(var(--ciano), var(--ciano)) top right / 18px 2px no-repeat, linear-gradient(var(--ciano), var(--ciano)) top right / 2px 18px no-repeat,
+  linear-gradient(var(--ciano), var(--ciano)) bottom left / 18px 2px no-repeat, linear-gradient(var(--ciano), var(--ciano)) bottom left / 2px 18px no-repeat,
+  linear-gradient(var(--ciano), var(--ciano)) bottom right / 18px 2px no-repeat, linear-gradient(var(--ciano), var(--ciano)) bottom right / 2px 18px no-repeat; filter: drop-shadow(0 0 4px rgba(79,227,255,.7)); }
+.in-lati { display: flex; gap: 10px; align-items: center; } .in-lato { flex: 1; display: grid; justify-items: center; gap: 4px; padding: 10px 0; border-radius: 12px; background: rgba(79,227,255,.05); border: 1px solid rgba(79,227,255,.25); }
+.in-lato.on { background: rgba(79,227,255,.18); } .in-lato b { font-size: 28px; } .in-lato small { font: 600 8px var(--mono); letter-spacing: 1.5px; color: var(--tenue); }
+.in-stato { text-align: center; font: 700 11px var(--mono); letter-spacing: 3px; color: #ff9f43; } .in-msg { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(79,227,255,.35); font-size: 14px; color: #fff; display: grid; gap: 3px; } .in-msg.altro { border-color: rgba(255,159,67,.4); } .in-msg small { color: var(--tenue); font-size: 12px; }
+.in-lingue { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .in-lingue .comando { text-transform: none; }
+.cf-area { min-height: 160px; border-radius: 12px; border: 1px solid rgba(79,227,255,.35); background: rgba(79,227,255,.05); padding: 10px; font-size: 14px; color: var(--tenue); }
+
+.testata b.marchio-j { font: 700 16px var(--mono); letter-spacing: 4px; color: var(--ciano); }   /* JARVIS Music */
 .sd-su > .anello, .sc-su > .anello { flex: none; display: grid; }
 .sd-su { gap: 6px !important; } .sd-su > div:not(.anello) { min-width: 0; } .sd-su .sd-arch { font-size: 8px !important; letter-spacing: 1px !important; padding-left: 7px !important; padding-right: 7px !important; gap: 4px !important; } .sd-su .sd-arch svg { width: 12px; height: 12px; } .sd-su .sd-chiudi, .sd-su .sd-arch { flex: none; }   /* con l'icona, ARCHIVIO e «Chiudi» stanno sulla riga */   /* Studio e Social: l'icona animata come tutte le sezioni */
+.al-su .se-testa { display: flex !important; flex-direction: row !important; align-items: center; gap: 14px; } .al-su .se-testa > div:last-child { display: grid; gap: 2px; } .al-su .se-testa .se-ora { display: block; margin-top: 2px; }
+.se-testa b { font: 700 17px var(--mono) !important; letter-spacing: 3px !important; } .se-testa small { font: 600 9px var(--mono) !important; letter-spacing: 2px !important; }   /* 10.0 (12): testate uguali in tutte le sezioni */
+.se-testa .anello { color: inherit; box-shadow: 0 0 18px currentColor; } .se-testa .anello::before { border-color: currentColor; opacity: .3; } .se-testa .anello::after { border-top-color: currentColor; } .se-testa b { color: inherit; }
 @keyframes gira { to { transform: rotate(360deg); } }
-.testata b { display: block; font: 700 22px var(--mono); letter-spacing: 3px; color: #fff; }
+.testata b { display: block; font: 700 17px var(--mono); letter-spacing: 3px; color: #fff; }   /* 10.0 (12): nome della sezione più piccolo */
 .testata small { font: 600 9px var(--mono); letter-spacing: 2px; color: var(--ciano); text-transform: uppercase; }
 .pannello { background: var(--pannello); border: 1px solid var(--bordo); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
 .pannello h3 { margin: 0; font: 700 10px var(--mono); letter-spacing: 2px; color: var(--ciano); }
@@ -720,7 +736,7 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 /* ══ STUDIO (build 32, rifatto il 25 ott sera): il piano olografico fisso al centro, la creazione a voce lì sopra ══ */
 .sd { background: var(--fondo); }
 .sd-su { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 6px; color: var(--ciano); z-index: 2; }
-.sd-su > div { flex: 1; display: grid; } .sd-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sd-su small { font: 500 9px var(--mono); letter-spacing: 2px; opacity: .75; }
+.sd-su > div { flex: 1; display: grid; } .sd-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sd-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; text-shadow: 0 0 8px rgba(0,229,255,.55); }   /* 27 ott: diciture più marcate */
 .sd-arch { display: flex; align-items: center; gap: 5px; height: 28px; margin-top: 3px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(79,227,255,.4); background: rgba(2,6,10,.6); color: var(--ciano); font: 700 9px var(--mono); letter-spacing: 1.2px; cursor: pointer; white-space: nowrap; }
 .sd-arch svg { width: 14px; height: 14px; }
 .sd-foglio .testa .sd-arch-ico { flex: 0 0 54px; display: grid; }
@@ -805,10 +821,14 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd-salva-nome { display: grid; gap: 6px; } .sd-salva-nome span { font: 700 9px var(--mono); letter-spacing: 1.6px; color: rgba(79,227,255,.7); }
 .sd-salva-nome input { height: 42px; border-radius: 12px; border: 1px solid rgba(79,227,255,.5); background: rgba(2,8,12,.8); color: #e6f4f8; font: 600 15px var(--sans); padding: 0 12px; outline: none; }
 /* BROWSER: lo stesso dell'app, in ologramma. Viola in incognito, ciano in normale (come accento nell'app) */
-.bp { --acc: 191,140,255; background: radial-gradient(ellipse at 50% 0%, rgba(var(--acc),.1), transparent 55%), var(--fondo); color: rgb(var(--acc)); transition: background .4s; }
+.bp { --acc: 13,92,112; background: radial-gradient(ellipse at 50% 0%, rgba(var(--acc),.1), transparent 55%), var(--fondo); color: rgb(var(--acc)); transition: background .4s; }
 .bp.normale { --acc: 79,227,255; }
 .bp.cambia .bp-pagina { animation: bpCambia .6s; } @keyframes bpCambia { 30% { filter: brightness(1.8) hue-rotate(40deg); opacity: .6; } }
-.bp-su { display: flex; align-items: center; gap: 8px; padding: 50px 10px 8px; }
+.bp-su { display: flex; align-items: center; gap: 8px; padding: 6px 16px 8px; } .bp-su .bp-x { display: none; } .bp-su .bp-tipo[data-tipo="foto"] { display: none; }   /* come l'app: solo VIDEO (YouTube) */
+.bp-testa { display: flex; align-items: center; gap: 14px; padding: 52px 16px 0; } .bp-testa > div:not(.anello) { flex: 1; display: grid; gap: 2px; }
+.bp-testa b { font: 700 17px var(--mono); letter-spacing: 3px; color: #fff; } .bp:not(.normale) .bp-testa b { color: rgb(var(--acc)); } .bp-testa small { font: 600 9px var(--mono); letter-spacing: 2px; color: rgb(var(--acc)); opacity: .8; }
+.bp-testa .anello { color: rgb(var(--acc)); box-shadow: 0 0 18px rgba(var(--acc),.3); } .bp-testa .anello::after { border-top-color: rgb(var(--acc)); } .bp-testa .chiudi { color: rgb(var(--acc)); margin-left: 0; }
+.bp-pagina { margin-left: 16px !important; margin-right: 16px !important; }
 .bp-x { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; background: none; color: rgb(var(--acc)); cursor: pointer; } .bp-x svg { width: 19px; height: 19px; stroke-width: 2.2; }
 .bp-barra { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 10px; border-radius: 10px; background: rgba(var(--acc),.1); border: .8px solid rgba(var(--acc),.4); box-shadow: 0 0 14px rgba(var(--acc),.12), inset 0 0 10px rgba(var(--acc),.06); transition: box-shadow .3s; }
 .bp-barra:focus-within { box-shadow: 0 0 22px rgba(var(--acc),.35), inset 0 0 12px rgba(var(--acc),.12); }
@@ -847,7 +867,8 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .bp-cr b { font: 500 15px var(--sans); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .bp-cr small { font: 11px var(--mono); color: #9fb3b9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bp-f-canc { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px 26px; } .bp-f-canc span { font: 700 9px var(--mono); letter-spacing: 1.6px; color: #ff6b6b; width: 100%; } .bp-f-canc .chip { color: #ff8a8a; border-color: rgba(255,107,107,.45); font-size: 10px; }
 .bp-cop { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; align-content: center; gap: 16px; background: var(--fondo); color: rgb(var(--acc)); transition: opacity .4s; }
-.bp-cop.via { opacity: 0; } .bp-cop-ico svg { width: 60px; height: 60px; filter: drop-shadow(0 0 10px rgba(var(--acc),.6)); } .bp-cop b { font: 600 13px var(--mono); letter-spacing: 4px; }
+.bp-cop.via { opacity: 0; }
+.allen.bp > .bp-cop { position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; height: auto !important; }   /* 10.0 (12): la copertura Face ID copre tutta la pagina mentre sblocca */ .bp-cop-ico svg { width: 60px; height: 60px; filter: drop-shadow(0 0 10px rgba(var(--acc),.6)); } .bp-cop b { font: 600 13px var(--mono); letter-spacing: 4px; }
 .bp-sblocca { display: flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 999px; border: 1px solid rgb(var(--acc)); background: none; color: rgb(var(--acc)); font: 600 15px var(--sans); cursor: pointer; } .bp-sblocca svg { width: 18px; height: 18px; }
 .bp-cop.scan .bp-cop-ico svg { animation: bpViso .55s ease-in-out infinite alternate; } @keyframes bpViso { to { transform: scale(1.12); filter: drop-shadow(0 0 18px rgba(var(--acc),.9)); } }
 .bp-cop.ok .bp-cop-ico svg { color: #46e8a0; filter: drop-shadow(0 0 16px rgba(70,232,160,.8)); }
@@ -856,7 +877,7 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 /* SOCIAL */
 .sc { background: radial-gradient(ellipse at 50% 0%, rgba(79,227,255,.1), transparent 55%), var(--fondo); color: var(--ciano); }
 .sc canvas { position: relative; inset: auto; }
-.sc-su { display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 4px; } .sc-su > div { flex: 1; display: grid; } .sc-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sc-su small { font: 500 9px var(--mono); letter-spacing: 2px; opacity: .75; }
+.sc-su { display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 4px; } .sc-su > div { flex: 1; display: grid; } .sc-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sc-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; text-shadow: 0 0 8px rgba(0,229,255,.55); }   /* 27 ott: diciture più marcate */
 .sc-chiudi { background: none; border: 0; color: var(--ciano); font: 600 16px var(--sans); cursor: pointer; padding: 6px 0 6px 10px; }
 .sc-conto { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; margin: 8px 16px 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(79,227,255,.25); background: rgba(10,31,38,.55); }
 .sc-avatar { position: relative; width: 48px; height: 48px; display: grid; place-items: center; } .sc-avatar i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; background: conic-gradient(from 0deg, rgba(79,227,255,.1), var(--ciano), rgba(79,227,255,.1)) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: bwGira 4s linear infinite; }
@@ -1249,9 +1270,9 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
   </div>
   <div class="vuota" id="vuota" hidden></div>
 
-  <div class="foglio" id="impostazioni">
-    <div class="barra-su"><b class="titolo-nav">Impostazioni</b><button class="chiudi" id="chiudiImpo" type="button">Fatto</button></div>
-    <div class="impo"><div><h5 class="testa-i">ACCESSO</h5><div class="gruppo"><div class="riga-i"><span class="segreto">••••••••••</span></div></div><div class=piede>La stessa impostata come JARVIS_TOKEN su Supabase. Resta nel portachiavi dell'iPhone.</div></div><div><h5 class="testa-i">VOCE DI JARVIS</h5><div class="gruppo"><label class="riga-i"><span>Voce di JARVIS (cloud)</span><input type="checkbox" checked><i></i></label><div class="riga-i"><span>Voce cloud</span><em>Predefinita ›</em></div></div><div class=piede>Voce neurale ElevenLabs, generata dal cervello. Se il cloud non risponde, JARVIS usa la voce dell'iPhone qui sotto.</div></div><div><h5 class="testa-i">VOCE DELL'IPHONE</h5><div class="gruppo"><div class="riga-i"><span>Voce</span><em>Automatica (la migliore installata) ›</em></div><label class="riga-i"><span>Silenzioso (solo testo)</span><input type="checkbox"><i></i></label><label class="riga-i"><span>In ascolto appena si apre</span><input type="checkbox" checked><i></i></label><button class="riga-i blu" type="button">Prova la voce</button></div></div><div><h5 class="testa-i">ALLA STARK</h5><div class="gruppo"><label class="riga-i"><span>Interruzione a voce</span><input type="checkbox" checked><i></i></label><label class="riga-i"><span>Richiamo «Jarvis» senza toccare</span><input type="checkbox" checked id="impRichiamo"><i></i></label><div id="impRich"><label class="riga-i"><span>Risponde a qualsiasi frase (non solo «Jarvis»)</span><input type="checkbox" checked><i></i></label><label class="riga-i"><span>Due battiti di mani per chiamarlo</span><input type="checkbox" checked><i></i></label></div><div class="riga-i"><span>La mia voce</span><em> ›</em></div><label class="riga-i"><span>Suoni dell'interfaccia</span><input type="checkbox" checked id="impSuoni"><i></i></label><div id="impSuono"><div class="riga-i"><span>Suono delle icone all'avvio</span><em>HUD (tick digitali) ›</em></div></div></div><div class=piede>Con l'interruzione a voce, mentre JARVIS parla basta dire «Jarvis», «basta» o «aspetta» per zittirlo e prendere la parola. L'iPhone tiene acceso il microfono mentre lui parla; se la voce le sembra meno piena, la spenga. Con il richiamo, quando JARVIS è in attesa e l'app è aperta basta dire «Jarvis, …»: le altre voci vengono ignorate. Il microfono resta acceso, quindi consuma un po' più di batteria.</div></div><div><h5 class="testa-i">CERVELLO</h5><div class="gruppo"><div class="riga-i mono-i">https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis</div></div><div class=piede>Le voci Premium si scaricano da Impostazioni › Accessibilità › Contenuti letti › Voci › Italiano.</div></div><div><h5 class="testa-i">SIRI E TASTO AZIONE</h5><div class="gruppo"><div class="riga-i piccola">«Ehi Siri, parla con Jarvis» · «Ehi Siri, buongiorno Jarvis»<small>Tasto Azione: Impostazioni › Tasto Azione › Comando rapido › Jarvis › Parla con Jarvis</small></div></div></div><div><h5 class="testa-i">AUTOMAZIONI</h5><div class="gruppo"><div class="riga-i piccola">Comando rapido «JARVIS invia»: riceve numero e testo e invia SMS o iMessage senza chiedere conferma.<small>Briefing: automazione «Sveglia › Quando viene interrotta» › Briefing di Jarvis.</small><small>Meteo locale fornito da  Meteo.</small></div></div></div><div><div class="gruppo"><button id="nuova" type="button">Nuova conversazione</button></div><div class="piede">Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.</div></div></div>
+  <div class="foglio scheda" id="impostazioni">
+    <div class="barra-su"><b class="titolo-nav"></b><button class="chiudi" id="chiudiImpo" type="button">Chiudi</button></div>
+    <div class="impo"><div class="testata"><div class="anello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></div><div><b>IMPOSTAZIONI</b><small>configurazione nucleo</small></div></div><div><h5 class="testa-i">ACCESSO</h5><div class="gruppo"><div class="riga-i"><span class="segreto">••••••••••</span></div></div><div class=piede>La stessa impostata come JARVIS_TOKEN su Supabase. Resta nel portachiavi dell'iPhone.</div></div><div><h5 class="testa-i">VOCE DI JARVIS</h5><div class="gruppo"><label class="riga-i"><span>Voce di JARVIS (cloud)</span><input type="checkbox" checked><i></i></label><div class="riga-i"><span>Voce cloud</span><em>Predefinita ›</em></div></div><div class=piede>Voce neurale ElevenLabs, generata dal cervello. Se il cloud non risponde, JARVIS usa la voce dell'iPhone qui sotto.</div></div><div><h5 class="testa-i">VOCE DELL'IPHONE</h5><div class="gruppo"><div class="riga-i"><span>Voce</span><em>Automatica (la migliore installata) ›</em></div><label class="riga-i"><span>Silenzioso (solo testo)</span><input type="checkbox"><i></i></label><label class="riga-i"><span>In ascolto appena si apre</span><input type="checkbox" checked><i></i></label><button class="riga-i blu" type="button">Prova la voce</button></div></div><div><h5 class="testa-i">ALLA STARK</h5><div class="gruppo"><label class="riga-i"><span>Interruzione a voce</span><input type="checkbox" checked><i></i></label><label class="riga-i"><span>Richiamo «Jarvis» senza toccare</span><input type="checkbox" checked id="impRichiamo"><i></i></label><div id="impRich"><label class="riga-i"><span>Risponde a qualsiasi frase (non solo «Jarvis»)</span><input type="checkbox" checked><i></i></label><label class="riga-i"><span>Due battiti di mani per chiamarlo</span><input type="checkbox" checked><i></i></label></div><div class="riga-i"><span>La mia voce</span><em> ›</em></div><label class="riga-i"><span>Suoni dell'interfaccia</span><input type="checkbox" checked id="impSuoni"><i></i></label><div id="impSuono"><div class="riga-i"><span>Suono delle icone all'avvio</span><em>HUD (tick digitali) ›</em></div></div></div><div class=piede>Con l'interruzione a voce, mentre JARVIS parla basta dire «Jarvis», «basta» o «aspetta» per zittirlo e prendere la parola. L'iPhone tiene acceso il microfono mentre lui parla; se la voce le sembra meno piena, la spenga. Con il richiamo, quando JARVIS è in attesa e l'app è aperta basta dire «Jarvis, …»: le altre voci vengono ignorate. Il microfono resta acceso, quindi consuma un po' più di batteria.</div></div><div><h5 class="testa-i">CERVELLO</h5><div class="gruppo"><div class="riga-i mono-i">https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis</div></div><div class=piede>Le voci Premium si scaricano da Impostazioni › Accessibilità › Contenuti letti › Voci › Italiano.</div></div><div><h5 class="testa-i">SIRI E TASTO AZIONE</h5><div class="gruppo"><div class="riga-i piccola">«Ehi Siri, parla con Jarvis» · «Ehi Siri, buongiorno Jarvis»<small>Tasto Azione: Impostazioni › Tasto Azione › Comando rapido › Jarvis › Parla con Jarvis</small></div></div></div><div><h5 class="testa-i">AUTOMAZIONI</h5><div class="gruppo"><div class="riga-i piccola">Comando rapido «JARVIS invia»: riceve numero e testo e invia SMS o iMessage senza chiedere conferma.<small>Briefing: automazione «Sveglia › Quando viene interrotta» › Briefing di Jarvis.</small><small>Meteo locale fornito da  Meteo.</small></div></div></div><div><div class="gruppo"><button id="nuova" type="button">Nuova conversazione</button></div><div class="piede">Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.</div></div></div>
   </div>
 
   <div class="foglio scheda" id="sezione">
@@ -1984,7 +2005,17 @@ const CONTENUTI = {
       <div class="mu-fonte">APPLE MUSIC · LOSSLESS</div></div>
     <div class="mu-schede" role="tablist">${["Oggi", "Radio", "Libreria", "Cerca"].map((t, i) => `<button class="chip" type="button" data-mus="${t}" aria-pressed="${!i}">${t.toUpperCase()}</button>`).join("")}</div>
     <div id="muPagina" style="display:grid;gap:14px"></div>`,
-  Ricordi: `<div class="segmenti" role="tablist" id="ricTab">${["Traccia", "Ricordi", "Posti"].map((t) => `<button type="button" data-rt="${t}" aria-pressed="false">${t}</button>`).join("")}</div>
+  Diario: `<div class="pannello olo-p"><h3>STASERA</h3><p>Com'è andata oggi, Sir? Una cosa che le ha fatto piacere e una che le è pesata.</p><button class="comando" type="button" data-pronto>Racconta a voce</button></div>
+    <div class="pannello olo-p"><h3>UMORE · ULTIME PAGINE</h3>${[["lun 26 ott", "sereno, studio produttivo"], ["dom 25 ott", "stanco, serata lunga"], ["sab 24 ott", "carico, build approvata"]].map(([d, t]) => `<div class="r"><span>${t}</span><em>${d}</em></div>`).join("")}</div>
+    <div class="pannello"><h3>A VOCE</h3><p>«Jarvis, diario» · «Jarvis, com'è andata la settimana?»</p></div>`,
+  Confidente: `<p style="margin:0;color:#cfe2e8;font-size:14px;line-height:1.45">Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia.</p>
+    <button class="comando" type="button" data-pronto>Preferisco raccontarlo a voce</button><div class="sez-l">OPPURE INCOLLI LA CONVERSAZIONE</div>
+    <div class="cf-area olo-box">Su WhatsApp: tenga premuto un messaggio › Copia, poi incolli qui.</div><button class="comando" type="button" data-pronto>Chieda a JARVIS</button>`,
+  Interprete: `<div id="inScelta"><div class="pannello olo-p"><h3>LINGUA</h3><div class="in-lingue">${[["🇬🇧", "Inglese"], ["🇪🇸", "Spagnolo"], ["🇫🇷", "Francese"], ["🇩🇪", "Tedesco"], ["🇧🇷", "Portoghese"], ["🇨🇳", "Cinese"], ["🇯🇵", "Giapponese"], ["🇸🇦", "Arabo"]].map(([b, n]) => `<button class="comando" type="button" data-lingua="${b}|${n}">${b} ${n.toUpperCase()}</button>`).join("")}</div></div></div>
+    <div id="inVivo" hidden><div class="in-lati"><div class="in-lato on"><b>🇮🇹</b><small>LEI</small></div><span style="color:var(--tenue)">⇄</span><div class="in-lato" id="inAltro"><b>🇬🇧</b><small>L'ALTRO</small></div></div>
+    <div class="in-stato">PRONTO · TOCCHI «ASCOLTA ME»</div><div class="pannello olo-p"><div class="in-msg"><span>Buonasera, un tavolo per due?</span><small>Good evening, a table for two?</small></div><div class="in-msg altro"><span>Of course, follow me please.</span><small>Certo, mi segua prego.</small></div></div>
+    <div class="comandi"><button class="comando" type="button" data-pronto>Ascolta me</button><button class="comando" type="button" data-pronto id="inAscolta">Ascolta 🇬🇧</button></div></div>`,
+  Ricordi: `<div class="mu-schede" role="tablist" id="ricTab">${["Traccia", "Ricordi", "Posti"].map((t) => `<button type="button" class="chip" data-rt="${t}" aria-pressed="false">${t.toUpperCase()}</button>`).join("")}</div>
     <div id="tabTraccia" class="tab-r" hidden><div class="pannello"><h3>TRACCIA</h3><div id="arAvviso"></div><div class="ar"><canvas width="720" height="520" id="arAuto"></canvas></div>
       <div class="r">Luogo<em id="arLuogo">—</em></div><div class="r">Salvato<em id="arQuando">—</em></div><div class="r">Distanza<em id="arDist">—</em></div><div class="r">A piedi<em id="arPiedi">—</em></div>
       <div class="comandi"><button class="comando" type="button" id="arGuida">Guida</button><button class="comando" type="button" id="arLuoghi">Luoghi</button><button class="comando" type="button" id="arSalva">Salva</button></div></div>
@@ -2055,9 +2086,12 @@ const CONTENUTI = {
         <div class="pannello"><h3>PROMESSE</h3><div class="r">Cena al lago<button class="fatto" type="button" data-pronto>FATTO</button></div></div>`,
   Spesa: `<div class="pannello"><h3>DA COMPRARE</h3><button class="voce" type="button" data-pronto>Latte d'avena<em>2</em></button><button class="voce" type="button" data-pronto>Pane integrale<em>1</em></button><button class="voce" type="button" data-pronto>Caffè in grani<em>1 kg</em></button><button class="voce" type="button" data-pronto>Limoni<em>4</em></button></div>`,
 };
+/* 10.0 (12): i testi di caricamento di ogni sezione (come TestiCaricamento nell'app) */
+const TESTI_CAR = { meteo: "aggancio satelliti meteo", email: "decrittazione posta", messaggi: "sintonizzazione frequenze", diario: "apertura archivio personale", sonno: "lettura cicli notturni", cuore: "sincronizzazione battito", briefing: "compilazione rapporto", spesa: "inventario dispensa", shazam: "scansione spettro sonoro", foto: "scansione galleria", serata: "collegamento sala", telefono: "apertura linea sicura", bea: "protective instinct", github: "sincronizzazione repository", supabase: "interrogazione database", archivio: "recupero file classificati", costi: "calcolo consumi", edith: "attivazione protocolli difesa", scanner: "ottiche in posizione", satellite: "aggancio orbita", sound: "riscaldamento amplificatori", musica: "allineamento canali audio", vitals: "lettura parametri vitali", ricordi: "richiamo memoria", confidente: "canale riservato", wiretap: "microfoni in ascolto", interprete: "caricamento dizionari", trainer: "calibrazione scheletro", occhi: "sistemi ottici in linea", cucina: "analisi ingredienti", lidar: "proiezione griglia laser", sentinella: "armamento perimetro", profiler: "riconoscimento soggetto", browser: "connessione cifrata", studio: "proiettori olografici", social: "intercettazione feed" };
+const TC = (n) => TESTI_CAR[String(n).toLowerCase()] || "acquisizione dati";
 function hudScheda(nome, ok) {
   const h = document.createElement("div"); h.className = "hud"; h.style.top = "120px"; h.style.placeItems = "start center";
-  h.innerHTML = `<div class="hud-dentro"><canvas width="400" height="320" style="width:200px;height:160px"></canvas><div class="tacche">${"<i></i>".repeat(24)}</div><div class="perc">0%</div><div class="voci"><div>COLLEGAMENTO AL CERVELLO</div><div>LETTURA SENSORI</div><div>ANALISI</div><div>COMPILAZIONE SCHEDA</div></div></div>`;
+  h.innerHTML = `<div class="hud-dentro"><canvas width="400" height="320" style="width:200px;height:160px"></canvas><div class="tacche">${"<i></i>".repeat(24)}</div><div class="perc">0%</div><div class="voci"><div>${TC(nome).toUpperCase()}</div><div>LETTURA SENSORI</div><div>ANALISI</div><div>COMPILAZIONE SCHEDA</div></div></div>`;
   sezione.appendChild(h); anima(h, ok, nome, true);
   // il mirino del caricamento parte sotto il titolo della sezione (e sotto la barra con Chiudi): mai sopra le scritte
   const metti = () => { if (!h.isConnected) return; const rs = sezione.getBoundingClientRect(), sc = sezione.offsetHeight / (rs.height || 1);
@@ -2075,7 +2109,7 @@ async function allenatore(ok) {
   suona("aScheda"); const h = hudScheda("Trainer", ok);
   const A = document.createElement("div"); A.className = "allen";
   A.innerHTML = `<canvas width="780" height="1688"></canvas>
-    <div class="al-su"><div><b>J.A.R.V.I.S.</b><small>PERSONAL TRAINER</small></div><button type="button" data-al="cam" aria-label="Cambia fotocamera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/></svg></button><button type="button" data-al="x" aria-label="Chiudi">✕</button></div>
+    <div class="al-su"><div class="testata se-testa"><div class="anello">${ICONE.Trainer}</div><div><b>PERSONAL TRAINER</b></div></div><button type="button" data-al="cam" aria-label="Cambia fotocamera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/></svg></button><button type="button" data-al="x" aria-label="Chiudi">✕</button></div>
     <div class="al-dati"><div><b id="alRip">0</b><small>RIPETIZIONI</small></div><div><b id="alSch">—</b><small>SCHIENA</small></div><div><b id="alSim">—</b><small>SIMMETRIA</small></div></div>
     <div class="al-giu"><p class="al-commento" id="alCom">Inquadri tutta la persona, Sir.</p>
       <div class="segmenti al-seg">${["Busto", "Mani", "Ginocchia", "Ologramma"].map((v) => `<button type="button" data-giunto="${v}" aria-pressed="false">${v}</button>`).join("")}</div>
@@ -3589,11 +3623,16 @@ const DOPO = {
       setTimeout(() => notifica(`Ricognizione su ${via}: ${metriL(distSat(L[k]))}, ${piediL(distSat(L[k])).replace("circa ", "")} a piedi. Niente pioggia per 2 ore.`), 1800); });
     scegli(0);
   },
+  Interprete(ok) {   // 10.0 (12): la lingua si sceglie nella scheda di JARVIS (bandierine, niente menu grigio di iOS), poi l'Interprete nel visore
+    if ($("sottoSez")) setTimeout(() => { if ($("sottoSez")) $("sottoSez").textContent = "scelga la lingua"; }, 1100);
+    corpo.querySelectorAll("[data-lingua]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); const [f, n] = b.dataset.lingua.split("|");
+      $("inScelta").hidden = true; $("inVivo").hidden = false; $("inAltro").querySelector("b").textContent = f; $("inAscolta").textContent = "Ascolta " + f;
+      if ($("sottoSez")) $("sottoSez").textContent = n.toLowerCase(); }));
+  },
   Ricordi(ok) {
     // pagina come l'app: titolo in alto, niente testata; si apre sempre su TRACCIA (dall'icona e dalle frasi «traccia/portami/ricorda questo luogo»)
-    corpo.querySelector(".testata")?.remove();
     const inizio = RIC; RIC = { tab: "Traccia" };
-    const tab = (t) => { $("titoloNav").textContent = t; corpo.querySelectorAll("[data-rt]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.rt === t));
+    const tab = (t) => { const tb = corpo.querySelector(".testata b"); if (tb) tb.textContent = t.toUpperCase(); const ts = corpo.querySelector(".testata small"); if (ts) ts.textContent = "seconda memoria"; corpo.querySelectorAll("[data-rt]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.rt === t));
       ["Traccia", "Ricordi", "Posti"].forEach((x) => ($("tab" + x).hidden = x !== t)); if (t === "Traccia") corpo.querySelectorAll(".cerca-r input").forEach((i) => (i.value = "")); };
     corpo.querySelectorAll("[data-rt]").forEach((b) => b.addEventListener("click", () => tab(b.dataset.rt)));
     tab(inizio.tab);
@@ -3638,7 +3677,7 @@ const DOPO = {
       requestAnimationFrame(f); })(performance.now());
   },
   Vitals(ok) {
-    corpo.querySelector(".testata")?.remove(); $("titoloNav").textContent = "Vitals";   // pagina come l'app: titolo in alto, niente testata
+    $("titoloNav").textContent = "";   // 10.0 (12): testata come Satellite e le altre schede (icona animata, VITALS)
     caricaT3(); const c = $("vArm"); const v3 = monta3d(c, { modo: "Armatura", fase: "risultato", ok, soloGiro: true });
     const x = c.getContext("2d"); x.fillStyle = "#4d666f"; x.font = "600 22px JetBrains Mono, monospace"; x.textAlign = "center"; x.fillText("OLOGRAMMA IN CARICAMENTO…", c.width / 2, c.height / 2);
     corpo.querySelectorAll("[data-chiedi-v]").forEach((b) => b.addEventListener("click", () => chiediDaScheda(b.dataset.chiediV, b.dataset.chiediV.startsWith("Come ho") ? "6 ore e 40, Sir: 35 minuti sotto la sua media. Profondo nella norma, è l'addormentarsi tardi che pesa." : "Bene, Sir: 58 a riposo, in linea con la settimana.")));
@@ -3771,15 +3810,16 @@ const DOPO = {
 
 async function apriSezione(nome) {
   const id = ++genSez, ok = () => id === genSez;
-  sezione.querySelectorAll(".hud,.scan,.mirino,.lidar,.allen,.sz-player,.bw-vis,.sc-conferma").forEach((e) => e.remove()); sezione.classList.remove("pieno");
+  sezione.querySelectorAll(".hud,.scan,.mirino,.mirino-testa,.lidar,.allen,.sz-player,.bw-vis,.sc-conferma").forEach((e) => e.remove()); sezione.classList.remove("pieno");
   corpo.hidden = false; corpo.innerHTML = "";
   sezione.classList.add("su"); $("titoloNav").textContent = "";
   const conCamera = !!CAMERA[nome] || nome === "Scanner" || nome === "LiDAR" || nome === "Sentinella";   // X nel cerchio con la fotocamera, «Chiudi» senza
   sezione.classList.toggle("camera", conCamera); $("chiudiSez").textContent = conCamera ? "✕" : "Chiudi"; $("chiudiSez").setAttribute("aria-label", "Chiudi");
+  if (nome === "LiDAR" || nome === "Occhi" || nome === "Cucina") { suona("aScheda"); const h0 = hudScheda(nome, ok); await attesa(1000); if (!ok()) return; sfuma("aScheda"); h0.remove(); }   // 10.0 (12): caricamento come le altre schede
   if (nome === "LiDAR") { if (!B23) { lidar22(ok); return; } modoLidar = "Stanza"; corpoLidar = "Postura"; stileLidar = "pieno"; caricaT3(); modiLidar(ok); return; }   // ogni volta da Interno, in Ologramma
   if (nome === "Scanner") {                                                   // scheda: caricamento, poi il lettore con la fotocamera
     suona("aScheda");
-    corpo.innerHTML = `<div class="testata"><div class="anello">${ICONE.Scanner}</div><div><b>SCANNER</b><small id="sottoSez">acquisizione dati</small></div></div>`;
+    corpo.innerHTML = `<div class="testata"><div class="anello">${ICONE.Scanner}</div><div><b>SCANNER</b><small id="sottoSez">${TC("Scanner")}</small></div></div>`;
     const h = hudScheda("Scanner", ok);
     await attesa(1000); if (!ok()) return;
     sfuma("aScheda");
@@ -3810,16 +3850,20 @@ async function apriSezione(nome) {
     const m = document.createElement("div"); m.className = "mirino";
     m.innerHTML = `<div class="angoli"></div><div class="stato">ACCENSIONE FOTOCAMERA…</div>` + (nome === "Profiler" ? `<button class="scatto" type="button" aria-label="Scatta"></button><div class="lampo"></div>` : "");
     sezione.appendChild(m);
+    { const hd = document.createElement("div"); hd.className = "testata se-testa mirino-testa"; hd.style.cssText = "padding:0 16px;color:var(--ciano)";   // 10.0 (12): testata con l'icona animata, come le altre sezioni
+      hd.innerHTML = `<div class="anello">${ICONE[nome]}</div><div><b>${nome.toUpperCase()}</b><small>${TC(nome).toUpperCase()}</small></div>`; sezione.insertBefore(hd, m); }
     const sc = m.querySelector(".scatto");
     if (sc) sc.addEventListener("click", () => { m.querySelector(".lampo").animate([{ opacity: .8 }, { opacity: 0 }], { duration: 260 }); suona("aPronto"); m.querySelector(".stato").textContent = "FOTO ACQUISITA · ANALISI"; });
     await attesa(700); if (!ok()) return;
     suona("aCamera");                                           // sezioni con fotocamera: «aperturacamera»
     m.classList.add("pronto"); m.querySelector(".stato").textContent = CAMERA[nome];
+    setTimeout(() => { const st = ok() && sezione.querySelector(".mirino-testa small"); if (st) st.textContent = nome === "Cucina" ? "RICETTE" : nome === "Occhi" ? "MANUALE" : "SOGGETTO"; }, 1300);   // 27 ott: la scritta di caricamento scorre via, arriva il modo e resta
     return;
   }
   const propria = false;                                          // Bea e Spesa: stessi suoni di tutte le altre schede
   suona("aScheda");
-  corpo.innerHTML = `<div class="testata"><div class="anello">${ICONE[nome]}</div><div><b>${nome.toUpperCase()}</b><small id="sottoSez">acquisizione dati</small></div></div>`;
+  corpo.innerHTML = `<div class="testata"><div class="anello">${ICONE[nome]}</div><div><b${nome === "Musica" ? ' class="marchio-j"' : ""}>${nome === "Musica" ? "J.A.R.V.I.S." : nome.toUpperCase()}</b><small id="sottoSez">${TC(nome)}</small></div>${nome === "Musica" ? '<button type="button" class="chiudi" data-chiudi-m>Chiudi</button>' : ""}</div>`;   // JARVIS Music: testata come Studio e Social, «Chiudi» sulla stessa riga
+  if (nome === "Musica") { sezione.classList.add("pieno"); corpo.querySelector("[data-chiudi-m]").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); }); }
   const resto = document.createElement("div"); resto.style.cssText = "display:grid;gap:16px;visibility:hidden";
   resto.innerHTML = CONTENUTI[nome] ?? `<div class="pannello"><h3>${nome.toUpperCase()}</h3><p>Contenuto di esempio della sezione.</p></div>`;
   corpo.appendChild(resto);
@@ -3833,10 +3877,10 @@ async function apriSezione(nome) {
   resto.querySelectorAll("[data-edith]").forEach((b) => b.addEventListener("click", async () => { if (b.disabled) return; suona("aTick"); const t = b.textContent; b.textContent = "…"; b.disabled = true;
     await attesa(b.dataset.edith === "password" ? 500 : 1600); if (!ok()) return; b.textContent = t; b.disabled = false;
     const [cl, ...righe] = ESITI_E[b.dataset.edith]; resto.querySelector(`[data-esito="${b.dataset.edith}"]`).innerHTML = righe.map((r, i) => `<div class="${i ? "" : cl}">${r}</div>`).join(""); }));
-  const h = hudScheda(nome, ok);
+  const h = hudScheda(nome === "Musica" ? "Sound" : nome, ok);
   await attesa(1000); if (!ok()) return;
   h.style.transition = "opacity .25s"; h.style.opacity = 0; setTimeout(() => h.remove(), 260);
-  if ($("sottoSez")) $("sottoSez").textContent = ({ Musica: "Apple Music", Browser: "web · foto · video", Shazam: "ShazamKit · Apple Music", EDITH: "Sistema di Difesa e Riconoscimento", Meteo: "Milano · Isola", Email: "apro la casella iCloud", Telefono: "tastiera", GitHub: "3 repository", Supabase: "discosizer serate · active_healthy", Archivio: "12 file · 4 cartelle", Costi: "mese ottobre · stima dai token", Studio: "disegno · voce · scansione", Travel: "verso Bea · entro le 20:00" })[nome] ?? "pronta"; resto.style.visibility = "visible";   // come il sottotitolo della scheda nell'app
+  if ($("sottoSez")) $("sottoSez").textContent = ({ Musica: "sound · apple music", Browser: "web · foto · video", Shazam: "ShazamKit · Apple Music", EDITH: "Sistema di Difesa e Riconoscimento", Meteo: "Milano · Isola", Email: "apro la casella iCloud", Telefono: "tastiera", GitHub: "3 repository", Supabase: "discosizer serate · active_healthy", Archivio: "12 file · 4 cartelle", Costi: "mese ottobre · stima dai token", Studio: "disegno · voce · scansione", Travel: "verso Bea · entro le 20:00" })[nome] ?? "pronta"; resto.style.visibility = "visible";   // come il sottotitolo della scheda nell'app
   if (propria) { sfuma("aApertura"); return; }                    // Bea e Spesa: il suono d'apertura sfuma e basta
   sfuma("aScheda"); suona("aPronta");
   if (riduci) return;
@@ -4897,7 +4941,7 @@ async function sentinella(ok) {
   const A = document.createElement("div"); A.className = "allen sentinella";
   const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">${d}</svg>`;
   A.innerHTML = `<canvas class="olo-cv"></canvas>
-    <div class="al-su"><div><b>SENTINELLA</b><small>SORVEGLIANZA ATTIVA</small><span class="se-ora" id="seOra"></span></div>
+    <div class="al-su"><div class="testata se-testa"><div class="anello">${ICONE.Sentinella}</div><div><b>SENTINELLA</b><small>SORVEGLIANZA ATTIVA</small><span class="se-ora" id="seOra"></span></div></div>
       <button type="button" data-se="reg" aria-label="Registro">${ico('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>')}</button>
       <button type="button" data-se="nero" aria-label="Schermo nero">${ico('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="currentColor"/>')}</button>
       <button type="button" data-se="x" aria-label="Disattiva la sentinella">✕</button></div>
@@ -4968,7 +5012,7 @@ async function occhi(ok) {
   corpo.hidden = true; sezione.classList.add("pieno");
   const A = document.createElement("div"); A.className = "allen occhi";
   A.innerHTML = `<div class="al-3d"></div>
-    <div class="al-su"><div><b>J.A.R.V.I.S.</b><small>OCCHI · MANUALE</small><div class="oc-info" id="ocInfo" aria-live="polite"></div></div><button type="button" data-oc="x" aria-label="Chiudi">✕</button></div>
+    <div class="al-su"><div class="testata se-testa"><div class="anello">${ICONE.Occhi}</div><div><b>OCCHI</b><small>${TC("Occhi").toUpperCase()}</small><div class="oc-info" id="ocInfo" aria-live="polite"></div></div></div><button type="button" data-oc="x" aria-label="Chiudi">✕</button></div>
     <div class="oc-giu"><div class="oc-comandi">
       <button type="button" class="oc-ico" data-oc="eti" aria-pressed="false" aria-label="Etichette"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 4.5V11l9.5 9.5 8-8L11 3H4.5A1.5 1.5 0 0 0 3 4.5z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg></i>ETICHETTE</button>
       <button type="button" class="oc-ico" data-oc="olo" aria-pressed="false" aria-label="Ologramma"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></i>OLOGRAMMA</button>
@@ -4978,6 +5022,7 @@ async function occhi(ok) {
       <div class="oc-tasti"><button type="button" class="oc-gira" data-oc="gira" aria-label="Selfie"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/></svg></button>
         <button type="button" class="oc-scatto" data-oc="scatta" aria-label="Scatta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button type="button" class="oc-rec" data-oc="rec" aria-label="Giro di cinque secondi">REC</button></div></div><div class="oc-lampo"></div>`;
+  setTimeout(() => { const st = ok() && document.querySelector(".al-su .se-testa small"); if (st) st.textContent = "MANUALE"; }, 1300);   // 27 ott: la scritta di caricamento scorre via, arriva il modo e resta
   A.style.opacity = 0; sezione.appendChild(A);
   // deciso dal signore (24 ott): all'apertura niente selezionato, ETICHETTE e OLOGRAMMA li accende lui (o a voce)
   let frontale = false, zoom = 1, occupato = false, vivo = null, nomeScena = "", olo = false, eti = false; window.OCCHI_AEREO_ON = false;
@@ -5585,10 +5630,11 @@ function social(ok) {
   const DIDA = ["Uscito ora dal banco olografico di JARVIS: progettato in 3D, stampato in PLA. Dite la vostra 👇\n\n#3dprinting #kingrusto #design #madeinitaly",
     "Dal muro allo Studio: lo stencil diventa un pezzo vero. Chi lo vuole? Commentate LISTA.\n\n#kingrusto #graffiti #customdenim #3dprint",
     "Nuovo drop in arrivo. Questo è il prototipo: ditemi colore e misura.\n\n#kingrusto #streetart #drop"];
-  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>J.A.R.V.I.S.</b><small>SOCIAL · @KINGRUSTO</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>J.A.R.V.I.S.</b><small data-sc-sotto>${TC("Social").toUpperCase()}</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
     <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["griglia", "GRIGLIA"], ["piano", "PIANO"], ["report", "REPORT"], ["orari", "ORARI"], ["rivali", "RIVALI"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
+  setTimeout(() => { const st = A.querySelector("[data-sc-sotto]"); if (st && A.isConnected) st.textContent = "SOCIAL · @KINGRUSTO"; }, 1300);   // 27 ott: la parola di caricamento scorre via, arriva la dicitura
   sezione.appendChild(A);
   const P = A.querySelector("#scPagina"), $s = (q) => A.querySelector(q);
   A.querySelector(".sc-chiudi").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); });
@@ -5790,7 +5836,7 @@ function browser(ok) {
   const A = document.createElement("div"); A.className = "allen bp"; let storia = [], pos = -1, carica = 0, sbloccato = !BP.faceid;
   const fonti = ["it.wikipedia.org", "www.ilpost.it", "www.dezeen.com", "www.repubblica.it", "www.theverge.com", "www.designboom.com", "www.apple.com", "www.reddit.com"];
   const canali = ["Stark Industries Labs", "Marques Brownlee", "Hypebeast", "Boiler Room", "Red Bull Music", "Vox", "Il Post", "Kurzgesagt"];
-  A.innerHTML = `<div class="bp-su"><button type="button" class="bp-x" aria-label="Chiudi il browser">${BP_ICO.x}</button>
+  A.innerHTML = `<div class="bp-testa"><div class="anello">${ICONE.Browser}</div><div><b>BROWSER</b><small data-bp-sotto>WEB</small></div><button type="button" class="chiudi" data-bp-chiudi>Chiudi</button></div><div class="bp-su"><button type="button" class="bp-x" aria-label="Chiudi il browser">${BP_ICO.x}</button>
       <form class="bp-barra"><i data-bp="scudo"></i><input id="bpQ" enterkeyhint="go" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Indirizzo o ricerca"><b class="bp-gira" hidden></b></form>
       <button type="button" class="bp-tipo" data-tipo="foto" aria-label="Cerca foto">${BP_ICO.foto}</button><button type="button" class="bp-tipo" data-tipo="video" aria-label="Cerca video">${BP_ICO.video}</button></div>
     <div class="bp-linea"><i></i></div>
@@ -5801,7 +5847,7 @@ function browser(ok) {
       <button type="button" data-bn="incognito" class="bp-inc"><span></span><small></small></button><button type="button" data-bn="faceid"></button></div>`;
   sezione.appendChild(A);
   const $b = (q) => A.querySelector(q), dentro = $b("#bpDentro"), inp = $b("#bpQ");
-  const tema = () => { A.classList.toggle("normale", !BP.incognito); $b('[data-bp="scudo"]').innerHTML = BP.incognito ? BP_ICO.occhiali : BP_ICO.scudo;
+  const tema = () => { A.classList.toggle("normale", !BP.incognito); const so = A.querySelector("[data-bp-sotto]"); if (so) so.textContent = BP.incognito ? "INCOGNITO" : "WEB"; $b('[data-bp="scudo"]').innerHTML = BP.incognito ? BP_ICO.occhiali : BP_ICO.scudo;
     inp.placeholder = BP.incognito ? "Incognito: cerchi o scriva un indirizzo" : "Cerchi o scriva un indirizzo";
     const t = $b('[data-bn="incognito"]'); t.querySelector("span").innerHTML = BP.incognito ? BP_ICO.occhiali : BP_ICO.occhio; t.querySelector("small").textContent = BP.incognito ? "INCOGNITO" : "NORMALE";
     t.setAttribute("aria-label", BP.incognito ? "Navigazione in incognito: tocchi per la normale" : "Navigazione normale: tocchi per l'incognito");
@@ -5829,7 +5875,7 @@ function browser(ok) {
   }
   // la pagina vuota: un globo olografico che gira (il simbolo del Browser), lento
   function globo(cv) { const x = cv.getContext("2d"), W = cv.width, c = W / 2, R = W * .36;
-    (function f(ts) { if (!cv.isConnected || !ok()) return; const t = ts / 1000, col = BP.incognito ? "191,140,255" : "79,227,255"; x.clearRect(0, 0, W, W); x.lineWidth = 1.4;
+    (function f(ts) { if (!cv.isConnected || !ok()) return; const t = ts / 1000, col = BP.incognito ? "13,92,112" : "79,227,255"; x.clearRect(0, 0, W, W); x.lineWidth = 1.4;
       x.strokeStyle = `rgba(${col},.55)`; x.beginPath(); x.arc(c, c, R, 0, 7); x.stroke();
       for (let k = 0; k < 6; k++) { const a = (k / 6 * Math.PI + t * .35) % Math.PI, rx = Math.abs(Math.cos(a)) * R; x.strokeStyle = `rgba(${col},${.15 + .35 * Math.abs(Math.cos(a))})`; x.beginPath(); x.ellipse(c, c, rx, R, 0, 0, 7); x.stroke(); }
       for (let k = -2; k <= 2; k++) { const y = c + k * R * .38, rr = Math.sqrt(Math.max(0, R * R - (y - c) ** 2)); x.strokeStyle = `rgba(${col},.3)`; x.beginPath(); x.ellipse(c, y, rr, rr * .18, 0, 0, 7); x.stroke(); }
@@ -5843,6 +5889,7 @@ function browser(ok) {
   A.querySelectorAll("[data-tipo]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); const cur = storia[pos], q = (inp.value && inp.value !== cur?.url ? inp.value : cur?.q) || "";
     if (!q.trim()) { inp.focus(); parlaMock(b.dataset.tipo === "foto" ? "Che foto cerco, Sir? Scriva e tocchi di nuovo FOTO, o dica «Jarvis, cercami le foto di…»." : "Che video cerco, Sir? Scriva e tocchi di nuovo VIDEO.", 2800); return; } vai(q, b.dataset.tipo); }));
   $b(".bp-x").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); });
+  $b("[data-bp-chiudi]").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); });
   $b(".bp-giu").addEventListener("click", (e) => { const b = e.target.closest("[data-bn]"); if (!b) return; suona("aTick"); const k = b.dataset.bn;
     if (k === "indietro") { if (pos <= 0) { parlaMock("Non c'è una pagina prima, Sir.", 1600); return; } pos--; mostra(storia[pos]); }
     if (k === "avanti") { if (pos >= storia.length - 1) { parlaMock("Non c'è una pagina dopo, Sir.", 1600); return; } pos++; mostra(storia[pos]); }
@@ -5894,12 +5941,12 @@ function browser(ok) {
   function copertura() {
     const C = document.createElement("div"); C.className = "bp-cop"; C.innerHTML = `<div class="bp-cop-ico">${BP_ICO.scudo}</div><b>BROWSER PRIVATO</b><small data-c="err"></small><button type="button" class="bp-sblocca">${BP_ICO.faceid}Sblocca</button><button type="button" class="bp-cop-chiudi">Chiudi</button>`;
     A.appendChild(C);
-    const sblocca = async () => { suona("aTick"); C.classList.add("scan"); C.querySelector(".bp-sblocca").disabled = true; await attesa(1100); if (!ok()) return; suona("aPronto"); C.classList.add("ok"); await attesa(450); sbloccato = true; C.classList.add("via"); setTimeout(() => C.remove(), 400); inp.focus(); };
+    const sblocca = async () => { suona("aTick"); C.classList.add("scan"); C.querySelector(".bp-sblocca").disabled = true; await attesa(1100); if (!ok()) return; suona("aPronto"); C.classList.add("ok"); await attesa(450); sbloccato = true; C.classList.add("via"); setTimeout(() => C.remove(), 400); };   // 10.0 (12): niente tastiera all'apertura, come l'app
     C.querySelector(".bp-sblocca").addEventListener("click", sblocca); C.querySelector(".bp-cop-chiudi").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); });
     setTimeout(() => ok() && C.isConnected && !C.classList.contains("scan") && sblocca(), 700);
   }
   tema(); mostra({ tipo: "vuota" }, true);
-  if (BP.faceid && !sbloccato) copertura(); else setTimeout(() => inp.focus(), 300);
+  if (BP.faceid && !sbloccato) copertura();   // 10.0 (12): niente tastiera all'apertura
   if (window.BROWSER_DA) { const d = window.BROWSER_DA; window.BROWSER_DA = null; inp.value = d.q; vai(d.q, d.modo === "web" ? null : d.modo); }
 }
 function shazam(ok) {
@@ -6123,7 +6170,7 @@ function studio(ok) {
   corpo.hidden = true; sezione.classList.add("pieno");
   const A = document.createElement("div"); A.className = "allen sd";
   const rail = (lista) => lista.map(([k, n]) => `<button type="button" data-sdt="${k}" aria-pressed="false" aria-label="${n}"><i>${SD_ICO[k]}</i>${n}</button>`).join("");
-  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>J.A.R.V.I.S.</b><small data-sd="prog">STUDIO · BANCO OLOGRAFICO</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>J.A.R.V.I.S.</b><small data-sd="prog">${TC("Studio").toUpperCase()}</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
     <div class="sd-vista"><div class="sd-modi">${[["solido", "SOLIDO"], ["reticolo", "WIREFRAME"], ["raggi", "RAGGI X"]].map(([k, n], i) => `<button type="button" data-sdv="${k}" aria-pressed="${!i}">${n}</button>`).join("")}<button type="button" data-sdg aria-pressed="true">SNAP 5</button></div>
       <div class="sd-storia"><button type="button" data-sda="annulla" aria-label="Annulla" class="spento">${SD_ICO.annulla}</button><button type="button" data-sda="ripeti" aria-label="Ripeti" class="spento">${SD_ICO.ripeti}</button></div></div>
     <div class="sd-banco"><div class="sd-angoli"></div>
@@ -6139,6 +6186,7 @@ function studio(ok) {
     <div class="sd-dock"><div class="sd-fonti">${[["disegna", "SCHIZZO"], ["foto", "FOTO"], ["carica", "IMPORTA"], ["lidar", "LIDAR"], ["occhi", "OCCHI"]].map(([k, n]) => `<button type="button" data-sdf="${k}">${SD_ICO[k]}${n}</button>`).join("")}</div>
       <div class="sd-azioni"><button type="button" class="pieno spento" data-sdx="stampa">${SD_ICO.stampa}STAMPA 3D</button><button type="button" class="vuoto spento" data-sdx="condividi">${SD_ICO.condividi}CONDIVIDI</button></div></div>
     <input type="file" accept="image/*,.stl" hidden data-sd="file"><input type="file" accept="image/*" capture="environment" hidden data-sd="cam">`;
+  const sdDopo = Date.now() + 1300;   // 27 ott: prima la parola di caricamento, poi il progetto
   A.style.opacity = 0; sezione.appendChild(A);
   const $sd = (k) => A.querySelector(`[data-sd="${k}"]`);
   const vivo = () => ok() && A.isConnected;
@@ -6214,7 +6262,7 @@ function studio(ok) {
   const nomeProg = () => { let n = ARCH.progetti.length + 1; while (ARCH.progetti.some((p) => p.nome === `Progetto ${n}`)) n++; return `Progetto ${n}`; };
   const nuovoRecord = (nome) => { const p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), nome: nome || nomeProg(), creato: Date.now(), data: Date.now(), oggetti: [], num: 0, geo: {} }; ARCH.progetti.unshift(p); ARCH.attivo = p.id; return p; };
   const miniatura = (cb) => { if (!B || !A.isConnected) return cb(null); const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = 160; c.height = Math.round(160 * im.height / im.width) || 120; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", .72)); }; im.onerror = () => cb(null); try { im.src = B.istantanea(); } catch { cb(null); } };
-  const titoloProg = () => { const t = $sd("prog"); if (t) t.textContent = `STUDIO · ${(progAtt()?.nome || "BANCO OLOGRAFICO").toUpperCase()}`; };
+  const titoloProg = () => { if (Date.now() < sdDopo) { setTimeout(titoloProg, sdDopo - Date.now()); return; } const t = $sd("prog"); if (t) t.textContent = `STUDIO · ${(progAtt()?.nome || "BANCO OLOGRAFICO").toUpperCase()}`; };
   function salvaSubito(conMini, esplicito) { clearTimeout(tSalva); if (caricando) return progAtt(); let p = progAtt(); if (!p) { if (!oggetti.length) return null; p = nuovoRecord(); }
     p.oggetti = copia(); p.num = num; p.geo = geoDi(oggetti); p.data = Date.now();
     if (esplicito) { p.copia = { oggetti: p.oggetti, num: p.num, geo: p.geo, data: p.data }; p.modificato = false; }
@@ -8209,4 +8257,24 @@ const DI = B32 ? (function () {
 </script>
 
 
+<script>
+/* 10.0 (12): la scritta sotto il nome della sezione arriva dal lato in trasparenza, sfocata, e si posa nitida (0,35 s, alla Stark);
+   quella di prima resta leggibile almeno 0,7 s, poi esce a sinistra sfumando e arriva la nuova */
+(function(){ const fatta = new WeakMap(), letta = new WeakMap(), voluta = new WeakMap();
+  const scrivi = (el, t) => { el.__mio = t; el.textContent = t; };
+  function arriva(el, fin) { voluta.set(el, fin); const vecchia = fatta.get(el);
+    const resta = vecchia ? Math.max(0, 700 - (performance.now() - (letta.get(el) || -1e9))) : 0;
+    if (vecchia && vecchia !== fin) scrivi(el, vecchia);
+    setTimeout(async () => { if (voluta.get(el) !== fin) return;
+      if (vecchia && vecchia !== fin) { await el.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(60px)" }], { duration: 300, easing: "ease-in", fill: "forwards" }).finished; if (voluta.get(el) !== fin) return; }
+      scrivi(el, fin); fatta.set(el, fin);
+      await el.animate([{ opacity: 0, transform: "translateX(-40px)" }, { opacity: 1, transform: "none" }], { duration: 350, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" }).finished;
+      letta.set(el, performance.now()); }, resta); }
+  new MutationObserver((ms) => { for (const m of ms) {
+    m.addedNodes.forEach((n) => { if (n.nodeType === 1) n.querySelectorAll(".testata small, .se-testa small, .sd-su small, .sc-su small").forEach((t) => { if (t.textContent !== t.__mio) arriva(t, t.textContent); }); });   // anche la prima scritta, all'apertura
+    const el = (m.target.nodeType === 3 ? m.target.parentElement : m.target);
+    const t = el && el.closest && el.closest(".testata small, .se-testa small, .sd-su small, .sc-su small"); if (!t || t.textContent === t.__mio) continue; arriva(t, t.textContent); } })
+    .observe(document.body, { subtree: true, childList: true, characterData: true });
+})();
+</script>
 </body></html>

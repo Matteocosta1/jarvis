@@ -152,8 +152,9 @@ struct TestataScheda: View {
                 }
                 // 27 ott (il signore): la scritta sotto il nome arriva dal lato in trasparenza (TestoCodice)
                 TestoCodice(testo: sottotitolo.uppercased())
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
+                    .font(.system(size: marchio ? 10.5 : 9, weight: marchio ? .bold : .semibold, design: .monospaced)).tracking(2)
                     .foregroundStyle(tinta)
+                    .shadow(color: marchio ? tinta.opacity(0.55) : .clear, radius: 4)   // 27 ott: in Sound (come Studio e Social) la dicitura più marcata
             }
             Spacer(minLength: 0)
         }
@@ -977,13 +978,13 @@ enum TestiCaricamento {
         "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "scansione spettro sonoro",
         "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
         "bea": "protective instinct", "github": "sincronizzazione repository", "supabase": "interrogazione database",
-        "archivio": "accesso al caveau", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
-        "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "allineamento canali audio",
+        "archivio": "recupero file classificati", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
+        "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "riscaldamento amplificatori",
         "vitals": "lettura parametri vitali", "ricordi": "richiamo memoria", "confidente": "canale riservato",
         "wiretap": "microfoni in ascolto", "interprete": "caricamento dizionari", "trainer": "calibrazione scheletro",
         "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "proiezione griglia laser",
         "sentinella": "armamento perimetro", "profiler": "riconoscimento soggetto", "browser": "connessione cifrata",
-        "studio": "proiettori olografici", "social": "collegamento instagram",
+        "studio": "proiettori olografici", "social": "intercettazione feed",
     ]
     static func di(_ sezione: String) -> String { testi[sezione.lowercased()] ?? "acquisizione dati" }
 }

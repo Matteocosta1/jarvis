@@ -1687,7 +1687,7 @@ struct ImpostazioniView: View {
             Form {
                 // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
                 Section {
-                    TestataScheda(titolo: "Impostazioni", sottotitolo: "sistemi", icona: "gearshape", tinta: Color.ciano)
+                    TestataScheda(titolo: "Impostazioni", sottotitolo: "configurazione nucleo", icona: "gearshape", tinta: Color.ciano)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 }
