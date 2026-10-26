@@ -595,9 +595,12 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
           // 26 ott (video del signore): «Chiudi» toccato da lui chiude subito la sezione dell'app, che scende come ogni scheda di JARVIS.
           // Prima la pagina si nascondeva e l'app aspettava 750 ms: un secondo di nero prima di JARVIS. L'attesa resta solo per i
           // passaggi dentro la pagina (Studio → Social), che premono «Chiudi» da programma e riaprono subito.
-          var tastoChiudi = document.getElementById('chiudiSez');
-          if (tastoChiudi) tastoChiudi.addEventListener('click', function(e){
-            if (!e.isTrusted || !aperta) return;
+          // 26 ott sera (video del signore, 21:06): il tocco arrivava PRIMA al «Chiudi» della pagina (WebKit, sullo stesso tasto, chiama
+          // gli ascoltatori nell'ordine in cui sono stati messi): la pagina si nascondeva (nero) e solo dopo la scheda scendeva, nera.
+          // Ora il tocco si prende sulla finestra, in cattura: arriva qui prima di qualunque altro, la pagina resta com'è e scende intera.
+          window.addEventListener('click', function(e){
+            var t = e.target && e.target.closest ? e.target.closest('#chiudiSez') : null;
+            if (!t || !e.isTrusted || !aperta) return;
             e.stopImmediatePropagation(); e.preventDefault();
             aperta = false; clearTimeout(via); via = null;
             post({ tipo: 'chiudi' });
