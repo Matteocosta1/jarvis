@@ -406,11 +406,27 @@ struct ContentView: View {
             VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
                             aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
         }
-        .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
-            ForEach(Lingua.tutte) { l in
-                Button("\(l.bandiera) \(l.nome)") { jarvis.interrompi(); jarvis.interprete = l }
+        // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
+        // ciano), non più nel menu di iOS con le bandierine
+        .fullScreenCover(isPresented: $scegliLingua) {
+            CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
+                Pannello(titolo: "LINGUA", tinta: Color.ciano) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                        ForEach(Lingua.tutte) { l in
+                            TastoComando(testo: l.nome) {
+                                Suoni.tocco()
+                                jarvis.interrompi()
+                                scegliLingua = false
+                                Task { @MainActor in
+                                    try? await Task.sleep(for: .milliseconds(450))     // iOS apre l'Interprete a scheda chiusa
+                                    jarvis.interprete = l
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            Button("Annulla", role: .cancel) {}
+            .paginaPiena()
         }
         .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
             Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
