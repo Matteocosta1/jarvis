@@ -170,3 +170,14 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **Studio e Social**: non più una schermata di iOS ma uno **strato dentro la schermata di JARVIS** (StratoPagina, PaginaPiena.swift): sale e scende **come le altre schede** (stesse curve, misurate fotogramma per fotogramma sul video del Satellite delle 21:58: salita ~0,3 s, discesa ~0,35 s; molle di iOS con scarto sotto l'1%, chiesto dal signore alle 22:19), JARVIS sotto non viene mai tolto; «Chiudi», swipe giù dalla fascia dell'ora, passaggio a Occhi/LiDAR come prima; la pagina web si butta solo a strato già sotto lo schermo. Con lo strato su del tutto reattore, sfondo e anelli di JARVIS restano fermi sull'ultimo fotogramma (il telefono lavora solo per la pagina, come prima sotto la schermata di iOS) e ripartono appena lo strato scende o si tira giù col dito. La pagina NON resta caricata tra un'apertura e l'altra (servirebbe riscrivere come riceve foto, video e LiDAR a ogni apertura).
 - **Satellite** (foto del signore 22:07): (1) barra in alto grigia appena compariva la mappa 3D: ora con lo sfondo deciso dallo scorrimento vero della pagina, trasparente in cima e quello di iOS quando si scorre, come le altre schede (solo Satellite; da iOS 18); (2) l'arco della testata che vagava per la pagina: girava con un'animazione infinita che si portava dietro lo spostamento della pagina all'apertura; ora l'angolo lo dà l'orologio (stesso arco, un giro ogni 3 s), nella testata comune a tutte le schede: nelle altre non cambia niente.
 - Watch, Complicazione e Isola: non toccati. Non compilata qui: codice ricontrollato riga per riga (import, isolamento, versioni iOS 17.6).
+
+## Prova della 10.0 (11) — 26 ott 23:03 (video del signore 23:03)
+- ✗ Studio e Social: alla chiusura ancora nero (~0,7 s fermo, poi lo strato scende nero). **Causa vera** (anche della 10): il «Chiudi» toccato è quello della testata della sezione (.sd-chiudi / .sc-chiudi), che preme #chiudiSez da programma; la presa del tocco guardava solo #chiudiSez (nascosto a pagina piena), quindi la pagina si chiudeva da sola, si nascondeva e l'app chiudeva 750 ms dopo. Lo strato scende bene: era la pagina a essere nera.
+- ✗ Titolo J.A.R.V.I.S.: chiusa la tastiera salta sotto l'ora per ~1,5 s (MARK X e icone ferme).
+- ✗ Linguetta grigia sotto la Dynamic Island: è quella di iOS, per `.defersSystemGestures(on: .top)` (limite di Apple, decisione del signore).
+- ✓ Satellite: barra trasparente in cima.
+
+## Per la prossima build (dopo la 11) — correzioni già su GitHub (f2f2d55)
+- Studio/Social: tocco sul «Chiudi» della testata (Studio anche dopo «Salvare in archivio?», non con ANNULLA) → lo strato scende subito con la pagina com'è; i passaggi dentro la pagina restano come prima.
+- Titolo: un testo solo, misura scelta sul posto libero accanto alle icone (le misure contate a parte, nascoste); niente più ViewThatFits.
+- Numero di build da confermare col signore (la 11 è già su TestFlight).
