@@ -206,7 +206,7 @@ enum ComandoVocale: Equatable {
         let verbi: Set<String> = ["crea", "creami", "fammi", "modella", "modellami", "progetta", "progettami", "stampami", "disegnami"]
         guard c(" studio ") || c(" plastico ") || verbi.contains(primo) else { return nil }
         let detta = t.joined(separator: " ")
-        if t == ["studio"] || (t.count <= 4 && ["apri", "aprimi", "mostrami"].contains(primo) && c(" studio ") && !c(" archivio "))   // «portami allo studio» è SATELLITE {
+        if t == ["studio"] || (t.count <= 4 && ["apri", "aprimi", "mostrami"].contains(primo) && c(" studio ") && !c(" archivio ")) {   // «portami allo studio» è SATELLITE
             return .pagina(sezione: "Studio", voce: nil, scheda: nil)
         }
         if c(" studio ") && c(" archivio ") && t.count <= 7 { return .pagina(sezione: "Studio", voce: detta, scheda: nil) }
