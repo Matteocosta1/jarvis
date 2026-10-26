@@ -262,6 +262,17 @@ enum ComandoVocale: Equatable {
             t.remove(at: k)
             if k > 0, ["la", "le", "nella", "alla", "in"].contains(t[k - 1]) { t.remove(at: k - 1) }
         }
+        // MARK X · BROWSER VIDEO: «fammi vedere dei video di Daft Punk dal vivo», «cercami i video del Milan» (anche frasi lunghe)
+        if let k = t.firstIndex(where: { $0 == "video" || $0 == "filmati" }), k + 1 < t.count, t[..<k].contains(where: { ["fammi", "cercami", "cerca", "mostrami", "trovami", "metti", "voglio"].contains($0) }) {
+            var resto = Array(t[(k + 1)...])
+            if let p = resto.first, ["di", "del", "della", "dello", "dei", "degli", "delle", "su", "sul", "sulla", "con"].contains(p) { resto.removeFirst() }
+            if resto.last == "youtube" { resto.removeLast(); if resto.last == "su" { resto.removeLast() } }
+            if !resto.isEmpty, !resto.contains("jarvis") {
+                let q = resto.joined(separator: " ")
+                CercaVideo.richiesta = (q, Date())              // il Browser la prende appena si apre (entro 8 s)
+                return .apri(.browser)
+            }
+        }
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }

@@ -304,6 +304,7 @@ struct PaginaBrowser: View {
     @State private var barra = ""
     @State private var mostraCronologia = false
     @State private var idVoce = UUID()
+    @State private var visoreVideo: String?             // MARK X: il visore olografico dei video di YouTube (cosa si cerca)
     @FocusState private var scrivendo: Bool
 
     init(incognito: Binding<Bool>, conFaceID: Binding<Bool>, attivo: Bool, chiudi: @escaping () -> Void) {
@@ -385,6 +386,11 @@ struct PaginaBrowser: View {
                 .background(accento.opacity(0.10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(accento.opacity(0.35), lineWidth: 0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                // MARK X: VIDEO accanto alla barra (solo icona, stile JARVIS): cerca su YouTube quello che c'è scritto
+                Button { apriVideo() } label: {
+                    IconaVideoWeb().frame(width: 22, height: 22).frame(width: 36, height: 36)
+                }
+                .accessibilityLabel("Video di YouTube")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -424,10 +430,20 @@ struct PaginaBrowser: View {
         .background(Color.fondo.ignoresSafeArea())
         .animation(.easeInOut(duration: 0.25), value: nav.popup != nil)
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
-        .onChange(of: attivo) { if attivo, barra.isEmpty { scrivendo = true } }
+        .onChange(of: attivo) {
+            if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }
+            else if attivo, barra.isEmpty { scrivendo = true }
+        }
         .onAppear {
-            if attivo, barra.isEmpty { scrivendo = true }
+            if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }      // «Jarvis, fammi vedere dei video di …»
+            else if attivo, barra.isEmpty { scrivendo = true }
             registraVoce()
+        }
+        .overlay {
+            if let q = visoreVideo {
+                VisoreVideo(cerca: q, accento: accento) { withAnimation(.easeOut(duration: 0.25)) { visoreVideo = nil } }
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
         }
         .onChange(of: attivo) { registraVoce() }              // Face ID dato: i comandi a voce si sbloccano
         .onDisappear {
@@ -440,6 +456,14 @@ struct PaginaBrowser: View {
                 nav.apri(url)
             }
         }
+    }
+
+    /// MARK X: VIDEO cerca quello che è scritto nella barra (non l'indirizzo della pagina aperta); se non c'è niente, si scrive.
+    private func apriVideo() {
+        let q = barra.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, q != nav.indirizzo, !q.hasPrefix("http") else { barra = ""; scrivendo = true; return }
+        scrivendo = false
+        withAnimation(.easeOut(duration: 0.3)) { visoreVideo = q }
     }
 
     /// Il pop-up del sito, in una finestra sopra la pagina: la X lo chiude.
