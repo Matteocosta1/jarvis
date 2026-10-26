@@ -984,7 +984,7 @@ enum TestiCaricamento {
         "wiretap": "microfoni in ascolto", "interprete": "caricamento dizionari", "trainer": "calibrazione scheletro",
         "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "proiezione griglia laser",
         "sentinella": "armamento perimetro", "profiler": "riconoscimento soggetto", "browser": "connessione cifrata",
-        "studio": "proiettori olografici", "social": "intercettazione feed",
+        "studio": "proiettori olografici", "social": "scansione rete globale",
     ]
     static func di(_ sezione: String) -> String { testi[sezione.lowercased()] ?? "acquisizione dati" }
 }
