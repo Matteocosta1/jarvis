@@ -413,7 +413,7 @@ struct ContentView: View {
                 Pannello(titolo: "LINGUA", tinta: Color.ciano) {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                         ForEach(Lingua.tutte) { l in
-                            TastoComando(testo: l.nome) {
+                            TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
                                 Suoni.tocco()
                                 jarvis.interrompi()
                                 scegliLingua = false

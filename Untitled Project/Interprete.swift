@@ -126,7 +126,7 @@ struct Interprete: View {
                 // i due tasti: ascolta me / ascolta l'altro
                 HStack(spacing: 14) {
                     tasto("Ascolta me", icona: "person.wave.2", colore: Color.ciano) { orecchio.ferma(); motore.ascolta(.io, lingua: lin) }
-                    tasto("Ascolta \(lin.codice.uppercased())", icona: "ear", colore: Color.orange) { orecchio.ferma(); motore.ascolta(.altro, lingua: lin) }
+                    tasto("Ascolta \(lin.bandiera)", icona: "ear", colore: Color.orange) { orecchio.ferma(); motore.ascolta(.altro, lingua: lin) }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 16)
             }
@@ -153,7 +153,7 @@ struct Interprete: View {
         .onChange(of: automatico) { _, v in motore.automatico = v }
         .onDisappear { chiuso = true; orecchio.ferma(); motore.ferma() }
         .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
-            ForEach(Lingua.tutte) { l in Button(l.nome) { cambia(l) } }
+            ForEach(Lingua.tutte) { l in Button("\(l.bandiera) \(l.nome)") { cambia(l) } }
             Button("Annulla", role: .cancel) {}
         }
         .aperturaHUD("Interprete")
@@ -193,9 +193,7 @@ struct Interprete: View {
 
     private func lato(_ l: Lingua, attivo: Bool, titolo: String) -> some View {
         VStack(spacing: 2) {
-            // 27 ott: niente bandierine di sistema: la sigla della lingua in stile JARVIS
-            Text(l.codice.uppercased()).font(.system(size: 26, weight: .bold, design: .monospaced)).tracking(3)
-                .foregroundStyle(Color.ciano).shadow(color: Color.ciano.opacity(0.6), radius: 6)
+            Text(l.bandiera).font(.system(size: 28))
             Text(titolo).font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(Color.tenue)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 8)
