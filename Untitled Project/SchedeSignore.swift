@@ -972,7 +972,7 @@ struct TestoCodice: View {
 /// Sotto il nome della sezione (al posto di «acquisizione dati») e prima voce dei sistemi nel caricamento.
 enum TestiCaricamento {
     private static let testi: [String: String] = [
-        "meteo": "aggancio satelliti meteo", "email": "decrittazione posta", "messaggi": "sintonizzazione frequenze",
+        "meteo": "aggancio satelliti meteo", "email": "decrittazione posta", "messaggi": "messaggi in arrivo",
         "diario": "apertura archivio personale", "sonno": "lettura cicli notturni", "cuore": "sincronizzazione battito",
         "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "scansione spettro sonoro",
         "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
