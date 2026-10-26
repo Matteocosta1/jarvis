@@ -370,8 +370,7 @@ struct VistaSentinella: View {
                             Text(t.date.formatted(date: .omitted, time: .standard))
                                 .font(.system(size: 10, design: .monospaced)).opacity(0.7)
                         }
-                        .foregroundStyle(colore)
-                        .shadow(color: colore.opacity(0.6), radius: 6)
+                        .foregroundStyle(colore)      // 27 ott: niente bagliore sulle scritte della testata
                     }
                     Button { Suoni.tocco(); registro = true } label: { tasto("list.bullet.rectangle") }
                         .accessibilityLabel("Registro")
