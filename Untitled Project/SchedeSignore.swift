@@ -53,7 +53,11 @@ struct CorniceScheda<Contenuto: View>: View {
                     }
                     .padding(16)
                     .padding(.bottom, 30)
+                    // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
+                    // larga esattamente quanto lo schermo e scorre solo in verticale, come nel mockup.
+                    .containerRelativeFrame(.horizontal)
                 }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .scrollDismissesKeyboard(.interactively)
                 if !mostrato {
                     CaricamentoHUD(titolo: titolo, tinta: tinta)

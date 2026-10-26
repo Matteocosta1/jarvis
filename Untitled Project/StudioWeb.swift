@@ -278,23 +278,19 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         }
     }
 
-    /// 26 ott sera (il signore: «c'è ancora il nero quando chiudi»): durante la chiusura il WKWebView smette di disegnare (è fuori
-    /// dalla finestra o viene smontato prima della fine dell'animazione) e la scheda scendeva vuota, nera. Prima di chiudere si
-    /// fotografa la pagina e la foto resta sopra: scende la pagina com'era, poi la scheda si chiude.
+    /// 26 ott sera (il signore: «c'è ancora il nero quando chiudi»; video 21:29, build 9: ancora nero alla chiusura): durante la
+    /// chiusura il WKWebView smette di disegnare e la scheda scendeva nera. La foto della pagina via WebKit (takeSnapshot) arriva
+    /// tardi ed è vuota quando c'è il 3D (WebGL). Ora si copia SUBITO quello che è sullo schermo (snapshotView: la copia la fa
+    /// iOS, compreso il 3D), la copia si mette sopra la scheda e scende con lei. Nessuna attesa: si chiude nello stesso istante.
     private func congelaEChiudi() {
         guard let w = web, w.window != nil else { chiudi(); return }
-        let conf = WKSnapshotConfiguration()
-        conf.afterScreenUpdates = false
-        w.takeSnapshot(with: conf) { [weak self] immagine, _ in
-            if let immagine, let w = self?.web {
-                let foto = UIImageView(image: immagine)
-                foto.frame = w.bounds
-                foto.contentMode = .scaleToFill
-                foto.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                w.addSubview(foto)
-            }
-            self?.chiudi()
+        let base = RegiaStudio.inCima(w)?.view ?? w
+        if let foto = base.snapshotView(afterScreenUpdates: false) {
+            foto.frame = base.bounds
+            foto.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            base.addSubview(foto)
         }
+        chiudi()
     }
 
     private func rispondi(_ id: Int, _ esito: (String?, String?)) {

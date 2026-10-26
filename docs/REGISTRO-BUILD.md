@@ -159,3 +159,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 ## 10.0 (9) — 26 ott 21:20
 - Contiene tutto della 8 più: schede a pagina piena con swipe giù (9bdbb9a), Studio/Social chiusura senza nero (7bb5e9e, dfab9f8).
 - La 8 installata (video 21:06) era stata compilata prima di queste correzioni.
+- 21:40 (dopo il video 21:29 della 9): Studio/Social chiusura con copia immediata dello schermo (snapshotView) al posto di takeSnapshot; schede: pagina larga quanto lo schermo, niente scorrimento di lato (Satellite).
