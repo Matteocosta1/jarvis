@@ -40,7 +40,8 @@ enum ComandiIsola {
     static var esegui: ((String) -> Void)?
 }
 
-nonisolated struct ComandoIsola: LiveActivityIntent {
+// niente «nonisolated» sul tipo: il @Parameter è una proprietà che cambia, e Swift 6 non lo permette (avviso di Xcode, 26 ott)
+struct ComandoIsola: LiveActivityIntent {
     static let title: LocalizedStringResource = "Comando di JARVIS"
     @Parameter(title: "Azione") var azione: String
 

@@ -1004,6 +1004,23 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         }
     }
 
+    /// MARK X · AEREO: la frase (già in minuscolo, senza accenti né apostrofi) → il comando. Le domande corte («dove va?»,
+    /// «a che quota è?») valgono solo con un aereo agganciato negli Occhi; con la parola «aereo» o «volo» valgono sempre.
+    private static func fraseAereo(_ t: String) -> String? {
+        let f = " \(t) "
+        func c(_ x: String) -> Bool { f.contains(" \(x) ") }
+        let aereo = c("aereo") || c("aerei") || c("aereoplano") || c("volo") || c("velivolo")
+        guard aereo || aereoAgganciato else { return nil }
+        if aereo && (c("spegni") || c("togli") || c("basta")) { return "AEREO_OFF" }
+        if c("altro") && (aereo || c("aggancia")) { return "AEREO_ALTRO" }
+        if c("da dove viene") || c("da dove arriva") || c("da dove parte") || c("da dove e partito") { return "AEREO_DA" }
+        if c("dove va") || c("dove sta andando") || c("dove e diretto") || c("dove atterra") { return "AEREO_DOVE" }
+        if c("quota") || c("quanto e alto") || c("a che altezza") || c("quanto vola alto") { return "AEREO_QUOTA" }
+        if c("compagnia") || c("di chi e") { return "AEREO_COMP" }
+        if aereo && (c("che") || c("quale") || c("cos e") || c("cosa e") || c("cerca") || c("trova") || c("guarda")) { return "AEREO" }
+        return nil
+    }
+
     static func riconosci(_ frase: String) -> ComandoOcchi? {
         var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
             .lowercased()
