@@ -115,7 +115,7 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **Aperti**: «aereo» a voce non c'è ancora (Travel/Aerei sono tappe non fatte); punto arancione = microfono di JARVIS acceso (normale).
 
 ### 26 ott, sera — 10.0 (7) consegnata (build 7 in tutti gli 8 blocchi, compresa l'estensione JarvisIsola)
-- **Cervello**: `social` v4 (griglia, ore, modifica, scambia, commenti; provata: 16 post con numeri, ore 7×8), `travel-voli` v2 (AviationStack, provata con AZ2010). Non toccate da questa chat: `jarvis` (ora v118) e `jarvis-ascolto` (ora v37): risultano più nuove di quanto annotato (v117/v36), cambiate fuori da questa chat.
+- **Cervello**: `social` v4 (griglia, ore, modifica, scambia, commenti; provata: 16 post con numeri, ore 7×8), `travel-voli` v2 (AviationStack, provata con AZ2010). Non toccate: `jarvis` è la v118 (ultima pubblicazione 25 ott 18:49) e `jarvis-ascolto` la v37 (26 ott 15:02, quella del passaggio di consegne, identica alla v34). I numeri annotati prima (v117, v36) erano sbagliati: nessun'altra chat le ha cambiate.
 - **Mockup**: tools/mockup_social_10_7.py rigenera il Social nuovo dal mockup precedente; tools/studio_app.py + toppe_social.py fanno markx.html per l'app.
 - **Da provare dal signore**: polso (niente loop, dialogo come la 9.0 (31)), Occhi › STUDIO da solo, AEREO a voce sotto un cielo con aerei, TRAVEL (le 6 schede), Dynamic Island (Avvisami e Guida, uscendo dall'app), Social GRIGLIA/PIANO/ORARI con i dati veri.
 - **Ancora da decidere (domande aperte)**: app taxi del tasto (oggi apre Mappe in auto); VOCE/REC nell'isola; PIOGGIA nell'isola; riquadro OCCHI di Social; battito di mani a 1:37; intestatario della verifica Meta (DM e RIVALI dipendono da Meta).
