@@ -4,11 +4,11 @@ import ActivityKit
 import AppIntents
 
 // MARK: - MARK X · DYNAMIC ISLAND di JARVIS (mockup approvato, build 32), disegnata da iOS fuori dall'app.
-// Compatta: a sinistra la linea (TRAVEL), la freccia con la via (GUIDA), il reattore (VOCE), il punto rosso (REC) o la nuvola
-// (PIOGGIA); a destra in ciano «esci 4′», i metri, la fase, il tempo registrato o i minuti alla pioggia.
+// Compatta: a sinistra la linea (TRAVEL), la freccia con la via (GUIDA), il punto rosso (REC) o la nuvola (PIOGGIA);
+// a destra in ciano «esci 4′», i metri, il tempo registrato o i minuti alla pioggia.
 // Grande (tocco lungo): il numero grande, la riga ciano in maiuscolo, la riga bianca e i due tasti (il secondo rosso).
 // Nella schermata bloccata la stessa cosa della grande. I tasti che aprono JARVIS sono collegamenti (it.discosizer.jarvis://isola/…),
-// gli altri (Muto, Fine, Pausa, Stop, Ok, Basta avvisi, Ferma guida) li esegue l'app senza aprirsi (ComandoIsola).
+// gli altri (Pausa, Stop, Ok, Basta avvisi, Ferma guida) li esegue l'app senza aprirsi (ComandoIsola).
 
 @main
 struct IsolaJarvisBundle: WidgetBundle {
@@ -54,33 +54,6 @@ struct IsolaJarvisWidget: Widget {
     }
 }
 
-/// Il reattore piccolo di JARVIS (anelli ciano), come nell'isola del mockup.
-private struct Reattore: View {
-    var lato: CGFloat = 22
-    var spento = false
-    var body: some View {
-        ZStack {
-            Circle().stroke(ciano.opacity(spento ? 0.25 : 0.45), lineWidth: lato * 0.06)
-            Circle().trim(from: 0.08, to: 0.92).stroke(ciano.opacity(spento ? 0.3 : 0.9), style: StrokeStyle(lineWidth: lato * 0.09, lineCap: .round))
-                .rotationEffect(.degrees(-90)).padding(lato * 0.16)
-            Circle().fill(spento ? ciano.opacity(0.3) : ciano).frame(width: lato * 0.28, height: lato * 0.28)
-                .shadow(color: ciano, radius: spento ? 0 : lato * 0.18)
-        }
-        .frame(width: lato, height: lato)
-    }
-}
-
-/// Le quattro barre della voce (ascolto e parlo).
-private struct Barre: View {
-    var body: some View {
-        HStack(alignment: .center, spacing: 1.5) {
-            ForEach([0.45, 0.9, 0.6, 0.8], id: \.self) { h in
-                Capsule().fill(ciano).frame(width: 2, height: 10 * h)
-            }
-        }
-    }
-}
-
 private struct PuntoRec: View {
     var pausa = false
     var body: some View {
@@ -95,16 +68,6 @@ private struct Nuvola: View {
     }
 }
 
-/// VOCE: la parola corta della fase («ASCOLTO», «PENSO», «PARLO», «ATTESA»).
-private func faseCorta(_ f: String?) -> String {
-    switch f {
-    case "LA ASCOLTO": return "ASCOLTO"
-    case "ELABORO": return "PENSO"
-    case "PARLO": return "PARLO"
-    default: return "ATTESA"
-    }
-}
-
 /// A sinistra nell'isola stretta.
 private struct SinistraCompatta: View {
     let stato: AttivitaJarvis.ContentState
@@ -116,8 +79,6 @@ private struct SinistraCompatta: View {
                     .frame(width: 24, height: 24).background(Circle().fill(colore(stato.coloreSigla)))
                 Text(stato.oraMezzo ?? "").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
             }
-        case "voce":
-            Reattore(lato: 22, spento: stato.muto == true)
         case "rec":
             HStack(spacing: 5) {
                 PuntoRec(pausa: stato.pausaSecondi != nil)
@@ -150,15 +111,6 @@ private struct DestraCompatta: View {
                     .frame(maxWidth: 46)
             } else {
                 Text(stato.tipo == "travel" ? "ESCI" : "ORA").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
-            }
-        case "voce":
-            if stato.muto == true {
-                Text("MUTO").font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(rossoTasto)
-            } else {
-                HStack(spacing: 4) {
-                    Text(faseCorta(stato.fase)).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
-                    if stato.fase == "LA ASCOLTO" || stato.fase == "PARLO" { Barre() }
-                }
             }
         case "rec":
             if let p = stato.pausaSecondi {
@@ -198,8 +150,6 @@ private struct Grande: View {
         case "travel":
             Text(stato.esci.map { $0.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)) } ?? "—")
                 .font(.system(size: 30, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
-        case "voce":
-            Reattore(lato: 52, spento: stato.muto == true)
         case "rec":
             Group {
                 if let p = stato.pausaSecondi {
@@ -234,8 +184,6 @@ private struct Grande: View {
                     if e > Date() { Text(timerInterval: Date()...e, countsDown: true, showsHours: false).monospacedDigit() }
                 }
             }
-        case "voce":
-            Text("J.A.R.V.I.S. · \(stato.muto == true ? "MICROFONO SPENTO" : (stato.fase ?? "IN ATTESA"))")
         case "rec":
             HStack(spacing: 6) {
                 PuntoRec(pausa: stato.pausaSecondi != nil)
@@ -253,9 +201,6 @@ private struct Grande: View {
         case "travel":
             collegamento("Percorso", "percorso")
             azione("Basta avvisi", "basta", rosso: true)
-        case "voce":
-            if stato.muto == true { azione("Riattiva", "riattiva", rosso: false) } else { azione("Muto", "muto", rosso: false) }
-            azione("Fine", "fine", rosso: true)
         case "rec":
             if stato.pausaSecondi != nil { azione("Riprendi", "riprendi", rosso: false) } else { azione("Pausa", "pausa", rosso: false) }
             azione("Stop", "stoprec", rosso: true)

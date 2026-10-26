@@ -6,16 +6,15 @@ import UIKit
 
 // MARK: - MARK X · DYNAMIC ISLAND: l'app accende, aggiorna e spegne l'attività di JARVIS (la disegna l'estensione JarvisIsola).
 // TRAVEL: dopo «Avvisami» fino all'ora di uscire (+10 min). GUIDA: finché la guida di SATELLITE è accesa, aggiornata alla svolta.
-// 26 ott sera (sì del signore): VOCE (esce da JARVIS mentre ci parla: la conversazione continua fuori), REC (il Wiretap registra
-// anche fuori dall'app), PIOGGIA (la accende il cervello col radar, anche ad app chiusa: push-to-start).
+// 26 ott sera (sì del signore): REC (il Wiretap registra anche fuori dall'app), PIOGGIA (la accende il cervello col radar, anche ad
+// app chiusa: push-to-start). VOCE tolta dal signore lo stesso giorno (iOS non garantisce di riaccendere il microfono da fuori).
 // Dentro JARVIS iOS non mostra la sua stessa attività: si vede quando lei esce dall'app o blocca il telefono.
 
 @MainActor
 enum IsolaJarvis {
     private static var attivita: Activity<AttivitaJarvis>?
     private static var guardiaGuida: AnyCancellable?
-    /// VOCE e REC: chi esegue i tasti dell'isola (li imposta Jarvis e il Wiretap).
-    static var voce: ((String) -> Void)?
+    /// REC: chi esegue i tasti dell'isola (lo imposta il Wiretap).
     static var rec: ((String) -> Void)?
 
     private static var permesso: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
@@ -27,7 +26,6 @@ enum IsolaJarvis {
             switch a {
             case "basta": AvvisoTravel.spegni()
             case "ferma": MotoreGuida.condiviso.ferma(); chiudi()
-            case "muto", "riattiva", "fine": voce?(a)
             case "pausa", "riprendi", "stoprec": rec?(a)
             case "ok": chiudiPioggia()
             default: break
@@ -96,25 +94,6 @@ enum IsolaJarvis {
     static func fineGuida() {
         guardiaGuida = nil
         if attivita?.content.state.tipo == "guida" { chiudi() }
-    }
-
-    // MARK: VOCE (26 ott sera)
-
-    /// La conversazione continua fuori da JARVIS: la fase e quello che sente o risponde. Accende l'isola se non c'è.
-    static func aggiornaVoce(fase: Fase, testo: String, muto: Bool) {
-        let s = AttivitaJarvis.ContentState(tipo: "voce", esci: nil, sigla: nil, coloreSigla: nil, oraMezzo: nil, freccia: nil, via: nil, metri: nil,
-                                            riga: muto ? "Non la ascolto finché non riattiva." : (testo.isEmpty ? "Mi dica pure, Sir: la ascolto." : testo),
-                                            fase: fase.rawValue, muto: muto)
-        if let a = attivita, a.content.state.tipo == "voce" {
-            guard a.content.state != s else { return }
-            Task { await a.update(ActivityContent(state: s, staleDate: Date().addingTimeInterval(900))) }
-        } else {
-            avvia(s, meta: "JARVIS", fine: Date().addingTimeInterval(900))
-        }
-    }
-
-    static func fineVoce() {
-        if attivita?.content.state.tipo == "voce" { chiudi() }
     }
 
     // MARK: REC (26 ott sera)

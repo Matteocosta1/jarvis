@@ -83,7 +83,7 @@ def toppe_social(s, toppa):
 
     # ── 10.0 (7): GRIGLIA, PIANO, ORARI, RIVALI con i dati veri (funzione «social»: media, ore, modifica, scambia, commenti) ──
     s = toppa(s, 'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = [];',
-              'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.media = []; SOC.ore = null;')
+              'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.media = []; SOC.ore = null; SOC.rivali = [];')
     s = toppa(s, 'SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || [];',
               'SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; SOC.media = r.media || []; SOC.ore = r.ore || null;')
     # commenti sì/no: davvero su Instagram; se non va, l'interruttore torna com'era
@@ -110,4 +110,7 @@ def toppe_social(s, toppa):
               '<button type="button" class="sc-vai" data-f="collega">${window.JARVIS_APP ? "HO CAPITO" : "COLLEGA (PROVA)"}</button>')
     s = toppa(s, '<li>Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook.</li>',
               '<li>${window.JARVIS_APP ? "Me lo dica: JARVIS le chiede un solo permesso a Facebook." : "Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook."}</li>')
+    # RIVALI nell'app: solo dati veri (senza la pagina Facebook non ce ne sono: niente tabella d'esempio sfocata)
+    s = toppa(s, 'Le storie e i messaggi degli altri non si vedono. Dati d\'esempio.</p>',
+              'Le storie e i messaggi degli altri non si vedono.${window.JARVIS_APP ? "" : " Dati d\'esempio."}</p>')
     return s

@@ -66,9 +66,7 @@ struct ContentView: View {
     /// tranne dove il microfono serve già a qualcun altro: Interprete, Allenatore, Sentinella, Wiretap, Shazam, La mia voce,
     /// e (per ora) Profiler e Scanner. App in secondo piano: spento.
     private var schermoLibero: Bool {
-        // 26 ott sera (VOCE nella Dynamic Island): se ci sta parlando, uscendo dall'app il microfono non si spegne (né nel passaggio
-        // «inattiva» né in sottofondo): la conversazione continua fuori. Altrimenti come prima.
-        let inPrimoPiano: Bool = scena == .active || jarvis.voceFuori || (scena == .inactive && jarvis.conversazioneInCorso)
+        let inPrimoPiano: Bool = scena == .active
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
         // iPhone, tastiera aperta (23 ott): JARVIS resta in attesa e appena lei parla passa in ascolto; mentre preme i tasti il microfono
@@ -233,8 +231,7 @@ struct ContentView: View {
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
-            if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno (26 ott sera: se ci sta parlando, continua fuori)
-            if fase == .active { jarvis.tornaDentro() }              // 26 ott sera: la conversazione torna sullo schermo, l'isola VOCE si spegne
+            if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
         }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
@@ -405,12 +402,7 @@ struct ContentView: View {
         .onChange(of: comandi.richiesta) { eseguiComando() }
         .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
-        .onChange(of: schermoLibero, initial: true) { _, libero in
-            // 26 ott sera: in sottofondo a metà conversazione il microfono non si spegne nemmeno per un attimo (da fuori iOS non lo
-            // lascerebbe riaccendere): prima si decide se la conversazione continua fuori
-            if !libero, scena == .background, jarvis.entraVoceFuoriSeServe() { return }
-            jarvis.richiamoConsentito = libero
-        }
+        .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
         .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
         .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }

@@ -155,92 +155,8 @@ final class Jarvis: NSObject, ObservableObject {
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio (e sul Mac la sua voce) non è «confusione»
             BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
-            ultimoMovimento = Date()
             aggiornaRichiamo()
-            if voceFuori { aggiornaIsolaVoce() }        // 26 ott sera: fuori da JARVIS la fase va nella Dynamic Island
         }
-    }
-
-    // MARK: VOCE fuori da JARVIS (26 ott sera, sì del signore: rovescia la decisione del 25 ott solo per la conversazione in corso)
-    /// Esce da JARVIS (o blocca il telefono) mentre ci sta parlando: la conversazione continua, la Dynamic Island mostra cosa sente,
-    /// quando pensa e cosa risponde (Muto, Fine). Se invece non ci stava parlando, come il 25 ott: in sottofondo JARVIS non ascolta.
-    @Published private(set) var voceFuori = false
-    /// L'ultima volta che la conversazione si è mossa (un cambio di fase): «ci sta parlando» = non in attesa o meno di 20 s fa.
-    private var ultimoMovimento = Date.distantPast
-    /// Muto dall'isola: il microfono resta aperto (iOS non lascia riaccenderlo da fuori), ma JARVIS non prende niente.
-    private var mutoFuori = false
-    private var vegliaFuori: Task<Void, Never>?
-
-    /// Ci sta parlando adesso: JARVIS non è in attesa, o la conversazione si è mossa meno di 20 s fa.
-    var conversazioneInCorso: Bool { fase != .attesa || Date().timeIntervalSince(ultimoMovimento) < 20 }
-
-    /// Chiamata quando l'app va in sottofondo: vero se la conversazione continua fuori (allora il microfono resta acceso).
-    @discardableResult
-    func entraVoceFuoriSeServe() -> Bool {
-        if voceFuori { return true }
-        guard conversazioneInCorso, !Jarvis.usaAscoltoCloud, !micSpento, Impostazioni.richiamo, occhi == nil, !inBenvenuto else { return false }
-        voceFuori = true
-        mutoFuori = false
-        IsolaJarvis.voce = { [weak self] a in self?.tastoIsolaVoce(a) }
-        aggiornaIsolaVoce()
-        vegliaFuori?.cancel()
-        vegliaFuori = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard let self, self.voceFuori else { return }
-                // in attesa da 30 s (10 minuti se muto): la conversazione è finita, l'isola si spegne e JARVIS smette di ascoltare
-                let limite: TimeInterval = self.mutoFuori ? 600 : 30
-                if self.fase == .attesa && Date().timeIntervalSince(self.ultimoMovimento) > limite { self.esciVoceFuori(); return }
-                if self.fase == .ascolto { self.aggiornaIsolaVoce() }      // quello che sta sentendo
-            }
-        }
-        return true
-    }
-
-    /// Tornato in JARVIS: la conversazione continua sullo schermo, l'isola si spegne.
-    func tornaDentro() {
-        guard voceFuori else { return }
-        voceFuori = false
-        mutoFuori = false
-        vegliaFuori?.cancel()
-        IsolaJarvis.fineVoce()
-    }
-
-    /// Fine della conversazione fuori (tasto Fine, o 30 s di silenzio): come il 25 ott, quello a metà si butta.
-    private func esciVoceFuori() {
-        tornaDentro()
-        vaInSottofondo()
-    }
-
-    private func tastoIsolaVoce(_ a: String) {
-        switch a {
-        case "muto":
-            mutoFuori = true
-            if fase == .parlo || fase == .elaboro { interrompi() }
-            if fase == .ascolto { fermaAscolto(invia: false) }
-            aggiornaIsolaVoce()
-        case "riattiva":
-            mutoFuori = false
-            ultimoMovimento = Date()
-            aggiornaIsolaVoce()
-        case "fine":
-            if fase == .parlo || fase == .elaboro { interrompi() }
-            esciVoceFuori()
-        default: break
-        }
-    }
-
-    private func aggiornaIsolaVoce() {
-        guard voceFuori else { return }
-        let detta = messaggi.last(where: { $0.ruolo == "user" })?.testo ?? ""
-        let risposta = messaggi.last(where: { $0.ruolo == "assistant" })?.testo ?? ""
-        let testo: String
-        switch fase {
-        case .ascolto: testo = parziale.isEmpty ? "…" : "«\(parziale)»"
-        case .elaboro: testo = detta.isEmpty ? "…" : "«\(detta)»"
-        case .parlo, .attesa: testo = risposta
-        }
-        IsolaJarvis.aggiornaVoce(fase: fase, testo: String(testo.prefix(160)), muto: mutoFuori)
     }
     @Published var parziale = ""
     @Published var stato: String?          // es. «cerco sul web»
@@ -693,7 +609,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
     private func richiamato() {
-        if mutoFuori { return }                          // muto dall'isola: la frase la butta fraseRichiamo, il microfono resta aperto
         Posizione.scalda()                               // difetto 5: il GPS si sveglia mentre il signore dice la frase
         if fase == .elaboro {                            // stava pensando: lo fermo, come un'interruzione
             segnaInterruzione()
@@ -728,7 +643,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Due battiti di mani.
     private func applaudito() {
-        if voceFuori { return }                          // fuori da JARVIS il rito dei battiti non parte
         guard fase == .attesa, !inBenvenuto else { return }
         if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
         ultimiBattiti = Date()
@@ -803,7 +717,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// La frase dopo «Jarvis» è finita: comando, domanda, oppure (solo «Jarvis») l'ascolto normale.
     private func fraseRichiamo(_ frase: String) {
-        if mutoFuori { parziale = ""; if fase == .ascolto { fase = .attesa }; return }   // muto dall'isola
         guard fase == .ascolto, !ascoltoCloud else { return }   // sul Mac la frase la sta già registrando l'ascolto in cloud
         fineFraseVoce = richiamo.ultimaVoce                     // idea B: l'ultima parola sentita
         parziale = ""
@@ -2326,7 +2239,6 @@ final class Jarvis: NSObject, ObservableObject {
     /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
-        if entraVoceFuoriSeServe() { return }          // 26 ott sera: ci stava parlando, la conversazione continua fuori
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello
