@@ -551,9 +551,16 @@ struct VistaSpesa: View {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
-                .opacity(caricata ? 1 : 0.25)
+                .opacity(caricata ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: 0.4), value: caricata)
                 if !caricata && !errore {
+                    // il titolo resta in alto mentre carica, come nelle altre schede
+                    VStack {
+                        TestataScheda(titolo: "Spesa", sottotitolo: "acquisizione dati", icona: "cart", tinta: tinta)
+                            .padding(.horizontal, 20).padding(.top, 8)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
                     CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
                 }
                 if errore && !caricata {

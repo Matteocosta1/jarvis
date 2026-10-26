@@ -167,7 +167,16 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if let json = p.json { esegui("window.__lidarVero && window.__lidarVero(\(json))") }
         // SOCIAL: i dati veri, le risposte, la pubblicazione, il calendario, l'automazione (funzione «social» del cervello)
         case "socialStato":
-            Task { let r = await RegiaStudio.social(["azione": "stato"]); self.esegui("window.__socStato && window.__socStato(\(r))") }
+            // 26 ott (video del signore: ~9 s di «KR · CARICO…»): subito gli ultimi dati salvati sull'iPhone, poi quelli nuovi del
+            // cervello appena arrivano. Il riassunto a voce («com'è andata la settimana?») aspetta i dati nuovi, mai quelli vecchi.
+            if let vecchio = RegiaStudio.socialSalvato() {
+                esegui("(function(){var v=window.__socRiassunto;window.__socRiassunto=false;window.__socStato&&window.__socStato(\(vecchio));window.__socRiassunto=v;})()")
+            }
+            Task {
+                let r = await RegiaStudio.social(["azione": "stato"])
+                RegiaStudio.salvaSocial(r)
+                self.esegui("window.__socStato && window.__socStato(\(r))")
+            }
         case "socialRispondi":
             let corpo: [String: Any] = ["azione": "rispondi", "tipo": o["tipoMsg"] as? String ?? "", "id": o["idMsg"] as? String ?? "",
                                         "a": o["a"] as? String ?? "", "testo": o["testo"] as? String ?? ""]
@@ -223,6 +232,21 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     // MARK: SOCIAL (Instagram dal cervello)
 
     /// Una chiamata alla funzione «social»: torna sempre un JSON valido (in caso di guasto, {"errore": …}) che la pagina legge.
+    /// SOCIAL: l'ultimo stato buono (senza errore), salvato sull'iPhone per mostrarlo subito alla prossima apertura.
+    private static var fileSocial: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("social-stato.json")
+    }
+    static func socialSalvato() -> String? {
+        guard let u = fileSocial, let d = try? Data(contentsOf: u), (try? JSONSerialization.jsonObject(with: d)) is [String: Any] else { return nil }
+        return String(data: d, encoding: .utf8)
+    }
+    static func salvaSocial(_ json: String) {
+        guard let u = fileSocial, let d = json.data(using: .utf8),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], o["errore"] == nil else { return }
+        try? FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? d.write(to: u, options: .atomic)
+    }
+
     static func social(_ corpo: [String: Any], attesa: TimeInterval = 60) async -> String {
         func errore(_ t: String) -> String { (try? JSONSerialization.data(withJSONObject: ["errore": t])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}" }
         let base = Impostazioni.indirizzo.replacingOccurrences(of: "/functions/v1/jarvis", with: "/functions/v1/social")

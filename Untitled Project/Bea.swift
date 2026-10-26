@@ -56,9 +56,16 @@ struct VistaBea: View {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
-                .opacity(dati != nil || errore ? 1 : 0.25)
+                .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: 0.4), value: dati != nil)
                 if dati == nil && !errore {
+                    // il titolo resta in alto mentre carica, come nelle altre schede
+                    VStack {
+                        TestataScheda(titolo: "Bea", sottotitolo: "acquisizione dati", icona: "link", tinta: tinta)
+                            .padding(.horizontal, 20).padding(.top, 8)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
                     CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
                 }
             }
