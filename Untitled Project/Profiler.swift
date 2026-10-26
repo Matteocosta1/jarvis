@@ -68,6 +68,7 @@ struct VistaProfiler: View {
                 .foregroundStyle(ambra)
                 .frame(width: 34, height: 34)
                 .overlay(Circle().stroke(ambra.opacity(0.5), lineWidth: 1))
+            AnelloOcchi(icona: "person.text.rectangle", tinta: Color.ciano)     // 26 ott notte: l'icona animata come le altre sezioni
             VStack(alignment: .leading, spacing: 2) {
                 Text("J.A.R.V.I.S.")
                     .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)

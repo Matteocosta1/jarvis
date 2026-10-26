@@ -1195,7 +1195,7 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AV
     }
 }
 /// L'icona della sezione dentro l'anello che gira (come TestataScheda), per gli Occhi e la Cucina.
-private struct AnelloOcchi: View {
+struct AnelloOcchi: View {
     let icona: String
     let tinta: Color
     var body: some View {

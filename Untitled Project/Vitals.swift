@@ -23,6 +23,8 @@ struct VistaVitals: View {
                 Color.fondo.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        // 26 ott notte: la testata delle altre schede (icona con l'anello che gira), niente titolo di iOS
+                        TestataScheda(titolo: "Vitals", sottotitolo: "parametri vitali", icona: "waveform.path.ecg", tinta: Color.ciano)
                         // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
                         PannelloOrganismo(oggi: oggi, diario: dati)
                         PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
@@ -59,7 +61,6 @@ struct VistaVitals: View {
                     .padding(16)
                 }
             }
-            .navigationTitle("Vitals")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
