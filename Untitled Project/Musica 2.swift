@@ -14,6 +14,7 @@ nonisolated enum Musica {
         let web: URL?
         let copertina: URL?
         let generi: [String]
+        var appleMusicID: String? = nil      // MARK X: per far partire subito proprio quel brano su Apple Music
     }
 
     nonisolated enum Esito: Sendable { case trovato(Brano), nessuno, errore(String) }
@@ -57,7 +58,7 @@ nonisolated enum Musica {
         case .match(let m):
             guard let v = m.mediaItems.first else { return .nessuno }
             return .trovato(Brano(titolo: v.title ?? "senza titolo", artista: v.artist ?? "artista sconosciuto", album: v.subtitle,
-                                  appleMusic: v.appleMusicURL, web: v.webURL, copertina: v.artworkURL, generi: v.genres))
+                                  appleMusic: v.appleMusicURL, web: v.webURL, copertina: v.artworkURL, generi: v.genres, appleMusicID: v.appleMusicID))
         case .noMatch:
             return .nessuno
         case .error(let e, _):

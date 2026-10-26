@@ -142,6 +142,12 @@ final class LettoreMusica: ObservableObject {
         aggiorna()
     }
 
+    /// MARK X · player di Shazam: −15 / +15 secondi.
+    func salta(_ secondi: Double) {
+        let fine = durata ?? .greatestFiniteMagnitude
+        lettore.playbackTime = max(0, min(fine, lettore.playbackTime + secondi))
+    }
+
     /// Tocco sulla barra del tempo: `frazione` da 0 a 1.
     func vaiA(_ frazione: Double) {
         guard let d = durata else { return }
@@ -986,6 +992,18 @@ enum PonteMusica {
         let l = LettoreMusica.condiviso
         guard MusicAuthorization.currentStatus == .authorized else {
             return ["errore": "Apra MUSICA sull'iPhone e dia il permesso ad Apple Music, Sir."]
+        }
+        if comando.hasPrefix("brano:") {                    // MARK X: Shazam al polso → la canzone suona sull'iPhone
+            let d = (try? JSONSerialization.jsonObject(with: Data(comando.dropFirst(6).utf8))) as? [String: String] ?? [:]
+            var s: Song?
+            if let id = d["id"], !id.isEmpty {
+                s = try? await MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(id)).response().items.first
+            }
+            if s == nil, let q = d["cerca"], !q.isEmpty {
+                var r = MusicCatalogSearchRequest(term: q, types: [Song.self]); r.limit = 1
+                s = try? await r.response().songs.first
+            }
+            if let s { await l.metti(s) } else { l.errore = "Non la trovo su Apple Music, Sir." }
         }
         switch comando {
         case "play": await l.play()

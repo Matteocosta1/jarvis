@@ -300,7 +300,7 @@ struct ContentView: View {
             case .meteo: VistaMeteo(chiedi: daScheda)
             case .email: VistaPosta(chiedi: daScheda)
             case .spesa: VistaSpesa(chiedi: daScheda)
-            case .shazam: VistaShazam(chiedi: daScheda)
+            case .shazam: VistaShazam(chiedi: daScheda, apriMusica: { scheda = .musica })
             case .foto: VistaFotoScheda(chiedi: daScheda)
             case .serata: VistaSerata(chiedi: daScheda)
             case .messaggi: VistaMessaggi(chiedi: daScheda)

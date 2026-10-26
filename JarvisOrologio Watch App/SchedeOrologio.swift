@@ -460,24 +460,16 @@ struct VistaShazamOrologio: View {
     enum Stato: Equatable { case ascolto, trovata, niente(String) }
     @State private var stato: Stato = .ascolto
     @State private var brano: Musica.Brano?
-    @State private var onda = false
+    @State private var suona = false                 // MARK X: la canzone suona sull'iPhone; dal polso pausa e play
+    @State private var avviso: String?
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Shazam") {
             VStack(spacing: 10) {
-                ZStack {
-                    ForEach(0..<3, id: \.self) { k in
-                        Circle().stroke(ciano.opacity(0.35), lineWidth: 1.5)
-                            .scaleEffect(stato == .ascolto && onda ? 1.5 + Double(k) * 0.2 : 1)
-                            .opacity(stato == .ascolto && onda ? 0 : 0.7)
-                            .animation(stato == .ascolto ? .easeOut(duration: 1.6).repeatForever(autoreverses: false).delay(Double(k) * 0.45) : .default, value: onda)
-                    }
-                    Circle().fill(ciano.opacity(0.85))
-                    Image(systemName: "shazam.logo.fill").font(.system(size: 34)).foregroundStyle(.white)
-                }
-                .frame(width: 80, height: 80)
-                .onTapGesture { Task { await ascolta() } }
+                logo
+                    .frame(width: 92, height: 92)
+                    .onTapGesture { Task { await ascolta() } }
                 switch stato {
                 case .ascolto: Text("Ascolto la musica…").font(.footnote).foregroundStyle(.secondary)
                 case .trovata:
@@ -485,6 +477,13 @@ struct VistaShazamOrologio: View {
                         Text(b.titolo).font(.system(size: 14, weight: .bold)).multilineTextAlignment(.center)
                         Text(b.artista).font(.footnote).foregroundStyle(ciano)
                         if let a = b.album { Text(a).font(.system(size: 9)).foregroundStyle(.secondary) }
+                        Button { Task { await playPausa() } } label: {
+                            Label(suona ? "PAUSA" : "PLAY", systemImage: suona ? "pause.fill" : "play.fill")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        }
+                        .tint(ciano)
+                        Text(avviso ?? "SUONA SULL'IPHONE · APPLE MUSIC").font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(avviso == nil ? .secondary : Color.orange).multilineTextAlignment(.center)
                         TastoJarvisOrologio(testo: "Chieda a JARVIS", frase: "Raccontami qualcosa di «\(b.titolo)» di \(b.artista).")
                     }
                 case .niente(let m):
@@ -497,16 +496,46 @@ struct VistaShazamOrologio: View {
         .task { await ascolta() }
     }
 
+    /// Il logo olografico come sull'iPhone (più leggero: 5 strati), gira mentre ascolta e oscilla a riposo.
+    private var logo: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let angolo = stato == .ascolto ? (t * 160).truncatingRemainder(dividingBy: 360) : sin(t * 0.9) * 38
+            let rad = angolo * .pi / 180
+            ZStack {
+                Circle().stroke(ciano.opacity(stato == .ascolto ? 0.6 : 0.25), lineWidth: 1.5)
+                ForEach(0..<5, id: \.self) { k in
+                    Image(systemName: "shazam.logo")
+                        .font(.system(size: 44, weight: .thin))
+                        .foregroundStyle(ciano.opacity(k == 2 ? 0.95 : 0.2))
+                        .offset(x: CGFloat(k - 2) * 1.6 * CGFloat(sin(rad)))
+                        .rotation3DEffect(.degrees(angolo), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+                }
+                .shadow(color: ciano.opacity(0.7), radius: 8)
+            }
+        }
+    }
+
     private func ascolta() async {
         guard stato != .ascolto || brano == nil else { return }
-        stato = .ascolto; brano = nil; onda = false
-        try? await Task.sleep(for: .milliseconds(50)); onda = true
+        stato = .ascolto; brano = nil; suona = false; avviso = nil
         switch await Musica.riconosci(secondi: 12) {
-        case .trovato(let b): brano = b; stato = .trovata; WKInterfaceDevice.current().play(.success); SuoniOrologio.pronto()
+        case .trovato(let b):
+            brano = b; stato = .trovata; WKInterfaceDevice.current().play(.success); SuoniOrologio.pronto()
+            // la canzone parte subito sull'iPhone (Apple Music), come il player del telefono
+            let d: [String: String] = ["id": b.appleMusicID ?? "", "cerca": "\(b.titolo) \(b.artista)"]
+            let j = String(decoding: (try? JSONSerialization.data(withJSONObject: d)) ?? Data("{}".utf8), as: UTF8.self)
+            if let r = await PonteOrologio.condiviso.musica("brano:" + j) { suona = r.suona; avviso = r.errore }
+            else { avviso = "L'IPHONE NON RISPONDE" }
         case .nessuno: stato = .niente("Non la riconosco, Sir. Avvicini il polso alla musica.")
         case .errore(let e): stato = .niente("Shazam non risponde: \(e)")
         }
-        onda = false
+    }
+
+    private func playPausa() async {
+        WKInterfaceDevice.current().play(.click)
+        if let r = await PonteOrologio.condiviso.musica(suona ? "pausa" : "play") { suona = r.suona; avviso = r.errore }
+        else { avviso = "L'IPHONE NON RISPONDE" }
     }
 }
 

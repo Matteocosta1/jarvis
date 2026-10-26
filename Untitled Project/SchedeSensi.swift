@@ -1,11 +1,13 @@
 #if os(iOS)
 import SwiftUI
 import Charts
+import MusicKit
 
-// MARK: - SHAZAM: che canzone è, e tutte quelle trovate
+// MARK: - SHAZAM (MARK X): logo olografico in ascolto, poi sale il player che la suona subito su Apple Music
 
 struct VistaShazam: View {
     let chiedi: (String) -> Void
+    var apriMusica: () -> Void = {}
     private let tinta = Tinte.shazam
 
     nonisolated struct Trovata: Codable, Identifiable, Sendable {
@@ -17,141 +19,268 @@ struct VistaShazam: View {
         let link: URL?
         let generi: [String]
         let quando: Date
+        var appleMusicID: String? = nil
     }
 
     enum Stato: Equatable { case fermo, ascolto, trovata, niente(String) }
 
     @State private var stato: Stato = .fermo
-    @State private var ultima: Trovata?
     @State private var storico: [Trovata] = []
-    @State private var onda = false
     @State private var chiediCancella = false
+    @State private var lampo = false                    // il lampo del logo quando la trova
+    @State private var aperta: Trovata?                 // il player
+    @State private var brano: Song?                     // il brano di Apple Music che suona nel player
+    @State private var inLibreria = Set<String>()
+    @State private var giu: CGFloat = 0                 // lo swipe giù del player
+    @ObservedObject private var lettore = LettoreMusica.condiviso
 
     var body: some View {
         CorniceScheda(titolo: "Shazam", sottotitolo: sottotitolo, icona: "shazam.logo", tinta: tinta) {
-            ascoltatore
-            if let t = ultima, stato == .trovata { scheda(t) }
+            logoOlografico
             if case .niente(let motivo) = stato {
-                Text(motivo).font(.footnote).foregroundStyle(.orange).frame(maxWidth: .infinity)
+                Text(motivo).font(.footnote).foregroundStyle(.orange).frame(maxWidth: .infinity).multilineTextAlignment(.center)
             }
             if !storico.isEmpty {
-                Pannello(titolo: "TROVATE · \(storico.count)", tinta: tinta) {
+                Pannello(titolo: "RICONOSCIUTE · \(storico.count)", tinta: tinta) {
                     ForEach(storico) { t in rigaStorico(t) }
                     Button(role: .destructive) { chiediCancella = true } label: { Label("Cancella la cronologia", systemImage: "trash").font(.footnote) }
                         .tint(.red).padding(.top, 4)
                 }
             }
         }
+        .overlay(alignment: .bottom) { if let t = aperta { player(t) } }
         .onAppear { storico = VistaShazam.leggi() }
         .task { await ascolta() }
-        .confirmationDialog("Cancellare tutte le canzoni trovate?", isPresented: $chiediCancella, titleVisibility: .visible) {
+        .task { await lettore.segui() }
+        .confirmationDialog("Cancellare tutte le canzoni riconosciute?", isPresented: $chiediCancella, titleVisibility: .visible) {
             Button("Cancella", role: .destructive) { storico = []; VistaShazam.salva([]) }
         }
     }
 
     private var sottotitolo: String {
         switch stato {
-        case .fermo: return "tocchi per ascoltare"
+        case .fermo: return "tocchi il logo per ascoltare"
         case .ascolto: return "ascolto la musica…"
-        case .trovata: return "trovata"
+        case .trovata: return "trovata · suona su Apple Music"
         case .niente: return "non riconosciuta"
         }
     }
 
-    /// Il cerchio che ascolta: onde che si allargano finché sente.
-    private var ascoltatore: some View {
+    // MARK: il logo olografico (come nel mockup: 9 strati, oscilla di ±38°, gira tutto mentre ascolta, lampo quando la trova)
+
+    private var logoOlografico: some View {
         Button { Task { await ascolta() } } label: {
-            ZStack {
-                ForEach(0..<3, id: \.self) { k in
-                    Circle().stroke(tinta.opacity(0.35), lineWidth: 2)
-                        .scaleEffect(stato == .ascolto && onda ? 1.6 + Double(k) * 0.25 : 1)
-                        .opacity(stato == .ascolto && onda ? 0 : 0.7)
-                        .animation(stato == .ascolto ? .easeOut(duration: 1.6).repeatForever(autoreverses: false).delay(Double(k) * 0.45) : .default, value: onda)
+            TimelineView(.animation(paused: UIAccessibility.isReduceMotionEnabled)) { tl in
+                let t = tl.date.timeIntervalSinceReferenceDate
+                let ascolto = stato == .ascolto
+                let angolo = ascolto ? (t * 160).truncatingRemainder(dividingBy: 360) : sin(t * 0.9) * 38
+                let rad = angolo * .pi / 180
+                ZStack {
+                    spettro(t: t, vivo: ascolto).frame(width: 230, height: 230)
+                    ForEach(0..<9, id: \.self) { k in
+                        Image(systemName: "shazam.logo")
+                            .font(.system(size: 88, weight: .thin))
+                            .foregroundStyle(tinta.opacity(k == 4 ? 0.95 : 0.16))
+                            .offset(x: CGFloat(k - 4) * 2.2 * CGFloat(sin(rad)))            // gli strati: la profondità dell'ologramma
+                            .rotation3DEffect(.degrees(angolo), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+                    }
+                    .shadow(color: tinta.opacity(ascolto ? 0.9 : 0.55), radius: ascolto ? 18 : 10)
+                    if ascolto {                                                         // la scansione che attraversa il logo
+                        let y = CGFloat((t * 0.8).truncatingRemainder(dividingBy: 1)) * 150 - 75
+                        Rectangle().fill(tinta.opacity(0.35)).frame(width: 130, height: 2).blur(radius: 1).offset(y: y)
+                    }
+                    Circle().fill(.white).frame(width: 150, height: 150).opacity(lampo ? 0.55 : 0).blur(radius: 18)
                 }
-                Circle().fill(RadialGradient(colors: [tinta, tinta.opacity(0.55)], center: .center, startRadius: 0, endRadius: 80))
-                    .shadow(color: tinta.opacity(0.7), radius: stato == .ascolto ? 24 : 10)
-                Image(systemName: "shazam.logo.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.white)
             }
-            .frame(width: 150, height: 150)
+            .frame(width: 240, height: 240)
+            .contentShape(Circle())
         }
         .buttonStyle(StileStark())
         .disabled(stato == .ascolto)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 8)
+        .accessibilityLabel(stato == .ascolto ? "Ascolto" : "Ascolta")
     }
 
-    private func scheda(_ t: Trovata) -> some View {
-        Pannello(tinta: tinta) {
-            HStack(alignment: .top, spacing: 14) {
-                AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                    .frame(width: 110, height: 110)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: tinta.opacity(0.4), radius: 10)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(t.titolo).font(.system(size: 19, weight: .bold)).foregroundStyle(.white)
-                    Text(t.artista).font(.system(size: 15)).foregroundStyle(tinta)
-                    if let a = t.album { Text(a).font(.system(size: 12)).foregroundStyle(Color.tenue) }
-                    if !t.generi.isEmpty { Text(t.generi.joined(separator: " · ")).font(.system(size: 11, design: .monospaced)).foregroundStyle(Color.tenue) }
-                }
-            }
-            HStack(spacing: 10) {
-                if let l = t.link {
-                    Link(destination: l) {
-                        Label("Apple Music", systemImage: "music.note")
-                            .font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 42)
-                            .foregroundStyle(Color.fondo).background(tinta).clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-                Button { chiedi("Raccontami qualcosa di «\(t.titolo)» di \(t.artista): l'anno, la storia, e se c'è un vinile da cercare su Discogs.") } label: {
-                    Label("Chieda a JARVIS", systemImage: "waveform")
-                        .font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 42)
-                        .foregroundStyle(tinta).overlay(RoundedRectangle(cornerRadius: 10).stroke(tinta.opacity(0.6), lineWidth: 1))
-                }
+    /// Lo spettro attorno al logo: fermo e tenue a riposo, vivo mentre ascolta.
+    private func spettro(t: Double, vivo: Bool) -> some View {
+        Canvas { c, size in
+            let centro = CGPoint(x: size.width / 2, y: size.height / 2), r0 = size.width * 0.36
+            for i in 0..<64 {
+                let a = Double(i) / 64 * 2 * .pi
+                let h = vivo ? 6 + 16 * abs(sin(t * 3.1 + Double(i) * 0.61) * cos(t * 1.7 + Double(i) * 0.23)) : 3
+                var p = Path()
+                p.move(to: CGPoint(x: centro.x + cos(a) * r0, y: centro.y + sin(a) * r0))
+                p.addLine(to: CGPoint(x: centro.x + cos(a) * (r0 + h), y: centro.y + sin(a) * (r0 + h)))
+                c.stroke(p, with: .color(tinta.opacity(vivo ? 0.75 : 0.25)), lineWidth: 2)
             }
         }
-        .transition(.scale(scale: 0.95).combined(with: .opacity))
+    }
+
+    // MARK: il player (sale da sotto; si chiude con uno swipe giù, come in Vinyl Hustler)
+
+    private func player(_ t: Trovata) -> some View {
+        VStack(spacing: 14) {
+            Capsule().fill(Color.white.opacity(0.35)).frame(width: 40, height: 5)
+            HStack(alignment: .top, spacing: 14) {
+                AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
+                    .frame(width: 96, height: 96).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: tinta.opacity(0.5), radius: 12)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(t.titolo).font(.system(size: 19, weight: .bold)).foregroundStyle(.white).lineLimit(2)
+                    Text(t.artista).font(.system(size: 15)).foregroundStyle(tinta).lineLimit(1)
+                    Text([t.album, brano?.releaseDate.map { String(Calendar.current.component(.year, from: $0)) }].compactMap { $0 }.joined(separator: " · "))
+                        .font(.system(size: 12)).foregroundStyle(Color.tenue).lineLimit(1)
+                    Text("APPLE MUSIC").font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(tinta.opacity(0.8))
+                }
+                Spacer(minLength: 0)
+            }
+            barraTempo
+            HStack(spacing: 34) {
+                Button { lettore.salta(-15) } label: { Image(systemName: "gobackward.15").font(.system(size: 24)) }
+                Button { Task { await lettore.playPausa() } } label: {
+                    Image(systemName: lettore.suona ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 54))
+                }
+                Button { lettore.salta(15) } label: { Image(systemName: "goforward.15").font(.system(size: 24)) }
+            }
+            .foregroundStyle(tinta)
+            HStack(spacing: 10) {
+                let gia = brano.map { inLibreria.contains($0.id.rawValue) } ?? false
+                Button { Task { await aggiungiLibreria() } } label: {
+                    Label(gia ? "IN LIBRERIA" : "LIBRERIA", systemImage: gia ? "checkmark" : "plus")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).frame(height: 42)
+                        .foregroundStyle(tinta).overlay(RoundedRectangle(cornerRadius: 10).stroke(tinta.opacity(0.6), lineWidth: 1))
+                }
+                .disabled(brano == nil || gia)
+                Button { chiudiPlayer(); apriMusica() } label: {
+                    Label("MUSICA", systemImage: "music.note")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced)).frame(maxWidth: .infinity).frame(height: 42)
+                        .foregroundStyle(Color.fondo).background(tinta).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            if let e = lettore.errore { Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center) }
+        }
+        .buttonStyle(StileStark())
+        .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 30)
+        .frame(maxWidth: 560)
+        .background(
+            RoundedRectangle(cornerRadius: 26).fill(Color.fondo.opacity(0.97))
+                .overlay(RoundedRectangle(cornerRadius: 26).stroke(tinta.opacity(0.45), lineWidth: 1))
+                .shadow(color: tinta.opacity(0.3), radius: 20)
+        )
+        .offset(y: max(0, giu))
+        .gesture(DragGesture()
+            .onChanged { giu = $0.translation.height }
+            .onEnded { v in
+                if v.translation.height > 90 || v.predictedEndTranslation.height > 260 { chiudiPlayer() }
+                else { withAnimation(.spring(duration: 0.3)) { giu = 0 } }
+            })
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private var barraTempo: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+            let d = lettore.durata ?? 0, now = lettore.tempo, f = d > 0 ? min(1, now / d) : 0
+            VStack(spacing: 4) {
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.12))
+                        Capsule().fill(tinta).frame(width: g.size.width * f)
+                    }
+                    .frame(height: 4).frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 0).onEnded { v in lettore.vaiA(v.location.x / max(1, g.size.width)) })
+                }
+                .frame(height: 22)
+                HStack {
+                    Text(VistaShazam.mmss(now)); Spacer(); Text(d > 0 ? VistaShazam.mmss(d) : "--:--")
+                }
+                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+            }
+        }
+    }
+
+    nonisolated static func mmss(_ s: Double) -> String { let x = Int(max(0, s)); return String(format: "%d:%02d", x / 60, x % 60) }
+
+    private func chiudiPlayer() {
+        withAnimation(.spring(duration: 0.35)) { aperta = nil; giu = 0 }            // la musica continua
     }
 
     private func rigaStorico(_ t: Trovata) -> some View {
-        HStack(spacing: 12) {
-            AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(t.titolo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                Text(t.artista).font(.system(size: 12)).foregroundStyle(tinta).lineLimit(1)
+        Button { Task { await suona(t) } } label: {
+            HStack(spacing: 12) {
+                AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
+                    .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(t.titolo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                    Text(t.artista).font(.system(size: 12)).foregroundStyle(tinta).lineLimit(1)
+                }
+                Spacer()
+                Text(t.quando.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
+                    .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
+                Image(systemName: "play.circle.fill").font(.system(size: 22)).foregroundStyle(tinta)
             }
-            Spacer()
-            Text(t.quando.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
-                .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
-            if let l = t.link { Link(destination: l) { Image(systemName: "play.circle.fill").font(.system(size: 22)).foregroundStyle(tinta) } }
         }
+        .buttonStyle(.plain)
         .contextMenu {
+            Button { chiedi("Raccontami qualcosa di «\(t.titolo)» di \(t.artista): l'anno, la storia, e se c'è un vinile da cercare su Discogs.") } label: { Label("Chieda a JARVIS", systemImage: "waveform") }
             Button(role: .destructive) { storico.removeAll { $0.id == t.id }; VistaShazam.salva(storico) } label: { Label("Elimina", systemImage: "trash") }
         }
     }
 
+    // MARK: ascolto, riproduzione, libreria
+
     private func ascolta() async {
         guard stato != .ascolto else { return }
-        withAnimation { stato = .ascolto; ultima = nil }
-        onda = false
-        try? await Task.sleep(for: .milliseconds(50))
-        onda = true
+        withAnimation { stato = .ascolto; aperta = nil }
         switch await Musica.riconosci(secondi: 12) {
         case .trovato(let b):
-            let t = Trovata(titolo: b.titolo, artista: b.artista, album: b.album, copertina: b.copertina, link: b.appleMusic ?? b.web, generi: b.generi, quando: Date())
+            let t = Trovata(titolo: b.titolo, artista: b.artista, album: b.album, copertina: b.copertina, link: b.appleMusic ?? b.web,
+                            generi: b.generi, quando: Date(), appleMusicID: b.appleMusicID)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             Suoni.pronto()
-            withAnimation(.spring(duration: 0.45)) { ultima = t; stato = .trovata }
+            withAnimation(.easeOut(duration: 0.15)) { stato = .trovata; lampo = true }
+            withAnimation(.easeOut(duration: 0.6).delay(0.15)) { lampo = false }
             storico.insert(t, at: 0)
             VistaShazam.salva(storico)
+            await suona(t)
         case .nessuno:
-            withAnimation { stato = .niente("Non la riconosco, Sir: forse la musica è troppo bassa o c'è troppo rumore. Ritocchi il cerchio.") }
+            withAnimation { stato = .niente("Non la riconosco, Sir: forse la musica è troppo bassa o c'è troppo rumore. Ritocchi il logo.") }
         case .errore(let e):
             withAnimation { stato = .niente("Shazam non risponde: \(e).") }
         }
-        onda = false
+    }
+
+    /// Sale il player e la canzone parte subito su Apple Music (serve l'abbonamento; senza, il player resta con il link).
+    private func suona(_ t: Trovata) async {
+        withAnimation(.spring(duration: 0.45, bounce: 0.15)) { aperta = t; giu = 0 }
+        brano = nil
+        guard await CatalogoMusica.autorizzato() else { lettore.errore = CatalogoMusica.senzaPermesso; return }
+        var trovato: Song?
+        if let id = t.appleMusicID {
+            let r = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(id))
+            trovato = try? await r.response().items.first
+        }
+        if trovato == nil {
+            var r = MusicCatalogSearchRequest(term: "\(t.titolo) \(t.artista)", types: [Song.self]); r.limit = 1
+            trovato = try? await r.response().songs.first
+        }
+        guard let s = trovato else { lettore.errore = "Non la trovo su Apple Music, Sir."; return }
+        lettore.errore = nil
+        brano = s
+        await lettore.metti(s)
+    }
+
+    private func aggiungiLibreria() async {
+        guard let s = brano else { return }
+        do {
+            try await MusicLibrary.shared.add(s)
+            inLibreria.insert(s.id.rawValue)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            lettore.errore = "Non riesco ad aggiungerla alla libreria: \(error.localizedDescription)"
+        }
     }
 
     private static let chiave = "shazamTrovate"
