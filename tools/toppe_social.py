@@ -50,7 +50,8 @@ def toppe_social(s, toppa):
           const r = await window.__jarvisChiedi("socialPubblica", { formato: media.formato, quando, didascalia, media: media.b64, mime: media.mime }).then((t) => JSON.parse(t)).catch((e) => ({ errore: e.message || String(e) }));
           L.remove(); if (!ok()) return;
           if (r.errore) { parlaMock("Non è andata, Sir: " + r.errore, 4200); return; }
-          suona("aPronto"); parlaMock(r.programmato ? `Programmato per ${r.programmato}, Sir: è l'orario migliore.` : (media.nota || "Pubblicato su @kingrusto, Sir."), 3200); fonte = null; didascalia = "";
+          suona("aPronto"); parlaMock(r.programmato ? `Programmato per ${r.programmato.toLowerCase().replace(" ", " alle ")}, Sir: lo trova nel PIANO.` : (media.nota || "Pubblicato su @kingrusto, Sir."), 3200); fonte = null; didascalia = "";
+          if (r.programmato) { quando = "ORA"; scheda = "piano"; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.sc === "piano")); pagina(); }
           window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialStato" }); return; }''')
     # nell'app niente dati d'esempio: posta, calendario e automazione arrivano dal cervello (window.__socStato, chiamata dall'app)
     s = toppa(s, 'CONTENUTI.Social = `<div id="social"></div>`;',
@@ -79,4 +80,34 @@ def toppe_social(s, toppa):
               'if (b.dataset.ignora) { suona("aTick"); const ig = SOC.posta[+b.dataset.ignora]; if (window.JARVIS_APP && ig?.id) { let l = []; try { l = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} l.push(ig.id); try { localStorage.setItem("jarvisSocialIgnorati", JSON.stringify(l.slice(-300))); } catch {} } SOC.posta.splice(+b.dataset.ignora, 1); pagina(); return; }')
     s = toppa(s, 'SOC.vero = r; SOC.posta = r.posta || [];',
               'SOC.vero = r; let ign = []; try { ign = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} SOC.posta = (r.posta || []).filter((m) => !ign.includes(m.id));')
+
+    # ── 10.0 (7): GRIGLIA, PIANO, ORARI, RIVALI con i dati veri (funzione «social»: media, ore, modifica, scambia, commenti) ──
+    s = toppa(s, 'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = [];',
+              'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.media = []; SOC.ore = null;')
+    s = toppa(s, 'SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || [];',
+              'SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; SOC.media = r.media || []; SOC.ore = r.ore || null;')
+    # commenti sì/no: davvero su Instagram; se non va, l'interruttore torna com'era
+    s = toppa(s, 'parlaMock(m.commOn ? "Commenti riaccesi, Sir." : "Commenti spenti su questo post, Sir.", 2000); pagina(); }',
+              'parlaMock(m.commOn ? "Commenti riaccesi, Sir." : "Commenti spenti su questo post, Sir.", 2000); pagina(); '
+              'if (window.JARVIS_APP) window.__jarvisChiedi("socialCommenti", { idMedia: m.id, on: m.commOn }).then((x) => JSON.parse(x)).catch((e) => ({ errore: e.message || String(e) })).then((r) => { if (!r.errore) return; m.commOn = !m.commOn; '
+              'if (t.isConnected) { t.classList.toggle("on", m.commOn); t.setAttribute("aria-pressed", m.commOn); t.previousElementSibling.textContent = `COMMENTI ${m.commOn ? "ATTIVI" : "DISATTIVATI"}`; } parlaMock("Instagram non ha cambiato i commenti, Sir: " + r.errore, 3600); pagina(); }); }')
+    # MODIFICA: il post nell'app di Instagram
+    s = toppa(s, 'if (k === "modifica") { suona("aTick"); parlaMock(',
+              'if (k === "modifica") { suona("aTick"); if (window.JARVIS_APP && m.link) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "apriInstagram", url: m.link }); parlaMock(')
+    # PIANO: scambio, modifica e togli vanno al cervello (se non va, si ricarica lo stato vero)
+    giusto = 'const ricarica = (r) => { if (r.errore) { parlaMock("Non è andata, Sir: " + r.errore, 3600); window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialStato" }); } }; '
+    s = toppa(s, 'const qa = a.quando; a.quando = b.quando; b.quando = qa; suona("aPronto");',
+              'const qa = a.quando; a.quando = b.quando; b.quando = qa; suona("aPronto"); '
+              'if (window.JARVIS_APP && a.id && b.id) { ' + giusto + 'window.__jarvisChiedi("socialScambia", { a: a.id, b: b.id }).then((x) => JSON.parse(x)).catch((e) => ({ errore: e.message || String(e) })).then(ricarica); }')
+    s = toppa(s, 'c.quando = q; via();',
+              'c.quando = q; via(); if (window.JARVIS_APP && c.id) { ' + giusto + 'window.__jarvisChiedi("socialModifica", { idCoda: c.id, didascalia: c.dida, quando: q }).then((x) => JSON.parse(x)).catch((e) => ({ errore: e.message || String(e) })).then(ricarica); }')
+    s = toppa(s, 'if (k === "togli") { suona("aTick"); SOC.coda.splice(i, 1);',
+              'if (k === "togli") { suona("aTick"); if (window.JARVIS_APP && c.id) window.__jarvisChiedi("socialAnnulla", { idCoda: c.id }).catch(() => {}); SOC.coda.splice(i, 1);')
+    # RIVALI: nell'app il collegamento a Facebook non si finge
+    s = toppa(s, 'if (k === "collega") { suona("aPronto"); SOC.fbCollegato = true;',
+              'if (k === "collega" && window.JARVIS_APP) { suona("aTick"); via(); parlaMock("Prima crei la pagina Facebook e la colleghi a Instagram, Sir: poi me lo dica e accendo RIVALI.", 4200); return; }\n      if (k === "collega") { suona("aPronto"); SOC.fbCollegato = true;')
+    s = toppa(s, '<button type="button" class="sc-vai" data-f="collega">COLLEGA (PROVA)</button>',
+              '<button type="button" class="sc-vai" data-f="collega">${window.JARVIS_APP ? "HO CAPITO" : "COLLEGA (PROVA)"}</button>')
+    s = toppa(s, '<li>Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook.</li>',
+              '<li>${window.JARVIS_APP ? "Me lo dica: JARVIS le chiede un solo permesso a Facebook." : "Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook."}</li>')
     return s

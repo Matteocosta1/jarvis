@@ -185,6 +185,21 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "socialAnnulla":
             let corpo: [String: Any] = ["azione": "annulla", "id": o["idCoda"] ?? 0]
             Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "socialModifica":                                           // PIANO: didascalia e ora di un programmato
+            var corpo: [String: Any] = ["azione": "modifica", "id": o["idCoda"] ?? 0]
+            if let d = o["didascalia"] as? String { corpo["didascalia"] = d }
+            if let q = o["quando"] as? String { corpo["quando"] = q }
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "socialScambia":                                            // PIANO: due programmati si scambiano l'ora
+            let corpo: [String: Any] = ["azione": "scambia", "a": o["a"] ?? 0, "b": o["b"] ?? 0]
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "socialCommenti":                                           // GRIGLIA: commenti sì/no su un post pubblicato
+            let corpo: [String: Any] = ["azione": "commenti", "id": o["idMedia"] as? String ?? "", "on": o["on"] as? Bool ?? true]
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "apriInstagram":                                            // GRIGLIA › MODIFICA: il post nell'app di Instagram
+            guard let t = o["url"] as? String, let u = URL(string: t), u.scheme == "https",
+                  u.host == "www.instagram.com" || u.host == "instagram.com" else { return }
+            UIApplication.shared.open(u)
         case "socialAuto":
             let corpo: [String: Any] = ["azione": "auto", "on": o["on"] as? Bool ?? false, "parola": o["parola"] as? String ?? "", "testo": o["testo"] as? String ?? ""]
             Task { _ = await RegiaStudio.social(corpo) }

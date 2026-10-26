@@ -1,10 +1,14 @@
 // JARVIS — SOCIAL (MARK X): Instagram di @kingrusto con l'API ufficiale (Instagram API with Instagram Login, app Meta «JARVIS KR»).
 // POST. Chi chiama: l'app (header x-jarvis-token) oppure pg_cron (header x-chiave-interna, solo «giro»).
-// Corpo: { azione: "stato" | "rispondi" | "pubblica" | "annulla" | "auto" | "giro", ... }
-//  · stato     → profilo, report 7 giorni, posta (commenti + messaggi, con la bozza di JARVIS), calendario, automazione
+// Corpo: { azione: "stato" | "rispondi" | "pubblica" | "annulla" | "modifica" | "scambia" | "commenti" | "auto" | "giro", ... }
+//  · stato     → profilo, report 7 giorni, posta (commenti + messaggi, con la bozza di JARVIS), piano (programmati), automazione,
+//                griglia (ultimi 18 post con i numeri), ore (follower online per giorno e fascia di 3 ore, ora di Roma)
 //  · rispondi  → { tipo: "commento"|"dm", id, a?, testo }  risposta pubblica al commento o messaggio in DM (solo col sì del signore, dall'app)
-//  · pubblica  → { formato: "POST"|"STORIA"|"REEL", quando: "ORA"|"LUN12", didascalia, media (base64), mime }
+//  · pubblica  → { formato: "POST"|"STORIA"|"REEL", quando: "ORA"|"LUN 12:00"|"GIO 21:00"…, didascalia, media (base64), mime }
 //  · annulla   → { id } toglie un post programmato
+//  · modifica  → { id, didascalia?, quando? ("GIO 21:00") } cambia un programmato finché non è uscito
+//  · scambia   → { a, b } due programmati si scambiano l'ora (PIANO, trascinamento)
+//  · commenti  → { id, on } accende o spegne i commenti di un post pubblicato
 //  · auto      → { on, parola, testo } l'automazione «commenta PAROLA → link in DM»
 //  · giro      → (pg_cron ogni 10 minuti) pubblica i programmati scaduti e fa girare l'automazione
 // Il token sta nella tabella social_token (rinnovato ogni lunedì da «social-token»); non esce mai da qui.
@@ -43,20 +47,55 @@ const quandoTesto = (d: Date) => {
   const oggi = new Date(), ieri = new Date(Date.now() - 864e5), f = (x: Date) => x.toLocaleDateString("it-IT", { timeZone: "Europe/Rome" });
   return (f(d) === f(oggi) ? "OGGI" : f(d) === f(ieri) ? "IERI" : giornoRoma(d)) + " " + oraRoma(d);
 };
-/** Il prossimo lunedì alle 12 a Roma (l'orario migliore del mockup), in UTC. */
-function prossimoLunedi12(): Date {
-  const ora = new Date();
-  for (let g = 0; g < 8; g++) {
+const GIORNI = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"], GIORNI_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** «GIO 21:00» → il prossimo giovedì alle 21 a Roma, in UTC (se non si capisce: lunedì alle 12, l'orario del mockup). */
+function prossimo(testo = "LUN 12:00"): Date {
+  const m = String(testo).toUpperCase().match(/^(LUN|MAR|MER|GIO|VEN|SAB|DOM)\s+(\d{1,2})(?::(\d{2}))?$/);
+  const gi = m ? GIORNI.indexOf(m[1]) : 0, hh = m ? Math.min(23, +m[2]) : 12, mi = m ? Math.min(59, +(m[3] ?? 0)) : 0;
+  const voluto = `${String(hh).padStart(2, "0")}:${String(mi).padStart(2, "0")}`, ora = new Date();
+  for (let g = 0; g < 9; g++) {
     const d = new Date(ora.getTime() + g * 864e5);
-    const giorno = d.toLocaleDateString("en-GB", { timeZone: "Europe/Rome", weekday: "short" });
-    if (giorno !== "Mon") continue;
+    if (d.toLocaleDateString("en-GB", { timeZone: "Europe/Rome", weekday: "short" }) !== GIORNI_EN[gi]) continue;
     const [gg, mm, aa] = d.toLocaleDateString("en-GB", { timeZone: "Europe/Rome" }).split("/").map(Number);
     for (const off of [1, 2]) {                                       // ora solare (+1) o legale (+2)
-      const c = new Date(Date.UTC(aa, mm - 1, gg, 12 - off, 0));
-      if (oraRoma(c) === "12:00" && c > ora) return c;
+      const c = new Date(Date.UTC(aa, mm - 1, gg, hh - off, mi));
+      if (oraRoma(c) === voluto && c > ora) return c;
     }
   }
   return new Date(ora.getTime() + 7 * 864e5);
+}
+const quandoBreve = (d: Date) => `${GIORNI[GIORNI_EN.indexOf(d.toLocaleDateString("en-GB", { timeZone: "Europe/Rome", weekday: "short" }))] ?? giornoRoma(d)} ${oraRoma(d)}`;
+
+/** ORARI: follower online (ultimi 30 giorni). Instagram dà le ore del Pacifico: qui diventano ora di Roma, 7 giorni × 8 fasce di 3 ore, in migliaia. */
+async function orari(t: string) {
+  const ora = Math.floor(Date.now() / 1000);
+  const r = await ig(t, "/me/insights", { metric: "online_followers", period: "lifetime", since: String(ora - 29 * 86400), until: String(ora) });
+  const somma = GIORNI.map(() => Array(8).fill(0)), conta = GIORNI.map(() => Array(8).fill(0));
+  for (const v of r.data?.[0]?.values ?? []) {
+    const inizio = new Date(v.end_time).getTime() - 864e5;           // end_time = mezzanotte del Pacifico del giorno dopo
+    for (const [h, n] of Object.entries(v.value ?? {})) {
+      const d = new Date(inizio + Number(h) * 36e5);
+      const g = GIORNI_EN.indexOf(d.toLocaleDateString("en-GB", { timeZone: "Europe/Rome", weekday: "short" }));
+      const hr = Number(d.toLocaleTimeString("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hour12: false }).slice(0, 2)) % 24;
+      if (g < 0) continue;
+      somma[g][Math.floor(hr / 3)] += Number(n) || 0; conta[g][Math.floor(hr / 3)]++;
+    }
+  }
+  if (!conta.flat().some((c) => c)) return null;
+  return somma.map((r, g) => r.map((s, f) => conta[g][f] ? Math.round(s / conta[g][f] / 100) / 10 : 0));
+}
+
+/** GRIGLIA: gli ultimi post con i numeri di ognuno (statistiche ufficiali del post). */
+async function griglia(t: string, media: any[]) {
+  const tipo = (m: any) => m.media_product_type === "REELS" ? "REEL" : m.media_type === "CAROUSEL_ALBUM" ? "CAROSELLO" : "POST";
+  return await Promise.all(media.map(async (m, i) => {
+    const n: Record<string, number> = {};
+    try { for (const x of (await ig(t, `/${m.id}/insights`, { metric: "reach,saved,shares,views" })).data ?? []) n[x.name] = x.values?.[0]?.value ?? 0; } catch { /* post troppo vecchio o senza statistiche */ }
+    const quando = new Date(m.timestamp).toLocaleDateString("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "short" }).toUpperCase().replace(".", "");
+    return { id: m.id, tipo: tipo(m), titolo: (m.caption ?? "").split("\n")[0].slice(0, 60) || "Senza didascalia", quando, dida: m.caption ?? "",
+      vis: n.views ?? 0, like: m.like_count ?? 0, comm: m.comments_count ?? 0, salv: n.saved ?? 0, cond: n.shares ?? 0, cop: n.reach ?? 0,
+      commOn: m.is_comment_enabled !== false, img: m.media_type === "VIDEO" ? (m.thumbnail_url ?? "") : (m.media_url ?? m.thumbnail_url ?? ""), link: m.permalink ?? "", n: i };
+  }));
 }
 
 /** Le bozze di JARVIS per commenti e messaggi (una chiamata sola, modello rapido). */
@@ -80,7 +119,8 @@ Rispondi SOLO con un array JSON di stringhe, nello stesso ordine.`;
 
 async function stato(t: string, leggero = false) {
   const me = await ig(t, "/me", { fields: "user_id,username,followers_count,media_count,profile_picture_url,account_type" });
-  const media = (await ig(t, "/me/media", { fields: "id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink", limit: "12" })).data ?? [];
+  const media = (await ig(t, "/me/media", { fields: "id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink,is_comment_enabled,media_url,thumbnail_url", limit: leggero ? "12" : "18" })).data ?? [];
+  const [grigliaVera, oreVere] = leggero ? [[], null] : await Promise.all([griglia(t, media), orari(t).catch(() => null)]);   // l'orologio non le mostra
   // REPORT: copertura giorno per giorno (7 giorni), follower guadagnati, interazioni
   const ora = Math.floor(Date.now() / 1000), da = ora - 7 * 86400;
   let giorni: number[] = [], etichette: string[] = [], copertura = 0, nuovi: number | null = null, interazioni: number | null = null;
@@ -131,7 +171,7 @@ async function stato(t: string, leggero = false) {
   const b = leggero ? [] : await bozze(daFare.map((p) => ({ tipo: p.tipo, testo: p.testo })));   // l'orologio non le mostra: niente bozze
   daFare.forEach((p, i) => (p.bozza = b[i] ?? ""));
 
-  const { data: coda } = await db.from("social_coda").select("id,quando,formato,didascalia,stato").eq("stato", "programmato").order("quando");
+  const { data: coda } = await db.from("social_coda").select("id,quando,formato,didascalia,stato,media_url,mime").eq("stato", "programmato").order("quando");
   const { data: imp } = await db.from("social_impostazioni").select("auto_on,parola,testo").eq("id", 1).maybeSingle();
   return {
     profilo: { username: me.username, follower: me.followers_count ?? 0, followerTesto: k(me.followers_count ?? 0), post: me.media_count ?? 0, foto: me.profile_picture_url ?? null, tipo: me.account_type ?? "" },
@@ -145,7 +185,9 @@ async function stato(t: string, leggero = false) {
       riassunto: `Ultimi 7 giorni, Sir: ${copertura ? k(copertura) + " account raggiunti" : "la copertura non è disponibile"}${nuovi != null ? `, ${nuovi >= 0 ? "+" : ""}${nuovi} follower` : ""}${interazioni != null ? `, ${k(interazioni)} interazioni` : ""}.${top ? ` Il più visto: «${titolo(top)}», ${top.like_count ?? 0} like.` : ""}`,
     },
     posta,
-    coda: (coda ?? []).map((c: any) => ({ id: c.id, quando: `${giornoRoma(new Date(c.quando))} ${oraRoma(new Date(c.quando))}`, titolo: (c.didascalia ?? "").split("\n")[0].slice(0, 60) || "Senza didascalia", tipo: c.formato })),
+    coda: (coda ?? []).map((c: any) => ({ id: c.id, quando: quandoBreve(new Date(c.quando)), titolo: (c.didascalia ?? "").split("\n")[0].slice(0, 60) || "Senza didascalia", tipo: c.formato,
+      dida: c.didascalia ?? "", seme: "coda" + c.id, img: String(c.mime ?? "").startsWith("image/") ? c.media_url : "" })),
+    media: grigliaVera, ore: oreVere,
     pubblicati: media.slice(0, 6).map((m: any) => ({ quando: quandoTesto(new Date(m.timestamp)), titolo: titolo(m), tipo: tipo(m) })),
     auto: { on: imp?.auto_on ?? false, parola: imp?.parola ?? "LISTA", testo: imp?.testo ?? "Ecco il link 👉" },
   };
@@ -228,12 +270,32 @@ Deno.serve(async (req) => {
       const url = `${URL_DB}/storage/v1/object/public/${BUCKET}/${nome}`;
       const didascalia = String(c.didascalia ?? "").slice(0, 2200);
       if (c.quando && c.quando !== "ORA") {
-        const quando = prossimoLunedi12();
+        const quando = prossimo(String(c.quando));
         await db.from("social_coda").insert({ quando: quando.toISOString(), formato, didascalia, media_url: url, mime, stato: "programmato" });
-        return json({ ok: true, programmato: `${giornoRoma(quando)} ${oraRoma(quando)}` });
+        return json({ ok: true, programmato: quandoBreve(quando) });
       }
       const id = await pubblicaOra(t, formato, url, mime, didascalia);
       return json({ ok: true, pubblicato: id });
+    }
+    if (c.azione === "modifica") {
+      const { data: v } = await db.from("social_coda").select("id,stato").eq("id", c.id).maybeSingle();
+      if (!v || v.stato !== "programmato") return json({ errore: "è già uscito o non c'è più" }, 409);
+      const cambio: Record<string, unknown> = {};
+      if (typeof c.didascalia === "string") cambio.didascalia = c.didascalia.slice(0, 2200);
+      if (c.quando) cambio.quando = prossimo(String(c.quando)).toISOString();
+      await db.from("social_coda").update(cambio).eq("id", c.id);
+      return json({ ok: true, quando: cambio.quando ? quandoBreve(new Date(cambio.quando as string)) : null });
+    }
+    if (c.azione === "scambia") {
+      const { data: due } = await db.from("social_coda").select("id,quando,stato").in("id", [c.a, c.b]);
+      if ((due ?? []).length !== 2 || due!.some((x: any) => x.stato !== "programmato")) return json({ errore: "uno dei due è già uscito" }, 409);
+      await db.from("social_coda").update({ quando: due![1].quando }).eq("id", due![0].id);
+      await db.from("social_coda").update({ quando: due![0].quando }).eq("id", due![1].id);
+      return json({ ok: true });
+    }
+    if (c.azione === "commenti") {
+      await ig(t, `/${String(c.id).replace(/\D/g, "")}`, { comment_enabled: String(!!c.on) }, "POST");
+      return json({ ok: true });
     }
     if (c.azione === "annulla") { await db.from("social_coda").update({ stato: "annullato" }).eq("id", c.id); return json({ ok: true }); }
     if (c.azione === "auto") {
