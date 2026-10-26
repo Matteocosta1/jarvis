@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var testo = ""
     @State private var mostraImpostazioni = false
     @State private var mostraBrowser = false
+    @State private var mostraStudio = false      // MARK X: STUDIO, il banco olografico (icona in alto dopo MUSICA)
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
@@ -251,6 +252,7 @@ struct ContentView: View {
         }) { ImpostazioniView().environmentObject(jarvis) }
         .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
+        .fullScreenCover(isPresented: $mostraStudio) { VistaStudio(parla: { [jarvis] frase in jarvis.annuncia(frase) }) }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
             Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                   oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia) { dati in jarvis.occhiChiusi(dati) }
@@ -571,7 +573,7 @@ struct ContentView: View {
     /// MARK X (26 ott): il nome della versione sotto il titolo.
     static let marca = "MARK X"
     /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra). Studio e Social arrivano con le tappe 2 e 3.
-    enum postoTesta { static let musica = 0, sistemi = 1, cestino = 2, impostazioni = 3, totale = 4 }
+    enum postoTesta { static let musica = 0, studio = 1, sistemi = 2, cestino = 3, impostazioni = 4, totale = 5 }
 
     /// `mini`: con la tastiera aperta (solo iPhone) qui c'è il posto del reattore piccolo, tra il titolo e i tasti: il reattore vero
     /// ci vola sopra dal centro (`reattoreVolante`). Build 23: le icone sono quattro (MUSICA, SISTEMI, cestino, Impostazioni); come nel
@@ -626,6 +628,17 @@ struct ContentView: View {
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
             .accessibilityLabel("Musica")
+            // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); mostraStudio = true } label: {
+                IconaStudio()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(Color.ciano)
+                    .padding(.vertical, 8).padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate)
+            .accessibilityLabel("Studio")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 16))
