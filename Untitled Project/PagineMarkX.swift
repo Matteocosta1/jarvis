@@ -26,6 +26,12 @@ enum PaginaMarkX {
     static func apri(_ a: AperturaPagina) {
         NotificationCenter.default.post(name: .jarvisApriPagina, object: nil, userInfo: ["a": a])
     }
+    /// Nessuna schermata sopra JARVIS (né aperta né ancora in chiusura): solo allora iOS apre la pagina.
+    static func schermoLibero() -> Bool {
+        let finestre = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        guard let radice = (finestre.first { $0.isKeyWindow } ?? finestre.first)?.rootViewController else { return true }
+        return radice.presentedViewController == nil && !radice.isBeingPresented && radice.transitionCoordinator == nil
+    }
     /// C'è un pezzo con la miniatura nell'archivio dello Studio? (per la frase di JARVIS, come il mockup)
     static var pezzoStudio: Bool {
         (RegiaStudio.leggiArchivio()["jarvisStudioArchivio1"] ?? "").contains("\"mini\"")

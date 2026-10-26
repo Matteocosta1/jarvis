@@ -255,9 +255,16 @@ struct ContentView: View {
         .fullScreenCover(item: $aperturaPagina) { a in VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }) }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
-            if aperturaPagina == nil { aperturaPagina = a; return }
-            aperturaPagina = nil                                   // ce n'è già una aperta: si chiude e si riapre con la nuova
-            Task { @MainActor in try? await Task.sleep(for: .milliseconds(650)); aperturaPagina = a }
+            // 26 ott (Occhi → Studio che non si apriva): iOS non apre una schermata mentre un'altra si sta ancora chiudendo
+            // (gli Occhi, LiDAR). Si aspetta che sia davvero chiusa (al massimo 3 s), poi si apre lo Studio o Social.
+            Task { @MainActor in
+                if aperturaPagina != nil { aperturaPagina = nil }     // ce n'è già una aperta: si chiude e si riapre con la nuova
+                for _ in 0..<60 {
+                    if PaginaMarkX.schermoLibero() { break }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                aperturaPagina = a
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisVaiA)) { n in   // LIDAR e OCCHI dello Studio: quelli veri
             let lidar = n.userInfo?["dove"] as? String == "lidar"
@@ -270,7 +277,7 @@ struct ContentView: View {
         }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
             Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
-                  oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda) { dati in jarvis.occhiChiusi(dati) }
+                  oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
         }
         .fullScreenCover(item: $jarvis.interprete) { l in
             Interprete(lingua: l) { jarvis.interprete = nil }
@@ -595,21 +602,34 @@ struct ContentView: View {
     /// mockup («.telefono.b23») le icone hanno 1 punto in meno per lato e, con la tastiera aperta, le lettere del titolo 1 punto più vicine:
     /// così il reattore piccolo non tocca né il titolo né le icone.
     /// `stretta`: schermo più stretto di `larghezzaStretta` (decisione 16): il titolo non va mai a capo e non tocca le icone.
+    /// Il titolo su una riga, a misura fissa (lo sceglie `ViewThatFits`): l'ultimo punto attaccato alla S.
+    private func titoloJarvis(spazio: CGFloat, misura: CGFloat) -> some View {
+        (Text("J.A.R.V.I.").tracking(spazio) + Text("S."))
+            .font(.system(size: misura, weight: .bold, design: .monospaced))
+            .lineLimit(1)
+            .fixedSize()
+    }
+
     private func intestazione(mini: Bool = false, stretta: Bool = false) -> some View {
         HStack(alignment: .rigaMark, spacing: 0) {          // le icone sulla stessa riga di «MARK VIII», strette tra loro
             VStack(alignment: .leading, spacing: 2) {
                 // l'ultimo punto attaccato alla S (la spaziatura delle lettere lo staccava)
-                (Text("J.A.R.V.I.").tracking(5) + Text("S."))   // MARK X (mockup b32): con la tastiera le lettere restano uguali
-                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                // 26 ott (foto del signore): con la tastiera aperta e 7 icone in testata, sul 15 Pro restano ~192 punti e il titolo ne
+                // vuole ~208: la «S.» andava a capo. Ora prima si stringe solo lo spazio tra le lettere (le lettere restano uguali, come il
+                // mockup b32), poi, solo se ancora non ci sta, il testo; sempre su una riga, mai tagliato.
+                ViewThatFits(in: .horizontal) {
+                    titoloJarvis(spazio: 5, misura: 22)
+                    titoloJarvis(spazio: 4, misura: 22)
+                    titoloJarvis(spazio: 3, misura: 22)
+                    titoloJarvis(spazio: 2, misura: 22)
+                    titoloJarvis(spazio: 2, misura: 20)
+                    titoloJarvis(spazio: 1.5, misura: 18)
+                    titoloJarvis(spazio: 1, misura: 16)
+                }
                     .foregroundStyle(.white)
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
                     .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
-                    // schermo stretto: mai a capo; se non ci sta nemmeno così (320 punti) si rimpicciolisce quanto basta
-                    // 26 ott: con 6 icone e la tastiera aperta (reattore piccolo in testata) la «S.» andava a capo anche sul 15 Pro:
-                    // mai a capo su nessun iPhone; se non ci sta, il titolo si stringe appena quanto basta
-                    .lineLimit(1)
-                    .minimumScaleFactor(stretta ? 0.7 : 0.8)
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)

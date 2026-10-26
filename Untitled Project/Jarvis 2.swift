@@ -914,6 +914,10 @@ final class Jarvis: NSObject, ObservableObject {
             if let r = c.risposta { annuncia(r) }
             return
         }
+        if case .aereo("AEREO_OFF", _) = c {                     // MARK X: a Occhi chiusi non c'è niente da spegnere
+            annuncia("La ricerca degli aerei è già spenta, Sir.")
+            return
+        }
         if let r = c.risposta ?? c.annuncioApertura ?? Reparto.occhi.annuncio { annuncia(r) }
         guardaManuale(iniziale: c)
     }
@@ -999,6 +1003,7 @@ final class Jarvis: NSObject, ObservableObject {
             case .aggancia?: o.olo = true; o.aggancia = true
             case .studio?: o.manda = "studio"          // MARK X: a fuoco e parte da sola verso lo Studio
             case .social?: o.manda = "social"
+            case .aereo(let p, let f)?: o.aereo = (p: p, frase: f)     // MARK X · AEREO: aperti, cercano e agganciano
             default: break
             }
             occhi = o

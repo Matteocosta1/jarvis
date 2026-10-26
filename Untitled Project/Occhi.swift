@@ -37,6 +37,8 @@ struct Occhiata: Identifiable {
     var aggancia = false
     /// MARK X, aperti a voce: «manda questo pezzo allo Studio» / «pubblica questa foto su Instagram» → a fuoco, poi parte da sola.
     var manda: String? = nil
+    /// MARK X · AEREO, aperti a voce: il comando (AEREO, AEREO_DOVE…) e la frase detta.
+    var aereo: (p: String, frase: String)? = nil
 }
 
 struct Occhi: View {
@@ -52,6 +54,8 @@ struct Occhi: View {
     var agganciaIniziale = false
     /// MARK X: aperti a voce per mandare la foto allo Studio o a Social ("studio" / "social").
     var mandaIniziale: String? = nil
+    /// MARK X · AEREO: aperti a voce con «che aereo è quello?» (o una domanda sull'aereo).
+    var aereoIniziale: (p: String, frase: String)? = nil
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -90,6 +94,11 @@ struct Occhi: View {
     @State private var fonte: PaginaWeb?
     /// I pezzi dell'interfaccia sopra la ripresa (i nomi piccoli non ci vanno sopra).
     @State private var riservati: [String: CGRect] = [:]
+    /// MARK X · AEREO: il cielo (aerei veri intorno), l'icona AEREO (compare quando lo chiede a voce, come il mockup)
+    /// e il campo visivo della fotocamera (con lo zoom) per mettere gli aerei dove sono davvero.
+    @StateObject private var cielo = CieloOcchi()
+    @State private var tastoAereo = false
+    @State private var campoAereo: Double = 70
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
     private var manualeStark: Bool { !automatico && !video && !cucina }
     private var occupato: Bool { scattando || registrando }
@@ -121,6 +130,14 @@ struct Occhi: View {
                 RiconoscimentoHUD(stato: stark, manuale: manualeStark && agganciato && !cambiando, riservati: Array(riservati.values), guida: guida.stato)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
+            }
+            if manualeStark && agganciato && !cambiando && cielo.acceso {
+                // MARK X · AEREO: il radar, il mirino sull'aereo vero, il filo e la scheda con l'ologramma
+                VistaCieloOcchi(cielo: cielo, campo: { campoAereo }) {
+                    withAnimation(.easeOut(duration: 0.3)) { web = nil; cielo.foglio = "che aereo è quello?" }
+                    Suoni.schedaPronta()
+                }
+                .ignoresSafeArea()
             }
             // decisione 26: negli Occhi MANUALE niente mirino (angoli, reticolo, riga di scansione), come il mockup 23;
             // l'automatico, il giro e la Cucina lo tengono
@@ -229,6 +246,14 @@ struct Occhi: View {
                             guard !occupato else { return }
                             Suoni.tocco(); cerca()
                         }
+                        if tastoAereo {                     // MARK X · AEREO: compare quando lo chiede a voce, poi si accende e si spegne
+                            TastoOcchi(tipo: .aereo, titolo: "AEREO", acceso: cielo.acceso) {
+                                guard !occupato else { return }
+                                Suoni.tocco()
+                                if cielo.acceso { spegniAereo() } else { Task { _ = await accendiAereo("che aereo è quello?") } }
+                            }
+                            .transition(.scale(scale: 0.4).combined(with: .opacity))
+                        }
                         TastoOcchiStudio {                  // MARK X: STUDIO, il bersaglio (o l'inquadratura) va sul banco dello Studio
                             guard !occupato else { return }
                             Suoni.tocco(); manda("studio")
@@ -284,6 +309,20 @@ struct Occhi: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
+            // AEREO: il foglio con i dati del volo, come quello di CERCA
+            if let chiesto = cielo.foglio, cielo.fase == .agganciato {
+                VStack {
+                    Spacer()
+                    FoglioVoloOcchi(cielo: cielo, chiesto: chiesto) {
+                        withAnimation(.easeOut(duration: 0.25)) { cielo.foglio = nil }; riservati["web"] = nil
+                    }
+                    .frame(maxHeight: stark.schermo.height * 0.56)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["web"] = $0 }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             // CERCA: il foglio sale dal basso, la fotocamera resta viva sopra
             if let w = web {
                 VStack {
@@ -304,7 +343,11 @@ struct Occhi: View {
         .statusBarHidden()
         .sheet(item: $fonte) { p in BrowserInterno(url: p.url).ignoresSafeArea() }      // decisione 29: come «Apri la pagina» della galleria
         .task { await prepara() }
+        .animation(.spring(duration: 0.45, bounce: 0.4), value: tastoAereo)
+        .animation(.easeOut(duration: 0.3), value: cielo.foglio)
+        .onChange(of: zoom) { aggiornaCampo() }
         .onDisappear {
+            cielo.spegni(); ComandoOcchi.aereoAgganciato = false
             OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; OcchiAperti.stark = nil
             stark.visore.imposta(attivo: false, olo: false, bersaglio: nil)
             motore.ferma()
@@ -317,8 +360,74 @@ struct Occhi: View {
     private var righeInfo: [(chiave: String, testo: String)] {
         if !agganciato || occupato { return [("s", stato)] }
         if let avviso { return [("s", avviso)] }
+        if cielo.acceso { return cielo.righe() }
         if stark.eti || stark.olo, !stark.conti.isEmpty { return stark.conti }
         return [("s", "INQUADRI E SCATTI")]
+    }
+
+    // MARK: MARK X · AEREO
+
+    /// Il campo visivo vero (con lo zoom): subito e di nuovo quando lo zoom ha finito di scivolare.
+    private func aggiornaCampo() {
+        let m = motore
+        Task {
+            for attesa in [0, 400] {
+                if attesa > 0 { try? await Task.sleep(for: .milliseconds(attesa)) }
+                if let c = await Task.detached(priority: .userInitiated, operation: { m.campoVisivo() }).value { campoAereo = c }
+            }
+        }
+    }
+
+    /// Cerca in cielo, aggancia l'aereo più vicino al centro e apre il foglio dicendo la frase breve (come il mockup).
+    private func accendiAereo(_ chiesto: String) async -> Bool {
+        tastoAereo = true
+        withAnimation(.easeOut(duration: 0.25)) { web = nil }
+        aggiornaCampo()
+        let ok = await cielo.accendi(schermo: stark.schermo, campo: campoAereo)
+        guard !chiuso else { return false }
+        guard ok else {
+            Suoni.errore()
+            OcchiAperti.parla?("Non vedo aerei in cielo qui intorno, Sir.")
+            return false
+        }
+        ComandoOcchi.aereoAgganciato = true
+        Suoni.pronto()
+        try? await Task.sleep(for: .milliseconds(900))
+        guard !chiuso, cielo.fase == .agganciato else { return false }
+        cielo.foglio = chiesto
+        Suoni.schedaPronta()
+        OcchiAperti.parla?(cielo.breve())
+        return true
+    }
+
+    private func spegniAereo() {
+        cielo.spegni()
+        ComandoOcchi.aereoAgganciato = false
+    }
+
+    /// I comandi a voce sull'aereo (Occhi aperti; a Occhi chiusi li aprono, agganciano e poi rispondono).
+    private func comandoAereo(_ p: String, _ chiesto: String) {
+        Task {
+            if p == "AEREO_OFF" { spegniAereo(); OcchiAperti.parla?("Ricerca degli aerei spenta, Sir."); return }
+            if cielo.fase != .agganciato {
+                guard await accendiAereo(chiesto), p != "AEREO" else { return }
+                try? await Task.sleep(for: .seconds(1.6))
+                guard !chiuso, cielo.fase == .agganciato else { return }
+            } else if p == "AEREO" {
+                cielo.foglio = chiesto
+                Suoni.schedaPronta()
+                OcchiAperti.parla?(cielo.breve())
+                return
+            }
+            if p == "AEREO_ALTRO" {
+                guard await cielo.altro(schermo: stark.schermo, campo: campoAereo) else { OcchiAperti.parla?("Vedo solo questo aereo, Sir."); return }
+                Suoni.pronto()
+                cielo.foglio = chiesto
+                OcchiAperti.parla?("Agganciato l'altro, Sir. " + cielo.breve().replacingOccurrences(of: ", Sir", with: ""))
+                return
+            }
+            OcchiAperti.parla?(cielo.risposta(p))
+        }
     }
 
     private func mettiOlogramma(_ v: Bool) {
@@ -479,8 +588,13 @@ struct Occhi: View {
                     case .cerca: cerca()
                     case .studio: manda("studio")
                     case .social: manda("social")
+                    case .aereo(let p, let f): comandoAereo(p, f)
                     }
                     return true
+                }
+                if let a = aereoIniziale {                   // MARK X · AEREO: come il mockup, 0,7 s dopo l'apertura
+                    try? await Task.sleep(for: .milliseconds(700))
+                    if !chiuso { comandoAereo(a.p, a.frase) }
                 }
                 if agganciaIniziale {
                     try? await Task.sleep(for: .milliseconds(900))
@@ -763,6 +877,18 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AV
             let massimo = min(cam.maxAvailableVideoZoomFactor / base, 15)
             p = p.filter { $0 <= massimo + 0.01 }.sorted()
             return (p, max(massimo, 1))
+        }
+    }
+
+    /// MARK X · AEREO: il campo visivo vero dell'inquadratura (gradi sul lato lungo, già con lo zoom), per mettere gli aerei
+    /// sullo schermo dove sono davvero. Nil se la fotocamera non c'è o è quella davanti.
+    func campoVisivo() -> Double? {
+        coda.sync {
+            guard let cam = camera, montata == .back else { return nil }
+            let g = Double(Ottica.campo(cam))
+            let campo = g > 1 ? g : 70
+            let z = Double(max(cam.videoZoomFactor, 0.1))
+            return 2 * atan(tan(campo / 2 * .pi / 180) / z) * 180 / .pi
         }
     }
 

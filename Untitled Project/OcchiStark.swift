@@ -802,7 +802,7 @@ struct RigheOcchi: View {
 // MARK: - Le tre icone sopra lo zoom: ETICHETTE, OLOGRAMMA, CERCA (disegnate come nel mockup)
 
 nonisolated enum IconaOcchi {
-    nonisolated enum Tipo: Sendable { case etichette, ologramma, cerca }
+    nonisolated enum Tipo: Sendable { case etichette, ologramma, cerca, aereo }
 
     /// Il disegno dell'icona (viewBox 24×24 del mockup) in un quadrato di `lato` punti.
     static func percorso(_ tipo: Tipo, lato: CGFloat) -> Path {
@@ -828,6 +828,14 @@ nonisolated enum IconaOcchi {
             path.move(to: p(4, 10.5)); path.addLine(to: p(17, 10.5))
             path.move(to: p(10.5, 4)); path.addCurve(to: p(10.5, 17), control1: p(8.1, 7.6), control2: p(8.1, 13.4))
             path.move(to: p(10.5, 4)); path.addCurve(to: p(10.5, 17), control1: p(12.9, 7.6), control2: p(12.9, 13.4))
+        case .aereo:              // MARK X: M12 2.5c1 0 1.5 1.2 1.5 2.5v4.5l7.5 4.5v2l-7.5-2.3V18l2.5 1.8V21L12 20l-4 1v-1.2l2.5-1.8v-4.3L3 16v-2l7.5-4.5V5c0-1.3.5-2.5 1.5-2.5z
+            path.move(to: p(12, 2.5)); path.addCurve(to: p(13.5, 5), control1: p(13, 2.5), control2: p(13.5, 3.7))
+            path.addLine(to: p(13.5, 9.5)); path.addLine(to: p(21, 14)); path.addLine(to: p(21, 16)); path.addLine(to: p(13.5, 13.7))
+            path.addLine(to: p(13.5, 18)); path.addLine(to: p(16, 19.8)); path.addLine(to: p(16, 21)); path.addLine(to: p(12, 20))
+            path.addLine(to: p(8, 21)); path.addLine(to: p(8, 19.8)); path.addLine(to: p(10.5, 18)); path.addLine(to: p(10.5, 13.7))
+            path.addLine(to: p(3, 16)); path.addLine(to: p(3, 14)); path.addLine(to: p(10.5, 9.5)); path.addLine(to: p(10.5, 5))
+            path.addCurve(to: p(12, 2.5), control1: p(10.5, 3.7), control2: p(11, 2.5))
+            path.closeSubpath()
         }
         return path
     }
@@ -844,7 +852,7 @@ struct TastoOcchi: View {
         Button(action: azione) {
             VStack(spacing: 4) {
                 IconaOcchi.percorso(tipo, lato: 18)
-                    .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: tipo == .cerca ? .round : .butt, lineJoin: .round))
+                    .stroke(style: StrokeStyle(lineWidth: tipo == .aereo ? 1.7 : 1.8, lineCap: tipo == .cerca ? .round : .butt, lineJoin: .round))
                     .frame(width: 18, height: 18)
                     .foregroundStyle(acceso ? Color.fondo : Color.ciano.opacity(0.7))
                     .frame(width: 40, height: 40)
@@ -965,12 +973,20 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     case cerca
     case studio                         // MARK X: «manda questo pezzo allo Studio»
     case social                         // MARK X: «pubblica questa foto su Instagram»
+    /// MARK X · AEREO (mockup build 32): `p` è AEREO, AEREO_DA, AEREO_DOVE, AEREO_QUOTA, AEREO_COMP, AEREO_ALTRO o AEREO_OFF;
+    /// `frase` è la domanda detta (va in cima al foglio del volo).
+    case aereo(String, frase: String)
+
+    /// Un aereo è agganciato negli Occhi aperti: allora valgono anche le domande corte («dove va?», «a che quota è?»).
+    /// Lo tengono aggiornato gli Occhi.
+    nonisolated(unsafe) static var aereoAgganciato = false
 
     /// Con gli Occhi chiusi, la frase quando si aprono per mandare la foto (come il mockup).
     var annuncioApertura: String? {
         switch self {
         case .studio: return "Gli occhi, Sir: inquadri il pezzo."
         case .social: return "Gli occhi, Sir: inquadri la foto."
+        case .aereo(let p, _): return p == "AEREO_OFF" ? nil : "Cerco l'aereo, Sir."
         default: return nil
         }
     }
@@ -983,7 +999,8 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         case .ologramma(true): return "Scansione olografica, Sir."
         case .ologramma(false): return "Ologramma disattivato, Sir."
         case .aggancia: return "Bersaglio agganciato, Sir."
-        case .cerca, .studio, .social: return nil
+        case .aereo("AEREO", _): return "Cerco l'aereo, Sir."
+        case .cerca, .studio, .social, .aereo: return nil
         }
     }
 
@@ -993,6 +1010,10 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
             .split(separator: " ").map(String.init)
         while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
+        let detta = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "^(?i)(ehi |ok |hey )?(jarvis|giarvis|jervis)[,. ]*", with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " ,."))
+        if let p = fraseAereo(t.joined(separator: " ")) { return .aereo(p, frase: detta.prefix(1).lowercased() + detta.dropFirst()) }
         switch t.joined(separator: " ") {
         case "mostra le etichette": return .etichette(true)
         case "togli le etichette": return .etichette(false)
