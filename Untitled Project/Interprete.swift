@@ -110,6 +110,12 @@ struct Interprete: View {
                     }
                     .onChange(of: motore.scambi.count) { if let u = motore.scambi.last { withAnimation { proxy.scrollTo(u.id, anchor: .bottom) } } }
                 }
+                // 27 ott: la conversazione nel visore olografico, come Browser e Confidente
+                .background(Color.ciano.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ciano.opacity(0.25), lineWidth: 1))
+                .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))
+                .padding(.horizontal, 12)
 
                 Toggle(isOn: $automatico) {
                     Text("A turni automatici").font(.footnote).foregroundStyle(Color.tenue)
