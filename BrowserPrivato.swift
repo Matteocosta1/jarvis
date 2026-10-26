@@ -315,7 +315,7 @@ struct PaginaBrowser: View {
         _nav = StateObject(wrappedValue: Navigatore(incognito: incognito.wrappedValue))
     }
 
-    private var accento: Color { incognito ? Color(red: 0.12, green: 0.50, blue: 0.60) : Color.ciano }   // 26 ott notte: Incognito ciano scuro, non viola
+    private var accento: Color { incognito ? Color(red: 0.05, green: 0.36, blue: 0.44) : Color.ciano }   // 26 ott notte: Incognito ciano molto più scuro, non viola
 
     /// A voce: con la barra attiva si scrive lì, se no nel campo della pagina (o della finestra pop-up).
     private func registraVoce() {
@@ -364,11 +364,15 @@ struct PaginaBrowser: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // 26 ott notte (il signore: «come le altre, stile olografico»): la testata di Studio, Sound e Social (icona animata,
+            // J.A.R.V.I.S. · BROWSER, «Chiudi» sulla riga: niente fotocamera), poi la barra, la pagina nella cornice olografica
+            HStack(alignment: .center) {
+                TestataScheda(titolo: "Browser", sottotitolo: incognito ? "browser · incognito" : "browser · web", icona: "globe", tinta: accento, marchio: true)
+                Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(accento)
+                    .accessibilityLabel("Chiudi il browser")
+            }
+            .padding(.horizontal, 16).padding(.top, 6)
             HStack(spacing: 8) {
-                Button { chiudi() } label: {
-                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold)).frame(width: 36, height: 36)
-                }
-                .accessibilityLabel("Chiudi il browser")
                 HStack(spacing: 6) {
                     Image(systemName: incognito ? "eyeglasses" : "lock.shield").font(.footnote)
                     TextField(incognito ? "Incognito: cerchi o scriva un indirizzo" : "Cerchi o scriva un indirizzo", text: $barra)
@@ -392,11 +396,28 @@ struct PaginaBrowser: View {
                 }
                 .accessibilityLabel("Video di YouTube")
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
             WebVista(web: nav.web)
+                .overlay {
+                    if nav.indirizzo.isEmpty && !nav.carica {          // niente pagina bianca: il visore spento, in attesa
+                        ZStack {
+                            Color.fondo
+                            RadialGradient(colors: [accento.opacity(0.14), .clear], center: .center, startRadius: 0, endRadius: 260)
+                            VStack(spacing: 10) {
+                                Image(systemName: "globe").font(.system(size: 34, weight: .light)).foregroundStyle(accento.opacity(0.8))
+                                Text("CERCHI O SCRIVA UN INDIRIZZO").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                                    .foregroundStyle(accento)
+                            }
+                        }
+                    }
+                }
                 .overlay { if nav.popup != nil { finestraPopup } }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(accento.opacity(0.3), lineWidth: 1))
+                .overlay(AngoliOlo(tinta: accento).padding(-1).allowsHitTesting(false))
+                .padding(.horizontal, 10)
 
             HStack {
                 Button { nav.web.goBack() } label: { Image(systemName: "chevron.left") }
@@ -633,6 +654,23 @@ struct VistaCronologiaBrowser: View {
         await Cronologia.cancella(da: da, ancheDati: ancheDati)
         Suoni.tocco()
         withAnimation { voci = Cronologia.leggi() }
+    }
+}
+/// Gli angoli olografici del visore (come il mirino delle altre sezioni): quattro L ciano sui bordi della pagina.
+private struct AngoliOlo: View {
+    let tinta: Color
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height, l: CGFloat = 18
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: l)); p.addLine(to: .zero); p.addLine(to: CGPoint(x: l, y: 0))
+                p.move(to: CGPoint(x: w - l, y: 0)); p.addLine(to: CGPoint(x: w, y: 0)); p.addLine(to: CGPoint(x: w, y: l))
+                p.move(to: CGPoint(x: 0, y: h - l)); p.addLine(to: CGPoint(x: 0, y: h)); p.addLine(to: CGPoint(x: l, y: h))
+                p.move(to: CGPoint(x: w - l, y: h)); p.addLine(to: CGPoint(x: w, y: h)); p.addLine(to: CGPoint(x: w, y: h - l))
+            }
+            .stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .shadow(color: tinta.opacity(0.7), radius: 4)
+        }
     }
 }
 #endif
