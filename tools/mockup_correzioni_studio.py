@@ -42,22 +42,36 @@ const tocca = (x, y) => x[0][0] <= y[1][0] + .01 && y[0][0] <= x[1][0] + .01 && 
 const gruppi = (L) => { const B = L.map(scatola), pad = L.map((_, i) => i), f = (i) => (pad[i] === i ? i : (pad[i] = f(pad[i])));
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (tocca(B[i], B[j])) pad[f(i)] = f(j);
   const m = new Map(); L.forEach((x, i) => { const r = f(i); if (!m.has(r)) m.set(r, []); m.get(r).push(x); }); return [...m.values()]; };
-onmessage = (e) => { try { const pieni = e.data.pieni.map((a) => BSP.daTriangoli(a)), buchi = e.data.buchi.map((a) => BSP.daTriangoli(a));
+""" + open(str(__import__("pathlib").Path(__file__).with_name("organico.js")), encoding="utf-8").read() + """
+// pari = true (scolpito): uno spigolo in 4 triangoli (due parti che si sfiorano lungo una linea) è chiuso lo stesso per l'affettatrice
+const chiusoDi = (t, pari) => { const id = new Map(), sp = new Map(); let nv = 0; const v = (i) => { const k = t[i] + "," + t[i + 1] + "," + t[i + 2]; let x = id.get(k); if (x === undefined) { x = nv++; id.set(k, x); } return x; };
+  for (let i = 0; i < t.length; i += 9) { const a = v(i), b = v(i + 3), c = v(i + 6); for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? p * 4194304 + q : q * 4194304 + p; sp.set(k, (sp.get(k) || 0) + 1); } }
+  for (const n of sp.values()) if (pari ? n % 2 : n !== 2) return false; return true; };
+onmessage = (e) => { try {
+  if (e.data.organico) { const r = ORG(e.data.pezzi, e.data.stile); if (!r || !r.t.length) { postMessage({ ok: false }); return; } postMessage({ ok: true, t: r.t, n: r.n, chiuso: chiusoDi(r.t, true) }, [r.t.buffer, r.n.buffer]); return; }
+  const pieni = e.data.pieni.map((a) => BSP.daTriangoli(a)), buchi = e.data.buchi.map((a) => BSP.daTriangoli(a));
   if (!pieni.length) { postMessage({ ok: false }); return; }
   // si uniscono solo i pezzi che si toccano (i gruppi staccati restano accostati); i fori scavano solo i gruppi che toccano
   const G = gruppi(pieni).map(coppie), H = buchi.length ? gruppi(buchi).map(coppie) : [], HB = H.map(scatola);
   let acc = []; for (let g of G) { const gb = scatola(g); for (let i = 0; i < H.length; i++) if (tocca(gb, HB[i])) g = BSP.differenza(g, H[i]); acc = acc.concat(g); }
   const t = BSP.aTriangoli(acc);
   // «stampabile»: ogni spigolo in due triangoli esatti (i vertici sono già saldati); prima lo contava la pagina e la bloccava 10 s
-  const id = new Map(), sp = new Map(); let nv = 0; const v = (i) => { const k = t[i] + "," + t[i + 1] + "," + t[i + 2]; let x = id.get(k); if (x === undefined) { x = nv++; id.set(k, x); } return x; };
-  for (let i = 0; i < t.length; i += 9) { const a = v(i), b = v(i + 3), c = v(i + 6); for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? p * 4194304 + q : q * 4194304 + p; sp.set(k, (sp.get(k) || 0) + 1); } }
-  let chiuso = true; for (const n of sp.values()) if (n !== 2) { chiuso = false; break; }
+  const chiuso = chiusoDi(t);
   postMessage({ ok: true, t, chiuso }, [t.buffer]); } catch (err) { postMessage({ ok: false, err: String(err) }); } };
 """
 sost(fine, fine + """
 // l'unione dei pezzi del progetto libero in un Worker: la pagina (e l'app) non si fermano mentre il cervello «costruisce»
 const BSP_SORGENTE = """ + json.dumps(lavoro) + """;
 let BSP_URL = null;
+function organicoInDisparte(pezzi, stile, ms = 45000) {   // { t, n, chiuso }; null = non riuscito; undefined = niente Worker
+  return new Promise((ok) => {
+    let w; try { BSP_URL = BSP_URL || URL.createObjectURL(new Blob([BSP_SORGENTE], { type: "text/javascript" })); w = new Worker(BSP_URL); } catch (e) { ok(undefined); return; }
+    const via = setTimeout(() => { w.terminate(); ok(null); }, ms);
+    w.onmessage = (e) => { clearTimeout(via); w.terminate(); ok(e.data && e.data.ok ? e.data : null); };
+    w.onerror = (e) => { clearTimeout(via); w.terminate(); e.preventDefault?.(); ok(undefined); };
+    w.postMessage({ organico: true, pezzi: JSON.parse(JSON.stringify(pezzi)), stile });
+  });
+}
 function bspInDisparte(pieni, buchi, ms = 60000) {          // Float32Array dei triangoli; null = troppo complesso; undefined = niente Worker
   return new Promise((ok) => {
     let w; try { BSP_URL = BSP_URL || URL.createObjectURL(new Blob([BSP_SORGENTE], { type: "text/javascript" })); w = new Worker(BSP_URL); } catch (e) { ok(undefined); return; }
@@ -83,6 +97,9 @@ sost("""        if (q.foro) buchi.push(tri(g)); else acc = acc ? BSP.unione(acc,
       if (!acc) return null; for (const b of buchi) acc = BSP.differenza(acc, b);
       return this.finisci(BSP.aTriangoli(acc)); },
     pezzi(pezzi) { return this.ricetta(pezzi, { pieni: [], buchi: [] }); },
+    finisciN(tri3, nor3) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(tri3, 3)); g.setAttribute("normal", new T.BufferAttribute(nor3, 3)); g.computeBoundingBox();
+      const bb = g.boundingBox; g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+      return { pos: new Float32Array(g.attributes.position.array), norm: new Float32Array(g.attributes.normal.array) }; },
     finisci(tri3) {
       const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(tri3, 3)); g.computeBoundingBox();""")
 sost("    ricetta(pezzi) {\n", "    ricetta(pezzi, soloPezzi = null) {\n")
@@ -122,11 +139,21 @@ sost("""    inventando = true; info(["CREA · PROGETTO LIBERO", `«${D.toUpperCa
     const R0 = B.finisci(tutti), k = "r" + Date.now().toString(36); GEO_DATI.set(k, { pos: R0.pos, norm: R0.norm, chiuso: false });
     const o = nuovo("unito", { k, ricetta: D }, nomeLibero(String(ric.nome || D).slice(0, 28).replace(/^./, (c) => c.toUpperCase())), { anim: "vacuform" });
     inventando = true; info(["CREA · PROGETTO LIBERO", `«${o.nome.toUpperCase()}» · ${ric.pezzi.length} PEZZI`, "UNISCO IN UN SOLIDO UNICO…"]);
-    let R = null; try { const t = await bspInDisparte(pp.pieni, pp.buchi); R = t === undefined ? B.ricetta(ric.pezzi) : t ? B.finisci(t) : null; if (R && t) R.chiuso = t.chiuso; } catch (e) { console.warn(e); R = null; }
+    // 26 ott sera: gli oggetti organici (animali, persone, piante, cibo…) si SCOLPISCONO, superficie unica e morbida; i meccanici
+    // (scatole, supporti, edifici, attrezzi: il cervello lo dice con "stile":"m") restano pezzi uniti a spigolo vivo
+    const organico = ric.stile !== "m";
+    let R = null; try {
+      if (organico) { const t = await organicoInDisparte(ric.pezzi, ric.stile); if (t) { R = B.finisciN(t.t, t.n); R.chiuso = t.chiuso; } }
+      if (!R) { const t = await bspInDisparte(pp.pieni.map((a) => a.slice()), pp.buchi.map((a) => a.slice())); R = t === undefined ? B.ricetta(ric.pezzi) : t ? B.finisci(t) : null; if (R && t) R.chiuso = t.chiuso; }
+    } catch (e) { console.warn(e); R = null; }
     inventando = false; if (!vivo()) return;
     if (R) GEO_DATI.set(k, { pos: R.pos, norm: R.norm, chiuso: R.chiuso });   // vale anche per le copie (ANNULLA/RIPETI usano la stessa chiave)
     const oo = oggetti.find((x) => x.p?.k === k); if (!oo) return;   // tolto mentre si univa: niente da mostrare
     if (!R) { parlaMock("Il pezzo è troppo complesso da unire, Sir: lo vede, ma per la stampa lo descriva più semplice.", 3600); mostraDati(); return; }
     rifai(oo, "nessuna"); const g = B.ingombro(oo);""")
+sost("""    info(["CREA · PROGETTO LIBERO", `${ric.pezzi.length} PEZZI UNITI · ${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM`, B.chiuso(o) ? "MESH MANIFOLD · STAMPABILE" : "MESH DA CONTROLLARE"]);
+    parlaMock(`Ecco «${o.nome}», Sir: ${ric.pezzi.length} pezzi uniti, ${mm(g.l)} per ${mm(g.p)} per ${mm(g.h)} millimetri.""",
+"""    info(["CREA · PROGETTO LIBERO", `${organico ? "MODELLATO" : ric.pezzi.length + " PEZZI UNITI"} · ${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM`, B.chiuso(o) ? "MESH MANIFOLD · STAMPABILE" : "MESH DA CONTROLLARE"]);
+    parlaMock(`Ecco «${o.nome}», Sir: ${organico ? "modellato in un pezzo unico" : ric.pezzi.length + " pezzi uniti"}, ${mm(g.l)} per ${mm(g.p)} per ${mm(g.h)} millimetri.""")
 open(dst, "w", encoding="utf-8").write(h)
 print("scritto (CREA veloce)", dst)
