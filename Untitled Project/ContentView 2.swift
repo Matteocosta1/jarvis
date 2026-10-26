@@ -255,7 +255,9 @@ struct ContentView: View {
             .environment(\.jarvisCoperto, stratoCopre)
             .onChange(of: aperturaPagina?.id) { _, id in if id == nil { stratoCopre = false } }   // senza strato JARVIS gira sempre
             .frame(width: g.size.width, height: g.size.height)
-            .defersSystemGestures(on: .top)                 // il dito che tira giù la tendina non apre il Centro notifiche di iOS
+            // 26 ott notte (foto del signore 23:29, «menu a tendina inutile»): tolto il blocco dello swipe di iOS dall'alto: con il
+            // blocco iOS mostrava sempre la sua linguetta grigia sotto la Dynamic Island. I PROTOCOLLI si aprono tirando giù da titolo,
+            // reattore e testi, come prima.
         }
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
