@@ -55,6 +55,7 @@ struct Interprete: View {
             SfondoHUD(fase: motore.faseHUD)
             VStack(spacing: 12) {
                 HStack {
+                    AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
                         Text("J.A.R.V.I.S.")
                             .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)

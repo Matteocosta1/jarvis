@@ -1669,6 +1669,12 @@ struct ImpostazioniView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
+                Section {
+                    TestataScheda(titolo: "Impostazioni", sottotitolo: "sistemi", icona: "gearshape", tinta: Color.ciano)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                }
                 Section {
                     SecureField("Parola d'ordine", text: $parola)
                         .textInputAutocapitalization(.never)
@@ -1759,7 +1765,6 @@ struct ImpostazioniView: View {
                     Text("Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.")
                 }
             }
-            .navigationTitle("Impostazioni")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
