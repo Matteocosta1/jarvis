@@ -69,4 +69,10 @@ def toppe_lidar(s, toppa):
     #  · STAMPA/CONDIVIDI non riuscito: nell'app non si dice «nell'app va in File»
     s = toppa(s, ': "Qui il salvataggio non è disponibile: nell\'app va in File.";',
               ': window.JARVIS_APP ? "Il salvataggio non è riuscito, Sir: riprovi." : "Qui il salvataggio non è disponibile: nell\'app va in File.";')
+    #  · SALVA STL nell'app: niente zip (l'STL va al foglio di condivisione così com'è), la frase lo dice giusto
+    s = toppa(s, 'notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm), dentro uno zip`)',
+              'notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm)${window.JARVIS_APP ? "" : ", dentro uno zip"}`)')
+    #  · CONDIVIDI › Copia nell'app: copia davvero l'immagine del banco negli appunti dell'iPhone
+    s = toppa(s, 'else notifica("Copiato, Sir.", { titolo: "Studio" }); }));',
+              'else { if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "copia", b64: B.istantanea(true).split(",")[1] }); notifica("Copiato, Sir.", { titolo: "Studio" }); } }));')
     return s

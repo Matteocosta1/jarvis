@@ -6877,7 +6877,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       <div class="sd-azioni"><button type="button" class="pieno" data-st="stl">SALVA STL</button><button type="button" class="vuoto" data-st="servizio">SERVICE</button></div>
       <p class="nota-sd" style="margin:0;font:11px var(--sans);color:#9fb3b9">Volume, maglia chiusa, sbalzi e orientamento sono calcolati sul modello; grammi e tempo sono stime (riempimento 15%). L'STL esce già nell'orientamento per la stampa. L'STL che salva è vero (qui arriva dentro uno zip) e si apre in qualsiasi programma di stampa.</p>`);
     F.querySelectorAll("[data-mat]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); mat = b.dataset.mat; F.querySelectorAll("[data-mat]").forEach((x) => x.setAttribute("aria-pressed", x === b)); const c = conti(); F.querySelector('[data-n="gr"]').textContent = c.gr; F.querySelector('[data-n="t"]').textContent = c.t; }));
-    F.querySelector('[data-st="stl"]').addEventListener("click", async () => { suona("aTick"); const r = await scarica(B.stl(o, pi.m), `${o.nome.replace(/[^\w-]+/g, "_")}.stl`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm), dentro uno zip`), { titolo: "Studio" }); });
+    F.querySelector('[data-st="stl"]').addEventListener("click", async () => { suona("aTick"); const r = await scarica(B.stl(o, pi.m), `${o.nome.replace(/[^\w-]+/g, "_")}.stl`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm)${window.JARVIS_APP ? "" : ", dentro uno zip"}`), { titolo: "Studio" }); });
     F.querySelector('[data-st="servizio"]').addEventListener("click", () => { suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF: ${conti().gr} g di ${mat}. Le dico prezzo e tempi appena rispondono, Sir.`, { titolo: "Studio" }); });
   }
   // ── CONDIVIDI: il foglio di iOS. Formato (immagine, video a 360°, modello AR, stampa 3D), app, azioni ──
@@ -6901,7 +6901,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     F.querySelectorAll("[data-az]").forEach((b) => b.addEventListener("click", async () => { suona("aTick");
       if (b.dataset.az === "foto") { const r = await scarica(B.istantanea(true), `${o.nome}.jpg`); notifica(esitoSalva(r, "Immagine salvata"), { titolo: "Studio" }); }
       else if (b.dataset.az === "file") { const r = fmt === "3d" ? await scarica(B.stl(o, B.stampaInfo(o).m), `${o.nome}.stl`) : await scarica(B.istantanea(true), `${o.nome}.jpg`); notifica(esitoSalva(r, "Salvato su File"), { titolo: "Studio" }); }
-      else notifica("Copiato, Sir.", { titolo: "Studio" }); }));
+      else { if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "copia", b64: B.istantanea(true).split(",")[1] }); notifica("Copiato, Sir.", { titolo: "Studio" }); } }));
     if (app) setTimeout(() => F.querySelector(`[data-app="${app}"]`)?.animate([{ transform: "scale(1)" }, { transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 600, iterations: 2 }), 400);
   }
   // salvare un file: chiede al visore di claude.ai (capability «downloads»); l'STL viaggia dentro uno zip (l'STL da solo il visore non lo accetta)

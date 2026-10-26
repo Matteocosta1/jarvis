@@ -131,6 +131,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
         case "foto":
             scatta()
+        case "copia":                                                    // CONDIVIDI › Copia: l'immagine del banco negli appunti
+            if let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64), let img = UIImage(data: d) { UIPasteboard.general.image = img }
         case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone
             let lidar = o["dove"] as? String == "lidar"
             parla(lidar ? "Apro il LiDAR su Oggetto, Sir: finita la scansione, tocchi STUDIO." : "Apro gli Occhi, Sir: inquadri il pezzo e tocchi STUDIO.")
