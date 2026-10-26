@@ -929,7 +929,7 @@ nonisolated enum Salute {
         }
     }
 }
-/// Un testo che compare decodificandosi, come le lettere della chat: da sinistra a destra i simboli diventano lettere (0,6 s),
+/// Un testo che compare decodificandosi, come le lettere della chat: da sinistra a destra i simboli diventano lettere (0,35 s, veloce),
 /// di nuovo a ogni cambio (es. «ACQUISIZIONE DATI» → «PRONTA»). Finito, si ferma: niente lavoro inutile.
 struct TestoCodice: View {
     let testo: String
@@ -939,7 +939,7 @@ struct TestoCodice: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: fermo)) { t in
-            Text(fermo ? testo : TestoCodice.mescola(testo, min(1, t.date.timeIntervalSince(inizio) / 0.6)))
+            Text(fermo ? testo : TestoCodice.mescola(testo, min(1, t.date.timeIntervalSince(inizio) / 0.35)))
         }
         .onAppear { parti() }
         .onChange(of: testo) { parti() }
@@ -949,7 +949,7 @@ struct TestoCodice: View {
         inizio = Date(); fermo = false
         let mio = inizio
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(400))
             if inizio == mio { fermo = true }
         }
     }
