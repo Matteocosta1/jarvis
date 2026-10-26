@@ -269,8 +269,8 @@ struct ContentView: View {
                 jarvis.svuotaChiesto = false
                 Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
             }
-        }) { ImpostazioniView().environmentObject(jarvis).paginaPiena() }
-        .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().paginaPiena() }
+        }) { ImpostazioniView().environmentObject(jarvis).aperturaHUD("Impostazioni").paginaPiena() }
+        .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser").paginaPiena() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
@@ -347,6 +347,7 @@ struct ContentView: View {
                 mostraProfiler = false
                 if !dati.isEmpty { jarvis.profila(dati, nome: nome) }
             }
+            .aperturaHUD("Profiler", soloSfuma: true)                          // 26 ott notte: il caricamento come tutte le sezioni
         }
         // le schede delle icone
         .fullScreenCover(item: $scheda) { sc in

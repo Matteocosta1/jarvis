@@ -197,6 +197,7 @@ struct VistaProfiler: View {
             chiudi([])
             return
         }
+        let inizio = Date()
         guard await monta(davanti ? .front : .back) else {
             stato = "FOTOCAMERA NON DISPONIBILE"
             Suoni.errore()
@@ -204,6 +205,8 @@ struct VistaProfiler: View {
             chiudi([])
             return
         }
+        let resta = 1.1 - Date().timeIntervalSince(inizio)          // 26 ott notte: sotto c'è il caricamento delle schede (AperturaHUD)
+        if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
         agganciato = true
         Suoni.aperturaCamera()
         stato = "INQUADRI IL SOGGETTO"
