@@ -6580,9 +6580,12 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     inventando = false; if (!vivo()) return;
     if (!ric?.pezzi?.length) { info(["CREA · PROGETTO LIBERO", "NESSUN PROGETTO"]);
       parlaMock(fonte === "negato" ? "Serve il permesso di chiedere al cervello, Sir: lo dia quando il visore lo chiede e riprovi." : fonte === "assente" ? `Qui senza il cervello so disegnare solo alcune cose (${Object.values(SD_RICETTE).map((r) => r.nome.toLowerCase()).join(", ")}). Nell'app «${D}» lo progetta il cervello.` : "Il cervello non è riuscito a progettarlo, Sir: lo descriva in un altro modo e riprovi.", 4200); return; }
-    let R; try { R = B.ricetta(ric.pezzi); } catch (e) { console.warn(e); R = null; }
+    // 26 ott sera: l'unione in disparte (Worker), la pagina resta viva; senza Worker, come prima
+    inventando = true; info(["CREA · PROGETTO LIBERO", `«${D.toUpperCase()}»`, `UNISCO ${ric.pezzi.length} PEZZI…`]);
+    let R = null; try { const pp = B.pezzi(ric.pezzi); if (pp) { const t = await bspInDisparte(pp.pieni, pp.buchi); R = t === undefined ? B.ricetta(ric.pezzi) : t ? B.finisci(t) : null; if (R && t) R.chiuso = t.chiuso; } } catch (e) { console.warn(e); R = null; }
+    inventando = false; if (!vivo()) return;
     if (!R) { parlaMock("Il progetto non torna, Sir: riprovi con una descrizione più semplice.", 3000); return; }
-    const k = "r" + Date.now().toString(36); GEO_DATI.set(k, { pos: R.pos, norm: R.norm });
+    const k = "r" + Date.now().toString(36); GEO_DATI.set(k, { pos: R.pos, norm: R.norm, chiuso: R.chiuso });
     const o = nuovo("unito", { k, ricetta: D }, nomeLibero(String(ric.nome || D).slice(0, 28).replace(/^./, (c) => c.toUpperCase())), { anim: "vacuform" }); const g = B.ingombro(o);
     info(["CREA · PROGETTO LIBERO", `${ric.pezzi.length} PEZZI UNITI · ${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} MM`, B.chiuso(o) ? "MESH MANIFOLD · STAMPABILE" : "MESH DA CONTROLLARE"]);
     parlaMock(`Ecco «${o.nome}», Sir: ${ric.pezzi.length} pezzi uniti, ${mm(g.l)} per ${mm(g.p)} per ${mm(g.h)} millimetri.${fonte === "prova" ? " Ricetta di prova del mockup: nell'app la disegna il cervello." : ""} Si scala, si sposta e si combina come gli altri.`, 4200);
@@ -7451,6 +7454,19 @@ const BSP = (() => {
     return new Float32Array(out); };
   return { daTriangoli, unione, differenza, aTriangoli };
 })();
+// l'unione dei pezzi del progetto libero in un Worker: la pagina (e l'app) non si fermano mentre il cervello «costruisce»
+const BSP_SORGENTE = "const BSP = (() => {\n  const EPS = 1e-5, COP = 0, FRONTE = 1, DIETRO = 2, TRAVERSO = 3;\n  const piano = (a, b, c) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2]; let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz); if (l < 1e-12) return null; nx /= l; ny /= l; nz /= l; return { n: [nx, ny, nz], w: nx * a[0] + ny * a[1] + nz * a[2] }; };\n  const giraP = (p) => ({ n: [-p.n[0], -p.n[1], -p.n[2]], w: -p.w });\n  const poli = (vs, p) => ({ vs, p });\n  function taglia(pl, P, copF, copD, fr, di) {\n    let tutto = 0; const tipi = P.vs.map((v) => { const t = pl.n[0] * v[0] + pl.n[1] * v[1] + pl.n[2] * v[2] - pl.w, ty = t < -EPS ? DIETRO : t > EPS ? FRONTE : COP; tutto |= ty; return ty; });\n    if (tutto === COP) (pl.n[0] * P.p.n[0] + pl.n[1] * P.p.n[1] + pl.n[2] * P.p.n[2] > 0 ? copF : copD).push(P);\n    else if (tutto === FRONTE) fr.push(P); else if (tutto === DIETRO) di.push(P);\n    else { const f = [], b = [], n = P.vs.length;\n      for (let i = 0; i < n; i++) { const j = (i + 1) % n, ti = tipi[i], tj = tipi[j], vi = P.vs[i], vj = P.vs[j];\n        if (ti !== DIETRO) f.push(vi); if (ti !== FRONTE) b.push(vi);\n        if ((ti | tj) === TRAVERSO) { const d = [vj[0] - vi[0], vj[1] - vi[1], vj[2] - vi[2]], t = (pl.w - (pl.n[0] * vi[0] + pl.n[1] * vi[1] + pl.n[2] * vi[2])) / (pl.n[0] * d[0] + pl.n[1] * d[1] + pl.n[2] * d[2]), v = [vi[0] + d[0] * t, vi[1] + d[1] * t, vi[2] + d[2] * t]; f.push(v); b.push(v); } }\n      if (f.length >= 3) fr.push(poli(f, P.p)); if (b.length >= 3) di.push(poli(b, P.p)); }\n  }\n  class Nodo {\n    constructor(ps) { this.pl = null; this.f = null; this.d = null; this.ps = []; if (ps) this.costruisci(ps); }\n    inverti() { const pila = [this]; while (pila.length) { const n = pila.pop(); n.ps.forEach((P) => { P.vs = P.vs.slice().reverse(); P.p = giraP(P.p); }); if (n.pl) n.pl = giraP(n.pl); const t = n.f; n.f = n.d; n.d = t; if (n.f) pila.push(n.f); if (n.d) pila.push(n.d); } }\n    ritaglia(ps) { if (!this.pl) return ps.slice(); let f = [], b = []; for (const P of ps) taglia(this.pl, P, f, b, f, b); f = this.f ? this.f.ritaglia(f) : f; b = this.d ? this.d.ritaglia(b) : []; return f.concat(b); }\n    ritagliaCon(bsp) { const pila = [this]; while (pila.length) { const n = pila.pop(); n.ps = bsp.ritaglia(n.ps); if (n.f) pila.push(n.f); if (n.d) pila.push(n.d); } }\n    tutti() { const o = [], pila = [this]; while (pila.length) { const n = pila.pop(); o.push(...n.ps); if (n.f) pila.push(n.f); if (n.d) pila.push(n.d); } return o; }\n    costruisci(ps) { const lavoro = [[this, ps]];\n      while (lavoro.length) { const [n, lista] = lavoro.pop(); if (!lista.length) continue; if (!n.pl) n.pl = lista[0].p; const f = [], b = [];\n        for (const P of lista) taglia(n.pl, P, n.ps, n.ps, f, b);\n        if (f.length) { n.f ||= new Nodo(); lavoro.push([n.f, f]); } if (b.length) { n.d ||= new Nodo(); lavoro.push([n.d, b]); } } }\n  }\n  const daTriangoli = (pos) => { const o = []; for (let i = 0; i < pos.length; i += 9) { const a = [pos[i], pos[i + 1], pos[i + 2]], b = [pos[i + 3], pos[i + 4], pos[i + 5]], c = [pos[i + 6], pos[i + 7], pos[i + 8]], p = piano(a, b, c); if (p) o.push(poli([a, b, c], p)); } return o; };\n  const unione = (A, B) => { const a = new Nodo(A), b = new Nodo(B); a.ritagliaCon(b); b.ritagliaCon(a); b.inverti(); b.ritagliaCon(a); b.inverti(); a.costruisci(b.tutti()); return a.tutti(); };\n  const differenza = (A, B) => { const a = new Nodo(A), b = new Nodo(B); a.inverti(); a.ritagliaCon(b); b.ritagliaCon(a); b.inverti(); b.ritagliaCon(a); b.inverti(); a.costruisci(b.tutti()); a.inverti(); return a.tutti(); };\n  // i poligoni del BSP hanno spesso vertici allineati (i punti di taglio): il ventaglio darebbe triangoli piatti che contano due volte lo stesso lato\n  const aTriangoli = (ps) => { const o = []; for (const P of ps) for (let i = 1; i + 1 < P.vs.length; i++) { const a = P.vs[0], b = P.vs[i], c = P.vs[i + 1], ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];\n    if ((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + (ux * vy - uy * vx) ** 2 < 1e-12) continue; o.push(...a, ...b, ...c); } return salda(o); };\n  // saldatura: i punti di taglio a meno di 0,2 micron diventano lo stesso vertice (i tagli fatti da due lati danno numeri appena diversi);\n  // i triangolini che collassano spariscono. Cos\u00ec la maglia esce davvero chiusa, e l'STL \u00e8 pulito per lo slicer.\n  const salda = (o) => { const celle = new Map(), rap = [], Q = 250, tol = .003;   // 3 \u00b5m: fonde le schegge dove sfere e coni sottili si incontrano (per la stampa \u00e8 lo stesso punto)\n    const vert = (x, y, z) => { const cx = Math.round(x * Q), cy = Math.round(y * Q), cz = Math.round(z * Q);\n      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) { const l = celle.get(`${cx + a},${cy + b},${cz + c}`); if (l) for (const i of l) { const r = rap[i]; if (Math.abs(r[0] - x) < tol && Math.abs(r[1] - y) < tol && Math.abs(r[2] - z) < tol) return i; } }\n      const k = `${cx},${cy},${cz}`; if (!celle.has(k)) celle.set(k, []); celle.get(k).push(rap.length); rap.push([x, y, z]); return rap.length - 1; };\n    const out = []; for (let i = 0; i < o.length; i += 9) { const a = vert(o[i], o[i + 1], o[i + 2]), b = vert(o[i + 3], o[i + 4], o[i + 5]), c = vert(o[i + 6], o[i + 7], o[i + 8]); if (a === b || b === c || a === c) continue;\n      const A = rap[a], B = rap[b], C = rap[c], ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];\n      if ((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + (ux * vy - uy * vx) ** 2 < 1e-12) continue; out.push(...A, ...B, ...C); }\n    return new Float32Array(out); };\n  return { daTriangoli, unione, differenza, aTriangoli };\n})();\nconst unisciTutti = (L) => { while (L.length > 1) { const n = []; for (let i = 0; i < L.length; i += 2) n.push(i + 1 < L.length ? BSP.unione(L[i], L[i + 1]) : L[i]); L = n; } return L[0] || null; };\nonmessage = (e) => { try { const pieni = e.data.pieni.map((a) => BSP.daTriangoli(a)), buchi = e.data.buchi.map((a) => BSP.daTriangoli(a));\n  let acc = unisciTutti(pieni); if (!acc) { postMessage({ ok: false }); return; } if (buchi.length) acc = BSP.differenza(acc, unisciTutti(buchi));\n  const t = BSP.aTriangoli(acc);\n  // \u00abstampabile\u00bb: ogni spigolo in due triangoli esatti (i vertici sono gi\u00e0 saldati); prima lo contava la pagina e la bloccava 10 s\n  const id = new Map(), sp = new Map(); let nv = 0; const v = (i) => { const k = t[i] + \",\" + t[i + 1] + \",\" + t[i + 2]; let x = id.get(k); if (x === undefined) { x = nv++; id.set(k, x); } return x; };\n  for (let i = 0; i < t.length; i += 9) { const a = v(i), b = v(i + 3), c = v(i + 6); for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? p * 4194304 + q : q * 4194304 + p; sp.set(k, (sp.get(k) || 0) + 1); } }\n  let chiuso = true; for (const n of sp.values()) if (n !== 2) { chiuso = false; break; }\n  postMessage({ ok: true, t, chiuso }, [t.buffer]); } catch (err) { postMessage({ ok: false, err: String(err) }); } };\n";
+let BSP_URL = null;
+function bspInDisparte(pieni, buchi, ms = 60000) {          // Float32Array dei triangoli; null = troppo complesso; undefined = niente Worker
+  return new Promise((ok) => {
+    let w; try { BSP_URL = BSP_URL || URL.createObjectURL(new Blob([BSP_SORGENTE], { type: "text/javascript" })); w = new Worker(BSP_URL); } catch (e) { ok(undefined); return; }
+    const via = setTimeout(() => { w.terminate(); ok(null); }, ms);
+    w.onmessage = (e) => { clearTimeout(via); w.terminate(); if (e.data && e.data.ok) { e.data.t.chiuso = e.data.chiuso; ok(e.data.t); } else ok(null); };
+    w.onerror = (e) => { clearTimeout(via); w.terminate(); e.preventDefault?.(); ok(undefined); };
+    const tutti = [...pieni, ...buchi].map((a) => a.buffer);
+    w.postMessage({ pieni, buchi }, tutti);
+  });
+}
 function leggiSTL(buf) {
   try {
     const dv = new DataView(buf), n = dv.getUint32(80, true);
@@ -7655,6 +7671,7 @@ async function bancoOlografico3D(el, vivo, cb) {
     const rec = { o, g, pezzi, M, puntiM, nascita: performance.now(), anim: anim || "nessuna" };
     M.f.opacity = opacitaF(rec);
     if (o.tipo === "ologramma") proiettore(rec);
+    if (o.tipo === "unito") { const D = GEO_DATI.get(o.p.k); if (D && D.chiuso != null) rec.chiuso = D.chiuso; }
     oggetti.set(o.id, rec); posa(o);
     if (anim === "vola" || anim === "pezzi") pezzi.forEach((p, i) => { p.pg.userData.da = new T.Vector3((i % 2 ? 1 : -1) * 160, 120 + i * 40, p.dz ? p.dz * 2 : -120); });
     return rec;
@@ -7802,16 +7819,16 @@ async function bancoOlografico3D(el, vivo, cb) {
       return { pos: new Float32Array(g.attributes.position.array), norm: new Float32Array(g.attributes.normal.array), x: cx, z: cz, tri: g.attributes.position.count / 3 };
     },
     box(o) { const r = oggetti.get(o.id); return r ? boxOf(r) : new T.Box3(); },
-    ricetta(pezzi) {
+    ricetta(pezzi, soloPezzi = null) {
       const cl = (v, d) => Math.max(.6, Math.min(250, Number.isFinite(+v) ? +v : d)), tri = (g) => BSP.daTriangoli((g.index ? g.toNonIndexed() : g).attributes.position.array);
       let acc = null; const buchi = [];
       for (const q of pezzi.slice(0, 28)) { const m = q.misure || {}; let g;
         const L = cl(m.l ?? m.d, 20), P = cl(m.p ?? m.d ?? m.l, 20), H = cl(m.h ?? m.d, 20), D = cl(m.d ?? Math.max(m.l || 0, m.p || 0), 20);
         if (q.forma === "scatola") g = new T.BoxGeometry(L, H, P);
-        else if (q.forma === "cilindro") g = new T.CylinderGeometry(D / 2, D / 2, H, 40);
-        else if (q.forma === "cono") g = +m.d2 > .6 ? new T.CylinderGeometry(cl(m.d2, 0) / 2, D / 2, H, 40) : new T.ConeGeometry(D / 2, H, 40);
-        else if (q.forma === "sfera") { g = new T.SphereGeometry(D / 2, 32, 20); if (m.h) g.scale(1, H / D, 1); }
-        else if (q.forma === "toro") { const sz = cl(m.s, 6); g = new T.TorusGeometry(Math.max(sz, D / 2 - sz / 2), sz / 2, 16, 48); g.rotateX(Math.PI / 2); }
+        else if (q.forma === "cilindro") g = new T.CylinderGeometry(D / 2, D / 2, H, 32);
+        else if (q.forma === "cono") g = +m.d2 > .6 ? new T.CylinderGeometry(cl(m.d2, 0) / 2, D / 2, H, 32) : new T.ConeGeometry(D / 2, H, 32);
+        else if (q.forma === "sfera") { g = new T.SphereGeometry(D / 2, 24, 16); if (m.h) g.scale(1, H / D, 1); }
+        else if (q.forma === "toro") { const sz = cl(m.s, 6); g = new T.TorusGeometry(Math.max(sz, D / 2 - sz / 2), sz / 2, 12, 36); g.rotateX(Math.PI / 2); }
         else if (q.forma === "cuneo") { const sh = new T.Shape(); sh.moveTo(-L / 2, 0); sh.lineTo(L / 2, 0); sh.lineTo(0, H); sh.closePath(); g = new T.ExtrudeGeometry(sh, { depth: P, bevelEnabled: false }); g.translate(0, -H / 2, -P / 2); }
         else if (q.forma === "piramide") { g = new T.ConeGeometry(D / 2, H, 4); g.rotateY(Math.PI / 4); }
         else if (q.forma === "profilo" && Array.isArray(q.punti) && q.punti.length >= 3) { const sh = new T.Shape(); q.punti.forEach(([x, z], i) => (i ? sh.lineTo(x, -z) : sh.moveTo(x, -z))); sh.closePath();
@@ -7819,9 +7836,14 @@ async function bancoOlografico3D(el, vivo, cb) {
         else continue;
         const r = q.rot || [0, 0, 0]; g.rotateX((+r[0] || 0) * Math.PI / 180); g.rotateY((+r[1] || 0) * Math.PI / 180); g.rotateZ((+r[2] || 0) * Math.PI / 180);
         const c = q.pos || [0, 0, 0]; g.translate(+c[0] || 0, +c[1] || 0, +c[2] || 0);
+        if (soloPezzi) { const a = (g.index ? g.toNonIndexed() : g).attributes.position.array; (q.foro ? soloPezzi.buchi : soloPezzi.pieni).push(new Float32Array(a)); continue; }
         if (q.foro) buchi.push(tri(g)); else acc = acc ? BSP.unione(acc, tri(g)) : tri(g); }
+      if (soloPezzi) return soloPezzi.pieni.length ? soloPezzi : null;
       if (!acc) return null; for (const b of buchi) acc = BSP.differenza(acc, b);
-      const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(BSP.aTriangoli(acc), 3)); g.computeBoundingBox();
+      return this.finisci(BSP.aTriangoli(acc)); },
+    pezzi(pezzi) { return this.ricetta(pezzi, { pieni: [], buchi: [] }); },
+    finisci(tri3) {
+      const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(tri3, 3)); g.computeBoundingBox();
       const bb = g.boundingBox; g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); g.computeVertexNormals();
       return { pos: new Float32Array(g.attributes.position.array), norm: new Float32Array(g.attributes.normal.array) }; },
     tocca(a, b) { const A3 = oggetti.get(a.id), B3 = oggetti.get(b.id); if (!A3 || !B3) return false; return boxOf(A3).expandByScalar(.05).intersectsBox(boxOf(B3)); },
