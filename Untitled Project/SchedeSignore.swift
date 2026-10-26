@@ -312,6 +312,7 @@ extension View {
 struct Pannello<Contenuto: View>: View {
     var titolo: String? = nil
     let tinta: Color
+    var olografico = false           // 27 ott: gli angoli del visore olografico (Diario, come Browser e Confidente)
     @ViewBuilder let contenuto: () -> Contenuto
 
     var body: some View {
@@ -326,6 +327,7 @@ struct Pannello<Contenuto: View>: View {
         .background(tinta.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(tinta.opacity(0.22), lineWidth: 1))
+        .overlay { if olografico { AngoliOlo(tinta: tinta).padding(-1).allowsHitTesting(false) } }
     }
 }
 
@@ -462,7 +464,7 @@ struct VistaDiario: View {
     }
 
     @ViewBuilder private var oggi: some View {
-        Pannello(titolo: "STASERA", tinta: tinta) {
+        Pannello(titolo: "STASERA", tinta: tinta, olografico: true) {
             if let p = paginaDiOggi {
                 Text("La pagina di oggi è scritta\(p.umore.map { ": \($0)" } ?? "").").font(.system(size: 15)).foregroundStyle(.white)
             } else {
@@ -478,7 +480,7 @@ struct VistaDiario: View {
             guard let g = x.giorno, let s = x.punteggio else { return nil }
             return (g, s)
         }.prefix(30)
-        return Pannello(titolo: "UMORE · ULTIME PAGINE", tinta: tinta) {
+        return Pannello(titolo: "UMORE · ULTIME PAGINE", tinta: tinta, olografico: true) {
             if punti.count < 2 {
                 Text("Il grafico compare dalla seconda pagina.").font(.footnote).foregroundStyle(Color.tenue)
             } else {

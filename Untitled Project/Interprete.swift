@@ -197,6 +197,7 @@ struct Interprete: View {
             Text(titolo).font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(Color.tenue)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 8)
+        .overlay { if attivo { AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false) } }   // 27 ott: chi parla, nel visore
         .background(Color.ciano.opacity(attivo ? 0.18 : 0.05))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(attivo ? 0.9 : 0.3), lineWidth: attivo ? 1.4 : 0.8))
         .clipShape(RoundedRectangle(cornerRadius: 12))
