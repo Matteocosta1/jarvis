@@ -332,6 +332,7 @@ struct ContentView: View {
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
             Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                   oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
+                .aperturaHUD(o.cucina ? "Cucina" : "Occhi", soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
         }
         .fullScreenCover(item: $jarvis.interprete) { l in
             Interprete(lingua: l) { jarvis.interprete = nil }
@@ -402,6 +403,7 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $mostraLidar) {
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
+                .aperturaHUD("LiDAR")                                              // 26 ott notte: il caricamento come le altre schede
                 .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
         .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }

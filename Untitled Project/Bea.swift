@@ -34,7 +34,7 @@ struct VistaBea: View {
         NavigationStack {
             ZStack {
                 Color.fondo.ignoresSafeArea()
-                RadialGradient(colors: [calda.opacity(0.10), .clear], center: .top, startRadius: 0, endRadius: 420).ignoresSafeArea()
+                RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420).ignoresSafeArea()   // 26 ott notte: ciano come le altre
                 List {
                     Section {
                         TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "link", tinta: tinta)

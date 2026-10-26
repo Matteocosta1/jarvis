@@ -619,6 +619,7 @@ struct Occhi: View {
     // MARK: Lavoro
 
     private func prepara() async {
+        let inizio = Date()
         guard await AVCaptureDevice.requestAccess(for: .video) else {
             stato = "ACCESSO NEGATO · IMPOSTAZIONI › JARVIS › FOTOCAMERA"
             Suoni.errore()
@@ -643,6 +644,8 @@ struct Occhi: View {
         }
         leggiZoom()
         if !davanti && abs(zoomIniziale - 1) > 0.05 { imposta(zoomIniziale, animato: true) }
+        let resta = 1.1 - Date().timeIntervalSince(inizio)          // 26 ott notte: sotto c'è il caricamento delle schede (AperturaHUD)
+        if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
         agganciato = true
         Suoni.aperturaCamera()
         if video {

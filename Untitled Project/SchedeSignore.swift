@@ -255,6 +255,7 @@ struct AperturaHUD: ViewModifier {
     let titolo: String
     var durata = 1.1
     var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
+    var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
     @State private var coperto = true
 
     func body(content: Content) -> some View {
@@ -271,7 +272,8 @@ struct AperturaHUD: ViewModifier {
             .onAppear { Suoni.schedaApre() }
             .task {
                 try? await Task.sleep(for: .seconds(durata))
-                if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
+                if soloSfuma { Suoni.schedaPronta(soloSfuma: true) }
+                else if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
                 withAnimation(.easeOut(duration: 0.4)) { coperto = false }
             }
     }
@@ -279,8 +281,8 @@ struct AperturaHUD: ViewModifier {
 
 extension View {
     /// Apre la sezione con il caricamento HUD di JARVIS.
-    func aperturaHUD(_ titolo: String, fotocamera: Bool = false) -> some View {
-        modifier(AperturaHUD(titolo: titolo, fotocamera: fotocamera))
+    func aperturaHUD(_ titolo: String, fotocamera: Bool = false, soloSfuma: Bool = false) -> some View {
+        modifier(AperturaHUD(titolo: titolo, fotocamera: fotocamera, soloSfuma: soloSfuma))
     }
 }
 

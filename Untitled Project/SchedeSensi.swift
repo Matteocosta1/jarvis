@@ -50,7 +50,11 @@ struct VistaShazam: View {
         }
         .overlay(alignment: .bottom) { if let t = aperta { player(t) } }
         .onAppear { storico = VistaShazam.leggi() }
-        .task { await ascolta() }
+        .task {
+            try? await Task.sleep(for: .seconds(1.7))
+            guard !Task.isCancelled else { return }
+            await ascolta()
+        }
         .task { await lettore.segui() }
         .confirmationDialog("Cancellare tutte le canzoni riconosciute?", isPresented: $chiediCancella, titleVisibility: .visible) {
             Button("Cancella", role: .destructive) { storico = []; VistaShazam.salva([]) }

@@ -235,24 +235,13 @@ struct VistaWiretap: View {
             Color.fondo.ignoresSafeArea()
             VStack(spacing: 14) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("WIRETAP")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                        Text(w.attivo ? "INTERCETTAZIONE IN CORSO" : (w.confermato.isEmpty ? "PRONTO" : "REGISTRAZIONE CHIUSA"))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2).opacity(0.8)
-                    }
-                    .foregroundStyle(w.attivo ? Color.red : Color.ciano)
-                    Spacer()
-                    Button { Suoni.tocco(); w.cancella(); chiudi() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.ciano)
-                            .frame(width: 42, height: 42)
-                            .background(Color.black.opacity(0.45))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-                    }
-                    .accessibilityLabel("Chiudi")
+                    // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e «Chiudi»: qui non c'è la fotocamera
+                    TestataScheda(titolo: "Wiretap",
+                                  sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
+                                  icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)
+                    Button("Chiudi") { Suoni.tocco(); w.cancella(); chiudi() }
+                        .font(.system(size: 17, weight: .semibold))
+                        .tint(Color.ciano)
                 }
 
                 // durata e onda
