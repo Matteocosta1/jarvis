@@ -88,23 +88,28 @@ struct IconaSocial: View {
 
 /// Il tasto STUDIO degli Occhi (accanto a CERCA): stesso stile dei tasti degli Occhi, con il cubo dello Studio.
 struct TastoOcchiStudio: View {
+    /// 26 ott (deciso dal signore): STUDIO si accende da solo, senza ETICHETTE né OLOGRAMMA; acceso, lo scatto va allo Studio.
+    var acceso = false
     let azione: () -> Void
     var body: some View {
         Button(action: azione) {
             VStack(spacing: 4) {
                 IconaStudio()
                     .frame(width: 18, height: 18)
-                    .foregroundStyle(Color.ciano.opacity(0.7))
+                    .foregroundStyle(acceso ? Color.fondo : Color.ciano.opacity(0.7))
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.black.opacity(0.5)))
+                    .background(Circle().fill(acceso ? Color.ciano : Color.black.opacity(0.5)))
                     .overlay(Circle().stroke(Color.ciano.opacity(0.55), lineWidth: 1))
+                    .shadow(color: Color.ciano.opacity(acceso ? 0.65 : 0), radius: 7)
                 Text("STUDIO").font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(0.5)
-                    .foregroundStyle(Color.ciano.opacity(0.7))
+                    .foregroundStyle(acceso ? Color.ciano : Color.ciano.opacity(0.7))
             }
             .frame(width: 50)
+            .animation(.easeOut(duration: 0.2), value: acceso)
         }
         .buttonStyle(StileStark())
         .accessibilityLabel("Manda allo Studio")
+        .accessibilityAddTraits(acceso ? .isSelected : [])
     }
 }
 

@@ -99,6 +99,8 @@ struct Occhi: View {
     @StateObject private var cielo = CieloOcchi()
     @State private var tastoAereo = false
     @State private var campoAereo: Double = 70
+    /// 26 ott: STUDIO acceso (da solo, senza ETICHETTE né OLOGRAMMA): il prossimo scatto va allo Studio.
+    @State private var modoStudio = false
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
     private var manualeStark: Bool { !automatico && !video && !cucina }
     private var occupato: Bool { scattando || registrando }
@@ -254,9 +256,10 @@ struct Occhi: View {
                             }
                             .transition(.scale(scale: 0.4).combined(with: .opacity))
                         }
-                        TastoOcchiStudio {                  // MARK X: STUDIO, il bersaglio (o l'inquadratura) va sul banco dello Studio
+                        TastoOcchiStudio(acceso: modoStudio) {   // MARK X: STUDIO si accende; poi lo scatto va sul banco dello Studio
                             guard !occupato else { return }
-                            Suoni.tocco(); manda("studio")
+                            Suoni.tocco(); modoStudio.toggle()
+                            if modoStudio { avvisa("SCATTI: LA FOTO VA ALLO STUDIO") }
                         }
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["icone"] = $0 }
@@ -451,18 +454,35 @@ struct Occhi: View {
 
     /// MARK X · STUDIO e PUBBLICA SU SOCIAL (come il mockup): il bersaglio con un po' di margine (o tutta l'inquadratura, se non
     /// c'è un bersaglio) va alla pagina dello Studio, che ne fa un ologramma 3D, o a Social, pronto da pubblicare. Gli Occhi si chiudono.
+    /// 26 ott (deciso dal signore): non serve più ETICHETTE né OLOGRAMMA. Con un bersaglio agganciato va il suo ritaglio;
+    /// senza, JARVIS scatta una foto vera (come il tasto di scatto) e manda tutta l'inquadratura.
     private func manda(_ k: String) {
         guard agganciato, !chiuso, !scattando else { OcchiAperti.parla?("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco."); return }
-        let o = stark.obiettivo
-        let box = o?.box ?? CGRect(x: 0, y: 0, width: 1, height: 1)
+        let o = (stark.olo || stark.eti) ? stark.obiettivo : nil
         let nome = o.map { stark.titolo($0) ?? $0.nome.lowercased() } ?? "inquadratura"
         let visore = stark.visore
+        scattando = true
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        withAnimation(.easeOut(duration: 0.06)) { lampo = true }
+        withAnimation(.easeIn(duration: 0.45).delay(0.06)) { lampo = false }
         Task {
-            let dati = await Task.detached(priority: .userInitiated) { visore.ritaglio(box, lato: 1600) }.value
+            var dati: Data?
+            if let o {
+                let box = o.box
+                dati = await Task.detached(priority: .userInitiated) { visore.ritaglio(box, lato: 1600) }.value
+            }
+            if dati == nil {
+                let foto = await withCheckedContinuation { (c: CheckedContinuation<Data?, Never>) in
+                    motore.scatta(veloce: false) { d in c.resume(returning: d) }
+                }
+                dati = foto.flatMap { Occhi.riduci($0, lato: 1600) }
+            }
+            scattando = false
             guard !chiuso, let dati, let img = UIImage(data: dati) else {
-                if !chiuso { OcchiAperti.parla?("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco.") }
+                if !chiuso { Suoni.errore(); OcchiAperti.parla?("La foto non è riuscita, Sir: riprovi.") }
                 return
             }
+            modoStudio = false
             Suoni.schedaPronta()
             OcchiAperti.parla?(k == "studio" ? "\(nome.prefix(1).uppercased() + nome.dropFirst()): lo mando allo Studio, Sir." : "La preparo per Instagram, Sir.")
             chiudi([])
@@ -681,6 +701,7 @@ struct Occhi: View {
 
     private func scatta() {
         guard agganciato, !scattando, !chiuso, !cambiando else { return }
+        if modoStudio && manualeStark { manda("studio"); return }   // STUDIO acceso: lo scatto va allo Studio
         scattando = true
         stato = "ACQUISIZIONE"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
