@@ -981,7 +981,7 @@ enum TestiCaricamento {
         "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "allineamento canali audio",
         "vitals": "lettura parametri vitali", "ricordi": "richiamo memoria", "confidente": "canale riservato",
         "wiretap": "microfoni in ascolto", "interprete": "caricamento dizionari", "trainer": "calibrazione scheletro",
-        "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "accensione sensore",
+        "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "proiezione griglia laser",
         "sentinella": "armamento perimetro", "profiler": "riconoscimento soggetto", "browser": "connessione cifrata",
         "studio": "proiettori olografici", "social": "collegamento instagram",
     ]
