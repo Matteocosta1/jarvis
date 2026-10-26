@@ -976,7 +976,7 @@ enum TestiCaricamento {
         "diario": "apertura archivio personale", "sonno": "lettura cicli notturni", "cuore": "sincronizzazione battito",
         "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "calibrazione microfoni",
         "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
-        "bea": "canale protetto", "github": "sincronizzazione repository", "supabase": "interrogazione database",
+        "bea": "protective instinct", "github": "sincronizzazione repository", "supabase": "interrogazione database",
         "archivio": "accesso al caveau", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
         "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "allineamento canali audio",
         "vitals": "lettura parametri vitali", "ricordi": "richiamo memoria", "confidente": "canale riservato",
