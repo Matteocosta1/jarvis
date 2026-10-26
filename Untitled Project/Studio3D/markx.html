@@ -5635,7 +5635,7 @@ function social(ok) {
     <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["griglia", "GRIGLIA"], ["piano", "PIANO"], ["report", "REPORT"], ["orari", "ORARI"], ["rivali", "RIVALI"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
-  setTimeout(() => { const st = A.querySelector("[data-sc-sotto]"); if (st && A.isConnected) st.textContent = "SOCIAL · @KINGRUSTO"; }, 1300);   // 27 ott: la parola di caricamento scorre via, arriva la dicitura
+  [["SEARCH ENGAGEMENT", 1300], ["SOCIAL · @KINGRUSTO", 2600]].forEach(([t, ms]) => setTimeout(() => { const st = A.querySelector("[data-sc-sotto]"); if (st && A.isConnected) st.textContent = t; }, ms));   // 27 ott: la parola di caricamento scorre via, arriva la dicitura
   sezione.appendChild(A);
   const P = A.querySelector("#scPagina"), $s = (q) => A.querySelector(q);
   A.querySelector(".sc-chiudi").addEventListener("click", () => { suona("aTick"); $("chiudiSez").click(); });
