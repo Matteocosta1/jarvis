@@ -52,4 +52,21 @@ def toppe_lidar(s, toppa):
     # «fai il plastico della stanza» detto nello Studio dell'app: la sala la dà l'app (l'ultima scansione salvata), non quella d'esempio
     s = toppa(s, '{ plastico(/giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"); return ""; }',
               '{ const kp = /giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"; if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "plastico", k: kp }); else plastico(kp); return ""; }')
+    # i tasti LIDAR e OCCHI dello Studio (e «scansiona…» a voce): nell'app aprono il LiDAR e gli Occhi veri (lo Studio si chiude;
+    # il tasto STUDIO di LiDAR e degli Occhi riporta sul banco la scansione e la foto vere). Nel mockup restano le prove d'esempio.
+    s = toppa(s, '  async function scansioneLidar(forma = "tazza") {',
+              '  async function scansioneLidar(forma = "tazza") {\n    if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "vaiA", dove: "lidar" }); return; }')
+    s = toppa(s, '  async function daOcchi() {',
+              '  async function daOcchi() { if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "vaiA", dove: "occhi" }); return; }')
+    # altri resti del mockup nello Studio dell'app (controllo del 26 ott):
+    #  · «trasforma questa foto in 3D», «fotografa il disegno» a voce: la fotocamera vera, non il mirino con le PROVE d'esempio
+    s = toppa(s, '  function fotocamera() {', '  function fotocamera() {\n    if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "foto" }); return; }')
+    #  · «scansiona questa tazza» a voce: il LiDAR vero anche se la frase nomina un oggetto (nel mockup creava una tazza)
+    s = toppa(s, '    if (!creare && /scansion|lidar/.test(t)) { scansioneLidar(); return null; }',
+              '    if ((!creare || (window.JARVIS_APP && /^(scansiona|scansione|lidar)\\b/.test(t))) && /scansion|lidar/.test(t)) { scansioneLidar(); return null; }')
+    #  · CREA libero: se il cervello non risponde, niente «ricetta di prova del mockup»
+    s = toppa(s, '    if (!ric?.pezzi?.length) { const k = Object.keys(SD_RICETTE)', '    if (!ric?.pezzi?.length && !window.JARVIS_APP) { const k = Object.keys(SD_RICETTE)')
+    #  · STAMPA/CONDIVIDI non riuscito: nell'app non si dice «nell'app va in File»
+    s = toppa(s, ': "Qui il salvataggio non è disponibile: nell\'app va in File.";',
+              ': window.JARVIS_APP ? "Il salvataggio non è riuscito, Sir: riprovi." : "Qui il salvataggio non è disponibile: nell\'app va in File.";')
     return s

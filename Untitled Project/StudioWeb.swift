@@ -131,6 +131,11 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
         case "foto":
             scatta()
+        case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone
+            let lidar = o["dove"] as? String == "lidar"
+            parla(lidar ? "Apro il LiDAR su Oggetto, Sir: finita la scansione, tocchi STUDIO." : "Apro gli Occhi, Sir: inquadri il pezzo e tocchi STUDIO.")
+            salvaOra()
+            NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": lidar ? "lidar" : "occhi"])
         case "plastico":                                                 // «fai il plastico della stanza» dentro lo Studio: la sala vera
             let p = PaginaMarkX.plasticoDaArchivio(o["k"] as? String ?? "stanza")
             parla(p.frase)

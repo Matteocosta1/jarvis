@@ -62,6 +62,8 @@ enum PaginaMarkX {
 
 extension Notification.Name {
     static let jarvisApriPagina = Notification.Name("jarvisApriPagina")
+    /// Dallo Studio: chiudi lo Studio e apri il LiDAR vero (su Oggetto) o gli Occhi veri (`userInfo["dove"]`: "lidar" / "occhi").
+    static let jarvisVaiA = Notification.Name("jarvisVaiA")
 }
 
 /// L'icona SOCIAL in alto: il glifo ufficiale di Instagram (scaricato da Meta), in ciano come le altre (regole di Meta: un colore pieno va bene).

@@ -57,4 +57,21 @@ def toppe_social(s, toppa):
               'if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.auto = { on: false, parola: "LISTA", testo: "" }; }\n'
               'window.__socStato = (r) => { if (!r || r.errore) { SOC.vero = { errore: (r && r.errore) || "non risponde" }; } else { SOC.vero = r; SOC.posta = r.posta || []; SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; if (r.auto) SOC.auto = r.auto; } window.__socRidisegna && window.__socRidisegna(); if (window.__socRiassunto) { window.__socRiassunto = false; if (SOC.vero.report) parlaMock(SOC.vero.report.riassunto, 6000); else parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); } };\n'
               'CONTENUTI.Social = `<div id="social"></div>`;')
+    # il pezzo dello Studio per Instagram: nell'app si tiene anche l'immagine grande del banco (la miniatura da 160 px faceva un Reel sgranato)
+    s = toppa(s, 'if (conMini) miniatura((m) => { if (m && progAtt() === p) { p.mini = m;',
+              'if (conMini) miniatura((m) => { if (m && progAtt() === p) { p.mini = m; if (window.JARVIS_APP) try { p.grande = B.istantanea(true); } catch {}')
+    s = toppa(s, 'return p ? { mini: p.mini, nome: p.nome || "Progetto" } : null; }',
+              'return p ? { mini: (window.JARVIS_APP && p.grande) || p.mini, nome: p.nome || "Progetto" } : null; }')
+    # POSTA vuota nell'app: si dice (prima restava uno spazio bianco); mentre carica, «Carico…»
+    s = toppa(s, 'P.innerHTML = `<div class="sc-lista">${SOC.posta.map((m, i) =>',
+              'P.innerHTML = `${window.JARVIS_APP && !SOC.posta.length ? `<p class="sc-nota">${SOC.vero ? (SOC.vero.errore ? "Instagram non risponde: " + escSd(SOC.vero.errore) + "." : "Nessun commento o messaggio da rispondere.") : "Carico commenti e messaggi…"}</p>` : ""}<div class="sc-lista">${SOC.posta.map((m, i) =>')
+    # REPORT nell'app senza dati (sta caricando o Instagram non risponde): niente numeri d'esempio, i trattini
+    ESEMPIO = '[["FOLLOWER", "12,4K", "+184 in 7 giorni"], ["COPERTURA", "38,2K", "account raggiunti · 7 giorni"], ["INTERAZIONI", "4,1K", "like, commenti, salvataggi"], ["ORARIO MIGLIORE", "LUN 12", "quando i suoi follower sono online"]]'
+    s = toppa(s, '(SOC.vero?.report?.numeri || ' + ESEMPIO + ')',
+              '(SOC.vero?.report?.numeri || (window.JARVIS_APP ? [["FOLLOWER", "—", SOC.vero?.errore ? "Instagram non risponde" : "carico…"], ["COPERTURA", "—", "account raggiunti · 7 giorni"], ["INTERAZIONI", "—", "like, commenti, salvataggi"], ["POST", "—", "pubblicati in tutto"]] : ' + ESEMPIO + '))')
+    s = toppa(s, 'v = SOC.vero?.report?.giorni?.length ? SOC.vero.report.giorni : [3.1,',
+              'v = SOC.vero?.report?.giorni?.length ? SOC.vero.report.giorni : window.JARVIS_APP ? [] : [3.1,')
+    s = toppa(s, '${SOC.vero?.report ? (SOC.vero.report.top ?', '${SOC.vero?.report || window.JARVIS_APP ? (SOC.vero?.report?.top ?')
+    s = toppa(s, '"Dalle statistiche ufficiali di Instagram." : "Numeri d\'esempio. Nell\'app arrivano dalle statistiche ufficiali di Instagram."',
+              '"Dalle statistiche ufficiali di Instagram." : window.JARVIS_APP ? (SOC.vero?.errore ? "Instagram non risponde: " + escSd(SOC.vero.errore) + "." : "Carico le statistiche di Instagram…") : "Numeri d\'esempio. Nell\'app arrivano dalle statistiche ufficiali di Instagram."')
     return s

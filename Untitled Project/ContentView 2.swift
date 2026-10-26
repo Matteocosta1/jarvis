@@ -259,6 +259,15 @@ struct ContentView: View {
             aperturaPagina = nil                                   // ce n'è già una aperta: si chiude e si riapre con la nuova
             Task { @MainActor in try? await Task.sleep(for: .milliseconds(650)); aperturaPagina = a }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisVaiA)) { n in   // LIDAR e OCCHI dello Studio: quelli veri
+            let lidar = n.userInfo?["dove"] as? String == "lidar"
+            aperturaPagina = nil
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(650))           // il tempo che lo Studio si chiuda
+                if lidar { LidarAperta.richiesta = (.oggetto, nil) }       // LiDAR parte già su Oggetto
+                apriReparto(lidar ? .lidar : .occhi)
+            }
+        }
         .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
             Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                   oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda) { dati in jarvis.occhiChiusi(dati) }

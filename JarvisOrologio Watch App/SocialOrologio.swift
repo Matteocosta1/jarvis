@@ -1,16 +1,18 @@
 import SwiftUI
 import WatchKit
 
-// MARK: - MARK X · SOCIAL al polso: @kingrusto in un colpo d'occhio
-// Follower, la settimana, i messaggi e i commenti da rispondere, il prossimo post in programma. I dati veri arrivano dal cervello
-// (funzione «social», senza le bozze delle risposte: al polso non si scrivono). Rispondere e pubblicare: dall'iPhone.
+// MARK: - MARK X · SOCIAL al polso (come il mockup: «Instagram al polso: il messaggio nuovo e la risposta di JARVIS, parte con un tocco»)
+// Il primo commento o messaggio da rispondere, con la risposta preparata da JARVIS; INVIA la manda (la stessa funzione «social»
+// dell'iPhone, col sì del signore: il tocco). Niente da rispondere: «0 · Nessun messaggio da rispondere».
 
 struct VistaSocialOrologio: View {
-    /// Detta a voce: "POSTA", "REPORT", "CALENDARIO" (quella parte va in cima).
+    /// Detta a voce ("POSTA", "REPORT"…): al polso c'è solo la posta, come nel mockup.
     var scheda: String? = nil
-    @State private var dati: [String: Any]?
+    @State private var messaggio: [String: Any]?
     @State private var errore: String?
     @State private var caricato = false
+    @State private var inviata = false
+    @State private var invio = false
     private let ciano = TintaOrologio.ciano
     private let tenue = Color(red: 0.30, green: 0.40, blue: 0.44)
     private let testo = Color(red: 0.812, green: 0.886, blue: 0.910)
@@ -19,100 +21,83 @@ struct VistaSocialOrologio: View {
         SchermoPolso(titolo: "SOCIAL · @KINGRUSTO", pronto: caricato) {
             if let errore {
                 Text(errore).font(.system(size: 10)).foregroundStyle(.orange).multilineTextAlignment(.center)
-            } else if dati != nil {
-                ForEach(ordine, id: \.self) { parte in
-                    switch parte {
-                    case "REPORT": report
-                    case "POSTA": posta
-                    default: calendario
-                    }
+            } else if let m = messaggio {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("@\(m["chi"] as? String ?? "")").font(.system(size: 10, weight: .bold)).foregroundStyle(ciano)
+                    Text(m["testo"] as? String ?? "").font(.system(size: 11)).foregroundStyle(.white)
+                    Text("JARVIS").font(.system(size: 10, weight: .bold)).foregroundStyle(ciano).padding(.top, 2)
+                    Text("«\(m["bozza"] as? String ?? "")»").font(.system(size: 11)).foregroundStyle(testo)
                 }
-                Text("Rispondere e pubblicare: dall'iPhone, Sir.").font(.system(size: 9)).foregroundStyle(tenue).multilineTextAlignment(.center)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ciano.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                Button { Task { await invia(m) } } label: {
+                    HStack {
+                        Text(inviata ? "INVIATA" : invio ? "INVIO…" : "INVIA").font(.system(size: 12, weight: .bold, design: .monospaced))
+                        Spacer()
+                        Text(inviata ? "✓" : "›").font(.system(size: 13, weight: .bold))
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .foregroundStyle(inviata ? Color.black : ciano)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(inviata ? ciano : Color.clear))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(ciano.opacity(0.6), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .disabled(inviata || invio || (m["bozza"] as? String ?? "").isEmpty)
+                Text("\((m["tipo"] as? String) == "dm" ? "Messaggio" : "Commento") · Instagram")
+                    .font(.system(size: 9)).foregroundStyle(tenue)
+            } else {
+                Text("0").font(.system(size: 30, weight: .bold, design: .monospaced)).foregroundStyle(.white)
+                Text("Nessun messaggio da rispondere").font(.system(size: 9)).foregroundStyle(tenue).multilineTextAlignment(.center)
             }
         }
         .task { await carica() }
     }
 
-    private var ordine: [String] {
-        let tutte = ["REPORT", "POSTA", "CALENDARIO"]
-        guard let s = scheda, tutte.contains(s) else { return tutte }
-        return [s] + tutte.filter { $0 != s }
+    // MARK: il cervello (funzione «social», come l'iPhone)
+
+    private static var indirizzo: URL? {
+        let base = ImpostazioniOrologio.indirizzo
+        return URL(string: base.hasSuffix("/jarvis") ? String(base.dropLast(7)) + "/social" : base.replacingOccurrences(of: "/jarvis", with: "/social"))
     }
 
-    // MARK: le tre parti
-
-    private var report: some View {
-        let profilo = dati?["profilo"] as? [String: Any]
-        let numeri = (dati?["report"] as? [String: Any])?["numeri"] as? [[String]] ?? []
-        return VStack(spacing: 4) {
-            Text(profilo?["followerTesto"] as? String ?? "—").font(.system(size: 26, weight: .bold, design: .monospaced)).foregroundStyle(.white)
-            Text("FOLLOWER" + (numeri.first.map { $0.count > 2 ? " · " + $0[2].uppercased() : "" } ?? ""))
-                .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(ciano).multilineTextAlignment(.center)
-            HStack(spacing: 6) {
-                ForEach(Array(numeri.dropFirst().prefix(2).enumerated()), id: \.offset) { _, n in
-                    VStack(spacing: 1) {
-                        Text(n.count > 1 ? n[1] : "—").font(.system(size: 14, weight: .semibold, design: .monospaced)).foregroundStyle(testo)
-                        Text(n.first ?? "").font(.system(size: 7, weight: .bold, design: .monospaced)).foregroundStyle(tenue)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .padding(.vertical, 4)
+    private static func chiama(_ corpo: [String: Any], attesa: TimeInterval) async -> [String: Any]? {
+        let token = PortachiaviOrologio.leggi()
+        guard !token.isEmpty, let url = indirizzo else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = attesa
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
+        guard let (d, _) = try? await URLSession.shared.data(for: req) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
     }
-
-    private var posta: some View {
-        let lista = (dati?["posta"] as? [[String: Any]] ?? []).filter { ($0["fatto"] as? Bool) != true && ($0["scaduto"] as? Bool) != true }
-        return VStack(alignment: .leading, spacing: 3) {
-            Text(lista.isEmpty ? "POSTA · TUTTO RISPOSTO" : "POSTA · \(lista.count) DA RISPONDERE")
-                .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(ciano)
-            ForEach(Array(lista.prefix(3).enumerated()), id: \.offset) { _, m in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("@\(m["chi"] as? String ?? "") · \((m["tipo"] as? String) == "dm" ? "DM" : "COMMENTO")")
-                        .font(.system(size: 9, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text(m["testo"] as? String ?? "").font(.system(size: 10)).foregroundStyle(testo).lineLimit(2)
-                }
-                .padding(6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(ciano.opacity(0.07))
-                .overlay(alignment: .leading) { Rectangle().fill(ciano).frame(width: 2) }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var calendario: some View {
-        let coda = dati?["coda"] as? [[String: Any]] ?? []
-        return VStack(alignment: .leading, spacing: 3) {
-            Text("CALENDARIO").font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1).foregroundStyle(ciano)
-            if let p = coda.first {
-                Text("\(p["quando"] as? String ?? "") · \(p["tipo"] as? String ?? "")").font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
-                Text(p["titolo"] as? String ?? "").font(.system(size: 10)).foregroundStyle(testo).lineLimit(2)
-            } else {
-                Text("Niente in programma.").font(.system(size: 10)).foregroundStyle(testo)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: il cervello
 
     private func carica() async {
         defer { caricato = true }
-        let base = ImpostazioniOrologio.indirizzo
-        let indirizzo = base.hasSuffix("/jarvis") ? String(base.dropLast(7)) + "/social" : base.replacingOccurrences(of: "/jarvis", with: "/social")
-        let token = PortachiaviOrologio.leggi()
-        guard !token.isEmpty, let url = URL(string: indirizzo) else { errore = "Manca la parola d'ordine, Sir: apra JARVIS sull'iPhone."; return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.timeoutInterval = 40
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["azione": "stato", "leggero": true] as [String: Any])
-        guard let (d, _) = try? await URLSession.shared.data(for: req),
-              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { errore = "Instagram non risponde, Sir."; return }
+        guard !PortachiaviOrologio.leggi().isEmpty else { errore = "Manca la parola d'ordine, Sir: apra JARVIS sull'iPhone."; return }
+        guard let o = await Self.chiama(["azione": "stato"], attesa: 45) else { errore = "Instagram non risponde, Sir."; return }
         if let e = o["errore"] as? String { errore = "Instagram: \(e)."; return }
-        dati = o
+        let posta = o["posta"] as? [[String: Any]] ?? []
+        messaggio = posta.first { ($0["fatto"] as? Bool) != true && ($0["scaduto"] as? Bool) != true }
+    }
+
+    private func invia(_ m: [String: Any]) async {
+        guard !inviata, !invio else { return }
+        invio = true
+        WKInterfaceDevice.current().play(.click)
+        let corpo: [String: Any] = ["azione": "rispondi", "tipo": m["tipo"] as? String ?? "", "id": m["id"] as? String ?? "",
+                                    "a": m["a"] as? String ?? "", "testo": m["bozza"] as? String ?? ""]
+        let r = await Self.chiama(corpo, attesa: 30)
+        invio = false
+        if r?["ok"] as? Bool == true {
+            inviata = true
+            WKInterfaceDevice.current().play(.success)
+        } else {
+            errore = "Non è partita, Sir: " + (r?["errore"] as? String ?? "Instagram non risponde") + "."
+            WKInterfaceDevice.current().play(.failure)
+        }
     }
 }
