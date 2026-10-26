@@ -111,10 +111,6 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         let w = WKWebView(frame: .zero, configuration: conf)
         w.isOpaque = false
         w.backgroundColor = UIColor(red: 0.008, green: 0.012, blue: 0.016, alpha: 1)
-        // 26 ott sera (il lampo bianco di pochi millesimi all'apertura): anche il fondo sotto la pagina e quello dello scorrimento
-        // sono neri, così prima del primo disegno non c'è niente di bianco
-        w.scrollView.backgroundColor = w.backgroundColor
-        w.underPageBackgroundColor = w.backgroundColor
         w.scrollView.isScrollEnabled = false
         w.scrollView.bounces = false
         w.scrollView.contentInsetAdjustmentBehavior = .never
