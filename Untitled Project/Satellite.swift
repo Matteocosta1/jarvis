@@ -193,6 +193,11 @@ struct VistaSatellite: View {
             switch p {
             case .naviga(let l): SchermoNaviga(luogo: l, apri: apri)
             case .guida(let l): SchermoGuida(luogo: l, apri: apri)
+            case .travel(let l, let k):
+                // MARK X · TRAVEL: «come arrivare», sopra SATELLITE come il Dossier
+                SchermoTravel(luogo: l, iniziale: k,
+                              lei: bussola.lat.flatMap { la in bussola.lon.map { CLLocationCoordinate2D(latitude: la, longitude: $0) } },
+                              chiudi: { apri(nil) }, guida: { apri(.guida(l)) })
             case .dossier(let l):
                 SchermoDossier(luogo: l, categoria: categoria(l), vicini: vicini(l), distanza: distanza(l), apri: apri) { nuova in
                     await ricarica(scegli: nuova)                       // la ricognizione salvata: ora è uno dei suoi luoghi
@@ -245,6 +250,7 @@ struct VistaSatellite: View {
             HStack(spacing: 8) {
                 TastoComando(testo: "Guida", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.guida(l)) } }
                 TastoComando(testo: "Naviga", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.naviga(l)) } }
+                TastoComando(testo: "Travel", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.travel(l, .mezzi)) } }   // MARK X
                 TastoComando(testo: "Dossier", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.dossier(l)) } }
             }
         }
@@ -384,7 +390,11 @@ struct VistaSatellite: View {
     private func apri(_ p: PaginaSat?) {
         if case .guida(let l)? = p { MotoreGuida.condiviso.avvia(l) }
         var t = Transaction()
-        t.disablesAnimations = { if case .dossier? = p { return false }; if case .dossier? = pagina { return false }; return true }()
+        t.disablesAnimations = {
+            if case .dossier? = p { return false }; if case .dossier? = pagina { return false }
+            if case .travel? = p { return false }; if case .travel? = pagina { return false }     // TRAVEL sale dal basso, come il Dossier
+            return true
+        }()
         withTransaction(t) { pagina = p }
     }
 
@@ -398,6 +408,28 @@ struct VistaSatellite: View {
         richiesta.azione = nil
         guard fresca else { return }
         try? await Task.sleep(for: .seconds(1.3))
+        if case .travel(var nome, let k) = a {               // MARK X · TRAVEL a voce: il luogo detto, se no quello scelto
+            if k == "voli" {                                 // per VOLI il «luogo» è il numero del volo detto: si ricorda
+                if !nome.isEmpty { VoloSalvato.numero = nome }
+                nome = ""
+            }
+            guard let l = nome.isEmpty ? scelto : (LuogoSat.trova(nome, in: tutti) ?? scelto) else {
+                Suoni.errore(); parla("Prima mi serve un luogo salvato, Sir: dica «Jarvis, ricorda questo luogo» dove si trova."); return
+            }
+            if !nome.isEmpty, LuogoSat.trova(nome, in: tutti) == nil, let c = await geocodifica(nome) {
+                let r = LuogoSat(chiave: String(format: "c%.5f,%.5f", c.latitude, c.longitude), ricordo: nil, tipo: "ricognizione", nome: nome,
+                                 via: nome, persona: nil, lat: c.latitude, lon: c.longitude, quando: "adesso")
+                ricognizione = r
+                sceltoChiave = r.chiave
+                apri(.travel(r, SchedaTravel(rawValue: k) ?? .mezzi))
+                return
+            }
+            sceltoChiave = l.chiave
+            parla(k == "voli" ? "Il suo volo, Sir." : k == "treni" ? "Le partenze, Sir." : k == "bici" ? "Le bici qui vicino, Sir."
+                  : k == "taxi" ? "Il radiotaxi, Sir." : k == "piedi" ? "A piedi verso \(l.nome), Sir." : "Ecco come arrivare, Sir.")
+            apri(.travel(l, SchedaTravel(rawValue: k) ?? .mezzi))
+            return
+        }
         if case .ricognizione(let via) = a {
             indirizzo = via
             await vai()
@@ -423,7 +455,7 @@ struct VistaSatellite: View {
             try? await Task.sleep(for: .seconds(0.5))
             parla("La strada per \(l.nome), Sir.")
             apri(.naviga(l))
-        case .mostra, .ricognizione:
+        case .mostra, .ricognizione, .travel:
             break
         }
     }
@@ -432,8 +464,10 @@ struct VistaSatellite: View {
 /// Le schermate a tutto schermo di SATELLITE.
 enum PaginaSat: Identifiable {
     case naviga(LuogoSat), guida(LuogoSat), dossier(LuogoSat)
+    case travel(LuogoSat, SchedaTravel)                   // MARK X
     var id: String {
         switch self {
+        case .travel(let l, _): return "travel-\(l.chiave)"
         case .naviga(let l): return "naviga-\(l.chiave)"
         case .guida(let l): return "guida-\(l.chiave)"
         case .dossier(let l): return "dossier-\(l.chiave)"

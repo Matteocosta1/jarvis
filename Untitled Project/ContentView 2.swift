@@ -266,6 +266,17 @@ struct ContentView: View {
                 aperturaPagina = a
             }
         }
+        .onOpenURL { url in                                 // MARK X · i tasti della Dynamic Island (it.discosizer.jarvis://isola/…)
+            guard let c = IsolaJarvis.comando(url) else { return }
+            switch c {
+            case "percorso":                                 // TRAVEL › Percorso: SATELLITE con TRAVEL aperto
+                RichiestaSatellite.condivisa.azione = .travel("", "mezzi")
+                apriReparto(.satellite)
+            case "guida":                                    // GUIDA › Apri: la guida di SATELLITE
+                if let l = MotoreGuida.condiviso.luogo { RichiestaSatellite.condivisa.azione = .guida(l.nome); apriReparto(.satellite) }
+            default: break                                   // «apri», «basta», «ferma»: JARVIS davanti, il resto l'ha già fatto l'isola
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisVaiA)) { n in   // LIDAR e OCCHI dello Studio: quelli veri
             let lidar = n.userInfo?["dove"] as? String == "lidar"
             aperturaPagina = nil

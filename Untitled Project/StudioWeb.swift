@@ -158,7 +158,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64), let img = UIImage(data: d) { UIPasteboard.general.image = img }
         case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone
             let lidar = o["dove"] as? String == "lidar"
-            parla(lidar ? "Apro il LiDAR su Oggetto, Sir: finita la scansione, tocchi STUDIO." : "Apro gli Occhi, Sir: inquadri il pezzo e tocchi STUDIO.")
+            if !lidar { OcchiAperti.studioAcceso = true }            // 26 ott: negli Occhi STUDIO è già acceso, basta lo scatto
+            parla(lidar ? "Apro il LiDAR su Oggetto, Sir: finita la scansione, tocchi STUDIO." : "Apro gli Occhi, Sir: inquadri il pezzo e scatti.")
             salvaOra()
             NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": lidar ? "lidar" : "occhi"])
         case "plastico":                                                 // «fai il plastico della stanza» dentro lo Studio: la sala vera

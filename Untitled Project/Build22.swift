@@ -441,6 +441,9 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         if ["ferma la guida", "ferma guida", "fine guida", "fine della guida", "stop guida", "termina la guida", "interrompi la guida"].contains(frase) {
             return .fermaGuida
         }
+        if ["travel", "bikemi", "radiotaxi"].contains(frase) {          // MARK X · TRAVEL, una parola sola
+            return .satellite(.travel("", frase == "travel" ? "mezzi" : frase == "bikemi" ? "bici" : "taxi"))
+        }
         guard t.count >= 2, t.count <= 12 else { return nil }
         /// Il luogo dopo le prime `da` parole, saltando le preposizioni in `preposizioni` (al massimo due: «fino al»).
         func luogo(da: Int, preposizioni: Set<String>, fino: Int? = nil) -> String? {
@@ -465,12 +468,51 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
         for inizio in [["ricognizione"], ["fai", "una", "ricognizione"], ["fammi", "una", "ricognizione"]] where t.starts(with: inizio) {
             if let n = luogo(da: inizio.count, preposizioni: sopra) { return .satellite(.ricognizione(n)) }
         }
+        // MARK X · TRAVEL (frasi del mockup b32 e varianti): «come arrivo da Bea?», «a che ora parte il treno?», «il volo AZ 2041 è in orario?»
+        if let v = travel(t, frase: frase, luogo: luogo) { return v }
         // «mostrami lo studio in 3D», «fammi vedere il locale in tre D»
         let fine: [[String]] = [["in", "3d"], ["in", "3", "d"], ["in", "tre", "d"], ["in", "tre", "di"]]
         for inizio in [["mostrami"], ["fammi", "vedere"]] where t.starts(with: inizio) {
             for coda in fine where t.count > inizio.count + coda.count && Array(t.suffix(coda.count)) == coda {
                 if let n = luogo(da: inizio.count, preposizioni: [], fino: t.count - coda.count) { return .satellite(.mostra(n)) }
             }
+        }
+        return nil
+    }
+
+    /// MARK X · TRAVEL a voce. Il luogo detto (vuoto: quello scelto in SATELLITE) e la scheda; per VOLI al posto del luogo
+    /// va il numero del volo, se è stato detto («il volo AZ 2041 è in orario?»).
+    private static func travel(_ t: [String], frase: String,
+                               luogo: (Int, Set<String>, Int?) -> String?) -> ComandoDedicato? {
+        let verso: Set<String> = ["a", "al", "allo", "alla", "all", "ai", "agli", "alle", "da", "dal", "dallo", "dalla", "dai", "verso", "fino", "per", "in"]
+        if ["travel", "apri travel", "modalita travel", "quando devo uscire", "a che ora devo uscire", "quando esco", "come arrivo"].contains(frase) {
+            return .satellite(.travel("", "mezzi"))
+        }
+        for inizio in [["come", "arrivo"], ["come", "ci", "arrivo"], ["come", "vado"], ["come", "ci", "vado"], ["come", "raggiungo"],
+                       ["come", "arrivo", "con", "i", "mezzi"], ["che", "mezzi", "prendo", "per", "andare"], ["che", "mezzi", "prendo"]]
+            where t.starts(with: inizio) && t.count > inizio.count {
+            if let n = luogo(inizio.count, verso, nil) { return .satellite(.travel(n, "mezzi")) }
+        }
+        if ["a che ora parte il treno", "quando parte il treno", "partenze dei treni", "che treni ci sono", "orari dei treni",
+            "il prossimo treno", "quando passa il treno", "treni in partenza"].contains(frase) {
+            return .satellite(.travel("", "treni"))
+        }
+        if t.contains("volo") || t.contains("aereo"), ["orario", "ritardo", "parte", "gate", "terminal", "decolla", "atterra", "stato", "partenza"].contains(where: t.contains),
+           !["quello", "quell", "questo", "lassu", "la"].contains(where: t.contains) {   // «dove atterra quell'aereo?» è degli Occhi
+            return .satellite(.travel(DatiTravel.numeroVolo(frase) ?? "", "voli"))
+        }
+        if ["ci sono bici qui vicino", "ci sono bici", "dove trovo una bici", "bikemi", "bici qui vicino", "bike mi", "dove prendo una bici"].contains(frase) {
+            return .satellite(.travel("", "bici"))
+        }
+        if ["chiamami un taxi", "chiama un taxi", "mi serve un taxi", "prenota un taxi", "radiotaxi", "chiamami il taxi"].contains(frase) {
+            return .satellite(.travel("", "taxi"))
+        }
+        for inizio in [["quanto", "ci", "metto", "a", "piedi"], ["quanto", "tempo", "a", "piedi"], ["quanto", "ci", "vuole", "a", "piedi"]]
+            where t.starts(with: inizio) {
+            if t.count == inizio.count { return .satellite(.travel("", "piedi")) }
+            var k = inizio.count
+            if t.count > k + 1, t[k] == "per", t[k + 1] == "andare" { k += 2 }
+            if let n = luogo(k, verso, nil) { return .satellite(.travel(n, "piedi")) }
         }
         return nil
     }

@@ -17,6 +17,7 @@
 		630306D4307C20E0005C3D6F /* ReattoreHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 630306D2307C20E0005C3D6F /* ReattoreHUD.swift */; };
 		63030717307F445D005C3D6F /* SchedeSistemi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63030716307F445D005C3D6F /* SchedeSistemi.swift */; };
 		63030718307F445D005C3D6F /* SchedeSistemi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63030716307F445D005C3D6F /* SchedeSistemi.swift */; };
+		A1A10000000000000000000D /* JarvisIsolaExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1A100000000000000000001 /* JarvisIsolaExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 630306BB3079C367005C3D6F;
 			remoteInfo = JarvisComplicazioneExtension;
+		};
+		A1A10000000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1A100000000000000000005;
+			remoteInfo = JarvisIsolaExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -55,6 +63,15 @@
 			);
 			name = "Embed Foundation Extensions";
 		};
+		A1A10000000000000000000C /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				A1A10000000000000000000D /* JarvisIsolaExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +85,7 @@
 		630306C03079C368005C3D6F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		630306D2307C20E0005C3D6F /* ReattoreHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReattoreHUD.swift; sourceTree = "<group>"; };
 		63030716307F445D005C3D6F /* SchedeSistemi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedeSistemi.swift; sourceTree = "<group>"; };
+		A1A100000000000000000001 /* JarvisIsolaExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JarvisIsolaExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -89,6 +107,7 @@
 				SaluteStorica.swift,
 				Satellite23.swift,
 				scheda.m4a,
+				TravelDati.swift,
 				schedapronta.m4a,
 				tick.m4a,
 				VolumeVoce.swift,
@@ -101,6 +120,20 @@
 				Info.plist,
 			);
 			target = 630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */;
+		};
+		A1A100000000000000000004 /* Exceptions for "JarvisIsola" folder in "JarvisIsolaExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A1A100000000000000000005 /* JarvisIsolaExtension */;
+		};
+		A1A100000000000000000003 /* Exceptions for "JarvisIsola" folder in "Untitled Project" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AttivitaJarvis.swift,
+			);
+			target = 000000000000000100000000 /* Untitled Project */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -126,6 +159,15 @@
 			path = JarvisComplicazione;
 			sourceTree = "<group>";
 		};
+		A1A100000000000000000002 /* JarvisIsola */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A1A100000000000000000004 /* Exceptions for "JarvisIsola" folder in "JarvisIsolaExtension" target */,
+				A1A100000000000000000003 /* Exceptions for "JarvisIsola" folder in "Untitled Project" target */,
+			);
+			path = JarvisIsola;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -146,6 +188,11 @@
 				630306BF3079C368005C3D6F /* WidgetKit.framework in Frameworks */,
 			);
 		};
+		A1A10000000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -160,6 +207,7 @@
 				000000000000000000000010 /* Untitled Project */,
 				6303066A30785BD7005C3D6F /* JarvisOrologio Watch App */,
 				630306C23079C368005C3D6F /* JarvisComplicazione */,
+				A1A100000000000000000002 /* JarvisIsola */,
 				630306BD3079C367005C3D6F /* Frameworks */,
 				000000000000000000000020 /* Products */,
 			);
@@ -171,6 +219,7 @@
 				000000000000000000000120 /* Untitled Project.app */,
 				6303066930785BD7005C3D6F /* JarvisOrologio Watch App.app */,
 				630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */,
+				A1A100000000000000000001 /* JarvisIsolaExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -195,11 +244,13 @@
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
 				6303067730785BD8005C3D6F /* Embed Watch Content */,
+				A1A10000000000000000000C /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				6303067230785BD8005C3D6F /* PBXTargetDependency */,
+				A1A10000000000000000000F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Untitled Project */,
@@ -249,6 +300,24 @@
 			productReference = 630306BC3079C367005C3D6F /* JarvisComplicazioneExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A1A100000000000000000005 /* JarvisIsolaExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1A100000000000000000006 /* Build configuration list for PBXNativeTarget "JarvisIsolaExtension" */;
+			buildPhases = (
+				A1A100000000000000000009 /* Sources */,
+				A1A10000000000000000000A /* Frameworks */,
+				A1A10000000000000000000B /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1A100000000000000000002 /* JarvisIsola */,
+			);
+			name = JarvisIsolaExtension;
+			productName = JarvisIsolaExtension;
+			productReference = A1A100000000000000000001 /* JarvisIsolaExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -268,6 +337,9 @@
 						LastSwiftMigration = 2700;
 					};
 					630306BB3079C367005C3D6F = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					A1A100000000000000000005 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -290,6 +362,7 @@
 				000000000000000100000000 /* Untitled Project */,
 				6303066830785BD7005C3D6F /* JarvisOrologio Watch App */,
 				630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */,
+				A1A100000000000000000005 /* JarvisIsolaExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -306,6 +379,11 @@
 			);
 		};
 		630306BA3079C367005C3D6F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		A1A10000000000000000000B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -334,6 +412,11 @@
 			files = (
 			);
 		};
+		A1A100000000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -346,6 +429,11 @@
 			isa = PBXTargetDependency;
 			target = 630306BB3079C367005C3D6F /* JarvisComplicazioneExtension */;
 			targetProxy = 630306CA3079C369005C3D6F /* PBXContainerItemProxy */;
+		};
+		A1A10000000000000000000F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1A100000000000000000005 /* JarvisIsolaExtension */;
+			targetProxy = A1A10000000000000000000E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -497,6 +585,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "JARVIS usa la fotocamera per guardare ciò che gli mostra, Sir.\n";
@@ -556,6 +645,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Per mettere la musica che chiede, Sir.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Per leggere e segnare i suoi impegni.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "JARVIS usa la fotocamera per guardare ciò che gli mostra, Sir.\n";
@@ -748,6 +838,71 @@
 			};
 			name = Release;
 		};
+		A1A100000000000000000007 /* Debug configuration for PBXNativeTarget "JarvisIsolaExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JarvisIsola/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 10.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.JarvisIsola;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1A100000000000000000008 /* Release configuration for PBXNativeTarget "JarvisIsolaExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = CKHH4HMH7R;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JarvisIsola/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 10.0;
+				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.JarvisIsola;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -780,6 +935,14 @@
 			buildConfigurations = (
 				630306CE3079C369005C3D6F /* Debug configuration for PBXNativeTarget "JarvisComplicazioneExtension" */,
 				630306CF3079C369005C3D6F /* Release configuration for PBXNativeTarget "JarvisComplicazioneExtension" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		A1A100000000000000000006 /* Build configuration list for PBXNativeTarget "JarvisIsolaExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1A100000000000000000007 /* Debug configuration for PBXNativeTarget "JarvisIsolaExtension" */,
+				A1A100000000000000000008 /* Release configuration for PBXNativeTarget "JarvisIsolaExtension" */,
 			);
 			defaultConfigurationName = Release;
 		};

@@ -22,6 +22,8 @@ enum OcchiAperti {
     static var stark: ((ComandoOcchi) -> Bool)?
     /// Build 23: la voce di JARVIS dagli Occhi («Ecco cosa ho trovato, Sir.»): la imposta Jarvis.
     static var parla: ((String) -> Void)?
+    /// 26 ott: aperti dallo Studio (tasto OCCHI): STUDIO già acceso, inquadra e scatta e la foto torna nello Studio.
+    static var studioAcceso = false
 }
 
 struct Occhiata: Identifiable {
@@ -599,6 +601,11 @@ struct Occhi: View {
                 stark.olo = oloIniziale
                 stark.eti = etiIniziale
                 stark.aggiorna()
+                if OcchiAperti.studioAcceso {                // dallo Studio: STUDIO già acceso, basta lo scatto
+                    OcchiAperti.studioAcceso = false
+                    modoStudio = true
+                    avvisa("SCATTI: LA FOTO VA ALLO STUDIO")
+                }
                 OcchiAperti.stark = { c in                 // a voce: «mostra le etichette», «scansione olografica»…
                     guard agganciato, !chiuso else { return false }
                     switch c {

@@ -92,9 +92,12 @@ nonisolated enum AzioneSatellite: Hashable, Sendable {
     case naviga(String)            // «mostrami la strada per il locale»: NAVIGA, le tappe con la vista da strada
     case ricognizione(String)      // «ricognizione su Via Savona»: RICOGNIZIONE su quell'indirizzo
     case mostra(String)            // «mostrami lo studio in 3D»: SATELLITE vola su quel luogo
+    /// MARK X · TRAVEL: «come arrivo da Bea?», «a che ora parte il treno?»: il luogo (vuoto: quello scelto) e la scheda
+    /// (mezzi, treni, voli, piedi, bici, taxi).
+    case travel(String, String)
 
     var nome: String {
-        switch self { case .guida(let n), .naviga(let n), .ricognizione(let n), .mostra(let n): return n }
+        switch self { case .guida(let n), .naviga(let n), .ricognizione(let n), .mostra(let n), .travel(let n, _): return n }
     }
 }
 

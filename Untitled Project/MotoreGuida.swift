@@ -299,10 +299,18 @@ final class MotoreGuida: NSObject, ObservableObject, CLLocationManagerDelegate {
         if GuidaCondivisa.condivisa.stato != nil { GuidaCondivisa.condivisa.ferma() }
         accendi()
         Task { await calcola(g, da: nil) }
+        IsolaJarvis.seguiGuida(self)                 // MARK X: la guida anche nella Dynamic Island, col telefono in tasca
     }
+
+    // MARK X · DYNAMIC ISLAND: la prossima svolta (freccia e via) e quella dopo, per l'isola.
+    private func tappaDopo(_ k: Int) -> TappaSat? { percorso.flatMap { $0.tappe.indices.contains(indice + k) ? $0.tappe[indice + k] : nil } }
+    var frecciaIsola: String { tappaDopo(1)?.svolta.freccia ?? GuidaCondivisa.Svolta.arrivo.freccia }
+    var viaIsola: String { tappaDopo(1).map { $0.via.isEmpty ? $0.testo : $0.via } ?? (luogo?.nome ?? "") }
+    var dopoIsola: String? { tappaDopo(2).map { "\($0.svolta.freccia) \($0.via.isEmpty ? $0.testo : $0.via)" } }
 
     /// Fine della guida («Fine guida», «ferma la guida», l'arrivo). Spegne il GPS se nessuno lo usa più.
     func ferma() {
+        IsolaJarvis.fineGuida()                      // MARK X: anche l'isola della guida si spegne
         generazione += 1
         let c_era = luogo != nil
         luogo = nil
