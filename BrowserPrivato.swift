@@ -367,7 +367,7 @@ struct PaginaBrowser: View {
             // 26 ott notte (il signore: «come le altre, stile olografico»): la testata di Studio, Sound e Social (icona animata,
             // J.A.R.V.I.S. · BROWSER, «Chiudi» sulla riga: niente fotocamera), poi la barra, la pagina nella cornice olografica
             HStack(alignment: .center) {
-                TestataScheda(titolo: "Browser", sottotitolo: incognito ? "browser · incognito" : "browser · web", icona: "globe", tinta: accento, marchio: true)
+                TestataScheda(titolo: "Browser", sottotitolo: incognito ? "incognito" : "web", icona: "globe", tinta: accento, titoloColorato: incognito)   // 27 ott: niente J.A.R.V.I.S.
                 Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(accento)
                     .accessibilityLabel("Chiudi il browser")
             }
