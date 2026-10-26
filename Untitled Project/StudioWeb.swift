@@ -125,7 +125,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             salvaPresto()
         case "cervello":                                                 // CREA libero: la ricetta dei pezzi
             let prompt = o["prompt"] as? String ?? ""
-            Task { await self.rispondi(id, await RegiaStudio.chiediCervello(prompt)) }
+            Task { let r = await RegiaStudio.chiediCervello(prompt); self.rispondi(id, r) }
         case "salvaFile":                                                // STAMPA / CONDIVIDI
             guard let nome = o["nome"] as? String, let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64) else { rispondi(id, (nil, "file non valido")); return }
             condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
@@ -141,17 +141,17 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "socialRispondi":
             let corpo: [String: Any] = ["azione": "rispondi", "tipo": o["tipoMsg"] as? String ?? "", "id": o["idMsg"] as? String ?? "",
                                         "a": o["a"] as? String ?? "", "testo": o["testo"] as? String ?? ""]
-            Task { await self.rispondi(id, (await RegiaStudio.social(corpo), nil)) }
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
         case "socialAnnulla":
             let corpo: [String: Any] = ["azione": "annulla", "id": o["idCoda"] ?? 0]
-            Task { await self.rispondi(id, (await RegiaStudio.social(corpo), nil)) }
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
         case "socialAuto":
             let corpo: [String: Any] = ["azione": "auto", "on": o["on"] as? Bool ?? false, "parola": o["parola"] as? String ?? "", "testo": o["testo"] as? String ?? ""]
             Task { _ = await RegiaStudio.social(corpo) }
         case "socialPubblica":
             let formato = o["formato"] as? String ?? "POST", quando = o["quando"] as? String ?? "ORA"
             let didascalia = o["didascalia"] as? String ?? "", b64 = o["media"] as? String ?? "", mime = o["mime"] as? String ?? "image/jpeg"
-            Task { await self.rispondi(id, (await self.pubblica(formato: formato, quando: quando, didascalia: didascalia, b64: b64, mime: mime), nil)) }
+            Task { let r = await self.pubblica(formato: formato, quando: quando, didascalia: didascalia, b64: b64, mime: mime); self.rispondi(id, (r, nil)) }
         case "socialFoto":
             scegli(per: o["da"] as? String == "occhi" ? "occhi" : "galleria")
         case "ascolta":
