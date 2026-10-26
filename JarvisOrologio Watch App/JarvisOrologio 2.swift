@@ -515,7 +515,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let grezzo = r.averagePower(forChannel: 0)          // decibel: -160 silenzio, 0 massimo
         Volume.voce.mettiDecibel(grezzo)                    // il reattore si gonfia con la voce
         let ora = Date()
-        let avviato = ora.timeIntervalSince(inizioAscolto) > 0.5   // il primo mezzo secondo contiene il "tic" dell'aptica
+        // 26 ott: il "tic" dell'aptica e il fruscio d'avvio del microfono (~0,6 s) non entrano nemmeno nella media del livello
+        guard ora.timeIntervalSince(inizioAscolto) > 0.8 else { return }
         // soglie che si adattano al rumore della stanza: il fondo è il livello più basso sentito (che risale piano)
         livello = livello == nil ? grezzo : (livello! * 0.6 + grezzo * 0.4)
         let l = livello!
@@ -524,9 +525,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // due controlli di fila (0,4 s): un colpo, una porta, un fruscio di 0,2 s non sono il signore. A frase cominciata
         // basta un controllo, come prima (le pause tra le parole non spezzano la frase).
         let sopra = l > sogliaVoce(fondo: fondo!, margine: 9)
-        tickVoce = sopra && avviato ? tickVoce + 1 : 0
+        tickVoce = sopra ? tickVoce + 1 : 0
         let voce = sopra && (parlatoRilevato || tickVoce >= 2)
-        if voce && avviato {
+        if voce {
             voceSentita += parlatoRilevato ? 0.2 : 0.4  // all'inizio contano tutti e due i controlli di fila
             parlatoRilevato = true
             silenzioDa = nil
@@ -640,8 +641,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         r.updateMeters()
         let grezzo = r.averagePower(forChannel: 0)
+        // il primo istante contiene il «tic» dell'aptica di fine ascolto e il fruscio d'avvio del microfono (~0,6 s, 26 ott):
+        // passava per l'aggiunta, l'app chiudeva la linea col cervello e la domanda vera si perdeva. Nel primo 0,8 s non si misura.
+        guard trascorso > 0.8 else { return }
         livelloAggiunta = livelloAggiunta.map { $0 * 0.6 + grezzo * 0.4 } ?? grezzo
-        guard trascorso > 0.4 else { return }            // il primo istante contiene il «tic» dell'aptica di fine ascolto
         // build 30: più netta di prima (fondo +12 invece di +9, vicino alla sua voce abituale, 0,6 s di fila invece di 0,4):
         // il rumore della stanza la faceva scattare da sola, la risposta si perdeva e ripartiva l'ascolto
         if livelloAggiunta! > sogliaVoce(fondo: fondoAggiunta, margine: 12) { colpiAggiunta += 1 } else { colpiAggiunta = 0 }
@@ -800,11 +803,14 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard attesaPossibile else { chiudiAttesa(); return }
         r.updateMeters()
         let grezzo = r.averagePower(forChannel: 0)
+        let trascorso = Date().timeIntervalSince(inizioAttesa)
+        // 26 ott: all'avvio del registratore il microfono dell'orologio fa un fruscio di ~0,6 s (−28 dB, misurato sugli audio
+        // mandati a vuoto): passava per voce, partiva «trascrivo» col solo fruscio e, tornato in attesa, di nuovo all'infinito.
+        // Nel primo 0,8 s non si misura niente (la registrazione c'è già: se il signore parla subito, la frase resta intera).
+        guard trascorso > 0.8 else { return }
         let l = livelloAttesa.map { $0 * 0.6 + grezzo * 0.4 } ?? grezzo
         livelloAttesa = l
         fondoAttesa = min(l, (fondoAttesa ?? l) + 0.08)
-        let trascorso = Date().timeIntervalSince(inizioAttesa)
-        guard trascorso > 0.3 else { return }               // l'avvio del registratore
         // la stessa regola dell'inizio frase: sopra la soglia (rumore +9 e vicino alla sua voce abituale) per 0,4 s di fila
         if l > sogliaVoce(fondo: fondoAttesa!, margine: 9) { colpiAttesa += 1 } else { colpiAttesa = 0 }
         if colpiAttesa >= 2 {

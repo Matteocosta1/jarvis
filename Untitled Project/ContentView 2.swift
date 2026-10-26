@@ -606,8 +606,10 @@ struct ContentView: View {
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
                     .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
                     // schermo stretto: mai a capo; se non ci sta nemmeno così (320 punti) si rimpicciolisce quanto basta
-                    .lineLimit(stretta ? 1 : nil)
-                    .minimumScaleFactor(stretta ? 0.7 : 1)
+                    // 26 ott: con 6 icone e la tastiera aperta (reattore piccolo in testata) la «S.» andava a capo anche sul 15 Pro:
+                    // mai a capo su nessun iPhone; se non ci sta, il titolo si stringe appena quanto basta
+                    .lineLimit(1)
+                    .minimumScaleFactor(stretta ? 0.7 : 0.8)
                 Text(sottotitolo)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(3)

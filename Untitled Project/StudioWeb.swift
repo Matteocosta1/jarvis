@@ -376,6 +376,35 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         return """
         (function(){
           window.JARVIS_APP = true;
+          // 26 ott: la pagina (4 MB) si disegnava a pezzi mentre si caricava: per un attimo la casa del mockup su fondo bianco
+          // (menu delle build, link). Resta nascosta, sul nero, finché non è aperta la sezione (la mostra copioneFine).
+          document.documentElement.style.visibility = 'hidden';
+          document.documentElement.style.background = '#020304';
+          // 26 ott: i suoni del banco (tag <audio>) aprivano il lettore di iOS nella Dynamic Island. Si suonano con Web Audio,
+          // che non passa da «In riproduzione»; i video (Reel, 360°) restano come sono.
+          (function(){
+            var C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+            var ctx = null, cache = new Map(), play = HTMLMediaElement.prototype.play, pausa = HTMLMediaElement.prototype.pause;
+            HTMLMediaElement.prototype.play = function(){
+              var el = this, src = el.currentSrc || el.src;
+              if (!(el instanceof HTMLAudioElement) || !src) return play.apply(this, arguments);
+              try { ctx = ctx || new C(); if (ctx.state === 'suspended') ctx.resume(); } catch (e) { return play.apply(this, arguments); }
+              var p = cache.get(src);
+              if (!p) { p = fetch(src).then(function(r){ return r.arrayBuffer(); }).then(function(b){ return new Promise(function(ok, no){ ctx.decodeAudioData(b, ok, no); }); }); cache.set(src, p); }
+              var da = el.currentTime || 0, vol = el.muted ? 0 : el.volume, vel = el.playbackRate || 1;
+              p.then(function(buf){
+                if (el.__s) { try { el.__s.stop(); } catch (e) {} }
+                var s = ctx.createBufferSource(), g = ctx.createGain();
+                s.buffer = buf; s.playbackRate.value = vel; g.gain.value = vol; s.connect(g); g.connect(ctx.destination);
+                s.start(0, Math.min(da, buf.duration)); el.__s = s;
+              }).catch(function(){ cache.delete(src); });
+              return Promise.resolve();
+            };
+            HTMLMediaElement.prototype.pause = function(){
+              if (this.__s) { try { this.__s.stop(); } catch (e) {} this.__s = null; }
+              return pausa.apply(this, arguments);
+            };
+          })();
           var post = function(o){ try { window.webkit.messageHandlers.jarvis.postMessage(o); } catch (e) {} };
           var m = new Map(Object.entries(\(iniziale)));
           var ls = { getItem: function(k){ return m.has(k) ? m.get(k) : null; },
@@ -444,7 +473,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
               via = setTimeout(function(){ via = null; if (sez.classList.contains('su')) { radice.style.visibility = ''; return; } aperta = false; post({ tipo: 'chiudi' }); }, 750);
             }
           }).observe(sez, { attributes: true, attributeFilter: ['class'] });
-          var apri = function(){ if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) aperta = true; };
+          var apri = function(){ if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; } };
+          setTimeout(function(){ if (!via) radice.style.visibility = ''; }, 1500);   // per sicurezza: mai una pagina che resta nera
           \(arrivo)
           var foto = \(foto);
           if (foto) { var im = new Image(); im.onload = function(){ \(conFoto) apri(); }; im.onerror = apri; im.src = foto; } else apri();
