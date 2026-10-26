@@ -269,7 +269,7 @@ struct ContentView: View {
                 jarvis.svuotaChiesto = false
                 Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
             }
-        }) { ImpostazioniView().environmentObject(jarvis).aperturaHUD("Impostazioni").paginaPiena() }
+        }) { ImpostazioniView().environmentObject(jarvis).paginaPiena() }   // 27 ott: senza caricamento, sale come le altre
         .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser").paginaPiena() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
