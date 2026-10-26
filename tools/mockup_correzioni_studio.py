@@ -36,9 +36,17 @@ fine = "  return { daTriangoli, unione, differenza, aTriangoli };\n})();"
 j = h.index(fine, i) + len(fine)
 bsp = h[i:j]
 lavoro = bsp + """
-const unisciTutti = (L) => { while (L.length > 1) { const n = []; for (let i = 0; i < L.length; i += 2) n.push(i + 1 < L.length ? BSP.unione(L[i], L[i + 1]) : L[i]); L = n; } return L[0] || null; };
+const coppie = (L) => { while (L.length > 1) { const n = []; for (let i = 0; i < L.length; i += 2) n.push(i + 1 < L.length ? BSP.unione(L[i], L[i + 1]) : L[i]); L = n; } return L[0] || null; };
+const scatola = (L) => { const a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9]; for (const P of L) for (const v of P.vs) for (let i = 0; i < 3; i++) { if (v[i] < a[i]) a[i] = v[i]; if (v[i] > b[i]) b[i] = v[i]; } return [a, b]; };
+const tocca = (x, y) => x[0][0] <= y[1][0] + .01 && y[0][0] <= x[1][0] + .01 && x[0][1] <= y[1][1] + .01 && y[0][1] <= x[1][1] + .01 && x[0][2] <= y[1][2] + .01 && y[0][2] <= x[1][2] + .01;
+const gruppi = (L) => { const B = L.map(scatola), pad = L.map((_, i) => i), f = (i) => (pad[i] === i ? i : (pad[i] = f(pad[i])));
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (tocca(B[i], B[j])) pad[f(i)] = f(j);
+  const m = new Map(); L.forEach((x, i) => { const r = f(i); if (!m.has(r)) m.set(r, []); m.get(r).push(x); }); return [...m.values()]; };
 onmessage = (e) => { try { const pieni = e.data.pieni.map((a) => BSP.daTriangoli(a)), buchi = e.data.buchi.map((a) => BSP.daTriangoli(a));
-  let acc = unisciTutti(pieni); if (!acc) { postMessage({ ok: false }); return; } if (buchi.length) acc = BSP.differenza(acc, unisciTutti(buchi));
+  if (!pieni.length) { postMessage({ ok: false }); return; }
+  // si uniscono solo i pezzi che si toccano (i gruppi staccati restano accostati); i fori scavano solo i gruppi che toccano
+  const G = gruppi(pieni).map(coppie), H = buchi.length ? gruppi(buchi).map(coppie) : [], HB = H.map(scatola);
+  let acc = []; for (let g of G) { const gb = scatola(g); for (let i = 0; i < H.length; i++) if (tocca(gb, HB[i])) g = BSP.differenza(g, H[i]); acc = acc.concat(g); }
   const t = BSP.aTriangoli(acc);
   // «stampabile»: ogni spigolo in due triangoli esatti (i vertici sono già saldati); prima lo contava la pagina e la bloccava 10 s
   const id = new Map(), sp = new Map(); let nv = 0; const v = (i) => { const k = t[i] + "," + t[i + 1] + "," + t[i + 2]; let x = id.get(k); if (x === undefined) { x = nv++; id.set(k, x); } return x; };
@@ -89,3 +97,36 @@ sost("""    oggetti.set(o.id, rec); posa(o);""", """    if (o.tipo === "unito") 
     oggetti.set(o.id, rec); posa(o);""")
 open(dst, "w", encoding="utf-8").write(h)
 print("scritto (con il Worker)", dst)
+
+# ── CREA veloce (26 ott sera, il signore: «veloce e intelligente al massimo») ──
+# 1 · il pezzo compare SUBITO (i pezzi accostati, così come arrivano dal cervello) e diventa un solido unico appena il Worker ha finito;
+# 2 · nel Worker si uniscono solo i pezzi che si toccano (gruppi separati restano separati: nessun calcolo inutile) e i fori scavano
+#     solo i gruppi che toccano; 3 · le forme tonde hanno facce in proporzione alla misura (un occhio da 4 mm non ne ha come la testa).
+# facce in proporzione alla misura
+sost('else if (q.forma === "cilindro") g = new T.CylinderGeometry(D / 2, D / 2, H, 32);', 'else if (q.forma === "cilindro") g = new T.CylinderGeometry(D / 2, D / 2, H, giri(D, 12, 32));')
+sost('g = +m.d2 > .6 ? new T.CylinderGeometry(cl(m.d2, 0) / 2, D / 2, H, 32) : new T.ConeGeometry(D / 2, H, 32);', 'g = +m.d2 > .6 ? new T.CylinderGeometry(cl(m.d2, 0) / 2, D / 2, H, giri(D, 12, 32)) : new T.ConeGeometry(D / 2, H, giri(D, 12, 32));')
+sost('g = new T.SphereGeometry(D / 2, 24, 16);', 'g = new T.SphereGeometry(D / 2, giri(D, 10, 24), Math.round(giri(D, 10, 24) * .66));')
+sost('g = new T.TorusGeometry(Math.max(sz, D / 2 - sz / 2), sz / 2, 12, 36);', 'g = new T.TorusGeometry(Math.max(sz, D / 2 - sz / 2), sz / 2, giri(sz * 2, 8, 12), giri(D, 16, 36));')
+sost("      let acc = null; const buchi = [];\n", "      let acc = null; const buchi = []; const giri = (d, a, b) => Math.max(a, Math.min(b, Math.round(d * .9)));\n")
+# il pezzo subito, poi il solido unico
+sost("""    inventando = true; info(["CREA · PROGETTO LIBERO", `«${D.toUpperCase()}»`, `UNISCO ${ric.pezzi.length} PEZZI…`]);
+    let R = null; try { const pp = B.pezzi(ric.pezzi); if (pp) { const t = await bspInDisparte(pp.pieni, pp.buchi); R = t === undefined ? B.ricetta(ric.pezzi) : t ? B.finisci(t) : null; if (R && t) R.chiuso = t.chiuso; } } catch (e) { console.warn(e); R = null; }
+    inventando = false; if (!vivo()) return;
+    if (!R) { parlaMock("Il progetto non torna, Sir: riprovi con una descrizione più semplice.", 3000); return; }
+    const k = "r" + Date.now().toString(36); GEO_DATI.set(k, { pos: R.pos, norm: R.norm, chiuso: R.chiuso });
+    const o = nuovo("unito", { k, ricetta: D }, nomeLibero(String(ric.nome || D).slice(0, 28).replace(/^./, (c) => c.toUpperCase())), { anim: "vacuform" }); const g = B.ingombro(o);""",
+"""    let pp = null; try { pp = B.pezzi(ric.pezzi); } catch (e) { console.warn(e); }
+    if (!pp) { parlaMock("Il progetto non torna, Sir: riprovi con una descrizione più semplice.", 3000); return; }
+    // subito sul banco: i pezzi accostati come arrivano (si vede in un attimo); intanto il Worker li fonde in un solido unico
+    const tutti = new Float32Array(pp.pieni.reduce((n, a) => n + a.length, 0)); { let i = 0; for (const a of pp.pieni) { tutti.set(a, i); i += a.length; } }
+    const R0 = B.finisci(tutti), k = "r" + Date.now().toString(36); GEO_DATI.set(k, { pos: R0.pos, norm: R0.norm, chiuso: false });
+    const o = nuovo("unito", { k, ricetta: D }, nomeLibero(String(ric.nome || D).slice(0, 28).replace(/^./, (c) => c.toUpperCase())), { anim: "vacuform" });
+    inventando = true; info(["CREA · PROGETTO LIBERO", `«${o.nome.toUpperCase()}» · ${ric.pezzi.length} PEZZI`, "UNISCO IN UN SOLIDO UNICO…"]);
+    let R = null; try { const t = await bspInDisparte(pp.pieni, pp.buchi); R = t === undefined ? B.ricetta(ric.pezzi) : t ? B.finisci(t) : null; if (R && t) R.chiuso = t.chiuso; } catch (e) { console.warn(e); R = null; }
+    inventando = false; if (!vivo()) return;
+    if (R) GEO_DATI.set(k, { pos: R.pos, norm: R.norm, chiuso: R.chiuso });   // vale anche per le copie (ANNULLA/RIPETI usano la stessa chiave)
+    const oo = oggetti.find((x) => x.p?.k === k); if (!oo) return;   // tolto mentre si univa: niente da mostrare
+    if (!R) { parlaMock("Il pezzo è troppo complesso da unire, Sir: lo vede, ma per la stampa lo descriva più semplice.", 3600); mostraDati(); return; }
+    rifai(oo, "nessuna"); const g = B.ingombro(oo);""")
+open(dst, "w", encoding="utf-8").write(h)
+print("scritto (CREA veloce)", dst)

@@ -1,5 +1,5 @@
 // JARVIS — STUDIO · CREA LIBERO (MARK X): il banco olografico chiede al cervello la ricetta dei pezzi per «qualsiasi cosa» descritta.
-// POST, header x-jarvis-token. Corpo: { prompt: string }  →  { testo: string } (il JSON dei pezzi lo legge la pagina dello Studio)
+// POST, header x-jarvis-token (l'app) o x-chiave-interna (le prove dal database). Corpo: { prompt: string }  →  { testo: string } (il JSON dei pezzi lo legge la pagina dello Studio)
 // Segreti: JARVIS_TOKEN, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Facoltativo: MODELLO_STUDIO (predefinito Sonnet).
 // v3 (26 ott sera, il signore: «CREA veloce e intelligente al massimo»):
 //  · le istruzioni del progettista stanno qui (in cache da Anthropic: si pagano e si leggono una volta), più precise e con un esempio;
@@ -53,7 +53,13 @@ async function db(percorso: string, init: RequestInit = {}) {
 
 Deno.serve(async (req) => {
   const segreto = env("JARVIS_TOKEN");
-  if (!segreto || !uguali(req.headers.get("x-jarvis-token") ?? "", segreto)) return json({ errore: "parola d'ordine errata" }, 401);
+  let ammesso = !!segreto && uguali(req.headers.get("x-jarvis-token") ?? "", segreto);
+  if (!ammesso) {                                          // le prove dal database (pg_net), come travel-voli
+    const interna = req.headers.get("x-chiave-interna") ?? "";
+    const v = interna ? await db("rpc/verifica_chiave_interna", { method: "POST", body: JSON.stringify({ p: interna }) }) : null;
+    ammesso = v?.ok ? (await v.json().catch(() => false)) === true : false;
+  }
+  if (!ammesso) return json({ errore: "parola d'ordine errata" }, 401);
   const { prompt } = await req.json().catch(() => ({ prompt: "" }));
   const p = String(prompt ?? "").slice(0, 6000);
   if (!p) return json({ errore: "manca la descrizione" }, 400);
@@ -70,7 +76,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "x-api-key": env("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
-        model: env("MODELLO_STUDIO") || "claude-sonnet-5-5", max_tokens: 1800, temperature: 0.4,
+        model: env("MODELLO_STUDIO") || "claude-sonnet-5-5", max_tokens: 1800,
         system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: `Progetta: «${descr}»` }],
       }),

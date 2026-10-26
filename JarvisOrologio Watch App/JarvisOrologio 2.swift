@@ -586,10 +586,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
         r.stop()
         registratore = nil
         let audio = try? Data(contentsOf: r.url)        // letto subito: il microfono dell'aggiunta registra già su un altro file
-        if daAttesa { daAttesa = false; trascriviInSilenzio(audio); return }
-        WKInterfaceDevice.current().play(.stop)
+        // 26 ott sera: la frase partita da sola in attesa va al cervello in silenzio (niente bip, niente «Trascrivo»): il cervello la
+        // trascrive dentro la stessa richiesta (veloce come col tocco) e solo con parole vere l'orologio fa il bip e risponde.
+        let silenzioso = daAttesa
+        daAttesa = false
+        if silenzioso, !(ImpostazioniOrologio.giroUnico && ecoDaTogliere == nil && primaParte == nil && !PortachiaviOrologio.leggi().isEmpty
+                         && (audio?.count ?? 0) > 1_000) { trascriviInSilenzio(audio); return }
+        if !silenzioso { WKInterfaceDevice.current().play(.stop) }
         fase = .elaboro
-        stato = "Trascrivo…"
+        stato = silenzioso ? nil : "Trascrivo…"
         let eco = ecoDaTogliere
         ecoDaTogliere = nil
         let prima = primaParte                          // c'era una frase prima, e questa è la sua aggiunta
@@ -601,11 +606,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // risposta. Un giro di rete in meno al polso. Se il cervello non lo sa fare, o la trascrizione non riesce, la strada di prima.
         if ImpostazioniOrologio.giroUnico, eco == nil, prima == nil, !token.isEmpty, let audio, audio.count > 1_000 {
             let canale = CanaleUnico()
+            canale.silenzioso = silenzioso
             canale.prima = Date().timeIntervalSince(quandoDaUnire) < Dialogo.validitaInterruzione ? daUnire : nil
             canaleUnico = canale
             ultimaTrascrizione = Task { await canale.attendi() }
             compito = Task { await self.turno(nuovoTentativo: true, unico: (audio: audio, canale: canale)) }
-            if !senzaAggiunta { ascoltaAggiunta(fondo: fondoStanza) } else { spegniAudioSeLibero() }   // M7: 2 s per un'aggiunta
+            if !senzaAggiunta && !silenzioso { ascoltaAggiunta(fondo: fondoStanza) } else { spegniAudioSeLibero() }   // M7: 2 s per un'aggiunta
             return
         }
         let indirizzo = JarvisOrologio.indirizzoAscolto
@@ -896,6 +902,22 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
+    /// 26 ott sera: c'erano solo rumori: si torna in attesa senza bip, senza scritte, e l'ascolto in attesa riparte.
+    private func tornaInAttesaMuto() {
+        guard fase == .elaboro else { return }
+        livelloUltimaFrase = nil
+        compito = nil
+        stato = nil
+        fase = .attesa
+        programmaAttesa()
+    }
+
+    /// Nella trascrizione ci sono parole vere (non vuota, non solo «ah», «mh», versi).
+    nonisolated static func paroleVere(_ t: String) -> Bool {
+        let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.contains(where: { $0.isLetter }) && !soloRumore(s)
+    }
+
     /// 26 ott sera: la frase partita da sola in attesa (nessun tocco) si trascrive senza bip e senza «Trascrivo»; JARVIS resta in
     /// attesa. Solo se ci sono parole vere fa il bip e va avanti come sempre; un rumore (0 parole, «ah», «mh») si butta in silenzio.
     private func trascriviInSilenzio(_ audio: Data?) {
@@ -912,7 +934,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             guard let self, self.provaSilenziosa == mio, self.fase == .attesa else { return }
             self.provaSilenziosa = nil
             let t = (testo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard errore == nil, t.contains(where: { $0.isLetter }), !JarvisOrologio.soloRumore(t) else {
+            guard errore == nil, JarvisOrologio.paroleVere(t) else {
                 self.livelloUltimaFrase = nil            // un rumore: non diventa la sua «voce abituale»
                 return
             }
@@ -1207,7 +1229,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// `lascia`, `soloTesto`, `ripiega`: idea D, il giro unico si ferma dopo la trascrizione (comando dell'app, testo per
     /// l'aggiunta, trascrizione fallita nel cervello).
-    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione, lascia(String), soloTesto, ripiega }
+    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione, lascia(String), soloTesto, ripiega, silenzio }
 
     /// Strumenti che l'orologio sa eseguire per il cervello.
     static let strumenti = ["salute_battito", "salute_riepilogo", "riconosci_musica", "meteo_qui", "foto_cerca"]
@@ -1334,11 +1356,19 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     return
                 case .soloTesto:
                     return                                       // idea D: il testo serviva all'aggiunta, che riparte da sé
+                case .silenzio:
+                    tornaInAttesaMuto()                          // 26 ott sera: era solo rumore, JARVIS resta in attesa senza dire niente
+                    return
                 case .ripiega:
                     // idea D: il cervello non è riuscito a trascrivere: la strada di prima (le orecchie in cloud, più servizi in gara)
                     guard let u = unico else { fallisci("Non sono riuscito a trascrivere, Sir. Riprovi."); return }
                     let (testo, errore) = await JarvisOrologio.trascrivi(u.audio, token: token, indirizzo: JarvisOrologio.indirizzoAscolto)
                     let esito = TrascrittoOrologio(testo: testo, errore: errore, vuoto: false)
+                    if u.canale.silenzioso {                     // partita da sola: solo con parole vere
+                        guard errore == nil, JarvisOrologio.paroleVere(testo ?? "") else { u.canale.consegna(esito); tornaInAttesaMuto(); return }
+                        u.canale.silenzioso = false
+                        WKInterfaceDevice.current().play(.stop)
+                    }
                     u.canale.consegna(esito)
                     if u.canale.soloTesto { return }
                     await dopoTrascrizione(Task { esito }, eco: nil, prima: nil)
@@ -1479,6 +1509,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 guard let canale, canale.esito == nil else { break }   // un nuovo tentativo dopo la linea caduta: già fatto
                 let t = (e["d"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if t.isEmpty, e["errore"] != nil { canale.presa.chiudi(); return .ripiega }
+                if canale.silenzioso {                                 // partita da sola in attesa: si va avanti solo con parole vere
+                    guard JarvisOrologio.paroleVere(t) else { livelloUltimaFrase = nil; canale.consegna(TrascrittoOrologio(testo: nil, errore: nil, vuoto: true)); canale.presa.chiudi(); return .silenzio }
+                    canale.silenzioso = false
+                    WKInterfaceDevice.current().play(.stop)
+                }
                 imparaVoce(t)                                          // build 30: parole vere → la sua voce abituale
                 canale.consegna(TrascrittoOrologio(testo: t, errore: nil, vuoto: false))
                 if canale.soloTesto { canale.presa.chiudi(); return .soloTesto }
@@ -1957,6 +1992,8 @@ final class CanaleUnico {
     var prima: String?
     /// Il signore ha aggiunto subito un'altra frase: questa serve solo come testo, la risposta non si aspetta.
     var soloTesto = false
+    /// 26 ott sera: la frase è partita da sola in attesa: niente bip né scritte finché la trascrizione non ha parole vere.
+    var silenzioso = false
     let presa = PresaRete()
 
     func attendi() async -> TrascrittoOrologio {
