@@ -373,7 +373,7 @@ struct VistaSentinella: View {
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "sorveglianza attiva",
-                                  icona: "dot.radiowaves.left.and.right", tinta: colore)
+                                  icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
                     TimelineView(.periodic(from: .now, by: 1)) { t in
                         Text(t.date.formatted(date: .omitted, time: .standard))
                             .font(.system(size: 10, design: .monospaced)).opacity(0.7)

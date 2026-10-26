@@ -112,6 +112,8 @@ struct TestataScheda: View {
     let tinta: Color
     /// Come Studio e Social: «J.A.R.V.I.S.» in ciano, sotto il nome della sezione (vedi CorniceScheda.marchio).
     var marchio = false
+    /// Sentinella: anche il titolo del colore della sezione (verde in visione notturna), non bianco.
+    var titoloColorato = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -145,7 +147,7 @@ struct TestataScheda: View {
                 } else {
                     Text(titolo.uppercased())
                         .font(.system(size: 24, weight: .bold, design: .monospaced)).tracking(3)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(titoloColorato ? tinta : .white)
                 }
                 Text(sottotitolo.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
