@@ -113,16 +113,16 @@ struct TestataScheda: View {
                         .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
                 }
                 if icona == "satellite" {                   // build 23: disegnata come nel mockup
-                    IconaSatellite(lato: 22).font(.system(size: 20, weight: .medium)).foregroundStyle(tinta)
+                    IconaSatellite(lato: 17).font(.system(size: 16, weight: .medium)).foregroundStyle(tinta)
                 } else if icona == "vinile" {               // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
-                    IconaVinile().frame(width: 22, height: 22).foregroundStyle(tinta)
+                    IconaVinile().frame(width: 17, height: 17).foregroundStyle(tinta)
                 } else {
                     Image(systemName: icona)
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(tinta)
                 }
             }
-            .frame(width: 52, height: 52)
+            .frame(width: 40, height: 40)          // 26 ott notte (il signore): le icone animate delle sezioni più piccole (prima 52)
             .shadow(color: tinta.opacity(0.5), radius: 10)
             VStack(alignment: .leading, spacing: 3) {
                 Text(titolo.uppercased())

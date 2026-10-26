@@ -1205,9 +1205,9 @@ private struct AnelloOcchi: View {
                 Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
             }
-            Image(systemName: icona).font(.system(size: 18, weight: .medium)).foregroundStyle(tinta)
+            Image(systemName: icona).font(.system(size: 16, weight: .medium)).foregroundStyle(tinta)
         }
-        .frame(width: 44, height: 44)
+        .frame(width: 40, height: 40)
         .shadow(color: tinta.opacity(0.5), radius: 10)
     }
 }
