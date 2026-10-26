@@ -26,6 +26,8 @@ enum OcchiAperti {
     static var studioAcceso = false
     /// 26 ott sera: aperti da Social (riquadro OCCHI di PUBBLICA): lo scatto torna a Social, pronto da pubblicare.
     static var socialAcceso = false
+    /// 26 ott sera: la didascalia scritta in Social prima di toccare OCCHI (torna a Social con lo scatto o il video).
+    static var socialDida: String?
 }
 
 struct Occhiata: Identifiable {
@@ -74,6 +76,11 @@ struct Occhi: View {
     @State private var chiuso = false
     @State private var agganciato = false
     @State private var registrando = false
+    /// 26 ott sera: il video per Social (REC con gli Occhi aperti da Social).
+    @State private var filmando = false
+    @State private var inizioFilm = Date()
+    /// La didascalia scritta in Social prima di venire qui: torna a Social con lo scatto.
+    @State private var didaSocial: String?
     @State private var mancano = 5
     @State private var davanti = false          // selfie: fotocamera frontale
     @State private var cambiando = false
@@ -153,6 +160,28 @@ struct Occhi: View {
                 MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
+            }
+            if filmando {                                    // il video per Social: il tempo che passa
+                VStack {
+                    HStack(spacing: 8) {
+                        Circle().fill(Color.red).frame(width: 10, height: 10)
+                            .shadow(color: .red, radius: 6)
+                        TimelineView(.periodic(from: inizioFilm, by: 1)) { t in
+                            let s = max(0, Int(t.date.timeIntervalSince(inizioFilm)))
+                            Text("REC · \(s / 60):\(String(format: "%02d", s % 60))")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .tracking(3)
+                                .foregroundStyle(.white)
+                                .monospacedDigit()
+                        }
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Capsule())
+                    .padding(.top, 70)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
             }
             if registrando {
                 VStack {
@@ -287,7 +316,7 @@ struct Occhi: View {
                                 .overlay(Circle().stroke(tinta.opacity(0.6), lineWidth: 1.5))
                         }
                         .buttonStyle(StileStark())
-                        .disabled(!agganciato || scattando || registrando || cambiando)
+                        .disabled(!agganciato || scattando || registrando || cambiando || filmando)
                         .accessibilityLabel(davanti ? "Fotocamera posteriore" : "Selfie")
                         Button { scatta() } label: {
                             ZStack {
@@ -298,10 +327,11 @@ struct Occhi: View {
                             .shadow(color: tinta.opacity(0.7), radius: 10)
                         }
                         .buttonStyle(StileStark())
-                        .disabled(!agganciato || scattando || registrando)
+                        .disabled(!agganciato || scattando || registrando || filmando)
                         .accessibilityLabel("Scatta")
                         // giro di 5 secondi: muova il telefono lungo lo scaffale o la stanza
-                        Button { Task { await giro() } } label: {
+                        // 26 ott sera: aperti da Social, REC registra il video per Social (tocco = parte, tocco = stop)
+                        Button { if modoSocial && manualeStark { filma() } else { Task { await giro() } } } label: {
                             ZStack {
                                 Circle().stroke(Color.red.opacity(0.85), lineWidth: 2).frame(width: 54, height: 54)
                                 Text("REC").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
@@ -310,7 +340,7 @@ struct Occhi: View {
                         }
                         .buttonStyle(StileStark())
                         .disabled(!agganciato || scattando || registrando)
-                        .accessibilityLabel("Giro di cinque secondi")
+                        .accessibilityLabel(modoSocial && manualeStark ? (filmando ? "Ferma il video" : "Video per Social") : "Giro di cinque secondi")
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["tasti"] = $0 }
                 }
@@ -494,7 +524,63 @@ struct Occhi: View {
             OcchiAperti.parla?(k == "studio" ? "\(nome.prefix(1).uppercased() + nome.dropFirst()): lo mando allo Studio, Sir." : "La preparo per Instagram, Sir.")
             chiudi([])
             try? await Task.sleep(for: .milliseconds(650))          // il tempo che gli Occhi si chiudano
-            PaginaMarkX.apri(AperturaPagina(sezione: k == "studio" ? "Studio" : "Social", foto: img, nomeFoto: nome))
+            PaginaMarkX.apri(AperturaPagina(sezione: k == "studio" ? "Studio" : "Social", foto: img, nomeFoto: nome,
+                                            didascalia: k == "social" ? didaSocial : nil))
+        }
+    }
+
+    /// 26 ott sera · il video per Social: REC parte, REC ferma (al massimo 60 s). Il video, ricompresso per Instagram, va a Social
+    /// con la copertina e la didascalia scritta prima; lì si sceglie REEL o STORIA.
+    private func filma() {
+        guard agganciato, !scattando, !chiuso, !cambiando else { return }
+        if filmando { Suoni.tocco(); motore.fermaFilm(); return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("occhi-social-\(UUID().uuidString).mov")
+        filmando = true
+        inizioFilm = Date()
+        stato = "REGISTRO PER SOCIAL"
+        Suoni.tocco()
+        motore.filma(url, massimo: 60, partito: { ok in
+            guard !ok else { return }
+            Task { @MainActor in
+                filmando = false
+                Suoni.errore()
+                OcchiAperti.parla?("Il video non parte, Sir: riprovi.")
+            }
+        }, finito: { u in
+            Task { @MainActor in finitoFilm(u) }
+        })
+    }
+
+    private func finitoFilm(_ u: URL?) {
+        let secondi = max(1, Int(Date().timeIntervalSince(inizioFilm).rounded()))
+        filmando = false
+        guard !chiuso else { if let u { try? FileManager.default.removeItem(at: u) }; return }
+        guard let u else { Suoni.errore(); OcchiAperti.parla?("Il video non è riuscito, Sir: riprovi."); return }
+        guard secondi >= 3 else {
+            try? FileManager.default.removeItem(at: u)
+            OcchiAperti.parla?("Troppo corto, Sir: Instagram vuole almeno tre secondi.")
+            return
+        }
+        scattando = true
+        stato = "PREPARO IL VIDEO"
+        Task {
+            let pronto = try? await VideoSocial.comprimi(u)
+            try? FileManager.default.removeItem(at: u)
+            var copertina: UIImage?
+            if let pronto { copertina = await VideoSocial.copertina(pronto) }
+            scattando = false
+            guard !chiuso, let pronto, let copertina else {
+                if let pronto { try? FileManager.default.removeItem(at: pronto) }
+                if !chiuso { Suoni.errore(); OcchiAperti.parla?("Il video non è riuscito, Sir: riprovi.") }
+                return
+            }
+            modoSocial = false
+            Suoni.schedaPronta()
+            OcchiAperti.parla?("Video di \(secondi) secondi, Sir: lo porto a Social.")
+            chiudi([])
+            try? await Task.sleep(for: .milliseconds(650))          // il tempo che gli Occhi si chiudano
+            PaginaMarkX.apri(AperturaPagina(sezione: "Social", foto: copertina, nomeFoto: "video", didascalia: didaSocial,
+                                            video: pronto, secondiVideo: secondi))
         }
     }
 
@@ -613,8 +699,10 @@ struct Occhi: View {
                 } else if OcchiAperti.socialAcceso {         // da Social › OCCHI: lo scatto torna a Social
                     OcchiAperti.socialAcceso = false
                     modoSocial = true
+                    didaSocial = OcchiAperti.socialDida
                     avvisa("SCATTI: LA FOTO VA A SOCIAL")
                 }
+                OcchiAperti.socialDida = nil
                 OcchiAperti.stark = { c in                 // a voce: «mostra le etichette», «scansione olografica»…
                     guard agganciato, !chiuso else { return false }
                     switch c {
@@ -882,7 +970,8 @@ struct AnteprimaOcchi: UIViewRepresentable {
 
 // MARK: - Motore della fotocamera (lavora su una coda sua, fuori dal thread principale)
 
-nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate,
+                                     AVCaptureFileOutputRecordingDelegate, @unchecked Sendable {
     let sessione = AVCaptureSession()
     private let uscita = AVCapturePhotoOutput()
     private let coda = DispatchQueue(label: "it.discosizer.jarvis.occhi")
@@ -1001,6 +1090,70 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AV
 
     func ferma() {
         coda.async { if self.sessione.isRunning { self.sessione.stopRunning() } }
+    }
+
+    // MARK: 26 ott sera · il video per Social (Occhi aperti da Social, tasto REC)
+    // Durante la registrazione la sessione passa a 1080p (il formato foto non è fatto per i video) con il microfono dell'iPhone,
+    // dentro la sessione audio di JARVIS (non ne crea una sua); finita, torna com'era. Il riconoscimento intanto continua (iOS 16+).
+    private let film = AVCaptureMovieFileOutput()
+    private var microfono: AVCaptureDeviceInput?
+    private var finitoFilm: (@Sendable (URL?) -> Void)?
+
+    /// Parte a registrare in `url` (al massimo `massimo` secondi). `partito(false)` se non si può; `finito` con il file (o nil) alla fine.
+    func filma(_ url: URL, massimo: Double, partito: @escaping @Sendable (Bool) -> Void, finito: @escaping @Sendable (URL?) -> Void) {
+        coda.async {
+            guard self.sessione.isRunning, !self.film.isRecording, let cam = self.camera else { partito(false); return }
+            let zoom = cam.videoZoomFactor
+            self.sessione.beginConfiguration()
+            if self.sessione.canSetSessionPreset(.hd1920x1080) { self.sessione.sessionPreset = .hd1920x1080 }
+            if !self.sessione.outputs.contains(self.film) {
+                guard self.sessione.canAddOutput(self.film) else { self.sessione.sessionPreset = .photo; self.sessione.commitConfiguration(); partito(false); return }
+                self.sessione.addOutput(self.film)
+            }
+            self.sessione.automaticallyConfiguresApplicationAudioSession = false
+            if self.microfono == nil, let m = AVCaptureDevice.default(for: .audio), let i = try? AVCaptureDeviceInput(device: m), self.sessione.canAddInput(i) {
+                self.sessione.addInput(i)
+                self.microfono = i
+            }
+            if let c = self.film.connection(with: .video) {
+                if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }               // verticale, come lo schermo
+                if c.isVideoStabilizationSupported { c.preferredVideoStabilizationMode = .auto }
+            }
+            self.sessione.commitConfiguration()
+            if (try? cam.lockForConfiguration()) != nil {                                       // lo zoom scelto resta
+                cam.videoZoomFactor = min(max(zoom, cam.minAvailableVideoZoomFactor), cam.maxAvailableVideoZoomFactor)
+                cam.unlockForConfiguration()
+            }
+            self.film.maxRecordedDuration = CMTime(seconds: massimo, preferredTimescale: 600)
+            self.finitoFilm = finito
+            self.film.startRecording(to: url, recordingDelegate: self)
+            partito(true)
+        }
+    }
+
+    func fermaFilm() {
+        coda.async { if self.film.isRecording { self.film.stopRecording() } }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
+        coda.async {
+            let finito = self.finitoFilm
+            self.finitoFilm = nil
+            let zoom = self.camera?.videoZoomFactor
+            self.sessione.beginConfiguration()
+            self.sessione.removeOutput(self.film)
+            if let m = self.microfono { self.sessione.removeInput(m); self.microfono = nil }
+            if self.sessione.canSetSessionPreset(.photo) { self.sessione.sessionPreset = .photo }
+            self.sessione.commitConfiguration()
+            if let cam = self.camera, let zoom, (try? cam.lockForConfiguration()) != nil {
+                cam.videoZoomFactor = min(max(zoom, cam.minAvailableVideoZoomFactor), cam.maxAvailableVideoZoomFactor)
+                cam.unlockForConfiguration()
+            }
+            // fermato da lui o arrivato al massimo: il file è buono anche con l'«errore» di fine corsa
+            let buono = error == nil || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool ?? false)
+            if !buono { try? FileManager.default.removeItem(at: url) }
+            finito?(buono ? url : nil)
+        }
     }
 
     /// veloce: per i fotogrammi del giro, scatto immediato senza elaborazioni pesanti.

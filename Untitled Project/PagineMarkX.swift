@@ -19,6 +19,9 @@ struct AperturaPagina: Identifiable {
     var foto: UIImage? = nil            // dagli Occhi: la foto per il banco o per Instagram
     var nomeFoto = "inquadratura"
     var lidar: String? = nil            // da LiDAR: la scansione vera già pronta per il banco (LidarStudio.swift, JSON)
+    var didascalia: String? = nil       // Social dagli Occhi: la didascalia scritta prima di andare agli Occhi (26 ott sera)
+    var video: URL? = nil               // Social dagli Occhi: il video già pronto per Instagram (VideoSocial), la foto è la copertina
+    var secondiVideo = 0
 }
 
 enum PaginaMarkX {

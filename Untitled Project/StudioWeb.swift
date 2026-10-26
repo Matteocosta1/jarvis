@@ -94,6 +94,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         self.parla = parla
         self.chiudi = chiudi
         self.pronta = pronta
+        self.videoScelto = apertura.video                // 26 ott sera: il video degli Occhi (lo carica l'app, alla pagina va la copertina)
         super.init()
     }
 
@@ -250,6 +251,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "socialFoto":
             if o["da"] as? String == "occhi" {                           // 26 ott sera: OCCHI apre gli Occhi di JARVIS, lo scatto torna qui
                 OcchiAperti.socialAcceso = true
+                OcchiAperti.socialDida = o["dida"] as? String          // la didascalia già scritta torna con lo scatto
                 salvaOra()
                 NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": "occhi"])
             } else {
@@ -540,7 +542,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             let p = UIGraphicsImageRenderer(size: CGSize(width: f.size.width * k, height: f.size.height * k)).image { _ in f.draw(in: CGRect(x: 0, y: 0, width: f.size.width * k, height: f.size.height * k)) }
             if let d = p.jpegData(compressionQuality: 0.88) { foto = "'data:image/jpeg;base64,\(d.base64EncodedString())'" }
         }
-        let conFoto = a.sezione == "Social" ? "window.SOCIAL_DA = { foto: im, da: 'occhi' };" : "window.STUDIO_DA = { foto: im, nome: \(js(a.nomeFoto)) };"
+        let conFoto = a.sezione == "Social"
+            ? "window.SOCIAL_DA = { foto: im, da: 'occhi', dida: \(js(a.didascalia ?? ""))\(a.video != nil ? ", video: \(max(1, a.secondiVideo))" : "") };" : "window.STUDIO_DA = { foto: im, nome: \(js(a.nomeFoto)) };"
         return """
         (function(){
           var post = function(o){ try { window.webkit.messageHandlers.jarvis.postMessage(o); } catch (e) {} };

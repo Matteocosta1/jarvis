@@ -932,6 +932,16 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sc-conferma { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(0,0,0,.6); opacity: 0; transition: opacity .25s; } .sc-conferma.su { opacity: 1; }
 .sc-conferma > div { width: min(86%, 320px); display: grid; gap: 12px; padding: 18px; border-radius: 18px; border: 1px solid rgba(79,227,255,.5); background: rgba(4,14,18,.97); box-shadow: 0 0 30px rgba(79,227,255,.25); }
 .sc-conferma b { font: 700 12px var(--mono); letter-spacing: 2px; } .sc-conferma p { margin: 0; font: 13px var(--sans); color: #cfe2e8; }
+/* 26 ott sera: dagli Occhi a Social, «DOVE LA METTO?» */
+.sc-scelta > div { justify-items: center; text-align: center; }
+.sc-ft { position: relative; width: min(100%, 36vh); } .sc-ft canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 12px; border: 1px solid rgba(79,227,255,.35); }
+.sc-ft span { position: absolute; left: 8px; bottom: 8px; font: 700 10px var(--mono); letter-spacing: 1px; background: rgba(0,0,0,.6); padding: 3px 7px; border-radius: 6px; color: #fff; }
+.sc-tre { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; } .sc-tre.due { grid-template-columns: repeat(2, 1fr); }
+.sc-tre button { display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 84px; padding: 12px 6px; border-radius: 14px; border: 1px solid rgba(79,227,255,.45); background: rgba(79,227,255,.08); color: var(--ciano); font: 700 11px var(--mono); letter-spacing: 1.5px; cursor: pointer; transition: background .15s; }
+.sc-tre button:active { background: rgba(79,227,255,.25); }
+.sc-tre i { position: relative; display: block; border: 2px solid currentColor; border-radius: 4px; } .sc-tre i.q { width: 28px; height: 28px; } .sc-tre i.v { width: 21px; height: 36px; }
+.sc-tre i.r::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-35%, -50%); border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+
 .sc-carica { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; align-content: center; gap: 14px; background: rgba(1,6,9,.9); } .sc-carica i { width: 64px; height: 64px; border-radius: 50%; border: 3px solid rgba(79,227,255,.2); border-top-color: var(--ciano); animation: bwGira .8s linear infinite; }
 .sc-carica.ok i { animation: none; border-color: #46e8a0; box-shadow: 0 0 20px rgba(70,232,160,.6); } .sc-carica b { font: 700 11px var(--mono); letter-spacing: 3px; }
 .bp .bw-vis-ologramma > i { border-color: rgb(var(--acc)); filter: drop-shadow(0 0 6px rgb(var(--acc))); } .bp .bw-vis-su button, .bp .bw-vis-su small { color: rgb(var(--acc)); }
@@ -5032,7 +5042,7 @@ async function occhi(ok) {
   };
   A.querySelector('[data-oc="scatta"]').addEventListener("click", async () => { if (occupato) return; if (window.OCCHI_PER_SOCIAL) { OCCHI_ATTIVI.social(); return; } occupato = true; suona("aTick"); stato("ACQUISIZIONE");
     A.querySelector(".oc-lampo").animate([{ opacity: .85 }, { opacity: 0 }], { duration: 260 }); await attesa(450); if (!ok()) return; manda(false); });
-  A.querySelector('[data-oc="rec"]').addEventListener("click", async () => { if (occupato) return; occupato = true; suona("aTick"); stato("ACQUISIZIONE IN MOVIMENTO");
+  A.querySelector('[data-oc="rec"]').addEventListener("click", async () => { if (window.OCCHI_PER_SOCIAL) { OCCHI_ATTIVI.socialVideo(); return; } if (occupato) return; occupato = true; suona("aTick"); stato("ACQUISIZIONE IN MOVIMENTO");
     const b = document.createElement("div"); b.className = "oc-recbadge"; A.appendChild(b);
     for (let n = 5; n >= 1; n--) { b.innerHTML = `<i></i>REC · ${n}`; await attesa(1000); if (!ok() || !A.isConnected) return; }
     b.remove(); manda(true); });
@@ -5050,7 +5060,15 @@ async function occhi(ok) {
   });
   const AER = B32 ? aereoOcchi(A, { info }) : null;                // build 32: «Jarvis, che aereo è quello?»
   OCCHI_ATTIVI = { olo: (v) => { metti(v); if (v) vivo.aggancia(); }, eti: (v) => mettiEti(v), cerca: () => cerca(), studio: () => { if (!occupato) allaStudio(); }, social: async () => { const f = fotoAlloStudio(); if (!f) { parlaMock("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco.", 2200); return; }
-    A.querySelector(".oc-lampo").animate([{ opacity: .85 }, { opacity: 0 }], { duration: 260 }); parlaMock("Scattata, Sir: la preparo per Instagram.", 1800); window.OCCHI_PER_SOCIAL = false; window.SOCIAL_DA = { foto: f.foto, da: "occhi" }; await attesa(500); $("chiudiSez").click(); await attesa(450); apriSezione("Social"); }, aggancia: () => { metti(true); vivo.aggancia(); }, aereo: (p = "AEREO", f) => AER?.comando(p, f), pronta: () => !!vivo?.scena?.()?.media, vivo: () => A.isConnected };
+    A.querySelector(".oc-lampo").animate([{ opacity: .85 }, { opacity: 0 }], { duration: 260 }); parlaMock("Scattata, Sir: la preparo per Instagram.", 1800); window.OCCHI_PER_SOCIAL = false; window.SOCIAL_DA = { foto: f.foto, da: "occhi", dida: window.SOC_DIDA }; await attesa(500); $("chiudiSez").click(); await attesa(450); apriSezione("Social"); },
+    socialVideo: async () => { const b0 = A.querySelector(".oc-recbadge"); if (b0) { b0.dataset.fine = "1"; return; }   // secondo tocco: stop
+      if (occupato) return; const f0 = fotoAlloStudio(); if (!f0) { parlaMock("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco.", 2200); return; }
+      occupato = true; suona("aTick"); stato("REGISTRO PER SOCIAL");
+      const b = document.createElement("div"); b.className = "oc-recbadge"; A.appendChild(b); let s = 0;
+      while (!b.dataset.fine && s < 60) { b.innerHTML = `<i></i>REC · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; await attesa(1000); if (!ok() || !A.isConnected) return; s++; }
+      b.remove(); suona("aTick"); occupato = false; const f = fotoAlloStudio() || f0; s = Math.max(1, s);
+      parlaMock(`Video di ${s} secondi, Sir: lo porto a Social.`, 1800); window.OCCHI_PER_SOCIAL = false;
+      window.SOCIAL_DA = { foto: f.foto, da: "occhi", video: s, dida: window.SOC_DIDA }; await attesa(500); $("chiudiSez").click(); await attesa(450); apriSezione("Social"); }, aggancia: () => { metti(true); vivo.aggancia(); }, aereo: (p = "AEREO", f) => AER?.comando(p, f), pronta: () => !!vivo?.scena?.()?.media, vivo: () => A.isConnected };
   if (ini?.aggancia) setTimeout(() => vivo.aggancia(), 900);
   if (ini?.aereo) setTimeout(() => AER?.comando(ini.aereo, ini.frase), 700);
 }
@@ -5586,7 +5604,7 @@ function social(ok) {
   function pagina() { giro++; contaPosta();
     if (scheda === "pubblica") {
       P.innerHTML = `<div class="sc-blocco"><small class="sc-et">DA DOVE PARTIAMO</small><div class="sc-fonti">${[["galleria", ICONE.Foto || ICONE.Ricordi, "GALLERIA", "FOTO E VIDEO"], ["occhi", ICONE.Occhi || ICONE.Profiler || ICONE.Studio, "OCCHI", "SCATTA ORA"], ["studio", ICONE.Studio, "STUDIO", "PEZZO 3D"]].map(([k, ic, n, sot]) => `<button type="button" data-fonte="${k}" aria-pressed="${fonte?.k === k}"><i>${ic}</i>${n}<small>${sot}</small></button>`).join("")}</div></div>
-        <div class="sc-anteprima"><canvas width="360" height="640"></canvas><div class="sc-ant-tipo">${formato}</div>${fonte?.img ? "" : `<p>${fonte?.k === "studio" ? "Banco dello Studio vuoto" : fonte?.k === "occhi" ? "Nessuna foto da Occhi" : "Scelga da dove viene il contenuto"}</p>`}</div>
+        <div class="sc-anteprima"><canvas width="360" height="640"></canvas><div class="sc-ant-tipo">${formato}${fonte?.video ? ` · VIDEO ${Math.floor(fonte.durata / 60)}:${String(fonte.durata % 60).padStart(2, "0")}` : ""}</div>${fonte?.img ? "" : `<p>${fonte?.k === "studio" ? "Banco dello Studio vuoto" : fonte?.k === "occhi" ? "Nessuna foto da Occhi" : "Scelga da dove viene il contenuto"}</p>`}</div>
         <div class="sc-blocco"><small class="sc-et">FORMATO</small><div class="sc-riga">${["REEL", "POST", "STORIA"].map((f) => `<button type="button" class="chip" data-formato="${f}" aria-pressed="${formato === f}">${f}</button>`).join("")}</div></div>
         <div class="sc-blocco"><div class="sc-et-r"><small class="sc-et">DIDASCALIA</small><button type="button" class="sc-mini" data-az="riscrivi">RISCRIVI</button></div><textarea id="scDida" rows="4">${escSd(didascalia)}</textarea></div>
         <div class="sc-blocco"><small class="sc-et">QUANDO</small><div class="sc-riga">${[["ORA", "ORA"], ...(quando !== "ORA" && quando !== scMigliori(1)[0] ? [[quando, quando]] : []), [scMigliori(1)[0], scMigliori(1)[0] + " · ORARIO MIGLIORE"]].map(([k, n]) => `<button type="button" class="chip" data-quando="${k}" aria-pressed="${quando === k}">${n}</button>`).join("")}</div></div>
@@ -5657,8 +5675,8 @@ function social(ok) {
     if (b.dataset.sc) { suona("aTick"); scheda = b.dataset.sc; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pagina(); return; }
     if (b.dataset.fonte) { suona("aTick"); const k = b.dataset.fonte;
       if (k === "studio") { fonte = { k, img: null }; const pz = pezzoStudio(); if (pz) { const im = new Image(); im.onload = () => { if (fonte?.k === "studio") { fonte.img = im; pagina(); } }; im.src = pz.mini; parlaMock(`${pz.nome}: l'ultimo pezzo dello Studio, Sir.`, 2600); } else parlaMock("Il banco dello Studio è vuoto, Sir: crei un pezzo in Studio, poi CONDIVIDI › SOCIAL.", 3600); }
-      else if (k === "occhi" && !SOC.daOcchi && !window.JARVIS_APP) { window.OCCHI_PER_SOCIAL = true; parlaMock("Apro gli Occhi, Sir: inquadri e scatti, la foto torna qui.", 2600); $("chiudiSez").click(); await attesa(450); apriSezione("Occhi"); return; }
-      else if (k === "occhi" && window.JARVIS_APP && !SOC.daOcchi) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFoto", da: "occhi" }); return; } else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock("Nessuna foto da Occhi, Sir: in Occhi, CERCA › PUBBLICA SU SOCIAL la manda qui.", 3200); }
+      else if (k === "occhi" && !SOC.daOcchi && !window.JARVIS_APP) { window.OCCHI_PER_SOCIAL = true; window.SOC_DIDA = didascalia; $("chiudiSez").click(); await attesa(450); apriSezione("Occhi"); return; }
+      else if (k === "occhi" && window.JARVIS_APP && !SOC.daOcchi) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFoto", da: "occhi", dida: didascalia }); return; } else if (k === "occhi") { fonte = { k, img: SOC.daOcchi || null }; if (!SOC.daOcchi) parlaMock("Nessuna foto da Occhi, Sir: in Occhi, CERCA › PUBBLICA SU SOCIAL la manda qui.", 3200); }
       else if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFoto", da: "galleria" }); return; } else { const c = document.createElement("canvas"); c.width = 360; c.height = 640; anteprima(c, "galleria" + Date.now()); fonte = { k, img: c }; }
       if (!didascalia) didascalia = DIDA[0]; pagina(); return; }
     if (b.dataset.formato) { suona("aTick"); formato = b.dataset.formato; pagina(); return; }
@@ -5735,8 +5753,14 @@ function social(ok) {
       parlaMock(`Scambiati, Sir: «${a.titolo}» esce ${a.quando.toLowerCase().replace(" ", " alle ")}.`, 2600); } pagina(); };
   P.addEventListener("pointerup", lascia); P.addEventListener("pointercancel", lascia);
   // arrivi: dallo Studio (il pezzo per un Reel), da Occhi (la foto), a voce
+  function scegliDove() { const v = !!fonte?.video, d = fonte?.durata || 0, F = document.createElement("div"); F.className = "sc-conferma sc-scelta";
+    F.innerHTML = `<div><b>DOVE LA METTO?</b><div class="sc-ft"><canvas width="600" height="600"></canvas>${v ? `<span>▶ ${Math.floor(d / 60)}:${String(d % 60).padStart(2, "0")}</span>` : ""}</div><div class="sc-tre${v ? " due" : ""}">${(v ? [["REEL", "v r"], ["STORIA", "v"]] : [["POST", "q"], ["STORIA", "v"], ["REEL", "v r"]]).map(([f, c]) => `<button type="button" data-dove="${f}"><i class="${c}"></i>${f}</button>`).join("")}</div>${v ? "<p>Su Instagram un video nel profilo è un Reel.</p>" : ""}</div>`;
+    const im = fonte?.img; if (im) { const cv = F.querySelector("canvas"), x = cv.getContext("2d"), w = im.naturalWidth || im.width, hh = im.naturalHeight || im.height, k = Math.max(600 / w, 600 / hh); try { x.drawImage(im, (600 - w * k) / 2, (600 - hh * k) / 2, w * k, hh * k); } catch (e) {} }
+    F.addEventListener("click", (e) => { e.stopPropagation(); const b = e.target.closest("[data-dove]"); if (!b) return; suona("aTick"); formato = b.dataset.dove; F.classList.remove("su"); setTimeout(() => F.remove(), 260); pagina(); });
+    A.appendChild(F); requestAnimationFrame(() => F.classList.add("su")); parlaMock(v ? "Reel o storia, Sir?" : "Post, storia o reel, Sir?", 2600); }
   const da = window.SOCIAL_DA; window.SOCIAL_DA = null;
-  if (da?.foto) { SOC.daOcchi = da.foto; fonte = { k: da.da || "occhi", img: da.foto }; didascalia = DIDA[1]; formato = da.da === "studio" ? "REEL" : "POST"; }
+  if (da?.foto) { SOC.daOcchi = da.foto; fonte = { k: da.da || "occhi", img: da.foto, video: !!da.video, durata: da.video || 0 }; didascalia = da.dida || DIDA[1]; window.SOC_DIDA = null; formato = da.da === "studio" || da.video ? "REEL" : "POST";
+    if (da.da !== "studio") setTimeout(() => ok() && scegliDove(), 380); }
   else if (da?.studio) { fonte = { k: "studio", img: null }; const pz = pezzoStudio(); if (pz) { const im = new Image(); im.onload = () => { if (fonte?.k === "studio" && !fonte.img) { fonte.img = im; pagina(); } }; im.src = pz.mini; } didascalia = DIDA[0]; formato = "REEL"; }
   else if (typeof da === "string") { scheda = da === "CALENDARIO" ? "piano" : da.toLowerCase(); A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.sc === scheda)); }
   pagina(); suona("aPronta");
