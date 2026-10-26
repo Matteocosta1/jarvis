@@ -937,6 +937,7 @@ struct TestoCodice: View {
     @State private var inizio = Date()
     @State private var fermo = false
     @State private var lettaDa = Date.distantPast    // da quando la scritta mostrata è tutta leggibile
+    @State private var voluta = ""                   // l'ultima scritta chiesta (se cambia ancora durante l'attesa, vale quella)
     private static let simboli = Array("ABCDEF0123456789#%&*<>/=+")
 
     var body: some View {
@@ -949,9 +950,10 @@ struct TestoCodice: View {
     }
 
     private func mostra(_ nuovo: String, attesa: Double) {
+        voluta = nuovo
         Task { @MainActor in
             if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
-            guard nuovo == testo else { return }                       // nel frattempo è cambiata ancora: vale l'ultima
+            guard nuovo == voluta else { return }                      // nel frattempo è cambiata ancora: vale l'ultima
             mostrato = nuovo; inizio = Date(); fermo = false
             let mio = inizio
             try? await Task.sleep(for: .milliseconds(400))
