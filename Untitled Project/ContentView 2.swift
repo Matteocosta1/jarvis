@@ -243,20 +243,19 @@ struct ContentView: View {
                 if let p = Protocolli.condiviso.prendiRichiesto() { Protocolli.condiviso.avvia(p) }
             }
         }
-        .sheet(isPresented: $mostraImpostazioni, onDismiss: {
+        // 26 ott sera (il signore: «nessuna arriva in cima a pagina piena»): tutte le schede a pagina piena, come il mockup (PaginaPiena)
+        .fullScreenCover(isPresented: $mostraImpostazioni, onDismiss: {
             eseguiComando()
             if jarvis.svuotaChiesto {                    // «Nuova conversazione»: a foglio chiuso, la stessa animazione del cestino
                 jarvis.svuotaChiesto = false
                 Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
             }
-        }) { ImpostazioniView().environmentObject(jarvis) }
-        .sheet(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }
+        }) { ImpostazioniView().environmentObject(jarvis).paginaPiena() }
+        .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().paginaPiena() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
-        // 26 ott sera (il signore: «devono chiudersi come le altre»): Studio e Social sono schede come Meteo, Posta, Diario: si aprono e
-        // si chiudono scorrendo (anche trascinando giù), con JARVIS sotto. A tutto schermo (fullScreenCover) alla chiusura iOS rimetteva
-        // sotto la schermata di JARVIS solo alla fine e per un attimo si vedeva nero.
-        .sheet(item: $aperturaPagina) { a in
-            VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) })
+        // Studio e Social come tutte le altre schede: pagina piena, «Chiudi» o trascinando giù dall'alto, JARVIS sotto (niente nero)
+        .fullScreenCover(item: $aperturaPagina) { a in
+            VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }).paginaPiena()
         }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
@@ -330,7 +329,8 @@ struct ContentView: View {
             }
         }
         // le schede delle icone
-        .sheet(item: $scheda) { sc in
+        .fullScreenCover(item: $scheda) { sc in
+            Group {
             switch sc {
             case .diario: VistaDiario(chiedi: daScheda) {
                 scheda = nil
@@ -363,6 +363,8 @@ struct ContentView: View {
             case .satellite: VistaSatellite(parla: { [jarvis] frase in jarvis.annuncia(frase) })
             case .musica: VistaMusica()
             }
+            }
+            .paginaPiena()
         }
         .fullScreenCover(isPresented: $jarvis.allenatore) {
             Allenatore { jarvis.allenatore = false }
@@ -372,15 +374,15 @@ struct ContentView: View {
                 .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         }
         .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
-        .sheet(isPresented: $mostraVitals) {
-            VistaVitals { frase in mostraVitals = false; chiedi(frase) }
+        .fullScreenCover(isPresented: $mostraVitals) {
+            VistaVitals { frase in mostraVitals = false; chiedi(frase) }.paginaPiena()
         }
-        .sheet(item: $mostraRicordi) { scheda in
-            VistaRicordi(iniziale: scheda, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }
+        .fullScreenCover(item: $mostraRicordi) { scheda in
+            VistaRicordi(iniziale: scheda, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }.paginaPiena()
         }
-        .sheet(isPresented: $mostraConfidente) {
+        .fullScreenCover(isPresented: $mostraConfidente) {
             VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
-                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") })
+                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
         }
         .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
             ForEach(Lingua.tutte) { l in
