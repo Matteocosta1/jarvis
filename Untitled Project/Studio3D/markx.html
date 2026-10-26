@@ -191,7 +191,7 @@ header .icona.testa.carica { animation: icoCarica .5s ease-out; }
 .cf-area { min-height: 160px; border-radius: 12px; border: 1px solid rgba(79,227,255,.35); background: rgba(79,227,255,.05); padding: 10px; font-size: 14px; color: var(--tenue); }
 
 .testata b.marchio-j { font: 700 16px var(--mono); letter-spacing: 4px; color: var(--ciano); }
-.testata b.marchio-j + small { font: 700 10.5px var(--mono); text-shadow: 0 0 8px rgba(0,229,255,.55); }   /* 27 ott: Sound come Studio e Social */   /* JARVIS Music */
+.testata b.marchio-j + small { font: 700 10.5px var(--mono); }   /* 27 ott: Sound come Studio e Social */   /* JARVIS Music */
 .sd-su > .anello, .sc-su > .anello { flex: none; display: grid; }
 .sd-su { gap: 6px !important; } .sd-su > div:not(.anello) { min-width: 0; } .sd-su .sd-arch { font-size: 8px !important; letter-spacing: 1px !important; padding-left: 7px !important; padding-right: 7px !important; gap: 4px !important; } .sd-su .sd-arch svg { width: 12px; height: 12px; } .sd-su .sd-chiudi, .sd-su .sd-arch { flex: none; }   /* con l'icona, ARCHIVIO e «Chiudi» stanno sulla riga */   /* Studio e Social: l'icona animata come tutte le sezioni */
 .al-su .se-testa { display: flex !important; flex-direction: row !important; align-items: center; gap: 14px; } .al-su .se-testa > div:last-child { display: grid; gap: 2px; } .al-su .se-testa .se-ora { display: block; margin-top: 2px; }
@@ -737,7 +737,7 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 /* ══ STUDIO (build 32, rifatto il 25 ott sera): il piano olografico fisso al centro, la creazione a voce lì sopra ══ */
 .sd { background: var(--fondo); }
 .sd-su { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 6px; color: var(--ciano); z-index: 2; }
-.sd-su > div { flex: 1; display: grid; } .sd-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sd-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; text-shadow: 0 0 8px rgba(0,229,255,.55); }   /* 27 ott: diciture più marcate */
+.sd-su > div { flex: 1; display: grid; } .sd-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sd-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; }   /* 27 ott: diciture più marcate */
 .sd-arch { display: flex; align-items: center; gap: 5px; height: 28px; margin-top: 3px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(79,227,255,.4); background: rgba(2,6,10,.6); color: var(--ciano); font: 700 9px var(--mono); letter-spacing: 1.2px; cursor: pointer; white-space: nowrap; }
 .sd-arch svg { width: 14px; height: 14px; }
 .sd-foglio .testa .sd-arch-ico { flex: 0 0 54px; display: grid; }
@@ -878,7 +878,7 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 /* SOCIAL */
 .sc { background: radial-gradient(ellipse at 50% 0%, rgba(79,227,255,.1), transparent 55%), var(--fondo); color: var(--ciano); }
 .sc canvas { position: relative; inset: auto; }
-.sc-su { display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 4px; } .sc-su > div { flex: 1; display: grid; } .sc-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sc-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; text-shadow: 0 0 8px rgba(0,229,255,.55); }   /* 27 ott: diciture più marcate */
+.sc-su { display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 4px; } .sc-su > div { flex: 1; display: grid; } .sc-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sc-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; }   /* 27 ott: diciture più marcate */
 .sc-chiudi { background: none; border: 0; color: var(--ciano); font: 600 16px var(--sans); cursor: pointer; padding: 6px 0 6px 10px; }
 .sc-conto { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; margin: 8px 16px 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(79,227,255,.25); background: rgba(10,31,38,.55); }
 .sc-avatar { position: relative; width: 48px; height: 48px; display: grid; place-items: center; } .sc-avatar i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; background: conic-gradient(from 0deg, rgba(79,227,255,.1), var(--ciano), rgba(79,227,255,.1)) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: bwGira 4s linear infinite; }
