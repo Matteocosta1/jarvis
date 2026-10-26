@@ -315,7 +315,7 @@ struct PaginaBrowser: View {
         _nav = StateObject(wrappedValue: Navigatore(incognito: incognito.wrappedValue))
     }
 
-    private var accento: Color { incognito ? Color(red: 0.75, green: 0.55, blue: 1.0) : Color.ciano }
+    private var accento: Color { incognito ? Color(red: 0.12, green: 0.50, blue: 0.60) : Color.ciano }   // 26 ott notte: Incognito ciano scuro, non viola
 
     /// A voce: con la barra attiva si scrive lì, se no nel campo della pagina (o della finestra pop-up).
     private func registraVoce() {
@@ -432,11 +432,9 @@ struct PaginaBrowser: View {
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
         .onChange(of: attivo) {
             if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }
-            else if attivo, barra.isEmpty { scrivendo = true }
         }
         .onAppear {
             if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }      // «Jarvis, fammi vedere dei video di …»
-            else if attivo, barra.isEmpty { scrivendo = true }
             registraVoce()
         }
         .overlay {
