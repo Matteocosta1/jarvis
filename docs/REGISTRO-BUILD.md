@@ -163,3 +163,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 
 ## 10.0 (10) — 26 ott 21:50
 - Dalla 9: Studio/Social chiusura con copia immediata dello schermo (niente nero); la pagina si prepara dopo la salita (apertura fluida); tendina Protocolli del mockup nascosta in Studio/Social; Satellite e schede senza scorrimento laterale; swipe giù dalla fascia dell'ora apre i Protocolli.
+- 21:55 (nella 10): Studio/Social con «Chiudi» scendono da sole (PaginaPiena.scendiEChiudi, curva del mockup 0,35 s) e iOS le toglie già sotto lo schermo: la pagina web non viene mai fatta scendere spenta. Anche verso Occhi/LiDAR.

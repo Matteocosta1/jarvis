@@ -20,6 +20,7 @@ struct VistaStudio: View {
     var apertura = AperturaPagina(sezione: "Studio")
     let parla: (String) -> Void
     @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiPagina) private var chiudiPagina      // scende da sola, senza nero (PaginaPiena)
     /// 26 ott sera (il signore: «si devono aprire come le altre app»): l'apertura di tutte le schede di JARVIS (il caricamento
     /// con anelli e mirino, i suoni di apertura e di pronta), poi la pagina già disegnata. Prima si vedeva la pagina mentre si
     /// caricava (un lampo bianco, poi nero). Il caricamento resta almeno quanto nelle altre schede e finché la pagina non è pronta.
@@ -30,7 +31,7 @@ struct VistaStudio: View {
     /// è della pagina. Lo dice la pagina al tocco (messaggio «presa»).
     @State private var presa = false
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: { chiudi() }, pronta: { scopri() }, presa: { presa = $0 })
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: { if let chiudiPagina { chiudiPagina() } else { chiudi() } }, pronta: { scopri() }, presa: { presa = $0 })
             .background(Color.fondo)
             .ignoresSafeArea()
             .overlay {
@@ -174,7 +175,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "parla":
             if let t = o["testo"] as? String, !t.isEmpty { parla(t) }
         case "chiudi":
-            salvaOra(); congelaEChiudi()
+            salvaOra(); chiudi()
         case "pronta":                                                   // la sezione è aperta e disegnata: via il caricamento
             pronta()
         case "presa":                                                    // il dito lavora nella pagina: niente chiusura trascinando
@@ -220,7 +221,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if !lidar { OcchiAperti.studioAcceso = true }            // 26 ott: negli Occhi STUDIO è già acceso, basta lo scatto
             parla(lidar ? "Apro il LiDAR su Oggetto, Sir: finita la scansione, tocchi STUDIO." : "Apro gli Occhi, Sir: inquadri il pezzo e scatti.")
             salvaOra()
-            NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": lidar ? "lidar" : "occhi"])
+            scendiPoi { NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": lidar ? "lidar" : "occhi"]) }
         case "plastico":                                                 // «fai il plastico della stanza» dentro lo Studio: la sala vera
             let p = PaginaMarkX.plasticoDaArchivio(o["k"] as? String ?? "stanza")
             parla(p.frase)
@@ -271,7 +272,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
                 OcchiAperti.socialAcceso = true
                 OcchiAperti.socialDida = o["dida"] as? String          // la didascalia già scritta torna con lo scatto
                 salvaOra()
-                NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": "occhi"])
+                scendiPoi { NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": "occhi"]) }
             } else {
                 scegli(per: "galleria")
             }
@@ -285,19 +286,13 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         }
     }
 
-    /// 26 ott sera (il signore: «c'è ancora il nero quando chiudi»; video 21:29, build 9: ancora nero alla chiusura): durante la
-    /// chiusura il WKWebView smette di disegnare e la scheda scendeva nera. La foto della pagina via WebKit (takeSnapshot) arriva
-    /// tardi ed è vuota quando c'è il 3D (WebGL). Ora si copia SUBITO quello che è sullo schermo (snapshotView: la copia la fa
-    /// iOS, compreso il 3D), la copia si mette sopra la scheda e scende con lei. Nessuna attesa: si chiude nello stesso istante.
-    private func congelaEChiudi() {
-        guard let w = web, w.window != nil else { chiudi(); return }
-        let base = RegiaStudio.inCima(w)?.view ?? w
-        if let foto = base.snapshotView(afterScreenUpdates: false) {
-            foto.frame = base.bounds
-            foto.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            base.addSubview(foto)
-        }
+    /// 26 ott sera: per gli Occhi e il LiDAR la scheda prima scende da sola (niente nero), poi si aprono loro.
+    private func scendiPoi(_ dopo: @escaping () -> Void) {
         chiudi()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(420))
+            dopo()
+        }
     }
 
     private func rispondi(_ id: Int, _ esito: (String?, String?)) {
