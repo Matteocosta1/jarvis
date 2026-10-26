@@ -3,7 +3,8 @@ import CoreLocation
 import SwiftUI
 
 // MARK: - MARK X · TRAVEL, i dati veri (iPhone e orologio): i tipi, il percorso dei mezzi (Transitous), le partenze dei treni
-// (ViaggiaTreno) e le bici (BikeMi). La schermata dell'iPhone è in Travel.swift, quella del polso in TravelOrologio.swift.
+// (ViaggiaTreno) e le bici (BikeMi). La schermata è in Travel.swift (solo iPhone: al polso TRAVEL non c'è, come nel mockup).
+// Il file è anche nell'orologio perché i comandi a voce (Build22.swift) usano DatiTravel.numeroVolo.
 
 nonisolated enum SchedaTravel: String, CaseIterable, Identifiable, Sendable {
     case mezzi, treni, voli, piedi, bici, taxi

@@ -1,6 +1,7 @@
 #if os(iOS)
 import SwiftUI
 import MapKit
+import UIKit
 import CoreLocation
 import UserNotifications
 import Combine
@@ -11,6 +12,8 @@ import Combine
 // PIEDI (Apple Mappe: tempo e strada, poi la GUIDA di Satellite), BICI (BikeMi, dati aperti: bici, elettriche e posti liberi),
 // TAXI (il radiotaxi 02 4040). «Avvisami» mette l'avviso 5 minuti prima di uscire e il conto alla rovescia nella Dynamic Island.
 
+/// Solo iPhone: usa l'indirizzo del cervello e il portachiavi (isolati sul MainActor), come RegiaStudio.
+@MainActor
 extension DatiTravel {
     /// TRENI: la stazione ferroviaria più vicina (Apple Mappe) e il suo codice ViaggiaTreno. Se non la trova, Milano Centrale.
     static func stazioneVicina(_ c: CLLocationCoordinate2D?) async -> (nome: String, codice: String) {
