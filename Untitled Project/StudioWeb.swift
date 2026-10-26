@@ -140,7 +140,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
                     self.rispondi(id, (nil, "errore")); return
                 }
                 try? FileManager.default.removeItem(at: u)
-                self.condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
+                self.condividi(d, nome: nome) { ok in self.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
             }
         case "modelloAR":                                                // CONDIVIDI › MODELLO AR: l'USDZ vero del pezzo, misura vera
             let nome = (o["nome"] as? String ?? "Studio") + ".usdz"
@@ -148,7 +148,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             Task {
                 guard let u = await ModelloAR.crea(stl), let d = try? Data(contentsOf: u) else { self.rispondi(id, (nil, "errore")); return }
                 try? FileManager.default.removeItem(at: u)
-                self.condividi(d, nome: nome) { [weak self] ok in self?.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
+                self.condividi(d, nome: nome) { ok in self.rispondi(id, ok ? ("ok", nil) : (nil, "declined")) }
             }
         case "apriURL":                                                  // SERVICE: la pagina di stampa 3D di Vectorealism, dentro l'app
             guard let t = o["url"] as? String, let u = URL(string: t), u.scheme == "https", u.host?.hasSuffix("vectorealism.com") == true,
