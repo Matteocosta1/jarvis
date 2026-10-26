@@ -70,9 +70,9 @@ struct VistaProfiler: View {
                 .overlay(Circle().stroke(ambra.opacity(0.5), lineWidth: 1))
             AnelloOcchi(icona: "person.text.rectangle", tinta: Color.ciano)     // 26 ott notte: l'icona animata come le altre sezioni
             VStack(alignment: .leading, spacing: 2) {
-                Text("J.A.R.V.I.S.")
+                Text("PROFILER")                                   // 27 ott: il nome della sezione, niente J.A.R.V.I.S.
                     .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                Text("PROFILER · \(foto != nil ? "SCHEDA SOGGETTO" : davanti ? "SELFIE" : "SOGGETTO")")
+                Text(foto != nil ? "SCHEDA SOGGETTO" : davanti ? "SELFIE" : "SOGGETTO")
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.75)
             }
             .foregroundStyle(ambra)

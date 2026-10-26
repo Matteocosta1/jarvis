@@ -211,11 +211,12 @@ struct Occhi: View {
                     // 26 ott notte: l'icona con l'anello che gira, come nelle altre schede
                     AnelloOcchi(icona: cucina ? "fork.knife" : "eye", tinta: tinta)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("J.A.R.V.I.S.")
+                        // 27 ott: il nome della sezione (niente J.A.R.V.I.S.), sotto il modo
+                        Text(cucina ? "CUCINA" : "OCCHI")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .tracking(4)
-                        Text(cucina ? "CUCINA · \(video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])"
-                                    : "OCCHI · \(video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE")")
+                        Text(cucina ? (video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])
+                                    : (video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE"))
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .tracking(2)
                             .opacity(0.7)
