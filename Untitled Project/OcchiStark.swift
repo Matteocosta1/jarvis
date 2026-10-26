@@ -1017,7 +1017,8 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         if c("dove va") || c("dove sta andando") || c("dove e diretto") || c("dove atterra") { return "AEREO_DOVE" }
         if c("quota") || c("quanto e alto") || c("a che altezza") || c("quanto vola alto") { return "AEREO_QUOTA" }
         if c("compagnia") || c("di chi e") { return "AEREO_COMP" }
-        if aereo && (c("che") || c("quale") || c("cos e") || c("cosa e") || c("cerca") || c("trova") || c("guarda")) { return "AEREO" }
+        // 27 ott (il signore): anche «Jarvis, target aereo» e «Jarvis, guarda l'aereo» (l'apostrofo diventa uno spazio: «guarda l aereo»)
+        if aereo && (c("che") || c("quale") || c("cos e") || c("cosa e") || c("cerca") || c("trova") || c("guarda") || c("target") || c("punta") || c("inquadra") || c("aggancia")) { return "AEREO" }
         return nil
     }
 
