@@ -283,7 +283,13 @@ struct ContentView: View {
             let lidar = n.userInfo?["dove"] as? String == "lidar"
             aperturaPagina = nil
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(650))           // il tempo che lo Studio si chiuda
+                // 26 ott sera: come Occhi → Studio, si aspetta che lo Studio (o Social) sia davvero chiuso (al massimo 3 s):
+                // iOS non apre gli Occhi o LiDAR mentre un'altra schermata si sta ancora chiudendo.
+                try? await Task.sleep(for: .milliseconds(150))
+                for _ in 0..<60 {
+                    if PaginaMarkX.schermoLibero() { break }
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
                 if lidar { LidarAperta.richiesta = (.oggetto, nil) }       // LiDAR parte già su Oggetto
                 apriReparto(lidar ? .lidar : .occhi)
             }
