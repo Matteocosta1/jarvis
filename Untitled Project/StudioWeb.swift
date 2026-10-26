@@ -167,7 +167,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "parla":
             if let t = o["testo"] as? String, !t.isEmpty { parla(t) }
         case "chiudi":
-            salvaOra(); chiudi()
+            salvaOra(); congelaEChiudi()
         case "pronta":                                                   // la sezione è aperta e disegnata: via il caricamento
             pronta()
         case "presa":                                                    // il dito lavora nella pagina: niente chiusura trascinando
@@ -275,6 +275,25 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             let t = dettatura.testo.trimmingCharacters(in: .whitespacesAndNewlines)
             if !t.isEmpty { esegui("window.STUDIO_ATTIVO && window.STUDIO_ATTIVO.voce(\(RegiaStudio.js(t)))") }
         default: break
+        }
+    }
+
+    /// 26 ott sera (il signore: «c'è ancora il nero quando chiudi»): durante la chiusura il WKWebView smette di disegnare (è fuori
+    /// dalla finestra o viene smontato prima della fine dell'animazione) e la scheda scendeva vuota, nera. Prima di chiudere si
+    /// fotografa la pagina e la foto resta sopra: scende la pagina com'era, poi la scheda si chiude.
+    private func congelaEChiudi() {
+        guard let w = web, w.window != nil else { chiudi(); return }
+        let conf = WKSnapshotConfiguration()
+        conf.afterScreenUpdates = false
+        w.takeSnapshot(with: conf) { [weak self] immagine, _ in
+            if let immagine, let w = self?.web {
+                let foto = UIImageView(image: immagine)
+                foto.frame = w.bounds
+                foto.contentMode = .scaleToFill
+                foto.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                w.addSubview(foto)
+            }
+            self?.chiudi()
         }
     }
 
