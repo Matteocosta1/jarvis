@@ -929,24 +929,24 @@ nonisolated enum Salute {
         }
     }
 }
-/// Un testo che compare decodificandosi, come le lettere della chat: da sinistra a destra i simboli diventano lettere (0,35 s, veloce),
-/// di nuovo a ogni cambio (es. «ACQUISIZIONE DATI» → «PRONTA»). Finito, si ferma: niente lavoro inutile.
+/// 27 ott (il signore: «più alla Stark, scritte che arrivano in trasparenza dal lato»): la scritta sotto il nome della sezione
+/// entra da destra, sfocata e trasparente, e si posa nitida (0,35 s); quella di prima resta leggibile almeno 0,7 s, poi esce a
+/// sinistra sfumando e arriva la nuova. Poi si ferma.
 struct TestoCodice: View {
     let testo: String
     @State private var mostrato = ""                 // la scritta che si vede (la nuova arriva solo dopo che la vecchia si è letta)
-    @State private var inizio = Date()
-    @State private var fermo = false
+    @State private var dentro = false                // posata (nitida, al suo posto) o fuori (trasparente, spostata, sfocata)
+    @State private var daSinistra = false            // in uscita va a sinistra, in entrata arriva da destra
     @State private var lettaDa = Date.distantPast    // da quando la scritta mostrata è tutta leggibile
     @State private var voluta = ""                   // l'ultima scritta chiesta (se cambia ancora durante l'attesa, vale quella)
-    private static let simboli = Array("ABCDEF0123456789#%&*<>/=+")
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: fermo)) { t in
-            Text(fermo ? mostrato : TestoCodice.mescola(mostrato, min(1, t.date.timeIntervalSince(inizio) / 0.35)))
-        }
-        .onAppear { mostra(testo, attesa: 0) }
-        // 27 ott (il signore): prima si deve leggere la scritta di prima (almeno 0,7 s ferma), poi la nuova si decodifica e si ferma
-        .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
+        Text(mostrato)
+            .opacity(dentro ? 1 : 0)
+            .offset(x: dentro ? 0 : (daSinistra ? -10 : 14))
+            .blur(radius: dentro ? 0 : 2.5)
+            .onAppear { mostra(testo, attesa: 0) }
+            .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
     }
 
     private func mostra(_ nuovo: String, attesa: Double) {
@@ -954,18 +954,18 @@ struct TestoCodice: View {
         Task { @MainActor in
             if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
             guard nuovo == voluta else { return }                      // nel frattempo è cambiata ancora: vale l'ultima
-            mostrato = nuovo; inizio = Date(); fermo = false
-            let mio = inizio
-            try? await Task.sleep(for: .milliseconds(400))
-            if inizio == mio { fermo = true; lettaDa = Date() }
+            if !mostrato.isEmpty {                                     // la vecchia esce a sinistra, sfumando
+                daSinistra = true
+                withAnimation(.easeIn(duration: 0.15)) { dentro = false }
+                try? await Task.sleep(for: .milliseconds(160))
+                guard nuovo == voluta else { return }
+            }
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) { mostrato = nuovo; daSinistra = false; dentro = false }   // pronta fuori, a destra
+            withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { dentro = true }
+            try? await Task.sleep(for: .milliseconds(360))
+            if nuovo == voluta { lettaDa = Date() }
         }
-    }
-
-    private static func mescola(_ s: String, _ p: Double) -> String {
-        let c = Array(s), n = max(1, c.count)
-        return String(c.enumerated().map { i, ch in
-            ch == " " || Double(i) / Double(n) < p ? ch : simboli.randomElement() ?? ch
-        })
     }
 }
 #endif
