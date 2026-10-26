@@ -20,6 +20,8 @@ struct CorniceScheda<Contenuto: View>: View {
     /// solo quando il contenuto le passa sotto. Acceso, lo sfondo della barra lo decide lo scorrimento vero della pagina:
     /// trasparente in cima, quello di iOS appena si scorre. Così è uguale alle altre. Spento (tutte le altre): come sempre.
     var barraDalloScorrimento = false
+    /// 26 ott notte (il signore, «JARVIS Music»): la testata come Studio e Social, «J.A.R.V.I.S.» e sotto il nome della sezione.
+    var marchio = false
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.dismiss) private var chiudi
     @State private var mostrato = false
@@ -35,7 +37,7 @@ struct CorniceScheda<Contenuto: View>: View {
                     .ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta)
+                        TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : "acquisizione dati", icona: icona, tinta: tinta, marchio: marchio)
                         if mostrato {
                             contenuto()
                                 .mask(alignment: .top) {
@@ -99,6 +101,8 @@ struct TestataScheda: View {
     let sottotitolo: String
     let icona: String
     let tinta: Color
+    /// Come Studio e Social: «J.A.R.V.I.S.» in ciano, sotto il nome della sezione (vedi CorniceScheda.marchio).
+    var marchio = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -125,9 +129,15 @@ struct TestataScheda: View {
             .frame(width: 40, height: 40)          // 26 ott notte (il signore): le icone animate delle sezioni più piccole (prima 52)
             .shadow(color: tinta.opacity(0.5), radius: 10)
             VStack(alignment: .leading, spacing: 3) {
-                Text(titolo.uppercased())
-                    .font(.system(size: 24, weight: .bold, design: .monospaced)).tracking(3)
-                    .foregroundStyle(.white)
+                if marchio {
+                    Text("J.A.R.V.I.S.")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
+                        .foregroundStyle(tinta)
+                } else {
+                    Text(titolo.uppercased())
+                        .font(.system(size: 24, weight: .bold, design: .monospaced)).tracking(3)
+                        .foregroundStyle(.white)
+                }
                 Text(sottotitolo.uppercased())
                     .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
                     .foregroundStyle(tinta)
