@@ -42,8 +42,7 @@ struct Allenatore: View {
                 HStack {
                     AnelloOcchi(icona: "figure.pilates", tinta: Color.ciano)      // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("J.A.R.V.I.S.").font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
-                        Text("PERSONAL TRAINER").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.7)
+                        Text("PERSONAL TRAINER").font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)   // 26 ott notte: solo «Personal Trainer»
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer()
