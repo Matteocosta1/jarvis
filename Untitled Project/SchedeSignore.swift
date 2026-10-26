@@ -147,7 +147,7 @@ struct TestataScheda: View {
                         .foregroundStyle(tinta)
                 } else {
                     Text(titolo.uppercased())
-                        .font(.system(size: 24, weight: .bold, design: .monospaced)).tracking(3)
+                        .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 27 ott: nome della sezione più piccolo (prima 24)
                         .foregroundStyle(titoloColorato ? tinta : .white)
                 }
                 Text(sottotitolo.uppercased())
