@@ -46,9 +46,9 @@ sost("""window.OCCHI_PER_SOCIAL = false; window.SOCIAL_DA = { foto: f.foto, da: 
       parlaMock(`Video di ${s} secondi, Sir: lo porto a Social.`, 1800); window.OCCHI_PER_SOCIAL = false;
       window.SOCIAL_DA = { foto: f.foto, da: "occhi", video: s, dida: window.SOC_DIDA }; await attesa(500); $("chiudiSez").click(); await attesa(450); apriSezione("Social"); }, aggancia:""")
 
-# Social › OCCHI: la didascalia scritta resta; JARVIS dice come si fa foto e video
+# Social › OCCHI: la didascalia scritta resta; JARVIS non dice niente (deciso dal signore)
 sost("""window.OCCHI_PER_SOCIAL = true; parlaMock("Apro gli Occhi, Sir: inquadri e scatti, la foto torna qui.", 2600);""",
-     """window.OCCHI_PER_SOCIAL = true; window.SOC_DIDA = didascalia; parlaMock("Apro gli Occhi, Sir: scatto per una foto, REC per un video.", 2800);""")
+     """window.OCCHI_PER_SOCIAL = true; window.SOC_DIDA = didascalia;""")
 
 # arrivati in Social: «DOVE LA METTO?»
 sost("""  const da = window.SOCIAL_DA; window.SOCIAL_DA = null;

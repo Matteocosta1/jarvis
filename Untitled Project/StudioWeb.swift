@@ -250,7 +250,6 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "socialFoto":
             if o["da"] as? String == "occhi" {                           // 26 ott sera: OCCHI apre gli Occhi di JARVIS, lo scatto torna qui
                 OcchiAperti.socialAcceso = true
-                parla("Apro gli Occhi, Sir: inquadri e scatti, la foto torna a Social.")
                 salvaOra()
                 NotificationCenter.default.post(name: .jarvisVaiA, object: nil, userInfo: ["dove": "occhi"])
             } else {
