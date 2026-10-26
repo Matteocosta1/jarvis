@@ -15,11 +15,17 @@ struct CorniceScheda<Contenuto: View>: View {
     let tinta: Color
     var pronto = true
     var fotocamera = false          // Scanner: quando è pronta, il suono delle sezioni con fotocamera al posto di «pronta»
+    /// 26 ott sera (SATELLITE, foto del signore 22:07): appena compariva la mappa 3D, iOS dava alla barra in alto (quella di
+    /// «Chiudi») lo sfondo grigio anche con la pagina ferma in cima; nelle altre schede in cima è trasparente e diventa grigia
+    /// solo quando il contenuto le passa sotto. Acceso, lo sfondo della barra lo decide lo scorrimento vero della pagina:
+    /// trasparente in cima, quello di iOS appena si scorre. Così è uguale alle altre. Spento (tutte le altre): come sempre.
+    var barraDalloScorrimento = false
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.dismiss) private var chiudi
     @State private var mostrato = false
     @State private var stampa: CGFloat = 0           // quanto della scheda è già «stampato» (0 → 1)
     @State private var apertaDa = Date()
+    @State private var scorsa = false                // il contenuto passa sotto la barra in alto (solo con barraDalloScorrimento)
 
     var body: some View {
         NavigationStack {
@@ -59,6 +65,7 @@ struct CorniceScheda<Contenuto: View>: View {
                 }
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .scrollDismissesKeyboard(.interactively)
+                .modifier(OsservaCima(attivo: barraDalloScorrimento, scorsa: $scorsa))
                 if !mostrato {
                     CaricamentoHUD(titolo: titolo, tinta: tinta)
                         .padding(.top, 120)
@@ -67,6 +74,7 @@ struct CorniceScheda<Contenuto: View>: View {
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .modifier(SfondoBarra(attivo: barraDalloScorrimento, visibile: scorsa))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) }
             }
@@ -91,15 +99,19 @@ struct TestataScheda: View {
     let sottotitolo: String
     let icona: String
     let tinta: Color
-    @State private var gira = false
 
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
                 Circle().stroke(tinta.opacity(0.25), lineWidth: 1)
-                Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(gira ? 360 : 0))
-                    .animation(.linear(duration: 3).repeatForever(autoreverses: false), value: gira)
+                // 26 ott sera (SATELLITE, foto del signore 22:07: un mezzo cerchio che gira per la pagina): l'arco girava con
+                // un'animazione infinita accesa all'apertura; se nello stesso istante la pagina si spostava (la salita, la barra
+                // in alto) iOS ripeteva all'infinito anche lo spostamento e l'arco vagava fuori dall'anello. Ora l'angolo lo dà
+                // l'orologio: stesso arco, un giro ogni 3 secondi, sempre centrato sull'icona, in tutte le schede.
+                TimelineView(.animation) { t in
+                    Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
+                }
                 if icona == "satellite" {                   // build 23: disegnata come nel mockup
                     IconaSatellite(lato: 22).font(.system(size: 20, weight: .medium)).foregroundStyle(tinta)
                 } else if icona == "vinile" {               // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
@@ -123,7 +135,44 @@ struct TestataScheda: View {
             Spacer(minLength: 0)
         }
         .padding(.bottom, 4)
-        .onAppear { gira = true }
+    }
+}
+
+/// Vedi CorniceScheda.barraDalloScorrimento: segue lo scorrimento vero della pagina (da iOS 18; prima resta in cima).
+private struct OsservaCima: ViewModifier {
+    let attivo: Bool
+    @Binding var scorsa: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if attivo {
+            if #available(iOS 18.0, *) {
+                content.onScrollGeometryChange(for: Bool.self) { g in
+                    g.contentOffset.y + g.contentInsets.top > 0.5            // in cima la somma è zero
+                } action: { _, sotto in
+                    withAnimation(.easeInOut(duration: 0.2)) { scorsa = sotto }
+                }
+            } else {
+                content
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// Vedi CorniceScheda.barraDalloScorrimento: lo sfondo della barra in alto, trasparente in cima, quello di iOS sotto.
+private struct SfondoBarra: ViewModifier {
+    let attivo: Bool
+    let visibile: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if attivo {
+            content.toolbarBackground(visibile ? .visible : .hidden, for: .navigationBar)
+        } else {
+            content
+        }
     }
 }
 

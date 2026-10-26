@@ -6,6 +6,7 @@ import SwiftUI
 /// Azzurro quando aspetta e ascolta; diventa un'intelligenza arancione, più agitata, quando pensa e parla.
 struct Reattore: View {
     let fase: Fase
+    @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
 
     @State private var calore: Double = 0          // 0 = azzurro, 1 = arancione (valore di partenza della transizione)
     @State private var obiettivo: Double = 0
@@ -40,7 +41,7 @@ struct Reattore: View {
     private static let arancio = (r: 1.00, g: 0.47, b: 0.10)
 
     var body: some View {
-        TimelineView(.animation) { ctx in
+        TimelineView(.animation(paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let mix = miscela(adesso: ctx.date)
             Canvas { gc, size in
@@ -270,8 +271,9 @@ struct Reattore: View {
 /// Sfondo animato: un bagliore che respira lentamente, del colore della fase.
 struct SfondoHUD: View {
     let fase: Fase
+    @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 20, paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let caldo = fase == .elaboro || fase == .parlo
             let base = caldo ? Color(red: 0.20, green: 0.08, blue: 0.02) : Color(red: 0.02, green: 0.13, blue: 0.13)

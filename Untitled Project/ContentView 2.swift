@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var mostraImpostazioni = false
     @State private var mostraBrowser = false
     @State private var aperturaPagina: AperturaPagina?   // MARK X: STUDIO e SOCIAL, la pagina del mockup (icone in alto, voce, Occhi)
+    @State private var stratoCopre = false               // Studio o Social su del tutto: JARVIS sotto si ferma (vedi jarvisCoperto)
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
@@ -236,7 +237,21 @@ struct ContentView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(!tendinaAperta && tendinaLibera)
                 tendina(g)
+                // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
+                // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
+                // scendono con la curva del mockup e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
+                if let a = aperturaPagina {
+                    StratoPagina(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) },
+                                 chiudi: { durata in abbassaPagina(durata) },
+                                 jarvisSiVede: { siVede in if aperturaPagina?.id == a.id { stratoCopre = !siVede } })
+                        .environment(\.jarvisCoperto, false)
+                        .id(a.id)
+                        .transition(.move(edge: .bottom))
+                        .zIndex(30)
+                }
             }
+            .environment(\.jarvisCoperto, stratoCopre)
+            .onChange(of: aperturaPagina?.id) { _, id in if id == nil { stratoCopre = false } }   // senza strato JARVIS gira sempre
             .frame(width: g.size.width, height: g.size.height)
             .defersSystemGestures(on: .top)                 // il dito che tira giù la tendina non apre il Centro notifiche di iOS
         }
@@ -265,21 +280,21 @@ struct ContentView: View {
         }) { ImpostazioniView().environmentObject(jarvis).paginaPiena() }
         .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().paginaPiena() }
         .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
-        // Studio e Social come tutte le altre schede: pagina piena, «Chiudi» o trascinando giù dall'alto, JARVIS sotto (niente nero)
-        .fullScreenCover(item: $aperturaPagina) { a in
-            VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }).paginaPiena()
-        }
+        // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
             // 26 ott (Occhi → Studio che non si apriva): iOS non apre una schermata mentre un'altra si sta ancora chiudendo
             // (gli Occhi, LiDAR). Si aspetta che sia davvero chiusa (al massimo 3 s), poi si apre lo Studio o Social.
             Task { @MainActor in
-                if aperturaPagina != nil { aperturaPagina = nil }     // ce n'è già una aperta: si chiude e si riapre con la nuova
+                if aperturaPagina != nil {                         // ce n'è già una aperta: scende, poi sale la nuova
+                    abbassaPagina()
+                    try? await Task.sleep(for: .milliseconds(400))
+                }
                 for _ in 0..<60 {
                     if PaginaMarkX.schermoLibero() { break }
                     try? await Task.sleep(for: .milliseconds(50))
                 }
-                aperturaPagina = a
+                alzaPagina(a)
             }
         }
         .onOpenURL { url in                                 // MARK X · i tasti della Dynamic Island (it.discosizer.jarvis://isola/…)
@@ -297,7 +312,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisVaiA)) { n in   // LIDAR e OCCHI dello Studio: quelli veri
             let lidar = n.userInfo?["dove"] as? String == "lidar"
-            aperturaPagina = nil
+            if aperturaPagina != nil { abbassaPagina() }      // di solito è già scesa (scendiPoi)
             Task { @MainActor in
                 // 26 ott sera: come Occhi → Studio, si aspetta che lo Studio (o Social) sia davvero chiuso (al massimo 3 s):
                 // iOS non apre gli Occhi o LiDAR mentre un'altra schermata si sta ancora chiudendo.
@@ -693,7 +708,7 @@ struct ContentView: View {
                 .accessibilityHidden(true)                          // per VoiceOver c'è il reattore stesso («Chiudi la tastiera»)
             }
             // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); aperturaPagina = AperturaPagina(sezione: "Social") } label: {
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Social")) } label: {
                 IconaSocial()
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
@@ -714,7 +729,7 @@ struct ContentView: View {
             .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); aperturaPagina = AperturaPagina(sezione: "Studio") } label: {
+            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Studio")) } label: {
                 IconaStudio()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
@@ -1140,6 +1155,22 @@ struct ContentView: View {
         jarvis.occhiChiusi([])
     }
 
+    /// 26 ott sera: Studio o Social salgono come strato sopra JARVIS (StratoPagina), con la curva del mockup. A salita finita
+    /// JARVIS sotto è tutto coperto e le sue animazioni si fermano (jarvisCoperto).
+    private func alzaPagina(_ a: AperturaPagina) {
+        withAnimation(StratoPagina.curva()) { aperturaPagina = a }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            if aperturaPagina?.id == a.id { stratoCopre = true }
+        }
+    }
+
+    /// Lo strato di Studio o Social scende e poi sparisce; JARVIS sotto riparte subito, così scendendo si vede vivo.
+    private func abbassaPagina(_ durata: Double = 0.35) {
+        stratoCopre = false
+        withAnimation(StratoPagina.curva(durata)) { aperturaPagina = nil }
+    }
+
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
     private func apriReparto(_ r: Reparto) {
         let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
@@ -1455,8 +1486,9 @@ struct ContentView: View {
 /// più veloci quando JARVIS pensa, arancioni quando lavora. Puro contorno: il reattore resta il cuore.
 struct AnelliHUD: View {
     let fase: Fase
+    @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let caldo = fase == .elaboro || fase == .parlo
             let fretta: Double = fase == .elaboro ? 2.2 : (fase == .ascolto ? 1.4 : 1)

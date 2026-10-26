@@ -19,8 +19,8 @@ import SafariServices
 struct VistaStudio: View {
     var apertura = AperturaPagina(sezione: "Studio")
     let parla: (String) -> Void
-    @Environment(\.dismiss) private var chiudi
-    @Environment(\.chiudiPagina) private var chiudiPagina      // scende da sola, senza nero (PaginaPiena)
+    /// «Chiudi» (della pagina), e prima degli Occhi o del LiDAR: lo strato scende sopra JARVIS e poi sparisce (StratoPagina).
+    let chiudi: () -> Void
     /// 26 ott sera (il signore: «si devono aprire come le altre app»): l'apertura di tutte le schede di JARVIS (il caricamento
     /// con anelli e mirino, i suoni di apertura e di pronta), poi la pagina già disegnata. Prima si vedeva la pagina mentre si
     /// caricava (un lampo bianco, poi nero). Il caricamento resta almeno quanto nelle altre schede e finché la pagina non è pronta.
@@ -31,7 +31,7 @@ struct VistaStudio: View {
     /// è della pagina. Lo dice la pagina al tocco (messaggio «presa»).
     @State private var presa = false
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: { if let chiudiPagina { chiudiPagina() } else { chiudi() } }, pronta: { scopri() }, presa: { presa = $0 })
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 })
             .background(Color.fondo)
             .ignoresSafeArea()
             .overlay {
