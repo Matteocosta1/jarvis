@@ -141,14 +141,21 @@ Deno.serve(async (req) => {
   const formato = corpo.formato === "wav" ? "wav" : "m4a";
 
   const t0 = Date.now();
-  // 1) Scribe, come il cervello: la sua risposta (anche vuota) è quella buona
+  // 1) Scribe, come il cervello. 26 ott: se torna VUOTO non vale più subito — si prova la riserva (Groq/Gemini, col filtro
+  //    delle frasi inventate): al polso tutte le frasi tornavano vuote e il signore restava senza risposta.
+  //    Diagnosi (temporanea): l'audio vuoto si salva nel bucket privato «diagnosi-ascolto» per controllare se c'è voce.
+  let vuotoScribe: any = null;
   if (eleven) {
     const e = await conElevenLabs(audio, formato, eleven);
     if (!("errore" in e)) {
       console.log(`ascolto: elevenlabs ${Date.now() - t0} ms, ${e.testo.length} caratteri, audio ${audio.length} byte`);
-      return json(e);
-    }
-    console.log(`ascolto: elevenlabs non riuscito (${Date.now() - t0} ms): ${e.errore}`);
+      if (e.testo) return json(e);
+      vuotoScribe = e;
+      const URL_DB = Deno.env.get("SUPABASE_URL") ?? "", KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      if (URL_DB && KEY) await fetch(`${URL_DB}/storage/v1/object/diagnosi-ascolto/${Date.now()}.${formato}`, {
+        method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, "content-type": tipoAudio(formato) }, body: audio,
+      }).catch(() => {});
+    } else console.log(`ascolto: elevenlabs non riuscito (${Date.now() - t0} ms): ${e.errore}`);
   }
   // 2) riserva: Groq e Gemini in gara; vince il primo che trascrive. Una risposta vuota vale come «niente parole».
   const errori: string[] = [];
@@ -168,7 +175,7 @@ Deno.serve(async (req) => {
     return json(e);
   } catch { /* nessuno ha trascritto qualcosa in tempo */ }
   console.log(`ascolto: nessun testo dalla riserva (${Date.now() - t0} ms) ${errori.join(" · ").slice(0, 300)}`);
-  if (vuoto) return json(vuoto);
+  if (vuoto || vuotoScribe) return json(vuoto ?? vuotoScribe);
   if (!errori.length) errori.push("nessun servizio di trascrizione ha risposto in tempo");
   return json({ errore: errori.join(" · ") }, 502);
 });
