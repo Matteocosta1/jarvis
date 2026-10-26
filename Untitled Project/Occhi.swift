@@ -75,6 +75,7 @@ struct Occhi: View {
     @State private var scattando = false
     @State private var chiuso = false
     @State private var agganciato = false
+    @State private var modoVisto = false            // 27 ott: la scritta di caricamento sotto OCCHI è passata, ora il modo
     @State private var registrando = false
     /// 26 ott sera: il video per Social (REC con gli Occhi aperti da Social).
     @State private var filmando = false
@@ -93,7 +94,7 @@ struct Occhi: View {
     @State private var ultimoTocco = Date()
     /// Cucina: 0 cosa cucino con quello che vedo, 1 che piatto è (e la ricetta), 2 valori nutrizionali.
     @AppStorage("cucinaModo") private var modoCucina = 0
-    static let richiesteCucina = ["COSA CUCINO", "CHE PIATTO È", "VALORI"]
+    static let richiesteCucina = ["RICETTE", "CHE PIATTO È", "VALORI"]   // 27 ott: «cosa cucino» → RICETTE
     private var tinta: Color { Color.ciano }
     // BUILD 23 — gli Occhi alla Stark (solo gli Occhi manuali): riconoscimento, ologramma, CERCA
     @StateObject private var stark = StatoOcchi()
@@ -215,10 +216,23 @@ struct Occhi: View {
                         Text(cucina ? "CUCINA" : "OCCHI")
                             .font(.system(size: 18, weight: .bold, design: .monospaced))
                             .tracking(3)
-                        Text(cucina ? (video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])
-                                    : (video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE"))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .tracking(2)
+                        // 27 ott (il signore): appena tolto il caricamento arriva la scritta della sezione con l'animazione delle
+                        // altre (TestoCodice), si legge, scorre via e arriva il modo (MANUALE…), che resta
+                        ZStack(alignment: .leading) {
+                            Text(" ").hidden()
+                            if agganciato {
+                                TestoCodice(testo: modoVisto ? (cucina ? (video ? "GIRO DEL FRIGO" : Occhi.richiesteCucina[min(modoCucina, 2)])
+                                                                       : (video ? "GIRO" : automatico ? "AUTOMATICO" : "MANUALE"))
+                                                             : TestiCaricamento.di(cucina ? "Cucina" : "Occhi").uppercased())
+                            }
+                        }
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .tracking(2)
+                        .task(id: agganciato) {
+                            guard agganciato, !modoVisto else { return }
+                            try? await Task.sleep(for: .milliseconds(1300))
+                            modoVisto = true
+                        }
                         if manualeStark {
                             // sotto OCCHI · MANUALE, piccolo, quello che vede (come i sistemi all'avvio)
                             RigheOcchi(righe: righeInfo)

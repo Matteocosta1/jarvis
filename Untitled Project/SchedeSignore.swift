@@ -974,7 +974,7 @@ enum TestiCaricamento {
     private static let testi: [String: String] = [
         "meteo": "aggancio satelliti meteo", "email": "decrittazione posta", "messaggi": "sintonizzazione frequenze",
         "diario": "apertura archivio personale", "sonno": "lettura cicli notturni", "cuore": "sincronizzazione battito",
-        "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "calibrazione microfoni",
+        "briefing": "compilazione rapporto", "spesa": "inventario dispensa", "shazam": "scansione spettro sonoro",
         "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
         "bea": "protective instinct", "github": "sincronizzazione repository", "supabase": "interrogazione database",
         "archivio": "accesso al caveau", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
