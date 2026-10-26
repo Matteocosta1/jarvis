@@ -6263,7 +6263,7 @@ function studio(ok) {
   const nomeProg = () => { let n = ARCH.progetti.length + 1; while (ARCH.progetti.some((p) => p.nome === `Progetto ${n}`)) n++; return `Progetto ${n}`; };
   const nuovoRecord = (nome) => { const p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), nome: nome || nomeProg(), creato: Date.now(), data: Date.now(), oggetti: [], num: 0, geo: {} }; ARCH.progetti.unshift(p); ARCH.attivo = p.id; return p; };
   const miniatura = (cb) => { if (!B || !A.isConnected) return cb(null); const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = 160; c.height = Math.round(160 * im.height / im.width) || 120; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", .72)); }; im.onerror = () => cb(null); try { im.src = B.istantanea(); } catch { cb(null); } };
-  const titoloProg = () => { if (Date.now() < sdDopo) { setTimeout(titoloProg, sdDopo - Date.now()); return; } const t = $sd("prog"); if (t) t.textContent = `STUDIO · ${(progAtt()?.nome || "BANCO OLOGRAFICO").toUpperCase()}`; };
+  const titoloProg = () => { if (Date.now() < sdDopo) { setTimeout(titoloProg, sdDopo - Date.now()); return; } const t = $sd("prog"); if (t) t.textContent = progAtt()?.nome ? `STUDIO · ${progAtt().nome.toUpperCase()}` : "CREATIVE STUDIO"; };
   function salvaSubito(conMini, esplicito) { clearTimeout(tSalva); if (caricando) return progAtt(); let p = progAtt(); if (!p) { if (!oggetti.length) return null; p = nuovoRecord(); }
     p.oggetti = copia(); p.num = num; p.geo = geoDi(oggetti); p.data = Date.now();
     if (esplicito) { p.copia = { oggetti: p.oggetti, num: p.num, geo: p.geo, data: p.data }; p.modificato = false; }
