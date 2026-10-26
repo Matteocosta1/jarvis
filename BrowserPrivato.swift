@@ -657,7 +657,7 @@ struct VistaCronologiaBrowser: View {
     }
 }
 /// Gli angoli olografici del visore (come il mirino delle altre sezioni): quattro L ciano sui bordi della pagina.
-private struct AngoliOlo: View {
+struct AngoliOlo: View {
     let tinta: Color
     var body: some View {
         GeometryReader { g in

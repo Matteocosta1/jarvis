@@ -97,6 +97,7 @@ struct VistaConfidente: View {
                         .background(Color.ciano.opacity(0.05))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 0.8))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))   // 27 ott: la cornice olografica
 
                         TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
                             .lineLimit(1...3)
