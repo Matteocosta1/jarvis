@@ -265,8 +265,10 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
       document.head.appendChild(st);
       if (typeof window.parlaMock === 'function') { var o = window.parlaMock; window.parlaMock = function(t){ post({ tipo: 'parla', testo: String(t) }); return o.apply(this, arguments); }; }
       var sez = document.getElementById('sezione');
+      var aperta = false;
+      if (sez) new MutationObserver(function(){ if (sez.classList.contains('su')) aperta = true; else if (aperta) { aperta = false; post({ tipo: 'chiudi' }); } }).observe(sez, { attributes: true, attributeFilter: ['class'] });
       if (typeof window.apriSezione === 'function') window.apriSezione('Studio');
-      var aperta = false; if (sez) new MutationObserver(function(){ if (sez.classList.contains('su')) aperta = true; else if (aperta) post({ tipo: 'chiudi' }); }).observe(sez, { attributes: true, attributeFilter: ['class'] });
+      if (sez && sez.classList.contains('su')) aperta = true;
     })();
     """
 }
