@@ -177,7 +177,7 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - ✗ Linguetta grigia sotto la Dynamic Island: è quella di iOS, per `.defersSystemGestures(on: .top)` (limite di Apple, decisione del signore).
 - ✓ Satellite: barra trasparente in cima.
 
-## Per la prossima build (dopo la 11) — correzioni già su GitHub (f2f2d55)
+## 10.0 (12) — 26 ott 23:30 = la 11 + correzioni f2f2d55 (Studio/Social nero, titolo che vola)
 - Studio/Social: tocco sul «Chiudi» della testata (Studio anche dopo «Salvare in archivio?», non con ANNULLA) → lo strato scende subito con la pagina com'è; i passaggi dentro la pagina restano come prima.
 - Titolo: un testo solo, misura scelta sul posto libero accanto alle icone (le misure contate a parte, nascoste); niente più ViewThatFits.
 - Numero di build da confermare col signore (la 11 è già su TestFlight).
