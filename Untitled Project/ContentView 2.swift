@@ -224,18 +224,8 @@ struct ContentView: View {
                     // tornato dal layout largo (iPhone girato) a tastiera chiusa: il reattore grande al suo posto
                     .onAppear { if telefono { reattoreGrande = !tastiera } }
                 }
-                // 26 ott sera (foto del signore, 21:42): lo swipe giù partito dal bordo in alto (sopra l'ora) non trovava nessuno che lo
-                // prendesse: iOS mostrava la sua linguetta e restava lì, la tendina non scendeva. Ora anche la fascia dell'ora tira giù
-                // la tendina PROTOCOLLI, come nel mockup (lo swipe dall'alto apre i protocolli).
-                VStack(spacing: 0) {
-                    Color.clear
-                        .frame(height: g.safeAreaInsets.top + 8)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(tiraGiuTendina)
-                    Spacer(minLength: 0)
-                }
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(!tendinaAperta && tendinaLibera)
+                // 26 ott notte (il signore): lo swipe giù dal bordo in alto è di iOS (Centro notifiche), senza linguetta; i PROTOCOLLI
+                // scendono con lo swipe giù da metà pagina (titolo, reattore e corona, testi). Tolta la fascia dell'ora che li apriva.
                 tendina(g)
                 // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
                 // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
