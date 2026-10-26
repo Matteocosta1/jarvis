@@ -118,6 +118,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var colpiAggiunta = 0
     private var livelloAggiunta: Float?
     private var fondoAggiunta: Float = -60
+    /// 26 ott sera: l'ascolto è partito da solo in attesa (non toccando il reattore): si conferma con le parole prima di reagire.
+    private var daAttesa = false
+    private var provaSilenziosa: UUID?
     /// 26 ott sera (deciso dal signore): sentita una voce nei 2 secondi dopo la domanda, l'orologio la registra IN SILENZIO
     /// (niente bip, niente «Trascrivo», la domanda va avanti) finché il signore tace; poi la trascrive. Solo se ci sono parole
     /// vere ferma la domanda e la unisce all'aggiunta. Prima un rumore bastava a fermare tutto: bip, «Trascrivo» e 0 caratteri.
@@ -459,6 +462,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// `limiteInizio`: quanto aspettare che cominci a parlare; `aspetta`: ascolto dopo «aspetta» (se tace: «Mi dica, Sir»)
     /// o dopo «Mi dica, Sir» (se tace: torna in attesa in silenzio).
     private func ascolta(automatico auto: Bool = false, limiteInizio limite: TimeInterval = 7, aspetta: DopoAspetta = .no) async {
+        daAttesa = false                                 // ascolto chiesto (tocco, voce, complicazione): reagisce come sempre
+        provaSilenziosa = nil
         guard await AVAudioApplication.requestRecordPermission() else {
             stato = "Mi serve il microfono, Sir: lo attivi in Impostazioni › Privacy e sicurezza › Microfono."
             return
@@ -581,6 +586,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         r.stop()
         registratore = nil
         let audio = try? Data(contentsOf: r.url)        // letto subito: il microfono dell'aggiunta registra già su un altro file
+        if daAttesa { daAttesa = false; trascriviInSilenzio(audio); return }
         WKInterfaceDevice.current().play(.stop)
         fase = .elaboro
         stato = "Trascrivo…"
@@ -868,16 +874,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
         livelloAttesa = l
         fondoAttesa = min(l, (fondoAttesa ?? l) + 0.08)
         // la stessa regola dell'inizio frase: sopra la soglia (rumore +9 e vicino alla sua voce abituale) per 0,4 s di fila
-        if l > sogliaVoce(fondo: fondoAttesa!, margine: 9) { colpiAttesa += 1 } else { colpiAttesa = 0 }
-        if colpiAttesa >= 2 {
+        // 26 ott sera (il signore: «deve ripartire solo con la voce»): più netta di prima (rumore +12 invece di +9, 0,6 s di fila
+        // invece di 0,4): un colpo, un bicchiere, una porta non bastano più. Niente vibrazione qui: il bip arriva solo se c'erano parole.
+        if l > sogliaVoce(fondo: fondoAttesa!, margine: 12) { colpiAttesa += 1 } else { colpiAttesa = 0 }
+        if colpiAttesa >= 3 {
             // il signore parla: lo stesso registratore (che l'ha preso dall'inizio) continua come ascolto normale
             timerAttesa?.invalidate()
             timerAttesa = nil
             attesaRec = nil
             fondo = fondoAttesa
             dopoAspetta = .no
-            WKInterfaceDevice.current().play(.start)
             continuaAscolto(r)
+            daAttesa = true                              // partito da solo: si trascrive in silenzio, si va avanti solo con parole vere
             return
         }
         // niente voce da 6 secondi: il silenzio registrato si butta e si riparte, così quando parla va solo la sua frase
@@ -885,6 +893,36 @@ final class JarvisOrologio: NSObject, ObservableObject {
             r.stop()
             r.deleteRecording()
             if let nuovo = registratoreAttesa() { attesaRec = nuovo; inizioAttesa = Date() } else { chiudiAttesa() }
+        }
+    }
+
+    /// 26 ott sera: la frase partita da sola in attesa (nessun tocco) si trascrive senza bip e senza «Trascrivo»; JARVIS resta in
+    /// attesa. Solo se ci sono parole vere fa il bip e va avanti come sempre; un rumore (0 parole, «ah», «mh») si butta in silenzio.
+    private func trascriviInSilenzio(_ audio: Data?) {
+        fase = .attesa
+        stato = nil
+        let token = PortachiaviOrologio.leggi()
+        guard let audio, audio.count > 1_000, !token.isEmpty else { programmaAttesa(); return }
+        let indirizzo = JarvisOrologio.indirizzoAscolto
+        let mio = UUID()
+        provaSilenziosa = mio
+        programmaAttesa()                                // intanto l'attesa riparte: se parla di nuovo, vale la frase nuova
+        Task { [weak self] in
+            let (testo, errore) = await JarvisOrologio.trascrivi(audio, token: token, indirizzo: indirizzo)
+            guard let self, self.provaSilenziosa == mio, self.fase == .attesa else { return }
+            self.provaSilenziosa = nil
+            let t = (testo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard errore == nil, t.contains(where: { $0.isLetter }), !JarvisOrologio.soloRumore(t) else {
+                self.livelloUltimaFrase = nil            // un rumore: non diventa la sua «voce abituale»
+                return
+            }
+            self.chiudiAttesa()
+            WKInterfaceDevice.current().play(.stop)
+            self.fase = .elaboro
+            self.stato = "Trascrivo…"
+            let prima = self.primaParte
+            self.primaParte = nil
+            self.compito = Task { await self.dopoTrascrizione(Task { TrascrittoOrologio(testo: t, errore: nil, vuoto: false) }, eco: nil, prima: prima) }
         }
     }
 
@@ -900,6 +938,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func chiudiMicrofono() {
         timerAscolto?.invalidate()
         timerAscolto = nil
+        daAttesa = false
         guard let r = registratore else { return }
         r.stop()
         registratore = nil
