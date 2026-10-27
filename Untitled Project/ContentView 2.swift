@@ -755,7 +755,7 @@ struct ContentView: View {
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
                     .padding(.vertical, 9)
-                    .padding(.leading, (mini ? 1 : 2) + 0.7).padding(.trailing, (mini ? 1 : 2) + 0.4)   // spazi a vista uguali (7 punti)
+                    .padding(.leading, (mini ? 1 : 2) + 1.4).padding(.trailing, (mini ? 1 : 2) + 1.1)   // spazi a vista uguali (7 punti, rimisurati sulla foto 02:49)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -776,7 +776,7 @@ struct ContentView: View {
                     .font(.system(size: 13.9))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
-                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.3).padding(.trailing, mini ? 1 : 2)
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.3).padding(.trailing, (mini ? 1 : 2) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
@@ -791,7 +791,7 @@ struct ContentView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14.4))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) + 0.35).padding(.trailing, mini ? 1 : 2)   // foto 02:49: spazio 7
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
