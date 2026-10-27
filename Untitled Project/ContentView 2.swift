@@ -183,6 +183,11 @@ struct ContentView: View {
                         registro
                         barraTesto
                     }
+                    // 27 ott (video del signore 01:34, misurato fotogramma per fotogramma): aprendo la tastiera titolo e icone salivano di
+                    // ~10 punti e ridiscendevano in 0,2 s. Lo spazio si accorcia subito (sale la tastiera) ma il reattore grande lascia
+                    // il posto un attimo dopo: per quell'attimo il contenuto è più alto dello spazio e iOS lo centrava, spingendo su la
+                    // testata. Ancorato in alto, la testata resta ferma (l'eccedenza va in basso, dietro la tastiera che sale).
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
                     .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
                     .onChange(of: tastiera) { _, aperta in
