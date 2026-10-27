@@ -94,7 +94,7 @@ struct Occhi: View {
     @State private var ultimoTocco = Date()
     /// Cucina: 0 cosa cucino con quello che vedo, 1 che piatto è (e la ricetta), 2 valori nutrizionali.
     @AppStorage("cucinaModo") private var modoCucina = 0
-    static let richiesteCucina = ["RICETTE", "CHE PIATTO È", "VALORI"]   // 27 ott: «cosa cucino» → RICETTE
+    static let richiesteCucina = ["RICETTE", "ANALISI PIATTO", "VALORI"]   // 27 ott: «cosa cucino» → RICETTE
     private var tinta: Color { Color.ciano }
     // BUILD 23 — gli Occhi alla Stark (solo gli Occhi manuali): riconoscimento, ologramma, CERCA
     @StateObject private var stark = StatoOcchi()
