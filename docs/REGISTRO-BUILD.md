@@ -200,3 +200,7 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - SISTEMI: niente alone intorno all'icona col menu aperto.
 - Allarme SOS di Bea e bordo d'allarme di Sentinella guidati dall'orologio (niente animazioni infinite).
 - Base: la 10.0 (12), provata: funziona tutto, fluidità a 120 Hz.
+
+### 10.0 (14) · 27 ott notte
+- La 13 sul telefono: il saltino restava (tutta la schermata saliva ~10 pt, video 01:34). Ora sull'iPhone la schermata ignora la tastiera e salgono solo chat e barra (alzoTastiera, stessa durata e curva della tastiera).
+- Icona STUDIO in alto grande come le altre 5 (disegno che riempie il riquadro, 20 pt); mockup uguale.

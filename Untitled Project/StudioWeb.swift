@@ -661,6 +661,9 @@ private final class PonteDebole: NSObject, WKScriptMessageHandler {
 
 /// L'icona STUDIO del mockup (il cubo a tasselli con i tre assi), disegnata uguale.
 struct IconaStudio: View {
+    /// 27 ott (il signore: «l'icona di Studio è troppo piccola rispetto alle altre 5»): in alto il disegno riempie il suo riquadro
+    /// (il cubo con gli assi, non il quadrato da 24 con i margini), così pesa come le altre icone.
+    var pieno = false
     private static func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x, y: y) }
     private static let tasselli: [(Double, [[CGPoint]])] = [
         (0.68, [[P(12.19, 13.81), P(14.21, 12.64), P(14.21, 14.98), P(12.19, 16.15)], [P(12.19, 16.6), P(14.21, 15.43), P(14.21, 17.77), P(12.19, 18.94)], [P(12.19, 19.39), P(14.21, 18.22), P(14.21, 20.56), P(12.19, 21.73)], [P(14.6, 12.42), P(16.61, 11.25), P(16.61, 13.59), P(14.6, 14.76)], [P(14.6, 15.21), P(16.61, 14.03), P(16.61, 16.38), P(14.6, 17.55)], [P(14.6, 17.99), P(16.61, 16.82), P(16.61, 19.17), P(14.6, 20.34)], [P(17, 11.02), P(19.02, 9.85), P(19.02, 12.19), P(17, 13.37)], [P(17, 13.81), P(19.02, 12.64), P(19.02, 14.98), P(17, 16.15)], [P(17, 16.6), P(19.02, 15.43), P(19.02, 17.77), P(17, 18.94)]]),
@@ -669,8 +672,11 @@ struct IconaStudio: View {
     ]
     var body: some View {
         Canvas { c, size in
-            let k = min(size.width, size.height) / 24
-            let t = CGAffineTransform(scaleX: k, y: k)
+            let lato = min(size.width, size.height)
+            let k = pieno ? lato / 19.6 : lato / 24
+            // pieno: il disegno (da 2,2 a 21,8 in larghezza, da 3 a 21,8 in altezza) al centro del riquadro
+            let t = pieno ? CGAffineTransform(translationX: (size.width - 19.6 * k) / 2 - 2.2 * k, y: (size.height - 18.8 * k) / 2 - 3 * k).scaledBy(x: k, y: k)
+                          : CGAffineTransform(scaleX: k, y: k)
             for (opacita, poligoni) in IconaStudio.tasselli {
                 var p = Path()
                 for poli in poligoni { p.addLines(poli); p.closeSubpath() }

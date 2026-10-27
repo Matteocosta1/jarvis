@@ -761,8 +761,8 @@ struct ContentView: View {
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
             Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Studio")) } label: {
-                IconaStudio()
-                    .frame(width: 18, height: 18)
+                IconaStudio(pieno: true)                            // 27 ott: grande come le altre 5
+                    .frame(width: 20, height: 20)
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
