@@ -208,3 +208,5 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 ### 10.0 (14) · 27 ott notte
 - La 13 sul telefono: il saltino restava (tutta la schermata saliva ~10 pt, video 01:34). Ora sull'iPhone la schermata ignora la tastiera e salgono solo chat e barra (alzoTastiera, stessa durata e curva della tastiera).
 - Icone in alto misurate sulla foto del signore: tutte alte ~15 pt e sullo stesso filo (cestino 16→14, impostazioni 17→14,5; Studio con cubo più grande e frecce corte, 16 pt).
+
+- **27 ott 02:10**: sulla 14 il saltino resta e Studio/Social lasciano un pezzetto visibile in fondo alla discesa (prima no). Tolta su GitHub la gestione tastiera della 14 (alzoTastiera / ignoresSafeArea keyboard). Il signore torna alla 12 (provata, funziona tutto). Saltino: da studiare giovedì col video della 14.
