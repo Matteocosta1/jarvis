@@ -13,17 +13,22 @@ enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 /// che si stampa dall'alto. Stesso ciano di JARVIS, stesso ritmo dell'iPhone, in piccolo.
 /// 27 ott: la quadrettatura sfumata delle sezioni dell'iPhone (GrigliaSfumata), in scala col polso: ferma, leggera, sfuma ai bordi.
 struct GrigliaPolso: View {
+    // come lo sfondo della schermata principale dell'orologio: il bagliore azzurro dall'alto e la griglia che ci sfuma dentro
     var body: some View {
-        Canvas { gc, size in
-            let passo: CGFloat = 14
-            var g = Path()
-            var x: CGFloat = 0
-            while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
-            var y: CGFloat = 0
-            while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
-            gc.stroke(g, with: .color(Color(red: 0, green: 0.9, blue: 1).opacity(0.32)), lineWidth: 0.6)   // sul polso più visibile che sull'iPhone (schermo piccolo)
+        ZStack {
+            RadialGradient(colors: [ReattoreOrologio.colore(0, 0.28, schiarisci: 0), .black],
+                           center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 160)
+            Canvas { gc, size in
+                let passo: CGFloat = 14
+                var g = Path()
+                var x: CGFloat = 0
+                while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
+                var y: CGFloat = 0
+                while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
+                gc.stroke(g, with: .color(ReattoreOrologio.colore(0, 0.07, schiarisci: 0)), lineWidth: 0.5)
+            }
+            .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.35), startRadius: 20, endRadius: 150))
         }
-        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.35), startRadius: 30, endRadius: 200))
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
