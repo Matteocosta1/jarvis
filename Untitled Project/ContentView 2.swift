@@ -750,12 +750,12 @@ struct ContentView: View {
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
             Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Studio")) } label: {
                 IconaStudio(pieno: true)                            // 27 ott: alta 15 punti come le altre 5 (misurate sulla foto), cubo più grande
-                    .frame(width: 18.5, height: 18.5)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
+                    .frame(width: 17.8, height: 17.8)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
                     .foregroundStyle(Color.ciano)
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
-                    .padding(.vertical, 7.75)
-                    .padding(.leading, (mini ? 1 : 2) + 0.3).padding(.trailing, (mini ? 1 : 2))   // spazi a vista uguali (7 punti, rimisurati sulla foto 02:49)
+                    .padding(.vertical, 8.1)
+                    .padding(.leading, (mini ? 1 : 2) + 0.65).padding(.trailing, (mini ? 1 : 2) + 0.35)   // spazi a vista uguali
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
