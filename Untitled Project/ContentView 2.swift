@@ -764,7 +764,7 @@ struct ContentView: View {
             .accessibilityLabel("Studio")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 11.8, weight: .regular))   // 27 ott notte (il signore): linee più grosse su SISTEMI, poi un pochino meno                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
+                    .font(.system(size: 11.8, weight: .semibold))   // 27 ott notte (il signore): linee spesse come Social (1,33 pt, misurate sulla foto)                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
@@ -774,7 +774,7 @@ struct ContentView: View {
             .accessibilityLabel("Sistemi")
             Button { Suoni.clickTesta(); chiediPulizia = true } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 13.9, weight: .regular))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
+                    .font(.system(size: 13.9, weight: .semibold))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : 2) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7

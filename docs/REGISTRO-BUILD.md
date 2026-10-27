@@ -226,3 +226,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Foto 02:49 (build 16): SISTEMI, cestino e impostazioni sembravano più grandi anche a misura uguale per il tratto più spesso dei simboli Apple: nella 18 tratto leggero (.light) oltre alle misure ridotte.
 - Studio in alto più grande (riquadro 16 → 18 pt, spazi compensati); mockup uguale.
 - SISTEMI, cestino e impostazioni: linee più grosse (.medium) su richiesta del signore (il tratto leggero non andava).
+- Linee di SISTEMI, cestino e impostazioni spesse come Social (1,33 pt misurati sulla foto): SISTEMI e cestino .semibold (rimpiccioliti avevano la linea a ~1 pt), impostazioni .regular.
