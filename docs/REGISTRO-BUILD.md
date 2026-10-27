@@ -227,3 +227,6 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Studio in alto più grande (riquadro 16 → 18 pt, spazi compensati); mockup uguale.
 - SISTEMI, cestino e impostazioni: linee più grosse (.medium) su richiesta del signore (il tratto leggero non andava).
 - Linee di SISTEMI, cestino e impostazioni spesse come Social (1,33 pt misurati sulla foto): SISTEMI e cestino .semibold (rimpiccioliti avevano la linea a ~1 pt), impostazioni .regular.
+
+### 10.0 (19) · 27 ott notte
+- Tutto quello della 18 (icone in alto: misure, spazi, linee come Social, Studio 18 pt) con numero nuovo.
