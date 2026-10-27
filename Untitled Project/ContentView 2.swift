@@ -241,7 +241,10 @@ struct ContentView: View {
                                  jarvisSiVede: { siVede in if aperturaPagina?.id == a.id { stratoCopre = !siVede } })
                         .environment(\.jarvisCoperto, false)
                         .id(a.id)
-                        .transition(.move(edge: .bottom))
+                        // 27 ott notte (il signore: «rimane un pezzettino visibile prima di sparire in fondo»): lo strato si stende anche
+                        // sotto l'ora e sotto la barretta, ma .move lo spostava solo dell'altezza utile: la fascia dell'ora restava in
+                        // fondo per un attimo. Ora scende (e sale) di tutta l'altezza vera dello schermo più un margine.
+                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 60))
                         .zIndex(30)
                 }
             }
