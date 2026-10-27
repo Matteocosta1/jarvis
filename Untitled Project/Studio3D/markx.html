@@ -4942,11 +4942,12 @@ async function sentinella(ok) {
   const A = document.createElement("div"); A.className = "allen sentinella";
   const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">${d}</svg>`;
   A.innerHTML = `<canvas class="olo-cv"></canvas>
-    <div class="al-su"><div class="testata se-testa"><div class="anello">${ICONE.Sentinella}</div><div><b>SENTINELLA</b><small>SORVEGLIANZA ATTIVA</small><span class="se-ora" id="seOra"></span></div></div>
+    <div class="al-su"><div class="testata se-testa"><div class="anello">${ICONE.Sentinella}</div><div><b>SENTINELLA</b><small data-se-sotto>${TC("Sentinella").toUpperCase()}</small><span class="se-ora" id="seOra"></span></div></div>
       <button type="button" data-se="reg" aria-label="Registro">${ico('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>')}</button>
       <button type="button" data-se="nero" aria-label="Schermo nero">${ico('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="currentColor"/>')}</button>
       <button type="button" data-se="x" aria-label="Disattiva la sentinella">✕</button></div>
     <div class="se-giu"><div class="se-stato" id="seStato">PERIMETRO SICURO</div><p class="se-nota">Lasci il telefono fermo, puntato sulla stanza. Gli allarmi arrivano all'orologio. «Jarvis, torna» per uscire.</p></div>`;
+  setTimeout(() => { const st = document.querySelector("[data-se-sotto]"); if (st && ok()) st.textContent = "PERIMETRO SOTTO CONTROLLO"; }, 1300);
   A.style.opacity = 0; sezione.appendChild(A);
   suona("aCamera"); A.style.transition = "opacity .35s"; requestAnimationFrame(() => { A.style.opacity = 1; });
   const cv = A.querySelector("canvas"), x = cv.getContext("2d"), registro = [], visti = new Set();

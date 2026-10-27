@@ -364,7 +364,7 @@ struct VistaSentinella: View {
                 // con il nome della sezione a 18 punti ci stanno
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
-                        TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "sorveglianza attiva",
+                        TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "perimetro sotto controllo",
                                       icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
                         TimelineView(.periodic(from: .now, by: 1)) { t in
                             Text(t.date.formatted(date: .omitted, time: .standard))
