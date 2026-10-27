@@ -766,7 +766,8 @@ struct ContentView: View {
                     .foregroundStyle(Color.ciano)
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
-                    .padding(.vertical, 9).padding(.horizontal, (mini ? 1 : 2) + 0.75)
+                    .padding(.vertical, 9)
+                    .padding(.leading, (mini ? 1 : 2) + 0.7).padding(.trailing, (mini ? 1 : 2) + 0.4)   // spazi a vista uguali (7 punti)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -786,7 +787,8 @@ struct ContentView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 14))                        // 27 ott: alta 15 punti come le altre (prima 17, usciva sopra e sotto)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
+                    // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.3).padding(.trailing, mini ? 1 : 2)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
