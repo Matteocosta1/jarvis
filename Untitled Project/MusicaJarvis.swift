@@ -915,7 +915,7 @@ struct IconaVinile: View {
             }
             let stile = StrokeStyle(lineWidth: 1.6 * k, lineCap: .round, lineJoin: .round)
             var tenue = gc
-            tenue.opacity = 0.55
+            tenue.opacity = 0.8          // 27 ott notte (il signore): il secondo ciano più vicino al ciano pieno delle altre icone
             gc.stroke(cerchio(9), with: .foreground, style: stile)
             tenue.stroke(cerchio(5.6), with: .foreground, style: stile)
             gc.stroke(cerchio(1.7), with: .foreground, style: stile)
