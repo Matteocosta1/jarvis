@@ -584,7 +584,6 @@ struct VistaAiutoBea: View {
     let chiudi: () -> Void
     @AppStorage("numeroBea") private var numero = ""
     @Environment(\.openURL) private var apriURL
-    @State private var pulsa = false
     @State private var indirizzo: String?          // la via dove si trova, da dire al 112 se serve
     @State private var chiama112 = false
     private let rosso = Color(red: 1.0, green: 0.27, blue: 0.32)
@@ -592,14 +591,17 @@ struct VistaAiutoBea: View {
     var body: some View {
         ZStack {
             Color.fondo.ignoresSafeArea()
-            RadialGradient(colors: [rosso.opacity(pulsa ? 0.35 : 0.15), .clear], center: .center, startRadius: 0, endRadius: 480)
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsa)
+            // 27 ott: la pulsazione la dà l'orologio (come gli anelli), non un'animazione infinita: niente più cose che vagano
+            TimelineView(.animation) { t in
+                RadialGradient(colors: [rosso.opacity(0.15 + 0.2 * BeaPulsa.fase(t.date)), .clear], center: .center, startRadius: 0, endRadius: 480)
+            }
+            .ignoresSafeArea()
             VStack(spacing: 22) {
                 Spacer()
-                Image(systemName: "link").font(.system(size: 54, weight: .medium)).foregroundStyle(rosso)
-                    .scaleEffect(pulsa ? 1.08 : 0.94)
-                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsa)
+                TimelineView(.animation) { t in
+                    Image(systemName: "link").font(.system(size: 54, weight: .medium)).foregroundStyle(rosso)
+                        .scaleEffect(0.94 + 0.14 * BeaPulsa.fase(t.date))
+                }
                 Text(aiuto.prova ? "PROVA" : "BEA HA BISOGNO DI LEI")
                     .font(.system(size: 22, weight: .bold, design: .monospaced)).tracking(2)
                     .multilineTextAlignment(.center).foregroundStyle(.white)
@@ -647,7 +649,6 @@ struct VistaAiutoBea: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            pulsa = true
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
         .task {
@@ -828,5 +829,10 @@ struct SceltaContattoBea: View {
         }
         .preferredColorScheme(.dark)
     }
+}
+
+/// 27 ott: la pulsazione dell'allarme (0 → 1 → 0 ogni 1,8 s, morbida come easeInOut 0,9 s avanti e indietro), dall'orologio.
+enum BeaPulsa {
+    static func fase(_ d: Date) -> Double { (1 - cos(d.timeIntervalSinceReferenceDate * .pi / 0.9)) / 2 }
 }
 #endif

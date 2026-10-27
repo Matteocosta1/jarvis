@@ -352,11 +352,13 @@ struct VistaSentinella: View {
             }
 
             // bordo rosso che lampeggia durante l'allarme
-            RoundedRectangle(cornerRadius: 36)
-                .stroke(Color.red, lineWidth: s.violato ? 6 : 0)
+            // 27 ott: il lampeggio lo dà l'orologio (come gli anelli), non un'animazione infinita: il bordo non può vagare
+            TimelineView(.animation(minimumInterval: nil, paused: !s.violato)) { t in
+                RoundedRectangle(cornerRadius: 36)
+                    .stroke(Color.red, lineWidth: 6)
+                    .opacity(s.violato ? (1 - cos(t.date.timeIntervalSinceReferenceDate * .pi / 0.35)) / 2 : 0)
+            }
                 .ignoresSafeArea()
-                .opacity(s.violato ? 1 : 0)
-                .animation(s.violato ? .easeInOut(duration: 0.35).repeatForever(autoreverses: true) : .default, value: s.violato)
                 .allowsHitTesting(false)
 
             VStack {
