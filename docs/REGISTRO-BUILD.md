@@ -192,3 +192,5 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Sentinella «perimetro sotto controllo» (di notte «visione notturna»), senza bagliore in testata.
 - Quadrettatura delle sezioni iPhone come il mockup (22 pt, linea 1, 0,03); orologio: stessa quadrettatura in scala nelle sezioni (CorniceOrologio).
 - Da fare (prossimo piano): orologio con icona animata e frasi come l'iPhone (mockup prima); restyling Interprete/Confidente/Diario; «CHE PIATTO È» → «PIATTO»?; bagliore titoli Occhi/Profiler da togliere?
+
+- **27 ott 01:29 — il signore ha provato la 10.0 (12) sull'iPhone: «funziona tutto».** 0 errori in Xcode.
