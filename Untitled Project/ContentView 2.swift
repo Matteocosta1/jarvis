@@ -755,8 +755,7 @@ struct ContentView: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
-                    .background(Color.ciano.opacity(mostraSistemi ? 0.15 : 0))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate)
