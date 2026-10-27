@@ -220,3 +220,6 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - = 15 + tempi di salita/discesa di Studio e Social allungati del 15% (strada più lunga: stessa velocità a vista di prima). Copertura di JARVIS dopo 700 ms invece di 600.
 - 10.0 (17): identica alla 16 (la 16 restava in elaborazione su Apple da 15 minuti), solo il numero cambiato.
 - **27 ott 02:42 — 10.0 (16) installata e provata dal signore: «bravo J»** (Studio/Social senza pezzetto in fondo). La 17 non serve.
+
+### 10.0 (18) · 27 ott notte
+- = 16 + SISTEMI, cestino e impostazioni più piccoli in alto (16→14,5 · 14→13 · 14,5→13,5): a vista come Social, Musica e Studio.

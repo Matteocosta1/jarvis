@@ -763,7 +763,7 @@ struct ContentView: View {
             .accessibilityLabel("Studio")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 16))
+                    .font(.system(size: 14.5))                      // 27 ott notte (il signore): a vista come le altre (prima 16, sembrava più grande)
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
@@ -773,7 +773,7 @@ struct ContentView: View {
             .accessibilityLabel("Sistemi")
             Button { Suoni.clickTesta(); chiediPulizia = true } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 14))                        // 27 ott: alta 15 punti come le altre (prima 17, usciva sopra e sotto)
+                    .font(.system(size: 13))                        // 27 ott notte: a vista come le altre (16 → 14 → 13)
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.3).padding(.trailing, mini ? 1 : 2)
@@ -789,7 +789,7 @@ struct ContentView: View {
             }
             Button { Suoni.clickTesta(); if telefono { tastiera = false }; mostraImpostazioni = true } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 14.5))                      // 27 ott: alta 15 punti come le altre (prima 17,7)
+                    .font(.system(size: 13.5))                      // 27 ott notte: a vista come le altre (17 → 14,5 → 13,5)
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
