@@ -210,3 +210,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Icone in alto misurate sulla foto del signore: tutte alte ~15 pt e sullo stesso filo (cestino 16→14, impostazioni 17→14,5; Studio con cubo più grande e frecce corte, 16 pt).
 
 - **27 ott 02:10**: sulla 14 il saltino resta e Studio/Social lasciano un pezzetto visibile in fondo alla discesa (prima no). Tolta su GitHub la gestione tastiera della 14 (alzoTastiera / ignoresSafeArea keyboard). Il signore torna alla 12 (provata, funziona tutto). Saltino: da studiare giovedì col video della 14.
+- **27 ott 02:11**: il signore tiene la 13; il saltino con la tastiera va bene così (non è più da correggere).
