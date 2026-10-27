@@ -763,7 +763,7 @@ struct ContentView: View {
             .accessibilityLabel("Studio")
             Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 13.1))                      // 27 ott notte (misurata sulla foto: 18,3 × 14,3 pt a 16): lato maggiore 15 pt come le altre
+                    .font(.system(size: 11.8))                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
