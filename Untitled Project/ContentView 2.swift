@@ -244,7 +244,7 @@ struct ContentView: View {
                         // 27 ott notte (il signore: «rimane un pezzettino visibile prima di sparire in fondo»): lo strato si stende anche
                         // sotto l'ora e sotto la barretta, ma .move lo spostava solo dell'altezza utile: la fascia dell'ora restava in
                         // fondo per un attimo. Ora scende (e sale) di tutta l'altezza vera dello schermo più un margine.
-                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 60))
+                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 2))   // tutta l'altezza, come le schede di iOS
                         .zIndex(30)
                 }
             }
@@ -1182,7 +1182,7 @@ struct ContentView: View {
     private func alzaPagina(_ a: AperturaPagina) {
         withAnimation(StratoPagina.salita) { aperturaPagina = a }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(700))      // 10.0 (16): la salita ora dura un filo di più (stessa velocità)
+            try? await Task.sleep(for: .milliseconds(600))
             if aperturaPagina?.id == a.id { stratoCopre = true }
         }
     }

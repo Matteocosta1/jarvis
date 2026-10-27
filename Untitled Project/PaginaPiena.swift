@@ -103,12 +103,12 @@ struct StratoPagina: View {
     /// 26 ott sera (il signore: «Studio e Social uguali alle altre schede»): la salita e la discesa delle altre schede, misurate
     /// fotogramma per fotogramma sul suo video delle 21:58 (SATELLITE, 60 fotogrammi al secondo): salita ~0,3 s che frena in
     /// fondo, discesa ~0,35 s che parte piano e si posa piano. Sono le molle di iOS che le ricalcano (scarto sotto l'1%).
-    // 27 ott notte (10.0 16): lo strato ora percorre tutta l'altezza dello schermo + 60 (prima solo quella utile, ~20% in meno):
-    // tempi allungati della stessa misura, così la velocità a vista resta quella di prima, misurata sul video di SATELLITE.
-    static let salita: Animation = .spring(response: 0.41, dampingFraction: 0.9)
+    // 27 ott notte (10.0 16): lo strato scende di tutta l'altezza dello schermo, come le altre schede di iOS: stessi tempi delle
+    // altre schede (misurati sul video di SATELLITE), quindi stessa durata e stessa velocità.
+    static let salita: Animation = .spring(response: 0.34, dampingFraction: 0.9)
     /// Dopo il trascinamento col dito: 0,22 s e frena, come le altre schede (PaginaPiena), il dito l'ha già portata giù.
     static func discesa(_ durata: Double = 0.35) -> Animation {
-        durata > 0.3 ? .spring(response: 0.40, dampingFraction: 1) : .easeOut(duration: durata * 1.2)
+        durata > 0.3 ? .spring(response: 0.33, dampingFraction: 1) : .easeOut(duration: durata)
     }
 
     var body: some View {
