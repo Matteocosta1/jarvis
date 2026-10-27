@@ -741,7 +741,8 @@ struct ContentView: View {
                 IconaVinile()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
+                    // 27 ott notte (il signore): il disco un poco più a destra, verso Studio
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) + 0.6).padding(.trailing, (mini ? 1 : 2) - 0.6)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
