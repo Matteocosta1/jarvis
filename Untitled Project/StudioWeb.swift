@@ -673,9 +673,9 @@ struct IconaStudio: View {
     var body: some View {
         Canvas { c, size in
             let lato = min(size.width, size.height)
-            let k = pieno ? lato / 19.6 : lato / 24
-            // pieno: il disegno (da 2,2 a 21,8 in larghezza, da 3 a 21,8 in altezza) al centro del riquadro
-            let t = pieno ? CGAffineTransform(translationX: (size.width - 19.6 * k) / 2 - 2.2 * k, y: (size.height - 18.8 * k) / 2 - 3 * k).scaledBy(x: k, y: k)
+            // pieno (in alto): il cubo grande e le frecce corte, tutto dentro il riquadro (da 2,5 a 21,5 e da 3,1 a 22,3)
+            let k = pieno ? lato / 19.2 : lato / 24
+            let t = pieno ? CGAffineTransform(translationX: (size.width - 19 * k) / 2 - 2.5 * k, y: (size.height - 19.2 * k) / 2 - 3.1 * k).scaledBy(x: k, y: k)
                           : CGAffineTransform(scaleX: k, y: k)
             for (opacita, poligoni) in IconaStudio.tasselli {
                 var p = Path()
@@ -683,6 +683,18 @@ struct IconaStudio: View {
                 var g = c
                 g.opacity = opacita
                 g.fill(p.applying(t), with: .foreground)
+            }
+            if pieno {
+                // 27 ott (il signore: «le frecce piccoline, non devono uscire dall'interlinea, equilibrio»): assi corti, punte piccole
+                var corte = Path()
+                for (a, b) in [(CGPoint(x: 12, y: 4.88), CGPoint(x: 12, y: 3.78)), (CGPoint(x: 4.39, y: 18.11), CGPoint(x: 3.13, y: 18.84)), (CGPoint(x: 19.61, y: 18.11), CGPoint(x: 20.87, y: 18.84))] {
+                    corte.move(to: a); corte.addLine(to: b)
+                }
+                corte.addLines([CGPoint(x: 12.4, y: 4.28), CGPoint(x: 12, y: 3.78), CGPoint(x: 11.6, y: 4.28)])
+                corte.addLines([CGPoint(x: 3.76, y: 18.94), CGPoint(x: 3.13, y: 18.84), CGPoint(x: 3.36, y: 18.24)])
+                corte.addLines([CGPoint(x: 20.24, y: 18.94), CGPoint(x: 20.87, y: 18.84), CGPoint(x: 20.64, y: 18.24)])
+                c.stroke(corte.applying(t), with: .foreground, style: StrokeStyle(lineWidth: 1.3 * k, lineCap: .round, lineJoin: .round))
+                return
             }
             var assi = Path()
             for (a, b) in [(CGPoint(x: 12, y: 4.88), CGPoint(x: 12, y: 3.05)), (CGPoint(x: 4.39, y: 18.11), CGPoint(x: 2.29, y: 19.33)), (CGPoint(x: 19.61, y: 18.11), CGPoint(x: 21.71, y: 19.33))] {
