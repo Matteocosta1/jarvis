@@ -218,3 +218,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 
 ### 10.0 (16) · 27 ott notte
 - = 15 + tempi di salita/discesa di Studio e Social allungati del 15% (strada più lunga: stessa velocità a vista di prima). Copertura di JARVIS dopo 700 ms invece di 600.
+- 10.0 (17): identica alla 16 (la 16 restava in elaborazione su Apple da 15 minuti), solo il numero cambiato.
