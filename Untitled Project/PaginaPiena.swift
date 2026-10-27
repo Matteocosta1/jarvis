@@ -155,15 +155,16 @@ struct StratoPagina: View {
 struct GrigliaSfumata: View {
     var body: some View {
         Canvas { gc, size in
-            let passo: CGFloat = 28
+            let passo: CGFloat = 22                       // come il mockup approvato (.foglio::after): 22 pt, linea 1, 0,03
             var g = Path()
             var x: CGFloat = 0
             while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
             var y: CGFloat = 0
             while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
-            gc.stroke(g, with: .color(Color.ciano.opacity(0.03)), lineWidth: 0.5)
+            gc.stroke(g, with: .color(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.03)), lineWidth: 1)
         }
-        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 520))
+        .mask(RadialGradient(stops: [.init(color: .black, location: 0.25), .init(color: .clear, location: 0.8)],
+                             center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 630))
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
