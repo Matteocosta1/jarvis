@@ -237,10 +237,10 @@ struct Occhi: View {
                             // sotto OCCHI · MANUALE, piccolo, quello che vede (come i sistemi all'avvio)
                             RigheOcchi(righe: righeInfo)
                                 .animation(.easeOut(duration: 0.35), value: righeInfo.map(\.chiave))
+                                .shadow(color: tinta.opacity(0.6), radius: 6)   // solo le righe sopra la fotocamera, per leggerle
                         }
                     }
-                    .foregroundStyle(tinta)
-                    .shadow(color: tinta.opacity(0.6), radius: 6)
+                    .foregroundStyle(tinta)                         // 27 ott: niente bagliore su titolo e modo, come le altre sezioni
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["testa"] = $0 }
                     Spacer()
                     Button { Suoni.tocco(); chiudi([]) } label: {

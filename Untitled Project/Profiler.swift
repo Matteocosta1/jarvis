@@ -75,8 +75,7 @@ struct VistaProfiler: View {
                 Text(foto != nil ? "SCHEDA SOGGETTO" : davanti ? "SELFIE" : "SOGGETTO")
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.75)
             }
-            .foregroundStyle(ambra)
-            .shadow(color: ambra.opacity(0.5), radius: 6)
+            .foregroundStyle(ambra)                                // 27 ott: niente bagliore sul titolo, come le altre sezioni
             Spacer()
             Button { Suoni.tocco(); chiudi([]) } label: {
                 Image(systemName: "xmark")
