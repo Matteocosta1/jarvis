@@ -776,7 +776,7 @@ struct ContentView: View {
                     .font(.system(size: 13.9, weight: .medium))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
-                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 1.3)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : 2) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : 2) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
