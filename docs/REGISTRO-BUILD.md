@@ -222,4 +222,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **27 ott 02:42 — 10.0 (16) installata e provata dal signore: «bravo J»** (Studio/Social senza pezzetto in fondo). La 17 non serve.
 
 ### 10.0 (18) · 27 ott notte
-- = 16 + SISTEMI, cestino e impostazioni più piccoli in alto (16→14,5 · 14→13 · 14,5→13,5): a vista come Social, Musica e Studio.
+- = 16 + icone in alto tutte con il lato maggiore di 15 pt (misurate sulla foto): SISTEMI 13,1 · cestino 13,9 · impostazioni 14,4.
