@@ -1182,7 +1182,7 @@ struct ContentView: View {
     private func alzaPagina(_ a: AperturaPagina) {
         withAnimation(StratoPagina.salita) { aperturaPagina = a }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
+            try? await Task.sleep(for: .milliseconds(700))      // 10.0 (16): la salita ora dura un filo di più (stessa velocità)
             if aperturaPagina?.id == a.id { stratoCopre = true }
         }
     }

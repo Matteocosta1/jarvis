@@ -215,3 +215,6 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 ### 10.0 (15) · 27 ott notte
 - Studio/Social: alla discesa restava un pezzetto in fondo (la fascia dell'ora dello strato, .move spostava solo l'altezza utile). Ora .offset di tutta l'altezza dello schermo + 60.
 - Contiene la 13 + icone in alto pareggiate (15 pt, spazi 7) + Studio cubo grande. Senza la gestione tastiera della 14.
+
+### 10.0 (16) · 27 ott notte
+- = 15 + tempi di salita/discesa di Studio e Social allungati del 15% (strada più lunga: stessa velocità a vista di prima). Copertura di JARVIS dopo 700 ms invece di 600.
