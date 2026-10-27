@@ -20,5 +20,7 @@
 		<string>location</string>
 		<string>audio</string>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 </dict>
 </plist>

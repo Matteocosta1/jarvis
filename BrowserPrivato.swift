@@ -679,7 +679,7 @@ struct AngoliOlo: View {
 struct GloboOlo: View {
     let tinta: Color
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { t in
+        TimelineView(.animation(minimumInterval: nil)) { t in
             Canvas { gc, size in
                 let r = min(size.width, size.height) / 2 - 1, c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let giro = t.date.timeIntervalSinceReferenceDate * 0.6

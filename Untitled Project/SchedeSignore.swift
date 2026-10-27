@@ -209,7 +209,7 @@ struct CaricamentoHUD: View {
     @State private var inizio = Date()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let passato = ctx.date.timeIntervalSince(inizio)
             let avanzamento = min(0.92, 1 - exp(-passato / 1.6))          // sale svelto, poi aspetta i dati

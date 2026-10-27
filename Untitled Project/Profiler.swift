@@ -304,7 +304,7 @@ struct MirinoProfiler: View {
     let acquisito: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let ambra = VistaProfiler.ambra

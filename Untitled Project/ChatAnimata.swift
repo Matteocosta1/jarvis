@@ -171,7 +171,7 @@ struct CaricamentoChat: View {
     @State private var inizio = Date()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let passato = ctx.date.timeIntervalSince(inizio)
             let av = min(0.92, 1 - exp(-passato / (0.6 / Avvio.velocita)))   // in proporzione all'avvio
@@ -214,7 +214,7 @@ struct BarraSvuota: View {
     private let voci = ["ARCHIVIO CONVERSAZIONE", "PULIZIA SCHERMO", "MEMORIA LIBERA"]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let q = min(1, ctx.date.timeIntervalSince(inizio) / (TempiChat.svuotaScala + TempiChat.svuotaRiga))
             VStack(spacing: 6) {
                 HStack {

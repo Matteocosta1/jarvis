@@ -273,7 +273,7 @@ struct SfondoHUD: View {
     let fase: Fase
     @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: coperto)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let caldo = fase == .elaboro || fase == .parlo
             let base = caldo ? Color(red: 0.20, green: 0.08, blue: 0.02) : Color(red: 0.02, green: 0.13, blue: 0.13)

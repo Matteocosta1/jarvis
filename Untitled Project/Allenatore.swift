@@ -174,7 +174,7 @@ struct ScheletroHUD: View {
     ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 guard let posa else { return }

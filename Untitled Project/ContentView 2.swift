@@ -1500,7 +1500,7 @@ struct AnelliHUD: View {
     let fase: Fase
     @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: coperto)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let caldo = fase == .elaboro || fase == .parlo
             let fretta: Double = fase == .elaboro ? 2.2 : (fase == .ascolto ? 1.4 : 1)
@@ -1615,7 +1615,7 @@ struct AnelloScansione: View {
     let attivo: Bool
     var body: some View {
         if attivo {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 let y = (t * 0.9).truncatingRemainder(dividingBy: 1)
                 GeometryReader { g in

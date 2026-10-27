@@ -912,7 +912,7 @@ struct MirinoHUD: View {
     var tinta: Color = .ciano
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let w = Double(size.width), h = Double(size.height)

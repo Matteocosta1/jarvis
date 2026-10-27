@@ -380,7 +380,7 @@ struct OndaWiretap: View {
     let livello: Float
     let attivo: Bool
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 20, paused: !attivo)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: !attivo)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let barre = 28

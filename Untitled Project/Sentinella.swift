@@ -495,7 +495,7 @@ struct AngoliMirino: Shape {
 struct RadarSentinella: View {
     let colore: Color
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let a = ctx.date.timeIntervalSinceReferenceDate * 1.2
             Canvas { gc, size in
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
