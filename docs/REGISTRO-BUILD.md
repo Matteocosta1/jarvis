@@ -194,3 +194,9 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Da fare (prossimo piano): orologio con icona animata e frasi come l'iPhone (mockup prima); restyling Interprete/Confidente/Diario; «CHE PIATTO È» → «PIATTO»?; bagliore titoli Occhi/Profiler da togliere?
 
 - **27 ott 01:29 — il signore ha provato la 10.0 (12) sull'iPhone: «funziona tutto».** 0 errori in Xcode.
+
+### 10.0 (13) · 27 ott notte
+- Testata ferma all'apertura della tastiera (saltino ~10 pt misurato sul video 01:34: schermata ancorata in alto).
+- SISTEMI: niente alone intorno all'icona col menu aperto.
+- Allarme SOS di Bea e bordo d'allarme di Sentinella guidati dall'orologio (niente animazioni infinite).
+- Base: la 10.0 (12), provata: funziona tutto, fluidità a 120 Hz.
