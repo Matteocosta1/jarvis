@@ -11,6 +11,25 @@ enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 
 /// Una scheda sull'orologio: il nome in alto, il caricamento HUD (anelli, barra, sistemi) e poi il contenuto
 /// che si stampa dall'alto. Stesso ciano di JARVIS, stesso ritmo dell'iPhone, in piccolo.
+/// 27 ott: la quadrettatura sfumata delle sezioni dell'iPhone (GrigliaSfumata), in scala col polso: ferma, leggera, sfuma ai bordi.
+struct GrigliaPolso: View {
+    var body: some View {
+        Canvas { gc, size in
+            let passo: CGFloat = 14
+            var g = Path()
+            var x: CGFloat = 0
+            while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
+            var y: CGFloat = 0
+            while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
+            gc.stroke(g, with: .color(Color(red: 0, green: 0.9, blue: 1).opacity(0.05)), lineWidth: 0.5)
+        }
+        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 180))
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct CorniceOrologio<Contenuto: View>: View {
     let titolo: String
     var pronto = true
@@ -22,6 +41,7 @@ struct CorniceOrologio<Contenuto: View>: View {
 
     var body: some View {
         ZStack {
+            GrigliaPolso()                  // 27 ott (il signore): la quadrettatura sfumata delle sezioni dell'iPhone anche qui
             if mostrato {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) { contenuto() }
