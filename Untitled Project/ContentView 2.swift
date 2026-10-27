@@ -103,9 +103,6 @@ struct ContentView: View {
     static let curvaTastiera: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: 0.25)
     @State private var durataRientro: Double = 0.25      // la durata vera dell'ultima discesa della tastiera (per far scorrere la chat insieme)
     @State private var salitaTastiera: (quando: Date, durata: Double)?   // l'ultima keyboardWillShow: quando e quanto dura la salita
-    /// 27 ott (video del signore 01:34): sull'iPhone la schermata ignora la tastiera (iOS la spingeva su tutta di ~10 punti per un
-    /// attimo); sale solo la parte bassa, di quanto sale la tastiera, con la sua durata e la sua curva.
-    @State private var alzoTastiera: CGFloat = 0
     /// Il reattore piccolo e il microfono spento mentre si scrive: solo sull'iPhone (iPad e Mac restano come prima).
     private var telefono: Bool { UIDevice.current.userInterfaceIdiom == .phone }
     /// Una schermata aperta da JARVIS o dal Tocco d'aiuto di Bea, non dal signore.
@@ -191,16 +188,6 @@ struct ContentView: View {
                     // il posto un attimo dopo: per quell'attimo il contenuto è più alto dello spazio e iOS lo centrava, spingendo su la
                     // testata. Ancorato in alto, la testata resta ferma (l'eccedenza va in basso, dietro la tastiera che sale).
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.bottom, alzoTastiera)                     // la chat e la barra salgono con la tastiera, la testata no
-                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { n in
-                        guard telefono, let fine = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-                        let alzo = max(0, fine.height - (FasciaAlta.finestra?.safeAreaInsets.bottom ?? 0))
-                        withAnimation(.timingCurve(0.38, 0.7, 0.125, 1, duration: max(ContentView.durataTastiera(n), 0.2))) { alzoTastiera = alzo }
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { n in
-                        guard telefono else { return }
-                        withAnimation(.timingCurve(0.38, 0.7, 0.125, 1, duration: max(ContentView.durataTastiera(n), 0.2))) { alzoTastiera = 0 }
-                    }
                     // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
                     .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
                     .onChange(of: tastiera) { _, aperta in
@@ -265,8 +252,6 @@ struct ContentView: View {
             // blocco iOS mostrava sempre la sua linguetta grigia sotto la Dynamic Island. I PROTOCOLLI si aprono tirando giù da titolo,
             // reattore e testi, come prima.
         }
-        // 27 ott: sull'iPhone iOS non sposta più la schermata quando sale la tastiera (la parte bassa sale da sola, alzoTastiera)
-        .ignoresSafeArea(.keyboard, edges: telefono ? .bottom : [])
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
