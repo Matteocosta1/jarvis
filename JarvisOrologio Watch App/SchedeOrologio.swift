@@ -21,9 +21,9 @@ struct GrigliaPolso: View {
             while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
             var y: CGFloat = 0
             while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
-            gc.stroke(g, with: .color(Color(red: 0, green: 0.9, blue: 1).opacity(0.05)), lineWidth: 0.5)
+            gc.stroke(g, with: .color(Color(red: 0, green: 0.9, blue: 1).opacity(0.14)), lineWidth: 0.5)   // sul polso più visibile che sull'iPhone (schermo piccolo)
         }
-        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 180))
+        .mask(RadialGradient(colors: [.black, .clear], center: UnitPoint(x: 0.5, y: 0.35), startRadius: 30, endRadius: 200))
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
