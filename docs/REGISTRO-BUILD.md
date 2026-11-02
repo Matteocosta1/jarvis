@@ -239,3 +239,9 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **SALVA 3MF** nel foglio di stampa: vertici condivisi (maglia chiusa), millimetri, appoggiato al piatto; un pezzo = orientato come l'STL, più pezzi = tutti sul piatto come sul banco.
 - SCRITTA 3D graffiti: fatta e poi **tolta su richiesta del signore** (2 nov), non è nella build.
 - Collaudo (Playwright, pagina dell'app): stencil 3 strati, SVG, 3MF (maglia chiusa, 0 spigoli sbagliati), STL senza zip nell'app, 19 frasi a voce, schizzo; dock identico a prima. Nessun file Swift toccato: cambia solo la pagina dello Studio (markx.html).
+
+### 10.0 (21) · 2 nov sera · STUDIO Fase 2 (mockup approvato: «ok … andiamo avanti»)
+- **SCOLPISCI** (SELEZIONA › SCOLPISCI, o «scolpisci»): il pezzo diventa creta (rimaglia a voxel, superficie unica, sempre chiusa); pennelli TIRA, GONFIA, LEVIGA, APPIATTISCI, AFFERRA, PIZZICA; SIMMETRIA, SCAVA, RAGGIO (mm), FORZA (%), DETTAGLIO basso/medio/alto. Il dito sul pezzo scolpisce, fuori gira la vista; scolpendo il banco non fa scorrere la pagina. Ogni tratto si annulla.
+- **MESH** (SELEZIONA › MESH, o «modifica la mesh»): facce vere (triangoli complanari = una faccia), VERTICI/SPIGOLI/FACCE col tocco, TUTTO/NIENTE; cursori in mm DESTRA, SU, AVANTI, ESTRUDI (anche in dentro), INSERISCI, SCALA %; UNISCI VERTICI, SUDDIVIDI. Oltre 8.000 triangoli no (si usa SCOLPISCI).
+- La creta resta con l'aspetto degli altri pezzi (proposta «più piena» mostrata al signore, non scelta: non applicata).
+- Collaudo (Playwright, pagina dell'app): 6 pennelli (~1 ms per movimento del dito), annulla, voce; cubo 4 cm + estrudi 15 mm = 88 cm³ esatti, inserisci + estrudi in dentro, sempre chiusa; creta in 3MF chiusa e riaperta uguale; Fase 1 invariata. Nessun file Swift toccato. Sul telefono non ancora provata.
