@@ -230,3 +230,4 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 
 ### 10.0 (19) · 27 ott notte
 - Tutto quello della 18 (icone in alto: misure, spazi, linee come Social, Studio 18 pt) con numero nuovo.
+- **2 nov 2026**: il signore dice che l'app JARVIS (10.0 (19)) «funziona da dio».
