@@ -190,6 +190,8 @@ header .icona.testa.carica { animation: icoCarica .5s ease-out; }
 .in-lingue { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .in-lingue .comando { text-transform: none; }
 .cf-area { min-height: 160px; border-radius: 12px; border: 1px solid rgba(79,227,255,.35); background: rgba(79,227,255,.05); padding: 10px; font-size: 14px; color: var(--tenue); }
 
+#studioTesta svg { transform: scale(.97); }   /* 27 ott: alta come le altre icone in alto */
+.icona.testa[aria-label="Sistemi"] svg { transform: scale(.98); }   /* 27 ott notte: linee come Social (1,6 come tutte) */ #cestino { margin-left: -1px; } #rotella { margin-left: -1px; } #studioTesta { margin-left: -.2px; } #musicaTesta { transform: translateX(.6px); }   /* spazi uguali */ #cestino svg { transform: scale(1.09); } #rotella svg { transform: scale(.975); }   /* 27 ott notte: tutte col lato maggiore come Social */
 .testata b.marchio-j { font: 700 16px var(--mono); letter-spacing: 4px; color: var(--ciano); }
 .testata b.marchio-j + small { font: 700 10.5px var(--mono); }   /* 27 ott: Sound come Studio e Social */   /* JARVIS Music */
 .sd-su > .anello, .sc-su > .anello { flex: none; display: grid; }
@@ -1009,7 +1011,7 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd-fonti button { display: grid; justify-items: center; gap: 4px; padding: 8px 0 6px; border-radius: 12px; border: 1px solid rgba(79,227,255,.25); background: rgba(79,227,255,.04); color: var(--ciano); font: 700 8px var(--mono); letter-spacing: 1px; cursor: pointer; }
 .sd-fonti button svg { width: 20px; height: 20px; }
 .sd-fonti button:active { background: rgba(79,227,255,.18); }
-.sd-azioni { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sd-azioni { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .sd-azioni .largo { grid-column: 1 / -1; }
 .sd-azioni button { min-height: 46px; border-radius: 12px; font: 700 12px var(--mono); letter-spacing: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .sd-azioni button svg { width: 18px; height: 18px; }
 .sd-azioni .pieno { background: var(--ciano); border: 0; color: #001820; } .sd-azioni .vuoto { background: none; border: 1px solid rgba(79,227,255,.5); color: var(--ciano); }
@@ -1034,6 +1036,8 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd-sospeso { align-items: center; } .sd-sospeso span { flex: 1; font: 700 9px var(--mono); letter-spacing: 1.5px; color: #9fb3b9; }
 .vai-riga { align-items: stretch; } .vai-riga .vai { flex: 1; margin: 0; } .vai-riga .chip { flex: 0 0 auto; padding: 0 14px; }
 .sd .chip.acceso { border-color: var(--ciano); color: var(--ciano); box-shadow: 0 0 10px rgba(79,227,255,.45); }
+.sk-riempi span { font: 700 9px var(--mono); letter-spacing: 1.5px; color: var(--ciano); opacity: .8; min-width: 62px; } .sk-riempi .chip { flex: 1 1 0; }
+.sd-strati { display: block; height: 120px; width: auto; max-width: 100%; border-radius: 10px; margin: 2px auto 4px; border: 1px solid rgba(76, 224, 255, .25); }   /* 2 nov: LINEE / PIENO */
 .sk-att { flex-wrap: nowrap; gap: 4px !important; } .sk-att .chip { flex: 1 1 0; min-width: 0; padding: 0 2px; font-size: 9px; letter-spacing: .5px; }
 .sd.sk-on .sd-voce, .sd.sk-on .sd-scrivi { display: none; }
 .sd-cam .sd-prove { position: absolute; left: 12px; bottom: 18px; display: grid; gap: 6px; }
@@ -5566,7 +5570,7 @@ ICONE.Travel = S('<circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3
 // in alto (ordine deciso dal signore il 26 ott): SOCIAL, MUSICA, STUDIO, SISTEMI, CESTINO, IMPOSTAZIONI → STUDIO subito dopo la musica
 (function () {
   const m = $("musicaTesta"); if (!m) return;
-  const b = document.createElement("button"); b.className = "icona testa"; b.id = "studioTesta"; b.type = "button"; b.setAttribute("aria-label", "Studio"); b.innerHTML = ICONE.Studio;
+  const b = document.createElement("button"); b.className = "icona testa"; b.id = "studioTesta"; b.type = "button"; b.setAttribute("aria-label", "Studio"); b.innerHTML = ICONE.Studio.replace('viewBox="0 0 24 24"', 'viewBox="2.5 3.1 19 19.2"').replace(/<path d="M12\.00 4\.88[^>]*>/, '<path d="M12 4.88 L12 3.78M12.4 4.28 L12 3.78 L11.6 4.28M4.39 18.11 L3.13 18.84M3.76 18.94 L3.13 18.84 L3.36 18.24M19.61 18.11 L20.87 18.84M20.24 18.94 L20.87 18.84 L20.64 18.24" stroke-width="1.3"/>');   // 27 ott: in alto cubo grande, frecce corte
   m.after(b); b.addEventListener("click", () => { suona("aTick"); if (TENDINA?.aperta?.()) TENDINA.chiudi(); apriSezione("Studio"); });
 })();
 CONTENUTI.Studio = `<div class="st" id="studio"></div>`;
@@ -6657,6 +6661,8 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
   }
   function capisci(t) {
     t = inCifre(t.replace(/[«»"!?;]/g, " ").replace(/(\D)\.|\.(\D)/g, "$1 $2").replace(/\s+/g, " ").replace(/^(?:jarvis|ok jarvis|ehi jarvis)\b,?\s*/, "").trim());
+    // 2 nov · «4 centimetri e mezzo», «3 e mezzo cm» → 4,5 / 3,5
+    t = t.replace(/\b(\d+)\s*(mm|millimetri|cm|centimetri|metri)\s+e mezzo\b/g, "$1.5 $2").replace(/\b(\d+)\s+e mezzo\b/g, "$1.5");
     if (!t) return null;
     // il plastico dalla scansione LiDAR: la sala (1:100), il giardino (1:50), l'allestimento dell'evento
     if (/\bplastic|\b(porta|portami|manda|mandami)\b.*\b(stanza|sala|salotto|giardino|terreno|evento|allestimento|palco)\b/.test(t)) { const kp = /giardin|terren|estern/.test(t) ? "esterno" : /evento|allestiment|palco|setup/.test(t) ? "setup" : "stanza"; if (window.JARVIS_APP) window.webkit.messageHandlers.jarvis.postMessage({ tipo: "plastico", k: kp }); else plastico(kp); return ""; }
@@ -6685,8 +6691,23 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
         if (!k) return `«${sel.nome}» non ha quella quota, Sir: usi SCALA.`; memorizza(); const prima = sel.p[k], dv = piu[2] ? mmDa(piu[2], piu[3]) : prima * .2, [mi, ma] = SD_LIM_T[sel.tipo]?.[k] || SD_LIM[k];
         const v = Math.round(Math.max(mi, Math.min(ma, prima + (su ? dv : -dv))) * 10) / 10; if (sel.tipo === "sfera") sel.p.d = v; else sel.p[k] = v; if (sel.p.fori) sel.p.df = Math.min(sel.p.df, maxForo(sel)); rifai(sel, "laser"); contesto();
         return v === prima ? `È già al limite, Sir: ${fmtMm(v)}.` : `${SD_NOMI[k]} da ${fmtMm(prima)} a ${fmtMm(v)}, Sir.`; }
+      // 2 nov · «raddoppialo», «fallo il doppio», «dimezzalo», «la metà», «il triplo»: tutto in proporzione, e dice le misure vere
+      const volte = /\b(raddoppi\w*|il doppio|doppio)\b/.test(t) ? 2 : /\b(triplic\w*|il triplo)\b/.test(t) ? 3 : /\b(dimezz\w*|la metà|metà)\b/.test(t) ? .5 : /\bun terzo\b/.test(t) ? 1 / 3 : 0;
+      if (volte && !/\b(fori|foro|buchi|copi|duplic|serie)\b/.test(t)) { const g = B.ingombro(sel), lato = Math.max(g.l, g.p, g.h);
+        const f = volte > 1 ? Math.min(volte, SD_VOL / lato) : Math.max(volte, 2 / Math.min(g.l, g.p, g.h)); if (Math.abs(f - 1) < .01) return `Di più non entra nel volume di stampa, Sir: ${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} millimetri.`;
+        memorizza(); sel.scala *= f; B.posa(sel); mostraDati(); const n = B.ingombro(sel);
+        return `${volte > 1 ? (f < volte ? "Ingrandito fin dove entra" : volte === 2 ? "Il doppio" : "Il triplo") : volte === .5 ? "La metà" : "Un terzo"}, Sir: ${mm(n.l)} × ${mm(n.p)} × ${mm(n.h)} millimetri.`; }
       // le misure dette: «alto 50», «80 x 40 x 10», «diametro 3 cm», «fallo da 30»
       { const M = leggiMisure(t); const detta = M.tre || Object.keys(M.q).length || (M.main && /\b(fall[oa]|rendil[oa]|portal[oa]|cambial[oa]|misura|misure|deve essere|dev'essere|lo voglio|la voglio|imposta)\b/.test(t));
+        // 2 nov · i pezzi senza misure proprie (uniti, STL, disegni, creati dal cervello): la misura detta si raggiunge in proporzione
+        if (detta && !/%|grad/.test(t) && !SD_MIS[sel.tipo]) { const g = B.ingombro(sel), q = M.q, asse = q.h ? ["h", q.h] : q.l ? ["l", q.l] : q.p ? ["p", q.p] : q.d ? ["l", q.d] : q.lato ? ["l", q.lato] : M.main ? ["max", M.main] : M.tre ? ["l", { v: M.tre[0] }] : null;
+          if (!asse) return `Mi dica una misura, Sir: «alto 5 cm», «largo 80 mm».`; const ora = asse[0] === "max" ? Math.max(g.l, g.p, g.h) : g[asse[0]], vuole = asse[1].senza && asse[1].v < 5 ? asse[1].v * 10 : asse[1].v;
+          let f = vuole / ora; f = Math.min(f, SD_VOL / Math.max(g.l, g.p, g.h)); memorizza(); sel.scala *= f; B.posa(sel); mostraDati(); const n = B.ingombro(sel);
+          return `«${sel.nome}» in proporzione, Sir: ${mm(n.l)} × ${mm(n.p)} × ${mm(n.h)} millimetri${Math.abs(f * ora - vuole) > .5 ? ", di più non entra nel volume di stampa" : ""}.`; }
+        // una quota che il pezzo non ha («spessore» su un cilindro pieno, «alto» su un anello): lo dice, invece di «sono già quelle»
+        if (detta && !/%|grad/.test(t)) { const map = SD_MIS[sel.tipo], manca = Object.keys(M.q).filter((k) => !map[k] && !(k === "lato" && sel.tipo === "scatola"));
+          if (manca.length && manca.length === Object.keys(M.q).length && !M.tre) { const nomi = { h: "un'altezza", l: "una lunghezza", p: "una larghezza", d: "un diametro", sp: "uno spessore", par: "pareti", lato: "un lato" };
+            return `«${sel.nome}» non ha ${nomi[manca[0]] || "quella misura"} da cambiare, Sir: ${descrivi(sel)}.${(manca[0] === "sp" || manca[0] === "par") && SD_GUSCIO.includes(sel.tipo) ? ` Per le pareti: «svuotalo con pareti da ${mmT(M.q[manca[0]].v)} mm».` : ""}`; } }
         if (detta && !/%|grad/.test(t)) { if (!SD_MIS[sel.tipo]) return `«${sel.nome}» non ha misure da impostare, Sir: usi SCALA.`; const avvisi = []; memorizza(); const prima = JSON.stringify(sel.p);
           if (!applicaMisure(sel, M, avvisi) || JSON.stringify(sel.p) === prima) { storia.pop(); aggiornaStoria(); return `Le misure sono già quelle, Sir: ${descrivi(sel)}.${avvisi.length ? " " + avvisi.join(" ") : ""}`; }
           rifai(sel, "laser"); contesto(); return `«${sel.nome}»: ${descrivi(sel)}, Sir.${avvisi.length ? " " + avvisi.join(" ") : ""}`; } }
@@ -6758,7 +6779,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
   // ── DISEGNA: il piano di schizzo sul banco (come lo sketch di Shapr3D / Fusion): millimetri veri, griglia, aggancio ──
   //    MANO (a mano libera), LINEA (punti; si chiude toccando il primo), RETTANGOLO e CERCHIO (trascinando, con la misura), GOMMA.
   //    Le forme chiuse sono pezzi pieni; una forma chiusa dentro un'altra è un buco; un tratto aperto diventa un filo in rilievo.
-  const SK = { forme: [], attrezzo: "mano", sp: 5, filo: 3, aperto: null, raggioGomma: 3, storia: [], futuro: [] };
+  const SK = { forme: [], attrezzo: "mano", sp: 5, filo: 3, riempi: "pieno", aperto: null, raggioGomma: 3, storia: [], futuro: [] };
   let skAzioni = null, chiudiSchizzo = null;                                                 // mentre lo schizzo è aperto, Annulla/Ripeti in alto lavorano sullo schizzo (non sui pezzi dietro)
   function schizzo() {
     if (A.querySelector(".sd-schizzo")) return;
@@ -6783,6 +6804,8 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     // le forme in profondità: quelle dentro un numero dispari di altre sono buchi
     const profondita = () => { const ch = SK.forme.filter((f) => f.chiusa); ch.forEach((f) => { f.a = Math.abs(area(f.pts)); }); ch.forEach((f) => { f.prof = ch.filter((g) => g !== f && g.a > f.a && dentro(f.pts[0], g.pts)).length; }); };
     const scrivi = (t) => { O.querySelector('[data-sk="info"]').textContent = t; };
+    // PIENO: un tratto aperto che racchiude un'area (almeno 3 punti, non una riga dritta) si chiude da solo unendo la fine all'inizio
+    const chiudibile = (f) => !f.chiusa && f.pts.length >= 3 && Math.abs(area(f.pts)) > 4;
     const misura = (f) => { const xs = f.pts.map((p) => p[0]), ys = f.pts.map((p) => p[1]); return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]; };
     function disegna() {
       x.clearRect(0, 0, Wc, Hc);
@@ -6793,7 +6816,8 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
         if (mmy % 20 === 0 && mmy) { x.fillStyle = "rgba(79,227,255,.55)"; x.fillText(String(mmy), 4, py - 2); } }
       // le forme: piene in ciano tenue (i buchi restano vuoti), il bordo acceso
       profondita();
-      x.save(); x.beginPath(); SK.forme.filter((f) => f.chiusa).forEach((f) => { f.pts.forEach((p, i) => { const [a, b] = aPx(p); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); });
+      // 2 nov (il signore: «oltre alle linee, il pieno»): l'anteprima segue la scelta LINEE / PIENO
+      x.save(); x.beginPath(); (SK.riempi === "linee" ? [] : SK.forme.filter((f) => f.chiusa || chiudibile(f))).forEach((f) => { f.pts.forEach((p, i) => { const [a, b] = aPx(p); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); });
       x.fillStyle = "rgba(79,227,255,.16)"; x.fill("evenodd"); x.restore();
       x.shadowColor = "#4fe3ff"; x.shadowBlur = 8; x.lineJoin = x.lineCap = "round";
       SK.forme.forEach((f) => { x.beginPath(); f.pts.forEach((p, i) => { const [a, b] = aPx(p); i ? x.lineTo(a, b) : x.moveTo(a, b); }); if (f.chiusa) x.closePath();
@@ -6867,11 +6891,13 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     function strumentiSk() {
       if (!O.isConnected) return; if (SK.aperto) scrivi(`LINEA · ${SK.aperto.length} PUNTI · IL PRIMO CHIUDE · DOPPIO TOCCO TERMINA`); const ATT = [["mano", "SPLINE"], ["linea", "LINEA"], ["rett", "RETTANGOLO"], ["cerchio", "CERCHIO"], ["gomma", "CANCELLA"]];
       CTX.innerHTML = `<div class="riga2 sk-att">${ATT.map(([k2, n]) => `<button type="button" class="chip" data-ska="${k2}" aria-pressed="${SK.attrezzo === k2}">${n}</button>`).join("")}</div>
+        <div class="riga2 sk-riempi"><span>ESTRUDE</span><button type="button" class="chip" data-skr="linee" aria-pressed="${SK.riempi === "linee"}">LINEE</button><button type="button" class="chip" data-skr="pieno" aria-pressed="${SK.riempi === "pieno"}">PIENO</button></div>
         <label class="cur"><span>ESTRUSIONE</span><input type="range" min="1" max="40" step="1" value="${SK.sp}" data-skc="sp"><b>${SK.sp} mm</b></label>
         ${SK.attrezzo === "gomma" ? `<label class="cur"><span>GOMMA</span><input type="range" min="1" max="12" step=".5" value="${SK.raggioGomma * 2}" data-skc="gommaD"><b>Ø ${SK.raggioGomma * 2} mm</b></label>` : `<label class="cur"><span>TRATTO</span><input type="range" min="1" max="10" step=".5" value="${SK.filo}" data-skc="filo"><b>${SK.filo} mm</b></label>`}
         <div class="riga2">${SK.aperto ? `<button type="button" class="chip acceso" data-skb="fine">TERMINA</button>` : ""}<button type="button" class="chip${SK.storia.length ? "" : " spento"}" data-skb="annulla">ANNULLA</button><button type="button" class="chip${SK.forme.length ? "" : " spento"}" data-skb="pulisci">AZZERA</button></div>
         <button type="button" class="vai${SK.forme.length || SK.aperto ? "" : " spento"}" data-skb="alza">ESTRUDI</button>`;
       CTX.querySelectorAll("[data-ska]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); if (SK.aperto && b.dataset.ska !== "linea") chiudiLinea(); SK.attrezzo = b.dataset.ska; strumentiSk(); }));
+      CTX.querySelectorAll("[data-skr]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); SK.riempi = b.dataset.skr; strumentiSk(); scrivi(SK.riempi === "linee" ? "LINEE · ESTRUDE SOLO I TRATTI, ANCHE IL BORDO DELLE FORME" : "PIENO · ESTRUDE LE FORME RIEMPITE, I TRATTI APERTI SI CHIUDONO DA SOLI"); }));
       CTX.querySelectorAll("[data-skc]").forEach((i) => i.addEventListener("input", () => { if (i.dataset.skc === "gommaD") { SK.raggioGomma = +i.value / 2; i.nextElementSibling.textContent = `Ø ${i.value} mm`; return; } SK[i.dataset.skc] = +i.value; i.nextElementSibling.textContent = `${i.value} mm`; }));
       CTX.querySelectorAll("[data-skb]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); const a = b.dataset.skb;
         if (a === "fine") { if (!SK.aperto) { parlaMock("Con LINEA tocchi il piano punto per punto, Sir: TERMINA la lascia aperta, toccando il primo punto si chiude.", 3600); return; } chiudiLinea(); return; }
@@ -6882,6 +6908,16 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
         if (a === "alza") alza(); }));
     }
     const chiudiLinea = () => { const L = SK.aperto; SK.aperto = null; if (L && L.length >= 2) aggiungi({ tipo: "linea", pts: L, chiusa: false }); else aggiornaInfo(); };
+    // una forma chiusa spostata verso fuori (d > 0) o verso dentro (d < 0) di d mm: per gli anelli di LINEE
+    function offsetChiuso(pts, d) {
+      const P = area(pts) > 0 ? pts : pts.slice().reverse(), n = P.length; if (n < 3) return null; const o = [];
+      for (let i = 0; i < n; i++) { const a = P[(i - 1 + n) % n], b = P[i], c = P[(i + 1) % n];
+        const n1 = (() => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; })(), n2 = (() => { const dx = c[0] - b[0], dy = c[1] - b[1], l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; })();
+        let mx = n1[0] + n2[0], my = n1[1] + n2[1]; const ml = Math.hypot(mx, my) || 1; mx /= ml; my /= ml;
+        const k = Math.min(2, 1 / Math.max(.35, mx * n1[0] + my * n1[1]));   // spigoli vivi: al massimo il doppio, niente punte infinite
+        o.push([b[0] + mx * d * k, b[1] + my * d * k]); }
+      if (d < 0 && Math.abs(area(o)) < 1) return null; return o;
+    }
     // un tratto aperto diventa un filo: il contorno a distanza filo/2 da entrambi i lati, con le punte tonde
     function filo(pts, w) {
       const r = w / 2, L = [], R = [], n = pts.length;
@@ -6890,12 +6926,20 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       return [...L, ...capo(pts[n - 1], pts[n - 2], -1).reverse(), ...R.reverse(), ...capo(pts[0], pts[1], 1).reverse()];
     }
     function alza() {
-      if (SK.aperto) chiudiLinea(); if (!SK.forme.length) return; profondita();
-      const ch = SK.forme.filter((f) => f.chiusa), fili = SK.forme.filter((f) => !f.chiusa && f.pts.length >= 2);
+      if (SK.aperto) chiudiLinea(); if (!SK.forme.length) return;
+      // 2 nov: PIENO chiude i tratti aperti che racchiudono un'area; LINEE fa diventare filo anche il bordo delle forme chiuse
+      const originali = SK.forme; SK.forme = SK.riempi === "linee" ? [] : originali.map((f) => chiudibile(f) ? { ...f, chiusa: true } : f);
+      profondita();
+      const ch = SK.forme.filter((f) => f.chiusa), fili = SK.riempi === "linee" ? originali.filter((f) => !f.chiusa && f.pts.length >= 2) : SK.forme.filter((f) => !f.chiusa && f.pts.length >= 2);
+      const anelli = SK.riempi === "linee" ? originali.filter((f) => f.chiusa) : []; SK.forme = originali;
       // le forme nel formato del disegno (y verso il basso, come le immagini): pieni e buchi con i loro padri
       const loops = [], idx = new Map();
       ch.filter((f) => f.prof % 2 === 0).forEach((f) => { idx.set(f, loops.length); loops.push({ pts: f.pts.map(([a, b]) => [a, -b]), buco: false, padre: -1 }); });
       fili.forEach((f) => loops.push({ pts: filo(f.pts, SK.filo).map(([a, b]) => [a, -b]), buco: false, padre: -1 }));
+      // LINEE: il bordo di una forma chiusa diventa un anello largo quanto il TRATTO (fuori metà, dentro metà)
+      anelli.forEach((f) => { const fuori = offsetChiuso(f.pts, SK.filo / 2), dentroL = offsetChiuso(f.pts, -SK.filo / 2), i0 = loops.length;
+        loops.push({ pts: fuori.map(([a, b]) => [a, -b]), buco: false, padre: -1 });
+        if (dentroL && Math.abs(area(dentroL)) > 1) loops.push({ pts: dentroL.map(([a, b]) => [a, -b]), buco: true, padre: i0 }); });
       ch.filter((f) => f.prof % 2 === 1).forEach((f) => { let best = null; ch.forEach((g) => { if (g.prof % 2 === 0 && g.a > f.a && dentro(f.pts[0], g.pts) && (!best || g.a < best.a)) best = g; }); if (best) loops.push({ pts: f.pts.map(([a, b]) => [a, -b]), buco: true, padre: idx.get(best) }); });
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; loops.forEach((l) => l.pts.forEach(([a, b]) => { x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); }));
       const w = x1 - x0 || 1, h = y1 - y0 || 1, pos = { x: Math.round((x0 + x1) / 2), z: Math.round((y0 + y1) / 2) };   // dove l'ha disegnato: y dello schizzo = −z del banco
@@ -7008,7 +7052,14 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
 
   // il foglio (foto o immagine caricata) arriva sul tavolo: i tratti si disegnano di luce, poi si alzano in 3D
   async function foglioSulBanco(im, nome) {
-    let soglia = null, inverti = false, liscia = 1, uso = "sagoma", riempi = null;
+    let soglia = null, inverti = false, liscia = 1, uso = "sagoma", riempi = null, strati = 1, cacheS = null;
+    const strt = () => { const k = `${strati}|${inverti}|${liscia}`; if (cacheS?.k !== k) cacheS = { k, R: stratiStencil(im, strati, inverti, liscia) }; return cacheS.R; };
+    // l'anteprima: gli strati spruzzati uno sopra l'altro sul denim, dal più chiaro al più scuro
+    const anteprima = (img) => { const R = strt(), cv = document.createElement("canvas"), x = cv.getContext("2d"), D = devicePixelRatio || 1, Wc = 330, sc = Wc / (R.w * 1.12), Hc = Math.round(R.h * 1.12 * sc);
+      cv.width = Wc * D; cv.height = Hc * D; x.scale(D, D); x.fillStyle = "#2c4766"; x.fillRect(0, 0, Wc, Hc);
+      const col = { 2: ["#eef1f3", "#121519"], 3: ["#eef1f3", "#6f7a85", "#121519"], 4: ["#eef1f3", "#a9b4bd", "#56606b", "#121519"] }[strati], ox = (Wc - R.w * sc) / 2, oy = (Hc - R.h * sc) / 2;
+      R.strati.forEach((L, k) => { const p = new Path2D(); L.forEach((l) => l.pts.forEach(([a, b], i) => p[i ? "lineTo" : "moveTo"](ox + (a - R.cornice[0]) * sc, oy + (b - R.cornice[1]) * sc)) || p.closePath());
+        x.fillStyle = col[k]; x.fill(p, "evenodd"); }); img.src = cv.toDataURL(); };
     $sd("attesa").style.opacity = 0; info([`${nome.toUpperCase()} · LETTURA`, "CERCO IL FOGLIO…"]); await attesa(60);
     const calcola = () => contorniImmagine(im, soglia, inverti, liscia, riempi);
     let r = calcola();
@@ -7021,19 +7072,32 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     info(righe());
     await B.foglio(r);
     const mostra = () => {
-      CTX.innerHTML = tastiModo("disegno") + `<label class="cur"><span>SOGLIA</span><input type="range" min="20" max="235" step="1" value="${r.soglia}" data-fg="soglia"><b>${r.soglia}</b></label>
+      const auto = uso === "stencil" && strati > 1;                     // a strati le soglie le trovano i toni: SOGLIA e LINEE/PIENO non servono
+      CTX.innerHTML = tastiModo("disegno") + `<label class="cur"${auto ? " hidden" : ""}><span>SOGLIA</span><input type="range" min="20" max="235" step="1" value="${r.soglia}" data-fg="soglia"><b>${r.soglia}</b></label>
         <label class="cur"><span>TOLLERANZA</span><input type="range" min="0" max="4" step=".5" value="${liscia}" data-fg="liscia"><b>${liscia}</b></label>
-        <div class="riga2"><button type="button" class="chip" data-fgb="riempi" aria-pressed="${!!r.riempi}">RIEMPI</button><button type="button" class="chip" data-fgb="inverti" aria-pressed="${inverti}">INVERTI</button></div>
+        <div class="riga2 sk-riempi"${auto ? " hidden" : ""}><span>ESTRUDE</span><button type="button" class="chip" data-fgb="linee" aria-pressed="${!r.riempi}">LINEE</button><button type="button" class="chip" data-fgb="pieno" aria-pressed="${!!r.riempi}">PIENO</button><button type="button" class="chip" data-fgb="inverti" aria-pressed="${inverti}">INVERTI</button></div>
         <div class="riga2">${[["sagoma", "PROFILO"], ["timbro", "TIMBRO"], ["stencil", "STENCIL"]].map(([k, n]) => `<button type="button" class="chip" data-fgu="${k}" aria-pressed="${uso === k}">${n}</button>`).join("")}</div>
+        ${uso === "stencil" ? `<div class="riga2 sk-riempi"><span>STRATI</span>${[1, 2, 3, 4].map((k) => `<button type="button" class="chip" data-fgs="${k}" aria-pressed="${strati === k}">${k}</button>`).join("")}</div>
+        ${strati > 1 ? `<img class="sd-strati" data-fgv alt="Anteprima degli strati">` : ""}<p class="nota-sd">${strati > 1 ? `${strati} strati dai toni dell'immagine: si spruzza dal 1 (il più chiaro) al ${strati} (il più scuro). Stessa cornice e fori di registro: combaciano.` : "Uno strato solo: il disegno così com'è. Con più strati, ogni tono ha il suo stencil."}</p>` : ""}
         <div class="riga2 vai-riga"><button type="button" class="vai" data-fgb="alza">ESTRUDI</button><button type="button" class="chip" data-scarta>SCARTA</button></div>`;
       CTX.querySelectorAll("[data-fg]").forEach((i) => i.addEventListener("input", () => { if (i.dataset.fg === "soglia") soglia = +i.value; else liscia = +i.value; i.nextElementSibling.textContent = i.value;
         r = calcola(); B.tratti(r); info(righe()); }));
       CTX.querySelectorAll("[data-fgu]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); uso = b.dataset.fgu; mostra(); }));
+      CTX.querySelectorAll("[data-fgs]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); strati = +b.dataset.fgs; mostra(); }));
+      const cv = CTX.querySelector("[data-fgv]"); if (cv) anteprima(cv);
       CTX.querySelectorAll("[data-fgb]").forEach((b) => b.addEventListener("click", () => { suona("aTick");
         if (b.dataset.fgb === "inverti") { inverti = !inverti; r = calcola(); B.foglio(r, true); info(righe()); mostra(); return; }
-        if (b.dataset.fgb === "riempi") { riempi = !r.riempi; r = calcola(); B.tratti(r); info(righe()); mostra(); return; }
+        // 2 nov: LINEE estrude solo i tratti del disegno, PIENO le forme riempite (prima era un solo tasto RIEMPI)
+        if (b.dataset.fgb === "linee" || b.dataset.fgb === "pieno") { const vuole = b.dataset.fgb === "pieno"; if (!!r.riempi === vuole) return; riempi = vuole; r = calcola(); B.tratti(r); info(righe()); mostra(); return; }
         if (!r.loops.some((l) => !l.buco)) { parlaMock("Con questa soglia non resta niente da alzare, Sir.", 2600); return; }
         inAttesa = null; B.via(); const l = Math.max(10, Math.min(250, larg() || 100));
+        if (uso === "stencil" && strati > 1) {                        // 2 nov · STENCIL A STRATI: uno stencil per tono, in fila sul banco
+          info([`STENCIL · ${strati} STRATI`, "TONI · CORNICE COMUNE · REGISTRO"]); const R = strt(), lS = Math.max(20, Math.min(250, R.mmPx ? Math.round(R.w * R.mmPx) : l));
+          const passo = lS + 26, x0 = -passo * (strati - 1) / 2; memorizza(); let ultimo = null;
+          R.strati.forEach((loops, k) => { if (!loops.some((q) => !q.buco)) return; ultimo = nuovo("disegno", { loops, w: R.w, h: R.h, l: lS, sp: 1.2, r: 0, uso: "stencil", fori: 0, df: 4, cornice: R.cornice, strato: k + 1, di: strati }, `Stencil ${k + 1}/${strati}`, { anim: "dalfoglio", pos: { x: Math.round(x0 + k * passo), z: 0 }, senzaStoria: true }); });
+          if (!ultimo) { parlaMock("Da questa immagine non escono strati, Sir: provi INVERTI o una foto più contrastata.", 3200); return; }
+          parlaMock(`${strati} strati pronti, Sir: larghi ${lS} millimetri, spessore 1,2. Si spruzza dal primo, il più chiaro. I tre fori agli angoli servono a metterli a registro; i puntini dicono il numero dello strato.`, 4800);
+          contesto(); return; }
         nuovo("disegno", { loops: r.loops, w: r.w, h: r.h, l, sp: 5, r: 0, uso, fori: 0, df: 4 }, uso === "timbro" ? "Timbro" : uso === "stencil" ? "Stencil" : "Sagoma", { anim: "dalfoglio" });
         const misura = larg() ? `largo ${l} millimetri, come sul foglio` : `largo ${l / 10} centimetri`;
         parlaMock(uso === "timbro" ? `Timbro pronto, Sir: a specchio, con la base e il manico, ${misura}.` : uso === "stencil" ? `Stencil pronto, Sir: ${misura}, con i ponti che tengono le isole.` : `Ecco il disegno in 3D, Sir: ${misura}, spessore 5 millimetri.`, 3400);
@@ -7148,11 +7212,17 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
         <div>Sbalzi oltre 45°<em class="${sbalzi ? "no" : ""}">${sbalzi ? `${Math.max(1, Math.round(pi.sbalzi * 100))}% · SERVONO SUPPORTI` : "NESSUNO"}</em></div><div>Volume di stampa 256 mm<em class="${sta ? "" : "no"}">${sta ? "SÌ" : "NO · DA DIVIDERE"}</em></div><div>Orientamento<em>${pi.orient}</em></div></div>
       <div class="riga2" style="display:flex;gap:6px">${Object.keys(materiali).map((m, i) => `<button type="button" class="chip" data-mat="${m}" aria-pressed="${!i}" style="flex:1">${m}</button>`).join("")}</div>
       <div class="sd-numeri"><div><small>VOLUME</small><b>${v.toFixed(1).replace(".", ",")}</b><span>cm³</span></div><div><small>MATERIALE</small><b data-n="gr">${conti().gr}</b><span>grammi · 15%</span></div><div><small>TEMPO</small><b data-n="t" style="font-size:14px">${conti().t}</b><span>stima</span></div></div>
-      <div class="sd-azioni"><button type="button" class="pieno" data-st="stl">SALVA STL</button><button type="button" class="vuoto" data-st="servizio">SERVICE</button></div>
-      <p class="nota-sd" style="margin:0;font:11px var(--sans);color:#9fb3b9">Volume, maglia chiusa, sbalzi e orientamento sono calcolati sul modello; grammi e tempo sono stime (riempimento 15%). L'STL esce già nell'orientamento per la stampa. L'STL che salva è vero (qui arriva dentro uno zip) e si apre in qualsiasi programma di stampa.</p>`);
+      <div class="sd-azioni"><button type="button" class="pieno" data-st="stl">SALVA STL</button><button type="button" class="pieno" data-st="3mf">SALVA 3MF</button>${o.tipo === "disegno" && o.p.uso === "stencil" ? `<button type="button" class="vuoto largo" data-st="svg">SVG DA TAGLIARE</button>` : `<button type="button" class="vuoto largo" data-st="servizio">SERVICE</button>`}</div>
+      <p class="nota-sd" style="margin:0;font:11px var(--sans);color:#9fb3b9">Volume, maglia chiusa, sbalzi e orientamento sono calcolati sul modello; grammi e tempo sono stime (riempimento 15%). STL e 3MF escono già nell'orientamento per la stampa, in millimetri. Il 3MF ha i vertici condivisi e si apre in Bambu Studio, PrusaSlicer, Cura e OrcaSlicer; ${oggetti.filter((x) => !x.foro).length > 1 ? "con più pezzi sul banco li mette tutti sullo stesso piatto, come sono sul banco." : "con un pezzo solo, esce quello selezionato."}</p>`);
     F.querySelectorAll("[data-mat]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); mat = b.dataset.mat; F.querySelectorAll("[data-mat]").forEach((x) => x.setAttribute("aria-pressed", x === b)); const c = conti(); F.querySelector('[data-n="gr"]').textContent = c.gr; F.querySelector('[data-n="t"]').textContent = c.t; }));
     F.querySelector('[data-st="stl"]').addEventListener("click", async () => { suona("aTick"); const r = await scarica(B.stl(o, pi.m), `${o.nome.replace(/[^\w-]+/g, "_")}.stl`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm)${window.JARVIS_APP ? "" : ", dentro uno zip"}`), { titolo: "Studio" }); });
-    F.querySelector('[data-st="servizio"]').addEventListener("click", async () => { if (window.JARVIS_APP) { suona("aTick"); parlaMock("Salvo il file e apro Vectorealism, Sir: lo carichi lì, scelga materiale e colore e tocchi Calcola il preventivo.", 4200); let st = B.stl(o, pi.m), nm = `${o.nome.replace(/[^\w-]+/g, "_")}.stl`; if (st.length > 9e6) { st = zipUno(nm, new TextEncoder().encode(st)); nm = nm.replace(/\.stl$/i, ".zip"); } const r = await scarica(st, nm); if (r === "ok") window.webkit.messageHandlers.jarvis.postMessage({ tipo: "apriURL", url: "https://www.vectorealism.com/it/stampa-3d/" }); else notifica(esitoSalva(r, ""), { titolo: "Studio" }); return; } suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF: ${conti().gr} g di ${mat}. Le dico prezzo e tempi appena rispondono, Sir.`, { titolo: "Studio" }); });
+    // 2 nov · il 3MF: con un pezzo solo, orientato come l'STL; con più pezzi, tutto il banco su un piatto (com'è disposto)
+    F.querySelector('[data-st="3mf"]').addEventListener("click", async () => { suona("aTick"); const pieni = oggetti.filter((x) => !x.foro), uno = pieni.length <= 1;
+      const pezzi = uno ? [{ nome: o.nome, stl: B.stl(o, pi.m) }] : pieni.map((x) => ({ nome: x.nome, stl: B.stl(x) })), titolo = uno ? o.nome : (progAtt()?.nome || "Banco");
+      const r = await scarica(treMF(pezzi, titolo), `${titolo.replace(/[^\w-]+/g, "_")}.3mf`); if (r === "ok") suona("aPronto");
+      notifica(esitoSalva(r, `Salvato ${titolo}.3mf${uno ? "" : `, ${pieni.length} pezzi sul piatto`}`), { titolo: "Studio" }); });
+    F.querySelector('[data-st="svg"]')?.addEventListener("click", async () => { suona("aTick"); const r = await scarica(new TextEncoder().encode(stencilSVG(o)), `${o.nome.replace(/[^\w-]+/g, "_")}.svg`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.svg, in millimetri veri: per la plotter da taglio o il laser`), { titolo: "Studio" }); });
+    F.querySelector('[data-st="servizio"]')?.addEventListener("click", async () => { if (window.JARVIS_APP) { suona("aTick"); parlaMock("Salvo il file e apro Vectorealism, Sir: lo carichi lì, scelga materiale e colore e tocchi Calcola il preventivo.", 4200); let st = B.stl(o, pi.m), nm = `${o.nome.replace(/[^\w-]+/g, "_")}.stl`; if (st.length > 9e6) { st = zipUno(nm, new TextEncoder().encode(st)); nm = nm.replace(/\.stl$/i, ".zip"); } const r = await scarica(st, nm); if (r === "ok") window.webkit.messageHandlers.jarvis.postMessage({ tipo: "apriURL", url: "https://www.vectorealism.com/it/stampa-3d/" }); else notifica(esitoSalva(r, ""), { titolo: "Studio" }); return; } suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF: ${conti().gr} g di ${mat}. Le dico prezzo e tempi appena rispondono, Sir.`, { titolo: "Studio" }); });
   }
   // APP · CONDIVIDI vero: il file del formato scelto, poi il foglio di condivisione di iOS
   async function condividiVero(o, fmt) {
@@ -7204,6 +7274,37 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
 }
 
 /* ── uno zip con un file solo (senza compressione): serve per salvare l'STL dal visore ── */
+/* ── 2 nov · uno zip con più file (senza compressione): serve per il 3MF, che è uno zip con il modello e le sue carte ── */
+function zipMolti(files) {
+  const enc = new TextEncoder(), parti = [], dirs = []; let off = 0;
+  const w = (a, o, v, b) => { for (let i = 0; i < b; i++) a[o + i] = (v >>> (8 * i)) & 255; };
+  for (const f of files) { const n = enc.encode(f.nome), d = typeof f.dati === "string" ? enc.encode(f.dati) : f.dati instanceof Uint8Array ? f.dati : new Uint8Array(f.dati);
+    let crc = ~0; for (let i = 0; i < d.length; i++) { crc ^= d[i]; for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1)); } crc = ~crc >>> 0;
+    const loc = new Uint8Array(30 + n.length), dir = new Uint8Array(46 + n.length);
+    w(loc, 0, 0x04034b50, 4); w(loc, 4, 20, 2); w(loc, 14, crc, 4); w(loc, 18, d.length, 4); w(loc, 22, d.length, 4); w(loc, 26, n.length, 2); loc.set(n, 30);
+    w(dir, 0, 0x02014b50, 4); w(dir, 4, 20, 2); w(dir, 6, 20, 2); w(dir, 16, crc, 4); w(dir, 20, d.length, 4); w(dir, 24, d.length, 4); w(dir, 28, n.length, 2); w(dir, 42, off, 4); dir.set(n, 46);
+    parti.push(loc, d); dirs.push(dir); off += loc.length + d.length; }
+  const lung = dirs.reduce((a, d) => a + d.length, 0), fine = new Uint8Array(22);
+  w(fine, 0, 0x06054b50, 4); w(fine, 8, files.length, 2); w(fine, 10, files.length, 2); w(fine, 12, lung, 4); w(fine, 16, off, 4);
+  return new Blob([...parti, ...dirs, fine]);
+}
+/* il 3MF vero: i pezzi (dall'STL già orientato per la stampa, Z in alto) con i vertici condivisi — così il programma di stampa
+   lo vede chiuso —, in millimetri, appoggiati al piano (z = 0) e al centro di un piatto da 256 mm */
+function treMF(pezzi, titolo) {
+  const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const ogg = pezzi.map(({ nome, stl }) => { const V = [], T3 = [], idx = new Map(); let tri = [];
+    for (const r of stl.split("\n")) { const m = r.match(/^\s*vertex\s+(\S+)\s+(\S+)\s+(\S+)/); if (!m) continue; const k = `${m[1]} ${m[2]} ${m[3]}`;
+      let i = idx.get(k); if (i == null) { i = V.length; idx.set(k, i); V.push([+m[1], +m[2], +m[3]]); } tri.push(i); if (tri.length === 3) { if (tri[0] !== tri[1] && tri[1] !== tri[2] && tri[0] !== tri[2]) T3.push(tri); tri = []; } }
+    return { nome, V, T: T3 }; });
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity; ogg.forEach((o) => o.V.forEach(([x, y, z]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); }));
+  const dx = 128 - (x0 + x1) / 2, dy = 128 - (y0 + y1) / 2, dz = -z0, f = (v) => +v.toFixed(4);
+  const risorse = ogg.map((o, i) => `  <object id="${i + 1}" name="${esc(o.nome)}" type="model">\n   <mesh>\n    <vertices>\n${o.V.map(([x, y, z]) => `     <vertex x="${f(x + dx)}" y="${f(y + dy)}" z="${f(z + dz)}"/>`).join("\n")}\n    </vertices>\n    <triangles>\n${o.T.map(([a, b, c]) => `     <triangle v1="${a}" v2="${b}" v3="${c}"/>`).join("\n")}\n    </triangles>\n   </mesh>\n  </object>`).join("\n");
+  const modello = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="it-IT" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n <metadata name="Title">${esc(titolo)}</metadata>\n <metadata name="Application">JARVIS Studio</metadata>\n <resources>\n${risorse}\n </resources>\n <build>\n${ogg.map((_, i) => `  <item objectid="${i + 1}"/>`).join("\n")}\n </build>\n</model>\n`;
+  return zipMolti([
+    { nome: "[Content_Types].xml", dati: `<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>\n` },
+    { nome: "_rels/.rels", dati: `<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>\n` },
+    { nome: "3D/3dmodel.model", dati: modello }]);
+}
 function zipUno(nome, dati) {
   const enc = new TextEncoder(), n = enc.encode(nome), d = dati instanceof Uint8Array ? dati : new Uint8Array(dati);
   let crc = ~0; for (let i = 0; i < d.length; i++) { crc ^= d[i]; for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1)); } crc = ~crc >>> 0;
@@ -7372,7 +7473,73 @@ function contorniImmagine(im, soglia, inverti, liscia, riempi) {
   let mx = Infinity, my = Infinity, Mx = -Infinity, My = -Infinity; fin.forEach((o) => o.pts.forEach(([a, b]) => { mx = Math.min(mx, a); my = Math.min(my, b); Mx = Math.max(Mx, a); My = Math.max(My, b); }));
   return { loops: fin, w: Mx - mx || 1, h: My - my || 1, x0: mx, y0: my, W, H, soglia: Math.round(soglia), buchi: fin.filter((o) => o.buco).length, maschera: m, img: P.img, mmPx: P.mmPx, tipo: P.tipo, riempi, auto, contorno, inchiostro };
 }
+/* ── 2 nov · i bordi di una maschera (marching squares) → profili chiusi con i buchi (le isole dentro): li usa lo STENCIL A STRATI ── */
+function tracciaMaschera(m, W, H, eps = .7) {
+  const M = (X, Y) => (X < 0 || Y < 0 || X >= W || Y >= H) ? 0 : m[Y * W + X];
+  const segs = [], key = (p) => p[0] * 4 + "," + p[1] * 4;
+  const TAB = { 1: [[3, 2]], 2: [[2, 1]], 3: [[3, 1]], 4: [[0, 1]], 5: [[3, 0], [2, 1]], 6: [[0, 2]], 7: [[3, 0]], 8: [[3, 0]], 9: [[0, 2]], 10: [[0, 1], [3, 2]], 11: [[0, 1]], 12: [[3, 1]], 13: [[2, 1]], 14: [[3, 2]] };
+  for (let y = -1; y < H; y++) for (let X = -1; X < W; X++) {
+    const idx = M(X, y) * 8 + M(X + 1, y) * 4 + M(X + 1, y + 1) * 2 + M(X, y + 1); if (!idx || idx === 15) continue;
+    const P = [[X + .5, y], [X + 1, y + .5], [X + .5, y + 1], [X, y + .5]];   // sopra, destra, sotto, sinistra
+    TAB[idx].forEach(([a, b]) => segs.push([P[a], P[b]])); }
+  const mappa = new Map(); segs.forEach((sg, i) => sg.forEach((p) => { const k = key(p); let a = mappa.get(k); if (!a) mappa.set(k, (a = [])); a.push(i); }));
+  const usato = new Uint8Array(segs.length), giri = [];
+  for (let i = 0; i < segs.length; i++) { if (usato[i]) continue; usato[i] = 1; const g = [segs[i][0], segs[i][1]]; let cur = segs[i][1];
+    for (let guard = 0; guard < 800000; guard++) { const c = (mappa.get(key(cur)) || []).find((j) => !usato[j]); if (c == null) break; usato[c] = 1; const sg = segs[c]; cur = key(sg[0]) === key(cur) ? sg[1] : sg[0]; g.push(cur); }
+    if (g.length > 8) giri.push(g); }
+  const area = (l) => { let a = 0; for (let i = 0; i < l.length; i++) { const [x1, y1] = l[i], [x2, y2] = l[(i + 1) % l.length]; a += x1 * y2 - x2 * y1; } return a / 2; };
+  const rdp = (pts, e) => { if (pts.length < 3) return pts; let dmax = 0, idx = 0; const a = pts[0], b = pts[pts.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], n = Math.hypot(dx, dy) || 1;
+    for (let i = 1; i < pts.length - 1; i++) { const d = Math.abs(dy * pts[i][0] - dx * pts[i][1] + b[0] * a[1] - b[1] * a[0]) / n; if (d > dmax) { dmax = d; idx = i; } }
+    return dmax > e ? [...rdp(pts.slice(0, idx + 1), e).slice(0, -1), ...rdp(pts.slice(idx), e)] : [a, b]; };
+  const rdpChiuso = (l, e) => { const q = key(l[0]) === key(l[l.length - 1]) ? l.slice(0, -1) : l; if (q.length < 4) return q; let f = 0, df = -1;
+    q.forEach((p2, i) => { const d2 = (p2[0] - q[0][0]) ** 2 + (p2[1] - q[0][1]) ** 2; if (d2 > df) { df = d2; f = i; } });
+    return [...rdp(q.slice(0, f + 1), e).slice(0, -1), ...rdp([...q.slice(f), q[0]], e).slice(0, -1)]; };
+  const dentro = (p, l) => { let c = false; for (let i = 0, j = l.length - 1; i < l.length; j = i++) { const [xi, yi] = l[i], [xj, yj] = l[j]; if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const L = giri.map((g) => ({ pts: rdpChiuso(g, eps) })).filter((o) => o.pts.length >= 3 && Math.abs(area(o.pts)) > 6);
+  L.forEach((o) => { o.a = Math.abs(area(o.pts)); }); L.forEach((o, i) => { o.prof = L.reduce((n, q, j) => n + (j !== i && q.a > o.a && dentro(o.pts[0], q.pts) ? 1 : 0), 0); });
+  const out = L.map((o) => ({ pts: o.pts, buco: o.prof % 2 === 1, padre: -1, a: o.a }));
+  out.forEach((o, i) => { if (!o.buco) return; let best = -1, ba = Infinity; out.forEach((q, j) => { if (j !== i && !q.buco && q.a > o.a && q.a < ba && dentro(o.pts[0], q.pts)) { ba = q.a; best = j; } }); o.padre = best; });
+  const resta = out.filter((o) => !o.buco || o.padre >= 0), ni = new Map(resta.map((o, i) => [o, i]));
+  return resta.map((o) => ({ pts: o.pts, buco: o.buco, padre: o.buco ? ni.get(out[o.padre]) : -1 }));
+}
 const LETTURE = new WeakMap();
+/* ── STENCIL A STRATI (2 nov, il signore: «lo stencil per il denim, a strati»). Dalla foto, i toni: lo strato 1 taglia tutto quello che non è
+   carta/fondo (soglia di Otsu), gli strati dopo solo le zone sempre più scure (diviso a quantili, così ogni strato ha il suo peso). Si spruzza
+   dal più chiaro al più scuro, uno sopra l'altro. Tutti nella stessa cornice, con i fori di registro: combaciano. */
+function stratiStencil(im, n, inverti, liscia = 1) {
+  let P = LETTURE.get(im); if (!P) { P = preparaFoglio(im); LETTURE.set(im, P); }
+  const c = P.img, W = c.width, H = c.height, N = W * H, d = c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  let g = new Float32Array(N); for (let i = 0; i < N; i++) g[i] = .299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2];
+  g = sfoca(g, W, H, 1);
+  const ord = Float32Array.from(g).sort(), lo = ord[Math.floor(N * .02)], hi = ord[Math.floor(N * .98)], rng = Math.max(1, hi - lo);
+  const scuro = new Uint8Array(N); for (let i = 0; i < N; i++) { let v = (g[i] - lo) / rng; v = Math.max(0, Math.min(1, v)); scuro[i] = Math.round((inverti ? v : 1 - v) * 255); }
+  // i toni: k-medie sull'istogramma (fondo + n toni), le soglie a metà fra un tono e il successivo. Così i toni veri si separano,
+  // anche quando uno occupa poca superficie (una pupilla, un'ombra piccola).
+  const ist = new Float64Array(256); for (let i = 0; i < N; i++) ist[scuro[i]]++;
+  let cen = Array.from({ length: n + 1 }, (_, k) => 255 * k / n);
+  for (let it = 0; it < 40; it++) { const sw = new Float64Array(n + 1), sv = new Float64Array(n + 1);
+    for (let v = 0; v < 256; v++) { if (!ist[v]) continue; let j = 0; for (let k = 1; k <= n; k++) if (Math.abs(v - cen[k]) < Math.abs(v - cen[j])) j = k; sw[j] += ist[v]; sv[j] += ist[v] * v; }
+    cen = cen.map((c, k) => sw[k] ? sv[k] / sw[k] : c).sort((a, b) => a - b); }
+  const t1 = Math.max(20, Math.min(otsu(scuro), (cen[0] + cen[1]) / 2 + 1)), soglie = [t1];
+  for (let k = 2; k <= n; k++) soglie.push(Math.max(soglie[k - 2] + 8, (cen[k - 1] + cen[k]) / 2));
+  const minA = Math.max(10, N * .00012), eps = .6 + liscia * .35, strati = [];
+  soglie.forEach((tk) => { let m = new Uint8Array(N); for (let i = 0; i < N; i++) m[i] = scuro[i] >= tk ? 1 : 0;
+    m = morfo(morfo(m, W, H, true), W, H, false); m = morfo(morfo(m, W, H, false), W, H, true);   // chiude i buchetti, toglie i puntini
+    const { lab, info } = componenti(m, W, H, true); for (let i = 0; i < N; i++) if (m[i] && info[lab[i]].n < minA) m[i] = 0;
+    strati.push(tracciaMaschera(m, W, H, eps)); });
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; strati.forEach((L) => L.forEach((l) => l.pts.forEach(([a, b]) => { x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); })));
+  return { strati, cornice: [x0, y0, x1, y1], w: x1 - x0 || 1, h: y1 - y0 || 1, mmPx: P.mmPx, soglie };
+}
+/* lo stencil per la plotter da taglio o il laser: lo stesso disegno della lastra (bordo, tagli, isole, registro) in un SVG in millimetri */
+function stencilSVG(o) {
+  const p = o.p; let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity; p.loops.forEach((l) => l.pts.forEach(([x, y]) => { bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); by0 = Math.min(by0, y); by1 = Math.max(by1, y); }));
+  if (p.cornice) [bx0, by0, bx1, by1] = p.cornice;
+  const s = p.l / p.w, M = 8, X = (x) => ((x - bx0) * s + M).toFixed(2), Y = (y) => ((y - by0) * s + M).toFixed(2), Wm = (bx1 - bx0) * s + 2 * M, Hm = (by1 - by0) * s + 2 * M;
+  const path = (pts) => "M" + pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join("L") + "Z", cer = (cx, cy, r) => `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r}"/>`;
+  const tagli = p.loops.filter((l) => !l.buco).map((l) => `<path d="${path(l.pts)}"/>`).join(""), isole = p.loops.filter((l) => l.buco).map((l) => `<path d="${path(l.pts)}" stroke="#0a7"/>`).join("");
+  const reg = p.cornice ? cer(M - 4, Hm - M + 4, 1.6) + cer(Wm - M + 4, Hm - M + 4, 1.6) + cer(M - 4, M - 4, 1.6) + Array.from({ length: p.strato || 0 }, (_, i) => cer(Wm - M + 4 - i * 3.4, M - 4, .9)).join("") : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${Wm.toFixed(1)}mm" height="${Hm.toFixed(1)}mm" viewBox="0 0 ${Wm.toFixed(2)} ${Hm.toFixed(2)}">\n<!-- ${o.nome} · JARVIS Studio · bordo in nero, tagli in nero, isole da tenere in verde -->\n<g fill="none" stroke="#000" stroke-width=".2"><rect x="0" y="0" width="${Wm.toFixed(2)}" height="${Hm.toFixed(2)}" rx="4"/>${tagli}${isole}${reg}</g>\n</svg>\n`;
+}
 /* ── L'OGGETTO IN UNA FOTO → OLOGRAMMA 3D (nell'app: VNGenerateForegroundInstanceMaskRequest di Vision per staccarlo, sul telefono, gratis)
    1 · lo stacca dallo sfondo: i colori del bordo della foto sono lo sfondo (4 gruppi, k-medie); quello che è lontano da tutti è l'oggetto
    2 · tiene il pezzo più grande e più centrale, chiude i buchi
@@ -7693,6 +7860,7 @@ async function bancoOlografico3D(el, vivo, cb) {
     if (o.tipo === "disegno") {
       // le coordinate dal bordo del disegno (prima partivano dall'angolo della foto: il timbro e la sua base erano sfalsati)
       let bx0 = Infinity, by1 = -Infinity; p.loops.forEach((l) => l.pts.forEach(([x, y]) => { bx0 = Math.min(bx0, x); by1 = Math.max(by1, y); }));
+      if (p.cornice) { bx0 = p.cornice[0]; by1 = p.cornice[3]; }       // 2 nov · STRATI: tutti gli strati nella stessa cornice, così combaciano
       const s = p.l / p.w, fx = (x) => (x - bx0) * s, fy = (y) => (by1 - y) * s;
       const forma = (pts, P = T.Shape) => { const f = new P(); pts.forEach(([x, y], i) => (i ? f.lineTo(fx(x), fy(y)) : f.moveTo(fx(x), fy(y)))); f.closePath(); return f; };
       const esterni = p.loops.map((l, i) => ({ l, i })).filter((q) => !q.l.buco);
@@ -7700,7 +7868,12 @@ async function bancoOlografico3D(el, vivo, cb) {
       const sp = p.sp || 5;
       if (p.uso === "stencil") {
         let mx = Infinity, my = Infinity, Mx = -Infinity, My = -Infinity; p.loops.forEach((l) => l.pts.forEach(([x, y]) => { mx = Math.min(mx, fx(x)); Mx = Math.max(Mx, fx(x)); my = Math.min(my, fy(y)); My = Math.max(My, fy(y)); }));
+        if (p.cornice) { mx = fx(p.cornice[0]); Mx = fx(p.cornice[2]); my = fy(p.cornice[3]); My = fy(p.cornice[1]); }
         const lastra = rett(mx - 8, my - 8, Mx + 8, My + 8, 4); esterni.forEach(({ l }) => lastra.holes.push(forma(l.pts, T.Path)));
+        // STRATI: tre fori di registro negli stessi punti su ogni strato (asimmetrici: lo strato non si può girare per sbaglio)
+        // e tanti puntini quanto il numero dello strato, in alto a destra (1 = il primo da spruzzare, il più chiaro)
+        if (p.cornice) { [[mx - 4, my - 4], [Mx + 4, my - 4], [mx - 4, My + 4]].forEach(([a, b]) => lastra.holes.push(cerchio(a, b, 1.6)));
+          for (let i = 0; i < (p.strato || 0); i++) lastra.holes.push(cerchio(Mx + 4 - i * 3.4, My + 4, .9)); }
         out.push({ geo: est(lastra, sp) });
         p.loops.forEach((b) => { if (!b.buco) return; out.push({ geo: est(forma(b.pts), sp), dz: 40 });   // le isole (il buco della R) e i ponti che le tengono
           let bx = 0, bMy = -Infinity; b.pts.forEach(([x, y]) => { bx += fx(x) / b.pts.length; bMy = Math.max(bMy, fy(y)); });

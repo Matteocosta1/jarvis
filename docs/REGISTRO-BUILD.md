@@ -231,3 +231,11 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 ### 10.0 (19) · 27 ott notte
 - Tutto quello della 18 (icone in alto: misure, spazi, linee come Social, Studio 18 pt) con numero nuovo.
 - **2 nov 2026**: il signore dice che l'app JARVIS (10.0 (19)) «funziona da dio».
+
+### 10.0 (20) · 2 nov · STUDIO Fase 1 (mockup approvato dal signore: «si molto bello»)
+- **ESTRUDE · LINEE / PIENO**: nello schizzo e nel foglio si sceglie se alzare solo i tratti o le forme piene.
+- **STENCIL A STRATI**: foto o disegno → STENCIL → STRATI 2-4; anteprima degli strati spruzzati sul denim; uno stencil per tono, cornice comune, 3 fori di registro asimmetrici e puntini col numero dello strato; **SVG DA TAGLIARE** in millimetri (plotter/laser) oltre all'STL.
+- **Voce in misure vere**: «e mezzo», «7,5 cm», raddoppia/dimezza/il triplo; sui pezzi uniti o creati la misura detta si raggiunge in proporzione; se il pezzo non ha quella misura lo dice.
+- **SALVA 3MF** nel foglio di stampa: vertici condivisi (maglia chiusa), millimetri, appoggiato al piatto; un pezzo = orientato come l'STL, più pezzi = tutti sul piatto come sul banco.
+- SCRITTA 3D graffiti: fatta e poi **tolta su richiesta del signore** (2 nov), non è nella build.
+- Collaudo (Playwright, pagina dell'app): stencil 3 strati, SVG, 3MF (maglia chiusa, 0 spigoli sbagliati), STL senza zip nell'app, 19 frasi a voce, schizzo; dock identico a prima. Nessun file Swift toccato: cambia solo la pagina dello Studio (markx.html).
