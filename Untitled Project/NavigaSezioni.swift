@@ -31,6 +31,10 @@ final class NavigaSezioni: ObservableObject {
     @Published var verso: UUID?? = nil
     /// AGGANCIO: la sezione che si sta sciogliendo in luce.
     @Published var agganciata: UUID?
+    /// Su dal basso: la tirata è partita dalle pagine olografiche (lasciata, torna a JARVIS).
+    var bassoDaSfoglio = false
+    /// Su dal basso fermo: la tendina PROTOCOLLI è aperta (o tirata), come nel mockup.
+    var bassoFermo = false
 }
 
 /// Dove e come sta una pagina (gli stessi modificatori in tutti i modi: cambiano solo i valori).
@@ -85,12 +89,10 @@ struct StratoSezioniVista<Vista: View>: View {
     let portaDavanti: (UUID?) -> Void
     let chiudiDietro: (UUID) -> Void
 
-    @State private var inizioTira: Date?
-    @State private var fermoDa: Date?
-    @State private var ultimoSu: CGFloat = 0
     @State private var P0: Double = 0
     @State private var assePagina: Int = 0           // 0 da decidere, 1 orizzontale (sfoglia), 2 verticale (alza)
     @State private var trackpad = TrackpadSezioni()  // sul Mac: due dita in orizzontale
+    @State private var basso = GestoBassoSezioni()   // su dal basso, poco sopra la barretta di iOS
 
     private var altezza: CGFloat { FasciaAlta.finestra?.bounds.height ?? 852 }
     private var larghezza: CGFloat { FasciaAlta.finestra?.bounds.width ?? 393 }
@@ -142,7 +144,8 @@ struct StratoSezioniVista<Vista: View>: View {
             bordi
         }
         .gesture(gestoSfoglio, including: naviga.modo == .sfoglio ? .all : .subviews)
-        .onAppear { preparaTrackpad() }
+        .onAppear { preparaTrackpad(); preparaBasso() }
+        .onChange(of: pila.voci.isEmpty) { basso.installa() }            // se all'avvio la finestra non c'era ancora
     }
 
     // MARK: le pagine
@@ -206,20 +209,10 @@ struct StratoSezioniVista<Vista: View>: View {
         return p
     }
 
-    // MARK: i bordi (in basso: su; ai lati: la sezione accanto)
+    // MARK: i bordi ai lati (la sezione accanto). Su dal basso: `GestoBassoSezioni`, sulla finestra.
 
     @ViewBuilder private var bordi: some View {
         let davanti = pila.voceDavanti
-        if (davanti != nil || naviga.modo == .sfoglio || !pila.voci.isEmpty) {
-            // in basso: tutta la larghezza, 24 punti (sopra la barretta di iOS: il primo swipe è di JARVIS, il secondo di iOS)
-            Color.clear
-                .frame(height: 24)
-                .contentShape(Rectangle())
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .gesture(gestoBasso)
-                .ignoresSafeArea(edges: .bottom)
-                .zIndex(200)
-        }
         if naviga.modo != .sfoglio && davanti != nil {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 20).contentShape(Rectangle()).gesture(gestoBordo(da: -1))
@@ -231,33 +224,46 @@ struct StratoSezioniVista<Vista: View>: View {
         }
     }
 
-    private var gestoBasso: some Gesture {
-        DragGesture(minimumDistance: 8, coordinateSpace: .global)
-            .onChanged { v in
-                let su = max(0, -v.translation.height)
-                if naviga.modo == .sfoglio { return }                       // dalle pagine: decide la fine
-                if pila.voceDavanti == nil {                                 // da JARVIS: solo le pagine (se ce ne sono)
-                    if su > altezza * 0.16 && naviga.modo != .sfoglio { apriSfoglio() }
-                    return
-                }
-                if naviga.modo == .normale { naviga.modo = .tira; inizioTira = Date(); fermoDa = Date(); ultimoSu = su }
-                guard naviga.modo == .tira else { return }
-                naviga.su = su
-                if abs(su - ultimoSu) > 3 { fermoDa = Date(); ultimoSu = su }
-                // fermo a metà (oltre il 22% dell'altezza, il dito quasi immobile per 140 ms): le pagine
-                if su > altezza * 0.22, let f = fermoDa, Date().timeIntervalSince(f) > 0.14 { apriSfoglio() }
-            }
-            .onEnded { v in
-                let su = max(0, -v.translation.height), lancio = max(0, -v.predictedEndTranslation.height)
-                switch naviga.modo {
-                case .sfoglio:
-                    if su > 36 || lancio > 160 { tornaAJarvis() }
-                case .tira:
-                    if su > 60 || lancio > 220 { aggancio() }
-                    else { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { naviga.su = 0; naviga.modo = .normale } }
-                default: break
-                }
-            }
+    // MARK: su dal basso (3 nov sera, deciso dal signore): parte poco sopra la barretta di iOS, come la tendina in alto che parte
+    // sotto la Dynamic Island. Il bordo resta tutto di iOS: si esce dall'app al primo colpo. Su veloce: AGGANCIO (la sezione va nel
+    // reattore); su lento e trascinato fin quasi al centro: le pagine olografiche. Dalle pagine, di nuovo su dal basso: JARVIS.
+
+    private func preparaBasso() {
+        basso.puo = {
+            !pila.voci.isEmpty && !naviga.bassoFermo && (naviga.modo == .normale || naviga.modo == .sfoglio)
+        }
+        basso.inizia = { naviga.bassoDaSfoglio = naviga.modo == .sfoglio }
+        basso.segue = { su, velocita in bassoSegue(su: su, velocita: velocita) }
+        basso.finisce = { su, velocita in bassoFinisce(su: su, velocita: velocita) }
+        basso.installa()
+    }
+
+    /// Il dito sale (`su` in punti; `velocita` in punti al secondo, positiva verso l'alto).
+    private func bassoSegue(su: CGFloat, velocita: CGFloat) {
+        if naviga.bassoDaSfoglio || naviga.modo == .sfoglio { return }     // dalle pagine (o già aperte in questa tirata): decide la fine
+        if pila.voceDavanti == nil {                                       // da JARVIS: solo le pagine (se ce ne sono)
+            if su > altezza * 0.16 { apriSfoglio() }
+            return
+        }
+        if naviga.modo == .normale { naviga.modo = .tira }
+        guard naviga.modo == .tira else { return }
+        naviga.su = su
+        // lento e trascinato fin quasi al centro (il 40% dell'altezza): le pagine olografiche
+        if su > altezza * GestoBassoSezioni.sfoglio && abs(velocita) < GestoBassoSezioni.lento { apriSfoglio() }
+    }
+
+    private func bassoFinisce(su: CGFloat, velocita: CGFloat) {
+        let daSfoglio = naviga.bassoDaSfoglio
+        naviga.bassoDaSfoglio = false
+        switch naviga.modo {
+        case .sfoglio:
+            // partita dalle pagine: di nuovo su = JARVIS (aperte in questa stessa tirata: restano)
+            if daSfoglio && (su > 36 || velocita > GestoBassoSezioni.diNuovoSu) { tornaAJarvis() }
+        case .tira:
+            if velocita > GestoBassoSezioni.veloce { aggancio() }           // su veloce: AGGANCIO
+            else { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { naviga.su = 0; naviga.modo = .normale } }
+        default: break
+        }
     }
 
     private func gestoBordo(da lato: Int) -> some Gesture {
@@ -348,7 +354,11 @@ struct StratoSezioniVista<Vista: View>: View {
     private var gestoSfoglio: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { v in
-                if v.translation == .zero { P0 = naviga.P; assePagina = 0; return }
+                // nella fascia in basso il gesto può partire un attimo dopo il tocco (aspetta lo swipe su): la pagina di partenza
+                // si prende finché l'asse non è deciso, non solo al primo istante
+                if v.translation == .zero { assePagina = 0 }
+                if assePagina == 0 { P0 = naviga.P }
+                if v.translation == .zero { return }
                 if assePagina == 0, hypot(v.translation.width, v.translation.height) > 8 {
                     assePagina = abs(v.translation.width) > abs(v.translation.height) ? 1 : 2
                     Suoni.zittisciOlo()
@@ -624,4 +634,77 @@ final class TrackpadSezioni: NSObject, UIGestureRecognizerDelegate {
     }
 
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { true }
+}
+
+/// Su dal basso (3 nov sera, deciso dal signore): il gesto parte nella fascia appena sopra la zona della barretta di iOS (il margine
+/// sicuro in basso; sul Mac e sugli iPhone col tasto Home, dal fondo), alta 56 punti e larga quanto lo schermo. Il bordo resta di iOS,
+/// come in alto per la tendina: si esce dall'app al primo swipe, sempre.
+/// Il riconoscitore sta sulla finestra e sente solo i tocchi che partono nella fascia. Prende solo lo swipe verso l'alto: un tocco,
+/// lo scorrere in orizzontale o verso il basso restano della sezione. Quando lo prende, ha la precedenza sullo scorrimento della
+/// sezione sotto (che così non si muove insieme). Spento con una schermata di iOS sopra (Safari, foto, aiuto).
+final class GestoBassoSezioni: NSObject, UIGestureRecognizerDelegate {
+    /// La fascia: 56 punti sopra la zona di iOS.
+    static let alta: CGFloat = 56
+    /// Lento e trascinato oltre il 40% dell'altezza (il dito arriva quasi al centro): le pagine olografiche.
+    static let sfoglio: CGFloat = 0.40
+    /// Lento: sotto i 900 punti al secondo.
+    static let lento: CGFloat = 900
+    /// Veloce, lasciato: oltre i 500 punti al secondo verso l'alto (AGGANCIO).
+    static let veloce: CGFloat = 500
+    /// Dalle pagine olografiche, di nuovo su: oltre 36 punti o 400 punti al secondo (JARVIS).
+    static let diNuovoSu: CGFloat = 400
+
+    var puo: () -> Bool = { false }                              // ci sono sezioni aperte e nessun altro gesto in corso
+    var inizia: () -> Void = {}
+    var segue: (CGFloat, CGFloat) -> Void = { _, _ in }          // su (punti, ≥ 0) e velocità (punti/s, positiva verso l'alto)
+    var finisce: (CGFloat, CGFloat) -> Void = { _, _ in }
+    private weak var finestra: UIWindow?
+    private var riconoscitore: UIPanGestureRecognizer?
+
+    func installa() {
+        guard riconoscitore == nil, let w = FasciaAlta.finestra else { return }
+        let r = UIPanGestureRecognizer(target: self, action: #selector(scorre(_:)))
+        r.maximumNumberOfTouches = 1
+        r.delegate = self
+        w.addGestureRecognizer(r)
+        riconoscitore = r
+        finestra = w
+    }
+
+    @objc private func scorre(_ r: UIPanGestureRecognizer) {
+        let t = r.translation(in: finestra), v = r.velocity(in: finestra)
+        switch r.state {
+        case .began:
+            inizia()
+            segue(max(0, -t.y), -v.y)
+        case .changed:
+            segue(max(0, -t.y), -v.y)
+        case .ended:
+            finisce(max(0, -t.y), -v.y)
+        case .cancelled, .failed:
+            finisce(max(0, -t.y), 0)
+        default: break
+        }
+    }
+
+    /// Solo i tocchi che partono nella fascia, con le sezioni aperte e nessuna schermata di iOS sopra.
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive tocco: UITouch) -> Bool {
+        guard let w = finestra, w.rootViewController?.presentedViewController == nil, puo() else { return false }
+        let fondo = w.bounds.height - w.safeAreaInsets.bottom
+        let y = tocco.location(in: w).y
+        return y <= fondo && y >= fondo - GestoBassoSezioni.alta
+    }
+
+    /// Solo verso l'alto (più in su che di lato).
+    func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+        guard let p = g as? UIPanGestureRecognizer else { return false }
+        let t = p.translation(in: finestra)
+        return t.y < 0 && -t.y > abs(t.x)
+    }
+
+    /// Nella fascia, lo scorrimento della sezione aspetta: se lo swipe va in su è di JARVIS, altrimenti parte subito.
+    /// I tocchi no: un pulsante nella fascia si preme come sempre.
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldBeRequiredToFailBy altro: UIGestureRecognizer) -> Bool {
+        !(altro is UITapGestureRecognizer) && !(altro is UILongPressGestureRecognizer)
+    }
 }
