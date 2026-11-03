@@ -64,7 +64,7 @@ struct PosaPagina: ViewModifier {
     func body(content: Content) -> some View {
         content
             .allowsHitTesting(posa.tocchi)
-            .overlay { TintaOlo().opacity(posa.tinta) }
+            .overlay { VeloOlo().opacity(posa.tinta) }
             .clipShape(Ritaglio(raggio: posa.raggio))
             .shadow(color: .ciano.opacity(posa.ombra), radius: posa.ombra > 0 ? 18 : 0)
             .scaleEffect(posa.scala)
@@ -538,7 +538,7 @@ struct LuceAggancio: View {
 }
 
 /// Il tono olografico delle pagine: un velo ciano con le righe di scansione.
-struct TintaOlo: View {
+struct VeloOlo: View {
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color.ciano.opacity(0.22), Color.ciano.opacity(0.06)], startPoint: .top, endPoint: .bottom)
