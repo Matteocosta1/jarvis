@@ -650,7 +650,7 @@ struct AggancioPagina: ViewModifier {
     let sale: CGFloat
 
     /// «ease in-out» quadratica (la stessa del mockup).
-    static func curva(_ a: Double) -> Double { a < 0.5 ? 2 * a * a : 1 - pow(-2 * a + 2, 2) / 2 }
+    nonisolated static func curva(_ a: Double) -> Double { a < 0.5 ? 2 * a * a : 1 - pow(-2 * a + 2, 2) / 2 }   // solo calcolo
 
     // sempre dentro lo stesso TimelineView (fermo quando non serve): la sezione non viene mai ricreata
     func body(content: Content) -> some View {
