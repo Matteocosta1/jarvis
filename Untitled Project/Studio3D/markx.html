@@ -6156,7 +6156,7 @@ const SD_ESEMPI = ["crea un supporto da muro per l'iPhone", "aggiungi due fori p
 
 const SD_FORABILI = ["scatola", "supporto", "cilindro", "ingranaggio"], SD_SMUSSABILI = ["scatola", "disegno", "tag", "ingranaggio", "supporto", "cilindro"];
 const SD_GUSCIO = ["scatola", "cilindro", "sfera", "cono"];
-const SD_ESTRUDI = { scatola: "h", cilindro: "h", cono: "h", vaso: "h", disegno: "sp", tag: "sp", ingranaggio: "sp", supporto: "h", ologramma: "prof" };
+const SD_ESTRUDI = { rilievo: "rel", scatola: "h", cilindro: "h", cono: "h", vaso: "h", disegno: "sp", tag: "sp", ingranaggio: "sp", supporto: "h", ologramma: "prof" };
 /* ── ARCHIVIO di Studio: i progetti (come le cartelle di Fusion o Shapr3D), ognuno coi suoi pezzi e la sua miniatura;
       si salva da solo a ogni modifica. Nel mockup vive nel browser (localStorage); se il browser non lo permette, vale finché la pagina è aperta ── */
 const ARCH_K = "jarvisStudioArchivio1";
@@ -6323,7 +6323,7 @@ function studio(ok) {
     if (edit) { CTX.innerHTML = edit.tipo === "scolpisci" ? pannelloScolpisci(o) : edit.tipo === "cad" ? pannelloCAD(o) : pannelloMaglia(o); return; }
     const vuoto = (msg) => { CTX.innerHTML = rigaSospeso() + `<p class="nota-sd">${msg}</p>`; };
     if (!o && !["seleziona", "misura", "sezione"].includes(t)) { vuoto("Tocchi un oggetto sul banco per usare questo strumento."); return; }
-    if (t === "seleziona") { CTX.innerHTML = o ? rigaSospeso() + (o.foro ? "" : `<div class="riga2 sd-edit"><button type="button" class="chip" data-edit="scolpisci">SCOLPISCI</button><button type="button" class="chip" data-edit="maglia">MESH</button><button type="button" class="chip" data-edit="cad">CAD</button></div>`) + `<div class="riga2 sd-ruolo"><button type="button" class="chip" data-ruolo="pieno" aria-pressed="${!o.foro}">CORPO</button><button type="button" class="chip" data-ruolo="foro" aria-pressed="${!!o.foro}">FORO</button><button type="button" class="chip${oggetti.length > 1 ? "" : " spento"}" data-unisci>COMBINA</button></div>
+    if (t === "seleziona") { CTX.innerHTML = o ? rigaSospeso() + (o.foro ? "" : `<div class="riga2 sd-edit"><button type="button" class="chip" data-edit="scolpisci">SCOLPISCI</button><button type="button" class="chip" data-edit="maglia">MESH</button><button type="button" class="chip" data-edit="cad">CAD</button><button type="button" class="chip" data-ar>AR</button></div>`) + `<div class="riga2 sd-ruolo"><button type="button" class="chip" data-ruolo="pieno" aria-pressed="${!o.foro}">CORPO</button><button type="button" class="chip" data-ruolo="foro" aria-pressed="${!!o.foro}">FORO</button><button type="button" class="chip${oggetti.length > 1 ? "" : " spento"}" data-unisci>COMBINA</button></div>
       <p class="nota-sd">${o.foro ? `<b>${o.nome}</b> è un foro: dove tocca un pezzo pieno, COMBINA lo scava.` : `Selezionato: <b>${o.nome}</b>. FORO lo fa diventare un buco; COMBINA fonde i pezzi che si toccano.`}</p>` : ""; return; }
     if (t === "sposta") { vuoto(`Trascini col dito per spostare <b>${o.nome}</b> sul piano${griglia ? ", agganciato alla griglia da 5 mm" : ""}.`); return; }
     if (t === "ruota") { const c = cursore("ROTAZIONE", "rotY", -180, 180, griglia ? 15 : 1, Math.round(o.rotY), "°", (v) => { o.rotY = v; B.posa(o); }); curs[c.k] = c; h += c.html; }
@@ -6384,6 +6384,7 @@ function studio(ok) {
     else if (b.dataset.sosp === "riprendi") { strumento = "seleziona"; A.querySelectorAll("[data-sdt]").forEach((x) => { if (!["misura", "sezione"].includes(x.dataset.sdt)) x.setAttribute("aria-pressed", x.dataset.sdt === "seleziona"); }); seleziona(null); }
     else if (b.dataset.sosp === "scarta" || b.hasAttribute("data-scarta")) scartaSospeso();
     else if (b.hasAttribute("data-unisci")) unisci();
+    else if (b.hasAttribute("data-ar")) vediAR(sel);
     else if (b.dataset.edit === "fine") { esciEdit(); contesto(); parlaMock("Fatto, Sir: il pezzo resta così, pronto da stampare.", 2200); }
     else if (b.dataset.edit) entraEdit(b.dataset.edit);
     else if (b.dataset.pen) { PEN.tipo = b.dataset.pen; contesto(); }
@@ -6541,9 +6542,9 @@ function studio(ok) {
   const nomeLibero = (base) => { if (!oggetti.some((o) => o.nome === base)) return base; let i = 2; while (oggetti.some((o) => o.nome === `${base} #${i}`)) i++; return `${base} #${i}`; };
   // cambiare le misure del pezzo selezionato: «alto 50», «largo 8 cm», «80 x 40 x 10», «fallo da 30»
   const SD_MIS = { scatola: { h: "h", l: "l", p: "p", main: "l" }, cilindro: { h: "h", d: "d", p: "d", main: "d" }, cono: { h: "h", d: "d", p: "d", main: "d" }, sfera: { d: "d", h: "d", p: "d", main: "d" },
-    toro: { d: "d", p: "d", sp: "s", main: "d" }, vaso: { h: "h", d: "d", p: "d", main: "h" }, tazza: { h: "h", d: "d", p: "d", main: "h" }, ingranaggio: { d: "d", p: "d", sp: "sp", main: "d" }, supporto: { h: "h", l: "l", p: "l", sp: "sp", main: "h" }, tag: { l: "l", sp: "sp", main: "l" } };
+    toro: { d: "d", p: "d", sp: "s", main: "d" }, vaso: { h: "h", d: "d", p: "d", main: "h" }, tazza: { h: "h", d: "d", p: "d", main: "h" }, ingranaggio: { d: "d", p: "d", sp: "sp", main: "d" }, supporto: { h: "h", l: "l", p: "l", sp: "sp", main: "h" }, tag: { l: "l", sp: "sp", main: "l" }, rilievo: { l: "l", p: "l", h: "rel", main: "l" } };
   const SD_LIM = { l: [2, SD_VOL], p: [2, SD_VOL], h: [1, SD_VOL], d: [3, SD_VOL], s: [2, 40], sp: [1, 40] };
-  const SD_LIM_T = { vaso: { h: [30, SD_VOL], d: [30, 200] }, tazza: { h: [40, 150], d: [40, 120] }, ingranaggio: { d: [15, SD_VOL], sp: [2, 40] }, supporto: { l: [60, 160], h: [80, 200], sp: [3, 8] }, tag: { l: [30, 150], sp: [2, 10] }, toro: { d: [16, SD_VOL] } };
+  const SD_LIM_T = { rilievo: { l: [20, 200], rel: [1, 30] }, vaso: { h: [30, SD_VOL], d: [30, 200] }, tazza: { h: [40, 150], d: [40, 120] }, ingranaggio: { d: [15, SD_VOL], sp: [2, 40] }, supporto: { l: [60, 160], h: [80, 200], sp: [3, 8] }, tag: { l: [30, 150], sp: [2, 10] }, toro: { d: [16, SD_VOL] } };
   const SD_NOMI = { l: "Lunghezza", p: "Larghezza", h: "Altezza", d: "Diametro", s: "Spessore", sp: "Spessore" };
   function applicaMisure(o, M, avvisi) {
     const map = SD_MIS[o.tipo]; if (!map) return false; let fatto = false; const detti = new Set();
@@ -7045,6 +7046,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     if (sel && !edit && /^(?:scolpisci|scolpiscil[oa]|fammel[oa] scolpire|scultura|modalità scultura)\b/.test(t)) { entraEdit("scolpisci"); return null; }
     if (sel && !edit && /\b(?:modifica (?:la )?mesh|modalità mesh|mesh|lavora (?:i )?vertici|vertici e facce)\b/.test(t)) { entraEdit("maglia"); return null; }
     if (sel && !edit && /\b(?:cad|modalità cad|apri(?:lo)? nel cad|portal[oa] nel cad)\b/.test(t)) { entraEdit("cad"); return null; }
+    if (sel && /\b(?:in ar|realtà aumentata|nella stanza|sul tavolo vero|grandezza vera)\b/.test(t)) { vediAR(sel); return null; }
     if (!edit) return undefined;
     const via = /\b(togli|senza|spegni|niente|disattiva)\b/.test(t);
     if (/^(?:fine|basta|ho finito|esci|chiudi (?:la )?(?:scultura|mesh))\b/.test(t)) { esciEdit(); contesto(); return "Fatto, Sir: il pezzo resta così, pronto da stampare."; }
@@ -7138,6 +7140,10 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     else if (/\b(guscio|svuota)/.test(t)) { if (!F.length) return "Scelga prima la faccia da aprire, Sir."; O = { op: "guscio", f: F, sp: v }; }
     if (!O) return undefined; const R2 = { base: R.base, ops: [...R.ops, O] }, s = CAD.forma(OCC, R2); if (!s) return "Così non si può fare, Sir: il valore è troppo grande per questo pezzo.";
     memorizza(); const k = "d" + Date.now().toString(36) + (++num); GEO_DATI.set(k, CAD.maglia(OCC, s)); o.p.k = k; o.p.ricetta = R2; vuotaSelM(); rifai(o); contesto(); return `Fatto, Sir: ${NOMI_OP[O.op](O).toLowerCase()} millimetri.`; }
+  // 3 nov · AR: il pezzo nella stanza, a grandezza vera (AR Quick Look di Apple, nell'app). La scansione a colori ci va coi suoi colori veri
+  function vediAR(o) { if (!o) return; if (o.foro) { parlaMock("È un foro, Sir: in AR si guardano i pezzi pieni.", 2400); return; }
+    if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "vediAR", nome: o.nome, stl: B.stl(o), usdz: o.p?.usdz || null }); parlaMock(`«${o.nome}» nella stanza, Sir: a grandezza vera, appoggiato a terra o sul tavolo.`, 3200); return; }
+    const g = B.ingombro(o); parlaMock(`Nell'app «${o.nome}» si apre nella stanza a grandezza vera, ${mm(g.l)} per ${mm(g.p)} per ${mm(g.h)} millimetri: lo si appoggia sul tavolo e ci si gira intorno. Qui nel browser la fotocamera non c'è.`, 4600); }
   async function salvaSTEP(o) { let oc; try { oc = await caricaOCC(); } catch { notifica("Il motore CAD non si è caricato: riprovi.", { titolo: "Studio" }); return; } const s = CAD.forma(oc, o.p.ricetta), t = s && CAD.step(oc, s, o.nome);
     if (!t) { notifica("Lo STEP non è venuto, Sir.", { titolo: "Studio" }); return; } const r = await scarica(new TextEncoder().encode(t), `${o.nome.replace(/[^\w-]+/g, "_")}.step`); if (r === "ok") suona("aPronto");
     notifica(esitoSalva(r, `Salvato ${o.nome}.step: si apre in Fusion, SolidWorks, Shapr3D e FreeCAD, con le superfici esatte`), { titolo: "Studio" }); }
@@ -7214,11 +7220,11 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       else { const c = fotoCanvas(im, 120), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height; let n = 0, chiari = 0;
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < 4 || y < 4 || x >= W - 4 || y >= H - 4) { const i = (y * W + x) * 4, M = Math.max(d[i], d[i + 1], d[i + 2]), m = Math.min(d[i], d[i + 1], d[i + 2]); n++; if (M > 185 && (M - m) / M < .12) chiari++; }
         modo = chiari / n > .7 ? "disegno" : "oggetto"; } }
-    CTX.dataset.foto = ""; if (modo === "oggetto") ologrammaSulBanco(im, nome); else foglioSulBanco(im, nome);
+    CTX.dataset.foto = ""; if (modo === "oggetto") ologrammaSulBanco(im, nome); else if (modo === "rilievo") rilievoSulBanco(im, nome); else foglioSulBanco(im, nome);
     sceltaFoto = { im, nome, modo };
   }
   let sceltaFoto = null;
-  const tastiModo = (modo) => `<div class="riga2 sd-modo"><button type="button" class="chip" data-modof="disegno" aria-pressed="${modo === "disegno"}">DISEGNO</button><button type="button" class="chip" data-modof="oggetto" aria-pressed="${modo === "oggetto"}">OGGETTO</button></div>`;
+  const tastiModo = (modo) => `<div class="riga2 sd-modo"><button type="button" class="chip" data-modof="disegno" aria-pressed="${modo === "disegno"}">DISEGNO</button><button type="button" class="chip" data-modof="oggetto" aria-pressed="${modo === "oggetto"}">OGGETTO</button><button type="button" class="chip" data-modof="rilievo" aria-pressed="${modo === "rilievo"}">RILIEVO</button></div>`;
   CTX.addEventListener("click", (e) => { const b = e.target.closest("[data-modof]"); if (!b || !sceltaFoto || b.dataset.modof === sceltaFoto.modo) return; leggiFoto(sceltaFoto.im, sceltaFoto.nome, b.dataset.modof); });
   // OGGETTO: staccato dallo sfondo, la foto sul banco col contorno acceso, poi l'ologramma che sale dal tavolo
   async function ologrammaSulBanco(im, nome) {
@@ -7241,6 +7247,35 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     mostraOgg.nome = "OGGETTO"; inAttesa = mostraOgg; mostraOgg();
   }
 
+  // 3 nov · RITRATTO: una foto fatta in modalità Ritratto ha dentro la mappa della profondità e il ritaglio della persona (li salva l'iPhone)
+  function fotoRitratto() { if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "ritratto" }); return; }
+    parlaMock("Nell'app si apre la galleria, Sir: scelga una foto fatta in modalità Ritratto. Dentro c'è la profondità misurata dall'iPhone, e il rilievo esce vero. Qui nel browser quella profondità non si legge.", 4800); }
+  function ritrattoArrivato(im, prof) { const b = (x, C) => new C(Uint8Array.from(atob(x), (c) => c.charCodeAt(0)).buffer);
+    if (prof?.z) im.__prof = { w: prof.w, h: prof.h, z: b(prof.z, Float32Array), m: prof.m ? b(prof.m, Uint8Array) : null };
+    else parlaMock("Questa foto non ha la profondità, Sir: non è stata fatta in modalità Ritratto. Uso la stima.", 3400);
+    leggiFoto(im, prof?.z ? "ritratto" : "foto", "rilievo"); }
+  window.__studioRitratto = (im, prof) => vivo() && ritrattoArrivato(im, prof);   // la porta dell'app (StudioWeb.swift)
+  // 3 nov · RILIEVO: la foto diventa una scultura in rilievo (un quadro o una medaglia da stampare sdraiata). Profondità vera dall'app, stimata qui
+  async function rilievoSulBanco(im, nome) {
+    $sd("attesa").style.opacity = 0; info([`${nome.toUpperCase()} · RILIEVO`, "LEGGO LA PROFONDITÀ…"]); await attesa(60); if (!vivo()) return;
+    const D = rilievoDati(im), k = "v" + Date.now().toString(36) + (++num); GEO_DATI.set(k, { W: D.W, H: D.H, z: D.z, m: D.m || new Uint8Array(0), vera: D.vera });
+    await B.riferimento?.(fotoCanvas(im, 400));
+    const R = { l: 100, rel: 8, base: 2, sfondo: D.m ? "soggetto" : "tutto", inverti: false };
+    info([`${nome.toUpperCase()} · RILIEVO`, D.vera ? "PROFONDITÀ VERA (LIDAR / RITRATTO)" : "PROFONDITÀ STIMATA DALLA FOTO", D.m ? "SOGGETTO STACCATO DALLO SFONDO" : "TUTTA LA FOTO"]);
+    const mostra = () => { CTX.innerHTML = tastiModo("rilievo") + `<label class="cur"><span>LARGHEZZA</span><input type="range" min="20" max="200" step="5" value="${R.l}" data-rv="l"><b>${R.l} mm</b></label>
+      <label class="cur"><span>RILIEVO</span><input type="range" min="1" max="30" step=".5" value="${R.rel}" data-rv="rel"><b>${R.rel} mm</b></label>
+      <label class="cur"><span>BASE</span><input type="range" min="0" max="10" step=".5" value="${R.base}" data-rv="base"><b>${R.base} mm</b></label>
+      <div class="riga2 sk-riempi"><span>SFONDO</span><button type="button" class="chip" data-rvs="soggetto" aria-pressed="${R.sfondo === "soggetto"}"${D.m ? "" : " disabled"}>SOLO SOGGETTO</button><button type="button" class="chip" data-rvs="tutto" aria-pressed="${R.sfondo === "tutto"}">TUTTA LA FOTO</button><button type="button" class="chip" data-rvs="inverti" aria-pressed="${R.inverti}">INVERTI</button></div>
+      <div class="riga2"><button type="button" class="chip" data-rvr${D.vera ? ' aria-pressed="true"' : ""}>RITRATTO</button></div>
+      <div class="riga2 vai-riga"><button type="button" class="vai" data-rv="alza">PROIETTA</button><button type="button" class="chip" data-scarta>SCARTA</button></div>
+      <p class="nota-sd">${D.vera ? "Profondità vera, misurata dall'iPhone." : "Qui la profondità è stimata dalla foto (soggetto arrotondato più i dettagli della luce). Per quella vera: RITRATTO, e si sceglie una foto fatta in modalità Ritratto (dentro c'è la profondità misurata dall'iPhone)."} SOLO SOGGETTO ritaglia il pezzo sul contorno; TUTTA LA FOTO fa un quadro rettangolare. Si stampa sdraiato, senza supporti.</p>`;
+      CTX.querySelectorAll("input[data-rv]").forEach((i) => i.addEventListener("input", () => { R[i.dataset.rv] = +i.value; i.nextElementSibling.textContent = `${i.value} mm`; }));
+      CTX.querySelector("[data-rvr]").addEventListener("click", () => { suona("aTick"); fotoRitratto(); });
+      CTX.querySelectorAll("[data-rvs]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); if (b.dataset.rvs === "inverti") R.inverti = !R.inverti; else R.sfondo = b.dataset.rvs; mostra(); }));
+      CTX.querySelector('[data-rv="alza"]').addEventListener("click", () => { suona("aTick"); inAttesa = null; B.via(); const o = nuovo("rilievo", { k, ...R }, `Rilievo ${nome}`.slice(0, 28), { anim: "vacuform" }), g = B.ingombro(o);
+        parlaMock(`Rilievo pronto, Sir: ${mm(g.l)} per ${mm(g.p)} millimetri, alto ${mm(g.h)}${B.chiuso(o) ? ", chiuso e stampabile" : ""}. Si stampa così, sdraiato.`, 3600); contesto(); }); };
+    mostra.nome = "RILIEVO"; inAttesa = mostra; mostra();
+  }
   // il foglio (foto o immagine caricata) arriva sul tavolo: i tratti si disegnano di luce, poi si alzano in 3D
   async function foglioSulBanco(im, nome) {
     let soglia = null, inverti = false, liscia = 1, uso = "sagoma", riempi = null, strati = 1, cacheS = null;
@@ -7461,7 +7496,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
   window.STUDIO_ATTIVO = { vivo, voce: (t) => ascolta(t.replace(/^./, (c) => c.toLowerCase())), foto: (im, nome) => { A.querySelector(".sd-cam")?.remove(); leggiFoto(im, nome || "foto", "oggetto"); },
     // per il collaudo automatico: mettere un oggetto in un punto preciso, leggere lo stato
     prova: { oggetti: () => oggetti.map((o) => ({ id: o.id, tipo: o.tipo, nome: o.nome, foro: !!o.foro, pos: o.pos, ...B.ingombro(o), vol: Math.round(B.volume(o)), chiuso: B.chiuso(o) })),
-      metti: (i, x, z) => { const o = oggetti[i]; o.pos = { ...o.pos, x, z }; B.posa(o); }, capisci: (t) => capisci(t.toLowerCase()), sceglie: (x, punto) => sceltaMaglia(x, punto), chiusoRicetta: (pezzi) => { const R = B.ricetta(pezzi); const k = "x" + Math.random(); GEO_DATI.set(k, { pos: R.pos, norm: R.norm }); const o = nuovo("unito", { k }, "Prova", { anim: "nessuna" }); const c = B.chiuso(o); const stl = B.stl(o); elimina(o); return window.STL_PROVA = stl, c; }, banco: () => B, dati: (i) => oggetti[i], scegli: (i) => seleziona(oggetti[i]) } };
+      metti: (i, x, z) => { const o = oggetti[i]; o.pos = { ...o.pos, x, z }; B.posa(o); }, capisci: (t) => capisci(t.toLowerCase()), ritratto: (im, prof) => ritrattoArrivato(im, prof), sceglie: (x, punto) => sceltaMaglia(x, punto), chiusoRicetta: (pezzi) => { const R = B.ricetta(pezzi); const k = "x" + Math.random(); GEO_DATI.set(k, { pos: R.pos, norm: R.norm }); const o = nuovo("unito", { k }, "Prova", { anim: "nessuna" }); const c = B.chiuso(o); const stl = B.stl(o); elimina(o); return window.STL_PROVA = stl, c; }, banco: () => B, dati: (i) => oggetti[i], scegli: (i) => seleziona(oggetti[i]) } };
   contesto(); azioni(); aggiornaStoria();
 }
 
@@ -8015,6 +8050,66 @@ function staccaOggetto(im) {
   let sIn = 0, sOut = 0, nOut = 0; for (let i = 0; i < N; i++) { if (ogg[i]) sIn += ds[i]; else { sOut += ds[i]; nOut++; } }
   return { c, W, H, d, m: ogg, n, box: [x0, y0, x1, y1], contrasto: (sIn / n - sOut / Math.max(1, nOut)) / 255 };
 }
+/* ── 3 nov · FASE 4 · RILIEVO: la scultura da una foto, gratis e sul telefono. La profondità vera, quando c'è, arriva dall'app
+   (il LiDAR dell'iPhone, o la mappa di profondità delle foto Ritratto): im.__prof = { w, h, z } con z da 0 (lontano) a 1 (vicino).
+   Senza (nel mockup, o una foto qualsiasi) si stima: il soggetto staccato dallo sfondo e arrotondato dal bordo verso il centro,
+   più i dettagli della luce (le ombre sono incavi, le luci sono rilievi). */
+function rilievoDati(im) {
+  const c = fotoCanvas(im, 200), W = c.width, H = c.height, N = W * H, d = c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const L = new Float32Array(N); for (let i = 0; i < N; i++) L[i] = (.299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2]) / 255;
+  const z = new Float32Array(N); let m = null, vera = false;
+  const P = im.__prof;
+  if (P && P.z?.length === P.w * P.h) { vera = true;                    // la profondità vera, ricampionata sulla griglia della foto
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const fx = x / Math.max(1, W - 1) * (P.w - 1), fy = y / Math.max(1, H - 1) * (P.h - 1), x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(P.w - 1, x0 + 1), y1 = Math.min(P.h - 1, y0 + 1), a = fx - x0, b = fy - y0;
+      z[y * W + x] = (P.z[y0 * P.w + x0] * (1 - a) + P.z[y0 * P.w + x1] * a) * (1 - b) + (P.z[y1 * P.w + x0] * (1 - a) + P.z[y1 * P.w + x1] * a) * b; }
+    if (P.m?.length === P.w * P.h) { m = new Uint8Array(N); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) m[y * W + x] = P.m[Math.round(y / Math.max(1, H - 1) * (P.h - 1)) * P.w + Math.round(x / Math.max(1, W - 1) * (P.w - 1))] ? 1 : 0; } }
+  else {
+    const S = staccaOggetto(im), ok = S && S.contrasto >= .12;
+    let sog = null; if (ok) { sog = new Uint8Array(N); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sog[y * W + x] = S.m[Math.min(S.H - 1, Math.round(y / Math.max(1, H - 1) * (S.H - 1))) * S.W + Math.min(S.W - 1, Math.round(x / Math.max(1, W - 1) * (S.W - 1)))]; }
+    // i dettagli della luce: la luce meno la sua media nei dintorni (passa-alto), ammorbidita
+    let Lm = sfoca(Float32Array.from(L), W, H, 6), D = new Float32Array(N); for (let i = 0; i < N; i++) D[i] = L[i] - Lm[i]; D = sfoca(D, W, H, 1);
+    let dmx = 1e-6; for (let i = 0; i < N; i++) dmx = Math.max(dmx, Math.abs(D[i]));
+    if (sog) { const dt = new Float32Array(N); for (let i = 0; i < N; i++) dt[i] = sog[i] ? 1e9 : 0;   // la distanza dal bordo: il profilo tondo
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (!dt[i]) continue; let v = dt[i]; if (x) v = Math.min(v, dt[i - 1] + 1); if (y) v = Math.min(v, dt[i - W] + 1); if (x && y) v = Math.min(v, dt[i - W - 1] + 1.414); if (y && x < W - 1) v = Math.min(v, dt[i - W + 1] + 1.414); if (!x || !y || x === W - 1) v = Math.min(v, 1); dt[i] = v; }
+      for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; if (!dt[i]) continue; let v = dt[i]; if (x < W - 1) v = Math.min(v, dt[i + 1] + 1); if (y < H - 1) v = Math.min(v, dt[i + W] + 1); if (x < W - 1 && y < H - 1) v = Math.min(v, dt[i + W + 1] + 1.414); if (y < H - 1 && x) v = Math.min(v, dt[i + W - 1] + 1.414); if (y === H - 1 || x === W - 1) v = Math.min(v, 1); dt[i] = v; }
+      let mx = 1; for (let i = 0; i < N; i++) mx = Math.max(mx, dt[i]);
+      for (let i = 0; i < N; i++) { if (!sog[i]) continue; const u = Math.min(1, dt[i] / mx), tondo = Math.sqrt(Math.max(0, 1 - (1 - u) * (1 - u))); z[i] = Math.max(0, Math.min(1, .78 * tondo + .22 * (.5 + .5 * D[i] / dmx))); }
+      m = sog; }
+    else for (let i = 0; i < N; i++) z[i] = Math.max(0, Math.min(1, .65 * L[i] + .35 * (.5 + .5 * D[i] / dmx)));   // niente soggetto: la luce (più chiaro = più alto)
+  }
+  return { W, H, z, m, vera };
+}
+// la maglia del rilievo: la superficie sopra, il fondo piano sotto, le pareti sul bordo (solo dove c'è il pezzo); chiusa, si stampa sdraiata
+function magliaRilievo(D, p) {
+  const st = Math.max(1, Math.round(Math.max(D.W, D.H) / 170)), GW = Math.floor((D.W - 1) / st) + 1, GH = Math.floor((D.H - 1) / st) + 1, s = p.l / ((GW - 1) * st || 1);
+  const z = (gx, gy) => { const i = Math.min(D.H - 1, gy * st) * D.W + Math.min(D.W - 1, gx * st), v = p.inverti ? 1 - D.z[i] : D.z[i]; return p.base + p.rel * (p.sfondo === "soggetto" && D.m && !D.m[i] ? 0 : v); };
+  const dentroC = (gx, gy) => { if (gx < 0 || gy < 0 || gx >= GW - 1 || gy >= GH - 1) return false; if (p.sfondo !== "soggetto" || !D.m) return true;
+    let n = 0; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) n += D.m[Math.min(D.H - 1, (gy + b) * st) * D.W + Math.min(D.W - 1, (gx + a) * st)]; return n >= 3; };
+  // SOLO SOGGETTO: la LARGHEZZA è quella del soggetto, centrato
+  let cx0 = (GW - 1) * st / 2, cy0 = (GH - 1) * st / 2, sc = s;
+  if (p.sfondo === "soggetto" && D.m?.length) { let x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1; for (let gy = 0; gy < GH - 1; gy++) for (let gx = 0; gx < GW - 1; gx++) if (dentroC(gx, gy)) { x0 = Math.min(x0, gx); x1 = Math.max(x1, gx + 1); y0 = Math.min(y0, gy); y1 = Math.max(y1, gy + 1); }
+    if (x1 > x0) { sc = p.l / ((x1 - x0) * st); cx0 = (x0 + x1) / 2 * st; cy0 = (y0 + y1) / 2 * st; } }
+  // il contorno del soggetto a gradini di pixel si ammorbidisce: i punti del bordo vanno verso la media dei vicini di bordo (4 passate)
+  const OX = new Float32Array(GW * GH), OY = new Float32Array(GW * GH);
+  if (p.sfondo === "soggetto" && D.m?.length) { const bordo = new Uint8Array(GW * GH);
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { let a = 0, n = 0; for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) { n++; if (dentroC(gx + dx, gy + dy)) a++; } bordo[gy * GW + gx] = a > 0 && a < n ? 1 : 0; }
+    for (let it = 0; it < 4; it++) { const NX = Float32Array.from(OX), NY = Float32Array.from(OY);
+      for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const k = gy * GW + gx; if (!bordo[k]) continue; let sx = 0, sy = 0, n = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = gx + dx, y = gy + dy; if (x < 0 || y < 0 || x >= GW || y >= GH || !bordo[y * GW + x]) continue; sx += x + OX[y * GW + x]; sy += y + OY[y * GW + x]; n++; }
+        if (n >= 2) { NX[k] = (gx + OX[k] + sx / n) / 2 - gx; NY[k] = (gy + OY[k] + sy / n) / 2 - gy; } }
+      OX.set(NX); OY.set(NY); } }
+  const pos = [], idT = new Int32Array(GW * GH).fill(-1), idB = new Int32Array(GW * GH).fill(-1), I = [], X = (gx, gy) => ((gx + OX[gy * GW + gx]) * st - cx0) * sc, Z = (gx, gy) => ((gy + OY[gy * GW + gx]) * st - cy0) * sc;
+  const vt = (gx, gy) => { const k = gy * GW + gx; if (idT[k] < 0) { idT[k] = pos.length / 3; pos.push(X(gx, gy), z(gx, gy), Z(gx, gy)); } return idT[k]; };
+  const vb = (gx, gy) => { const k = gy * GW + gx; if (idB[k] < 0) { idB[k] = pos.length / 3; pos.push(X(gx, gy), 0, Z(gx, gy)); } return idB[k]; };
+  for (let gy = 0; gy < GH - 1; gy++) for (let gx = 0; gx < GW - 1; gx++) { if (!dentroC(gx, gy)) continue;
+    const a = vt(gx, gy), b = vt(gx + 1, gy), c = vt(gx + 1, gy + 1), e = vt(gx, gy + 1); I.push(a, e, c, a, c, b);                 // sopra (normale in su)
+    const A = vb(gx, gy), Bv = vb(gx + 1, gy), Cv = vb(gx + 1, gy + 1), E = vb(gx, gy + 1); I.push(A, Bv, Cv, A, Cv, E);              // sotto
+    if (!dentroC(gx, gy - 1)) I.push(a, b, Bv, a, Bv, A);                                                                            // le pareti dove finisce il pezzo
+    if (!dentroC(gx + 1, gy)) I.push(b, c, Cv, b, Cv, Bv);
+    if (!dentroC(gx, gy + 1)) I.push(c, e, E, c, E, Cv);
+    if (!dentroC(gx - 1, gy)) I.push(e, a, A, e, A, E); }
+  return { pos: new Float32Array(pos), idx: new Uint32Array(I) };
+}
 // 3 + 4 · la profondità dalla sagoma e la maglia chiusa
 function gonfia(S) {
   const { W, H, m, d, box } = S, N = W * H, INF = 1e9, dt = new Float32Array(N);
@@ -8325,6 +8420,7 @@ async function bancoOlografico3D(el, vivo, cb) {
       const bb = new T.Box3(); out.forEach((q) => { q.geo.computeBoundingBox(); bb.union(q.geo.boundingBox); });
       out.forEach((q) => q.geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2));
     }
+    if (o.tipo === "rilievo") { const D = GEO_DATI.get(p.k); if (D) { const R = magliaRilievo(D, p), g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(R.pos, 3)); g.setIndex(new T.BufferAttribute(R.idx, 1)); g.computeVertexNormals(); out.push({ geo: g, spigoli: 60 }); } }
     if (o.tipo === "cad") { const D = GEO_DATI.get(p.k); if (D) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(D.pos.slice(), 3)); g.setIndex(new T.BufferAttribute(D.idx, 1)); g.computeVertexNormals();
       const l = new T.BufferGeometry(); l.setAttribute("position", new T.BufferAttribute(D.lin.slice(), 3)); out.push({ geo: g, lineeGeo: l }); } }   // 2 nov · CAD: gli spigoli veri del solido, non quelli dei triangoli
     if (o.tipo === "creta" || o.tipo === "maglia") { const D = GEO_DATI.get(p.k); if (D) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(D.pos.slice(), 3)); g.setIndex(new T.BufferAttribute(D.idx, 1)); g.computeVertexNormals(); out.push({ geo: g, spigoli: 20, linee: o.tipo === "maglia" }); } }

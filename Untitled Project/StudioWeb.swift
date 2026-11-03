@@ -6,6 +6,9 @@ import Combine
 import AVFoundation
 import UniformTypeIdentifiers
 import SafariServices
+import PhotosUI             // 3 nov · RITRATTO: la galleria con i byte originali delle foto (la profondità dentro l'HEIC)
+import QuickLook            // 3 nov · AR: AR Quick Look
+import ARKit                // ARQuickLookPreviewItem
 
 // MARK: - STUDIO e SOCIAL (MARK X): il banco olografico per modellare in 3D e stampare, e Instagram, IDENTICI al mockup approvato.
 // La pagina è il mockup stesso («Studio3D/markx.html», generata da tools/studio_app.py) con three.js 0.160 nel pacchetto
@@ -96,6 +99,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private let apertura: AperturaPagina
     private var perChi = "studio"                    // a chi va la foto scelta: "studio", "galleria" o "occhi" (Social)
     private var videoScelto: URL?                    // Social: il video scelto dalla galleria (lo carica l'app, non la pagina)
+    private var sceltaRitratto: SceltaRitratto?      // 3 nov · RITRATTO: il delegato della galleria (il picker lo tiene debole)
+    private var fonteAR: FonteAR?                    // 3 nov · AR: la fonte di AR Quick Look (anche lei tenuta debole)
 
     init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {},
          presa: @escaping (Bool) -> Void = { _ in }) {
@@ -278,6 +283,14 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             } else {
                 scegli(per: "galleria")
             }
+        case "vediAR":                                                   // 3 nov · AR: il pezzo nella stanza, a grandezza vera
+            let stl = o["stl"] as? String ?? ""
+            Task {
+                guard let u = await ModelloAR.crea(stl) else { self.parla("Il modello per l'AR non è venuto, Sir."); return }
+                self.mostraAR(u)
+            }
+        case "ritratto":                                                 // 3 nov · RILIEVO › RITRATTO: una foto Ritratto, con la profondità vera
+            scegliRitratto()
         case "ascolta":
             Task { await self.dettatura.avvia() }
         case "ferma":
@@ -392,6 +405,45 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         foglio.popoverPresentationController?.sourceView = sopra.view
         foglio.popoverPresentationController?.sourceRect = CGRect(x: sopra.view.bounds.midX, y: sopra.view.bounds.maxY - 80, width: 1, height: 1)
         sopra.present(foglio, animated: true)
+    }
+
+    // MARK: AR (AR Quick Look a grandezza vera) e RITRATTO (la foto con la profondità per il RILIEVO)
+
+    private func mostraAR(_ u: URL) {
+        guard let sopra = RegiaStudio.inCima(web) else { return }
+        let modello = ARQuickLookPreviewItem(fileAt: u)
+        modello.allowsContentScaling = false                 // niente ingrandimento con le dita: la misura resta quella vera
+        let fonte = FonteAR(modello)
+        fonteAR = fonte
+        let anteprima = QLPreviewController()
+        anteprima.dataSource = fonte
+        sopra.present(anteprima, animated: true)
+    }
+
+    private func scegliRitratto() {
+        var c = PHPickerConfiguration()
+        c.filter = .images
+        c.selectionLimit = 1
+        c.preferredAssetRepresentationMode = .current         // l'HEIC originale: con la profondità e il ritaglio della persona
+        let galleria = PHPickerViewController(configuration: c)
+        let scelta = SceltaRitratto { [weak self] dati in self?.ritrattoScelto(dati) }
+        sceltaRitratto = scelta
+        galleria.delegate = scelta
+        RegiaStudio.inCima(web)?.present(galleria, animated: true)
+    }
+
+    private func ritrattoScelto(_ dati: Data?) {
+        sceltaRitratto = nil
+        guard let dati else { return }
+        Task {
+            guard let r = await ProfonditaRitratto.leggi(dati) else { self.parla("Questa foto non si apre, Sir."); return }
+            var prof = "null"
+            if let z = r.profondita {
+                let m = r.ritaglio.map { "'\($0.base64EncodedString())'" } ?? "null"
+                prof = "{w:\(r.larghezza),h:\(r.altezza),z:'\(z.base64EncodedString())',m:\(m)}"
+            }
+            self.esegui("(function(){var im=new Image();im.onload=function(){window.__studioRitratto&&window.__studioRitratto(im,\(prof));};im.src='data:image/jpeg;base64,\(r.jpg.base64EncodedString())';})()")
+        }
     }
 
     // MARK: FOTO (fotocamera vera; se manca, la galleria)
