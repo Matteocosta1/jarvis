@@ -581,3 +581,47 @@ struct VeloOlo: View {
         .allowsHitTesting(false)
     }
 }
+
+/// Sul Mac: due dita sul trackpad, in orizzontale, fanno lo stesso dello swipe dai bordi (la sezione accanto nel cerchio).
+/// Il riconoscitore sta sulla finestra e sente solo lo scorrimento del trackpad (nessun tocco): non toglie niente agli altri gesti
+/// e lo scorrimento in verticale resta delle sezioni.
+final class TrackpadSezioni: NSObject, UIGestureRecognizerDelegate {
+    var inizia: (CGFloat) -> Bool = { _ in false }       // il verso (+1 avanti, −1 indietro): vero se c'è una sezione accanto
+    var segue: (CGFloat) -> Void = { _ in }              // −1…1
+    var finisce: (CGFloat, CGFloat) -> Void = { _, _ in } // spostamento e slancio (frazioni della larghezza)
+    private var asse = 0                                  // 0 da decidere, 1 orizzontale, 2 verticale (ignorato)
+    private weak var finestra: UIWindow?
+    private var riconoscitore: UIPanGestureRecognizer?
+
+    func installa() {
+        guard ProcessInfo.processInfo.isiOSAppOnMac, riconoscitore == nil, let w = FasciaAlta.finestra else { return }
+        let r = UIPanGestureRecognizer(target: self, action: #selector(scorre(_:)))
+        r.allowedScrollTypesMask = .continuous
+        r.allowedTouchTypes = []
+        r.cancelsTouchesInView = false
+        r.delegate = self
+        w.addGestureRecognizer(r)
+        riconoscitore = r
+        finestra = w
+    }
+
+    @objc private func scorre(_ r: UIPanGestureRecognizer) {
+        let w = max(1, finestra?.bounds.width ?? 1000)
+        let t = r.translation(in: finestra)
+        switch r.state {
+        case .began:
+            asse = 0
+        case .changed:
+            if asse == 0, hypot(t.x, t.y) > 10 {
+                asse = abs(t.x) > abs(t.y) * 1.5 && inizia(t.x < 0 ? 1 : -1) ? 1 : 2
+            }
+            if asse == 1 { segue(max(-1, min(1, t.x / w))) }
+        case .ended, .cancelled, .failed:
+            if asse == 1 { finisce(t.x / w, r.velocity(in: finestra).x / w * 0.3) }
+            asse = 0
+        default: break
+        }
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { true }
+}
