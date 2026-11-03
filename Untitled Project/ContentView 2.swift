@@ -68,6 +68,7 @@ struct ContentView: View {
     @State private var dock = LenteDock()
     /// MARK XI: le sezioni aperte (fino a 10), nel contenitore sopra JARVIS al posto delle schermate di iOS.
     @StateObject private var pila = PilaSezioni()
+    @State private var naviga = NavigaSezioni()                // i gesti fra le sezioni (letti solo dal contenitore)
     @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
     private enum ModoCorona { case ruota, tendina }
@@ -264,6 +265,8 @@ struct ContentView: View {
             // blocco iOS mostrava sempre la sua linguetta grigia sotto la Dynamic Island. I PROTOCOLLI si aprono tirando giù da titolo,
             // reattore e testi, come prima.
         }
+        // MARK XI: con sezioni aperte, lo swipe dal basso è prima di JARVIS (il secondo, subito dopo, è di iOS)
+        .defersSystemGestures(on: pila.voci.isEmpty ? [] : .bottom)
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
@@ -1220,23 +1223,20 @@ struct ContentView: View {
     }
 
     /// Il contenitore: le sezioni in ordine d'apertura; quella davanti si vede e si tocca, le altre restano vive e invisibili
-    /// (le spente non si disegnano).
+    /// (le spente non si disegnano). Con i gesti per muoversi fra loro (NavigaSezioni.swift).
     private var strato: some View {
-        ZStack {
-            ForEach(pila.voci) { v in
-                if !v.spenta {
-                    let davanti = pila.davanti == v.id
-                    vistaSezione(v)
-                        .environment(\.sezioneAperta, v.id)
-                        .environment(\.jarvisCoperto, false)
-                        .opacity(davanti ? 1 : 0)
-                        .allowsHitTesting(davanti)
-                        .accessibilityHidden(!davanti)
-                        .zIndex(davanti ? 1 : 0)
-                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 2))   // sale e scende di tutta l'altezza, come prima
-                }
-            }
-        }
+        StratoSezioniVista(pila: pila, naviga: naviga, reattore: CGPoint(x: rettCorona.midX, y: rettCorona.midY),
+                           vista: { v in vistaSezione(v) },
+                           portaDavanti: { id in portaDavanti(id) },
+                           chiudiDietro: { id in chiudiDietro(id) })
+    }
+
+    /// Dalle pagine olografiche: la pagina spinta in su si chiude (davanti o dietro che sia).
+    private func chiudiDietro(_ id: UUID) {
+        guard let v = pila.voci.first(where: { $0.id == id }) else { return }
+        if pila.davanti == id { spegniStato(v.sezione); return }
+        pila.togli(v.sezione)
+        sezioneChiusa(v.sezione)
     }
 
     /// La vista di ogni sezione: quella che prima stava nella sua schermata di iOS, uguale.
