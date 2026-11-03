@@ -159,15 +159,23 @@ enum Suoni {
         riproduci(url, volume: 0.86)
     }
 
-    /// Le pagine olografiche delle sezioni aperte compaiono (swipe su fermandosi a metà). File: «caricaolo»
-    /// (vadim «holographic interface menu opening»). Sfuma al primo gesto (`zittisciOlo`).
-    static func caricaOlo() {
-        guard attivi, let url = file("caricaolo"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        p.volume = 1.0
-        lettoreOlo?.stop()
-        lettoreOlo = p
-        p.play()
-        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
+    // MARK: MARK XI · i suoni delle pagine, a tempo con l'animazione (3 nov sera, «sincronizza alla perfezione»)
+    // «sparisce», «caricaolo» e «scelta» hanno due lettori già pronti ciascuno (niente file da aprire nel momento del gesto) e
+    // partono a un istante preciso dell'orologio audio (`play(atTime:)`), tenendo conto del ritardo dell'uscita (altoparlante
+    // ~10–20 ms, cuffie Bluetooth di più). Ogni funzione restituisce fra quanto il suono si sente davvero: l'animazione si regola
+    // su quello, così i colpi del suono e i momenti dell'animazione coincidono.
+
+    /// Prepara i lettori (all'apertura del contenitore delle sezioni), così il primo gesto non aspetta.
+    static func preparaPagine() {
+        for n in ["sparisce", "caricaolo", "scelta"] { _ = pronti(n) }
+    }
+
+    /// Le pagine olografiche delle sezioni aperte compaiono. File: «caricaolo» (vadim «holographic interface menu opening»).
+    /// Sfuma al primo gesto (`zittisciOlo`). Restituisce fra quanti secondi si sente.
+    @discardableResult static func caricaOlo() -> TimeInterval {
+        let (fra, p) = suonaPronto("caricaolo", volume: 1.0)
+        if let p { lettoreOlo = p }
+        return fra
     }
     /// Si sfoglia, si sceglie o si chiude una pagina: il suono delle pagine sfuma (0,25 s).
     static func zittisciOlo() {
@@ -175,17 +183,46 @@ enum Suoni {
     }
     private static var lettoreOlo: AVAudioPlayer?
 
-    /// Swipe su veloce dal basso: la sezione si scioglie in luce e si torna a JARVIS. File: «sparisce» (vadim «hologram menu appear»).
-    static func sparisce() {
-        guard attivi, let url = file("sparisce") else { return }
-        riproduci(url, volume: 1.0)
+    /// AGGANCIO: la sezione vola nel reattore. File: «sparisce» (vadim «hologram menu appear»; colpi a 0,466 e 1,002 s).
+    /// Restituisce fra quanti secondi si sente (l'aggancio cade 0,44 s dopo).
+    @discardableResult static func sparisce() -> TimeInterval {
+        suonaPronto("sparisce", volume: 1.0).0
     }
 
     /// Scelta una pagina dalle pagine olografiche (solo le sezioni senza fotocamera: quelle con la fotocamera hanno il loro suono).
-    /// File: «scelta» (soundshelfstudio «sci-fi ui click»).
-    static func sceltaPagina() {
-        guard attivi, let url = file("scelta") else { return }
-        riproduci(url, volume: 1.0)
+    /// File: «scelta» (soundshelfstudio «sci-fi ui click»). `fra`: fra quanti secondi deve sentirsi (quando la pagina arriva).
+    static func sceltaPagina(fra: TimeInterval = 0) {
+        _ = suonaPronto("scelta", volume: 1.0, fra: fra)
+    }
+
+    private static var lettoriPronti: [String: [AVAudioPlayer]] = [:]
+    private static var turnoPronti: [String: Int] = [:]
+
+    /// Un lettore già pronto per il file `nome` (due a turno: un suono può ripartire mentre l'altro finisce).
+    private static func pronti(_ nome: String) -> AVAudioPlayer? {
+        if lettoriPronti[nome] == nil, let url = file(nome) {
+            let l: [AVAudioPlayer] = (0..<2).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
+            l.forEach { $0.prepareToPlay() }
+            lettoriPronti[nome] = l
+        }
+        guard let l = lettoriPronti[nome], !l.isEmpty else { return nil }
+        let k = (turnoPronti[nome] ?? 0) % l.count
+        turnoPronti[nome] = k + 1
+        return l[k]
+    }
+
+    /// Suona `nome` in modo che si senta fra `fra` secondi (o appena possibile): restituisce fra quanto si sente davvero.
+    private static func suonaPronto(_ nome: String, volume: Float, fra: TimeInterval = 0) -> (TimeInterval, AVAudioPlayer?) {
+        guard attivi, let p = pronti(nome) else { return (0, nil) }
+        let uscita = min(0.25, max(0, AVAudioSession.sharedInstance().outputLatency))
+        let anticipo = max(0.012, fra - uscita)                     // 12 ms: il tempo all'audio di mettersi in fila, preciso
+        p.stop()
+        p.currentTime = 0
+        p.volume = volume
+        p.prepareToPlay()
+        p.play(atTime: p.deviceCurrentTime + anticipo)
+        BattitoMani.ignora(per: anticipo + p.duration + 0.2)         // un suono dell'app non è un battito di mani
+        return (anticipo + uscita, p)
     }
 
     /// Il tick di un'icona che si accende all'avvio: un segnale digitale da HUD, non una nota.
