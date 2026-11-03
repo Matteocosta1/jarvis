@@ -1144,6 +1144,7 @@ struct ContentView: View {
                 if d.restaDavanti { spegniStato(d) } else { pila.vaDietro(d); spegniStato(d) }
             }
             let cucina = jarvis.occhi?.cucina ?? false
+            if aperturaPagina != nil { abbassaPagina() }              // Studio o Social sopra: scendono, la sezione chiesta si vede
             withAnimation(StratoPagina.salita) {
                 if let vecchia = pila.accesa(s, cucina: s == .occhi && cucina, ricordi: s == .ricordi ? mostraRicordi : nil) {
                     pila.togli(vecchia)                               // più di 10: la più vecchia si chiude
