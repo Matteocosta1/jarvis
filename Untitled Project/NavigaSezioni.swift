@@ -41,10 +41,8 @@ final class NavigaSezioni: ObservableObject {
     @Published var rivela: Double = 0
     /// Il fondo olografico dietro le pagine (0…1).
     @Published var fondo: Double = 0
-    /// In questa tirata le pagine sono già comparse (lasciato il dito, restano).
+    /// Da JARVIS: in questa tirata il suono delle pagine è già partito.
     var rivelata = false
-    /// Da quando il dito va piano oltre la soglia delle pagine.
-    var lentoDa: Date?
     /// AGGANCIO: la posa da cui parte la pagina (dove l'ha lasciata il dito, o la pagina al centro) e di quanto sale.
     var baseAggancio = Posa()
     var spostaAggancio: CGFloat = 0
@@ -279,13 +277,13 @@ struct StratoSezioniVista<Vista: View>: View {
     }
 
     // MARK: su dal basso (3 nov sera, deciso dal signore): parte nella fascia poco sopra la barretta di iOS, come la tendina in alto
-    // che parte sotto la Dynamic Island. Il bordo resta tutto di iOS: si esce dall'app al primo colpo. Le misure (GestoBassoSezioni):
-    // - su veloce (lasciato oltre 500 punti/s, almeno 40 punti): AGGANCIO, la sezione va nel reattore;
-    // - su lento e trascinato fin quasi al centro (oltre un terzo dell'altezza, sotto i 400 punti/s per 60 ms): compaiono le pagine
-    //   olografiche col loro suono, anche col dito ancora giù; lasciato, si resta lì. Lento e lasciato oltre un terzo: lo stesso;
-    // - poco e lasciato: la sezione torna com'era;
+    // che parte sotto la Dynamic Island. Il bordo resta tutto di iOS: si esce dall'app al primo colpo. La regola del signore: swipe su
+    // veloce = AGGANCIO, swipe su lento = pagine olografiche. Decide la velocità quando si lascia il dito (GestoBassoSezioni):
+    // - lasciato oltre 500 punti/s, dopo almeno 40 punti: AGGANCIO, la sezione va nel reattore;
+    // - lasciato piano, dopo almeno un quinto dell'altezza: le pagine olografiche si formano in 0,6 s, a tempo col suono;
+    // - poco e piano: la sezione torna com'era;
     // - dalle pagine, di nuovo su dalla fascia: JARVIS (la pagina al centro va nel reattore).
-    // Da JARVIS, con sezioni aperte: le pagine compaiono col dito e restano oltre il 5% dell'altezza (o lasciate veloci).
+    // Mentre si tira, la pagina segue il dito. Da JARVIS, con sezioni aperte: le pagine compaiono col dito e restano oltre il 5%.
 
     private func preparaBasso() {
         Suoni.preparaPagine()
@@ -307,7 +305,6 @@ struct StratoSezioniVista<Vista: View>: View {
             naviga.P = Double(k)
             naviga.alzata = 0
             naviga.rivelata = false
-            naviga.lentoDa = nil
             naviga.rivela = 0
             naviga.modo = .tira
         }
@@ -320,25 +317,11 @@ struct StratoSezioniVista<Vista: View>: View {
         }
         naviga.su = su
         naviga.dx = dx
-        guard !naviga.rivelata else { return }
-        // lento oltre la soglia, per 60 ms: le pagine compaiono (anche col dito fermo, che non manda più movimenti)
-        if su >= altezza * GestoBassoSezioni.soglia && abs(velocita) <= GestoBassoSezioni.lento {
-            guard naviga.lentoDa == nil else { return }
-            let da = Date()
-            naviga.lentoDa = da
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(Int(GestoBassoSezioni.tenuta * 1000)))
-                if naviga.lentoDa == da, naviga.modo == .tira, !naviga.rivelata { rivelaPagine() }
-            }
-        } else {
-            naviga.lentoDa = nil
-        }
     }
 
     private func bassoFinisce(su: CGFloat, velocita: CGFloat) {
         let daSfoglio = naviga.bassoDaSfoglio
         naviga.bassoDaSfoglio = false
-        naviga.lentoDa = nil
         switch naviga.modo {
         case .sfoglio:
             // partita dalle pagine: di nuovo su = JARVIS (aperte in questa stessa tirata: restano)
@@ -346,12 +329,10 @@ struct StratoSezioniVista<Vista: View>: View {
         case .tira:
             if pila.voceDavanti == nil {
                 if su > altezza * 0.45 * 0.12 || velocita > GestoBassoSezioni.diNuovoSu { entraSfoglio() } else { tornaGiu() }
-            } else if naviga.rivelata {
-                entraSfoglio()
             } else if velocita >= GestoBassoSezioni.veloce && su >= GestoBassoSezioni.minimo {
-                aggancio(da: posaTirata(), id: pila.davanti)               // su veloce: AGGANCIO
+                aggancio(da: posaTirata(), id: pila.davanti)               // veloce: AGGANCIO
             } else if su >= altezza * GestoBassoSezioni.soglia {
-                entraSfoglio()                                             // lento e lasciato oltre la soglia: le pagine
+                formaPagine()                                              // lento: le pagine olografiche
             } else {
                 tornaGiu()                                                 // poco: torna com'era
             }
@@ -424,17 +405,23 @@ struct StratoSezioniVista<Vista: View>: View {
 
     // MARK: le pagine olografiche
 
-    /// Le pagine compaiono col dito ancora giù: il suono «caricaolo» e, allo stesso istante, le pagine in 0,30 s (il suono sale fino
-    /// a 0,32 s).
-    private func rivelaPagine() {
-        naviga.rivelata = true
-        naviga.lentoDa = nil
+    /// Swipe su lento, lasciato: la pagina tirata si forma nelle pagine olografiche in 0,6 s (curva «ease out» cubica: al 90% sul
+    /// picco del suono «caricaolo», a 0,32 s), col fondo e le altre pagine; il suono e l'animazione partono allo stesso istante.
+    private func formaPagine() {
+        guard !carte.isEmpty else { tornaGiu(); return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let fra = min(Suoni.caricaOlo(), TempiAggancio.attesaMassima)
-        withAnimation(.linear(duration: TempiAggancio.rivela).delay(fra)) { naviga.rivela = 1 }
+        withAnimation(TempiAggancio.forma.delay(fra)) {
+            naviga.modo = .sfoglio
+            naviga.su = 0
+            naviga.dx = 0
+            naviga.alzata = 0
+            naviga.fondo = 1
+            naviga.rivela = 1
+        }
     }
 
-    /// Lasciato il dito: la pagina tirata (o la prima, da JARVIS) si posa al centro delle pagine in 0,26 s, come nel mockup.
+    /// Da JARVIS, lasciato il dito: le pagine già comparse col dito finiscono di posarsi (0,26 s), come nel mockup.
     private func entraSfoglio() {
         guard !carte.isEmpty else { tornaGiu(); return }
         if !naviga.rivelata {
@@ -629,8 +616,8 @@ enum TempiAggancio {
     /// I due battiti del reattore, sui due colpi del suono.
     static let battiti: [(Double, Double)] = [(0.455, 1), (0.99, 0.75)]
     static let fine: Double = 1.5
-    /// SFOGLIO («caricaolo»: sale fino a 0,32 s): le pagine compaiono in 0,30 s.
-    static let rivela: Double = 0.30
+    /// SFOGLIO («caricaolo»: sale fino a 0,32 s, poi resta): le pagine si formano in 0,6 s.
+    static let forma = Animation.timingCurve(0.33, 1, 0.68, 1, duration: 0.6)
     /// La pagina scelta arriva a schermo pieno («scelta»: il colpo a 0,055 s dall'inizio del file).
     static let scelta: Double = 0.32
     static let colpoScelta: Double = 0.055
@@ -953,11 +940,8 @@ final class TrackpadSezioni: NSObject, UIGestureRecognizerDelegate {
 final class GestoBassoSezioni: NSObject, UIGestureRecognizerDelegate {
     /// La fascia: 56 punti sopra la zona di iOS (su iPhone 15 Pro: dai 34 ai 90 punti dal fondo), un pollice comodo.
     static let alta: CGFloat = 56
-    /// Le pagine: oltre un terzo dell'altezza (partendo dalla fascia il dito arriva appena sotto il centro).
-    static let soglia: CGFloat = 0.33
-    /// Lento: sotto i 400 punti al secondo, per 60 ms (anche col dito fermo).
-    static let lento: CGFloat = 400
-    static let tenuta: Double = 0.06
+    /// Lento, lasciato: le pagine, dopo almeno un quinto dell'altezza (meno: la sezione torna com'era).
+    static let soglia: CGFloat = 0.20
     /// Veloce, lasciato: oltre i 500 punti al secondo verso l'alto, dopo almeno 40 punti (AGGANCIO).
     static let veloce: CGFloat = 500
     static let minimo: CGFloat = 40
