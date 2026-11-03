@@ -1,5 +1,6 @@
 #if os(iOS)
 import AVFoundation
+import QuartzCore
 import UIKit
 
 /// I suoni dell'interfaccia, alla Stark. Se nel progetto c'è un file audio con il nome giusto, si usa quello;
@@ -114,6 +115,79 @@ enum Suoni {
         if let url = file("clicktesta") { riproduci(url, volume: 1.0); return }
         tocco()
     }
+    // MARK: MARK XI (mockup del 3 nov, suoni scelti dal signore)
+
+    /// Il click delle icone del Dock in alto (Social, Musica, Studio, Sistemi, cestino, Impostazioni): mixkit «modern technology
+    /// select» (3124). File: «dock». Sul Mac suona anche passandoci sopra col puntatore (`clickDockSopra`).
+    static func clickDock() {
+        Aptica.click()
+        guard attivi else { return }
+        if let url = file("dock") { riproduci(url, volume: 1.0); return }
+        clickTesta()
+    }
+    /// Sul Mac, il puntatore che entra su un'icona del Dock: lo stesso click, al massimo uno ogni 60 ms.
+    static func clickDockSopra() {
+        guard attivi, let url = file("dock") else { return }
+        let ora = CACurrentMediaTime()
+        guard ora - ultimoDockSopra >= 0.06 else { return }
+        ultimoDockSopra = ora
+        riproduci(url, volume: 0.7)
+    }
+    private static var ultimoDockSopra: CFTimeInterval = 0
+
+    /// Lo scatto della click wheel: un'icona passa in alto. File: «ruota» (mixkit «mouse hard clicking», un colpo solo).
+    /// Arriva a raffica (fino a uno ogni 35 ms): quattro lettori già pronti, a turno, così parte senza ritardo.
+    static func scattoRuota() {
+        guard attivi, let url = file("ruota") else { return }
+        if lettoriRuota.isEmpty {
+            lettoriRuota = (0..<4).compactMap { _ in try? AVAudioPlayer(contentsOf: url) }
+            lettoriRuota.forEach { $0.volume = 0.86; $0.prepareToPlay() }
+        }
+        guard !lettoriRuota.isEmpty else { return }
+        let p = lettoriRuota[turnoRuota % lettoriRuota.count]
+        turnoRuota += 1
+        p.currentTime = 0
+        p.play()
+        BattitoMani.ignora(per: 0.5)
+    }
+    private static var lettoriRuota: [AVAudioPlayer] = []
+    private static var turnoRuota = 0
+
+    /// La corona si è fermata: l'ologramma dell'icona si crea. File: «olo» (mixkit «click melodic tone»).
+    static func tonoOlo() {
+        guard attivi, let url = file("olo") else { return }
+        riproduci(url, volume: 0.86)
+    }
+
+    /// Le pagine olografiche delle sezioni aperte compaiono (swipe su fermandosi a metà). File: «caricaolo»
+    /// (vadim «holographic interface menu opening»). Sfuma al primo gesto (`zittisciOlo`).
+    static func caricaOlo() {
+        guard attivi, let url = file("caricaolo"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
+        p.volume = 1.0
+        lettoreOlo?.stop()
+        lettoreOlo = p
+        p.play()
+        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
+    }
+    /// Si sfoglia, si sceglie o si chiude una pagina: il suono delle pagine sfuma (0,25 s).
+    static func zittisciOlo() {
+        if let p = lettoreOlo, p.isPlaying { p.setVolume(0, fadeDuration: 0.25) }
+    }
+    private static var lettoreOlo: AVAudioPlayer?
+
+    /// Swipe su veloce dal basso: la sezione si scioglie in luce e si torna a JARVIS. File: «sparisce» (vadim «hologram menu appear»).
+    static func sparisce() {
+        guard attivi, let url = file("sparisce") else { return }
+        riproduci(url, volume: 1.0)
+    }
+
+    /// Scelta una pagina dalle pagine olografiche (solo le sezioni senza fotocamera: quelle con la fotocamera hanno il loro suono).
+    /// File: «scelta» (soundshelfstudio «sci-fi ui click»).
+    static func sceltaPagina() {
+        guard attivi, let url = file("scelta") else { return }
+        riproduci(url, volume: 1.0)
+    }
+
     /// Il tick di un'icona che si accende all'avvio: un segnale digitale da HUD, non una nota.
     /// Un impulso di rumore elettronico brevissimo più un «ping» che scende di tono in 40 ms, con una minima
     /// variazione da un'icona all'altra. Stile: «hud» (predefinito), «note» (la scala di prima) o «off».

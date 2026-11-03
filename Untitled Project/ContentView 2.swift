@@ -61,6 +61,13 @@ struct ContentView: View {
     @State private var tendinaTrascina: CGFloat = 0      // di quanto la sta tirando il dito (in giù da chiusa, in su da aperta)
     @State private var altezzaTendina: CGFloat = 640     // misurata appena la tendina c'è
     @ObservedObject private var protocolli = Protocolli.condiviso
+    /// MARK XI: la click wheel della corona. In @State (non osservata): la leggono solo icone, archi e ologramma, non tutta la schermata.
+    @State private var ruota = RuotaCorona()
+    @State private var rettCorona: CGRect = .zero              // la corona sullo schermo (coordinate globali), per sapere se il dito è sull'anello
+    @State private var modoCorona: ModoCorona?                 // il dito sulla corona: gira la ruota o tira giù la tendina (deciso al primo movimento)
+    @State private var dock = LenteDock()                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
+    @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
+    private enum ModoCorona { case ruota, tendina }
     @Environment(\.scenePhase) private var scena
 
     /// Il richiamo «Jarvis» resta in ascolto ovunque nell'app (schede, Occhi, Cucina, Impostazioni, SISTEMI, Browser, LiDAR…),
@@ -136,14 +143,12 @@ struct ContentView: View {
                         VStack(spacing: 0) {
                             intestazione()
                                 .contentShape(Rectangle())
-                                .highPriorityGesture(tiraGiuTendina)
+                                .highPriorityGesture(gestoTestata)
                             Spacer(minLength: 0)
                             corona()
                                 .frame(width: 430)
                                 .scaleEffect(scala, anchor: .top)                     // il reattore cresce con lo schermo
                                 .frame(width: g.size.width, height: (altezzaCorona + 12) * scala, alignment: .top)
-                                .contentShape(Rectangle())
-                                .highPriorityGesture(tiraGiuTendina)
                             testiHUD
                                 .frame(maxWidth: max(0, min(640, (g.size.width - 32) / 1.25)))
                                 .scaleEffect(mac ? 1.25 : 1, anchor: .top)
@@ -166,7 +171,7 @@ struct ContentView: View {
                     VStack(spacing: 0) {
                         intestazione(mini: telefono && !reattoreGrande, stretta: g.size.width < ContentView.larghezzaStretta)
                             .contentShape(Rectangle())
-                                .highPriorityGesture(tiraGiuTendina)
+                                .highPriorityGesture(gestoTestata)
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
                         if telefono && !reattoreGrande && g.size.height > 300 {   // iPhone piccolo girato: non c'è posto, niente riga
                             rigaStato
@@ -176,8 +181,6 @@ struct ContentView: View {
                         if reattoreGrande || !telefono {
                             // con la tastiera le icone delle sezioni e gli archi si spengono e lasciano il posto alla chat (il reattore vola)
                             centroHUD
-                                .contentShape(Rectangle())
-                                .highPriorityGesture(tiraGiuTendina)
                                 .transition(.opacity)
                         }
                         registro
@@ -461,6 +464,7 @@ struct ContentView: View {
         .onChange(of: comandi.richiesta) { eseguiComando() }
         .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
         .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
+        .onChange(of: tastiera) { _, aperta in if aperta { ruota.spegni() } }       // MARK XI: si scrive, l'ologramma della ruota si spegne
         .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
         .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
         .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
@@ -727,7 +731,7 @@ struct ContentView: View {
                 .accessibilityHidden(true)                          // per VoiceOver c'è il reattore stesso («Chiudi la tastiera»)
             }
             // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Social")) } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.social) } label: {
                 IconaSocial()
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
@@ -735,9 +739,10 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.social))
             .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.musica) } label: {
                 IconaVinile()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
@@ -747,9 +752,10 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
-            Button { Suoni.clickTesta(); Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Studio")) } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.studio) } label: {
                 IconaStudio(pieno: true)                            // 27 ott: alta 15 punti come le altre 5 (misurate sulla foto), cubo più grande
                     .frame(width: 18, height: 18)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
                     .foregroundStyle(Color.ciano)
@@ -761,8 +767,9 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.studio))
             .accessibilityLabel("Studio")
-            Button { Suoni.clickTesta(); jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() } } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.sistemi) } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 11.8, weight: .semibold))   // 27 ott notte (il signore): linee spesse come Social (1,33 pt, misurate sulla foto)                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
                     .foregroundStyle(Color.ciano)
@@ -771,8 +778,9 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sistemi))
             .accessibilityLabel("Sistemi")
-            Button { Suoni.clickTesta(); chiediPulizia = true } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.cestino) } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13.9, weight: .semibold))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
                     .foregroundStyle(Color.ciano)
@@ -781,6 +789,7 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.cestino))
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
                 Button("Pulisci", role: .destructive) { svuotaChat() }
@@ -788,7 +797,7 @@ struct ContentView: View {
             } message: {
                 Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
             }
-            Button { Suoni.clickTesta(); if telefono { tastiera = false }; mostraImpostazioni = true } label: {
+            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.impostazioni) } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
@@ -798,9 +807,18 @@ struct ContentView: View {
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.impostazioni))
             .accessibilityLabel("Impostazioni")
         }
         .buttonStyle(StileStark())
+        // MARK XI: sul Mac il puntatore sopra le icone le ingrandisce (senza premere), con il click per icona
+        .onContinuousHover(coordinateSpace: .global) { fase in
+            guard ProcessInfo.processInfo.isiOSAppOnMac, testaArrivate >= ContentView.postoTesta.totale else { return }
+            switch fase {
+            case .active(let p): if sulDock(p) { dock.segui(p.x, mac: true) } else if dock.x != nil { dock.lascia() }
+            case .ended: if dock.x != nil { dock.lascia() }
+            }
+        }
         .padding(.horizontal, 16)
         .padding(.top, 8)
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
@@ -893,6 +911,8 @@ struct ContentView: View {
             corona(reattoreFuori: telefono)
                 .padding(.top, 26)        // il reattore più verso il centro dello schermo
             testiHUD
+                .contentShape(Rectangle())
+                .highPriorityGesture(tiraGiuTendina)
         }
     }
 
@@ -940,36 +960,14 @@ struct ContentView: View {
         let ang = angoli
         let coda = Avvio.inizioCoda(elenco.map { $0.nome })
         let r = ContentView.raggioCorona
+        let passo = ang.count > 1 ? abs(ang[1] - ang[0]) : 0.2
         // il cerchio ora è intero: in basso c'è INTELLIGENCE, con il suo nome sotto le icone
         let altezza = ContentView.latoCorona / 2 + r + 40
         return ZStack {
-            // archi e nomi dei gruppi, sotto le icone
-            Canvas { gc, size in
-                let c = CGPoint(x: size.width / 2, y: size.height / 2)
-                var k = 0
-                while k < elenco.count {
-                    var fine = k
-                    while fine + 1 < elenco.count && elenco[fine + 1].gruppo == elenco[k].gruppo { fine += 1 }
-                    let acceso = fine < accese
-                    let da = ang[k] - 0.09, a = ang[fine] + 0.09
-                    var arco = Path()
-                    arco.addArc(center: c, radius: r, startAngle: .radians(da), endAngle: .radians(a), clockwise: false)
-                    gc.stroke(arco, with: .color(Color.ciano.opacity(acceso ? 0.35 : 0.08)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
-                    let medio = (ang[k] + ang[fine]) / 2
-                    // il nome corre lungo l'arco, appena fuori dalle icone, sempre leggibile da sinistra a destra
-                    var rotazione = medio + .pi / 2
-                    if cos(rotazione) < 0 { rotazione += .pi }
-                    var testo = gc
-                    testo.translateBy(x: c.x + (r + 27) * cos(medio), y: c.y + (r + 27) * sin(medio))
-                    testo.rotate(by: .radians(rotazione))
-                    testo.draw(Text(elenco[k].gruppo).font(.system(size: 7, weight: .bold, design: .monospaced)).tracking(1.5)
-                        .foregroundStyle(Color.tenue.opacity(acceso ? 1 : 0)), at: .zero)
-                    k = fine + 1
-                }
-            }
+            // archi e nomi dei gruppi, sotto le icone (MARK XI: girano con la ruota)
+            ArchiRuota(ruota: ruota, gruppi: elenco.map(\.gruppo), angoli: ang, accese: accese, raggio: r)
             // più alto della corona (stesso centro): il nome INTELLIGENCE, sotto le icone in basso, non viene più tagliato
             .frame(height: ContentView.latoCorona + 80)
-            .allowsHitTesting(false)
 
             // il reattore al centro, della misura di sempre (sull'iPhone solo il suo posto: il reattore vola sopra)
             if reattoreFuori {
@@ -984,6 +982,8 @@ struct ContentView: View {
                     .scaleEffect(acceso ? 1 : 0.7)
                     .opacity(acceso ? 1 : 0)
                     .accessibilityLabel("Parla con Jarvis")
+                    .modifier(VeloRuota(ruota: ruota))
+                ologramma
             }
 
             // le icone
@@ -991,6 +991,7 @@ struct ContentView: View {
                 let inCorso = iconaAttiva == k && jarvis.fase != .attesa
                 let accesa = k < accese
                 Button {
+                    ruota.spegni()                                       // MARK XI: si apre una sezione, l'ologramma si spegne
                     Suoni.tocco()
                     if ["Occhi", "Cucina"].contains(s.nome) { iconaAttiva = k }
                     s.azione()
@@ -1017,10 +1018,13 @@ struct ContentView: View {
                 .scaleEffect(accesa ? 1 : 2.4)                      // grande e trasparente, poi si restringe e si accende
                 .brightness(k == accese - 1 && accese < elenco.count ? 0.35 : 0)   // lampo solo mentre si accende: l'ultima non resta chiara
                 .animation(.spring(duration: k >= coda ? Avvio.mollaCoda : 0.32, bounce: 0.25), value: accese)   // da Interprete: la stessa molla, più svelta
-                .offset(x: r * CGFloat(cos(ang[k])), y: r * CGFloat(sin(ang[k])))
+                .modifier(PostoRuota(ruota: ruota, indice: k, base: ang[k], raggio: r, passo: passo))   // MARK XI: gira con la ruota, lente in alto
             }
         }
         .frame(maxWidth: .infinity).frame(height: ContentView.latoCorona)          // largo quanto lo schermo: i nomi non vengono tagliati
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { rettCorona = $0 }
+        .contentShape(Rectangle())
+        .highPriorityGesture(gestoCorona)                                          // MARK XI: sull'anello gira la ruota, altrove la tendina
         .frame(maxWidth: .infinity).frame(height: altezza, alignment: .top)       // sotto resta lo spazio per la chat
     }
 
@@ -1031,6 +1035,8 @@ struct ContentView: View {
             Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
         }
         .frame(width: 240, height: 240)
+        // MARK XI: si tocca il cerchio del reattore, non il quadrato degli anelli (290): l'anello delle icone resta della ruota
+        .contentShape(Circle())
     }
 
     /// Il lato del reattore piccolo nella barra in alto (tastiera aperta): gli anelli da 290 rimpiccioliti a 34.
@@ -1055,6 +1061,10 @@ struct ContentView: View {
                 .position(x: r.midX, y: r.midY)
                 .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima
                 .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con Jarvis")
+                .modifier(VeloRuota(ruota: ruota))
+                if !piccolo {
+                    ologramma.position(x: r.midX, y: r.midY)            // MARK XI: l'ologramma dell'icona in alto, al posto del reattore
+                }
             }
         }
     }
@@ -1126,17 +1136,114 @@ struct ContentView: View {
     /// e una tirata che finisce sul reattore non lo accende.
     private var tiraGiuTendina: some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { v in tendinaSegue(v.translation) }
+            .onEnded { v in tendinaLasciata(v.translation, previsto: v.predictedEndTranslation) }
+    }
+
+    /// MARK XI: cosa fa ogni icona del Dock (dal tocco o alzando il dito dopo averci scorso sopra).
+    private func azioneDock(_ i: Int) {
+        switch i {
+        case ContentView.postoTesta.social:
+            Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Social"))
+        case ContentView.postoTesta.musica:
+            Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica
+        case ContentView.postoTesta.studio:
+            Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Studio"))
+        case ContentView.postoTesta.sistemi:
+            jarvis.interrompi(); withAnimation(.spring(duration: 0.35, bounce: 0.2)) { mostraSistemi.toggle() }
+        case ContentView.postoTesta.cestino:
+            chiediPulizia = true
+        case ContentView.postoTesta.impostazioni:
+            if telefono { tastiera = false }; mostraImpostazioni = true
+        default: break
+        }
+    }
+
+    /// Il dito sulla testata: partito sulle icone del Dock (arrivate tutte) scorre sul Dock con la lente; partito altrove (il titolo)
+    /// tira giù la tendina PROTOCOLLI, come sempre. Deciso al primo movimento.
+    private var gestoTestata: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { v in
-                guard !tendinaAperta, tendinaLibera else { return }
-                if tendinaTrascina > 0 { tendinaTrascina = max(0.5, v.translation.height); return }   // già partita: segue il dito su e giù
-                guard v.translation.height > 0, abs(v.translation.height) > abs(v.translation.width) * 1.2 else { return }
-                tendinaTrascina = v.translation.height
+                if modoTestata == nil { modoTestata = sulDock(v.startLocation) ? .ruota : .tendina }
+                if modoTestata == .ruota { dock.segui(v.location.x) } else { tendinaSegue(v.translation) }
             }
             .onEnded { v in
-                guard !tendinaAperta, tendinaTrascina > 0 else { tendinaTrascina = 0; return }
-                if v.translation.height > altezzaTendina * 0.3 || v.predictedEndTranslation.height > altezzaTendina * 0.6 { apriTendina() }
-                else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
+                if modoTestata == .ruota {
+                    if let i = dock.lascia() { azioneDock(i) }
+                } else {
+                    tendinaLasciata(v.translation, previsto: v.predictedEndTranslation)
+                }
+                modoTestata = nil
             }
+    }
+
+    /// Il punto è sulle icone del Dock (a destra del titolo, all'altezza delle icone), finito il loro arrivo.
+    private func sulDock(_ p: CGPoint) -> Bool {
+        guard testaArrivate >= ContentView.postoTesta.totale, !mostraSistemi else { return false }
+        return dock.vicino(p)
+    }
+
+    private func tendinaSegue(_ spostamento: CGSize) {
+        guard !tendinaAperta, tendinaLibera else { return }
+        if tendinaTrascina > 0 { tendinaTrascina = max(0.5, spostamento.height); return }   // già partita: segue il dito su e giù
+        guard spostamento.height > 0, abs(spostamento.height) > abs(spostamento.width) * 1.2 else { return }
+        tendinaTrascina = spostamento.height
+    }
+
+    private func tendinaLasciata(_ spostamento: CGSize, previsto: CGSize) {
+        guard !tendinaAperta, tendinaTrascina > 0 else { tendinaTrascina = 0; return }
+        if spostamento.height > altezzaTendina * 0.3 || previsto.height > altezzaTendina * 0.6 { apriTendina() }
+        else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
+    }
+
+    // MARK: MARK XI · la click wheel
+
+    /// Il dito sulla corona. Sull'anello delle icone (finito l'avvio, tastiera chiusa) gira la ruota; altrove (il centro, il reattore)
+    /// resta la tendina PROTOCOLLI di sempre. Deciso al primo movimento (7 punti): un tocco resta un tocco.
+    private var gestoCorona: some Gesture {
+        DragGesture(minimumDistance: 7, coordinateSpace: .global)
+            .onChanged { v in
+                if modoCorona == nil {
+                    if sullAnello(v.startLocation) {
+                        modoCorona = .ruota
+                        ruota.inizia(base: angoli, angolo: angoloDito(v.startLocation))
+                    } else {
+                        modoCorona = .tendina
+                    }
+                }
+                if modoCorona == .ruota { ruota.trascina(angolo: angoloDito(v.location)) }
+                else if v.translation.height > 0 || tendinaTrascina > 0 { tendinaSegue(v.translation) }
+            }
+            .onEnded { v in
+                if modoCorona == .ruota { ruota.lascia() } else { tendinaLasciata(v.translation, previsto: v.predictedEndTranslation) }
+                modoCorona = nil
+            }
+    }
+
+    /// Il dito è sull'anello delle icone (fra 24 punti dentro e 44 fuori dal raggio), finito l'avvio e con la tastiera chiusa.
+    private func sullAnello(_ p: CGPoint) -> Bool {
+        guard accese >= tutteLeIcone.count, !tastiera, rettCorona.height > 0 else { return false }
+        let k = rettCorona.height / ContentView.latoCorona
+        let d = hypot(p.x - rettCorona.midX, p.y - rettCorona.midY) / k
+        return d >= ContentView.raggioCorona - 24 && d <= ContentView.raggioCorona + 44
+    }
+
+    private func angoloDito(_ p: CGPoint) -> Double {
+        Double(atan2(p.y - rettCorona.midY, p.x - rettCorona.midX))
+    }
+
+    /// L'ologramma dell'icona in alto, nel reattore: toccato apre la sezione, come il tocco sull'icona.
+    private var ologramma: some View {
+        OlogrammaRuota(ruota: ruota, voci: tutteLeIcone.map { (nome: $0.nome, gruppo: $0.gruppo, icona: $0.icona) }) { k in
+            let elenco = tutteLeIcone
+            guard elenco.indices.contains(k) else { return }
+            let s = elenco[k]
+            ruota.spegni()
+            guard !(jarvis.fase == .elaboro && s.nome != "Browser" && (s.gruppo != "INTELLIGENCE" || s.nome == "Bea")) else { return }
+            Suoni.tocco()
+            if ["Occhi", "Cucina"].contains(s.nome) { iconaAttiva = k }
+            s.azione()
+        }
     }
 
     /// La tendina scende solo sulla schermata principale libera: niente tastiera aperta, niente menu SISTEMI.
