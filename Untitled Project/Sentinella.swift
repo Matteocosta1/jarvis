@@ -441,6 +441,8 @@ struct VistaSentinella: View {
             }
         }
         .onDisappear { orecchio.ferma(); s.ferma() }
+        .pausaDietro(ferma: { orecchio.ferma(); s.ferma() },                              // MARK XI: dietro in pausa
+                     riprendi: { Task { if await s.avvia() { Suoni.aperturaCamera(); orecchio.avvia() } } })
         .aperturaHUD("Sentinella", fotocamera: true)
         .sheet(isPresented: $registro) { RegistroSentinella() }
     }

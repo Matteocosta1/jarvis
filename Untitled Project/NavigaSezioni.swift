@@ -151,16 +151,13 @@ struct StratoSezioniVista<Vista: View>: View {
 
     @ViewBuilder private func pagina(_ v: PilaSezioni.Voce) -> some View {
         let p = posa(v)
-        if v.spenta {
-            if naviga.modo == .sfoglio { CartaSpenta(sezione: v.sezione).modifier(PosaPagina(posa: p)) }
-        } else {
-            vista(v)
+        vista(v)
                 .environment(\.sezioneAperta, v.id)
+                .environment(\.sezioneDietro, pila.davanti != v.id)        // dietro: fotocamera e microfono in pausa
                 .environment(\.jarvisCoperto, false)
                 .modifier(AggancioPagina(attivo: naviga.agganciata == v.id, inizio: naviga.aggancioDa))
                 .modifier(PosaPagina(posa: p))
                 .transition(.offset(y: altezza + 2))               // sale e scende di tutta l'altezza, come prima
-        }
     }
 
     private func posa(_ v: PilaSezioni.Voce) -> Posa {
@@ -213,8 +210,7 @@ struct StratoSezioniVista<Vista: View>: View {
 
     @ViewBuilder private var bordi: some View {
         let davanti = pila.voceDavanti
-        let libero = !(davanti?.sezione.restaDavanti ?? false)
-        if libero && (davanti != nil || naviga.modo == .sfoglio || !pila.voci.isEmpty) {
+        if (davanti != nil || naviga.modo == .sfoglio || !pila.voci.isEmpty) {
             // in basso: tutta la larghezza, 24 punti (sopra la barretta di iOS: il primo swipe è di JARVIS, il secondo di iOS)
             Color.clear
                 .frame(height: 24)
@@ -224,7 +220,7 @@ struct StratoSezioniVista<Vista: View>: View {
                 .ignoresSafeArea(edges: .bottom)
                 .zIndex(200)
         }
-        if libero && naviga.modo != .sfoglio && davanti != nil {
+        if naviga.modo != .sfoglio && davanti != nil {
             HStack(spacing: 0) {
                 Color.clear.frame(width: 20).contentShape(Rectangle()).gesture(gestoBordo(da: -1))
                 Spacer(minLength: 0).allowsHitTesting(false)
@@ -301,7 +297,7 @@ struct StratoSezioniVista<Vista: View>: View {
     /// Sul Mac, il trackpad: come il bordo (lato +1 = avanti, la sezione dopo; −1 = indietro).
     private func preparaTrackpad() {
         trackpad.inizia = { lato in
-            guard naviga.modo == .normale, let d = pila.voceDavanti, !d.sezione.restaDavanti,
+            guard naviga.modo == .normale, pila.voceDavanti != nil,
                   let r = pila.vicina(di: pila.davanti, passo: Int(lato)) else { return false }
             naviga.verso = r
             naviga.modo = .bordo
@@ -584,64 +580,4 @@ struct VeloOlo: View {
         }
         .allowsHitTesting(false)
     }
-}
-
-/// La pagina di una sezione spenta dietro (fotocamera): il nome e l'icona, in attesa di riaprirsi.
-struct CartaSpenta: View {
-    let sezione: Sezione
-    var body: some View {
-        ZStack {
-            Color.fondo
-            VStack(spacing: 10) {
-                Image(systemName: "camera.aperture").font(.system(size: 34, weight: .light)).foregroundStyle(Color.ciano)
-                Text(sezione.nome.uppercased()).font(.system(size: 13, weight: .bold, design: .monospaced)).tracking(4).foregroundStyle(Color.ciano)
-                Text("IN PAUSA").font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.tenue)
-            }
-        }
-        .ignoresSafeArea()
-    }
-}
-
-/// Sul Mac: due dita sul trackpad, in orizzontale, fanno lo stesso dello swipe dai bordi (la sezione accanto nel cerchio).
-/// Il riconoscitore sta sulla finestra e sente solo lo scorrimento del trackpad (nessun tocco): non toglie niente agli altri gesti
-/// e lo scorrimento in verticale resta delle sezioni.
-final class TrackpadSezioni: NSObject, UIGestureRecognizerDelegate {
-    var inizia: (CGFloat) -> Bool = { _ in false }       // il verso (−1 sinistra, +1 destra): vero se c'è una sezione accanto
-    var segue: (CGFloat) -> Void = { _ in }              // −1…1
-    var finisce: (CGFloat, CGFloat) -> Void = { _, _ in } // spostamento e slancio (frazioni della larghezza)
-    private var asse = 0                                  // 0 da decidere, 1 orizzontale, 2 verticale (ignorato)
-    private weak var finestra: UIWindow?
-    private var riconoscitore: UIPanGestureRecognizer?
-
-    func installa() {
-        guard ProcessInfo.processInfo.isiOSAppOnMac, riconoscitore == nil, let w = FasciaAlta.finestra else { return }
-        let r = UIPanGestureRecognizer(target: self, action: #selector(scorre(_:)))
-        r.allowedScrollTypesMask = .continuous
-        r.allowedTouchTypes = []
-        r.cancelsTouchesInView = false
-        r.delegate = self
-        w.addGestureRecognizer(r)
-        riconoscitore = r
-        finestra = w
-    }
-
-    @objc private func scorre(_ r: UIPanGestureRecognizer) {
-        let w = max(1, finestra?.bounds.width ?? 1000)
-        let t = r.translation(in: finestra)
-        switch r.state {
-        case .began:
-            asse = 0
-        case .changed:
-            if asse == 0, hypot(t.x, t.y) > 10 {
-                asse = abs(t.x) > abs(t.y) * 1.5 && inizia(t.x < 0 ? 1 : -1) ? 1 : 2
-            }
-            if asse == 1 { segue(max(-1, min(1, t.x / w))) }
-        case .ended, .cancelled, .failed:
-            if asse == 1 { finisce(t.x / w, r.velocity(in: finestra).x / w * 0.3) }
-            asse = 0
-        default: break
-        }
-    }
-
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { true }
 }

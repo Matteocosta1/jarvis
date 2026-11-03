@@ -30,7 +30,6 @@ struct ContentView: View {
     @State private var mostraImpostazioni = false
     @State private var mostraBrowser = false
     @State private var aperturaPagina: AperturaPagina?   // MARK X: STUDIO e SOCIAL, la pagina del mockup (icone in alto, voce, Occhi)
-    @State private var stratoCopre = false               // Studio o Social su del tutto: JARVIS sotto si ferma (vedi jarvisCoperto)
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
@@ -69,7 +68,8 @@ struct ContentView: View {
     /// MARK XI: le sezioni aperte (fino a 10), nel contenitore sopra JARVIS al posto delle schermate di iOS.
     @StateObject private var pila = PilaSezioni()
     @State private var naviga = NavigaSezioni()                // i gesti fra le sezioni (letti solo dal contenitore)
-    @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
+    @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)
+    @State private var riprendo: Sezione?                      // la sezione che torna davanti da dietro (non una richiesta nuova)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
     private enum ModoCorona { case ruota, tendina }
     @Environment(\.scenePhase) private var scena
@@ -79,7 +79,7 @@ struct ContentView: View {
     /// e (per ora) Profiler e Scanner. App in secondo piano: spento.
     private var schermoLibero: Bool {
         let inPrimoPiano: Bool = scena == .active
-        let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && !mostraWiretap
+        let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && pila.voce(.wiretap) == nil   // MARK XI: il Wiretap registra anche dietro
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
         // iPhone, tastiera aperta (23 ott): JARVIS resta in attesa e appena lei parla passa in ascolto; mentre preme i tasti il microfono
         // tace (i tasti non lo fanno partire) e un attimo dopo l'ultimo tasto torna in attesa. Chiusa la tastiera: la voce di sempre
@@ -245,21 +245,10 @@ struct ContentView: View {
                 // MARK XI: le sezioni, nel contenitore (davanti una, dietro le altre vive)
                 strato
                     .zIndex(25)
-                if let a = aperturaPagina {
-                    StratoPagina(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) },
-                                 chiudi: { durata in abbassaPagina(durata) },
-                                 jarvisSiVede: { siVede in if aperturaPagina?.id == a.id { stratoCopre = !siVede } })
-                        .environment(\.jarvisCoperto, false)
-                        .id(a.id)
-                        // 27 ott notte (il signore: «rimane un pezzettino visibile prima di sparire in fondo»): lo strato si stende anche
-                        // sotto l'ora e sotto la barretta, ma .move lo spostava solo dell'altezza utile: la fascia dell'ora restava in
-                        // fondo per un attimo. Ora scende (e sale) di tutta l'altezza vera dello schermo più un margine.
-                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 2))   // tutta l'altezza, come le schede di iOS
-                        .zIndex(30)
-                }
+                // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
-            .environment(\.jarvisCoperto, stratoCopre || pilaCopre)
-            .onChange(of: aperturaPagina?.id) { _, id in if id == nil { stratoCopre = false } }   // senza strato JARVIS gira sempre
+            .environment(\.jarvisCoperto, pilaCopre)
+
             .frame(width: g.size.width, height: g.size.height)
             // 26 ott notte (foto del signore 23:29, «menu a tendina inutile»): tolto il blocco dello swipe di iOS dall'alto: con il
             // blocco iOS mostrava sempre la sua linguetta grigia sotto la Dynamic Island. I PROTOCOLLI si aprono tirando giù da titolo,
@@ -289,10 +278,6 @@ struct ContentView: View {
             // 26 ott (Occhi → Studio che non si apriva): iOS non apre una schermata mentre un'altra si sta ancora chiudendo
             // (gli Occhi, LiDAR). Si aspetta che sia davvero chiusa (al massimo 3 s), poi si apre lo Studio o Social.
             Task { @MainActor in
-                if aperturaPagina != nil {                         // ce n'è già una aperta: scende, poi sale la nuova
-                    abbassaPagina()
-                    try? await Task.sleep(for: .milliseconds(450))
-                }
                 for _ in 0..<60 {
                     if PaginaMarkX.schermoLibero() { break }
                     try? await Task.sleep(for: .milliseconds(50))
@@ -315,7 +300,6 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .jarvisVaiA)) { n in   // LIDAR e OCCHI dello Studio: quelli veri
             let lidar = n.userInfo?["dove"] as? String == "lidar"
-            if aperturaPagina != nil { abbassaPagina() }      // di solito è già scesa (scendiPoi)
             Task { @MainActor in
                 // 26 ott sera: come Occhi → Studio, si aspetta che lo Studio (o Social) sia davvero chiuso (al massimo 3 s):
                 // iOS non apre gli Occhi o LiDAR mentre un'altra schermata si sta ancora chiudendo.
@@ -1125,6 +1109,7 @@ struct ContentView: View {
         if mostraConfidente { a.append(.confidente) }
         if scegliLingua { a.append(.lingua) }
         if let sc = scheda { a.append(.scheda(sc)) }
+        if let p = aperturaPagina { a.append(.pagina(p.sezione)) }
         return a
     }
 
@@ -1133,25 +1118,42 @@ struct ContentView: View {
         let unaScheda: (Sezione) -> Bool = { if case .scheda = $0 { return true } else { return false } }
         for s in prima where !adesso.contains(s) {
             // una scheda al posto di un'altra (lo stato delle schede è uno solo): quella di prima va dietro, non si chiude
-            if unaScheda(s), adesso.contains(where: unaScheda), !s.restaDavanti { pila.vaDietro(s) }
+            if unaScheda(s), adesso.contains(where: unaScheda) { pila.vaDietro(s) }
             var chiusa = false
             withAnimation(StratoPagina.discesa()) { chiusa = pila.spenta(s) }
             if chiusa { sezioneChiusa(s) }
         }
         for s in adesso where !prima.contains(s) {
             // quella che era davanti ed è ancora accesa va dietro (come nel mockup: la sezione di prima resta viva)
-            if let d = pila.voceDavanti?.sezione, d != s, adesso.contains(d) {
-                if d.restaDavanti { spegniStato(d) } else { pila.vaDietro(d); spegniStato(d) }
+            if let d = pila.voceDavanti?.sezione, d != s, adesso.contains(d) { pila.vaDietro(d); spegniStato(d) }
+            // riaperta da zero (non ripresa da dietro): Occhi con un'altra richiesta, Interprete in un'altra lingua, Studio o Social
+            // con una frase o una foto. Quella vecchia si chiude e sale la nuova.
+            if riprendo != s, let vecchia = pila.voce(s), nuovaRichiesta(s, vecchia) {
+                pila.togli(s)
             }
-            let cucina = jarvis.occhi?.cucina ?? false
-            if aperturaPagina != nil { abbassaPagina() }              // Studio o Social sopra: scendono, la sezione chiesta si vede
+            if riprendo == s { riprendo = nil }
+            let occhiata: Occhiata? = s == .occhi ? jarvis.occhi : nil
+            let lingua: Lingua? = s == .interprete ? jarvis.interprete : nil
+            let pagina: AperturaPagina? = aperturaPagina.flatMap { s == .pagina($0.sezione) ? $0 : nil }
             withAnimation(StratoPagina.salita) {
-                if let vecchia = pila.accesa(s, cucina: s == .occhi && cucina, ricordi: s == .ricordi ? mostraRicordi : nil) {
+                if let vecchia = pila.accesa(s, ricordi: s == .ricordi ? mostraRicordi : nil, occhiata: occhiata, lingua: lingua, pagina: pagina) {
                     pila.togli(vecchia)                               // più di 10: la più vecchia si chiude
                     sezioneChiusa(vecchia)
                 }
             }
             ruota.spegni()
+        }
+    }
+
+    /// La richiesta è nuova (non la stessa sezione che torna davanti)?
+    private func nuovaRichiesta(_ s: Sezione, _ v: PilaSezioni.Voce) -> Bool {
+        switch s {
+        case .occhi: return true
+        case .interprete: return v.lingua?.id != jarvis.interprete?.id
+        case .pagina:
+            guard let a = aperturaPagina else { return false }
+            return a.voce != nil || a.foto != nil || a.scheda != nil
+        default: return false
         }
     }
 
@@ -1174,7 +1176,7 @@ struct ContentView: View {
         switch s {
         case .impostazioni: mostraImpostazioni = false
         case .browser: mostraBrowser = false
-        case .occhi: jarvis.occhiChiusi([])
+        case .occhi: jarvis.occhiChiusi([])               // dietro: JARVIS non resta ad aspettare la foto (davanti la riaspetta)
         case .interprete: jarvis.interprete = nil
         case .sentinella: mostraSentinella = false
         case .wiretap: mostraWiretap = false
@@ -1186,16 +1188,19 @@ struct ContentView: View {
         case .confidente: mostraConfidente = false
         case .lingua: scegliLingua = false
         case .scheda(let sc): if scheda == sc { scheda = nil }
+        case .pagina: aperturaPagina = nil
         }
     }
 
     /// Riaccende lo stato di una sezione che sta dietro: torna davanti (le spente si riaprono, la fotocamera col suo suono).
     private func accendiStato(_ v: PilaSezioni.Voce) {
+        riprendo = v.sezione
         switch v.sezione {
         case .impostazioni: mostraImpostazioni = true
         case .browser: mostraBrowser = true
-        case .occhi: if v.cucina { jarvis.guardaCucina() } else { jarvis.guardaManuale() }
-        case .interprete, .wiretap: break                                     // non stanno mai dietro
+        case .occhi: if let o = v.occhiata { jarvis.riprendiOcchi(o) }       // la stessa inquadratura, e JARVIS riaspetta la foto
+        case .interprete: jarvis.interprete = v.lingua
+        case .wiretap: mostraWiretap = true
         case .sentinella: mostraSentinella = true
         case .profiler: profiler()
         case .allenatore: jarvis.allenatore = true
@@ -1205,12 +1210,13 @@ struct ContentView: View {
         case .confidente: mostraConfidente = true
         case .lingua: scegliLingua = true
         case .scheda(let sc): scheda = sc
+        case .pagina: aperturaPagina = v.pagina
         }
     }
 
     /// Manda dietro la sezione davanti (resta viva, o spenta se ha la fotocamera): davanti torna JARVIS.
     private func mandaDietroDavanti() {
-        guard let d = pila.voceDavanti?.sezione, !d.restaDavanti else { return }
+        guard let d = pila.voceDavanti?.sezione else { return }
         pila.vaDietro(d)
         spegniStato(d)
     }
@@ -1248,13 +1254,13 @@ struct ContentView: View {
         case .browser:
             BrowserPrivato()
         case .occhi:
-            if let o = jarvis.occhi {
+            if let o = v.occhiata {
                 Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                       oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
                     .aperturaHUD(o.cucina ? "Cucina" : "Occhi", soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
-            if let l = jarvis.interprete { Interprete(lingua: l) { jarvis.interprete = nil } }
+            if let l = v.lingua { Interprete(lingua: l) { jarvis.interprete = nil } }
         case .sentinella:
             VistaSentinella(chiudi: { mostraSentinella = false }, comando: comandoDaReparto)
         case .wiretap:
@@ -1304,6 +1310,16 @@ struct ContentView: View {
             .paginaPiena()
         case .scheda(let sc):
             vistaScheda(sc).paginaPiena()
+        case .pagina:
+            if let a = v.pagina {
+                // MARK X: Studio e Social (la pagina del mockup), ora una sezione come le altre: si chiudono col loro «Chiudi»
+                // o trascinando giù dalla fascia dell'ora
+                VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }, chiudi: { aperturaPagina = nil })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.fondo)
+                    .ignoresSafeArea()
+                    .paginaPiena()
+            }
         }
     }
 
@@ -1435,18 +1451,13 @@ struct ContentView: View {
     /// 26 ott sera: Studio o Social salgono come strato sopra JARVIS (StratoPagina), con la salita delle altre schede. A salita
     /// finita (la molla si posa in ~0,5 s) JARVIS sotto è tutto coperto e le sue animazioni si fermano (jarvisCoperto).
     private func alzaPagina(_ a: AperturaPagina) {
-        withAnimation(StratoPagina.salita) { aperturaPagina = a }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            if aperturaPagina?.id == a.id { stratoCopre = true }
-        }
+        aperturaPagina = a                                   // MARK XI: nel contenitore, come le altre sezioni
     }
 
-    /// Lo strato di Studio o Social scende come le altre schede e poi sparisce; JARVIS sotto riparte subito, così scendendo
-    /// si vede vivo.
+    /// Studio o Social si chiudono (scendono come le altre sezioni).
     private func abbassaPagina(_ durata: Double = 0.35) {
-        stratoCopre = false
-        withAnimation(StratoPagina.discesa(durata)) { aperturaPagina = nil }
+        _ = durata
+        aperturaPagina = nil
     }
 
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.

@@ -60,6 +60,7 @@ struct VistaScanner: View {
             orecchio.avvia()
         }
         .onDisappear { orecchio.ferma() }
+        .pausaDietro(ferma: { orecchio.ferma() }, riprendi: { orecchio.avvia() })        // MARK XI: dietro i comandi a voce in pausa
     }
 
     /// Un comando detto a voce, come il tasto corrispondente.

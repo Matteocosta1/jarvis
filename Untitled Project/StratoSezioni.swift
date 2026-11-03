@@ -5,10 +5,11 @@ import Combine
 // MARK: - MARK XI · le sezioni restano aperte (mockup approvato dal signore il 3 nov)
 // Prima ogni sezione era una schermata di iOS (fullScreenCover): chiusa, spariva del tutto. Ora stanno tutte in un contenitore
 // sopra JARVIS (`StratoSezioni` in ContentView): fino a 10 vive, in ordine d'apertura; all'undicesima si chiude la più vecchia.
-// Una sola è davanti; le altre restano dietro, vive (con i loro dati, dove le aveva lasciate). Le sezioni con la fotocamera
-// (o col microfono) dietro si spengono, come se fossero chiuse, e restano nell'elenco: riportate davanti si riaprono e la
-// fotocamera riparte col suo suono (scelta B del signore, 3 nov). Wiretap e Interprete (registrano o traducono dal vivo) non
-// vanno dietro: si chiudono e basta.
+// Una sola è davanti; le altre restano dietro, vive (con i loro dati, dove le aveva lasciate), come nel mockup. Le sezioni con
+// la fotocamera (o col microfono) dietro vanno in PAUSA (l'ultima immagine resta ferma) e davanti riprendono da dove erano, la
+// fotocamera col suo suono (scelta B del signore, 3 nov; «deve funzionare tutto come il mockup»). Il Wiretap dietro continua a
+// registrare (e intanto JARVIS non ascolta); l'Interprete dietro si ferma e davanti riprende. Studio e Social sono sezioni come le
+// altre (la pagina web resta viva dietro).
 //
 // La regola che tiene tutto in ordine: lo «stato» di sempre di ogni sezione (mostraVitals, scheda, jarvis.occhi…) acceso vuol
 // dire «davanti». Mandata dietro, il suo stato si spegne ma la sezione resta nell'elenco (`dietro`); chiusa davvero, esce.
@@ -17,6 +18,7 @@ import Combine
 enum Sezione: Hashable {
     case impostazioni, browser, occhi, interprete, sentinella, wiretap, profiler, allenatore, lidar, vitals, ricordi, confidente, lingua
     case scheda(SchedaApp)
+    case pagina(String)                 // MARK X: Studio e Social
 
     /// Il nome, come sulla corona (le pagine olografiche, la scritta APERTA dell'ologramma).
     var nome: String {
@@ -34,6 +36,7 @@ enum Sezione: Hashable {
         case .ricordi: return "Ricordi"
         case .confidente: return "Confidente"
         case .lingua: return "Interprete"
+        case .pagina(let n): return n
         case .scheda(let s):
             switch s {
             case .github: return "GitHub"
@@ -44,17 +47,14 @@ enum Sezione: Hashable {
         }
     }
 
-    /// Fotocamera o microfono: dietro si spegne (e si riapre quando torna davanti).
-    var siSpegneDietro: Bool {
+    /// Fotocamera o microfono: dietro va in pausa (e riprende quando torna davanti).
+    var inPausaDietro: Bool {
         switch self {
-        case .occhi, .sentinella, .profiler, .allenatore, .lidar, .interprete, .wiretap: return true
+        case .occhi, .sentinella, .profiler, .allenatore, .lidar, .interprete: return true
         case .scheda(let s): return s == .scanner || s == .shazam
         default: return false
         }
     }
-
-    /// Non va dietro (registra o traduce dal vivo): gli swipe per tornare a JARVIS o sfogliare qui non valgono.
-    var restaDavanti: Bool { self == .wiretap || self == .interprete }
 
     /// Le sezioni con la fotocamera: scelte dalle pagine olografiche hanno già il loro suono d'apertura (niente «scelta»).
     var conFotocamera: Bool {
@@ -71,12 +71,13 @@ final class PilaSezioni: ObservableObject {
     struct Voce: Identifiable, Equatable {
         let id = UUID()
         let sezione: Sezione
-        /// Dietro e spenta (fotocamera o microfono): non si disegna, si riapre quando torna davanti.
-        var spenta = false
-        /// Occhi: aperti in modalità Cucina (per riaprirli uguali).
-        var cucina = false
         /// Ricordi: la scheda con cui si erano aperti.
         var ricordi: VistaRicordi.Scheda?
+        /// Occhi, Interprete, Studio e Social: con cosa si erano aperti (servono per disegnarli anche dietro, a stato spento).
+        var occhiata: Occhiata?
+        var lingua: Lingua?
+        var pagina: AperturaPagina?
+        static func == (a: Voce, b: Voce) -> Bool { a.id == b.id && a.ricordi == b.ricordi && a.pagina?.id == b.pagina?.id }
     }
 
     @Published private(set) var voci: [Voce] = []
@@ -93,17 +94,22 @@ final class PilaSezioni: ObservableObject {
 
     /// La sezione si accende (davanti): nuova in fondo all'elenco, o una che c'era già (torna davanti, sveglia se era spenta).
     /// Restituisce la sezione da chiudere perché sono più di 10 (la più vecchia, mai quella davanti).
-    @discardableResult func accesa(_ s: Sezione, cucina: Bool = false, ricordi: VistaRicordi.Scheda? = nil) -> Sezione? {
+    @discardableResult func accesa(_ s: Sezione, ricordi: VistaRicordi.Scheda? = nil, occhiata: Occhiata? = nil,
+                                   lingua: Lingua? = nil, pagina: AperturaPagina? = nil) -> Sezione? {
         vannoDietro.remove(s)
         if let i = voci.firstIndex(where: { $0.sezione == s }) {
-            voci[i].spenta = false
             if let ricordi { voci[i].ricordi = ricordi }
+            if let occhiata { voci[i].occhiata = occhiata }
+            if let lingua { voci[i].lingua = lingua }
+            if let pagina { voci[i].pagina = pagina }
             davanti = voci[i].id
             return nil
         }
         var v = Voce(sezione: s)
-        v.cucina = cucina
         v.ricordi = ricordi
+        v.occhiata = occhiata
+        v.lingua = lingua
+        v.pagina = pagina
         voci.append(v)
         davanti = v.id
         if voci.count > PilaSezioni.massimo, let vecchia = voci.first(where: { $0.id != davanti }) {
@@ -118,7 +124,6 @@ final class PilaSezioni: ObservableObject {
         guard let i = voci.firstIndex(where: { $0.sezione == s }) else { vannoDietro.remove(s); return false }
         if vannoDietro.contains(s) {
             vannoDietro.remove(s)
-            if s.siSpegneDietro { voci[i].spenta = true }
             if davanti == voci[i].id { davanti = nil }
             return false
         }
@@ -129,7 +134,7 @@ final class PilaSezioni: ObservableObject {
 
     /// La sezione sta per andare dietro (subito dopo il suo stato si spegne).
     func vaDietro(_ s: Sezione) {
-        guard voce(s) != nil, !s.restaDavanti else { return }
+        guard voce(s) != nil else { return }
         vannoDietro.insert(s)
     }
 

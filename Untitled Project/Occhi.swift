@@ -401,6 +401,9 @@ struct Occhi: View {
         .animation(.spring(duration: 0.45, bounce: 0.4), value: tastoAereo)
         .animation(.easeOut(duration: 0.3), value: cielo.foglio)
         .onChange(of: zoom) { aggiornaCampo() }
+        // MARK XI: dietro la fotocamera si ferma (l'ultima immagine resta), davanti riparte col suo suono
+        .pausaDietro(ferma: { motore.ferma() },
+                     riprendi: { motore.avvia(posizione: davanti ? .front : .back) { _ in }; Suoni.aperturaCamera() })
         .onDisappear {
             cielo.spegni(); ComandoOcchi.aereoAgganciato = false
             OcchiAperti.scatta = nil; OcchiAperti.giro = nil; OcchiAperti.comando = nil; OcchiAperti.stark = nil

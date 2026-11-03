@@ -16,6 +16,8 @@ import ImageIO
 /// nil quando non c'è una scansione in corso: allora «guarda» apre Occhi come sempre.
 enum OcchiLidar {
     static var scatta: (() -> Data?)?
+    /// MARK XI: LiDAR dietro (in pausa): «guarda» apre gli Occhi; tornato davanti, la sua fotocamera torna a scattare.
+    static var inPausa: (() -> Data?)?
 }
 
 /// LiDAR aperto: «rifai la scansione» la fa ripartire, e «scansione» non apre lo Scanner dei codici a barre.
@@ -200,6 +202,14 @@ struct VistaLidar: View {
             if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; parti(r.modo, nome: r.nome) }   // aperta a voce già su un modo
         }
         .onDisappear { LidarAperta.aperta = false }
+        .pausaDietro(ferma: {                                                                  // MARK XI: dietro in pausa
+            LidarAperta.aperta = false
+            if OcchiLidar.scatta != nil { OcchiLidar.inPausa = OcchiLidar.scatta; OcchiLidar.scatta = nil }
+        }, riprendi: {
+            LidarAperta.aperta = true
+            if let s = OcchiLidar.inPausa { OcchiLidar.scatta = s; OcchiLidar.inPausa = nil }
+            Suoni.aperturaCamera()
+        })
         .onReceive(NotificationCenter.default.publisher(for: .jarvisRifaiLidar)) { _ in   // a voce: la scansione da capo, nello stesso modo
             guard fase != .menu else { return }
             Suoni.tocco()
@@ -689,6 +699,13 @@ struct CatturaStanza: UIViewRepresentable {
         return v
     }
     func updateUIView(_ v: RoomCaptureView, context: Context) {
+        // MARK XI: dietro la fotocamera di RoomPlan si ferma; davanti riprende dalla stessa stanza
+        let dietro = context.environment.sezioneDietro
+        if dietro != context.coordinator.inPausa, !context.coordinator.fermata {
+            context.coordinator.inPausa = dietro
+            if dietro { v.captureSession.arSession.pause() }
+            else if let c = v.captureSession.arSession.configuration { v.captureSession.arSession.run(c, options: []) }
+        }
         if ferma && !context.coordinator.fermata {
             context.coordinator.fermata = true
             OcchiLidar.scatta = nil                    // scansione finita: «guarda» torna a Occhi
@@ -718,6 +735,7 @@ struct CatturaStanza: UIViewRepresentable {
         weak var vista: RoomCaptureView?
         var fermata = false
         var annullata = false                       // chiusa a metà: niente pianta, niente suono, niente file
+        var inPausa = false                         // MARK XI: la sezione è dietro, la fotocamera ferma
 
         init(aggiorna: @escaping (MisureDalVivo) -> Void, vivo: ((ScansioneLidar) -> Void)?, finita: @escaping (ScansioneLidar) -> Void,
              errore: @escaping (String) -> Void) {

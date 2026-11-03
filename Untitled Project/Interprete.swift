@@ -152,6 +152,8 @@ struct Interprete: View {
         }
         .onChange(of: automatico) { _, v in motore.automatico = v }
         .onDisappear { chiuso = true; orecchio.ferma(); motore.ferma() }
+        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },                          // MARK XI: dietro in pausa
+                     riprendi: { if !chiuso, motore.fase == .attesa { orecchio.avvia() } })
         .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
             ForEach(Lingua.tutte) { l in Button("\(l.bandiera) \(l.nome)") { cambia(l) } }
             Button("Annulla", role: .cancel) {}

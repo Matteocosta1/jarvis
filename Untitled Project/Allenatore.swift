@@ -144,6 +144,8 @@ struct Allenatore: View {
             orecchio.avvia()
         }
         .onDisappear { orecchio.ferma(); motore.ferma() }
+        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },                         // MARK XI: dietro in pausa
+                     riprendi: { Task { await motore.avvia(); Suoni.aperturaCamera(); orecchio.avvia() } })
         .aperturaHUD("Trainer", fotocamera: true)
     }
 

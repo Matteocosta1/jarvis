@@ -58,6 +58,7 @@ struct VistaProfiler: View {
         .statusBarHidden()
         .task { await avvia() }
         .onDisappear { orecchio.ferma(); motore.ferma() }
+        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() }, riprendi: { Task { await avvia() } })   // MARK XI: dietro in pausa
     }
 
     // MARK: Pezzi

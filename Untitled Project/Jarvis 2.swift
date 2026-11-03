@@ -1042,6 +1042,26 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
+    /// MARK XI: gli Occhi tornano davanti dalle sezioni aperte (erano dietro, in pausa): la stessa inquadratura (le stesse
+    /// impostazioni) e JARVIS riaspetta la foto, come quando li si apre dall'icona.
+    func riprendiOcchi(_ o: Occhiata) {
+        occhiChiusi([])
+        Task {
+            let dati = await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
+                attesaOcchi = c
+                occhi = o
+            }
+            let detta = prendiDomandaOcchi()
+            guard !dati.isEmpty else { return }
+            preparaFoto(dati)
+            if o.cucina {
+                await invia(detta.map { "Cucina: \($0)" } ?? "Cosa cucino stasera con quello che vedi? Proponimi due o tre piatti e dimmi se manca qualcosa da mettere nella lista della spesa.")
+            } else {
+                await invia(detta ?? (dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?"))
+            }
+        }
+    }
+
     /// «Ehi Siri, Jarvis guarda»: scatta da sola e chiede cosa c'è davanti.
     func guardaAutomatico() {
         Task {

@@ -86,10 +86,27 @@ private struct ChiaveJarvisCoperto: EnvironmentKey { static let defaultValue = f
 
 /// La sezione del contenitore in cui sta questa vista (nil: fuori dal contenitore).
 private struct ChiaveSezioneAperta: EnvironmentKey { static let defaultValue: UUID? = nil }
+/// La sezione è dietro (o è una pagina olografica non davanti): fotocamera, microfono e comandi a voce in pausa.
+private struct ChiaveSezioneDietro: EnvironmentKey { static let defaultValue = false }
 extension Notification.Name {
     /// Una sezione del contenitore chiede di chiudersi (userInfo «id»: UUID).
     static let jarvisChiudiSezione = Notification.Name("JarvisChiudiSezione")
 }
+/// MARK XI: una sezione con fotocamera o microfono, mandata dietro, va in pausa; tornata davanti riprende (come nel mockup).
+struct PausaDietro: ViewModifier {
+    @Environment(\.sezioneDietro) private var dietro
+    let ferma: () -> Void
+    let riprendi: () -> Void
+    func body(content: Content) -> some View {
+        content.onChange(of: dietro) { _, d in if d { ferma() } else { riprendi() } }
+    }
+}
+extension View {
+    func pausaDietro(ferma: @escaping () -> Void, riprendi: @escaping () -> Void) -> some View {
+        modifier(PausaDietro(ferma: ferma, riprendi: riprendi))
+    }
+}
+
 /// Chiude la sezione del contenitore, o il foglio di iOS se la vista è presentata.
 struct ChiudiOVia {
     let sezione: UUID?
@@ -110,6 +127,10 @@ extension EnvironmentValues {
     var sezioneAperta: UUID? {
         get { self[ChiaveSezioneAperta.self] }
         set { self[ChiaveSezioneAperta.self] = newValue }
+    }
+    var sezioneDietro: Bool {
+        get { self[ChiaveSezioneDietro.self] }
+        set { self[ChiaveSezioneDietro.self] = newValue }
     }
     /// Al posto di `dismiss`: dentro il contenitore chiude la sezione; in un foglio presentato, il foglio.
     var chiudiOVia: ChiudiOVia { ChiudiOVia(sezione: isPresented ? nil : sezioneAperta, dismiss: dismiss) }

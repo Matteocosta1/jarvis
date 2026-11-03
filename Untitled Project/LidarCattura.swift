@@ -82,6 +82,12 @@ struct CatturaAR: UIViewRepresentable {
     }
 
     func updateUIView(_ v: ARSCNView, context: Context) {
+        // MARK XI: dietro la sessione AR si ferma; davanti riprende senza ricominciare (stessa scansione)
+        let dietro = context.environment.sezioneDietro
+        if dietro != context.coordinator.inPausa, !context.coordinator.fermata {
+            context.coordinator.inPausa = dietro
+            if dietro { v.session.pause() } else if let c = v.session.configuration { v.session.run(c, options: []) }
+        }
         if ferma && !context.coordinator.fermata { context.coordinator.concludi() }
     }
 
@@ -148,6 +154,9 @@ final class RegistaAR: NSObject, ARSessionDelegate {
 
     /// Gli avvisi passano dal main un attimo dopo: mai mentre SwiftUI sta disegnando.
     private func segnala(_ testo: String) { Task { @MainActor in if !self.annullata { self.errore(testo) } } }
+
+    /// MARK XI: la sezione è dietro e la sessione AR è in pausa.
+    var inPausa = false
 
     func avvia() {
         guard let v = vista else { return }
@@ -939,6 +948,7 @@ struct CatturaStatua: View {
         .onAppear(perform: avvia)
         .onDisappear(perform: chiudi)
         .onChange(of: ferma) { _, f in if f { concludi() } }
+        .pausaDietro(ferma: { sessione?.pause() }, riprendi: { sessione?.resume() })    // MARK XI: Object Capture in pausa dietro
     }
 
     private func avvia() {
