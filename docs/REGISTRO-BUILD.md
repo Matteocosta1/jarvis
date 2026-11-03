@@ -245,3 +245,10 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **MESH** (SELEZIONA › MESH, o «modifica la mesh»): facce vere (triangoli complanari = una faccia), VERTICI/SPIGOLI/FACCE col tocco, TUTTO/NIENTE; cursori in mm DESTRA, SU, AVANTI, ESTRUDI (anche in dentro), INSERISCI, SCALA %; UNISCI VERTICI, SUDDIVIDI. Oltre 8.000 triangoli no (si usa SCOLPISCI).
 - La creta resta con l'aspetto degli altri pezzi (proposta «più piena» mostrata al signore, non scelta: non applicata).
 - Collaudo (Playwright, pagina dell'app): 6 pennelli (~1 ms per movimento del dito), annulla, voce; cubo 4 cm + estrudi 15 mm = 88 cm³ esatti, inserisci + estrudi in dentro, sempre chiusa; creta in 3MF chiusa e riaperta uguale; Fase 1 invariata. Nessun file Swift toccato. Sul telefono non ancora provata.
+
+### 10.0 (22) · 3 nov · STUDIO Fase 3 · CAD (mockup approvato: «bravo J … vai avanti»)
+- **CAD** (SELEZIONA › CAD, o «cad»): motore OpenCascade (build di replicad, commit 6ef8ae1, LGPL-2.1: licenza in `Licenze/OpenCascade-LGPL-2.1.txt`), superfici esatte. Cubo, cilindro, sfera, cono e anello entrano come solidi esatti; gli altri dalle facce piane (fino a 8.000 triangoli).
+- FACCE: SPINGI (alza/scava in mm), FORO (Ø, profondità o passante, nel punto toccato), GUSCIO (apre le facce scelte). SPIGOLI: RACCORDO, SMUSSO. STORIA delle operazioni; ogni passo si annulla; valori impossibili rifiutati (solido controllato con BRepCheck, guscio che deve togliere materiale) con avviso, il pezzo resta com'era.
+- STAMPA › **SALVA STEP** (Fusion, SolidWorks, Shapr3D, FreeCAD). A voce: «spingi di 10 mm», «foro da 8 mm», «raccordo 3 mm», «smusso 2», «guscio 2 mm».
+- Swift: `StudioWeb.swift` serve anche `replicad_single.js` e `replicad_single.wasm` (application/wasm) dalla cartella Studio3D; nient'altro di Swift cambiato.
+- Collaudo (Playwright, pagina dell'app con il ramo «app» del caricamento): motore in 0,8 s; cubo 4 cm + spingi 10 = 80 cm³ esatti, foro, raccordo, smusso, guscio rifiutato dopo i raccordi, annulla, STEP valido; Fase 1 e 2 invariate. Non compilata qui: Build in Xcode (0 errori 0 avvisi da verificare); sul telefono non ancora provata.

@@ -1038,6 +1038,8 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd .chip.acceso { border-color: var(--ciano); color: var(--ciano); box-shadow: 0 0 10px rgba(79,227,255,.45); }
 .sk-riempi span { font: 700 9px var(--mono); letter-spacing: 1.5px; color: var(--ciano); opacity: .8; min-width: 62px; } .sk-riempi .chip { flex: 1 1 0; }
 .sd-pen .chip, .sd-edit .chip { flex: 1 1 0; padding-left: 4px; padding-right: 4px; }
+.sd-crono { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; } .sd-crono span { font: 700 9px var(--mono); letter-spacing: 1.5px; color: var(--ciano); opacity: .8; margin-right: 4px; }
+.sd-crono i { font: 10px var(--mono); font-style: normal; color: #9fb3b9; border: 1px solid rgba(79,227,255,.25); border-radius: 8px; padding: 3px 6px; } .sd-crono i.ultima { color: #e6f4f8; border-color: rgba(79,227,255,.6); }
 .sd-strati { display: block; height: 120px; width: auto; max-width: 100%; border-radius: 10px; margin: 2px auto 4px; border: 1px solid rgba(76, 224, 255, .25); }   /* 2 nov: LINEE / PIENO */
 .sk-att { flex-wrap: nowrap; gap: 4px !important; } .sk-att .chip { flex: 1 1 0; min-width: 0; padding: 0 2px; font-size: 9px; letter-spacing: .5px; }
 .sd.sk-on .sd-voce, .sd.sk-on .sd-scrivi { display: none; }
@@ -6219,7 +6221,7 @@ function studio(ok) {
     B = await bancoOlografico3D(A.querySelector(".sd-banco"), vivo, {
       tocca: (id) => { const o = oggetti.find((x) => x.id === id); seleziona(o || null); },
       trascina: (dx, dy) => trascina(dx, dy), fine: () => fineTrascina(),
-      tratto: () => memorizza(), scolpito: (o, P) => scolpito(o, P), sceglie: (x) => sceltaMaglia(x),
+      tratto: () => memorizza(), scolpito: (o, P) => scolpito(o, P), sceglie: (x, punto) => sceltaMaglia(x, punto),
       coord: (t) => { $sd("coord").textContent = t; },
     });
     if (!vivo()) return;
@@ -6316,12 +6318,12 @@ function studio(ok) {
     if (inAttesa && strumento === "seleziona" && !sel) { inAttesa(); return; }
     curs = {}; let h = "";
     const t = strumento, o = sel;
-    if (edit && (t !== "seleziona" || !o || o.id !== edit.id || o.tipo !== (edit.tipo === "scolpisci" ? "creta" : "maglia"))) esciEdit();
+    if (edit && (t !== "seleziona" || !o || o.id !== edit.id || o.tipo !== { scolpisci: "creta", maglia: "maglia", cad: "cad" }[edit.tipo])) esciEdit();
     A.querySelector(".sd-banco").classList.toggle("edita", !!edit);   // scolpendo, il dito non deve mai far scorrere la pagina
-    if (edit) { CTX.innerHTML = edit.tipo === "scolpisci" ? pannelloScolpisci(o) : pannelloMaglia(o); return; }
+    if (edit) { CTX.innerHTML = edit.tipo === "scolpisci" ? pannelloScolpisci(o) : edit.tipo === "cad" ? pannelloCAD(o) : pannelloMaglia(o); return; }
     const vuoto = (msg) => { CTX.innerHTML = rigaSospeso() + `<p class="nota-sd">${msg}</p>`; };
     if (!o && !["seleziona", "misura", "sezione"].includes(t)) { vuoto("Tocchi un oggetto sul banco per usare questo strumento."); return; }
-    if (t === "seleziona") { CTX.innerHTML = o ? rigaSospeso() + (o.foro ? "" : `<div class="riga2 sd-edit"><button type="button" class="chip" data-edit="scolpisci">SCOLPISCI</button><button type="button" class="chip" data-edit="maglia">MESH</button></div>`) + `<div class="riga2 sd-ruolo"><button type="button" class="chip" data-ruolo="pieno" aria-pressed="${!o.foro}">CORPO</button><button type="button" class="chip" data-ruolo="foro" aria-pressed="${!!o.foro}">FORO</button><button type="button" class="chip${oggetti.length > 1 ? "" : " spento"}" data-unisci>COMBINA</button></div>
+    if (t === "seleziona") { CTX.innerHTML = o ? rigaSospeso() + (o.foro ? "" : `<div class="riga2 sd-edit"><button type="button" class="chip" data-edit="scolpisci">SCOLPISCI</button><button type="button" class="chip" data-edit="maglia">MESH</button><button type="button" class="chip" data-edit="cad">CAD</button></div>`) + `<div class="riga2 sd-ruolo"><button type="button" class="chip" data-ruolo="pieno" aria-pressed="${!o.foro}">CORPO</button><button type="button" class="chip" data-ruolo="foro" aria-pressed="${!!o.foro}">FORO</button><button type="button" class="chip${oggetti.length > 1 ? "" : " spento"}" data-unisci>COMBINA</button></div>
       <p class="nota-sd">${o.foro ? `<b>${o.nome}</b> è un foro: dove tocca un pezzo pieno, COMBINA lo scava.` : `Selezionato: <b>${o.nome}</b>. FORO lo fa diventare un buco; COMBINA fonde i pezzi che si toccano.`}</p>` : ""; return; }
     if (t === "sposta") { vuoto(`Trascini col dito per spostare <b>${o.nome}</b> sul piano${griglia ? ", agganciato alla griglia da 5 mm" : ""}.`); return; }
     if (t === "ruota") { const c = cursore("ROTAZIONE", "rotY", -180, 180, griglia ? 15 : 1, Math.round(o.rotY), "°", (v) => { o.rotY = v; B.posa(o); }); curs[c.k] = c; h += c.html; }
@@ -6367,7 +6369,8 @@ function studio(ok) {
   CTX.addEventListener("input", (e) => { const i = e.target.closest("[data-cur]"); if (!i) return; const c = curs[i.dataset.cur]; if (!c) return;
     if (!cursorePreso && sel && !c.libero) { memorizza(); cursorePreso = true; }
     const v = +i.value; A.querySelector(`[data-curv="${c.k}"]`).textContent = `${v} ${c.unita}`.trim(); c.cambia(v); });
-  CTX.addEventListener("change", (e) => { if (!e.target.closest("[data-cur]")) return; cursorePreso = false; if (magOp) { magOp = null; mostraDati(); contesto(); } });
+  CTX.addEventListener("change", (e) => { if (!e.target.closest("[data-cur]")) return; cursorePreso = false; if (magOp) { const fallito = magOp.ok === false; if (fallito && !magOp.applicato) { storia.pop(); aggiornaStoria(); } if (sel?.tipo === "cad" && !fallito) vuotaSelM(); magOp = null; mostraDati(); contesto();
+    if (fallito) parlaMock("Con quel valore non si può fare, Sir: è più grande di quello che il pezzo permette (spessori, spigoli vicini). Il pezzo è rimasto com'era.", 4200); } });
   CTX.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return; suona("aTick");
     if (b.dataset.serie) serie(sel, +b.dataset.serie);
@@ -6972,12 +6975,15 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     leviga: "LEVIGA ammorbidisce bozzi e gradini.", appiattisci: "APPIATTISCI spiana: fa un piano dove passa il dito.", afferra: "AFFERRA prende la creta sotto il dito e la porta dove va il dito.",
     pizzica: "PIZZICA stringe la creta verso il dito: pieghe e spigoli netti." };
   const SEL_M = { modo: "f", v: new Set(), e: new Set(), f: new Set() };
-  const vuotaSelM = () => { SEL_M.v.clear(); SEL_M.e.clear(); SEL_M.f.clear(); };
+  const vuotaSelM = () => { SEL_M.v.clear(); SEL_M.e.clear(); SEL_M.f.clear(); SEL_M.punto = {}; };
   function esciEdit() { if (!edit) return; edit = null; magOp = null; B?.pennello(null); B?.magliaVista(null); }
   // entrare: il pezzo diventa creta (SCOLPISCI) o maglia (MESH); la creta e la maglia restano tali, si riprendono quando si vuole
   async function entraEdit(tipo, ris) {
     const o = sel; if (!o || !B) { parlaMock("Prima scelga un pezzo sul banco, Sir.", 2200); return; }
     if (o.foro) { parlaMock("È un foro, Sir: si scolpiscono e si modificano i pezzi pieni.", 2600); return; }
+    if (tipo === "cad") { const n = await entraCAD(o); if (!n) return; edit = { tipo, id: n.id }; magOp = null; vuotaSelM(); SEL_M.modo = "f";
+      strumento = "seleziona"; A.querySelectorAll("[data-sdt]").forEach((x) => { if (!["misura", "sezione"].includes(x.dataset.sdt)) x.setAttribute("aria-pressed", x.dataset.sdt === "seleziona"); });
+      seleziona(n, true); mostraDati(); const D = GEO_DATI.get(n.p.k); parlaMock(`CAD pronto, Sir: ${D.nf} facce e ${D.ne} spigoli veri. Tocchi una faccia, o passi a SPIGOLI.`, 3600); return; }
     const vuole = tipo === "scolpisci" ? "creta" : "maglia"; let n = o;
     if (o.tipo !== vuole || (ris && o.p.ris !== ris)) {
       const tri = B.triangoli(o);
@@ -7032,15 +7038,17 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     if (cosa === "suddividi") { if (D.idx.length / 3 * 4 > 20000) return "Già abbastanza fitta, Sir: oltre i 20.000 triangoli la mesh non si lavora bene a mano."; salvaMaglia(o, suddividiG(D)); SEL_M.v.clear(); SEL_M.e.clear(); contesto(); const N = GEO_DATI.get(o.p.k); return `Suddivisa, Sir: ${N.pos.length / 3} vertici, la forma non cambia.`; }
     if (cosa === "unisci") { const G = unisciG(D, vertiSel(D)); if (!G) return "Servono almeno due vertici, Sir."; SEL_M.v.clear(); SEL_M.e.clear(); salvaMaglia(o, G); return `Vertici uniti, Sir${G.chiuso ? "" : ": la mesh adesso è aperta, la controlli prima di stampare"}.`; }
     return ""; }
-  function sceltaMaglia(x) { if (edit?.tipo !== "maglia") return; const S = SEL_M[SEL_M.modo]; if (x == null) { if (!S.size) return; S.clear(); } else if (S.has(x)) S.delete(x); else S.add(x); suona("aTick"); contesto(); }
+  function sceltaMaglia(x, punto) { if (edit?.tipo !== "maglia" && edit?.tipo !== "cad") return; const S = SEL_M[SEL_M.modo]; if (x == null) { if (!S.size) return; S.clear(); } else if (S.has(x)) S.delete(x); else { S.add(x); if (punto) (SEL_M.punto ||= {})[x] = punto; } suona("aTick"); contesto(); }
   function scolpito(o, P) { const D = GEO_DATI.get(o.p.k); if (!D) return; const k = "c" + Date.now().toString(36) + (++num); GEO_DATI.set(k, { pos: P, idx: D.idx, chiuso: D.chiuso }); o.p.k = k; mostraDati(); }
   // a voce: «scolpisci», «pennello gonfia», «raggio 8 mm», «simmetria», «modifica la mesh», «estrudi la faccia di 10 mm», «suddividi», «fine»
   function voceEdit(t) {
     if (sel && !edit && /^(?:scolpisci|scolpiscil[oa]|fammel[oa] scolpire|scultura|modalità scultura)\b/.test(t)) { entraEdit("scolpisci"); return null; }
     if (sel && !edit && /\b(?:modifica (?:la )?mesh|modalità mesh|mesh|lavora (?:i )?vertici|vertici e facce)\b/.test(t)) { entraEdit("maglia"); return null; }
+    if (sel && !edit && /\b(?:cad|modalità cad|apri(?:lo)? nel cad|portal[oa] nel cad)\b/.test(t)) { entraEdit("cad"); return null; }
     if (!edit) return undefined;
     const via = /\b(togli|senza|spegni|niente|disattiva)\b/.test(t);
     if (/^(?:fine|basta|ho finito|esci|chiudi (?:la )?(?:scultura|mesh))\b/.test(t)) { esciEdit(); contesto(); return "Fatto, Sir: il pezzo resta così, pronto da stampare."; }
+    if (edit.tipo === "cad") return voceCAD(t);
     if (edit.tipo === "scolpisci") { const r = [], p = PENNELLI.find(([k]) => new RegExp(`\\b${k.slice(0, 5)}`).test(t));
       if (p) { PEN.tipo = p[0]; r.push(`pennello ${p[1].toLowerCase()}`); }
       const rg = t.match(/\braggio\D{0,8}(\d+(?:[.,]\d+)?)\s*(mm|millimetri|cm|centimetri)?/); if (rg) { PEN.R = Math.max(1, Math.min(40, mmDa(rg[1], rg[2]))); r.push(`raggio ${mmT(PEN.R)} millimetri`); }
@@ -7064,6 +7072,75 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     salvaMaglia(o, spostaG(D, vs, d)); return `Spostato di ${fmtMm(v)}, Sir.`;
   }
   function sceltaTutto(D) { vuotaSelM(); if (SEL_M.modo === "f") new Set(D.fid).forEach((f) => SEL_M.f.add(f)); else if (SEL_M.modo === "e") bordiG(D).forEach(([a, b]) => SEL_M.e.add(`${Math.min(a, b)},${Math.max(a, b)}`)); else bordiG(D).flat().forEach((i) => SEL_M.v.add(i)); }
+  // ── 2 nov · FASE 3 · CAD (come Fusion e Shapr3D): facce e spigoli veri; SPINGI, FORO, RACCORDO, SMUSSO, GUSCIO in millimetri ──
+  const CADST = { prof: 0 };
+  // la ricetta di partenza: i pezzi base diventano solidi esatti (cilindri veri, sfere vere); gli altri passano dalla MESH (facce piane)
+  function ricettaDa(o) { const p = o.p, s = o.scala || 1;
+    if (o.tipo === "scatola" && !p.guscio?.sp && !p.fori) { const R = { base: { forma: "scatola", l: p.l * s, p: p.p * s, h: p.h * s }, ops: [] }; if (p.r > 0) R.ops.push({ op: "raccordo", e: [...Array(12).keys()], r: Math.min(p.r * s, Math.min(p.l, p.p, p.h) * s / 2.2) }); return R; }
+    if (o.tipo === "cilindro" && !p.guscio?.sp) { const R = { base: { forma: "cilindro", d: p.d * s, h: p.h * s }, ops: [] }; if (p.fori) R.ops.push({ op: "foro", f: 1, d: Math.min(p.d - 3, p.df || 4) * s }); return R; }
+    if (o.tipo === "sfera" && !p.guscio?.sp) return { base: { forma: "sfera", d: p.d * s }, ops: [] };
+    if (o.tipo === "cono" && !p.guscio?.sp) return { base: { forma: "cono", d: p.d * s, h: p.h * s }, ops: [] };
+    if (o.tipo === "toro") return { base: { forma: "toro", d: p.d * s, s: p.s * s }, ops: [] };
+    return null; }
+  async function entraCAD(o) {
+    info(["CAD · ACCENDO IL MOTORE", "OPENCASCADE · SUPERFICI ESATTE", "LA PRIMA VOLTA CI METTE QUALCHE SECONDO"]); if (!OCC) parlaMock("Accendo il motore CAD, Sir: la prima volta ci mette qualche secondo.", 3000);
+    let oc; try { oc = await caricaOCC(); } catch (e) { console.warn(e); parlaMock("Il motore CAD non si è caricato, Sir: riprovi tra un momento.", 3000); mostraDati(); return null; }
+    if (!vivo() || !oggetti.includes(o)) return null;
+    if (o.tipo === "cad") return o;
+    let R = ricettaDa(o), pos = { ...o.pos }, rotY = o.rotY;
+    if (!R) { const tri = B.triangoli(o); if (tri > 8000) { parlaMock(`«${o.nome}» ha ${tri.toLocaleString("it-IT")} triangoli, Sir: nel CAD entrano i pezzi con facce piane fino a 8.000 triangoli. Le forme morbide si fanno con SCOLPISCI.`, 4400); mostraDati(); return null; }
+      let U = null; try { U = B.unisci([o], []); } catch (e) { console.warn(e); } const G = U && (o.tipo === "maglia" && o.scala === 1 && !o.rotY && !o.specchio ? GEO_DATI.get(o.p.k) : magliaDa(U.pos));
+      if (!G?.fid) { parlaMock("Questo pezzo non entra nel CAD, Sir.", 2400); return null; }
+      R = { base: { forma: "facce", facce: facceDaMaglia(G) }, ops: [] }; pos = { x: Math.round(U.x * 100) / 100, z: Math.round(U.z * 100) / 100 }; rotY = 0; }
+    const s = CAD.forma(oc, R); if (!s) { parlaMock("Questo pezzo non si riesce a chiudere in un solido CAD, Sir: provi prima con MESH › UNISCI VERTICI, o lo ricostruisca.", 4000); mostraDati(); return null; }
+    const M = CAD.maglia(oc, s); memorizza(); const k = "d" + Date.now().toString(36) + (++num); GEO_DATI.set(k, M);
+    B.togli(o); oggetti = oggetti.filter((x) => x !== o);
+    const n = nuovo("cad", { k, ricetta: R }, o.nome, { anim: "laser", pos, senzaStoria: true }); n.rotY = rotY; B.posa(n); return n;
+  }
+  const NOMI_OP = { spingi: (O) => `Spingi ${O.d > 0 ? "+" : ""}${mmT(O.d)}`, foro: (O) => `Foro Ø ${mmT(O.d)}${O.prof > 0 ? ` × ${mmT(O.prof)}` : " passante"}`, raccordo: (O) => `Raccordo ${mmT(O.r)}`, smusso: (O) => `Smusso ${mmT(O.r)}`, guscio: (O) => `Guscio ${mmT(O.sp)}` };
+  // un'operazione dal vivo (cursore): rifà la forma con l'operazione nuova in fondo; al rilascio resta (ANNULLA la toglie)
+  let cadCorsa = null;
+  function cadVivo(o, fare) { return (v) => {
+    if (!magOp) magOp = { R0: o.p.ricetta, k: "d" + Date.now().toString(36) + (++num), ok: true };
+    cadCorsa = { o, fare, v }; if (cadCorsa.attesa) return; cadCorsa.attesa = true;
+    requestAnimationFrame(() => { const c = cadCorsa; cadCorsa = null; if (!c || !magOp || !OCC) return; const O = c.fare(c.v), R = O ? { base: magOp.R0.base, ops: [...magOp.R0.ops, O] } : magOp.R0;
+      const s = CAD.forma(OCC, R), nota = CTX.querySelector("[data-cadnota]");
+      if (!s) { magOp.ok = false; if (nota) nota.textContent = "Così non si può fare: il valore è troppo grande per questo pezzo. Torni indietro col cursore."; return; }
+      magOp.ok = true; magOp.applicato = true; if (nota) nota.textContent = ""; const M = CAD.maglia(OCC, s); GEO_DATI.set(magOp.k, M); o.p.k = magOp.k; o.p.ricetta = R; B.rifai(o); B.magliaVista(o, SEL_M); }); }; }
+  function pannelloCAD(o) { const D = GEO_DATI.get(o.p.k), R = o.p.ricetta; if (!D || !R) return ""; if (SEL_M.modo === "v") SEL_M.modo = "f"; B.magliaVista(o, SEL_M);
+    const S = SEL_M[SEL_M.modo], n = S.size, nomi = { e: ["SPIGOLO SCELTO", "SPIGOLI SCELTI"], f: ["FACCIA SCELTA", "FACCE SCELTE"] };
+    let h = `<div class="riga2">${[["f", "FACCE"], ["e", "SPIGOLI"]].map(([k, t]) => `<button type="button" class="chip" data-mmodo="${k}" aria-pressed="${SEL_M.modo === k}">${t}</button>`).join("")}</div>
+      <div class="riga2 sk-riempi"><span>${n ? `${n} ${nomi[SEL_M.modo][n === 1 ? 0 : 1]}` : "TOCCHI IL PEZZO"}</span><button type="button" class="chip" data-msel="niente">NIENTE</button></div>`;
+    const cs = [];
+    if (SEL_M.modo === "f" && n) { const fi = [...S], info1 = n === 1 && OCC ? CAD.faccia(OCC, CAD.forma(OCC, R), fi[0]) : null;
+      if (n === 1 && info1?.piana) {
+        cs.push(cursore("SPINGI", "c_s", -50, 50, .5, 0, "mm", cadVivo(o, (v) => (v ? { op: "spingi", f: fi[0], d: v } : null))));
+        const cp = cursore("PROFONDITÀ", "c_p", 0, 60, 1, CADST.prof, "mm", (v) => { CADST.prof = v; A.querySelector('[data-curv="c_p"]').textContent = v ? `${v} mm` : "PASSANTE"; }); cp.libero = true; cs.push(cp);
+        cs.push(cursore("FORO Ø", "c_f", 0, 40, .5, 0, "mm", cadVivo(o, (v) => (v ? { op: "foro", f: fi[0], d: v, prof: CADST.prof, punto: SEL_M.punto?.[fi[0]] } : null)))); }
+      cs.push(cursore("GUSCIO", "c_g", 0, 10, .2, 0, "mm", cadVivo(o, (v) => (v ? { op: "guscio", f: fi, sp: v } : null))));
+      if (n === 1 && info1 && !info1.piana) h += `<p class="nota-sd">Faccia curva: si può aprire col GUSCIO. SPINGI e FORO vanno sulle facce piane.</p>`; }
+    if (SEL_M.modo === "e" && n) { const ei = [...S]; cs.push(cursore("RACCORDO", "c_r", 0, 25, .25, 0, "mm", cadVivo(o, (v) => (v ? { op: "raccordo", e: ei, r: v } : null))), cursore("SMUSSO", "c_m", 0, 25, .25, 0, "mm", cadVivo(o, (v) => (v ? { op: "smusso", e: ei, r: v } : null)))); }
+    cs.forEach((c) => { curs[c.k] = c; h += c.html; }); if (CADST.prof === 0) h = h.replace('<b data-curv="c_p">0 mm</b>', '<b data-curv="c_p">PASSANTE</b>');
+    const fasi = [{ scatola: "Base cubo", cilindro: "Base cilindro", sfera: "Base sfera", cono: "Base cono", toro: "Base anello", facce: "Base dalla mesh" }[R.base.forma], ...R.ops.map((O) => NOMI_OP[O.op]?.(O) || O.op)];
+    h += `<p class="nota-sd" data-cadnota style="color:#ffb86b"></p><div class="sd-crono"><span>STORIA</span>${fasi.map((t, i) => `<i${i === fasi.length - 1 ? ' class="ultima"' : ""}>${t}</i>`).join("")}</div>
+      <p class="nota-sd">${D.nf} facce · ${D.ne} spigoli · solido chiuso. ${SEL_M.modo === "f" ? "Tocchi una faccia: SPINGI la alza o la scava, FORO fa un foro dove l'ha toccata, GUSCIO la apre e svuota il pezzo." : "Tocchi gli spigoli da arrotondare o smussare: si possono sceglierne tanti insieme."} In STAMPA c'è anche il file STEP per Fusion, SolidWorks e Shapr3D.</p>
+      <div class="riga2 vai-riga"><button type="button" class="vai" data-edit="fine">FINE</button></div>`;
+    return h; }
+  // a voce nel CAD: «spingi di 10 mm», «foro da 8 mm», «raccordo 3 mm», «smusso 2», «guscio 2 mm», «facce», «spigoli»
+  function voceCAD(t) { const o = sel, R = o?.p.ricetta; if (!R || !OCC) return undefined;
+    if (/\bfacc/.test(t) && !/\d/.test(t)) { SEL_M.modo = "f"; contesto(); return "Facce, Sir: tocchi quella da modificare."; }
+    if (/\bspigol/.test(t) && !/\d/.test(t)) { SEL_M.modo = "e"; contesto(); return "Spigoli, Sir: tocchi quelli da arrotondare."; }
+    const m = t.match(/(\d+(?:[.,]\d+)?)\s*(mm|millimetri|cm|centimetri)?/); if (!m) return undefined; const v = mmDa(m[1], m[2]), F = [...SEL_M.f], E = [...SEL_M.e]; let O = null;
+    if (/\b(spingi|estrud|alza|tira|scava|abbassa)/.test(t)) { if (SEL_M.modo !== "f" || F.length !== 1) return "Scelga prima una faccia piana, Sir."; O = { op: "spingi", f: F[0], d: /\b(scava|abbassa|dentro|giù)/.test(t) ? -v : v }; }
+    else if (/\b(foro|buco)\b/.test(t)) { if (SEL_M.modo !== "f" || F.length !== 1) return "Scelga prima la faccia dove fare il foro, Sir."; const pr = t.match(/profond\w*\D{0,8}(\d+(?:[.,]\d+)?)\s*(mm|millimetri|cm|centimetri)?/); O = { op: "foro", f: F[0], d: v, prof: pr ? mmDa(pr[1], pr[2]) : 0, punto: SEL_M.punto?.[F[0]] }; }
+    else if (/\b(raccord|arrotond)/.test(t)) { if (!E.length) return "Scelga prima gli spigoli, Sir."; O = { op: "raccordo", e: E, r: v }; }
+    else if (/\b(smuss)/.test(t)) { if (!E.length) return "Scelga prima gli spigoli, Sir."; O = { op: "smusso", e: E, r: v }; }
+    else if (/\b(guscio|svuota)/.test(t)) { if (!F.length) return "Scelga prima la faccia da aprire, Sir."; O = { op: "guscio", f: F, sp: v }; }
+    if (!O) return undefined; const R2 = { base: R.base, ops: [...R.ops, O] }, s = CAD.forma(OCC, R2); if (!s) return "Così non si può fare, Sir: il valore è troppo grande per questo pezzo.";
+    memorizza(); const k = "d" + Date.now().toString(36) + (++num); GEO_DATI.set(k, CAD.maglia(OCC, s)); o.p.k = k; o.p.ricetta = R2; vuotaSelM(); rifai(o); contesto(); return `Fatto, Sir: ${NOMI_OP[O.op](O).toLowerCase()} millimetri.`; }
+  async function salvaSTEP(o) { let oc; try { oc = await caricaOCC(); } catch { notifica("Il motore CAD non si è caricato: riprovi.", { titolo: "Studio" }); return; } const s = CAD.forma(oc, o.p.ricetta), t = s && CAD.step(oc, s, o.nome);
+    if (!t) { notifica("Lo STEP non è venuto, Sir.", { titolo: "Studio" }); return; } const r = await scarica(new TextEncoder().encode(t), `${o.nome.replace(/[^\w-]+/g, "_")}.step`); if (r === "ok") suona("aPronto");
+    notifica(esitoSalva(r, `Salvato ${o.nome}.step: si apre in Fusion, SolidWorks, Shapr3D e FreeCAD, con le superfici esatte`), { titolo: "Studio" }); }
   // ── le fonti: DISEGNA, FOTO, CARICA, LIDAR, OCCHI ──
   const chiudiFonti = (k) => { if (k !== "foto") A.querySelector(".sd-cam .x")?.click(); if (k !== "disegna") chiudiSchizzo?.(); A.querySelector(".sd-foglio [data-chiudi]")?.click(); };
   A.querySelectorAll("[data-sdf]").forEach((b) => b.addEventListener("click", () => {
@@ -7326,7 +7403,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
         <div>Sbalzi oltre 45°<em class="${sbalzi ? "no" : ""}">${sbalzi ? `${Math.max(1, Math.round(pi.sbalzi * 100))}% · SERVONO SUPPORTI` : "NESSUNO"}</em></div><div>Volume di stampa 256 mm<em class="${sta ? "" : "no"}">${sta ? "SÌ" : "NO · DA DIVIDERE"}</em></div><div>Orientamento<em>${pi.orient}</em></div></div>
       <div class="riga2" style="display:flex;gap:6px">${Object.keys(materiali).map((m, i) => `<button type="button" class="chip" data-mat="${m}" aria-pressed="${!i}" style="flex:1">${m}</button>`).join("")}</div>
       <div class="sd-numeri"><div><small>VOLUME</small><b>${v.toFixed(1).replace(".", ",")}</b><span>cm³</span></div><div><small>MATERIALE</small><b data-n="gr">${conti().gr}</b><span>grammi · 15%</span></div><div><small>TEMPO</small><b data-n="t" style="font-size:14px">${conti().t}</b><span>stima</span></div></div>
-      <div class="sd-azioni"><button type="button" class="pieno" data-st="stl">SALVA STL</button><button type="button" class="pieno" data-st="3mf">SALVA 3MF</button>${o.tipo === "disegno" && o.p.uso === "stencil" ? `<button type="button" class="vuoto largo" data-st="svg">SVG DA TAGLIARE</button>` : `<button type="button" class="vuoto largo" data-st="servizio">SERVICE</button>`}</div>
+      <div class="sd-azioni"><button type="button" class="pieno" data-st="stl">SALVA STL</button><button type="button" class="pieno" data-st="3mf">SALVA 3MF</button>${o.tipo === "disegno" && o.p.uso === "stencil" ? `<button type="button" class="vuoto largo" data-st="svg">SVG DA TAGLIARE</button>` : o.tipo === "cad" ? `<button type="button" class="vuoto" data-st="step">SALVA STEP</button><button type="button" class="vuoto" data-st="servizio">SERVICE</button>` : `<button type="button" class="vuoto largo" data-st="servizio">SERVICE</button>`}</div>
       <p class="nota-sd" style="margin:0;font:11px var(--sans);color:#9fb3b9">Volume, maglia chiusa, sbalzi e orientamento sono calcolati sul modello; grammi e tempo sono stime (riempimento 15%). STL e 3MF escono già nell'orientamento per la stampa, in millimetri. Il 3MF ha i vertici condivisi e si apre in Bambu Studio, PrusaSlicer, Cura e OrcaSlicer; ${oggetti.filter((x) => !x.foro).length > 1 ? "con più pezzi sul banco li mette tutti sullo stesso piatto, come sono sul banco." : "con un pezzo solo, esce quello selezionato."}</p>`);
     F.querySelectorAll("[data-mat]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); mat = b.dataset.mat; F.querySelectorAll("[data-mat]").forEach((x) => x.setAttribute("aria-pressed", x === b)); const c = conti(); F.querySelector('[data-n="gr"]').textContent = c.gr; F.querySelector('[data-n="t"]').textContent = c.t; }));
     F.querySelector('[data-st="stl"]').addEventListener("click", async () => { suona("aTick"); const r = await scarica(B.stl(o, pi.m), `${o.nome.replace(/[^\w-]+/g, "_")}.stl`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.stl (${mm(g.l)} × ${mm(g.p)} × ${mm(g.h)} mm)${window.JARVIS_APP ? "" : ", dentro uno zip"}`), { titolo: "Studio" }); });
@@ -7335,6 +7412,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       const pezzi = uno ? [{ nome: o.nome, stl: B.stl(o, pi.m) }] : pieni.map((x) => ({ nome: x.nome, stl: B.stl(x) })), titolo = uno ? o.nome : (progAtt()?.nome || "Banco");
       const r = await scarica(treMF(pezzi, titolo), `${titolo.replace(/[^\w-]+/g, "_")}.3mf`); if (r === "ok") suona("aPronto");
       notifica(esitoSalva(r, `Salvato ${titolo}.3mf${uno ? "" : `, ${pieni.length} pezzi sul piatto`}`), { titolo: "Studio" }); });
+    F.querySelector('[data-st="step"]')?.addEventListener("click", () => { suona("aTick"); salvaSTEP(o); });
     F.querySelector('[data-st="svg"]')?.addEventListener("click", async () => { suona("aTick"); const r = await scarica(new TextEncoder().encode(stencilSVG(o)), `${o.nome.replace(/[^\w-]+/g, "_")}.svg`); if (r === "ok") suona("aPronto"); notifica(esitoSalva(r, `Salvato ${o.nome}.svg, in millimetri veri: per la plotter da taglio o il laser`), { titolo: "Studio" }); });
     F.querySelector('[data-st="servizio"]')?.addEventListener("click", async () => { if (window.JARVIS_APP) { suona("aTick"); parlaMock("Salvo il file e apro Vectorealism, Sir: lo carichi lì, scelga materiale e colore e tocchi Calcola il preventivo.", 4200); let st = B.stl(o, pi.m), nm = `${o.nome.replace(/[^\w-]+/g, "_")}.stl`; if (st.length > 9e6) { st = zipUno(nm, new TextEncoder().encode(st)); nm = nm.replace(/\.stl$/i, ".zip"); } const r = await scarica(st, nm); if (r === "ok") window.webkit.messageHandlers.jarvis.postMessage({ tipo: "apriURL", url: "https://www.vectorealism.com/it/stampa-3d/" }); else notifica(esitoSalva(r, ""), { titolo: "Studio" }); return; } suona("aPronto"); notifica(`Mandato al servizio di stampa [da scegliere] in 3MF: ${conti().gr} g di ${mat}. Le dico prezzo e tempi appena rispondono, Sir.`, { titolo: "Studio" }); });
   }
@@ -7383,7 +7461,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
   window.STUDIO_ATTIVO = { vivo, voce: (t) => ascolta(t.replace(/^./, (c) => c.toLowerCase())), foto: (im, nome) => { A.querySelector(".sd-cam")?.remove(); leggiFoto(im, nome || "foto", "oggetto"); },
     // per il collaudo automatico: mettere un oggetto in un punto preciso, leggere lo stato
     prova: { oggetti: () => oggetti.map((o) => ({ id: o.id, tipo: o.tipo, nome: o.nome, foro: !!o.foro, pos: o.pos, ...B.ingombro(o), vol: Math.round(B.volume(o)), chiuso: B.chiuso(o) })),
-      metti: (i, x, z) => { const o = oggetti[i]; o.pos = { ...o.pos, x, z }; B.posa(o); }, capisci: (t) => capisci(t.toLowerCase()), chiusoRicetta: (pezzi) => { const R = B.ricetta(pezzi); const k = "x" + Math.random(); GEO_DATI.set(k, { pos: R.pos, norm: R.norm }); const o = nuovo("unito", { k }, "Prova", { anim: "nessuna" }); const c = B.chiuso(o); const stl = B.stl(o); elimina(o); return window.STL_PROVA = stl, c; }, banco: () => B, dati: (i) => oggetti[i], scegli: (i) => seleziona(oggetti[i]) } };
+      metti: (i, x, z) => { const o = oggetti[i]; o.pos = { ...o.pos, x, z }; B.posa(o); }, capisci: (t) => capisci(t.toLowerCase()), sceglie: (x, punto) => sceltaMaglia(x, punto), chiusoRicetta: (pezzi) => { const R = B.ricetta(pezzi); const k = "x" + Math.random(); GEO_DATI.set(k, { pos: R.pos, norm: R.norm }); const o = nuovo("unito", { k }, "Prova", { anim: "nessuna" }); const c = B.chiuso(o); const stl = B.stl(o); elimina(o); return window.STL_PROVA = stl, c; }, banco: () => B, dati: (i) => oggetti[i], scegli: (i) => seleziona(oggetti[i]) } };
   contesto(); azioni(); aggiornaStoria();
 }
 
@@ -7791,6 +7869,113 @@ function unisciG(G, verts) { const L = [...verts]; if (L.length < 2) return null
     if (a !== b && b !== c && a !== c) { I.push(a, b, c); F.push(G.fid[t]); } }
   return compattaG(P, I, F); }
 // SUDDIVIDI: ogni triangolo in quattro (i punti a metà degli spigoli sono condivisi): più vertici da muovere, la forma non cambia
+/* ── 2 nov · FASE 3 · CAD: il motore dei programmi di progettazione veri (OpenCascade: lo stesso nucleo di FreeCAD e di tanti CAD
+   industriali; libero, licenza LGPL). Le superfici sono esatte (piani, cilindri, sfere, tori), non triangoli: i raccordi e gli smussi
+   si fanno sugli spigoli veri, i fori sono cilindri veri, il GUSCIO è un offset vero. Il pezzo è una RICETTA: la base e le operazioni
+   in fila, ognuna con i numeri delle facce e degli spigoli della forma di quel momento (si rifà sempre uguale). Esce anche in STEP,
+   il formato che aprono Fusion, SolidWorks, Shapr3D e FreeCAD. Si carica solo la prima volta che si entra in CAD (circa 23 MB). */
+let OCC = null, OCC_P = null;
+function caricaOCC() {
+  if (OCC) return Promise.resolve(OCC); if (OCC_P) return OCC_P;
+  OCC_P = (async () => {
+    const app = !!window.JARVIS_APP, base = app ? "jarvis3d://app/" : new URL("occ/", document.baseURI).href;
+    let wasmBinary;
+    if (app) wasmBinary = await (await fetch(base + "replicad_single.wasm")).arrayBuffer();
+    else { const parti = await Promise.all([1, 2].map((i) => fetch(`${base}replicad_single.${i}.wasm`).then((r) => { if (!r.ok) throw new Error("occ " + r.status); return r.arrayBuffer(); })));
+      const u = new Uint8Array(parti[0].byteLength + parti[1].byteLength); u.set(new Uint8Array(parti[0])); u.set(new Uint8Array(parti[1]), parti[0].byteLength); wasmBinary = u.buffer; }
+    const init = (await import(base + "replicad_single.js")).default;
+    OCC = await init({ wasmBinary, print: () => {}, printErr: () => {} }); return OCC;
+  })().catch((e) => { OCC_P = null; throw e; });
+  return OCC_P;
+}
+const CAD = (() => {
+  const cache = new Map();                                            // ricetta (fino a un'operazione) → forma, così i cursori rifanno solo l'ultima
+  const tieni = (k, s) => { cache.set(k, s); if (cache.size > 40) { const [k0, s0] = cache.entries().next().value; cache.delete(k0); try { s0.delete(); } catch {} } return s; };
+  const mappa = (oc, s, tipo) => { const out = [], hb = new Map(), ex = new oc.TopExp_Explorer(s, tipo, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    for (; ex.More(); ex.Next()) { const c = ex.Current(), h = oc.ReplicadShapeHasher.HashCode(c, 1 << 30), l = hb.get(h) || []; if (l.some((q) => q.IsSame(c))) continue; l.push(c); hb.set(h, l); out.push(c); }
+    ex.delete(); out.indice = (c) => { const l = hb.get(oc.ReplicadShapeHasher.HashCode(c, 1 << 30)) || []; const q = l.find((x) => x.IsSame(c)); return q ? out.indexOf(q) : -1; }; return out; };
+  const facce = (oc, s) => mappa(oc, s, oc.TopAbs_ShapeEnum.TopAbs_FACE), spigoli = (oc, s) => mappa(oc, s, oc.TopAbs_ShapeEnum.TopAbs_EDGE);
+  const sposta = (oc, s, x, y, z) => { const t = new oc.gp_Trsf(); t.SetTranslation(new oc.gp_Vec(x, y, z)); return new oc.BRepBuilderAPI_Transform(s, t, true).Shape(); };
+  const unifica = (oc, s) => { try { const u = new oc.ShapeUpgrade_UnifySameDomain(s, true, true, false); u.Build(); return u.Shape(); } catch { return s; } };
+  const bool = (oc, tipo, a, b) => { const m = tipo === "unisci" ? new oc.BRepAlgoAPI_Fuse(a, b, new oc.Message_ProgressRange()) : new oc.BRepAlgoAPI_Cut(a, b, new oc.Message_ProgressRange()); if (m.HasErrors()) return null; return unifica(oc, m.Shape()); };
+  // il piano di una faccia: normale verso fuori e un punto; null se la faccia è curva
+  function piano(oc, f) { const ad = new oc.BRepAdaptor_Surface(oc.TopoDS.Face(f), true); if (ad.GetType() !== oc.GeomAbs_SurfaceType.GeomAbs_Plane) return null;
+    const pl = ad.Plane(), d = pl.Axis().Direction(), o = pl.Location(); let n = [d.X(), d.Y(), d.Z()]; if (f.Orientation() === oc.TopAbs_Orientation.TopAbs_REVERSED) n = n.map((v) => -v);
+    const g = new oc.GProp_GProps(); oc.BRepGProp.SurfaceProperties(f, g, false, false); const c = g.CentreOfMass(); return { n, o: [o.X(), o.Y(), o.Z()], c: [c.X(), c.Y(), c.Z()], area: g.Mass() }; }
+  const poligono = (oc, pts) => { const w = new oc.BRepBuilderAPI_MakeWire(); for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; w.Add(new oc.BRepBuilderAPI_MakeEdge(new oc.gp_Pnt(...a), new oc.gp_Pnt(...b)).Edge()); } return w.Wire(); };
+  function base(oc, B) {
+    if (B.forma === "scatola") return new oc.BRepPrimAPI_MakeBox(new oc.gp_Pnt(-B.l / 2, -B.p / 2, 0), new oc.gp_Pnt(B.l / 2, B.p / 2, B.h)).Shape();
+    if (B.forma === "cilindro") return new oc.BRepPrimAPI_MakeCylinder(B.d / 2, B.h).Shape();
+    if (B.forma === "sfera") return new oc.BRepPrimAPI_MakeSphere(new oc.gp_Pnt(0, 0, B.d / 2), B.d / 2).Shape();
+    if (B.forma === "toro") { const r2 = Math.max(.5, B.s / 2), r1 = Math.max(r2 + .1, B.d / 2 - r2); return sposta(oc, new oc.BRepPrimAPI_MakeTorus(r1, r2).Shape(), 0, 0, r2); }
+    if (B.forma === "cono") { const r = B.d / 2, r2 = (B.d2 || 0) / 2, pts = r2 > .05 ? [[0, 0, 0], [r, 0, 0], [r2, 0, B.h], [0, 0, B.h]] : [[0, 0, 0], [r, 0, 0], [0, 0, B.h]];
+      return new oc.BRepPrimAPI_MakeRevol(new oc.BRepBuilderAPI_MakeFace(poligono(oc, pts), true).Face(), new oc.gp_Ax1(new oc.gp_Pnt(0, 0, 0), new oc.gp_Dir(0, 0, 1)), Math.PI * 2, false).Shape(); }
+    if (B.forma === "facce") {                                       // dalla MESH: ogni faccia piana (con i suoi buchi) diventa una faccia vera, poi si cuciono
+      const cuci = new oc.BRepBuilderAPI_Sewing(1e-3, true, true, true, false);
+      for (const F of B.facce) { const mf = new oc.BRepBuilderAPI_MakeFace(poligono(oc, F[0]), true); for (let i = 1; i < F.length; i++) mf.Add(poligono(oc, F[i])); if (mf.IsDone()) cuci.Add(mf.Face()); }
+      cuci.Perform(new oc.Message_ProgressRange()); const g = cuci.SewedShape(); let sh = null;
+      const ex = new oc.TopExp_Explorer(g, oc.TopAbs_ShapeEnum.TopAbs_SHELL, oc.TopAbs_ShapeEnum.TopAbs_SHAPE); if (ex.More()) sh = oc.TopoDS.Shell(ex.Current()); ex.delete(); if (!sh) return null;
+      const so = new oc.BRepBuilderAPI_MakeSolid(sh); if (!so.IsDone()) return null; let s = so.Solid();
+      const p = new oc.GProp_GProps(); oc.BRepGProp.VolumeProperties(s, p, false, false, false); if (p.Mass() < 0) s = s.Reversed();
+      return unifica(oc, s); }
+    return null;
+  }
+  // ogni operazione si controlla: solido valido (BRepCheck) e volume sensato; il GUSCIO deve togliere materiale, non aggiungerlo
+  const volume = (oc, s) => { const g = new oc.GProp_GProps(); oc.BRepGProp.VolumeProperties(s, g, false, false, false); return g.Mass(); };
+  function op(oc, s, O) { const n = opGrezza(oc, s, O); if (!n || n === s) return n; try { if (!new oc.BRepCheck_Analyzer(n, true, false).IsValid()) return null; } catch { return null; }
+    const v = volume(oc, n); if (!(v > 1e-3)) return null; if (O.op === "guscio" && v >= volume(oc, s) - 1e-3) return null; return n; }
+  function opGrezza(oc, s, O) {
+    if (O.op === "spingi") { const F = facce(oc, s)[O.f]; if (!F) return null; const P = piano(oc, F); if (!P || !O.d) return O.d ? null : s;
+      const pr = new oc.BRepPrimAPI_MakePrism(F, new oc.gp_Vec(P.n[0] * O.d, P.n[1] * O.d, P.n[2] * O.d), false, true).Shape(); return bool(oc, O.d > 0 ? "unisci" : "togli", s, pr); }
+    if (O.op === "foro") { const F = facce(oc, s)[O.f]; if (!F) return null; const P = piano(oc, F); if (!P) return null; const c = O.punto || P.c, k = (c[0] - P.o[0]) * P.n[0] + (c[1] - P.o[1]) * P.n[1] + (c[2] - P.o[2]) * P.n[2];
+      const q = [c[0] - P.n[0] * (k - .02), c[1] - P.n[1] * (k - .02), c[2] - P.n[2] * (k - .02)], prof = O.prof > 0 ? O.prof + .02 : 2000;
+      const cil = new oc.BRepPrimAPI_MakeCylinder(new oc.gp_Ax2(new oc.gp_Pnt(...q), new oc.gp_Dir(-P.n[0], -P.n[1], -P.n[2])), O.d / 2, prof).Shape(); return bool(oc, "togli", s, cil); }
+    if (O.op === "raccordo" || O.op === "smusso") { const E = spigoli(oc, s), m = O.op === "raccordo" ? new oc.BRepFilletAPI_MakeFillet(s, oc.ChFi3d_FilletShape.ChFi3d_Rational) : new oc.BRepFilletAPI_MakeChamfer(s);
+      for (const i of O.e) { if (!E[i]) return null; m.Add(O.r, oc.TopoDS.Edge(E[i])); } try { m.Build(new oc.Message_ProgressRange()); } catch { return null; } if (!m.IsDone()) return null; return m.Shape(); }
+    if (O.op === "guscio") { const F = facce(oc, s), l = new oc.NCollection_List_TopoDS_Shape(); for (const i of O.f) { if (!F[i]) return null; l.Append(F[i]); }
+      const m = new oc.BRepOffsetAPI_MakeThickSolid(); try { m.MakeThickSolidByJoin(s, l, -O.sp, 1e-3); m.Build(new oc.Message_ProgressRange()); } catch { return null; } if (!m.IsDone()) return null; return m.Shape(); }
+    return null;
+  }
+  // la forma della ricetta (le forme intermedie restano in memoria: i cursori rifanno solo l'ultima operazione)
+  function forma(oc, R) { let k = JSON.stringify(R.base), s = cache.get(k); if (!s) { s = base(oc, R.base); if (!s) return null; tieni(k, s); }
+    for (const O of R.ops || []) { k += "|" + JSON.stringify(O); const c = cache.get(k); if (c) { s = c; continue; } let n = null; try { n = op(oc, s, O); } catch (e) { n = null; } if (!n) return null; s = tieni(k, n); }
+    return s; }
+  // la pelle da mostrare: triangoli per faccia (fid), gli spigoli veri come linee (eid), volume; Y in alto come il banco (OCC ha Z in alto)
+  function maglia(oc, s) {
+    const box = new oc.Bnd_Box(); oc.BRepBndLib.Add(s, box, false); const mn = box.CornerMin(), mx = box.CornerMax(), dim = Math.max(mx.X() - mn.X(), mx.Y() - mn.Y(), mx.Z() - mn.Z());
+    const defl = Math.max(.02, Math.min(.2, dim / 500)); new oc.BRepMesh_IncrementalMesh(s, defl, false, .3, false);
+    const F = facce(oc, s), E = spigoli(oc, s), pos = [], idx = [], fid = [], lin = [], eid = [], z0 = mn.Z();
+    F.forEach((f, fi) => { const face = oc.TopoDS.Face(f), loc = new oc.TopLoc_Location(), tr = oc.BRep_Tool.Triangulation(face, loc, 0); if (!tr) return; const T = loc.Transformation(), v0 = pos.length / 3, giro = f.Orientation() === oc.TopAbs_Orientation.TopAbs_REVERSED;
+      for (let j = 1; j <= tr.NbNodes(); j++) { const p = tr.Node(j).Transformed(T); pos.push(p.X(), p.Z() - z0, -p.Y()); }
+      for (let j = 1; j <= tr.NbTriangles(); j++) { const t = tr.Triangle(j), a = t.Value(1) - 1 + v0, b = t.Value(2) - 1 + v0, c = t.Value(3) - 1 + v0; if (giro) idx.push(a, c, b); else idx.push(a, b, c); fid.push(fi); } });
+    // le cuciture (la riga di chiusura di un cilindro o di una sfera) non sono spigoli: non si disegnano
+    const cucitura = new Set(); F.forEach((f) => { const ex = new oc.TopExp_Explorer(f, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE), visti = []; for (; ex.More(); ex.Next()) { const i = E.indice(ex.Current()); if (visti.includes(i)) cucitura.add(i); visti.push(i); } ex.delete(); });
+    E.forEach((e, ei) => { const ed = oc.TopoDS.Edge(e); if (cucitura.has(ei) || oc.BRep_Tool.Degenerated(ed)) return; const cu = new oc.BRepAdaptor_Curve(ed), u0 = cu.FirstParameter(), u1 = cu.LastParameter(), tipo = cu.GetType(), P = [];
+      // gli spigoli dritti: i due estremi; i cerchi: un punto ogni 7° circa; le altre curve: 48 punti
+      const n = tipo === oc.GeomAbs_CurveType.GeomAbs_Line ? 1 : tipo === oc.GeomAbs_CurveType.GeomAbs_Circle ? Math.max(8, Math.ceil(Math.abs(u1 - u0) / .12)) : 48;
+      for (let j = 0; j <= n; j++) { const p = cu.Value(u0 + (u1 - u0) * j / n); P.push([p.X(), p.Z() - z0, -p.Y()]); } cu.delete(); for (let j = 0; j + 1 < P.length; j++) { lin.push(...P[j], ...P[j + 1]); eid.push(ei); } });
+    const g = new oc.GProp_GProps(); oc.BRepGProp.VolumeProperties(s, g, false, false, false);
+    return { pos: new Float32Array(pos), idx: new Uint32Array(idx), fid: new Int32Array(fid), lin: new Float32Array(lin), eid: new Int32Array(eid), vol: g.Mass(), nf: F.length, ne: E.length, z0, chiuso: true }; }
+  // informazioni su una faccia scelta: piana o curva, misura
+  function faccia(oc, s, i) { const F = facce(oc, s)[i]; if (!F) return null; const P = piano(oc, F); if (P) return { piana: true, ...P };
+    const g = new oc.GProp_GProps(); oc.BRepGProp.SurfaceProperties(F, g, false, false); return { piana: false, area: g.Mass() }; }
+  function step(oc, s, nome) { const w = new oc.STEPControl_Writer(); w.Transfer(s, oc.STEPControl_StepModelType.STEPControl_AsIs, true, new oc.Message_ProgressRange());
+    const f = "/" + (nome || "pezzo").replace(/[^\w-]+/g, "_") + ".step"; if (w.Write(f) !== oc.IFSelect_ReturnStatus.IFSelect_RetDone) return null; const t = oc.FS.readFile(f, { encoding: "utf8" }); oc.FS.unlink(f); return t; }
+  return { forma, maglia, faccia, step, piano };
+})();
+// dalla MESH alle facce del CAD: per ogni faccia piana i suoi giri di bordo (il primo è il contorno, gli altri i buchi), in coordinate CAD (Z in alto)
+function facceDaMaglia(G) { const P = G.pos, I = G.idx, nV = P.length / 3, gruppi = new Map(); for (let t = 0; t < G.fid.length; t++) { const l = gruppi.get(G.fid[t]); if (l) l.push(t); else gruppi.set(G.fid[t], [t]); }
+  const out = []; for (const tris of gruppi.values()) { const dir = new Set(); tris.forEach((t) => { for (let j = 0; j < 3; j++) dir.add(I[t * 3 + j] * nV + I[t * 3 + (j + 1) % 3]); });
+    const succ = new Map(); tris.forEach((t) => { for (let j = 0; j < 3; j++) { const a = I[t * 3 + j], b = I[t * 3 + (j + 1) % 3]; if (!dir.has(b * nV + a)) succ.set(a, b); } });
+    const giri = [], usati = new Set(); for (const a0 of succ.keys()) { if (usati.has(a0)) continue; const g = []; let a = a0; for (let k = 0; k < 100000 && !usati.has(a); k++) { usati.add(a); g.push(a); a = succ.get(a); if (a === undefined) break; } if (g.length >= 3) giri.push(g); }
+    // via i punti in mezzo a un lato dritto (la faccia CAD vuole solo gli angoli)
+    const pulisci = (g) => g.filter((v, i) => { const p = g[(i + g.length - 1) % g.length], n = g[(i + 1) % g.length], ax = P[v * 3] - P[p * 3], ay = P[v * 3 + 1] - P[p * 3 + 1], az = P[v * 3 + 2] - P[p * 3 + 2], bx = P[n * 3] - P[v * 3], by = P[n * 3 + 1] - P[v * 3 + 1], bz = P[n * 3 + 2] - P[v * 3 + 2];
+      const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx; return Math.hypot(cx, cy, cz) > 1e-6 * Math.hypot(ax, ay, az) * Math.hypot(bx, by, bz) + 1e-9; });
+    const cad = (v) => [P[v * 3], -P[v * 3 + 2], P[v * 3 + 1]];
+    const L = giri.map(pulisci).filter((g) => g.length >= 3).map((g) => g.map(cad)); if (!L.length) continue;
+    const area = (g) => { let x = 0, y = 0, z = 0; for (let i = 0; i < g.length; i++) { const a = g[i], b = g[(i + 1) % g.length]; x += a[1] * b[2] - a[2] * b[1]; y += a[2] * b[0] - a[0] * b[2]; z += a[0] * b[1] - a[1] * b[0]; } return Math.hypot(x, y, z); };
+    L.sort((a, b) => area(b) - area(a)); out.push(L); }
+  return out; }
 function suddividiG(G) { const P = Array.from(G.pos), nV = G.pos.length / 3, m = new Map(), I = [], F = [];
   const mezzo = (a, b) => { const k = a < b ? a * nV + b : b * nV + a; let v = m.get(k); if (v === undefined) { v = P.length / 3; m.set(k, v); P.push((P[a * 3] + P[b * 3]) / 2, (P[a * 3 + 1] + P[b * 3 + 1]) / 2, (P[a * 3 + 2] + P[b * 3 + 2]) / 2); } return v; };
   for (let t = 0; t < G.idx.length / 3; t++) { const a = G.idx[t * 3], b = G.idx[t * 3 + 1], c = G.idx[t * 3 + 2], ab = mezzo(a, b), bc = mezzo(b, c), ca = mezzo(c, a), f = G.fid[t];
@@ -8140,6 +8325,8 @@ async function bancoOlografico3D(el, vivo, cb) {
       const bb = new T.Box3(); out.forEach((q) => { q.geo.computeBoundingBox(); bb.union(q.geo.boundingBox); });
       out.forEach((q) => q.geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2));
     }
+    if (o.tipo === "cad") { const D = GEO_DATI.get(p.k); if (D) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(D.pos.slice(), 3)); g.setIndex(new T.BufferAttribute(D.idx, 1)); g.computeVertexNormals();
+      const l = new T.BufferGeometry(); l.setAttribute("position", new T.BufferAttribute(D.lin.slice(), 3)); out.push({ geo: g, lineeGeo: l }); } }   // 2 nov · CAD: gli spigoli veri del solido, non quelli dei triangoli
     if (o.tipo === "creta" || o.tipo === "maglia") { const D = GEO_DATI.get(p.k); if (D) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(D.pos.slice(), 3)); g.setIndex(new T.BufferAttribute(D.idx, 1)); g.computeVertexNormals(); out.push({ geo: g, spigoli: 20, linee: o.tipo === "maglia" }); } }
     if (o.tipo === "unito") { const D = GEO_DATI.get(p.k); if (D) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(D.pos.slice(), 3)); g.setAttribute("normal", new T.BufferAttribute(D.norm.slice(), 3)); out.push({ geo: g, spigoli: 25 }); } }
     if (o.tipo === "ologramma") { const D = GEO_DATI.get(p.k); if (D) { const h2 = p.h, z2 = p.h * (p.prof ?? 70) / 100, sc = (a) => { const o2 = new Float32Array(a.length); for (let i = 0; i < a.length; i += 3) { o2[i] = a[i] * h2; o2[i + 1] = a[i + 1] * h2; o2[i + 2] = a[i + 2] * z2; } return o2; };
@@ -8163,13 +8350,13 @@ async function bancoOlografico3D(el, vivo, cb) {
     const g = new T.Group(); g.userData.id = o.id; mondo.add(g);
     const sel = o.id === selId, M = materiali(sel, o.foro), pezzi = [];
     let puntiM = null;
-    costruisci(o).forEach((q) => { if (!q.geo.attributes.normal) q.geo.computeVertexNormals(); const mesh = new T.Mesh(q.geo, M.f); mesh.userData.id = o.id; const linee = q.linee === false ? new T.LineSegments(new T.BufferGeometry(), M.l) : new T.LineSegments(new T.EdgesGeometry(q.geo, q.spigoli ?? 20), M.l); if (M.foro && q.linee !== false) linee.computeLineDistances(); const pg = new T.Group(); pg.add(mesh, linee);
+    costruisci(o).forEach((q) => { if (!q.geo.attributes.normal) q.geo.computeVertexNormals(); const mesh = new T.Mesh(q.geo, M.f); mesh.userData.id = o.id; const linee = q.lineeGeo ? new T.LineSegments(q.lineeGeo, M.l) : q.linee === false ? new T.LineSegments(new T.BufferGeometry(), M.l) : new T.LineSegments(new T.EdgesGeometry(q.geo, q.spigoli ?? 20), M.l); if (M.foro && q.linee !== false && linee.geometry.attributes.position) linee.computeLineDistances(); const pg = new T.Group(); pg.add(mesh, linee);
       if (q.punti) { puntiM = new T.PointsMaterial({ size: .8, vertexColors: true, transparent: true, opacity: .7, blending: add, depthWrite: false, clippingPlanes: [M.piano, pianoX] }); pg.add(new T.Points(q.punti, puntiM)); }
       g.add(pg); pezzi.push({ pg, mesh, linee, dz: q.dz || 0 }); });
     const rec = { o, g, pezzi, M, puntiM, nascita: performance.now(), anim: anim || "nessuna" };
     M.f.opacity = opacitaF(rec);
     if (o.tipo === "ologramma") proiettore(rec);
-    if (["unito", "creta", "maglia"].includes(o.tipo)) { const D = GEO_DATI.get(o.p.k); if (D && D.chiuso != null) rec.chiuso = D.chiuso; }
+    if (["unito", "creta", "maglia", "cad"].includes(o.tipo)) { const D = GEO_DATI.get(o.p.k); if (D && D.chiuso != null) rec.chiuso = D.chiuso; }
     oggetti.set(o.id, rec); posa(o);
     if (anim === "vola" || anim === "pezzi") pezzi.forEach((p, i) => { p.pg.userData.da = new T.Vector3((i % 2 ? 1 : -1) * 160, 120 + i * 40, p.dz ? p.dz * 2 : -120); });
     return rec;
@@ -8295,7 +8482,10 @@ async function bancoOlografico3D(el, vivo, cb) {
   // ── MESH: vertici, spigoli e facce sopra il pezzo; il tocco sceglie l'elemento più vicino al dito ──
   function sceltaMaglia(e) { const rec = oggetti.get(magV.id), D = GEO_DATI.get(rec?.o.p.k); if (!rec || !D) return; const m = ndc(e), rc = new T.Raycaster(); rc.setFromCamera(m, cam);
     const hit = rc.intersectObject(rec.pezzi[0].mesh, false)[0]; if (!hit) { cb.sceglie?.(null); return; }
-    const f = D.fid[hit.faceIndex]; if (magV.modo === "f") { cb.sceglie?.(f); return; }
+    const f = D.fid[hit.faceIndex]; if (magV.modo === "f") { const lp = rec.pezzi[0].mesh.worldToLocal(hit.point.clone()); cb.sceglie?.(f, D.lin ? [lp.x, -lp.z, lp.y + (D.z0 || 0)] : null); return; }
+    if (D.lin) { const L = D.lin, mw0 = rec.pezzi[0].mesh.matrixWorld, asp0 = w() / h(), pr = (i) => { const v = new T.Vector3(L[i], L[i + 1], L[i + 2]).applyMatrix4(mw0).project(cam); return [v.x * asp0, v.y]; }, M0 = [m.x * asp0, m.y]; let best = null, bd = .08;
+      for (let s = 0; s < D.eid.length; s++) { const A = pr(s * 6), Bq = pr(s * 6 + 3), dx = Bq[0] - A[0], dy = Bq[1] - A[1], L2 = dx * dx + dy * dy || 1e-9, q = Math.max(0, Math.min(1, ((M0[0] - A[0]) * dx + (M0[1] - A[1]) * dy) / L2)), d = Math.hypot(A[0] + dx * q - M0[0], A[1] + dy * q - M0[1]); if (d < bd) { bd = d; best = D.eid[s]; } }
+      cb.sceglie?.(best); return; }
     const mw = rec.pezzi[0].mesh.matrixWorld, asp = w() / h(), sc = (i) => { const v = new T.Vector3(D.pos[i * 3], D.pos[i * 3 + 1], D.pos[i * 3 + 2]).applyMatrix4(mw).project(cam); return [v.x * asp, v.y]; }, M = [m.x * asp, m.y];
     const suF = new Set(); for (let t = 0; t < D.fid.length; t++) if (D.fid[t] === f) for (let j = 0; j < 3; j++) suF.add(D.idx[t * 3 + j]);
     const lati = bordiG(D).filter(([a, b]) => suF.has(a) && suF.has(b)); if (!lati.length) return;
@@ -8303,12 +8493,13 @@ async function bancoOlografico3D(el, vivo, cb) {
     let best = null, bd = Infinity; lati.forEach(([a, b]) => { const A = sc(a), Bq = sc(b), dx = Bq[0] - A[0], dy = Bq[1] - A[1], L2 = dx * dx + dy * dy || 1, q = Math.max(0, Math.min(1, ((M[0] - A[0]) * dx + (M[1] - A[1]) * dy) / L2));
       const d = Math.hypot(A[0] + dx * q - M[0], A[1] + dy * q - M[1]); if (d < bd) { bd = d; best = `${Math.min(a, b)},${Math.max(a, b)}`; } }); cb.sceglie?.(best); }
   function vistaMaglia(o, S) { magV?.gruppo?.parent?.remove(magV.gruppo); magV = null; if (!o) return; const rec = oggetti.get(o.id), D = GEO_DATI.get(o.p.k); if (!rec || !D?.fid) return;
-    const G = new T.Group(), P = D.pos, L = bordiG(D), mat = (col, op) => new T.LineBasicMaterial({ color: col, transparent: true, opacity: op, blending: add, depthTest: false });
+    const G = new T.Group(), P = D.pos, L = D.lin ? [] : bordiG(D), mat = (col, op) => new T.LineBasicMaterial({ color: col, transparent: true, opacity: op, blending: add, depthTest: false });
     const linee = (l, col, op) => { const a = new Float32Array(l.length * 6); l.forEach(([x, y], i) => a.set([P[x * 3], P[x * 3 + 1], P[x * 3 + 2], P[y * 3], P[y * 3 + 1], P[y * 3 + 2]], i * 6)); const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(a, 3)); const s = new T.LineSegments(g, mat(col, op)); s.renderOrder = 15; return s; };
     const punti = (l, col, sz) => { const a = new Float32Array(l.length * 3); l.forEach((i, q) => a.set([P[i * 3], P[i * 3 + 1], P[i * 3 + 2]], q * 3)); const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(a, 3)); const p = new T.Points(g, new T.PointsMaterial({ color: col, size: sz, sizeAttenuation: false, transparent: true, opacity: 1, blending: add, depthTest: false })); p.renderOrder = 16; return p; };
-    G.add(linee(L, CIANO, S.modo === "e" ? .9 : .55));
+    if (!D.lin) G.add(linee(L, CIANO, S.modo === "e" ? .9 : .55));
+    if (D.lin && S.modo === "e" && S.e.size) { const a = []; for (let s = 0; s < D.eid.length; s++) if (S.e.has(D.eid[s])) for (let j = 0; j < 6; j++) a.push(D.lin[s * 6 + j]); const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(new Float32Array(a), 3)); const sl = new T.LineSegments(g, mat(0xffffff, 1)); sl.renderOrder = 15; G.add(sl); }
     if (S.modo === "v") { G.add(punti([...new Set(L.flat())], CIANO, 6)); if (S.v.size) G.add(punti([...S.v], 0xffffff, 11)); }
-    if (S.modo === "e" && S.e.size) { const sl = linee([...S.e].map((k) => k.split(",").map(Number)), 0xffffff, 1); sl.material.linewidth = 2; G.add(sl); }
+    if (S.modo === "e" && S.e.size && !D.lin) { const sl = linee([...S.e].map((k) => k.split(",").map(Number)), 0xffffff, 1); sl.material.linewidth = 2; G.add(sl); }
     if (S.modo === "f" && S.f.size) { const a = []; for (let t = 0; t < D.fid.length; t++) if (S.f.has(D.fid[t])) for (let j = 0; j < 3; j++) { const i = D.idx[t * 3 + j]; a.push(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); }
       const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(new Float32Array(a), 3)); const mm = new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .32, blending: add, depthTest: false, depthWrite: false, side: T.DoubleSide })); mm.renderOrder = 14; G.add(mm); }
     rec.pezzi[0].pg.add(G); magV = { id: o.id, modo: S.modo, gruppo: G }; }

@@ -153,14 +153,16 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         guard let url = t.request.url else { return }
         let nome = url.lastPathComponent
         let base = (nome as NSString).deletingPathExtension, est = (nome as NSString).pathExtension
-        guard ["markx.html", "three.module.min.js"].contains(nome),
+        // 3 nov · CAD: il motore OpenCascade (replicad_single.js + .wasm, LGPL: licenza in Licenze/) si carica solo quando si entra in CAD
+        guard ["markx.html", "three.module.min.js", "replicad_single.js", "replicad_single.wasm"].contains(nome),
               let file = Bundle.main.url(forResource: base, withExtension: est) ?? Bundle.main.url(forResource: base, withExtension: est, subdirectory: "Studio3D"),
               let d = try? Data(contentsOf: file) else {
             t.didFailWithError(URLError(.fileDoesNotExist)); return
         }
-        let mime = est == "js" ? "text/javascript" : "text/html"
+        let mime = est == "js" ? "text/javascript" : est == "wasm" ? "application/wasm" : "text/html"
+        let tipo = est == "wasm" ? mime : "\(mime); charset=utf-8"
         let r = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
-                                headerFields: ["Content-Type": "\(mime); charset=utf-8", "Content-Length": "\(d.count)", "Access-Control-Allow-Origin": "*"])
+                                headerFields: ["Content-Type": tipo, "Content-Length": "\(d.count)", "Access-Control-Allow-Origin": "*"])
             ?? URLResponse(url: url, mimeType: mime, expectedContentLength: d.count, textEncodingName: "utf-8")
         t.didReceive(r); t.didReceive(d); t.didFinish()
     }
