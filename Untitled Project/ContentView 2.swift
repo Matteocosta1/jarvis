@@ -254,9 +254,8 @@ struct ContentView: View {
             // blocco iOS mostrava sempre la sua linguetta grigia sotto la Dynamic Island. I PROTOCOLLI si aprono tirando giù da titolo,
             // reattore e testi, come prima.
         }
-        // MARK XI (3 nov sera): il bordo in basso è tutto di iOS (si esce dall'app al primo swipe); lo swipe su delle sezioni parte
-        // poco sopra la barretta (GestoBassoSezioni), come la tendina in alto. Con la tendina aperta o tirata, è fermo (come nel mockup).
-        .onChange(of: tendinaAperta || tendinaTrascina != 0) { _, ferma in naviga.bassoFermo = ferma }
+        // MARK XI: con sezioni aperte, lo swipe dal basso è prima di JARVIS (il secondo, subito dopo, è di iOS)
+        .defersSystemGestures(on: pila.voci.isEmpty ? [] : .bottom)
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
