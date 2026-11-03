@@ -8,7 +8,7 @@ import UIKit
 //   il fondo (la fascia sopra la barretta di iOS: il bordo resta di iOS). La pagina resta attaccata al dito (il punto toccato resta
 //   sotto il dito) e rimpicciolisce salendo, diventando ologramma (TiroPagina, 120 Hz).
 //   - sollevata piano: quando il dito si ferma oltre il 28% dell'altezza, vibrazione e suono «caricaolo»; lasciata (anche senza
-//     fermarsi, se è salita oltre il 28%) si ferma a metà pagina, scala 0,6: le pagine olografiche (SFOGLIO), da sfogliare a
+//     fermarsi, se è salita oltre il 28%) si ferma a metà pagina, scala 0,78: le pagine olografiche (SFOGLIO), da sfogliare a
 //     destra e sinistra, col numero piccolo «2 / 3» in alto. Tocchi la pagina: si apre. La spingi in su: si chiude. Di nuovo su
 //     dalla fascia: JARVIS;
 //   - lanciata veloce: continua il lancio del dito e vola dentro il reattore (AGGANCIO: si inclina, la scansione la scioglie in
@@ -235,7 +235,7 @@ struct StratoSezioniVista<Vista: View>: View {
         return p
     }
 
-    /// Le pagine olografiche, come nel mockup: a metà pagina (scala 0,6, centro al 48% dell'altezza), una alla volta in 3D (le
+    /// Le pagine olografiche, come nel mockup: a metà pagina (scala 0,78, centro al 48% dell'altezza), una alla volta in 3D (le
     /// accanto girate di 50° per pagina, indietro di 320 in prospettiva 1100, che si vedono sfogliando); spinta in su sfuma.
     private func posaSfoglio(_ v: PilaSezioni.Voce) -> Posa {
         var p = Posa()
@@ -732,7 +732,7 @@ final class TiroPagina: NSObject, ObservableObject {
     }
 
     // le misure (uguali al mockup)
-    static let sMeta: CGFloat = 0.6                    // la pagina olografica a metà pagina
+    static let sMeta: CGFloat = 0.78                   // la pagina olografica a metà pagina («almeno il 30% più grandi», 3 nov sera)
     static let soglia: CGFloat = 0.28                  // le pagine: oltre il 28% dell'altezza
     static let pausaV: CGFloat = 140                   // fermo: sotto 140 punti al secondo…
     static let pausaT: Double = 0.06                   // …per 60 ms
