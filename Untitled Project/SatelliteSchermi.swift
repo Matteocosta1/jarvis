@@ -441,8 +441,7 @@ struct SchermoNaviga: View {
                         }
                     }
                 }
-                (Text("A piedi ") + Text(Rotta.distanza(p.metri)).foregroundColor(.white).bold()
-                 + Text(" · ") + Text(Rotta.aPiedi(p.metri).replacingOccurrences(of: "circa ", with: "")).foregroundColor(.white).bold())
+                Text("A piedi \(Text(Rotta.distanza(p.metri)).foregroundStyle(.white).bold()) · \(Text(Rotta.aPiedi(p.metri).replacingOccurrences(of: "circa ", with: "")).foregroundStyle(.white).bold())")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(ColoriHUD.chiaro.opacity(0.8))
                     .frame(maxWidth: .infinity)

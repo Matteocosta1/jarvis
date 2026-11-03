@@ -54,7 +54,7 @@ struct VistaBeaOrologio: View {
                 let promesse = d["promesse"] as? [[String: Any]] ?? []
                 if !promesse.isEmpty {
                     Section {
-                        ForEach(Array(promesse.enumerated()), id: \.offset) { _, r in
+                        ForEach(Array(promesse.enumerated()), id: \.element.chiaveRiga) { _, r in
                             Text(r["testo"] as? String ?? "").font(.footnote)
                                 .swipeActions {
                                     Button { Task { await fatto(r) } } label: { Label("Mantenuta", systemImage: "checkmark") }.tint(.green)

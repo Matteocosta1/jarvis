@@ -272,3 +272,12 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Il signore ha scoperto che l'app ruotava in orizzontale (impostazione di partenza di Xcode, mai disegnata): «esce tutto storto».
 - `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` = solo verticale (prima anche orizzontale sinistra/destra), Debug e Release. iPad invariato. Nient'altro.
 - Da fare col tempo: l'orizzontale disegnato bene, a gruppi (prima la principale: reattore a sinistra, chat a destra; poi Studio/Social, schede, fotocamere, SISTEMI/Impostazioni), ognuno col suo mockup approvato.
+
+### In attesa della 11.0 (1) · 3 nov pomeriggio · correzioni dalla revisione con le skill (approvate dal signore)
+- Revisione della 10.0 (25) con SwiftUI Pro e Swift Concurrency: nessun errore grave, thread e dati condivisi a posto. Corrette solo le cose approvate:
+- **Watch · Spesa**: lo swipe «Elimina» non funzionava (stava in una ScrollView, funziona solo in una List). Ora è un elenco vero come Ricordi e Bea (apertura `aperturaOrologio("Spesa")`, conteggio in testa, tasti JARVIS in fondo).
+- **Watch · Spesa, Ricordi, Bea**: le righe si riconoscono dal numero della voce (`chiaveRiga`), non dalla posizione: dopo «Elimina» o «Fatta» l'animazione resta sulla riga giusta.
+- **VoiceOver**: nome alle icone della barra del Watch; sull'iPhone ai tasti Chiama e Cancella del tastierino, al telefono accanto ai contatti, al cestino «Dimentica» della memoria in Sistemi.
+- **Testi uniti col «+»** (segnati da Apple come vecchi): Satellite «A piedi …», nome col numero nel Dossier, BikeMi del Travel al polso → interpolazione, a schermo identici.
+- Rimandato su decisione del signore: la luminosità dello schermo (Sentinella, Strumenti) con `UIScreen.main`, «l'aggiorneremo a tempo debito».
+- Version e Build invariati (10.0 · 25): queste correzioni escono con la 11.0 (1).

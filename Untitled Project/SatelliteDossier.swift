@@ -179,7 +179,7 @@ struct SchermoDossier: View {
 
     private func scheda(_ nome: String, _ n: Int, acceso: Bool, _ azione: @escaping () -> Void) -> some View {
         Button { Suoni.tocco(); azione() } label: {
-            (Text(nome).foregroundColor(acceso ? Color.ciano : Color.ciano.opacity(0.7)) + Text(" \(n)").foregroundColor(.white))
+            Text("\(Text(nome).foregroundStyle(acceso ? Color.ciano : Color.ciano.opacity(0.7))) \(Text("\(n)").foregroundStyle(.white))")
                 .font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(Capsule().fill(Color.ciano.opacity(acceso ? 0.16 : 0)))

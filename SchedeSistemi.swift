@@ -468,6 +468,7 @@ struct VistaSupabase: View {
                             Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(.red.opacity(0.8)).padding(6)
                         }
                         .buttonStyle(StileStark())
+                        .accessibilityLabel("Dimentica")
                     }
                     .padding(.vertical, 2)
                 }

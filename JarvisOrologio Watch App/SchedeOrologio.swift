@@ -170,6 +170,15 @@ struct ValoreOrologio: View {
     }
 }
 
+/// 3 nov: le righe degli elenchi che si aggiornano (Spesa, Ricordi, Bea) si riconoscono dal loro numero nella memoria,
+/// non dalla posizione: eliminata o spuntata una voce, l'animazione resta sulla riga giusta.
+extension Dictionary where Key == String, Value == Any {
+    nonisolated var chiaveRiga: String {
+        if let n = self["id"] as? NSNumber { return "id\(n.intValue)" }
+        return "t\(self["testo"] as? String ?? "")·\(self["quando_leggibile"] as? String ?? "")"
+    }
+}
+
 struct IntestazioneOrologio: View {
     let testo: String
     var body: some View {
@@ -437,26 +446,35 @@ struct VistaSpesaOrologio: View {
     @State private var errore = false
     private let ciano = TintaOrologio.ciano
 
+    /// 3 nov (il signore): un elenco vero, come Ricordi e Bea, perché lo swipe «Elimina» funziona solo dentro una List.
     var body: some View {
-        CorniceOrologio(titolo: "Spesa", pronto: voci != nil || errore) {
+        List {
             if let voci {
-                Text(voci.isEmpty ? "Lista vuota, Sir." : "\(voci.count) da comprare · tocchi per spuntare")
-                    .font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
-                ForEach(Array(voci.enumerated()), id: \.offset) { _, r in
-                    let testo = r["testo"] as? String ?? ""
-                    Button { Task { await spunta(r) } } label: {
-                        Label(testo.prefix(1).uppercased() + testo.dropFirst(), systemImage: "circle").font(.footnote)
+                Section {
+                    ForEach(Array(voci.enumerated()), id: \.element.chiaveRiga) { _, r in
+                        let testo = r["testo"] as? String ?? ""
+                        Button { Task { await spunta(r) } } label: {
+                            Label(testo.prefix(1).uppercased() + testo.dropFirst(), systemImage: "circle").font(.footnote)
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) { Task { await elimina(r) } } label: { Label("Elimina", systemImage: "trash") }
+                        }
                     }
-                    .swipeActions {
-                        Button(role: .destructive) { Task { await elimina(r) } } label: { Label("Elimina", systemImage: "trash") }
-                    }
+                } header: {
+                    Text(voci.isEmpty ? "Lista vuota, Sir." : "\(voci.count) da comprare · tocchi per spuntare")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano).textCase(nil)
                 }
-                TastoJarvisOrologio(testo: "Me la legga JARVIS", frase: "Leggimi la lista della spesa.")
-                TastoJarvisOrologio(testo: "Aggiungi a voce", frase: "Jarvis, aggiungi alla lista della spesa:")
+                Section {
+                    TastoJarvisOrologio(testo: "Me la legga JARVIS", frase: "Leggimi la lista della spesa.")
+                    TastoJarvisOrologio(testo: "Aggiungi a voce", frase: "Jarvis, aggiungi alla lista della spesa:")
+                }
             } else if errore {
                 Text("Non raggiungo la lista, Sir.").font(.footnote).foregroundStyle(.orange)
+            } else {
+                ProgressView()
             }
         }
+        .navigationTitle("Spesa")
         .task { await carica() }
     }
 

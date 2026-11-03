@@ -393,10 +393,13 @@ struct VistaTelefono: View {
                         .shadow(color: Color.green.opacity(0.4), radius: 8)
                 }
                 .buttonStyle(StileStark()).disabled(numero.isEmpty).opacity(numero.isEmpty ? 0.4 : 1)
+                .accessibilityLabel("Chiama")
                 Button { if !numero.isEmpty { numero.removeLast(); Suoni.tocco() } } label: {
                     Image(systemName: "delete.left").font(.system(size: 22)).foregroundStyle(tinta).frame(width: 74, height: 74)
                 }
                 .buttonStyle(StileStark())
+                .accessibilityLabel("Cancella")
+                .accessibilityHint("Tenga premuto per cancellare tutto il numero")
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in numero = ""; Suoni.tocco() })
                 .opacity(numero.isEmpty ? 0 : 1)
             }
@@ -432,6 +435,7 @@ struct VistaTelefono: View {
                     Image(systemName: "phone.fill").foregroundStyle(Color(red: 0.2, green: 0.75, blue: 0.4)).frame(width: 40, height: 40)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Chiama \(c.nome)")
             }
             .contextMenu {
                 ForEach(c.numeri, id: \.numero) { n in Button("Chiama \(n.etichetta) \(n.numero)") { daChiamare = (c.nome, n.numero) } }

@@ -186,7 +186,7 @@ struct VistaTravelOrologio: View {
             VStack(spacing: 3) {
                 ForEach(Array(((d["stazioni"] as? [[String: Any]]) ?? []).enumerated()), id: \.offset) { _, b in
                     HStack(spacing: 4) {
-                        (Text(b["n"] as? String ?? "BikeMi") + Text(" \(b["m"] as? String ?? "")").foregroundStyle(ColoriTravel.tenue))
+                        Text("\(b["n"] as? String ?? "BikeMi")\(Text(" \(b["m"] as? String ?? "")").foregroundStyle(ColoriTravel.tenue))")
                             .lineLimit(1).truncationMode(.tail)
                         Spacer(minLength: 2)
                         Text("\(b["b"] as? Int ?? 0) · \(b["e"] as? Int ?? 0)⚡").font(.system(size: 10, design: .monospaced)).foregroundStyle(ColoriTravel.tenue)

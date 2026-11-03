@@ -254,7 +254,7 @@ struct VistaOrologio: View {
         case .briefing: VistaBriefingOrologio()
         case .meteo: VistaMeteoOrologio()
         case .email: VistaPostaOrologio()
-        case .spesa: VistaSpesaOrologio()
+        case .spesa: VistaSpesaOrologio().aperturaOrologio("Spesa")      // 3 nov: elenco vero, si apre come Ricordi e Bea
         case .shazam: VistaShazamOrologio()
         case .serata: VistaSerataOrologio()
         case .ricordi: VistaRicordiOrologio().aperturaOrologio("Ricordi")
@@ -563,6 +563,20 @@ struct VistaOrologio: View {
         ]
     }
 
+    /// Il nome di una scorciatoia per VoiceOver (a schermo c'è solo l'icona): lo stesso della sezione che apre.
+    private func nomeScorciatoia(_ frase: String?) -> String {
+        guard let frase else { return "Pulisci" }
+        if frase == "@social" { return "Social" }
+        if frase.hasPrefix("Modalità confidente") { return "Confidente" }
+        if frase.hasPrefix("Fammi da interprete") { return "Interprete" }
+        let nome = String(frase.dropFirst())
+        switch nome {
+        case "github": return "GitHub"
+        case "supabase": return "Supabase"
+        default: return nome.prefix(1).uppercased() + nome.dropFirst()
+        }
+    }
+
     /// L'icona di una scorciatoia: un simbolo di sistema, un logo dagli Assets («logo:nome») o la cartella dell'Archivio.
     @ViewBuilder private func iconaScorciatoia(_ icona: String) -> some View {
         if icona.hasPrefix("logo:") {
@@ -612,6 +626,7 @@ struct VistaOrologio: View {
                             .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, 1, schiarisci: 0.2))
                     }
                     .buttonStyle(StileStarkOrologio())
+                    .accessibilityLabel(nomeScorciatoia(s.frase))          // 3 nov: VoiceOver dice il nome della sezione
                     .opacity(posto(k) < accese ? 1 : 0)
                     .scaleEffect(posto(k) < accese ? 1 : 2.4)               // come sull'iPhone: grande e trasparente, poi si restringe e si accende
                     .brightness(posto(k) == accese - 1 && accese < n ? 0.35 : 0)   // lampo solo mentre si accende
@@ -902,7 +917,7 @@ struct VistaRicordiOrologio: View {
                 let posti = (d["posti"] as? [[String: Any]] ?? []).prefix(8)
                 if !posti.isEmpty {
                     Section {
-                        ForEach(Array(posti.enumerated()), id: \.offset) { _, p in
+                        ForEach(Array(posti.enumerated()), id: \.element.chiaveRiga) { _, p in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(p["testo"] as? String ?? "").font(.footnote).lineLimit(2)
                                 Text([p["luogo"] as? String, p["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · "))
@@ -920,7 +935,7 @@ struct VistaRicordiOrologio: View {
                 Section {
                     let spesa = d["spesa"] as? [[String: Any]] ?? []
                     if spesa.isEmpty { Text("Lista vuota").font(.footnote).foregroundStyle(.secondary) }
-                    ForEach(Array(spesa.enumerated()), id: \.offset) { _, r in
+                    ForEach(Array(spesa.enumerated()), id: \.element.chiaveRiga) { _, r in
                         Button { Task { await spunta(r) } } label: {
                             Label(r["testo"] as? String ?? "", systemImage: "circle")
                         }
@@ -931,7 +946,7 @@ struct VistaRicordiOrologio: View {
                 let promesse = d["promesse"] as? [[String: Any]] ?? []
                 if !promesse.isEmpty {
                     Section {
-                        ForEach(Array(promesse.enumerated()), id: \.offset) { _, r in
+                        ForEach(Array(promesse.enumerated()), id: \.element.chiaveRiga) { _, r in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(r["testo"] as? String ?? "").font(.footnote)
                                 Text([r["persona"] as? String, r["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · "))
@@ -948,7 +963,7 @@ struct VistaRicordiOrologio: View {
                 let ultimi = d["ricordi"] as? [[String: Any]] ?? []
                 if !ultimi.isEmpty {
                     Section {
-                        ForEach(Array(ultimi.enumerated()), id: \.offset) { _, r in
+                        ForEach(Array(ultimi.enumerated()), id: \.element.chiaveRiga) { _, r in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(r["testo"] as? String ?? "").font(.footnote).lineLimit(3)
                                 Text([r["tipo"] as? String, r["luogo"] as? String, r["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · "))
