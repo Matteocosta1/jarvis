@@ -267,3 +267,8 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Un disegno chiaro su fondo scuro arriva già come DISEGNO (prima OGGETTO), con INVERTI e PIENO.
 - **SCULTURA** (riga COLORI): la sagoma piena del disegno gonfiata davanti e dietro, linee incise davanti (INCISE), BASE da 3 mm per stare in piedi; ALTEZZA e SPESSORE.
 - Collaudo con la foto del signore (pagina dell'app): PIENO 100 × 202 × 5 mm chiuso; INSIEME chiuso; SCULTURA 83 × 40 × 153 mm sulla base, chiusa. Contorno con un buco di 2 mm: ora si riempie. Stencil, schizzo, 3MF invariati. Solo la pagina dello Studio: nessun file Swift toccato rispetto alla 23.
+
+### 10.0 (25) · 3 nov mattina · iPhone solo in verticale (deciso dal signore: «blocchiamola in verticale e poi col tempo l'adattiamo all'orizzontale»)
+- Il signore ha scoperto che l'app ruotava in orizzontale (impostazione di partenza di Xcode, mai disegnata): «esce tutto storto».
+- `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone` = solo verticale (prima anche orizzontale sinistra/destra), Debug e Release. iPad invariato. Nient'altro.
+- Da fare col tempo: l'orizzontale disegnato bene, a gruppi (prima la principale: reattore a sinistra, chat a destra; poi Studio/Social, schede, fotocamere, SISTEMI/Impostazioni), ognuno col suo mockup approvato.
