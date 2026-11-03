@@ -36,6 +36,9 @@ enum SuoniOrologio {
         return u
     }
     static func tick() { suona(file("tick") ?? file("tocco"), volume: 1.0) }          // click: 100%
+    /// MARK XI: lo scatto della barra quando un'icona passa al centro (il click «ruota» dell'iPhone) e il tono dell'ologramma che si crea.
+    static func scatto() { suona(file("ruota"), volume: 0.86) }
+    static func tonoOlo() { suona(file("olo"), volume: 0.86) }
     /// Musica d'avvio con una pulsazione per ognuna delle 20 icone del polso (build 23) («avvioorologio»); se manca, quella dell'iPhone.
     /// `fra`: la musica parte fra tanti secondi, al campione esatto (play(atTime:) sull'orologio dell'audio).
     static func avvio(fra: TimeInterval = 0) {                           // 100%
@@ -121,6 +124,8 @@ struct VistaOrologio: View {
     @State private var barraInFondo = false                // avvio: la barra parte dall'ultima icona (Bea)
     @State private var scorriA: Int?                       // avvio: l'icona che sta per accendersi, che la barra porta sul bordo sinistro
     @State private var passoBarra = 0.15                   // quanto dura ogni scorrimento (il tempo fino al colpo dopo)
+    /// MARK XI: la barra va col dito, con l'ologramma nel reattore (non osservata qui: la leggono solo barra, icone e ologramma)
+    @State private var ruota = RuotaPolso()
     @AppStorage("vibrazioni") private var vibrazioni = true   // al posto dei suoni dell'iPhone: tocchi sul polso
 
     private let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
@@ -128,6 +133,7 @@ struct VistaOrologio: View {
     var body: some View {
         NavigationStack {
             principale
+                .avvisaRighe()                                        // MARK XI: toccando fuori dalla riga delle foto, la corona torna alla pagina
                 .onAppear { jarvis.principaleVisibile = true }       // build 31: in attesa ascolta solo dalla schermata principale
                 .onDisappear { jarvis.principaleVisibile = false }
                 .navigationDestination(isPresented: $mostraVitals) { VistaVitalsOrologio() }
@@ -416,6 +422,13 @@ struct VistaOrologio: View {
                     .buttonStyle(StileStarkOrologio())
                     .scaleEffect(acceso ? 1 : 0.6)
                     .opacity(acceso ? 1 : 0)
+                    .modifier(VeloPolso(ruota: ruota))
+                    .overlay {
+                        // MARK XI: l'ologramma dell'icona al centro della barra, al posto del reattore; toccato, apre la sezione
+                        OlogrammaPolso(ruota: ruota, nomi: scorciatoie.map { nomeScorciatoia($0.frase) }, gruppi: scorciatoie.map(\.gruppo),
+                                       icona: { k in iconaOlogramma(scorciatoie[k].icona) },
+                                       apri: { k in ruota.spegni(); toccaScorciatoia(k) })
+                    }
 
                 barraRapida
 
@@ -458,7 +471,7 @@ struct VistaOrologio: View {
                 if let s = svuotaDa { BarraSvuotaOrologio(inizio: s, colore: ciano) }   // la barra della pulizia, come sull'iPhone
 
                 if !jarvis.immagini.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    RigaCorona(quanti: jarvis.immagini.count) {     // MARK XI: col dito e, toccata, con la corona
                         HStack(spacing: 4) {
                             ForEach(Array(jarvis.immagini.enumerated()), id: \.element.id) { k, foto in
                                 NavigationLink {
@@ -469,6 +482,7 @@ struct VistaOrologio: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 6))
                                 }
                                 .buttonStyle(.plain)
+                                .id(k)
                             }
                         }
                     }
@@ -563,6 +577,40 @@ struct VistaOrologio: View {
         ]
     }
 
+    /// L'icona nell'ologramma: i simboli a 34 punti, i disegni e i loghi (fatti per 15) ingranditi alla stessa misura.
+    @ViewBuilder private func iconaOlogramma(_ icona: String) -> some View {
+        if icona.hasPrefix("logo:") || ["archivio", "satellite", "vinile"].contains(icona) {
+            iconaScorciatoia(icona).scaleEffect(2.4)
+        } else {
+            iconaScorciatoia(icona).font(.system(size: 34))
+        }
+    }
+
+    /// Il tocco su una scorciatoia: dalla barra o dall'ologramma (MARK XI), lo stesso.
+    private func toccaScorciatoia(_ k: Int) {
+        guard scorciatoie.indices.contains(k) else { return }
+        let s = scorciatoie[k]
+        vibra(.click); SuoniOrologio.tick()
+        if s.frase == "@social" { apriPolso(.social(nil)) }
+        else if let f = s.frase, f.hasPrefix("#"), let r = Reparto(rawValue: String(f.dropFirst())) { apri(r) }
+        else if let frase = s.frase { iconaAttiva = k; jarvis.chiedi(frase) }
+        else { chiediPulizia = true }
+    }
+
+    /// MARK XI: i centri delle icone nella barra (34 punti ciascuna, 6 fra due, la linea di 1 punto fra i gruppi, 2 all'inizio).
+    private func misuraBarra(larghezza: CGFloat) {
+        let elenco = scorciatoie
+        var x: CGFloat = 2, centri: [CGFloat] = []
+        for (k, s) in elenco.enumerated() {
+            if k > 0 && elenco[k - 1].gruppo != s.gruppo { x += 1 + 6 }
+            centri.append(x + 17)
+            x += 34 + 6
+        }
+        ruota.centri = centri
+        ruota.larghezza = larghezza
+        ruota.larghezzaTotale = x - 6 + 2
+    }
+
     /// Il nome di una scorciatoia per VoiceOver (a schermo c'è solo l'icona): lo stesso della sezione che apre.
     private func nomeScorciatoia(_ frase: String?) -> String {
         guard let frase else { return "Pulisci" }
@@ -595,8 +643,7 @@ struct VistaOrologio: View {
     private var barraRapida: some View {
         let n = scorciatoie.count
         let posto: (Int) -> Int = { n - 1 - $0 }                  // il posto di un'icona nell'ordine d'accensione (al contrario)
-        return ScrollViewReader { lettore in
-        ScrollView(.horizontal, showsIndicators: false) {
+        return GeometryReader { g in
             HStack(spacing: 6) {
                 ForEach(Array(scorciatoie.enumerated()), id: \.offset) { k, s in
                     let inCorso = iconaAttiva == k && jarvis.fase != .attesa
@@ -608,11 +655,8 @@ struct VistaOrologio: View {
                             .animation(.easeOut(duration: 0.3), value: accese)
                     }
                     Button {
-                        vibra(.click); SuoniOrologio.tick()
-                        if s.frase == "@social" { apriPolso(.social(nil)) }
-                        else if let f = s.frase, f.hasPrefix("#"), let r = Reparto(rawValue: String(f.dropFirst())) { apri(r) }
-                        else if let frase = s.frase { iconaAttiva = k; jarvis.chiedi(frase) }
-                        else { chiediPulizia = true }
+                        ruota.spegni()
+                        toccaScorciatoia(k)
                     } label: {
                         iconaScorciatoia(s.icona)
                             .font(.system(size: 14))
@@ -626,6 +670,7 @@ struct VistaOrologio: View {
                             .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, 1, schiarisci: 0.2))
                     }
                     .buttonStyle(StileStarkOrologio())
+                    .modifier(IconaSegueRuota(ruota: ruota, indice: k))     // MARK XI: lente al centro e anello con l'ologramma
                     .accessibilityLabel(nomeScorciatoia(s.frase))          // 3 nov: VoiceOver dice il nome della sezione
                     .opacity(posto(k) < accese ? 1 : 0)
                     .scaleEffect(posto(k) < accese ? 1 : 2.4)               // come sull'iPhone: grande e trasparente, poi si restringe e si accende
@@ -635,10 +680,24 @@ struct VistaOrologio: View {
                 }
             }
             .padding(.horizontal, 2)
+            .fixedSize()
+            .modifier(BarraSegueRuota(ruota: ruota))
+            .frame(width: g.size.width, alignment: .leading)
+            .onAppear { misuraBarra(larghezza: g.size.width) }
+            .onChange(of: g.size.width) { _, w in misuraBarra(larghezza: w) }
         }
-        .onChange(of: barraInFondo) { _, si in if si { lettore.scrollTo(n - 1, anchor: .trailing) } }
-        .onChange(of: scorriA) { _, k in if let k { withAnimation(.easeOut(duration: passoBarra)) { lettore.scrollTo(k, anchor: .leading) } } }
-        }
+        .frame(height: 34)
+        // come prima la barra taglia ai lati; finito l'avvio la lente può uscire un poco sopra e sotto (come nel mockup)
+        .mask { Rectangle().padding(.vertical, accese >= n ? -14 : 0) }
+        .contentShape(Rectangle())
+        // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona); la corona resta della pagina
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { v in if accese >= n { ruota.trascina(v.location.x) } }
+                .onEnded { _ in ruota.lascia() }
+        )
+        .onChange(of: barraInFondo) { _, si in if si { ruota.inFondo() } }
+        .onChange(of: scorriA) { _, k in if let k { ruota.scorriA(k, durata: passoBarra) } }
         .disabled(jarvis.fase == .elaboro)
     }
 

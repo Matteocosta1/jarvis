@@ -104,6 +104,8 @@
 				Organismo.swift,
 				pronto.m4a,
 				ComandiVocali.swift,
+				olo.m4a,
+				ruota.wav,
 				SaluteStorica.swift,
 				Satellite23.swift,
 				scheda.m4a,

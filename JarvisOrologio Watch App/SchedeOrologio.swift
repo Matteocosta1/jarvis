@@ -49,6 +49,7 @@ struct CorniceOrologio<Contenuto: View>: View {
                     VStack(alignment: .leading, spacing: 8) { contenuto() }
                         .padding(.horizontal, 4)
                 }
+                .avvisaRighe()                       // MARK XI: toccando fuori da una riga di lato, la corona torna alla pagina
                 .mask(alignment: .top) {
                     GeometryReader { g in
                         VStack(spacing: 0) {
@@ -354,15 +355,18 @@ struct VistaMeteoOrologio: View {
                 }
                 Text(luogo).font(.system(size: 9, design: .monospaced)).foregroundStyle(ciano)
                 IntestazioneOrologio(testo: "PROSSIME ORE")
-                ScrollView(.horizontal, showsIndicators: false) {
+                // MARK XI: col dito come sempre; toccata, anche con la corona (un'ora per scatto)
+                let ore = Array(m.hourlyForecast.forecast.filter { $0.date > Date().addingTimeInterval(-1800) }.prefix(12))
+                RigaCorona(quanti: ore.count) {
                     HStack(spacing: 10) {
-                        ForEach(Array(m.hourlyForecast.forecast.filter { $0.date > Date().addingTimeInterval(-1800) }.prefix(12)), id: \.date) { h in
+                        ForEach(Array(ore.enumerated()), id: \.element.date) { k, h in
                             VStack(spacing: 2) {
                                 Text(h.date.formatted(.dateTime.hour())).font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary)
                                 Image(systemName: h.symbolName).symbolRenderingMode(.multicolor).font(.system(size: 13))
                                 Text(gradi(h.temperature)).font(.system(size: 11, weight: .semibold))
                                 Text(h.precipitationChance >= 0.1 ? "\(Int((h.precipitationChance * 100).rounded()))%" : " ").font(.system(size: 8)).foregroundStyle(ciano)
                             }
+                            .id(k)
                         }
                     }
                 }
