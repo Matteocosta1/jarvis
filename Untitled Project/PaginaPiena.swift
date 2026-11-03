@@ -7,7 +7,7 @@ import UIKit
 // dalla parte alta dello schermo (la fascia dell'ora). Sotto resta JARVIS: scendendo si vede lui, mai nero.
 
 struct PaginaPiena: ViewModifier {
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var scesa: CGFloat = 0
 
     /// L'altezza della fascia in alto (ora, Dynamic Island) dove parte il trascinamento: lì non ci sono tasti delle schede.
@@ -79,6 +79,26 @@ enum FasciaAlta {
 // La pagina web si butta solo quando lo strato è già sotto lo schermo.
 
 private struct ChiaveJarvisCoperto: EnvironmentKey { static let defaultValue = false }
+
+// MARK: - MARK XI · le sezioni non sono più schermate di iOS ma stanno nel contenitore di JARVIS (StratoSezioni)
+// Il «Chiudi» delle sezioni (e il trascinamento giù dalla fascia dell'ora) chiude la sezione del contenitore; dentro una sezione,
+// un foglio di iOS aperto da lei (presentato) si chiude come sempre col suo dismiss.
+
+/// La sezione del contenitore in cui sta questa vista (nil: fuori dal contenitore).
+private struct ChiaveSezioneAperta: EnvironmentKey { static let defaultValue: UUID? = nil }
+extension Notification.Name {
+    /// Una sezione del contenitore chiede di chiudersi (userInfo «id»: UUID).
+    static let jarvisChiudiSezione = Notification.Name("JarvisChiudiSezione")
+}
+/// Chiude la sezione del contenitore, o il foglio di iOS se la vista è presentata.
+struct ChiudiOVia {
+    let sezione: UUID?
+    let dismiss: DismissAction
+    func callAsFunction() {
+        if let sezione { NotificationCenter.default.post(name: .jarvisChiudiSezione, object: nil, userInfo: ["id": sezione]) }
+        else { dismiss() }
+    }
+}
 extension EnvironmentValues {
     /// Studio o Social sono su del tutto e coprono JARVIS: le sue animazioni continue (reattore, sfondo, anelli) restano ferme
     /// sull'ultimo fotogramma, così il telefono lavora solo per la pagina (prima, sotto una schermata di iOS, JARVIS non girava).
@@ -87,6 +107,12 @@ extension EnvironmentValues {
         get { self[ChiaveJarvisCoperto.self] }
         set { self[ChiaveJarvisCoperto.self] = newValue }
     }
+    var sezioneAperta: UUID? {
+        get { self[ChiaveSezioneAperta.self] }
+        set { self[ChiaveSezioneAperta.self] = newValue }
+    }
+    /// Al posto di `dismiss`: dentro il contenitore chiude la sezione; in un foglio presentato, il foglio.
+    var chiudiOVia: ChiudiOVia { ChiudiOVia(sezione: isPresented ? nil : sezioneAperta, dismiss: dismiss) }
 }
 
 struct StratoPagina: View {

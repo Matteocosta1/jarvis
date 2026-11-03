@@ -9,7 +9,7 @@ import Charts
 struct VistaVitals: View {
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var giorni = 30
     @State private var dati: DatiVitals?
     @State private var oggi: SaluteOggi?

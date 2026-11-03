@@ -28,7 +28,7 @@ struct VistaScanner: View {
     @State private var storico: [Passato] = []
     @State private var mostraIngredienti = false
     @State private var orecchio = OrecchioComandi()   // «Jarvis, un altro», «Jarvis, fa bene?», «Jarvis, cosa c'è dentro?»
-    @Environment(\.dismiss) private var chiudiScheda
+    @Environment(\.chiudiOVia) private var chiudiScheda
 
     var body: some View {
         CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "barcode.viewfinder", tinta: tinta, fotocamera: true) {

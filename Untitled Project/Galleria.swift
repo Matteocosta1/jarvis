@@ -119,7 +119,7 @@ struct Miniatura: View {
 struct VistaImmagini: View {
     let immagini: [Immagine]
     @State var iniziale: Int
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var pagina: PaginaWeb?
 
     var body: some View {

@@ -434,7 +434,7 @@ struct VistaPosta: View {
 struct VistaSpesa: View {
     let chiedi: (String) -> Void
     private let tinta = Tinte.spesa
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @Environment(\.openURL) private var apriLink
 
     struct Voce: Identifiable, Equatable {

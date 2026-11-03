@@ -23,7 +23,7 @@ struct CorniceScheda<Contenuto: View>: View {
     /// 26 ott notte (il signore, «JARVIS Music»): la testata come Studio e Social, «J.A.R.V.I.S.» e sotto il nome della sezione.
     var marchio = false
     @ViewBuilder let contenuto: () -> Contenuto
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
     @State private var stampa: CGFloat = 0           // quanto della scheda è già «stampato» (0 → 1)
     @State private var apertaDa = Date()

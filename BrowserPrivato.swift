@@ -234,7 +234,7 @@ struct WebVista: UIViewRepresentable {
 
 /// Contenitore: sblocco con Face ID e scelta Incognito/Normale (cambiando modalità si riapre una pagina nuova).
 struct BrowserPrivato: View {
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @Environment(\.scenePhase) private var fase
     @AppStorage("browserFaceID") private var conFaceID = true
     @AppStorage("browserIncognito") private var incognito = true
@@ -563,7 +563,7 @@ struct VistaCronologiaBrowser: View {
     let incognito: Bool
     let accento: Color
     let apri: (URL) -> Void
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var voci: [VoceCronologia] = []
     @State private var cerca = ""
     @State private var chiediCancella = false

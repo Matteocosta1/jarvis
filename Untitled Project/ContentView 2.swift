@@ -65,7 +65,10 @@ struct ContentView: View {
     @State private var ruota = RuotaCorona()
     @State private var rettCorona: CGRect = .zero              // la corona sullo schermo (coordinate globali), per sapere se il dito è sull'anello
     @State private var modoCorona: ModoCorona?                 // il dito sulla corona: gira la ruota o tira giù la tendina (deciso al primo movimento)
-    @State private var dock = LenteDock()                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
+    @State private var dock = LenteDock()
+    /// MARK XI: le sezioni aperte (fino a 10), nel contenitore sopra JARVIS al posto delle schermate di iOS.
+    @StateObject private var pila = PilaSezioni()
+    @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
     private enum ModoCorona { case ruota, tendina }
     @Environment(\.scenePhase) private var scena
@@ -238,6 +241,9 @@ struct ContentView: View {
                 // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
                 // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
                 // scendono come le altre schede e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
+                // MARK XI: le sezioni, nel contenitore (davanti una, dietro le altre vive)
+                strato
+                    .zIndex(25)
                 if let a = aperturaPagina {
                     StratoPagina(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) },
                                  chiudi: { durata in abbassaPagina(durata) },
@@ -251,7 +257,7 @@ struct ContentView: View {
                         .zIndex(30)
                 }
             }
-            .environment(\.jarvisCoperto, stratoCopre)
+            .environment(\.jarvisCoperto, stratoCopre || pilaCopre)
             .onChange(of: aperturaPagina?.id) { _, id in if id == nil { stratoCopre = false } }   // senza strato JARVIS gira sempre
             .frame(width: g.size.width, height: g.size.height)
             // 26 ott notte (foto del signore 23:29, «menu a tendina inutile»): tolto il blocco dello swipe di iOS dall'alto: con il
@@ -273,16 +279,7 @@ struct ContentView: View {
                 if let p = Protocolli.condiviso.prendiRichiesto() { Protocolli.condiviso.avvia(p) }
             }
         }
-        // 26 ott sera (il signore: «nessuna arriva in cima a pagina piena»): tutte le schede a pagina piena, come il mockup (PaginaPiena)
-        .fullScreenCover(isPresented: $mostraImpostazioni, onDismiss: {
-            eseguiComando()
-            if jarvis.svuotaChiesto {                    // «Nuova conversazione»: a foglio chiuso, la stessa animazione del cestino
-                jarvis.svuotaChiesto = false
-                Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
-            }
-        }) { ImpostazioniView().environmentObject(jarvis).paginaPiena() }   // 27 ott: senza caricamento, sale come le altre
         .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser").paginaPiena() }
-        .fullScreenCover(isPresented: $mostraBrowser) { BrowserPrivato() }
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
@@ -328,117 +325,27 @@ struct ContentView: View {
                 apriReparto(lidar ? .lidar : .occhi)
             }
         }
-        .fullScreenCover(item: $jarvis.occhi, onDismiss: { jarvis.occhiChiusi([]) }) { o in
-            Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
-                  oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
-                .aperturaHUD(o.cucina ? "Cucina" : "Occhi", soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
-        }
-        .fullScreenCover(item: $jarvis.interprete) { l in
-            Interprete(lingua: l) { jarvis.interprete = nil }
-        }
-        .fullScreenCover(isPresented: $mostraSentinella) {
-            VistaSentinella(chiudi: { mostraSentinella = false }, comando: comandoDaReparto)
-        }
-        .fullScreenCover(isPresented: $mostraWiretap) {
-            VistaWiretap(verbale: { testo, minuti in
-                mostraWiretap = false
-                jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
-        }
         .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
+        // MARK XI: lo stato di ogni sezione acceso = davanti nel contenitore; spento = dietro (se ci sta andando) o chiusa
+        .onChange(of: sezioniAccese) { prima, adesso in sincronizzaSezioni(prima: prima, adesso: adesso) }
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisChiudiSezione)) { n in
+            guard let id = n.userInfo?["id"] as? UUID, let v = pila.voci.first(where: { $0.id == id }) else { return }
+            spegniStato(v.sezione)
+        }
+        .onChange(of: pila.davanti) { _, d in
+            if d == nil { pilaCopre = false; return }
+            Task { @MainActor in                                 // a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma
+                try? await Task.sleep(for: .milliseconds(550))
+                if pila.davanti == d { pilaCopre = true }
+            }
+        }
         // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
         .onChange(of: jarvis.repartoRichiesto) { _, r in
             guard let r else { return }
             jarvis.repartoRichiesto = nil
             apriReparto(r)
         }
-        // Profiler: la sua schermata (fotocamera dietro o selfie) e la scheda da compilare
-        .fullScreenCover(isPresented: $mostraProfiler) {
-            VistaProfiler { dati, nome in
-                mostraProfiler = false
-                if !dati.isEmpty { jarvis.profila(dati, nome: nome) }
-            }
-            .aperturaHUD("Profiler", soloSfuma: true)                          // 26 ott notte: il caricamento come tutte le sezioni
-        }
-        // le schede delle icone
-        .fullScreenCover(item: $scheda) { sc in
-            Group {
-            switch sc {
-            case .diario: VistaDiario(chiedi: daScheda) {
-                scheda = nil
-                Task {
-                    try? await Task.sleep(for: .milliseconds(450))
-                    jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")
-                }
-            }
-            case .sonno: VistaSonno(chiedi: daScheda)
-            case .cuore: VistaCuoreTelefono(chiedi: daScheda)
-            case .briefing: VistaBriefing(chiedi: daScheda) { altra in
-                scheda = nil
-                Task { try? await Task.sleep(for: .milliseconds(500)); scheda = altra }
-            }
-            case .meteo: VistaMeteo(chiedi: daScheda)
-            case .email: VistaPosta(chiedi: daScheda)
-            case .spesa: VistaSpesa(chiedi: daScheda)
-            case .shazam: VistaShazam(chiedi: daScheda, apriMusica: { scheda = .musica })
-            case .foto: VistaFotoScheda(chiedi: daScheda)
-            case .serata: VistaSerata(chiedi: daScheda)
-            case .messaggi: VistaMessaggi(chiedi: daScheda)
-            case .telefono: VistaTelefono(chiedi: daScheda)
-            case .github: VistaGitHub(chiedi: daScheda, apri: apriPagina)
-            case .supabase: VistaSupabase(chiedi: daScheda)
-            case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
-            case .costi: VistaCosti(chiedi: daScheda)
-            case .edith: VistaEdith(chiedi: daScheda)
-            case .scanner: VistaScanner(chiedi: daScheda)
-            case .bea: VistaBea(chiedi: daScheda)
-            case .satellite: VistaSatellite(parla: { [jarvis] frase in jarvis.annuncia(frase) })
-            case .musica: VistaMusica()
-            }
-            }
-            .paginaPiena()
-        }
-        .fullScreenCover(isPresented: $jarvis.allenatore) {
-            Allenatore { jarvis.allenatore = false }
-        }
-        .fullScreenCover(isPresented: $mostraLidar) {
-            VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
-                .aperturaHUD("LiDAR")                                              // 26 ott notte: il caricamento come le altre schede
-                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
-        }
         .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
-        .fullScreenCover(isPresented: $mostraVitals) {
-            VistaVitals { frase in mostraVitals = false; chiedi(frase) }.paginaPiena()
-        }
-        .fullScreenCover(item: $mostraRicordi) { scheda in
-            VistaRicordi(iniziale: scheda, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }.paginaPiena()
-        }
-        .fullScreenCover(isPresented: $mostraConfidente) {
-            VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
-                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
-        }
-        // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
-        // ciano), non più nel menu di iOS con le bandierine
-        .fullScreenCover(isPresented: $scegliLingua) {
-            CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
-                Pannello(titolo: "LINGUA", tinta: Color.ciano) {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        ForEach(Lingua.tutte) { l in
-                            TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
-                                Suoni.tocco()
-                                jarvis.interrompi()
-                                scegliLingua = false
-                                Task { @MainActor in
-                                    try? await Task.sleep(for: .milliseconds(450))     // iOS apre l'Interprete a scheda chiusa
-                                    jarvis.interprete = l
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .paginaPiena()
-        }
         .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
             Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
                 jarvis.impostaFoto(immagine)
@@ -1196,6 +1103,245 @@ struct ContentView: View {
         else { withAnimation(ContentView.curvaTendina) { tendinaTrascina = 0 } }
     }
 
+    // MARK: MARK XI · il contenitore delle sezioni
+
+    /// Le sezioni accese adesso (lo stato di sempre acceso), cioè quella davanti (di solito una sola).
+    private var sezioniAccese: [Sezione] {
+        var a: [Sezione] = []
+        if mostraImpostazioni { a.append(.impostazioni) }
+        if mostraBrowser { a.append(.browser) }
+        if jarvis.occhi != nil { a.append(.occhi) }
+        if jarvis.interprete != nil { a.append(.interprete) }
+        if mostraSentinella { a.append(.sentinella) }
+        if mostraWiretap { a.append(.wiretap) }
+        if mostraProfiler { a.append(.profiler) }
+        if jarvis.allenatore { a.append(.allenatore) }
+        if mostraLidar { a.append(.lidar) }
+        if mostraVitals { a.append(.vitals) }
+        if mostraRicordi != nil { a.append(.ricordi) }
+        if mostraConfidente { a.append(.confidente) }
+        if scegliLingua { a.append(.lingua) }
+        if let sc = scheda { a.append(.scheda(sc)) }
+        return a
+    }
+
+    /// Una sezione si è accesa: davanti (se un'altra era davanti, va dietro). Una si è spenta: dietro o chiusa.
+    private func sincronizzaSezioni(prima: [Sezione], adesso: [Sezione]) {
+        let unaScheda: (Sezione) -> Bool = { if case .scheda = $0 { return true } else { return false } }
+        for s in prima where !adesso.contains(s) {
+            // una scheda al posto di un'altra (lo stato delle schede è uno solo): quella di prima va dietro, non si chiude
+            if unaScheda(s), adesso.contains(where: unaScheda), !s.restaDavanti { pila.vaDietro(s) }
+            var chiusa = false
+            withAnimation(StratoPagina.discesa()) { chiusa = pila.spenta(s) }
+            if chiusa { sezioneChiusa(s) }
+        }
+        for s in adesso where !prima.contains(s) {
+            // quella che era davanti ed è ancora accesa va dietro (come nel mockup: la sezione di prima resta viva)
+            if let d = pila.voceDavanti?.sezione, d != s, adesso.contains(d) {
+                if d.restaDavanti { spegniStato(d) } else { pila.vaDietro(d); spegniStato(d) }
+            }
+            let cucina = jarvis.occhi?.cucina ?? false
+            withAnimation(StratoPagina.salita) {
+                if let vecchia = pila.accesa(s, cucina: s == .occhi && cucina, ricordi: s == .ricordi ? mostraRicordi : nil) {
+                    pila.togli(vecchia)                               // più di 10: la più vecchia si chiude
+                    sezioneChiusa(vecchia)
+                }
+            }
+            ruota.spegni()
+        }
+    }
+
+    /// Quello che succedeva alla chiusura della schermata di iOS (onDismiss).
+    private func sezioneChiusa(_ s: Sezione) {
+        switch s {
+        case .impostazioni:
+            eseguiComando()
+            if jarvis.svuotaChiesto {                    // «Nuova conversazione»: a foglio chiuso, la stessa animazione del cestino
+                jarvis.svuotaChiesto = false
+                Task { @MainActor in try? await Task.sleep(for: .milliseconds(250)); svuotaChat() }
+            }
+        case .occhi: jarvis.occhiChiusi([])
+        default: break
+        }
+    }
+
+    /// Spegne lo stato della sezione (davanti → dietro, se prima è stata segnata con `vaDietro`; altrimenti la chiude).
+    private func spegniStato(_ s: Sezione) {
+        switch s {
+        case .impostazioni: mostraImpostazioni = false
+        case .browser: mostraBrowser = false
+        case .occhi: jarvis.occhiChiusi([])
+        case .interprete: jarvis.interprete = nil
+        case .sentinella: mostraSentinella = false
+        case .wiretap: mostraWiretap = false
+        case .profiler: mostraProfiler = false
+        case .allenatore: jarvis.allenatore = false
+        case .lidar: mostraLidar = false
+        case .vitals: mostraVitals = false
+        case .ricordi: mostraRicordi = nil
+        case .confidente: mostraConfidente = false
+        case .lingua: scegliLingua = false
+        case .scheda(let sc): if scheda == sc { scheda = nil }
+        }
+    }
+
+    /// Riaccende lo stato di una sezione che sta dietro: torna davanti (le spente si riaprono, la fotocamera col suo suono).
+    private func accendiStato(_ v: PilaSezioni.Voce) {
+        switch v.sezione {
+        case .impostazioni: mostraImpostazioni = true
+        case .browser: mostraBrowser = true
+        case .occhi: if v.cucina { jarvis.guardaCucina() } else { jarvis.guardaManuale() }
+        case .interprete, .wiretap: break                                     // non stanno mai dietro
+        case .sentinella: mostraSentinella = true
+        case .profiler: profiler()
+        case .allenatore: jarvis.allenatore = true
+        case .lidar: mostraLidar = true
+        case .vitals: mostraVitals = true
+        case .ricordi: mostraRicordi = v.ricordi ?? .ricordi
+        case .confidente: mostraConfidente = true
+        case .lingua: scegliLingua = true
+        case .scheda(let sc): scheda = sc
+        }
+    }
+
+    /// Manda dietro la sezione davanti (resta viva, o spenta se ha la fotocamera): davanti torna JARVIS.
+    private func mandaDietroDavanti() {
+        guard let d = pila.voceDavanti?.sezione, !d.restaDavanti else { return }
+        pila.vaDietro(d)
+        spegniStato(d)
+    }
+
+    /// Porta davanti una sezione che sta dietro (dalle pagine olografiche o dallo swipe dai bordi); nil: JARVIS.
+    private func portaDavanti(_ id: UUID?) {
+        guard let id else { mandaDietroDavanti(); return }
+        guard let v = pila.voci.first(where: { $0.id == id }), pila.davanti != id else { return }
+        mandaDietroDavanti()
+        accendiStato(v)
+    }
+
+    /// Il contenitore: le sezioni in ordine d'apertura; quella davanti si vede e si tocca, le altre restano vive e invisibili
+    /// (le spente non si disegnano).
+    private var strato: some View {
+        ZStack {
+            ForEach(pila.voci) { v in
+                if !v.spenta {
+                    let davanti = pila.davanti == v.id
+                    vistaSezione(v)
+                        .environment(\.sezioneAperta, v.id)
+                        .environment(\.jarvisCoperto, false)
+                        .opacity(davanti ? 1 : 0)
+                        .allowsHitTesting(davanti)
+                        .accessibilityHidden(!davanti)
+                        .zIndex(davanti ? 1 : 0)
+                        .transition(.offset(y: (FasciaAlta.finestra?.bounds.height ?? 1000) + 2))   // sale e scende di tutta l'altezza, come prima
+                }
+            }
+        }
+    }
+
+    /// La vista di ogni sezione: quella che prima stava nella sua schermata di iOS, uguale.
+    @ViewBuilder private func vistaSezione(_ v: PilaSezioni.Voce) -> some View {
+        switch v.sezione {
+        case .impostazioni:
+            ImpostazioniView().environmentObject(jarvis).paginaPiena()                 // 27 ott: senza caricamento, sale come le altre
+        case .browser:
+            BrowserPrivato()
+        case .occhi:
+            if let o = jarvis.occhi {
+                Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
+                      oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
+                    .aperturaHUD(o.cucina ? "Cucina" : "Occhi", soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
+            }
+        case .interprete:
+            if let l = jarvis.interprete { Interprete(lingua: l) { jarvis.interprete = nil } }
+        case .sentinella:
+            VistaSentinella(chiudi: { mostraSentinella = false }, comando: comandoDaReparto)
+        case .wiretap:
+            VistaWiretap(verbale: { testo, minuti in
+                mostraWiretap = false
+                jarvis.verbaleWiretap(testo, minuti: minuti)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
+        case .profiler:
+            VistaProfiler { dati, nome in
+                mostraProfiler = false
+                if !dati.isEmpty { jarvis.profila(dati, nome: nome) }
+            }
+            .aperturaHUD("Profiler", soloSfuma: true)                                 // 26 ott notte: il caricamento come tutte le sezioni
+        case .allenatore:
+            Allenatore { jarvis.allenatore = false }
+        case .lidar:
+            VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
+                .aperturaHUD("LiDAR")                                                  // 26 ott notte: il caricamento come le altre schede
+                .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
+        case .vitals:
+            VistaVitals { frase in mostraVitals = false; chiedi(frase) }.paginaPiena()
+        case .ricordi:
+            VistaRicordi(iniziale: v.ricordi ?? .ricordi, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }.paginaPiena()
+        case .confidente:
+            VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
+                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
+        case .lingua:
+            // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
+            // ciano), non più nel menu di iOS con le bandierine
+            CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
+                Pannello(titolo: "LINGUA", tinta: Color.ciano) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                        ForEach(Lingua.tutte) { l in
+                            TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
+                                Suoni.tocco()
+                                jarvis.interrompi()
+                                scegliLingua = false
+                                Task { @MainActor in
+                                    try? await Task.sleep(for: .milliseconds(450))     // l'Interprete sale a scheda chiusa
+                                    jarvis.interprete = l
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .paginaPiena()
+        case .scheda(let sc):
+            vistaScheda(sc).paginaPiena()
+        }
+    }
+
+    /// Le schede delle icone.
+    @ViewBuilder private func vistaScheda(_ sc: SchedaApp) -> some View {
+        switch sc {
+        case .diario: VistaDiario(chiedi: daScheda) {
+            scheda = nil
+            Task {
+                try? await Task.sleep(for: .milliseconds(450))
+                jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")
+            }
+        }
+        case .sonno: VistaSonno(chiedi: daScheda)
+        case .cuore: VistaCuoreTelefono(chiedi: daScheda)
+        case .briefing: VistaBriefing(chiedi: daScheda) { altra in
+            scheda = nil
+            Task { try? await Task.sleep(for: .milliseconds(500)); scheda = altra }
+        }
+        case .meteo: VistaMeteo(chiedi: daScheda)
+        case .email: VistaPosta(chiedi: daScheda)
+        case .spesa: VistaSpesa(chiedi: daScheda)
+        case .shazam: VistaShazam(chiedi: daScheda, apriMusica: { scheda = .musica })
+        case .foto: VistaFotoScheda(chiedi: daScheda)
+        case .serata: VistaSerata(chiedi: daScheda)
+        case .messaggi: VistaMessaggi(chiedi: daScheda)
+        case .telefono: VistaTelefono(chiedi: daScheda)
+        case .github: VistaGitHub(chiedi: daScheda, apri: apriPagina)
+        case .supabase: VistaSupabase(chiedi: daScheda)
+        case .archivio: VistaArchivio(chiedi: daScheda, apri: apriPagina)
+        case .costi: VistaCosti(chiedi: daScheda)
+        case .edith: VistaEdith(chiedi: daScheda)
+        case .scanner: VistaScanner(chiedi: daScheda)
+        case .bea: VistaBea(chiedi: daScheda)
+        case .satellite: VistaSatellite(parla: { [jarvis] frase in jarvis.annuncia(frase) })
+        case .musica: VistaMusica()
+        }
+    }
+
     // MARK: MARK XI · la click wheel
 
     /// Il dito sulla corona. Sull'anello delle icone (finito l'avvio, tastiera chiusa) gira la ruota; altrove (il centro, il reattore)
@@ -1234,7 +1380,7 @@ struct ContentView: View {
 
     /// L'ologramma dell'icona in alto, nel reattore: toccato apre la sezione, come il tocco sull'icona.
     private var ologramma: some View {
-        OlogrammaRuota(ruota: ruota, voci: tutteLeIcone.map { (nome: $0.nome, gruppo: $0.gruppo, icona: $0.icona) }) { k in
+        OlogrammaRuota(ruota: ruota, voci: tutteLeIcone.map { (nome: $0.nome, gruppo: $0.gruppo, icona: $0.icona) }, aperte: pila.nomiAperti) { k in
             let elenco = tutteLeIcone
             guard elenco.indices.contains(k) else { return }
             let s = elenco[k]
@@ -1304,10 +1450,11 @@ struct ContentView: View {
 
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
     private func apriReparto(_ r: Reparto) {
-        let aperto = mostraSentinella || mostraWiretap || mostraProfiler || scheda != nil || jarvis.occhi != nil
-            || mostraVitals || mostraConfidente || mostraRicordi != nil || mostraBrowser || jarvis.allenatore || mostraLidar
-            || mostraImpostazioni || jarvis.pagina != nil
+        // MARK XI: le sezioni stanno nel contenitore: quella davanti va dietro (resta viva) e la nuova sale subito. Solo la pagina
+        // web e la fotocamera di sistema sono ancora schermate di iOS: lì si aspetta che si chiudano.
+        let aperto = jarvis.pagina != nil || sorgenteFoto != nil
         if tendinaAperta { chiudiTendina() }      // come nel mockup: la sezione chiesta a voce non si apre con la tendina PROTOCOLLI rimasta giù dietro
+        mandaDietroDavanti()
         chiudiTutto()
         Task {
             if aperto { try? await Task.sleep(for: .milliseconds(700)) }     // il tempo che la schermata si chiuda
@@ -1783,7 +1930,7 @@ struct RigaMessaggio: View {
 
 struct ImpostazioniView: View {
     @EnvironmentObject var jarvis: Jarvis
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @AppStorage("indirizzo") private var indirizzo = Impostazioni.indirizzoPredefinito
     @AppStorage("voce") private var voce = ""
     @AppStorage("muto") private var muto = false
@@ -1982,7 +2129,7 @@ func descriviAzioni(_ azioni: [String]) -> String {
 struct Fotocamera: UIViewControllerRepresentable {
     let sorgente: UIImagePickerController.SourceType
     let suFoto: (UIImage) -> Void
-    @Environment(\.dismiss) var chiudi
+    @Environment(\.chiudiOVia) var chiudi
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let p = UIImagePickerController()

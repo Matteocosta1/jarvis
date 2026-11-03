@@ -15,7 +15,7 @@ struct VistaConfidente: View {
     @State private var domanda = ""
     @FocusState private var scrivendo: Bool
 
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
 
     /// La riga che JARVIS riceve insieme alla conversazione, così il confidente sa come sta il corpo.
     private var rigaStato: String {

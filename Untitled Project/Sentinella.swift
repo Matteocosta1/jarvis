@@ -515,7 +515,7 @@ struct RadarSentinella: View {
 /// Il registro: chi è passato e quando, con il fotogramma.
 struct RegistroSentinella: View {
     @ObservedObject private var s = Sentinella.condiviso
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
 
     var body: some View {
         NavigationStack {

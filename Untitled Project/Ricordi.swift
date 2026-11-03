@@ -13,7 +13,7 @@ struct VistaRicordi: View {
     /// Per chiedere qualcosa a JARVIS a voce (chiude la pagina e invia la frase).
     let chiedi: (String) -> Void
 
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @State private var scheda: Scheda = .ricordi
     @State private var dati: DatiRicordi?
     @State private var cerca = ""

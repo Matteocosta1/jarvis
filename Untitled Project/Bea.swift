@@ -11,7 +11,7 @@ struct VistaBea: View {
     let chiedi: (String) -> Void
     private let tinta = Color.ciano
     private let calda = Color(red: 1.0, green: 0.62, blue: 0.72)      // un filo di rosa, solo per il cuore
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
     @Environment(\.openURL) private var apriURL
 
     @AppStorage("numeroBea") private var numero = ""
@@ -796,7 +796,7 @@ struct SceltaContattoBea: View {
     let scelto: (Contatto, String) -> Void
     @State private var tutti: [Contatto] = []
     @State private var cerca = "Bea"
-    @Environment(\.dismiss) private var chiudi
+    @Environment(\.chiudiOVia) private var chiudi
 
     private var trovati: [Contatto] {
         let c = cerca.trimmingCharacters(in: .whitespaces)
