@@ -382,7 +382,7 @@ struct VistaOrologio: View {
                 jarvis.ascoltaDopoAvvio()
             }
             try? await Task.sleep(for: .seconds(2.2 / v))
-            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK X" }
+            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK XI" }
         }
     }
 
@@ -413,8 +413,8 @@ struct VistaOrologio: View {
                 Text(titolo)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .tracking(1.5)
-                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK X" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
-                    .shadow(color: .white.opacity(titolo == "J.A.R.V.I.S. · MARK X" ? 0.35 : 0), radius: 4)   // MARK X: leggero bagliore bianco, fermo
+                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK XI" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
+                    .shadow(color: .white.opacity(titolo == "J.A.R.V.I.S. · MARK XI" ? 0.35 : 0), radius: 4)   // MARK X: leggero bagliore bianco, fermo
                     .id(titolo)
                     .transition(.opacity)
                     .opacity(acceso ? 1 : 0)

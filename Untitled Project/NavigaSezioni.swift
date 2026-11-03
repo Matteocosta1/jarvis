@@ -90,6 +90,7 @@ struct StratoSezioniVista<Vista: View>: View {
     @State private var ultimoSu: CGFloat = 0
     @State private var P0: Double = 0
     @State private var assePagina: Int = 0           // 0 da decidere, 1 orizzontale (sfoglia), 2 verticale (alza)
+    @State private var trackpad = TrackpadSezioni()  // sul Mac: due dita in orizzontale
 
     private var altezza: CGFloat { FasciaAlta.finestra?.bounds.height ?? 852 }
     private var larghezza: CGFloat { FasciaAlta.finestra?.bounds.width ?? 393 }
@@ -141,6 +142,7 @@ struct StratoSezioniVista<Vista: View>: View {
             bordi
         }
         .gesture(gestoSfoglio, including: naviga.modo == .sfoglio ? .all : .subviews)
+        .onAppear { preparaTrackpad() }
     }
 
     // MARK: le pagine
@@ -294,6 +296,35 @@ struct StratoSezioniVista<Vista: View>: View {
                     Task { @MainActor in try? await Task.sleep(for: .milliseconds(300)); if naviga.bordo == 0 { naviga.modo = .normale; naviga.verso = nil } }
                 }
             }
+    }
+
+    /// Sul Mac, il trackpad: come il bordo (lato +1 = avanti, la sezione dopo; −1 = indietro).
+    private func preparaTrackpad() {
+        trackpad.inizia = { lato in
+            guard naviga.modo == .normale, let d = pila.voceDavanti, !d.sezione.restaDavanti,
+                  let r = pila.vicina(di: pila.davanti, passo: Int(lato)) else { return false }
+            naviga.verso = r
+            naviga.modo = .bordo
+            return true
+        }
+        trackpad.segue = { p in if naviga.modo == .bordo { naviga.bordo = p } }
+        trackpad.finisce = { p, lancio in
+            guard naviga.modo == .bordo else { return }
+            if (abs(p) > 0.25 || abs(lancio) > 0.5), let r = naviga.verso {
+                withAnimation(.easeOut(duration: 0.22)) { naviga.bordo = p < 0 ? -1 : 1 }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(230))
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { portaDavanti(r) }
+                    await Task.yield()
+                    withTransaction(t) { naviga.modo = .normale; naviga.bordo = 0; naviga.verso = nil }
+                }
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { naviga.bordo = 0 }
+                Task { @MainActor in try? await Task.sleep(for: .milliseconds(300)); if naviga.bordo == 0 { naviga.modo = .normale; naviga.verso = nil } }
+            }
+        }
+        trackpad.installa()
     }
 
     // MARK: le pagine olografiche
@@ -569,4 +600,48 @@ struct CartaSpenta: View {
         }
         .ignoresSafeArea()
     }
+}
+
+/// Sul Mac: due dita sul trackpad, in orizzontale, fanno lo stesso dello swipe dai bordi (la sezione accanto nel cerchio).
+/// Il riconoscitore sta sulla finestra e sente solo lo scorrimento del trackpad (nessun tocco): non toglie niente agli altri gesti
+/// e lo scorrimento in verticale resta delle sezioni.
+final class TrackpadSezioni: NSObject, UIGestureRecognizerDelegate {
+    var inizia: (CGFloat) -> Bool = { _ in false }       // il verso (−1 sinistra, +1 destra): vero se c'è una sezione accanto
+    var segue: (CGFloat) -> Void = { _ in }              // −1…1
+    var finisce: (CGFloat, CGFloat) -> Void = { _, _ in } // spostamento e slancio (frazioni della larghezza)
+    private var asse = 0                                  // 0 da decidere, 1 orizzontale, 2 verticale (ignorato)
+    private weak var finestra: UIWindow?
+    private var riconoscitore: UIPanGestureRecognizer?
+
+    func installa() {
+        guard ProcessInfo.processInfo.isiOSAppOnMac, riconoscitore == nil, let w = FasciaAlta.finestra else { return }
+        let r = UIPanGestureRecognizer(target: self, action: #selector(scorre(_:)))
+        r.allowedScrollTypesMask = .continuous
+        r.allowedTouchTypes = []
+        r.cancelsTouchesInView = false
+        r.delegate = self
+        w.addGestureRecognizer(r)
+        riconoscitore = r
+        finestra = w
+    }
+
+    @objc private func scorre(_ r: UIPanGestureRecognizer) {
+        let w = max(1, finestra?.bounds.width ?? 1000)
+        let t = r.translation(in: finestra)
+        switch r.state {
+        case .began:
+            asse = 0
+        case .changed:
+            if asse == 0, hypot(t.x, t.y) > 10 {
+                asse = abs(t.x) > abs(t.y) * 1.5 && inizia(t.x < 0 ? 1 : -1) ? 1 : 2
+            }
+            if asse == 1 { segue(max(-1, min(1, t.x / w))) }
+        case .ended, .cancelled, .failed:
+            if asse == 1 { finisce(t.x / w, r.velocity(in: finestra).x / w * 0.3) }
+            asse = 0
+        default: break
+        }
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { true }
 }
