@@ -260,3 +260,10 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Swift: nuovo `StudioRitratto.swift` (FotoRitratto, ProfonditaRitratto, SceltaRitratto, FonteAR; import espliciti, `#if os(iOS)`); `StudioWeb.swift`: import PhotosUI/QuickLook/ARKit, casi «vediAR» e «ritratto», `mostraAR`, `scegliRitratto`, `ritrattoScelto`.
 - Non fatti (decisione del signore): scatto diretto col LiDAR, colori della scansione in AR.
 - Collaudo: pagina dell'app (messaggi «vediAR» con l'STL e «ritratto»; arrivo di una foto con profondità finta 256×192 e ritaglio → «PROFONDITÀ VERA», rilievo chiuso); Fase 1-3 invariate. Swift NON compilato qui (niente compilatore Swift in questo ambiente): controllato a mano (firme delle API, isolamento: delegati in classi `nonisolated` come nel resto del progetto). Da compilare in Xcode: 0 errori, 0 avvisi da verificare; sul telefono non ancora provata.
+
+### 10.0 (24) · 3 nov notte · STUDIO: da un disegno la figura PIENA e la SCULTURA IN PIEDI (approvato: «si»)
+- Il problema del signore (build 19, foto del robot verde su nero): estrudendo uscivano solo le linee. Cause: la 19 aveva il vecchio RIEMPI, e il riempimento reggeva solo contorni chiusi perfettamente.
+- **PIENO robusto**: le linee si ingrossano di qualche pixel (i tratti non chiusi per poco si chiudono; TOLLERANZA ne chiude di più), riempimento a strati dentro/fuori (un occhio resta un buco), poi si torna alla misura vera. **SAGOMA**: tutto pieno dentro il contorno esterno. **INSIEME**: sagoma piena + le linee del disegno in rilievo da 1,2 mm.
+- Un disegno chiaro su fondo scuro arriva già come DISEGNO (prima OGGETTO), con INVERTI e PIENO.
+- **SCULTURA** (riga COLORI): la sagoma piena del disegno gonfiata davanti e dietro, linee incise davanti (INCISE), BASE da 3 mm per stare in piedi; ALTEZZA e SPESSORE.
+- Collaudo con la foto del signore (pagina dell'app): PIENO 100 × 202 × 5 mm chiuso; INSIEME chiuso; SCULTURA 83 × 40 × 153 mm sulla base, chiusa. Contorno con un buco di 2 mm: ora si riempie. Stencil, schizzo, 3MF invariati. Solo la pagina dello Studio: nessun file Swift toccato rispetto alla 23.

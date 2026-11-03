@@ -7217,9 +7217,11 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     inAttesa = null;
     if (!modo) { const P = LETTURE.get(im) || (LETTURE.set(im, preparaFoglio(im)), LETTURE.get(im));
       if (P.tipo !== "immagine") modo = "disegno";
-      else { const c = fotoCanvas(im, 120), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height; let n = 0, chiari = 0;
-        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < 4 || y < 4 || x >= W - 4 || y >= H - 4) { const i = (y * W + x) * 4, M = Math.max(d[i], d[i + 1], d[i + 2]), m = Math.min(d[i], d[i + 1], d[i + 2]); n++; if (M > 185 && (M - m) / M < .12) chiari++; }
-        modo = chiari / n > .7 ? "disegno" : "oggetto"; } }
+      else { const c = fotoCanvas(im, 120), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height; let n = 0, chiari = 0, scuri = 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < 4 || y < 4 || x >= W - 4 || y >= H - 4) { const i = (y * W + x) * 4, M = Math.max(d[i], d[i + 1], d[i + 2]), m = Math.min(d[i], d[i + 1], d[i + 2]); n++; if (M > 185 && (M - m) / M < .12) chiari++; if (M < 45) scuri++; }
+        // 3 nov · un disegno a linee chiare su fondo scuro (il robot verde su nero del signore) è un DISEGNO, non un oggetto: bordo scuro e poche linee accese
+        let accesi = 0; for (let i = 0; i < W * H; i++) if (Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) > 110) accesi++;
+        modo = chiari / n > .7 || (scuri / n > .85 && accesi / (W * H) < .25) ? "disegno" : "oggetto"; } }
     CTX.dataset.foto = ""; if (modo === "oggetto") ologrammaSulBanco(im, nome); else if (modo === "rilievo") rilievoSulBanco(im, nome); else foglioSulBanco(im, nome);
     sceltaFoto = { im, nome, modo };
   }
@@ -7247,6 +7249,27 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
     mostraOgg.nome = "OGGETTO"; inAttesa = mostraOgg; mostraOgg();
   }
 
+  // 3 nov · SCULTURA IN PIEDI dal disegno: ALTEZZA, SPESSORE, linee incise, base; PROIETTA la mette sul banco
+  async function sculturaDaDisegno(im, nome, soglia, inverti, liscia) {
+    info([`${nome.toUpperCase()} · SCULTURA`, "LA SAGOMA PIENA DEL DISEGNO…"]); await attesa(60); if (!vivo()) return;
+    const S = sagomaDaDisegno(im, soglia, inverti, liscia);
+    if (!S) { parlaMock("Da questo disegno non esce una figura chiusa, Sir: provi INVERTI o alzi la TOLLERANZA.", 3200); return; }
+    await B.riferimento(fotoStaccata(S));
+    const R = { alt: 150, prof: 70, linee: true, base: true }, conGeo = new Map();
+    const geo = () => { const k0 = R.linee ? "l" : "n"; if (!conGeo.has(k0)) { const G = gonfia(R.linee ? S : { ...S, incisi: null }), k = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); GEO_DATI.set(k, G); conGeo.set(k0, k); } return conGeo.get(k0); };
+    info([`${nome.toUpperCase()} · SCULTURA IN PIEDI`, `SAGOMA ${Math.round(S.n / (S.W * S.H) * 100)}% DEL DISEGNO`, "GONFIATA DAVANTI E DIETRO · LINEE INCISE"]);
+    const mostra = () => { CTX.innerHTML = `<label class="cur"><span>ALTEZZA</span><input type="range" min="40" max="250" step="5" value="${R.alt}" data-sc="alt"><b>${R.alt} mm</b></label>
+      <label class="cur"><span>SPESSORE</span><input type="range" min="20" max="150" step="5" value="${R.prof}" data-sc="prof"><b>${R.prof} %</b></label>
+      <div class="riga2 sk-riempi"><span>LINEE</span><button type="button" class="chip" data-scl="linee" aria-pressed="${R.linee}">INCISE</button><button type="button" class="chip" data-scl="base" aria-pressed="${R.base}">BASE</button></div>
+      <div class="riga2 vai-riga"><button type="button" class="vai" data-sc="alza">PROIETTA</button><button type="button" class="chip" data-sc="indietro">INDIETRO</button></div>
+      <p class="nota-sd">La figura piena del disegno, gonfiata davanti e dietro: più spessa dove è larga, sottile nelle gambe e nelle braccia. Le linee del disegno restano incise davanti. Con la BASE sta in piedi da sola. SPESSORE 100% = tondo pieno.</p>`;
+      CTX.querySelectorAll("input[data-sc]").forEach((i) => i.addEventListener("input", () => { R[i.dataset.sc] = +i.value; i.nextElementSibling.textContent = `${i.value} ${i.dataset.sc === "alt" ? "mm" : "%"}`; }));
+      CTX.querySelectorAll("[data-scl]").forEach((b) => b.addEventListener("click", () => { suona("aTick"); R[b.dataset.scl] = !R[b.dataset.scl]; mostra(); }));
+      CTX.querySelector('[data-sc="indietro"]').addEventListener("click", () => { suona("aTick"); leggiFoto(im, nome, "disegno"); });
+      CTX.querySelector('[data-sc="alza"]').addEventListener("click", () => { suona("aTick"); inAttesa = null; B.via(); const o = nuovo("ologramma", { k: geo(), h: R.alt, prof: R.prof, base: R.base }, "Scultura", { anim: "vacuform" }), g = B.ingombro(o);
+        parlaMock(`Scultura pronta, Sir: alta ${mm(g.h)} millimetri, larga ${mm(g.l)}, spessa ${mm(g.p)}${R.base ? ", sulla sua base" : ""}${B.chiuso(o) ? ". Chiusa e stampabile" : ""}. Si stampa in piedi.`, 4200); contesto(); }); };
+    mostra.nome = "SCULTURA"; inAttesa = mostra; mostra();
+  }
   // 3 nov · RITRATTO: una foto fatta in modalità Ritratto ha dentro la mappa della profondità e il ritaglio della persona (li salva l'iPhone)
   function fotoRitratto() { if (window.JARVIS_APP) { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "ritratto" }); return; }
     parlaMock("Nell'app si apre la galleria, Sir: scelga una foto fatta in modalità Ritratto. Dentro c'è la profondità misurata dall'iPhone, e il rilievo esce vero. Qui nel browser quella profondità non si legge.", 4800); }
@@ -7301,7 +7324,9 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       const auto = uso === "stencil" && strati > 1;                     // a strati le soglie le trovano i toni: SOGLIA e LINEE/PIENO non servono
       CTX.innerHTML = tastiModo("disegno") + `<label class="cur"${auto ? " hidden" : ""}><span>SOGLIA</span><input type="range" min="20" max="235" step="1" value="${r.soglia}" data-fg="soglia"><b>${r.soglia}</b></label>
         <label class="cur"><span>TOLLERANZA</span><input type="range" min="0" max="4" step=".5" value="${liscia}" data-fg="liscia"><b>${liscia}</b></label>
-        <div class="riga2 sk-riempi"${auto ? " hidden" : ""}><span>ESTRUDE</span><button type="button" class="chip" data-fgb="linee" aria-pressed="${!r.riempi}">LINEE</button><button type="button" class="chip" data-fgb="pieno" aria-pressed="${!!r.riempi}">PIENO</button><button type="button" class="chip" data-fgb="inverti" aria-pressed="${inverti}">INVERTI</button></div>
+        <div class="riga2 sk-riempi"${auto ? " hidden" : ""}><span>ESTRUDE</span><button type="button" class="chip" data-fgb="linee" aria-pressed="${!r.riempi}">LINEE</button><button type="button" class="chip" data-fgb="pieno" aria-pressed="${r.riempi === true}">PIENO</button><button type="button" class="chip" data-fgb="sagoma" aria-pressed="${r.riempi === "sagoma"}">SAGOMA</button><button type="button" class="chip" data-fgb="insieme" aria-pressed="${r.riempi === "insieme"}">INSIEME</button></div>
+        <div class="riga2 sk-riempi"${auto ? " hidden" : ""}><span>COLORI</span><button type="button" class="chip" data-fgb="inverti" aria-pressed="${inverti}">INVERTI</button><button type="button" class="chip" data-fgb="scultura">SCULTURA</button></div>
+        ${!auto && r.riempi ? `<p class="nota-sd">${{ true: "PIENO: dentro i contorni è pieno, i contorni dentro (un occhio, un foro) restano vuoti.", sagoma: "SAGOMA: tutto pieno dentro il contorno esterno, come un timbro della figura.", insieme: "INSIEME: la sagoma piena e sopra le linee del disegno in rilievo (1,2 mm): la figura con i suoi dettagli." }[r.riempi]} I tratti non chiusi per poco si chiudono da soli (TOLLERANZA li chiude di più).</p>` : ""}
         <div class="riga2">${[["sagoma", "PROFILO"], ["timbro", "TIMBRO"], ["stencil", "STENCIL"]].map(([k, n]) => `<button type="button" class="chip" data-fgu="${k}" aria-pressed="${uso === k}">${n}</button>`).join("")}</div>
         ${uso === "stencil" ? `<div class="riga2 sk-riempi"><span>STRATI</span>${[1, 2, 3, 4].map((k) => `<button type="button" class="chip" data-fgs="${k}" aria-pressed="${strati === k}">${k}</button>`).join("")}</div>
         ${strati > 1 ? `<img class="sd-strati" data-fgv alt="Anteprima degli strati">` : ""}<p class="nota-sd">${strati > 1 ? `${strati} strati dai toni dell'immagine: si spruzza dal 1 (il più chiaro) al ${strati} (il più scuro). Stessa cornice e fori di registro: combaciano.` : "Uno strato solo: il disegno così com'è. Con più strati, ogni tono ha il suo stencil."}</p>` : ""}
@@ -7314,7 +7339,8 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
       CTX.querySelectorAll("[data-fgb]").forEach((b) => b.addEventListener("click", () => { suona("aTick");
         if (b.dataset.fgb === "inverti") { inverti = !inverti; r = calcola(); B.foglio(r, true); info(righe()); mostra(); return; }
         // 2 nov: LINEE estrude solo i tratti del disegno, PIENO le forme riempite (prima era un solo tasto RIEMPI)
-        if (b.dataset.fgb === "linee" || b.dataset.fgb === "pieno") { const vuole = b.dataset.fgb === "pieno"; if (!!r.riempi === vuole) return; riempi = vuole; r = calcola(); B.tratti(r); info(righe()); mostra(); return; }
+        if (b.dataset.fgb === "scultura") { inAttesa = null; B.via(); sculturaDaDisegno(im, nome, soglia, inverti, liscia); return; }   // 3 nov · in piedi, tonda
+        if (["linee", "pieno", "sagoma", "insieme"].includes(b.dataset.fgb)) { const vuole = { linee: false, pieno: true, sagoma: "sagoma", insieme: "insieme" }[b.dataset.fgb]; if ((r.riempi || false) === vuole) return; riempi = vuole; r = calcola(); B.tratti(r); info(righe()); mostra(); return; }
         if (!r.loops.some((l) => !l.buco)) { parlaMock("Con questa soglia non resta niente da alzare, Sir.", 2600); return; }
         inAttesa = null; B.via(); const l = Math.max(10, Math.min(250, larg() || 100));
         if (uso === "stencil" && strati > 1) {                        // 2 nov · STENCIL A STRATI: uno stencil per tono, in fila sul banco
@@ -7324,7 +7350,7 @@ Regole: Y è l'alto, il piano è y=0; "pos" è il CENTRO del pezzo; "rot" in gra
           if (!ultimo) { parlaMock("Da questa immagine non escono strati, Sir: provi INVERTI o una foto più contrastata.", 3200); return; }
           parlaMock(`${strati} strati pronti, Sir: larghi ${lS} millimetri, spessore 1,2. Si spruzza dal primo, il più chiaro. I tre fori agli angoli servono a metterli a registro; i puntini dicono il numero dello strato.`, 4800);
           contesto(); return; }
-        nuovo("disegno", { loops: r.loops, w: r.w, h: r.h, l, sp: 5, r: 0, uso, fori: 0, df: 4 }, uso === "timbro" ? "Timbro" : uso === "stencil" ? "Stencil" : "Sagoma", { anim: "dalfoglio" });
+        nuovo("disegno", { loops: r.loops, ...(r.dett && uso === "sagoma" ? { dett: r.dett, spD: 1.2 } : {}), w: r.w, h: r.h, l, sp: 5, r: 0, uso, fori: 0, df: 4 }, uso === "timbro" ? "Timbro" : uso === "stencil" ? "Stencil" : "Sagoma", { anim: "dalfoglio" });
         const misura = larg() ? `largo ${l} millimetri, come sul foglio` : `largo ${l / 10} centimetri`;
         parlaMock(uso === "timbro" ? `Timbro pronto, Sir: a specchio, con la base e il manico, ${misura}.` : uso === "stencil" ? `Stencil pronto, Sir: ${misura}, con i ponti che tengono le isole.` : `Ecco il disegno in 3D, Sir: ${misura}, spessore 5 millimetri.`, 3400);
         contesto(); }));
@@ -7647,6 +7673,31 @@ function preparaFoglio(im) {
   return { img, W, H, norm, mmPx, tipo, soglia0: soglia };
 }
 // 3 + 4 · i tratti e i contorni
+/* 3 nov · PIENO che regge i disegni veri (il signore: «mi segna solo le linee, non la parte piena»): le linee si ingrossano di r pixel
+   (così un tratto non chiuso per poco si chiude), le zone chiuse si riempiono a strati come nei programmi di grafica (dentro un
+   contorno è pieno, dentro un contorno che sta dentro è vuoto: l'occhio di una figura resta un buco), poi tutto torna alla misura
+   vera togliendo gli stessi r pixel dal bordo. SAGOMA riempie tutto quello che sta dentro il contorno esterno. */
+function distanzaMaschera(m, W, H, dentro) {                          // chamfer 3-4: distanza (in pixel) dai pixel con m === dentro
+  const N = W * H, d = new Float32Array(N), INF = 1e9; for (let i = 0; i < N; i++) d[i] = m[i] === dentro ? 0 : INF;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; let v = d[i]; if (!v) continue;
+    if (x) v = Math.min(v, d[i - 1] + 1); if (y) { v = Math.min(v, d[i - W] + 1); if (x) v = Math.min(v, d[i - W - 1] + 1.414); if (x < W - 1) v = Math.min(v, d[i - W + 1] + 1.414); } d[i] = v; }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; let v = d[i]; if (!v) continue;
+    if (x < W - 1) v = Math.min(v, d[i + 1] + 1); if (y < H - 1) { v = Math.min(v, d[i + W] + 1); if (x < W - 1) v = Math.min(v, d[i + W + 1] + 1.414); if (x) v = Math.min(v, d[i + W - 1] + 1.414); } d[i] = v; }
+  return d; }
+function riempiMaschera(m, W, H, r, sagoma) {
+  const N = W * H, dI = distanzaMaschera(m, W, H, 1), D = new Uint8Array(N); for (let i = 0; i < N; i++) D[i] = dI[i] <= r ? 1 : 0;
+  const fondo = new Uint8Array(N); for (let i = 0; i < N; i++) fondo[i] = D[i] ? 0 : 1;
+  const F = componenti(fondo, W, H, false), I = componenti(D, W, H, true), nF = F.info.length, nI = I.info.length;
+  // chi tocca chi: le zone vuote e i tratti confinanti (0-1 BFS: dal vuoto al tratto +0, dal tratto al vuoto +1)
+  const vic = Array.from({ length: nF + nI }, () => new Set());
+  const unisci = (a, b) => { const fa = F.lab[a], ib = I.lab[b]; if (fa >= 0 && ib >= 0) { vic[fa].add(nF + ib); vic[nF + ib].add(fa); } };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (x < W - 1) { unisci(i, i + 1); unisci(i + 1, i); } if (y < H - 1) { unisci(i, i + W); unisci(i + W, i); } }
+  const prof = new Int32Array(nF + nI).fill(1e9), coda = []; F.info.forEach((q, k) => { if (q.bordo) { prof[k] = 0; coda.push(k); } });
+  for (let h = 0; h < coda.length; h++) { const a = coda[h]; for (const b of vic[a]) { const p = prof[a] + (a >= nF && b < nF ? 1 : 0); if (p < prof[b]) { prof[b] = p; coda.push(b); } } }
+  const pieno = new Uint8Array(N); for (let i = 0; i < N; i++) { if (D[i]) { pieno[i] = 1; continue; } const k = F.lab[i]; if (k < 0) continue; const p = prof[k]; pieno[i] = p > 0 && p < 1e9 && (sagoma || p % 2 === 1) ? 1 : 0; }
+  // di nuovo alla misura vera: via r pixel dal bordo del pieno (i tratti ingrossati tornano sottili dove confinano col vuoto)
+  const dV = distanzaMaschera(pieno, W, H, 0), out = new Uint8Array(N); for (let i = 0; i < N; i++) out[i] = dV[i] > r ? 1 : 0;
+  return out; }
 function contorniImmagine(im, soglia, inverti, liscia, riempi) {
   let P = LETTURE.get(im); if (!P) { P = preparaFoglio(im); LETTURE.set(im, P); }
   const { W, H, norm } = P, N = W * H; if (soglia == null) soglia = P.soglia0;
@@ -7692,6 +7743,13 @@ function contorniImmagine(im, soglia, inverti, liscia, riempi) {
   const spessore = tot ? 2 * inchiostro / tot : 0, lato = Math.max(x1 - x0, y1 - y0) || 1;
   const contorno = spessore < lato * .045 && L2.some((o) => o.prof === 1 && o.a > (x1 - x0) * (y1 - y0) * .015);
   const auto = riempi == null; if (auto) riempi = contorno;
+  // 3 nov · PIENO / SAGOMA / INSIEME: il riempimento a maschera (regge i tratti non chiusi); INSIEME tiene anche le linee, in rilievo sopra
+  if (riempi) { const rr = Math.max(1, Math.round(Math.max(W, H) * (.002 + .0015 * liscia))), F = riempiMaschera(m, W, H, rr, riempi === "sagoma");
+    const piene = tracciaMaschera(F, W, H, eps).filter((o) => o.pts.length >= 3);
+    if (piene.length) { let dett = null;
+      if (riempi === "insieme") dett = tracciaMaschera(morfo(m, W, H, true), W, H, Math.max(.6, eps * .6)).filter((o) => o.pts.length >= 3);   // le linee, con la stessa precisione del pieno
+      let mx = Infinity, my = Infinity, Mx = -Infinity, My = -Infinity; piene.forEach((o) => o.pts.forEach(([a, b]) => { mx = Math.min(mx, a); my = Math.min(my, b); Mx = Math.max(Mx, a); My = Math.max(My, b); }));
+      return { loops: piene, dett, w: Mx - mx || 1, h: My - my || 1, x0: mx, y0: my, W, H, soglia: Math.round(soglia), buchi: piene.filter((o) => o.buco).length, maschera: m, img: P.img, mmPx: P.mmPx, tipo: P.tipo, riempi, auto, contorno, inchiostro }; } }
   if (riempi) L2 = L2.filter((o) => o.prof % 4 === 0 || o.prof % 4 === 3);
   const out = L2.map((o) => ({ pts: o.pts, buco: riempi ? o.prof % 4 === 3 : o.prof % 2 === 1, padre: -1, a: o.a }));
   out.forEach((o, i) => { if (!o.buco) return; let best = -1, ba = Infinity; out.forEach((q, j) => { if (j !== i && !q.buco && q.a > o.a && dentro(o.pts[0], q.pts) && q.a < ba) { ba = q.a; best = j; } }); o.padre = best; });
@@ -8110,6 +8168,21 @@ function magliaRilievo(D, p) {
     if (!dentroC(gx - 1, gy)) I.push(e, a, A, e, A, E); }
   return { pos: new Float32Array(pos), idx: new Uint32Array(I) };
 }
+/* 3 nov · SCULTURA IN PIEDI da un disegno (il signore: «una scultura in piedi, esatto»): la sagoma piena del disegno si gonfia davanti
+   e dietro (più spessa dove la figura è larga, sottile nelle gambe e nelle braccia), le linee del disegno restano incise davanti. */
+function sagomaDaDisegno(im, soglia, inverti, liscia) {
+  const r = contorniImmagine(im, soglia, inverti, liscia, "sagoma"), P = LETTURE.get(im); if (!r.loops.length || !P) return null;
+  const { W, H } = P, rr = Math.max(1, Math.round(Math.max(W, H) * (.002 + .0015 * liscia))), F = riempiMaschera(r.maschera, W, H, rr, true);
+  const k = Math.min(1, 480 / Math.max(W, H)), Ws = Math.max(2, Math.round(W * k)), Hs = Math.max(2, Math.round(H * k)), N = Ws * Hs, m = new Uint8Array(N), incisi = new Uint8Array(N);
+  for (let y = 0; y < Hs; y++) for (let x = 0; x < Ws; x++) { const X0 = Math.floor(x / k), Y0 = Math.floor(y / k), X1 = Math.min(W - 1, Math.floor((x + 1) / k)), Y1 = Math.min(H - 1, Math.floor((y + 1) / k));
+    m[y * Ws + x] = F[Math.min(H - 1, Math.round((y + .5) / k)) * W + Math.min(W - 1, Math.round((x + .5) / k))];
+    let ink = 0; for (let Y = Y0; Y <= Y1 && !ink; Y++) for (let X = X0; X <= X1; X++) if (r.maschera[Y * W + X]) { ink = 1; break; } incisi[y * Ws + x] = ink; }
+  const { lab, info } = componenti(m, Ws, Hs, false); for (let i = 0; i < N; i++) if (m[i] && info[lab[i]].n < N * .002) m[i] = 0;   // via i puntini
+  let x0 = Ws, y0 = Hs, x1 = -1, y1 = -1, n = 0; for (let y = 0; y < Hs; y++) for (let x = 0; x < Ws; x++) if (m[y * Ws + x]) { n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (!n) return null;
+  const c = document.createElement("canvas"); c.width = Ws; c.height = Hs; const cx = c.getContext("2d", { willReadFrequently: true }); cx.drawImage(P.img, 0, 0, Ws, Hs);
+  return { c, W: Ws, H: Hs, m, d: cx.getImageData(0, 0, Ws, Hs).data, box: [x0, y0, x1, y1], n, contrasto: 1, incisi };
+}
 // 3 + 4 · la profondità dalla sagoma e la maglia chiusa
 function gonfia(S) {
   const { W, H, m, d, box } = S, N = W * H, INF = 1e9, dt = new Float32Array(N);
@@ -8131,7 +8204,9 @@ function gonfia(S) {
     if (!tolte) break; }
   const pos = [], idF = new Int32Array(GW * GH).fill(-1), idB = new Int32Array(GW * GH).fill(-1);
   const vert = (gx, gy, dietro) => { const k = gy * GW + gx; if (!dietro && idF[k] >= 0) return idF[k]; if (dietro) { if (quante[k] < 4) return vert(gx, gy, false); if (idB[k] >= 0) return idB[k]; }
-    const x = Math.min(W - 1, gx * st), y = Math.min(H - 1, gy * st), z = quante[k] < 4 ? 0 : alto(y * W + x) * sp; pos.push((x - cx) / hp, (y1 + 1 - y) / hp, dietro ? -z : z); const id = pos.length / 3 - 1; if (dietro) idB[k] = id; else idF[k] = id; return id; };
+    const x = Math.min(W - 1, gx * st), y = Math.min(H - 1, gy * st); let z = quante[k] < 4 ? 0 : alto(y * W + x) * sp;
+    if (!dietro && S.incisi && quante[k] >= 4 && S.incisi[y * W + x]) z -= Math.min(z * .4, .007);   // 3 nov · SCULTURA: le linee del disegno incise davanti (0,7 mm ogni 10 cm d'altezza)
+    pos.push((x - cx) / hp, (y1 + 1 - y) / hp, dietro ? -z : z); const id = pos.length / 3 - 1; if (dietro) idB[k] = id; else idF[k] = id; return id; };
   const tri = [];
   for (let gy = 0; gy < GH - 1; gy++) for (let gx = 0; gx < GW - 1; gx++) { if (!cella[gy * GW + gx]) continue;
     const TL = vert(gx, gy), TR = vert(gx + 1, gy), BL = vert(gx, gy + 1), BR = vert(gx + 1, gy + 1), tl = vert(gx, gy, true), tr = vert(gx + 1, gy, true), bl = vert(gx, gy + 1, true), br = vert(gx + 1, gy + 1, true);
@@ -8413,7 +8488,9 @@ async function bancoOlografico3D(el, vivo, cb) {
         const g = est(forme, sp, Math.min(p.r || 0, .8)); g.scale(-1, 1, 1); out.push({ geo: g, dz: 50 });
         const W2 = p.l + 12, H2 = p.h * s + 12, base = new T.BoxGeometry(W2, H2, 4); base.translate(-p.l / 2, p.h * s / 2, -2); out.push({ geo: base });
         const man = new T.CylinderGeometry(Math.min(16, W2 / 4), Math.min(18, W2 / 3.6), 30, 32); man.rotateX(Math.PI / 2); man.translate(-p.l / 2, p.h * s / 2, -19); out.push({ geo: man, dz: -60 });
-      } else out.push({ geo: est(forme, sp, Math.min(p.r || 0, sp / 3)) });
+      } else { out.push({ geo: est(forme, sp, Math.min(p.r || 0, sp / 3)) });
+        if (p.dett?.length) { const de = p.dett.map((l, i) => ({ l, i })).filter((q) => !q.l.buco).map(({ l, i }) => { const f = forma(l.pts); p.dett.forEach((b) => { if (b.buco && b.padre === i) f.holes.push(forma(b.pts, T.Path)); }); return f; });
+          const g = est(de, p.spD || 1.2); g.translate(0, 0, sp - .01); out.push({ geo: g, dz: 30 }); } }   // 3 nov · INSIEME: le linee del disegno in rilievo sopra la sagoma
       // sdraiato sul tavolo, come il foglio da cui nasce: lo spessore sale verso l'alto; il timbro col manico in su e il rilievo sotto
       out.forEach((q) => q.geo.rotateX(p.uso === "timbro" ? Math.PI / 2 : -Math.PI / 2));
       // tutto al centro insieme, appoggiato sul tavolo
@@ -8428,6 +8505,7 @@ async function bancoOlografico3D(el, vivo, cb) {
     if (o.tipo === "ologramma") { const D = GEO_DATI.get(p.k); if (D) { const h2 = p.h, z2 = p.h * (p.prof ?? 70) / 100, sc = (a) => { const o2 = new Float32Array(a.length); for (let i = 0; i < a.length; i += 3) { o2[i] = a[i] * h2; o2[i + 1] = a[i + 1] * h2; o2[i + 2] = a[i + 2] * z2; } return o2; };
       const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(sc(D.pos), 3)); g.setIndex(new T.BufferAttribute(D.idx, 1)); g.computeVertexNormals();
       const pg = new T.BufferGeometry(); pg.setAttribute("position", new T.BufferAttribute(sc(D.punti), 3)); pg.setAttribute("color", new T.BufferAttribute(D.colori, 3));
+      if (p.base) { const bh = 3, bl = Math.max(20, (D.larg || .5) * h2 + 8), bp = Math.max(16, (D.sp || .1) * z2 * 2 + 10), b = new T.BoxGeometry(bl, bh, bp); b.translate(0, bh / 2, 0); g.translate(0, bh - .2, 0); pg.translate(0, bh - .2, 0); out.push({ geo: b, dz: -30 }); }   // 3 nov · la base: la scultura sta in piedi da sola
       out.push({ geo: g, punti: pg, spigoli: 75 }); } }   // solo il contorno (davanti e dietro si incontrano): niente righe a gradini
     if (o.tipo === "stl") { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(STL_GEO.get(o.p.k), 3)); g.computeBoundingBox(); const b = g.boundingBox, sz = b.getSize(new T.Vector3());
       if (Math.abs(sz.z) > Math.abs(sz.y) * 1.2) g.rotateX(-Math.PI / 2); inPiedi(g); out.push({ geo: g }); }
