@@ -586,13 +586,14 @@ struct MappaSatellite: View {
         }
         .onChange(of: lei == nil) { _, _ in if centro == nil, let lei { centro = lei } }
         .task(id: ferma) {
-            // la camera, 30 volte al secondo: il giro lento, il volo, il dito (coperta da un'altra schermata: ferma)
+            // la camera a ogni fotogramma dello schermo, fino a 120 Hz (4 nov; prima 30 volte al secondo): il giro lento, il volo,
+            // il dito (coperta da un'altra schermata: ferma)
             guard !ferma else { return }
             prima = Date()
-            while !Task.isCancelled {
-                passo()
-                try? await Task.sleep(for: .milliseconds(33))
-            }
+            let ritmo = RitmoSatellite { passo() }
+            ritmo.avvia()
+            while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }      // la cancellazione la sveglia subito
+            ritmo.ferma()
         }
     }
 
@@ -618,6 +619,29 @@ struct MappaSatellite: View {
         if giro < 0 { giro += 360 }
         posizione = .camera(MapCamera(centerCoordinate: c, distance: distanza + quota, heading: giro, pitch: inclinazione))
     }
+}
+
+/// Il passo della camera a ogni fotogramma dello schermo (CADisplayLink a 120 Hz, come la ruota delle icone e l'AGGANCIO).
+private final class RitmoSatellite: NSObject {
+    private let passo: () -> Void
+    private var link: CADisplayLink?
+
+    init(_ passo: @escaping () -> Void) { self.passo = passo }
+
+    func avvia() {
+        guard link == nil else { return }
+        let l = CADisplayLink(target: self, selector: #selector(scatto(_:)))
+        l.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        l.add(to: .main, forMode: .common)
+        link = l
+    }
+
+    func ferma() {
+        link?.invalidate()
+        link = nil
+    }
+
+    @objc private func scatto(_ l: CADisplayLink) { passo() }
 }
 
 /// L'HUD sulla mappa, come il mockup: in alto SATELLITE · 3D e la bussola, in basso le coordinate con la quota e il meteo,
@@ -706,7 +730,7 @@ private struct AstaSat: View {
             CartellinoSat(testo: testo, tinta: tinta, scritta: scelta ? Color(red: 1, green: 0.85, blue: 0.66) : ColoriHUD.chiaro, alone: scelta)
                 .offset(sposta)
             Rectangle().fill(tinta.opacity(0.85)).frame(width: 2.2, height: 64).shadow(color: tinta, radius: 4)
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in                   // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 let p = (ctx.date.timeIntervalSinceReferenceDate * 0.8).truncatingRemainder(dividingBy: 1)
                 Ellipse().stroke(tinta, lineWidth: 2)
                     .frame(width: 22, height: 9)
@@ -731,7 +755,7 @@ private struct PuntoLei: View {
             CartellinoSat(testo: "LEI", tinta: PuntoLei.verde, scritta: Color(red: 0.79, green: 0.96, blue: 0.84))
                 .offset(sposta)
             ZStack {
-                TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+                TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: a 120 Hz come tutta l'app (prima 30)
                     let p = (ctx.date.timeIntervalSinceReferenceDate * 0.9).truncatingRemainder(dividingBy: 1)
                     Circle().stroke(PuntoLei.verde, lineWidth: 2).frame(width: 20, height: 20)
                         .scaleEffect(1 + p * 1.5).opacity((1 - p) * 0.9)

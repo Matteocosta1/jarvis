@@ -330,6 +330,14 @@ struct VistaFotoScheda: View {
     @State private var aperta: Int?
     @State private var limitato = false
     @ObservedObject private var analisi = AvanzamentoFoto.condiviso       // il conto dell'analisi della galleria
+    // 11.0 (3), come il mockup approvato: il pannello dell'analisi in ologramma, le parole capite, i quadratini che si materializzano
+    @State private var pannello = false
+    @State private var completa = false
+    @State private var capite: [String] = []
+    @State private var ritardi: [String: Double] = [:]
+    @State private var quandoRisultati = Date.distantPast
+    @State private var apertaIl = Date()
+    @Environment(\.accessibilityReduceMotion) private var riduci
 
     var body: some View {
         CorniceScheda(titolo: "Foto", sottotitolo: foto.map { "\($0.count) foto · \(periodo.rawValue.lowercased())" } ?? "sfoglio la galleria", icona: "photo.on.rectangle", tinta: tinta, pronto: foto != nil) {
@@ -358,14 +366,15 @@ struct VistaFotoScheda: View {
             .background(tinta.opacity(0.07))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            // 4 nov: l'analisi di tutta la galleria (una volta sola, poi solo le foto nuove), con il conto a schermo
-            if analisi.attivo && analisi.totale > 0 {
-                Text("ANALISI · \(VistaFotoScheda.numero(analisi.fatte)) / \(VistaFotoScheda.numero(analisi.totale))")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(tinta)
-                    .contentTransition(.numericText())
-                    .animation(.easeOut(duration: 0.2), value: analisi.fatte)
+            // 11.0 (3): le cose capite, in fila col «+» (devono esserci tutte nella foto)
+            if !capite.isEmpty {
+                ParoleCapite(parole: capite, tinta: tinta).padding(.top, -6)
+            }
+            // l'analisi di tutta la galleria (una volta sola, poi solo le foto nuove), in ologramma: c'è solo mentre va avanti e se
+            // restano almeno 50 foto (le poche foto nuove passano senza); finita lo dice, poi il pannello si chiude
+            if pannello {
+                PannelloAnalisi(analisi: analisi, tinta: tinta, completa: completa)
+                    .transition(.opacity)
             }
             // 4 nov: con l'accesso limitato JARVIS vede solo le foto scelte: si dice, e un tocco apre le Impostazioni
             if limitato {
@@ -385,11 +394,12 @@ struct VistaFotoScheda: View {
                     Text(nota ?? "Nessuna foto in questo periodo.").font(.footnote).foregroundStyle(Color.tenue)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 4)], spacing: 4) {
-                    ForEach(Array(foto.enumerated()), id: \.offset) { k, f in
+                    ForEach(Array(foto.enumerated()), id: \.element.id) { k, f in
                         Button { aperta = k } label: {
                             Miniatura(immagine: f, lato: 300)
                                 .frame(minHeight: 104, maxHeight: 104)
                                 .clipped()
+                                .modifier(Materializza(ritardo: ritardi[f.id], quando: quandoRisultati))   // le foto nuove: col laser
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                                 // la foto riempita sborda dal quadratino: senza questa riga il tocco prendeva anche la parte tagliata
                                 // (che copriva il campo «Cerca» sopra la prima riga)
@@ -412,6 +422,9 @@ struct VistaFotoScheda: View {
             try? await Task.sleep(for: .milliseconds(cerca.isEmpty ? 0 : 450))
             if !Task.isCancelled { await carica() }
         }
+        .onAppear { apertaIl = Date(); aggiornaPannello() }
+        .onChange(of: analisi.fatte) { _, _ in aggiornaPannello() }
+        .onChange(of: analisi.attivo) { _, _ in aggiornaPannello() }
         // 4 nov: quando si comincia a scrivere si cerca in tutta la galleria (poi un periodo toccato restringe la ricerca)
         .onChange(of: cerca) { prima, adesso in
             let vuota = { (s: String) in s.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -430,11 +443,38 @@ struct VistaFotoScheda: View {
         let esito = await FotoLocali.cercaTesto(c, da: da, a: a, quante: c.isEmpty ? 120 : 300)
         guard !Task.isCancelled else { return }                        // un'altra ricerca è già partita
         nota = esito.nota
-        withAnimation(.easeOut(duration: 0.25)) { foto = esito.trovate.map { Immagine(fonte: "Le sue foto", locale: $0) } }
+        let nuove = esito.trovate.map { Immagine(fonte: "Le sue foto", locale: $0) }
+        // le foto che arrivano adesso (non quelle già a schermo) si materializzano una dopo l'altra; non sotto il caricamento
+        // della sezione e non con «Riduci movimento»
+        var r: [String: Double] = [:]
+        if Date().timeIntervalSince(apertaIl) > 1.15 && !riduci {
+            let gia = Set((foto ?? []).map { $0.id })                     // quelle già nella griglia restano come sono
+            var k = 0
+            for f in nuove where !gia.contains(f.id) { r[f.id] = Double(min(k, 16)) * 0.026; k += 1 }
+        }
+        ritardi = r
+        quandoRisultati = Date()
+        withAnimation(.easeOut(duration: 0.25)) { foto = nuove }
+        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.34)) { capite = esito.capite }
     }
 
-    /// I numeri del conto con il punto delle migliaia («1.240»).
-    private static func numero(_ n: Int) -> String { n.formatted(.number.locale(Locale(identifier: "it_IT"))) }
+    /// Il pannello dell'analisi: si apre se l'analisi va avanti e restano almeno 50 foto; quando finisce dice «ANALISI COMPLETA»
+    /// (col suono «pronto»), poi dopo 1,9 s si chiude.
+    private func aggiornaPannello() {
+        if !pannello && analisi.attivo && analisi.totale > 0 && analisi.totale - analisi.fatte >= 50 {
+            completa = false
+            withAnimation(.easeOut(duration: 0.3)) { pannello = true }
+        } else if pannello && !analisi.attivo && !completa {
+            completa = true
+            Suoni.fatto()
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.9))
+                withAnimation(.timingCurve(0.3, 0.7, 0.3, 1, duration: 0.45)) { pannello = false }
+                completa = false
+            }
+        }
+    }
+
 }
 
 // MARK: - SERATA: i conti di una serata Discosizer

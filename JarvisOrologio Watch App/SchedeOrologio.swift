@@ -88,7 +88,7 @@ struct CaricamentoOrologio: View {
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in                   // 4 nov: al massimo dell'orologio, 60 Hz (prima 30)
             let t = ctx.date.timeIntervalSinceReferenceDate
             let passato = ctx.date.timeIntervalSince(inizio)
             let avanzamento = min(0.92, 1 - exp(-passato / 1.6))
@@ -347,7 +347,10 @@ struct VistaMeteoOrologio: View {
             if let m = meteo {
                 let c = m.currentWeather
                 HStack(spacing: 10) {
-                    Image(systemName: c.symbolName).symbolRenderingMode(.multicolor).font(.system(size: 30))
+                    // 11.0 (3), come il mockup approvato: il cielo di adesso in ologramma, piccolo
+                    OlogrammaCielo(stato: StatoCielo(c, probabilita: m.hourlyForecast.forecast.first?.precipitationChance), piccolo: true)
+                        .frame(width: 46, height: 46)
+                        .padding(-4)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(gradi(c.temperature)).font(.system(size: 30, weight: .thin, design: .rounded))
                         Text(c.condition.description).font(.system(size: 10)).foregroundStyle(.secondary)
@@ -542,7 +545,7 @@ struct VistaShazamOrologio: View {
 
     /// Il logo olografico come sull'iPhone (più leggero: 5 strati), gira mentre ascolta e oscilla a riposo.
     private var logo: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+        TimelineView(.animation(minimumInterval: nil)) { tl in                    // 4 nov: al massimo dell'orologio, 60 Hz (prima 30)
             let t = tl.date.timeIntervalSinceReferenceDate
             let angolo = stato == .ascolto ? (t * 160).truncatingRemainder(dividingBy: 360) : sin(t * 0.9) * 38
             let rad = angolo * .pi / 180

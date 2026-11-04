@@ -519,7 +519,7 @@ struct VistaOrologio: View {
             RadialGradient(colors: [ReattoreOrologio.colore(caldo ? 1 : 0, 0.28, schiarisci: 0), .black],
                            center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 160)
             // la griglia HUD dell'iPhone (SfondoHUD), in scala col polso: passo 14 invece di 28, scorre piano
-            TimelineView(.animation(minimumInterval: 1 / 20)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: al massimo dell'orologio, 60 Hz (prima 20)
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 Canvas { gc, size in
                     let passo: CGFloat = 14
@@ -729,7 +729,7 @@ struct AnelloRotanteOrologio: View {
     let colore: Color
     var body: some View {
         if attivo {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: al massimo dell'orologio, 60 Hz (prima 30)
                 let giro = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2 * 360
                 Circle()
                     .trim(from: 0, to: 0.28)
@@ -1086,7 +1086,9 @@ struct VistaCuore: View {
         List {
             Section {
                 HStack {
-                    Image(systemName: "heart.fill").foregroundStyle(.red)
+                    // 11.0 (3), come il mockup approvato: il cuore in ologramma che batte al ritmo di adesso
+                    OlogrammaCuore(dati: DatiCuore(adesso: cuore.ultimo ?? 0), piccolo: true)
+                        .frame(width: 42, height: 42)
                     Text(cuore.ultimo.map { "\(Int($0.rounded())) bpm" } ?? "—")
                         .font(.title2.bold())
                 }

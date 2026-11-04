@@ -24,7 +24,7 @@ struct OlogrammaPolso<Icona: View>: View {
         let k = ruota.scelta
         let vivo = ruota.vivo && nomi.indices.contains(k)
         let etichetta: String = vivo ? "Apri \(nomi[k])" : ""
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !vivo)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: !vivo)) { ctx in    // 4 nov: al massimo dell'orologio, 60 Hz (prima 30)
             let t = ctx.date.timeIntervalSinceReferenceDate
             let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1000 } ?? 1e9
             ZStack {

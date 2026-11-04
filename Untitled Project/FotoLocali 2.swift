@@ -19,7 +19,8 @@ nonisolated enum FotoLocali {
         var righe: [[String: String]] = []  // per il cervello: data, luogo (se c'è), etichette (le prime 30 foto)
         var esaminate = 0
         var nota: String?
-        var nonCapite: [String] = []        // le parole che non sono né categorie di Apple né album
+        var nonCapite: [String] = []        // le parole che non sono né categorie di Apple né album (come le ha scritte lui)
+        var capite: [String] = []           // le cose capite, come le ha scritte lui: si mostrano sotto il campo («CANI + MARE»)
     }
 
     /// Una cosa da trovare: basta una delle sue categorie o dei suoi album.
@@ -41,9 +42,9 @@ nonisolated enum FotoLocali {
     @concurrent static func cerca(cosa: [String], da: Date?, a: Date?, luogo: CLLocation?, raggioKm: Double, album: String?, quante: Int, limiteAI: Int = 400) async -> Esito {
         var g = Gruppo(), ignote: [String] = []
         for p in cosa {
-            let (cose, non) = DizionarioFoto.capisci(p)
-            ignote += non
-            for c in cose {
+            let l = DizionarioFoto.capisci(p)
+            ignote += l.nonCapite
+            for c in l.cose {
                 switch c {
                 case .etichette(let e): g.etichette.formUnion(e)
                 case .album(let t): g.album.append(t)
@@ -66,7 +67,8 @@ nonisolated enum FotoLocali {
     /// Per la sezione Foto: il testo scritto dal signore. Ogni cosa riconosciuta deve esserci («cani al mare»: cani e mare);
     /// le parole che non sono categorie né album si segnalano. Senza parole da cercare: le foto del periodo.
     @concurrent static func cercaTesto(_ testo: String, da: Date?, a: Date?, quante: Int) async -> Esito {
-        let (cose, ignote) = DizionarioFoto.capisci(testo)
+        let lettura = DizionarioFoto.capisci(testo)
+        let cose = lettura.cose, ignote = lettura.nonCapite
         if cose.isEmpty && !ignote.isEmpty {
             var e = Esito()
             e.nonCapite = ignote
@@ -81,6 +83,7 @@ nonisolated enum FotoLocali {
         }
         var esito = await trova(gruppi: gruppi, da: da, a: a, luogo: nil, raggioKm: 5, album: nil, quante: quante, recenti: 60)
         esito.nonCapite = ignote
+        esito.capite = lettura.scritte
         if !ignote.isEmpty && !esito.trovate.isEmpty {
             esito.nota = "Non riconosco «\(ignote.joined(separator: " "))»: cerco solo il resto."
         }
@@ -210,6 +213,11 @@ nonisolated enum FotoLocali {
     /// Le categorie di Vision di una foto (fiducia almeno 0,25, le 12 più probabili, come prima). nil: la foto non si è aperta
     /// (non si segna: si riprova al giro dopo). `rete`: anche la versione piccola da iCloud.
     static func classifica(_ foto: PHAsset, rete: Bool) -> [UInt16]? {
+        classificaConFiducia(foto, rete: rete)?.map { $0.0 }
+    }
+
+    /// Come `classifica`, con la fiducia di ogni categoria (0-1): l'ologramma dell'analisi la scrive accanto alle cose trovate.
+    static func classificaConFiducia(_ foto: PHAsset, rete: Bool) -> [(UInt16, Float)]? {
         guard let cg = immagineSincrona(foto, lato: 360, rete: rete)?.cgImage else { return nil }
         let richiesta = VNClassifyImageRequest()
         do {
@@ -219,7 +227,10 @@ nonisolated enum FotoLocali {
             .filter { $0.confidence >= 0.25 }
             .sorted { $0.confidence > $1.confidence }
             .prefix(12)
-            .compactMap { DizionarioFoto.posizione[$0.identifier] }
+            .compactMap { (r: VNClassificationObservation) -> (UInt16, Float)? in
+                guard let k = DizionarioFoto.posizione[r.identifier] else { return nil }
+                return (k, r.confidence)
+            }
     }
 
     private static func immagineSincrona(_ foto: PHAsset, lato: CGFloat, rete: Bool) -> UIImage? {
@@ -330,14 +341,22 @@ actor IndiceFoto {
         lavoro = nil
     }
 
-    /// Una foto: le sue categorie nell'indice. Falso se non si è aperta (non si segna niente).
+    /// Una foto: le sue categorie nell'indice. Falso se non si è aperta (non si segna niente). Ogni 1,4 s la foto appena letta,
+    /// con le sue cose e la fiducia, diventa il campione che l'ologramma della sezione Foto mostra.
     private func analizza(_ f: PHAsset, rete: Bool) -> Bool {
-        guard let e = FotoLocali.classifica(f, rete: rete) else { return false }
-        etichette[f.localIdentifier] = e
+        guard let e = FotoLocali.classificaConFiducia(f, rete: rete) else { return false }
+        etichette[f.localIdentifier] = e.map { $0.0 }
         nonSalvate += 1
         fatte += 1
+        if Date().timeIntervalSince(ultimoCampione) > 1.4 {
+            ultimoCampione = Date()
+            campione = CampioneFoto(id: f.localIdentifier, cose: CampioneFoto.cose(e))
+        }
         return true
     }
+
+    private var ultimoCampione = Date.distantPast
+    private var campione: CampioneFoto?
 
     private var ultimoConto = Date.distantPast
 
@@ -396,8 +415,8 @@ actor IndiceFoto {
     }
 
     private func pubblica(attivo: Bool) async {
-        let f = fatte, t = totale
-        await MainActor.run { AvanzamentoFoto.condiviso.aggiorna(fatte: f, totale: t, attivo: attivo) }
+        let f = fatte, t = totale, c = campione
+        await MainActor.run { AvanzamentoFoto.condiviso.aggiorna(fatte: f, totale: t, attivo: attivo, campione: c) }
     }
 
     /// Il file delle etichette nella cache dell'app (le categorie per nome: il file resta valido anche se l'elenco cambiasse).
@@ -425,7 +444,30 @@ actor IndiceFoto {
     }
 }
 
-/// Il conto dell'analisi della galleria, per la sezione Foto («1.240 / 8.312»).
+/// Una foto appena analizzata, per l'ologramma della sezione Foto: il suo id e le prime 4 cose trovate (nome italiano, fiducia).
+nonisolated struct CampioneFoto: Sendable, Equatable {
+    nonisolated struct CosaTrovata: Sendable, Equatable {
+        let nome: String
+        let fiducia: Double
+    }
+    let id: String
+    let cose: [CosaTrovata]
+
+    /// Le prime 4 cose con un nome diverso (dog e canine sono tutti e due «cane»).
+    static func cose(_ e: [(UInt16, Float)]) -> [CosaTrovata] {
+        var visti = Set<String>(), out: [CosaTrovata] = []
+        for (k, c) in e {
+            let n = DizionarioFoto.nome(k).uppercased()
+            if visti.contains(n) { continue }
+            visti.insert(n)
+            out.append(CosaTrovata(nome: n, fiducia: Double(c)))
+            if out.count == 4 { break }
+        }
+        return out
+    }
+}
+
+/// Il conto dell'analisi della galleria, per la sezione Foto («1.240 / 8.312»), e la foto che l'ologramma mostra.
 final class AvanzamentoFoto: ObservableObject {
     static let condiviso = AvanzamentoFoto()
     @Published private(set) var fatte = 0
@@ -433,12 +475,15 @@ final class AvanzamentoFoto: ObservableObject {
     @Published private(set) var attivo = false
     /// Sale ogni 400 foto analizzate: una ricerca aperta si ripete e trova anche quelle nuove.
     @Published private(set) var passo = 0
+    /// L'ultima foto letta (una ogni 1,4 s circa), con le sue cose.
+    @Published private(set) var campione: CampioneFoto?
 
-    func aggiorna(fatte: Int, totale: Int, attivo: Bool) {
+    func aggiorna(fatte: Int, totale: Int, attivo: Bool, campione: CampioneFoto? = nil) {
         if self.fatte != fatte { self.fatte = fatte }
         if self.totale != totale { self.totale = totale }
         if self.attivo != attivo { self.attivo = attivo }
         let p = attivo ? fatte / 400 : -1
         if passo != p { passo = p }
+        if let campione, self.campione != campione { self.campione = campione }
     }
 }

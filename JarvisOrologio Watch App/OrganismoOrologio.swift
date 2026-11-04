@@ -25,7 +25,7 @@ struct VistaOrganismoOrologio: View {
             ZStack {
                 if attivo {
                     SceneView(scene: ologramma.scena, pointOfView: ologramma.camera, options: [.rendersContinuously],
-                              preferredFramesPerSecond: 30, antialiasingMode: .none)
+                              preferredFramesPerSecond: 60, antialiasingMode: .none)   // 4 nov: al massimo dell'orologio (prima 30)
                 } else {
                     Color.black
                 }

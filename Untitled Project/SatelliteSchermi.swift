@@ -214,7 +214,7 @@ struct FrecceNaviga: View {
         // a tutto schermo (chi la usa ignora la zona sicura): i bordi sicuri servono a tenere dentro il cartellino (decisione 42)
         GeometryReader { g in
             let bordi = g.safeAreaInsets
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in                   // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate, bordi: bordi) }
             }
         }
@@ -284,7 +284,7 @@ struct FrecceGuida: View {
         // a tutto schermo (chi la usa ignora la zona sicura): i bordi sicuri servono a tenere dentro il cartellino (decisione 42)
         GeometryReader { g in
             let bordi = g.safeAreaInsets
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in                   // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate, bordi: bordi) }
             }
         }

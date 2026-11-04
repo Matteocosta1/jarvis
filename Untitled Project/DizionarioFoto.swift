@@ -82,22 +82,64 @@ nonisolated enum DizionarioFoto {
         return String(pulito).split(separator: " ").map { String($0) }.filter { !vuote.contains($0) }
     }
 
+    /// Quello che si è capito di un testo: le cose da cercare, ognuna con le parole come le ha scritte lui («torta di
+    /// compleanno»: per mostrarle sotto il campo), e le parole che non si riconoscono, anche loro come scritte («Bea»).
+    nonisolated struct Lettura: Sendable {
+        var cose: [Cosa] = []
+        var scritte: [String] = []
+        var nonCapite: [String] = []
+    }
+
     /// Le cose da cercare in un testo (la frase più lunga che si riconosce, fino a 4 parole) e le parole che non si riconoscono.
-    static func capisci(_ testo: String) -> (cose: [Cosa], nonCapite: [String]) {
-        let w = normalizza(testo)
-        var cose: [Cosa] = [], ignote: [String] = []
+    static func capisci(_ testo: String) -> Lettura {
+        // le parole scritte (lettere e cifre) col loro posto nel testo; ognuna dà zero o più parole normalizzate
+        var pezzi: [Range<String.Index>] = []
+        var inizio: String.Index?
+        var i0 = testo.startIndex
+        while i0 < testo.endIndex {
+            let c = testo[i0]
+            if c.isLetter || c.isNumber { if inizio == nil { inizio = i0 } } else if let a = inizio { pezzi.append(a..<i0); inizio = nil }
+            i0 = testo.index(after: i0)
+        }
+        if let a = inizio { pezzi.append(a..<testo.endIndex) }
+        var w: [String] = [], dove: [Int] = []
+        for (j, r) in pezzi.enumerated() { for n in normalizza(String(testo[r])) { w.append(n); dove.append(j) } }
+        let scritto = { (a: Int, b: Int) -> String in String(testo[pezzi[dove[a]].lowerBound..<pezzi[dove[b]].upperBound]) }
+        var l = Lettura()
         var i = 0
         while i < w.count {
             var presa = 0
-            for l in stride(from: min(4, w.count - i), through: 1, by: -1) {
-                let k = w[i..<(i + l)].joined(separator: " ")
-                if let a = albumSpeciali[k] { cose.append(.album(a)); presa = l; break }
-                if let e = parole[k] { cose.append(.etichette(e)); presa = l; break }
-                if let e = inglese(k) { cose.append(.etichette(e)); presa = l; break }
+            for n in stride(from: min(4, w.count - i), through: 1, by: -1) {
+                let k = w[i..<(i + n)].joined(separator: " ")
+                var cosa: Cosa?
+                if let a = albumSpeciali[k] { cosa = .album(a) } else if let e = parole[k] { cosa = .etichette(e) } else if let e = inglese(k) { cosa = .etichette(e) }
+                if let cosa {
+                    l.cose.append(cosa)
+                    l.scritte.append(scritto(i, i + n - 1))
+                    presa = n
+                    break
+                }
             }
-            if presa == 0 { ignote.append(w[i]); i += 1 } else { i += presa }
+            if presa == 0 { l.nonCapite.append(String(testo[pezzi[dove[i]]])); i += 1 } else { i += presa }
         }
-        return (cose, ignote)
+        return l
+    }
+
+    /// Il nome italiano di ogni categoria, il primo del dizionario (dog → «cane»): per le cose trovate nell'ologramma.
+    static let nomi: [UInt16: String] = {
+        var m: [UInt16: String] = [:]
+        for riga in dati.split(separator: "\n") {
+            let pezzi = riga.split(separator: "|", maxSplits: 1)
+            guard pezzi.count == 2, let k = posizione[pezzi[0].trimmingCharacters(in: .whitespaces)], m[k] == nil,
+                  let primo = pezzi[1].split(separator: ",").first?.split(separator: "/").first else { continue }
+            let n = primo.trimmingCharacters(in: .whitespaces)
+            if !n.isEmpty { m[k] = n }
+        }
+        return m
+    }()
+
+    static func nome(_ k: UInt16) -> String {
+        nomi[k] ?? (Int(k) < etichette.count ? etichette[Int(k)].replacingOccurrences(of: "_", with: " ") : "?")
     }
 
     /// Una parola (o frase) inglese della tassonomia: la categoria intera («ice cream» = ice_cream), una sua parte («sunset»), o il

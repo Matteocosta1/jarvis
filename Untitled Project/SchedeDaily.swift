@@ -23,7 +23,7 @@ struct VistaMeteo: View {
         CorniceScheda(titolo: "Meteo", sottotitolo: luogo, icona: "cloud.sun", tinta: tinta, pronto: meteo != nil || errore != nil) {
             PannelloRadar(radar: radar, finito: radarFinito)       // in testa, come nel mockup
             if let m = meteo {
-                adesso(m.currentWeather)
+                adesso(m.currentWeather, pioggia: m.hourlyForecast.forecast.first?.precipitationChance)
                 prossimeOre(Array(m.hourlyForecast.forecast.filter { $0.date > Date().addingTimeInterval(-1800) }.prefix(24)))
                 settimana(Array(m.dailyForecast.forecast.prefix(7)))
                 TastoJarvis(testo: "Mi serve l'ombrello? Chieda a JARVIS", icona: "umbrella", tinta: tinta) {
@@ -43,12 +43,17 @@ struct VistaMeteo: View {
         }
     }
 
-    private func adesso(_ c: CurrentWeather) -> some View {
+    /// 11.0 (3), come il mockup approvato: al posto dell'icona il cielo di adesso in ologramma, con la rosa dei venti
+    /// (`pioggia`: la probabilità della prossima ora, 0-1: la pioggia cade fitta quanto lei).
+    private func adesso(_ c: CurrentWeather, pioggia: Double?) -> some View {
         Pannello(tinta: tinta) {
             HStack(alignment: .center, spacing: 16) {
-                Image(systemName: c.symbolName)
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: 64))
+                OlogrammaCielo(stato: StatoCielo(c, probabilita: pioggia))
+                    .frame(width: 110, height: 110)
+                    .padding(.top, -10)
+                    .padding(.trailing, -6)
+                    .padding(.bottom, -2)
+                    .padding(.leading, -14)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(gradi(c.temperature))")
                         .font(.system(size: 54, weight: .thin, design: .rounded)).foregroundStyle(.white)

@@ -37,8 +37,8 @@ struct ReattoreOrologio: View {
     }()
 
     var body: some View {
-        // In attesa basta un'animazione lenta (risparmia batteria); quando lavora, fluida.
-        TimelineView(.animation(minimumInterval: fase == .attesa ? 1.0 / 15 : 1.0 / 30)) { ctx in
+        // 4 nov (il signore: «tutte le animazioni di tutta l'app»): sempre al massimo dell'orologio, 60 Hz (prima 15 in attesa, 30 al lavoro)
+        TimelineView(.animation(minimumInterval: nil)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let mix = miscela(adesso: ctx.date)
             Canvas { gc, size in

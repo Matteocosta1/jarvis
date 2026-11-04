@@ -701,6 +701,16 @@ struct VistaCuoreTelefono: View {
     var body: some View {
         CorniceScheda(titolo: "Cuore", sottotitolo: ultimo.map { "ultimo battito \(Int($0.1)) bpm · \($0.0.formatted(date: .omitted, time: .shortened))" } ?? "ascolto il polso",
                       icona: "heart", tinta: tinta, pronto: caricato) {
+            // 11.0 (3), come il mockup approvato: il cuore in ologramma batte al ritmo di adesso; l'anello va da 40 a 180 battiti,
+            // con l'arco di oggi (dal minimo al massimo), adesso e a riposo
+            OlogrammaCuore(dati: DatiCuore(adesso: ultimo?.1 ?? 0, riposo: Double(oggi?.battito ?? 0),
+                                           minimo: battiti.map(\.1).min() ?? 0, massimo: battiti.map(\.1).max() ?? 0))
+                .frame(height: 250)
+                .frame(maxWidth: .infinity)
+                .background(tinta.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(tinta.opacity(0.22), lineWidth: 1))
+                .overlay { AngoliOlo(tinta: tinta).padding(-1).allowsHitTesting(false) }
             HStack(spacing: 10) {
                 Valore(titolo: "ADESSO", valore: ultimo.map { "\(Int($0.1))" } ?? "—", sotto: "bpm", tinta: tinta)
                 Valore(titolo: "A RIPOSO", valore: oggi?.battito.map { "\($0)" } ?? "—", sotto: oggi?.battitoMedia.map { "media 7 gg \($0)" }, tinta: tinta)
