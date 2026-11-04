@@ -125,6 +125,95 @@ struct ContentView: View {
     }
 
     var body: some View {
+        // 4 nov: la catena dei collegamenti di `body` è divisa in tre pezzi (schermata, collegata e qui), che il compilatore
+        // controlla uno alla volta: tutta insieme era troppo lunga («unable to type-check this expression in reasonable time»).
+        // Stesso ordine e stesse cose di prima.
+        collegata
+            .onChange(of: comandi.richiesta) { eseguiComando() }
+            .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
+            .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
+            .onChange(of: tastiera) { _, aperta in if aperta { ruota.spegni() } }       // MARK XI: si scrive, l'ologramma della ruota si spegne
+            .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
+            .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
+            .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
+            .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
+            // si apre una schermata da sola (pagina web, Occhi, Interprete, Allenatore, l'SOS di Bea): la tastiera si chiude
+            .onChange(of: schermataDaSola) { _, aperta in
+                if aperta && telefono { tastiera = false }
+            }
+            // decisione 15 (24 ott): JARVIS apre una schermata da solo (Occhi, pagina web, Interprete, l'SOS di Bea, qualsiasi foglio
+            // o schermata intera): la tendina PROTOCOLLI risale da sola, anche se era solo tirata a metà
+            .onChange(of: qualcosaAperto || schermataDaSola) { _, aperta in
+                if aperta && (tendinaAperta || tendinaTrascina != 0) { chiudiTendina() }
+            }
+            .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
+                try? await Task.sleep(for: .seconds(8))
+                await caricaStatoSistemi()
+            }
+            .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
+                guard si else { return }
+                jarvis.chiudiChiesto = false
+                if tendinaAperta { chiudiTendina() }               // decisione 15: «Jarvis, chiudi» manda su anche la tendina PROTOCOLLI
+                chiudiTutto()
+            }
+    }
+
+    /// La schermata con i suoi collegamenti di mezzo: le sezioni del contenitore, i reparti chiesti a voce, la fotocamera di
+    /// sistema, l'avvio (vedi `body`).
+    private var collegata: some View {
+        schermata
+            .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
+            // MARK XI: lo stato di ogni sezione acceso = davanti nel contenitore; spento = dietro (se ci sta andando) o chiusa
+            .onChange(of: sezioniAccese) { prima, adesso in sincronizzaSezioni(prima: prima, adesso: adesso) }
+            .onReceive(NotificationCenter.default.publisher(for: .jarvisChiudiSezione)) { n in
+                guard let id = n.userInfo?["id"] as? UUID, let v = pila.voci.first(where: { $0.id == id }) else { return }
+                spegniStato(v.sezione)
+            }
+            .onChange(of: pila.davanti) { _, d in
+                if d == nil { pilaCopre = false; return }
+                Task { @MainActor in                                 // a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma
+                    try? await Task.sleep(for: .milliseconds(550))
+                    if pila.davanti == d { pilaCopre = true }
+                }
+            }
+            // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
+            .onChange(of: jarvis.repartoRichiesto) { _, r in
+                guard let r else { return }
+                jarvis.repartoRichiesto = nil
+                apriReparto(r)
+            }
+            .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
+            // 4 nov: gli Occhi e l'Interprete aperti da JARVIS («cosa vedi?», «traduci in inglese») salgono nel contenitore e la
+            // sezione davanti va dietro da sola; si chiude solo quello che starebbe sopra di loro (la pagina web, il menu SISTEMI…)
+            .onChange(of: jarvis.occhi != nil) { _, aperti in if aperti { liberaSopra() } }
+            .onChange(of: jarvis.interprete != nil) { _, aperto in if aperto { liberaSopra() } }
+            .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
+                Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
+                    jarvis.impostaFoto(immagine)
+                    jarvis.ascoltaSubito()          // subito dopo la foto: «che disco è?»
+                }
+                .ignoresSafeArea()
+            }
+            .onAppear {
+                Aptica.prepara()
+                MotoreGuida.condiviso.parla = { [jarvis] frase in jarvis.annuncia(frase) }   // build 23: la GUIDA di SATELLITE parla
+                accendi()
+                if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
+                if primaApertura {
+                    primaApertura = false
+                    if comandi.richiesta == nil && ascoltaApertura {
+                        // sul Mac il microfono non cancella l'eco: aperto subito registrerebbe la musica d'avvio e la chat che si carica,
+                        // e dalla trascrizione vuota verrebbe «Non ho capito, Sir». Lì si apre a sequenza finita.
+                        ascoltaDopoAvvio = true                         // iPhone e Mac: dopo l'avvio, così musica e pulsazioni escono a pieno volume
+                    }
+                }
+                eseguiComando()
+            }
+    }
+
+    /// La schermata di JARVIS (reattore, chat, tendina, contenitore delle sezioni) con i primi collegamenti: protocolli, pagina
+    /// web, Studio e Social, isola, Occhi e LiDAR dallo Studio (vedi `body`).
+    private var schermata: some View {
         GeometryReader { g in
             // schermo grande (il Mac, un iPad in orizzontale): la stessa interfaccia dell'iPhone, centrata,
             // con il reattore che cresce con la finestra e la conversazione sotto, più stretta e al centro
@@ -327,80 +416,6 @@ struct ContentView: View {
                 if lidar { LidarAperta.richiesta = (.oggetto, nil) }       // LiDAR parte già su Oggetto
                 apriReparto(lidar ? .lidar : .occhi)
             }
-        }
-        .onChange(of: mostraWiretap) { _, aperto in if !aperto { jarvis.riunioneSubito = false } }
-        // MARK XI: lo stato di ogni sezione acceso = davanti nel contenitore; spento = dietro (se ci sta andando) o chiusa
-        .onChange(of: sezioniAccese) { prima, adesso in sincronizzaSezioni(prima: prima, adesso: adesso) }
-        .onReceive(NotificationCenter.default.publisher(for: .jarvisChiudiSezione)) { n in
-            guard let id = n.userInfo?["id"] as? UUID, let v = pila.voci.first(where: { $0.id == id }) else { return }
-            spegniStato(v.sezione)
-        }
-        .onChange(of: pila.davanti) { _, d in
-            if d == nil { pilaCopre = false; return }
-            Task { @MainActor in                                 // a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma
-                try? await Task.sleep(for: .milliseconds(550))
-                if pila.davanti == d { pilaCopre = true }
-            }
-        }
-        // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
-        .onChange(of: jarvis.repartoRichiesto) { _, r in
-            guard let r else { return }
-            jarvis.repartoRichiesto = nil
-            apriReparto(r)
-        }
-        .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
-        // 4 nov: gli Occhi e l'Interprete aperti da JARVIS («cosa vedi?», «traduci in inglese») salgono nel contenitore e la
-        // sezione davanti va dietro da sola; si chiude solo quello che starebbe sopra di loro (la pagina web, il menu SISTEMI…)
-        .onChange(of: jarvis.occhi != nil) { _, aperti in if aperti { liberaSopra() } }
-        .onChange(of: jarvis.interprete != nil) { _, aperto in if aperto { liberaSopra() } }
-        .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
-            Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
-                jarvis.impostaFoto(immagine)
-                jarvis.ascoltaSubito()          // subito dopo la foto: «che disco è?»
-            }
-            .ignoresSafeArea()
-        }
-        .onAppear {
-            Aptica.prepara()
-            MotoreGuida.condiviso.parla = { [jarvis] frase in jarvis.annuncia(frase) }   // build 23: la GUIDA di SATELLITE parla
-            accendi()
-            if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
-            if primaApertura {
-                primaApertura = false
-                if comandi.richiesta == nil && ascoltaApertura {
-                    // sul Mac il microfono non cancella l'eco: aperto subito registrerebbe la musica d'avvio e la chat che si carica,
-                    // e dalla trascrizione vuota verrebbe «Non ho capito, Sir». Lì si apre a sequenza finita.
-                    ascoltaDopoAvvio = true                         // iPhone e Mac: dopo l'avvio, così musica e pulsazioni escono a pieno volume
-                }
-            }
-            eseguiComando()
-        }
-        .onChange(of: comandi.richiesta) { eseguiComando() }
-        .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
-        .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
-        .onChange(of: tastiera) { _, aperta in if aperta { ruota.spegni() } }       // MARK XI: si scrive, l'ologramma della ruota si spegne
-        .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
-        .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
-        .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
-        .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
-        // si apre una schermata da sola (pagina web, Occhi, Interprete, Allenatore, l'SOS di Bea): la tastiera si chiude
-        .onChange(of: schermataDaSola) { _, aperta in
-            if aperta && telefono { tastiera = false }
-        }
-        // decisione 15 (24 ott): JARVIS apre una schermata da solo (Occhi, pagina web, Interprete, l'SOS di Bea, qualsiasi foglio
-        // o schermata intera): la tendina PROTOCOLLI risale da sola, anche se era solo tirata a metà
-        .onChange(of: qualcosaAperto || schermataDaSola) { _, aperta in
-            if aperta && (tendinaAperta || tendinaTrascina != 0) { chiudiTendina() }
-        }
-        .task {                                               // il menu SISTEMI si prepara da solo, a avvio finito: all'apertura è già fresco
-            try? await Task.sleep(for: .seconds(8))
-            await caricaStatoSistemi()
-        }
-        .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
-            guard si else { return }
-            jarvis.chiudiChiesto = false
-            if tendinaAperta { chiudiTendina() }               // decisione 15: «Jarvis, chiudi» manda su anche la tendina PROTOCOLLI
-            chiudiTutto()
         }
     }
 
