@@ -210,6 +210,13 @@ struct VistaSatellite: View {
         .task(id: scelto?.chiave) { await caricaMeteo() }
         .onAppear { bussola.accendi() }
         .onDisappear { bussola.spegni() }
+        // 4 nov (il signore, strada B): SATELLITE già aperto (davanti o dietro) e una richiesta nuova a voce («come arrivo da
+        // Bea?», «guidami allo studio», «ricognizione su…»): la fa qui, sul posto (prima tornava com'era e la richiesta si
+        // perdeva). Se i luoghi non sono ancora arrivati la fa `carica`, appena arrivano
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+            guard (n.userInfo?["reparto"] as? String) == Reparto.satellite.rawValue, caricato, richiesta.azione != nil else { return }
+            Task { await eseguiVoce(sulPosto: true) }
+        }
     }
 
     // MARK: SATELLITE
@@ -404,12 +411,25 @@ struct VistaSatellite: View {
 
     /// «guidami allo studio», «mostrami la strada per il locale», «ricognizione su …», «mostrami lo studio in 3D».
     /// Come il mockup: prima la sezione, poi il volo sul luogo, poi JARVIS lo dice e si apre la schermata.
-    private func eseguiVoce() async {
+    /// `sulPosto` (4 nov, strada B): SATELLITE era già aperto ed è appena tornato davanti: il TRAVEL subito, il resto quando
+    /// l'avrebbe fatto aprendosi (1,3 s dalla frase, 0,38 dei quali per tornare davanti), come nel mockup.
+    private func eseguiVoce(sulPosto: Bool = false) async {
         guard let a = richiesta.azione else { return }
         let fresca = Date().timeIntervalSince(richiesta.quando) < 15
         richiesta.azione = nil
         guard fresca else { return }
-        try? await Task.sleep(for: .seconds(1.3))
+        let attesa: Swift.Duration
+        switch a {
+        case .travel: attesa = sulPosto ? .zero : .seconds(1.3)
+        default: attesa = sulPosto ? .milliseconds(920) : .seconds(1.3)
+        }
+        if attesa > .zero { try? await Task.sleep(for: attesa) }
+        if sulPosto, pagina != nil {                         // con NAVIGA, GUIDA, TRAVEL o il DOSSIER sopra: il volo e la
+            switch a {                                       // ricognizione si vedono sulla mappa; le altre schermate si cambiano da sole
+            case .mostra, .ricognizione: apri(nil)
+            case .guida, .naviga, .travel: break
+            }
+        }
         if case .travel(var nome, let k) = a {               // MARK X · TRAVEL a voce: il luogo detto, se no quello scelto
             if k == "voli" {                                 // per VOLI il «luogo» è il numero del volo detto: si ricorda
                 if !nome.isEmpty { VoloSalvato.numero = nome }

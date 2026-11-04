@@ -1,5 +1,7 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
+import Combine
 
 /// La seconda memoria di JARVIS, sull'iPhone: tutti i ricordi e i posti (qualsiasi luogo salvato),
 /// con ricerca, spunta e cancellazione con uno scorrimento. La lista della spesa ha la sua scheda (icona Spesa).
@@ -73,6 +75,15 @@ struct VistaRicordi: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
             }
             .onAppear { scheda = iniziale; guidaAccesa = guida; salvaDaFare = salva }
+            // 4 nov (il signore, strada B): Ricordi già aperto (davanti o dietro) e TRACCIA chiesta a voce («traccia il luogo»,
+            // «portami al luogo», «ricorda questo luogo»): la fa qui, sul posto (prima tornava com'era e la guida non partiva)
+            .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+                guard (n.userInfo?["reparto"] as? String) == Reparto.ricordi.rawValue else { return }
+                fotoAperta = nil                                 // una foto aperta sopra non copre TRACCIA
+                scheda = .traccia
+                if (n.userInfo?["guida"] as? Bool) == true { guidaAccesa = true }
+                if (n.userInfo?["salva"] as? Bool) == true { salvaDaFare = true }
+            }
             // TRACCIA mostra tutti i luoghi: una ricerca lasciata nella scheda Ricordi non li deve filtrare
             .onChange(of: scheda) { _, nuova in if nuova == .traccia && !cerca.isEmpty { cerca = "" } }
             .task { await carica() }

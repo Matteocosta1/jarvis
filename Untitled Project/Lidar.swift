@@ -23,8 +23,10 @@ enum OcchiLidar {
 /// LiDAR aperto: «rifai la scansione» la fa ripartire, e «scansione» non apre lo Scanner dei codici a barre.
 enum LidarAperta {
     static var aperta = false
-    /// Aperta a voce su un modo («Jarvis, metro laser»): LiDAR parte già lì.
-    static var richiesta: (modo: ModoLidar, nome: String?)?
+    /// Aperta a voce su un modo («Jarvis, metro laser»): LiDAR parte già lì. 4 nov (strada B): già aperta, anche dietro, lo fa
+    /// sul posto. `voce`: chiesto a voce, e la frase del modo la dice LiDAR quando il modo parte; no: dal tasto LIDAR dello
+    /// Studio (Oggetto), in silenzio come sempre.
+    static var richiesta: (modo: ModoLidar, nome: String?, voce: Bool)?
 
     /// «Jarvis, rifai la scansione», «riprova la scansione», «nuova scansione», «ricomincia».
     static func eRifai(_ frase: String) -> Bool {
@@ -161,13 +163,13 @@ struct VistaLidar: View {
     // 4 nov (il signore): «SALVARE LA SCANSIONE?» come lo Studio; ELIMINA › CONFERMA nell'archivio come Studio e Satellite
     @State private var chiediSalva = false
     @State private var nomeSalva = ""
-    @State private var dopoSalva: DopoSalva = .chiudi            // cosa fa dopo SALVA o NON SALVARE: chiude, o torna ai modi
+    @State private var dopoSalva: DopoSalva = .chiudi            // cosa fa dopo SALVA o NON SALVARE: chiude, torna ai modi, o un modo
     @State private var scartata = false                       // NON SALVARE (o mandata allo Studio): uscendo non si salva da sola
     @State private var daEliminare: UUID?                     // ARCHIVIO: la scansione che aspetta CONFERMA (3 s)
     @State private var giroElimina = 0
 
     enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
-    enum DopoSalva { case chiudi, menu }
+    enum DopoSalva: Equatable { case chiudi, menu, modo(ModoLidar, String?, parla: Bool) }   // .modo: chiesto a voce o dallo Studio
     enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
 
     /// Il modo vero: in Corpo, Postura (lo scheletro) o Texture (la «Statua»).
@@ -208,7 +210,7 @@ struct VistaLidar: View {
         .statusBarHidden(fase == .scansione || fase == .elaboro)
         .onAppear {
             LidarAperta.aperta = true
-            if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; parti(r.modo, nome: r.nome) }   // aperta a voce già su un modo
+            if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; avviaModo(r.modo, nome: r.nome, parla: r.voce) }   // aperta a voce già su un modo
         }
         .onDisappear {
             LidarAperta.aperta = false
@@ -232,6 +234,13 @@ struct VistaLidar: View {
             guard let a else { return }
             jarvis.azioneLidar = nil
             aVoce(a)
+        }
+        // 4 nov (il signore, strada B): LiDAR era dietro e gli si chiede un modo («Jarvis, metro laser», o LIDAR dallo Studio): è
+        // tornato davanti e lo fa qui, sul posto (prima tornava com'era e il modo si perdeva)
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+            guard (n.userInfo?["reparto"] as? String) == Reparto.lidar.rawValue, let r = LidarAperta.richiesta else { return }
+            LidarAperta.richiesta = nil
+            modoChiesto(r.modo, nome: r.nome, voce: r.voce)
         }
     }
 
@@ -271,12 +280,26 @@ struct VistaLidar: View {
             jarvis.annuncia(inScansione ? "Prima finisca la scansione, Sir." : "Non ho una scansione aperta, Sir.")
         case .modo(let chiave, let nome):
             guard let m = ModoLidar(rawValue: chiave) else { return }
-            if fase == .risultatoModo, let r = risultatoModo, r.modo == m { jarvis.annuncia(r.annuncio); return }   // «dimensioni dell'oggetto» sul risultato
-            if fase == .risultato, m == .stanza, risultato != nil { vista = .pianta; return }                    // «dammi la pianta»
-            if inScansione, vero == m { return }                                                                 // già al lavoro
-            parti(m, nome: nome)
-            jarvis.annuncia(SupportoModi.disponibile(m) ? m.annuncioVoce : (Reparto.lidar.annuncio ?? ""))   // senza il sensore: niente «… pronto», c'è la riga arancione
+            modoChiesto(m, nome: nome, voce: true)
         }
+    }
+
+    /// Un modo chiesto con LiDAR davanti o appena tornato davanti (4 nov, strada B): a voce («Jarvis, metro laser») o dal tasto
+    /// LIDAR dello Studio (`voce` falso: niente frasi, e sempre una scansione nuova). Con una scansione non salvata prima
+    /// «SALVARE LA SCANSIONE?», come «Modalità» (il signore: «B»); poi il modo parte.
+    private func modoChiesto(_ m: ModoLidar, nome: String?, voce: Bool) {
+        let inScansione = fase == .scansione || fase == .elaboro
+        if voce, fase == .risultatoModo, let r = risultatoModo, r.modo == m { jarvis.annuncia(r.annuncio); return }   // «dimensioni dell'oggetto» sul risultato
+        if voce, fase == .risultato, m == .stanza, risultato != nil { vista = .pianta; return }                    // «dammi la pianta»
+        if inScansione, vero == m { return }                                                                       // già al lavoro
+        if nomeDaSalvare != nil { chiediPrima(.modo(m, nome, parla: voce)); return }
+        avviaModo(m, nome: nome, parla: voce)
+    }
+
+    /// Il modo parte; chiesto a voce, con la sua frase (senza il sensore: niente «… pronto», c'è la riga arancione).
+    private func avviaModo(_ m: ModoLidar, nome: String?, parla: Bool) {
+        parti(m, nome: nome)
+        if parla { jarvis.annuncia(SupportoModi.disponibile(m) ? m.annuncioVoce : (Reparto.lidar.annuncio ?? "")) }
     }
 
     /// Un modo chiesto a voce: si sceglie e parte subito la scansione.
@@ -495,11 +518,17 @@ struct VistaLidar: View {
         withAnimation(.salitaFoglio) { chiediSalva = true }
     }
 
-    /// Dopo la domanda (o senza): chiude, oppure torna ai modi (il modello di Texture non salvato si cancella).
+    /// Dopo la domanda (o senza): chiude, torna ai modi (il modello di Texture non salvato si cancella), oppure parte il modo
+    /// chiesto (a voce o dallo Studio).
     private func fai(_ dopo: DopoSalva) {
         switch dopo {
         case .chiudi: esci()
         case .menu: pulisciModo(); risultatoModo = nil; fase = .menu
+        case .modo(let m, let nome, let parla):
+            // NON SALVARE su Interno: il suo modello 3D non resta a occupare spazio, come uscendo (quello di Texture lo
+            // cancella già la scansione nuova)
+            if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D); risultato = nil }
+            avviaModo(m, nome: nome, parla: parla)
         }
     }
 

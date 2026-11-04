@@ -167,6 +167,8 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
     var guidaTraccia = false                     // build 22: Ricordi › TRACCIA si apre con la Guida (fotocamera) accesa
     var salvaTraccia = false                     // build 22: Ricordi › TRACCIA salva subito il posto dove si trova («ricorda questo luogo»)
+    var richiestaTraccia = false                 // 4 nov (strada B): chiesto TRACCIA a voce («traccia», «portami al», «ricorda questo luogo»):
+                                                 // con Ricordi già aperto, si fa sul posto (ContentView.richiestaSulPosto)
     @Published var azioneLidar: ComandoVocale.AzioneLidar?   // comando vocale dentro LiDAR: lo esegue la sua schermata
     var lidarAperto = false                      // LiDAR aperto: valgono anche i suoi comandi («salva», «fine scansione»…)
     var sezioneAperta: Reparto?                  // la scheda aperta sopra la schermata principale: valgono anche i suoi tasti a voce
@@ -813,10 +815,10 @@ final class Jarvis: NSObject, ObservableObject {
         case .lidar(let azione)?:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             if case .modo(let chiave, let nome) = azione, !lidarAperto, let m = ModoLidar(rawValue: chiave) {   // LiDAR 23: «metro laser» da fuori apre LiDAR già sul modo
-                LidarAperta.richiesta = (m, nome)
+                LidarAperta.richiesta = (m, nome, true)
+                // 4 nov (strada B): la frase del modo la dice LiDAR quando il modo parte (VistaLidar.avviaModo): appena aperto, o
+                // già aperto dietro dopo «SALVARE LA SCANSIONE?» se c'è una scansione da salvare
                 apriReparto(.lidar, annuncia: false)
-                // sul Mac (o su un iPhone senza LiDAR) il modo non c'è: niente «Metro pronto…», lo schermo dice «SERVE UN IPHONE CON IL LIDAR»
-                annuncia(SupportoModi.disponibile(m) ? m.annuncioVoce : (Reparto.lidar.annuncio ?? ""))
                 return true
             }
             azioneLidar = azione
@@ -863,9 +865,9 @@ final class Jarvis: NSObject, ObservableObject {
         switch d {
         case .protocollo(let p):
             Protocolli.condiviso.richiedi(p)     // la tendina PROTOCOLLI scende e lo avvia, come il tasto «Avvia» (ContentView)
-        case .traccia: guidaTraccia = false; salvaTraccia = false; apriReparto(.ricordi)   // Ricordi si apre su TRACCIA, con la bussola
-        case .guida: guidaTraccia = true; salvaTraccia = false; apriReparto(.ricordi)      // TRACCIA con la Guida già accesa (fotocamera e frecce)
-        case .salvaLuogo: guidaTraccia = false; salvaTraccia = true; apriReparto(.ricordi) // TRACCIA salva il posto dove si trova
+        case .traccia: guidaTraccia = false; salvaTraccia = false; richiestaTraccia = true; apriReparto(.ricordi)   // Ricordi su TRACCIA, con la bussola
+        case .guida: guidaTraccia = true; salvaTraccia = false; richiestaTraccia = true; apriReparto(.ricordi)      // TRACCIA con la Guida già accesa
+        case .salvaLuogo: guidaTraccia = false; salvaTraccia = true; richiestaTraccia = true; apriReparto(.ricordi) // TRACCIA salva il posto dove si trova
         case .radar: apriReparto(.meteo)          // RADAR è in testa al Meteo
         case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
         case .organismo: apriReparto(.vitals)

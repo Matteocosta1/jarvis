@@ -17,6 +17,10 @@ import Combine
 extension Notification.Name {
     /// MARK XI: un comando a voce delle sezioni aperte («sezioni aperte», «quella di prima», «chiudi il meteo»…).
     static let jarvisComandoSezioni = Notification.Name("jarvisComandoSezioni")
+    /// 4 nov (il signore, strada B): una richiesta nuova a voce per una sezione già aperta, davanti o dietro («portami al luogo»,
+    /// «come arrivo da Bea?», «metro laser», «video di…»): la sezione torna davanti e la fa sul posto, senza riaprirsi.
+    /// userInfo: "reparto" (il `rawValue` del Reparto) e, per Ricordi, "guida" e "salva".
+    static let jarvisRichiestaSezione = Notification.Name("jarvisRichiestaSezione")
 }
 
 /// MARK XI (4 nov, approvati dal signore): i comandi a voce delle sezioni aperte arrivano da JARVIS o dal microfono di una

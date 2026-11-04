@@ -306,6 +306,7 @@ struct PaginaBrowser: View {
     @State private var idVoce = UUID()
     @State private var visoreVideo: String?             // MARK X: il visore olografico dei video di YouTube (cosa si cerca)
     @FocusState private var scrivendo: Bool
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: il Browser dietro (MARK XI) non prende più le frasi a voce
 
     init(incognito: Binding<Bool>, conFaceID: Binding<Bool>, attivo: Bool, chiudi: @escaping () -> Void) {
         _incognito = incognito
@@ -320,7 +321,9 @@ struct PaginaBrowser: View {
     /// A voce: con la barra attiva si scrive lì, se no nel campo della pagina (o della finestra pop-up).
     private func registraVoce() {
         BrowserVoce.proprietario = idVoce
-        let sbloccato = attivo                                 // Face ID non ancora dato: niente
+        // Face ID non ancora dato: niente. 4 nov (strada B): niente anche col Browser dietro un'altra sezione (MARK XI): «cerca …»,
+        // «scorri giù», «scrivi …» non vanno più alla pagina che non si vede, e «fammi vedere dei video di …» lo riporta davanti
+        let sbloccato = attivo && !dietro
         BrowserVoce.sbloccato = sbloccato
         BrowserVoce.scrivi = { testo in
             guard sbloccato else { return }
@@ -460,13 +463,24 @@ struct PaginaBrowser: View {
             if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }      // «Jarvis, fammi vedere dei video di …»
             registraVoce()
         }
+        // 4 nov (il signore, strada B): il Browser già aperto (davanti o dietro) e «Jarvis, fammi vedere dei video di …»: la
+        // ricerca nuova qui, sul posto (prima tornava com'era e non cercava). Ancora chiuso col Face ID: la prende lo sblocco
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+            guard (n.userInfo?["reparto"] as? String) == Reparto.browser.rawValue, attivo, let q = CercaVideo.prendiRichiesta() else { return }
+            scrivendo = false
+            mostraCronologia = false
+            barra = q
+            withAnimation(.easeOut(duration: 0.3)) { visoreVideo = q }
+        }
         .overlay {
             if let q = visoreVideo {
                 VisoreVideo(cerca: q, accento: accento) { withAnimation(.easeOut(duration: 0.25)) { visoreVideo = nil } }
+                    .id(q)                                      // 4 nov (strada B): una ricerca nuova col visore aperto riparte da capo
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             }
         }
         .onChange(of: attivo) { registraVoce() }              // Face ID dato: i comandi a voce si sbloccano
+        .onChange(of: dietro) { registraVoce() }              // 4 nov: davanti di nuovo, i comandi a voce tornano
         .onDisappear {
             guard BrowserVoce.proprietario == idVoce else { return }
             BrowserVoce.scrivi = nil; BrowserVoce.invia = nil; BrowserVoce.naviga = nil; BrowserVoce.proprietario = nil; BrowserVoce.sbloccato = false

@@ -413,7 +413,7 @@ struct ContentView: View {
                     if PaginaMarkX.schermoLibero() { break }
                     try? await Task.sleep(for: .milliseconds(50))
                 }
-                if lidar { LidarAperta.richiesta = (.oggetto, nil) }       // LiDAR parte già su Oggetto
+                if lidar { LidarAperta.richiesta = (.oggetto, nil, false) }   // LiDAR parte già su Oggetto (in silenzio, come sempre)
                 apriReparto(lidar ? .lidar : .occhi)
             }
         }
@@ -1665,16 +1665,24 @@ struct ContentView: View {
         }
     }
 
-    /// Il reparto è chiesto con qualcosa da fare appena aperto (la guida di Ricordi, una ricognizione di SATELLITE, un modo di
-    /// LiDAR, i video del Browser): allora non è solo «apri» e la strada resta quella di prima.
+    /// Il reparto è chiesto con qualcosa da fare appena aperto (TRACCIA di Ricordi con la guida o il salvataggio, la guida, il
+    /// TRAVEL o la ricognizione di SATELLITE, un modo di LiDAR, i video del Browser): allora non è solo «apri».
     private func conRichiesta(_ r: Reparto) -> Bool {
         switch r {
-        case .ricordi: return jarvis.guidaTraccia || jarvis.salvaTraccia
+        case .ricordi: return jarvis.richiestaTraccia
         case .satellite: return RichiestaSatellite.condivisa.azione != nil
         case .lidar: return LidarAperta.richiesta != nil
         case .browser: return CercaVideo.richiesta != nil
         default: return false
         }
+    }
+
+    /// 4 nov (il signore, strada B): la sezione già aperta fa sul posto la richiesta nuova («portami al luogo», «come arrivo da
+    /// Bea?», «metro laser», «video di…»), senza riaprirsi. Ricordi riceve qui la guida e il salvataggio; SATELLITE, LiDAR e il
+    /// Browser trovano la richiesta dove l'ha lasciata JARVIS (RichiestaSatellite, LidarAperta, CercaVideo).
+    private func richiestaSulPosto(_ r: Reparto, guida: Bool, salva: Bool) {
+        NotificationCenter.default.post(name: .jarvisRichiestaSezione, object: nil,
+                                        userInfo: ["reparto": r.rawValue, "guida": guida, "salva": salva])
     }
 
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
@@ -1683,9 +1691,20 @@ struct ContentView: View {
         // web e la fotocamera di sistema sono ancora schermate di iOS: lì si aspetta che si chiudano.
         let aperto = jarvis.pagina != nil || sorgenteFoto != nil
         if tendinaAperta { chiudiTendina() }      // come nel mockup: la sezione chiesta a voce non si apre con la tendina PROTOCOLLI rimasta giù dietro
+        // 4 nov (il signore, strada B): già aperta, davanti o dietro, e con una richiesta nuova: la fa sul posto (sotto)
+        let s: Sezione? = sezione(di: r)
+        let sulPosto: Bool = s.map { pila.voce($0) != nil } == true && conRichiesta(r)
+        let guida = jarvis.guidaTraccia, salva = jarvis.salvaTraccia
         // 4 nov (il signore): chiesta mentre è già davanti («Jarvis, apri il meteo» col Meteo aperto) resta ferma, senza andare dietro
-        // e tornare; JARVIS risponde lo stesso (la sua frase l'ha già detta)
-        if let s = sezione(di: r), pila.voceDavanti?.sezione == s, !conRichiesta(r) { liberaSopra(); return }
+        // e tornare; JARVIS risponde lo stesso (la sua frase l'ha già detta). Con una richiesta nuova, la fa lì
+        if let s, pila.voceDavanti?.sezione == s {
+            liberaSopra()
+            if sulPosto {
+                if r == .ricordi { jarvis.guidaTraccia = false; jarvis.salvaTraccia = false; jarvis.richiestaTraccia = false }
+                richiestaSulPosto(r, guida: guida, salva: salva)
+            }
+            return
+        }
         mandaDietroDavanti()
         chiudiTutto()
         Task {
@@ -1723,6 +1742,7 @@ struct ContentView: View {
                 salvaRicordi = jarvis.salvaTraccia                 // e salva subito solo se è stato «ricorda questo luogo»
                 jarvis.guidaTraccia = false
                 jarvis.salvaTraccia = false
+                jarvis.richiestaTraccia = false
                 mostraRicordi = .traccia
             case .interprete: scegliLingua = true
             case .browser: mostraBrowser = true
@@ -1733,6 +1753,11 @@ struct ContentView: View {
             case .impostazioni: mostraImpostazioni = true
             case .pulisci: svuotaChat()
             case .musica: scheda = .musica
+            }
+            // 4 nov (il signore, strada B): era dietro: prima torna davanti (la salita), poi fa la richiesta, come nel mockup
+            if sulPosto {
+                try? await Task.sleep(for: .milliseconds(380))
+                richiestaSulPosto(r, guida: guida, salva: salva)
             }
         }
     }

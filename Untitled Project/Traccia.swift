@@ -90,6 +90,13 @@ struct PannelliTraccia: View {
             salvaSubito = false
             await salva()
         }
+        .onChange(of: salvaSubito) { _, si in
+            // 4 nov (strada B): «ricorda questo luogo» con TRACCIA già qui: la posizione c'è già, si salva subito (senza, ci pensa
+            // il .task qui sopra appena arriva)
+            guard si, bussola.lat != nil else { return }
+            salvaSubito = false
+            Task { await salva() }
+        }
     }
 
     /// Una riga di LUOGHI: nome e via a sinistra, la distanza da qui a destra; quello puntato è acceso.
