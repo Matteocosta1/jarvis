@@ -257,6 +257,8 @@ struct ContentView: View {
         // MARK XI (3 nov sera, «DEFINITIVA»): il bordo in basso è tutto di iOS (si esce dall'app al primo swipe); lo swipe su delle
         // sezioni parte poco sopra la barretta (GestoBassoSezioni). Con la tendina aperta o tirata, è fermo (come nel mockup).
         .onChange(of: tendinaAperta || tendinaTrascina != 0) { _, ferma in naviga.bassoFermo = ferma }
+        // 4 nov: quando cambia la sezione davanti (aperta, chiusa, mandata dietro con lo swipe) le icone del Dock tornano allineate
+        .onChange(of: pila.davanti) { if dock.x != nil { dock.lascia() } }
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
@@ -1037,6 +1039,9 @@ struct ContentView: View {
 
     /// MARK XI: cosa fa ogni icona del Dock (dal tocco o alzando il dito dopo averci scorso sopra).
     private func azioneDock(_ i: Int) {
+        // 4 nov: la lente si spegne sempre quando un'icona apre qualcosa. Sul Mac il puntatore era ancora sopra l'icona quando la
+        // sezione la copriva: l'icona restava ingrandita (anche dopo lo swipe veloce); ora le icone tornano sempre allineate.
+        if dock.x != nil { dock.lascia() }
         switch i {
         case ContentView.postoTesta.social:
             Suoni.tocco(); if telefono { tastiera = false }; jarvis.interrompi(); alzaPagina(AperturaPagina(sezione: "Social"))

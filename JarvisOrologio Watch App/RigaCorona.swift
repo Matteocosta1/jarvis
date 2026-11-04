@@ -16,6 +16,8 @@ struct RigaCorona<Contenuto: View>: View {
 
     /// La pagina avvisa di ogni tocco (coordinate globali): fuori dalla riga, la corona torna alla pagina.
     static var toccoPagina: Notification.Name { Notification.Name("JarvisPolsoToccoPagina") }
+    /// La riga ha lasciato la corona (4 nov: nella schermata principale la riprendono le icone, `CoronaBarra`).
+    static var lascia: Notification.Name { Notification.Name("JarvisPolsoRigaLascia") }
 
     var body: some View {
         ScrollViewReader { lettore in
@@ -42,6 +44,7 @@ struct RigaCorona<Contenuto: View>: View {
                 .onReceive(NotificationCenter.default.publisher(for: RigaCorona<Contenuto>.toccoPagina)) { n in
                     guard fuoco, let p = n.userInfo?["p"] as? CGPoint, !riquadro.contains(p) else { return }
                     fuoco = false
+                    NotificationCenter.default.post(name: RigaCorona<Contenuto>.lascia, object: nil)
                 }
         }
     }

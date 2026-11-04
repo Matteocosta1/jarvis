@@ -7,7 +7,10 @@ import WatchKit
 /// Il dito trascina la barra; lasciata, va con lo slancio all'icona più vicina al centro, con una molla smorzata al punto critico.
 /// Mentre si muove, l'icona al centro si vede in ologramma nel reattore (uno scatto per icona: suono «ruota» e vibrazione); ferma,
 /// l'ologramma si crea sul tono «olo». Toccato, apre la sezione; 5 s senza toccare niente e si spegne. Un tocco su un'icona la apre
-/// come sempre. La corona resta della pagina (come oggi): non muove le icone.
+/// come sempre.
+/// 4 nov (il signore: «con la corona le muovi normalmente, con il dito l'animazione olografica»): nella schermata principale la
+/// corona fa scorrere la barra normalmente, un'icona per scatto (l'icona sul bordo sinistro, come lo scorrimento di prima), senza
+/// ologramma né lente; la pagina si scorre col dito. Nelle sezioni la corona resta delle pagine (`CoronaBarra`).
 /// La barra a riposo è quella di sempre (dalla prima icona); all'avvio la portano `inFondo()` e `scorriA(_:durata:)`.
 final class RuotaPolso: ObservableObject {
     /// Lo spostamento della barra (punti, negativo verso sinistra).
@@ -19,6 +22,8 @@ final class RuotaPolso: ObservableObject {
     @Published private(set) var creataDa: Date?
     /// La lente: 0 → 1, solo mentre si muove.
     @Published private(set) var lente: Double = 0
+    /// La corona: l'icona che sta sul bordo sinistro (si aggiorna anche dopo il dito, così la corona riparte da dov'è la barra).
+    @Published private(set) var kCorona = 0
 
     /// Il centro di ogni icona dal bordo sinistro della barra (con lo spazio iniziale di 2 punti), e la larghezza visibile.
     var centri: [CGFloat] = []
@@ -39,13 +44,52 @@ final class RuotaPolso: ObservableObject {
     func inFondo() {
         animazione = nil
         spostamento = min(0, larghezza - larghezzaTotale)
+        kCorona = ultimaCorona
     }
 
     /// Porta l'icona `k` sul bordo sinistro (come lo scrollTo con anchor .leading di prima).
     func scorriA(_ k: Int, durata: Double) {
         guard centri.indices.contains(k) else { return }
         animazione = .easeOut(duration: durata)
-        spostamento = max(min(0, larghezza - larghezzaTotale), min(0, -(centri[k] - 17 - 2)))
+        spostamento = sinistra(k)
+        kCorona = min(k, ultimaCorona)
+    }
+
+    // MARK: la corona (4 nov)
+
+    /// Lo spostamento che mette l'icona `k` sul bordo sinistro (senza andare oltre la fine della barra).
+    private func sinistra(_ k: Int) -> CGFloat {
+        max(min(0, larghezza - larghezzaTotale), min(0, -(centri[k] - 17 - 2)))
+    }
+
+    /// L'ultima posizione della corona: quella che porta in vista la fine della barra (oltre, la barra non si muove più).
+    var ultimaCorona: Int {
+        guard !centri.isEmpty else { return 0 }
+        let fine = min(0, larghezza - larghezzaTotale)
+        return centri.indices.first { sinistra($0) <= fine + 0.5 } ?? centri.count - 1
+    }
+
+    /// Uno scatto della corona: la barra scorre normalmente fino all'icona `k` (sul bordo sinistro), senza ologramma né lente.
+    func corona(_ k: Int) {
+        guard centri.indices.contains(k) else { return }
+        if vivo { spegni() }                                          // l'ologramma è del dito: la corona lo spegne
+        dito = nil
+        meta = nil
+        velocita = 0
+        kCorona = k
+        animazione = .easeOut(duration: 0.16)
+        spostamento = sinistra(k)
+    }
+
+    /// Dopo il dito: la posizione della corona è l'icona che sta più vicina al bordo sinistro.
+    private func sincronizzaCorona() {
+        guard !centri.isEmpty else { return }
+        var migliore = 0, distanza = CGFloat.greatestFiniteMagnitude
+        for k in 0...ultimaCorona {
+            let d = abs(sinistra(k) - spostamento)
+            if d < distanza { distanza = d; migliore = k }
+        }
+        if kCorona != migliore { kCorona = migliore }
     }
 
     // MARK: il dito
@@ -161,6 +205,7 @@ final class RuotaPolso: ObservableObject {
             p += velocita * dt
             if abs(m - p) < 0.004 && abs(velocita) < 0.05 { p = m; velocita = 0; meta = nil }
             posa()
+            if meta == nil { sincronizzaCorona() }                    // ferma: la corona riparte da qui
             aggiorna(suona: true)
             spegniAlle = Date().addingTimeInterval(RuotaPolso.resta)
         }
@@ -207,6 +252,50 @@ struct IconaSegueRuota: ViewModifier {
             .shadow(color: TintaOrologio.ciano.opacity(scelta ? 0.7 : 0), radius: 5)
             .scaleEffect(s)
             .zIndex(s > 1.02 ? 2 : 0)
+    }
+}
+
+/// 4 nov · la corona nella schermata principale (il signore: «con la corona scorri normalmente le icone, con il dito che trascina
+/// tipo click wheel si crea l'animazione olografica; dentro le sezioni la corona fa scorrere le pagine»). La barra prende la corona
+/// finito l'avvio e ogni volta che la schermata torna davanti; un'icona per scatto, con lo scatto della corona di watchOS. La riga
+/// delle foto nella chat, toccata, se la prende come prima; quando la lascia (toccato altrove), la corona torna alle icone. Nelle
+/// sezioni non c'è: lì la corona resta delle pagine.
+struct CoronaBarra: ViewModifier {
+    @ObservedObject var ruota: RuotaPolso
+    /// Finito l'avvio (prima la barra si accende da sola).
+    let attiva: Bool
+    @FocusState private var fuoco: Bool
+    @State private var valore = 0.0
+    @State private var davanti = false
+
+    func body(content: Content) -> some View {
+        content
+            .focusable(attiva && davanti)
+            .focused($fuoco)
+            .focusEffectDisabled()
+            .digitalCrownRotation($valore, from: 0, through: Double(max(1, ruota.ultimaCorona)), by: 1,
+                                  sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+            .onChange(of: valore) { _, v in
+                let k = Int(v.rounded())
+                if k != ruota.kCorona { ruota.corona(min(k, ruota.ultimaCorona)) }
+            }
+            .onChange(of: ruota.kCorona) { _, k in if Int(valore.rounded()) != k { valore = Double(k) } }
+            .onChange(of: attiva) { _, si in if si && davanti { prendi() } }
+            .onAppear {
+                davanti = true
+                if attiva { prendi() }
+            }
+            .onDisappear { davanti = false }
+            .onReceive(NotificationCenter.default.publisher(for: RigaCorona<EmptyView>.lascia)) { _ in
+                // la riga delle foto ha lasciato la corona (toccato altrove): torna alle icone
+                if attiva && davanti { prendi() }
+            }
+    }
+
+    /// La barra prende la corona (al giro dopo: prima deve essere diventata «focusable»).
+    private func prendi() {
+        valore = Double(ruota.kCorona)
+        Task { @MainActor in fuoco = true }
     }
 }
 

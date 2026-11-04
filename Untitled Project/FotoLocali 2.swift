@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import Photos
 import Vision
 import CoreLocation
@@ -6,14 +7,25 @@ import UIKit
 
 /// Ricerca nella galleria del signore: per data, luogo, album e — con l'AI di Apple sul telefono (Vision) — per contenuto.
 /// Tutto resta sull'iPhone: le foto non vanno mai al cervello, solo le date e le etichette trovate.
-/// Le funzioni sono `nonisolated`: Photos e Vision lavorano su thread in background.
+/// 4 nov (i problemi trovati col signore, corretti): prima cercava solo nel periodo scelto e solo fra le 400 foto più recenti,
+/// capiva una trentina di parole e confrontava pezzi di parola, e una foto che una volta non si apriva restava «vuota» per sempre.
+/// Ora l'analisi copre tutta la galleria (IndiceFoto: una volta sola, dalle più recenti, poi solo le nuove), le parole passano dal
+/// dizionario completo (DizionarioFoto) e si confrontano parole intere; le foto che non si aprono si riprovano.
+/// Le funzioni sono `nonisolated`: Photos e Vision lavorano fuori dal thread principale.
 nonisolated enum FotoLocali {
 
     nonisolated struct Esito: Sendable {
         var trovate: [String] = []          // localIdentifier, dalla più recente
-        var righe: [[String: String]] = []  // per il cervello: data, luogo (se c'è), etichette
+        var righe: [[String: String]] = []  // per il cervello: data, luogo (se c'è), etichette (le prime 30 foto)
         var esaminate = 0
         var nota: String?
+        var nonCapite: [String] = []        // le parole che non sono né categorie di Apple né album
+    }
+
+    /// Una cosa da trovare: basta una delle sue categorie o dei suoi album.
+    nonisolated struct Gruppo: Sendable {
+        var etichette = Set<UInt16>()
+        var album: [Int] = []
     }
 
     static func autorizza() async -> Bool {
@@ -21,8 +33,65 @@ nonisolated enum FotoLocali {
         return s == .authorized || s == .limited
     }
 
-    /// cosa: parole chiave in inglese (tassonomia di Vision). Le altre condizioni sono facoltative.
+    /// Accesso limitato: JARVIS vede solo le foto che il signore ha scelto.
+    static var accessoLimitato: Bool { PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited }
+
+    /// Per il cervello e l'orologio: `cosa` sono parole (le categorie inglesi di Vision, o italiane) e basta che una corrisponda.
+    /// `limiteAI`: quante foto fra le più recenti si analizzano subito, se l'analisi della galleria non ci è ancora arrivata.
     @concurrent static func cerca(cosa: [String], da: Date?, a: Date?, luogo: CLLocation?, raggioKm: Double, album: String?, quante: Int, limiteAI: Int = 400) async -> Esito {
+        var g = Gruppo(), ignote: [String] = []
+        for p in cosa {
+            let (cose, non) = DizionarioFoto.capisci(p)
+            ignote += non
+            for c in cose {
+                switch c {
+                case .etichette(let e): g.etichette.formUnion(e)
+                case .album(let t): g.album.append(t)
+                }
+            }
+        }
+        let vuota = g.etichette.isEmpty && g.album.isEmpty
+        if vuota && !ignote.isEmpty {
+            var e = Esito()
+            e.nonCapite = ignote
+            e.nota = "nessuna di queste parole è tra le cose che l'AI di Apple riconosce nelle foto: \(ignote.joined(separator: ", "))"
+            return e
+        }
+        var esito = await trova(gruppi: vuota ? [] : [g], da: da, a: a, luogo: luogo, raggioKm: raggioKm, album: album,
+                                quante: max(1, min(quante, 30)), recenti: limiteAI)
+        esito.nonCapite = ignote
+        return esito
+    }
+
+    /// Per la sezione Foto: il testo scritto dal signore. Ogni cosa riconosciuta deve esserci («cani al mare»: cani e mare);
+    /// le parole che non sono categorie né album si segnalano. Senza parole da cercare: le foto del periodo.
+    @concurrent static func cercaTesto(_ testo: String, da: Date?, a: Date?, quante: Int) async -> Esito {
+        let (cose, ignote) = DizionarioFoto.capisci(testo)
+        if cose.isEmpty && !ignote.isEmpty {
+            var e = Esito()
+            e.nonCapite = ignote
+            e.nota = "Non riconosco «\(ignote.joined(separator: " "))»: l'AI di Apple riconosce cose, animali e luoghi nelle foto, non le persone per nome."
+            return e
+        }
+        let gruppi: [Gruppo] = cose.map { c in
+            switch c {
+            case .etichette(let e): return Gruppo(etichette: e, album: [])
+            case .album(let t): return Gruppo(etichette: [], album: [t])
+            }
+        }
+        var esito = await trova(gruppi: gruppi, da: da, a: a, luogo: nil, raggioKm: 5, album: nil, quante: quante, recenti: 60)
+        esito.nonCapite = ignote
+        if !ignote.isEmpty && !esito.trovate.isEmpty {
+            esito.nota = "Non riconosco «\(ignote.joined(separator: " "))»: cerco solo il resto."
+        }
+        return esito
+    }
+
+    // MARK: il cuore della ricerca
+
+    /// `gruppi`: tutti insieme (in ognuno basta una categoria o un album); poi le date, il luogo, l'album col nome.
+    private static func trova(gruppi: [Gruppo], da: Date?, a: Date?, luogo: CLLocation?, raggioKm: Double, album: String?,
+                              quante: Int, recenti: Int) async -> Esito {
         var esito = Esito()
         let opzioni = PHFetchOptions()
         opzioni.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
@@ -31,66 +100,82 @@ nonisolated enum FotoLocali {
         if let a { condizioni.append(NSPredicate(format: "creationDate <= %@", a as NSDate)) }
         opzioni.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: condizioni)
 
-        let risultato: PHFetchResult<PHAsset>
+        var raccolta: PHAssetCollection?
         if let album, !album.isEmpty {
-            guard let raccolta = trovaAlbum(album) else {
+            guard let r = trovaAlbum(album) else {
                 esito.nota = "nessun album con nome simile a «\(album)»"
                 return esito
             }
-            risultato = PHAsset.fetchAssets(in: raccolta, options: opzioni)
-        } else {
-            risultato = PHAsset.fetchAssets(with: opzioni)
+            raccolta = r
         }
+        let base = raccolta.map { PHAsset.fetchAssets(in: $0, options: opzioni) } ?? PHAsset.fetchAssets(with: opzioni)
+        let indice = IndiceFoto.condiviso
+        await indice.avvia()                                          // l'analisi di tutta la galleria, se non c'è ancora
 
-        // 1. filtri veloci (luogo) su un massimo di 5000 foto
-        var candidati: [(id: String, data: Date?, pos: CLLocation?)] = []
-        let limiteScansione = min(risultato.count, 5000)
-        for k in 0..<limiteScansione {
-            let f = risultato.object(at: k)
-            if let luogo {
-                guard let p = f.location, p.distance(from: luogo) <= raggioKm * 1000 else { continue }
+        var scelte: [PHAsset] = []
+        if gruppi.isEmpty {
+            esito.esaminate = base.count
+            var k = 0
+            while k < base.count && scelte.count < quante {
+                let f = base.object(at: k)
+                if vicina(f, a: luogo, raggioKm: raggioKm) { scelte.append(f) }
+                k += 1
             }
-            candidati.append((f.localIdentifier, f.creationDate, f.location))
-        }
-
-        // 2. contenuto con Vision, sulle più recenti (con cache: la seconda volta è istantaneo)
-        let parole = cosa.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        var etichette: [String: [String]] = [:]
-        if !parole.isEmpty {
-            var cache = Cache.carica()
-            let daEsaminare = candidati.prefix(limiteAI)
-            var nuove = 0
-            for c in daEsaminare {
-                if Task.isCancelled { break }
-                if let e = cache[c.id] { etichette[c.id] = e; continue }
-                let e = classifica(id: c.id)
-                cache[c.id] = e
-                etichette[c.id] = e
-                nuove += 1
-            }
-            if nuove > 0 { Cache.salva(cache) }
-            esito.esaminate = daEsaminare.count
-            candidati = daEsaminare.filter { c in
-                let e = etichette[c.id] ?? []
-                return parole.contains { p in e.contains { $0 == p || $0.contains(p) || ($0.count > 3 && p.contains($0)) } }
-            }
-            if candidati.isEmpty { esito.nota = "esaminate le \(daEsaminare.count) foto più recenti tra quelle filtrate: nessuna corrisponde" }
         } else {
-            esito.esaminate = candidati.count
+            // le più recenti (anche appena scattate) si analizzano subito; il resto lo fa l'analisi della galleria
+            var nuove: [String] = []
+            for k in 0..<min(base.count, recenti) { nuove.append(base.object(at: k).localIdentifier) }
+            await indice.assicura(nuove)
+            var buone: Set<String>?
+            for g in gruppi {
+                var s = await indice.con(g.etichette)
+                for t in g.album { s.formUnion(idsAlbum(t)) }
+                buone = buone.map { $0.intersection(s) } ?? s
+            }
+            esito.esaminate = await indice.analizzate
+            let ids = Array(buone ?? [])
+            if !ids.isEmpty {
+                let trovati = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: opzioni)
+                let dentro: Set<String>? = raccolta == nil ? nil : idsDi(base)
+                var k = 0
+                while k < trovati.count && scelte.count < quante {
+                    let f = trovati.object(at: k)
+                    k += 1
+                    if let dentro, !dentro.contains(f.localIdentifier) { continue }
+                    if vicina(f, a: luogo, raggioKm: raggioKm) { scelte.append(f) }
+                }
+            }
         }
 
         let f = DateFormatter()
         f.locale = Locale(identifier: "it_IT")
         f.dateFormat = "EEEE d MMMM yyyy, HH:mm"
-        for c in candidati.prefix(max(1, min(quante, 30))) {
-            esito.trovate.append(c.id)
-            var riga: [String: String] = ["data": c.data.map { f.string(from: $0) } ?? "senza data"]
-            if let e = etichette[c.id], !e.isEmpty { riga["contenuto"] = e.prefix(5).joined(separator: ", ") }
-            if let p = c.pos { riga["coordinate"] = String(format: "%.4f, %.4f", p.coordinate.latitude, p.coordinate.longitude) }
+        let etichette = await indice.etichette(di: scelte.prefix(30).map(\.localIdentifier))
+        for c in scelte {
+            esito.trovate.append(c.localIdentifier)
+            guard esito.righe.count < 30 else { continue }
+            var riga: [String: String] = ["data": c.creationDate.map { f.string(from: $0) } ?? "senza data"]
+            if let e = etichette[c.localIdentifier], !e.isEmpty {
+                riga["contenuto"] = e.prefix(5).map { DizionarioFoto.etichette[Int($0)].replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
+            }
+            if let p = c.location { riga["coordinate"] = String(format: "%.4f, %.4f", p.coordinate.latitude, p.coordinate.longitude) }
             esito.righe.append(riga)
         }
-        if esito.trovate.isEmpty, esito.nota == nil { esito.nota = "nessuna foto con questi criteri" }
+        if esito.trovate.isEmpty {
+            let stato = await indice.stato()
+            if !gruppi.isEmpty && !stato.completa && stato.totale > 0 {
+                esito.nota = "Nessuna finora: sto ancora analizzando la galleria (\(stato.fatte) di \(stato.totale) foto)."
+            } else {
+                esito.nota = "nessuna foto con questi criteri"
+            }
+        }
         return esito
+    }
+
+    private static func vicina(_ f: PHAsset, a luogo: CLLocation?, raggioKm: Double) -> Bool {
+        guard let luogo else { return true }
+        guard let p = f.location else { return false }
+        return p.distance(from: luogo) <= raggioKm * 1000
     }
 
     private static func trovaAlbum(_ nome: String) -> PHAssetCollection? {
@@ -106,29 +191,45 @@ nonisolated enum FotoLocali {
         return trovato
     }
 
-    /// Etichette di Vision (in inglese) con fiducia sufficiente, dalla più probabile.
-    private static func classifica(id: String) -> [String] {
-        guard let cg = immagineSincrona(id: id, lato: 360)?.cgImage else { return [] }
+    /// Le foto di un album di Apple (selfie, screenshot, preferite…).
+    private static func idsAlbum(_ tipo: Int) -> Set<String> {
+        guard let s = PHAssetCollectionSubtype(rawValue: tipo),
+              let c = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: s, options: nil).firstObject else { return [] }
+        return idsDi(PHAsset.fetchAssets(in: c, options: nil))
+    }
+
+    private static func idsDi(_ r: PHFetchResult<PHAsset>) -> Set<String> {
+        var s = Set<String>()
+        s.reserveCapacity(r.count)
+        for k in 0..<r.count { s.insert(r.object(at: k).localIdentifier) }
+        return s
+    }
+
+    // MARK: le immagini
+
+    /// Le categorie di Vision di una foto (fiducia almeno 0,25, le 12 più probabili, come prima). nil: la foto non si è aperta
+    /// (non si segna: si riprova al giro dopo). `rete`: anche la versione piccola da iCloud.
+    static func classifica(_ foto: PHAsset, rete: Bool) -> [UInt16]? {
+        guard let cg = immagineSincrona(foto, lato: 360, rete: rete)?.cgImage else { return nil }
         let richiesta = VNClassifyImageRequest()
         do {
             try VNImageRequestHandler(cgImage: cg, options: [:]).perform([richiesta])
-        } catch { return [] }
+        } catch { return nil }
         return (richiesta.results ?? [])
             .filter { $0.confidence >= 0.25 }
             .sorted { $0.confidence > $1.confidence }
             .prefix(12)
-            .map { $0.identifier.lowercased().replacingOccurrences(of: "_", with: " ") }
+            .compactMap { DizionarioFoto.posizione[$0.identifier] }
     }
 
-    private static func immagineSincrona(id: String, lato: CGFloat) -> UIImage? {
-        guard let f = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return nil }
+    private static func immagineSincrona(_ foto: PHAsset, lato: CGFloat, rete: Bool) -> UIImage? {
         let o = PHImageRequestOptions()
         o.isSynchronous = true
-        o.deliveryMode = .fastFormat
+        o.deliveryMode = rete ? .highQualityFormat : .fastFormat
         o.resizeMode = .fast
-        o.isNetworkAccessAllowed = false     // solo ciò che è già sul telefono: veloce
+        o.isNetworkAccessAllowed = rete      // prima solo ciò che è già sul telefono (veloce); al secondo giro anche iCloud
         let out = Scatola()
-        PHImageManager.default().requestImage(for: f, targetSize: CGSize(width: lato, height: lato), contentMode: .aspectFit, options: o) { img, _ in
+        PHImageManager.default().requestImage(for: foto, targetSize: CGSize(width: lato, height: lato), contentMode: .aspectFit, options: o) { img, _ in
             out.img = img
         }
         return out.img
@@ -152,16 +253,192 @@ nonisolated enum FotoLocali {
             return out.img
         }.value
     }
+}
 
-    // Le etichette già calcolate restano in un file nella cache dell'app.
-    nonisolated private enum Cache {
-        static var file: URL { FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("etichette-foto.json") }
-        static func carica() -> [String: [String]] {
-            guard let d = try? Data(contentsOf: file), let c = try? JSONDecoder().decode([String: [String]].self, from: d) else { return [:] }
-            return c
+/// L'analisi di tutta la galleria con l'AI di Apple (Vision), una volta sola: dalle foto più recenti alle più vecchie, poi solo le
+/// nuove. Le etichette restano in un file nella cache dell'app (salvato ogni 300 foto). Le foto che non si aprono non si segnano:
+/// alla fine del giro si riprovano con iCloud, e se ancora non si aprono si riprovano la volta dopo.
+actor IndiceFoto {
+    nonisolated static let condiviso = IndiceFoto()
+
+    private var etichette: [String: [UInt16]] = [:]
+    private var caricato = false
+    private var lavoro: Task<Void, Never>?
+    private var nonSalvate = 0
+    private var fatte = 0
+    private var totale = 0
+    private var completa = false
+
+    /// Quante foto sono già analizzate.
+    var analizzate: Int { etichette.count }
+
+    func stato() -> (fatte: Int, totale: Int, completa: Bool) { (fatte, totale, completa) }
+
+    private func carica() {
+        guard !caricato else { return }
+        caricato = true
+        etichette = Archivio.carica()
+        Archivio.togliVecchio()
+    }
+
+    /// Parte (o continua) l'analisi di tutta la galleria, in sottofondo; il conto lo pubblica `AvanzamentoFoto`.
+    func avvia() {
+        carica()
+        let permesso = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard lavoro == nil, permesso == .authorized || permesso == .limited else { return }
+        lavoro = Task(priority: .utility) { await self.analizzaTutto() }
+    }
+
+    private func analizzaTutto() async {
+        let opzioni = PHFetchOptions()
+        opzioni.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        opzioni.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        let tutte = PHAsset.fetchAssets(with: opzioni)
+        var mancanti: [PHAsset] = [], presenti = Set<String>()
+        presenti.reserveCapacity(tutte.count)
+        for k in 0..<tutte.count {
+            let f = tutte.object(at: k)
+            presenti.insert(f.localIdentifier)
+            if etichette[f.localIdentifier] == nil { mancanti.append(f) }
         }
-        static func salva(_ c: [String: [String]]) {
+        // le foto cancellate escono dall'indice (il file resta piccolo)
+        if etichette.count > presenti.count - mancanti.count {
+            etichette = etichette.filter { presenti.contains($0.key) }
+            nonSalvate += 1
+        }
+        totale = tutte.count
+        fatte = totale - mancanti.count
+        completa = mancanti.isEmpty
+        await pubblica(attivo: !mancanti.isEmpty)
+        // primo giro: solo quello che è già sul telefono (veloce); secondo giro: le foto che non si sono aperte, anche da iCloud
+        var daRiprovare: [PHAsset] = [], falliti = 0
+        for f in mancanti {
+            if Task.isCancelled { break }
+            if etichette[f.localIdentifier] != nil { fatte += 1 }      // analizzata intanto da una ricerca
+            else if !analizza(f, rete: false) { daRiprovare.append(f) }
+            await avanza()
+        }
+        for f in daRiprovare {
+            if Task.isCancelled { break }
+            if etichette[f.localIdentifier] != nil { fatte += 1 }      // analizzata intanto da una ricerca
+            else if !analizza(f, rete: true) { falliti += 1 }          // si riprova la volta dopo
+            await avanza()
+        }
+        completa = falliti == 0 && !Task.isCancelled
+        if nonSalvate > 0 { salva() }
+        await pubblica(attivo: false)
+        lavoro = nil
+    }
+
+    /// Una foto: le sue categorie nell'indice. Falso se non si è aperta (non si segna niente).
+    private func analizza(_ f: PHAsset, rete: Bool) -> Bool {
+        guard let e = FotoLocali.classifica(f, rete: rete) else { return false }
+        etichette[f.localIdentifier] = e
+        nonSalvate += 1
+        fatte += 1
+        return true
+    }
+
+    private var ultimoConto = Date.distantPast
+
+    /// Dopo ogni foto: il file ogni 300 foto, il conto a schermo 4 volte al secondo, e spazio alle ricerche.
+    private func avanza() async {
+        if nonSalvate >= 300 { salva() }
+        if Date().timeIntervalSince(ultimoConto) > 0.25 {
+            ultimoConto = Date()
+            await pubblica(attivo: true)
+        }
+        await Task.yield()
+    }
+
+    /// Le foto indicate (le più recenti di una ricerca), analizzate subito se mancano.
+    func assicura(_ ids: [String]) async {
+        carica()
+        let mancano = ids.filter { etichette[$0] == nil }
+        guard !mancano.isEmpty else { return }
+        let r = PHAsset.fetchAssets(withLocalIdentifiers: mancano, options: nil)
+        var nuove = 0
+        for k in 0..<r.count {
+            if Task.isCancelled { break }
+            let f = r.object(at: k)
+            if etichette[f.localIdentifier] == nil, let e = FotoLocali.classifica(f, rete: false) {
+                etichette[f.localIdentifier] = e
+                nuove += 1
+            }
+            await Task.yield()
+        }
+        if nuove > 0 {
+            nonSalvate += nuove
+            if lavoro == nil { salva() }
+        }
+    }
+
+    /// Le foto con almeno una di queste categorie.
+    func con(_ g: Set<UInt16>) -> Set<String> {
+        carica()
+        guard !g.isEmpty else { return [] }
+        var out = Set<String>()
+        for (id, e) in etichette where e.contains(where: { g.contains($0) }) { out.insert(id) }
+        return out
+    }
+
+    /// Le categorie di queste foto (per il cervello).
+    func etichette(di ids: [String]) -> [String: [UInt16]] {
+        carica()
+        var out: [String: [UInt16]] = [:]
+        for id in ids { if let e = etichette[id] { out[id] = e } }
+        return out
+    }
+
+    private func salva() {
+        Archivio.salva(etichette)
+        nonSalvate = 0
+    }
+
+    private func pubblica(attivo: Bool) async {
+        let f = fatte, t = totale
+        await MainActor.run { AvanzamentoFoto.condiviso.aggiorna(fatte: f, totale: t, attivo: attivo) }
+    }
+
+    /// Il file delle etichette nella cache dell'app (le categorie per nome: il file resta valido anche se l'elenco cambiasse).
+    nonisolated private enum Archivio {
+        static var cartella: URL { FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0] }
+        static var file: URL { cartella.appendingPathComponent("etichette-foto-2.json") }
+
+        static func carica() -> [String: [UInt16]] {
+            guard let d = try? Data(contentsOf: file), let c = try? JSONDecoder().decode([String: [String]].self, from: d) else { return [:] }
+            var out: [String: [UInt16]] = [:]
+            out.reserveCapacity(c.count)
+            for (id, nomi) in c { out[id] = nomi.compactMap { DizionarioFoto.posizione[$0] } }
+            return out
+        }
+
+        static func salva(_ e: [String: [UInt16]]) {
+            let c = e.mapValues { v in v.map { DizionarioFoto.etichette[Int($0)] } }
             if let d = try? JSONEncoder().encode(c) { try? d.write(to: file, options: .atomic) }
         }
+
+        /// Il file di prima (con le foto «vuote» segnate per sempre): si butta, l'analisi riparte giusta.
+        static func togliVecchio() {
+            try? FileManager.default.removeItem(at: cartella.appendingPathComponent("etichette-foto.json"))
+        }
+    }
+}
+
+/// Il conto dell'analisi della galleria, per la sezione Foto («1.240 / 8.312»).
+final class AvanzamentoFoto: ObservableObject {
+    static let condiviso = AvanzamentoFoto()
+    @Published private(set) var fatte = 0
+    @Published private(set) var totale = 0
+    @Published private(set) var attivo = false
+    /// Sale ogni 400 foto analizzate: una ricerca aperta si ripete e trova anche quelle nuove.
+    @Published private(set) var passo = 0
+
+    func aggiorna(fatte: Int, totale: Int, attivo: Bool) {
+        if self.fatte != fatte { self.fatte = fatte }
+        if self.totale != totale { self.totale = totale }
+        if self.attivo != attivo { self.attivo = attivo }
+        let p = attivo ? fatte / 400 : -1
+        if passo != p { passo = p }
     }
 }

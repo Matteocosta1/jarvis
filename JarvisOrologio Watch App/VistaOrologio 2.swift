@@ -690,7 +690,7 @@ struct VistaOrologio: View {
         // come prima la barra taglia ai lati; finito l'avvio la lente può uscire un poco sopra e sotto (come nel mockup)
         .mask { Rectangle().padding(.vertical, accese >= n ? -14 : 0) }
         .contentShape(Rectangle())
-        // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona); la corona resta della pagina
+        // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona), con l'ologramma; la corona la fa scorrere normalmente
         .highPriorityGesture(
             DragGesture(minimumDistance: 5)
                 .onChanged { v in if accese >= n { ruota.trascina(v.location.x) } }
@@ -698,6 +698,8 @@ struct VistaOrologio: View {
         )
         .onChange(of: barraInFondo) { _, si in if si { ruota.inFondo() } }
         .onChange(of: scorriA) { _, k in if let k { ruota.scorriA(k, durata: passoBarra) } }
+        // 4 nov: la corona muove le icone normalmente (senza ologramma); il dito resta la ruota con l'ologramma
+        .modifier(CoronaBarra(ruota: ruota, attiva: accese >= n))
         .disabled(jarvis.fase == .elaboro)
     }
 

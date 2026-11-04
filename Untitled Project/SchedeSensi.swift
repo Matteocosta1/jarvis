@@ -2,6 +2,7 @@
 import SwiftUI
 import Charts
 import MusicKit
+import UIKit
 
 // MARK: - SHAZAM (MARK X): logo olografico in ascolto, poi sale il player che la suona subito su Apple Music
 
@@ -319,21 +320,16 @@ struct VistaFotoScheda: View {
         }
     }
 
-    /// Parole in italiano → etichette di Apple Vision (in inglese).
-    private static let parole: [String: [String]] = [
-        "cane": ["dog"], "gatto": ["cat"], "mare": ["sea", "beach"], "spiaggia": ["beach"], "montagna": ["mountain"], "neve": ["snow"],
-        "cibo": ["food"], "pizza": ["pizza"], "auto": ["car"], "macchina": ["car"], "concerto": ["concert"], "festa": ["party", "concert"],
-        "persone": ["people"], "folla": ["crowd"], "documento": ["document"], "documenti": ["document"], "screenshot": ["screenshot"],
-        "tramonto": ["sunset"], "vinile": ["vinyl"], "dischi": ["vinyl"], "fiori": ["flower"], "città": ["city"], "graffiti": ["graffiti"],
-        "muro": ["wall", "graffiti"], "selfie": ["selfie"], "bambino": ["baby", "child"], "torta": ["cake"], "vino": ["wine"], "birra": ["beer"],
-        "scarpe": ["shoe"], "jeans": ["jeans", "denim"], "denim": ["denim", "jeans"], "dj": ["dj", "concert"], "laser": ["laser", "concert"],
-    ]
+    // 4 nov: le parole le capisce DizionarioFoto (tutte le 1.303 categorie di Apple in italiano, con i plurali, parole intere;
+    // selfie, screenshot, preferite e ritratti sono gli album di Apple). Prima erano una trentina e alcune non esistevano.
 
     @State private var periodo: Periodo = .oggi
     @State private var cerca = ""
     @State private var foto: [Immagine]?
     @State private var nota: String?
     @State private var aperta: Int?
+    @State private var limitato = false
+    @ObservedObject private var analisi = AvanzamentoFoto.condiviso       // il conto dell'analisi della galleria
 
     var body: some View {
         CorniceScheda(titolo: "Foto", sottotitolo: foto.map { "\($0.count) foto · \(periodo.rawValue.lowercased())" } ?? "sfoglio la galleria", icona: "photo.on.rectangle", tinta: tinta, pronto: foto != nil) {
@@ -362,8 +358,30 @@ struct VistaFotoScheda: View {
             .background(tinta.opacity(0.07))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
+            // 4 nov: l'analisi di tutta la galleria (una volta sola, poi solo le foto nuove), con il conto a schermo
+            if analisi.attivo && analisi.totale > 0 {
+                Text("ANALISI · \(VistaFotoScheda.numero(analisi.fatte)) / \(VistaFotoScheda.numero(analisi.totale))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(tinta)
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.2), value: analisi.fatte)
+            }
+            // 4 nov: con l'accesso limitato JARVIS vede solo le foto scelte: si dice, e un tocco apre le Impostazioni
+            if limitato {
+                Button {
+                    if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
+                } label: {
+                    Text("Accesso limitato: vedo solo le foto che ha scelto lei. Per cercare in tutta la galleria: Impostazioni › App › Jarvis › Foto › Accesso completo.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+            }
+
             if let foto {
-                if foto.isEmpty {
+                if foto.isEmpty || nota != nil {
                     Text(nota ?? "Nessuna foto in questo periodo.").font(.footnote).foregroundStyle(Color.tenue)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 4)], spacing: 4) {
@@ -389,9 +407,15 @@ struct VistaFotoScheda: View {
                 ProgressView().tint(tinta).frame(maxWidth: .infinity).padding(.top, 40)
             }
         }
-        .task(id: "\(periodo.rawValue)|\(cerca)") {
+        // la ricerca si ripete mentre l'analisi della galleria va avanti (ogni 400 foto): escono anche le foto appena analizzate
+        .task(id: "\(periodo.rawValue)|\(cerca)|\(cerca.isEmpty ? 0 : analisi.passo)") {
             try? await Task.sleep(for: .milliseconds(cerca.isEmpty ? 0 : 450))
             if !Task.isCancelled { await carica() }
+        }
+        // 4 nov: quando si comincia a scrivere si cerca in tutta la galleria (poi un periodo toccato restringe la ricerca)
+        .onChange(of: cerca) { prima, adesso in
+            let vuota = { (s: String) in s.trimmingCharacters(in: .whitespaces).isEmpty }
+            if vuota(prima) && !vuota(adesso) && periodo != .tutte { periodo = .tutte }
         }
         .fullScreenCover(isPresented: Binding(get: { aperta != nil }, set: { if !$0 { aperta = nil } })) {
             if let foto, let k = aperta { VistaImmagini(immagini: foto, iniziale: k) }
@@ -399,14 +423,18 @@ struct VistaFotoScheda: View {
     }
 
     private func carica() async {
-        guard await FotoLocali.autorizza() else { nota = "Serve l'accesso alle foto: Impostazioni › JARVIS › Foto."; foto = []; return }
+        guard await FotoLocali.autorizza() else { nota = "Serve l'accesso alle foto: Impostazioni › App › Jarvis › Foto."; foto = []; return }
+        limitato = FotoLocali.accessoLimitato
         let (da, a) = periodo.intervallo
-        let c = cerca.lowercased().trimmingCharacters(in: .whitespaces)
-        let cosa = c.isEmpty ? [] : c.components(separatedBy: CharacterSet(charactersIn: " ,")).filter { !$0.isEmpty }.flatMap { VistaFotoScheda.parole[$0] ?? [$0] }
-        let esito = await FotoLocali.cerca(cosa: cosa, da: da, a: a, luogo: nil, raggioKm: 5, album: nil, quante: cosa.isEmpty ? 120 : 60)
+        let c = cerca.trimmingCharacters(in: .whitespaces)
+        let esito = await FotoLocali.cercaTesto(c, da: da, a: a, quante: c.isEmpty ? 120 : 300)
+        guard !Task.isCancelled else { return }                        // un'altra ricerca è già partita
         nota = esito.nota
         withAnimation(.easeOut(duration: 0.25)) { foto = esito.trovate.map { Immagine(fonte: "Le sue foto", locale: $0) } }
     }
+
+    /// I numeri del conto con il punto delle migliaia («1.240»).
+    private static func numero(_ n: Int) -> String { n.formatted(.number.locale(Locale(identifier: "it_IT"))) }
 }
 
 // MARK: - SERATA: i conti di una serata Discosizer

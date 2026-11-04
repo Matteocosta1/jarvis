@@ -11,9 +11,9 @@ import UIKit
 //     fermarsi, se è salita oltre il 28%) si ferma a metà pagina, scala 0,78: le pagine olografiche (SFOGLIO), da sfogliare a
 //     destra e sinistra, col numero piccolo «2 / 3» in alto. Tocchi la pagina: si apre. La spingi in su: si chiude. Di nuovo su
 //     dalla fascia: JARVIS;
-//   - lanciata veloce: continua il lancio del dito e vola dentro il reattore (AGGANCIO: si inclina, la scansione la scioglie in
-//     scintille, le staffe agganciano, il mirino scatta, il lampo e i due battiti sui colpi del suono «sparisce»); la sezione
-//     resta aperta dietro;
+//   - lanciata veloce: continua il lancio del dito e vola dentro il reattore (AGGANCIO = ORIGINE · AGGANCIO II, 4 nov notte: il
+//     reattore si apre, la pagina si inclina e diventa luce, il laser la scioglie in scintille a vortice, le staffe agganciano, il
+//     mirino scatta, il lampo e i battiti sui colpi del suono «sparisce», tutto spento a 1,1 s); la sezione resta aperta dietro;
 //   - poco, o tirata giù prima di lasciarla: torna com'era.
 //   Dopo il dito, molle con la sua velocità (come quelle di iOS).
 // · swipe dai BORDI destro e sinistro: la sezione accanto nel cerchio delle aperte (con JARVIS fra l'ultima e la prima), con il
@@ -91,6 +91,8 @@ struct PosaPagina: ViewModifier {
 }
 
 /// La pagina in mano (al dito, alla molla o al volo): la posa viva, 120 volte al secondo. Lo legge solo questo modificatore.
+/// Nell'AGGANCIO (ORIGINE · AGGANCIO II) la pagina si inclina all'indietro con la prospettiva del mockup e il laser la scioglie dal
+/// basso: maschera e inclinazione stanno qui, nello stesso fotogramma del volo (un orologio solo).
 struct SegueTiro: ViewModifier {
     @ObservedObject var tiro: TiroPagina
     let id: UUID
@@ -100,9 +102,64 @@ struct SegueTiro: ViewModifier {
             .overlay { if v.tinta > 0.001 { VeloOlo().opacity(v.tinta) } }
             .clipShape(Ritaglio(raggio: v.raggio))
             .shadow(color: .ciano.opacity(v.ombra), radius: v.ombra > 0 ? 18 : 0)
-            .scaleEffect(v.scala)
-            .offset(x: v.x, y: v.y)
+            .mask { MascheraLaser(riga: v.riga) }
+            .modifier(Proiezione(x: v.x, y: v.y, scala: v.scala, inclina: v.inclina))
     }
+}
+
+/// Dove sta la pagina, come il `transform` del mockup: `perspective(1100px) translate(x, y) rotateX(inclina) scale(scala)` dal centro
+/// della pagina. Senza inclinazione è esattamente scala + spostamento (come `scaleEffect` e `offset` di prima).
+nonisolated struct Proiezione: GeometryEffect {
+    var x: CGFloat
+    var y: CGFloat
+    var scala: CGFloat
+    var inclina: Double                                   // gradi: la cima va indietro (come rotateX del mockup)
+    static let distanza: CGFloat = 1100                   // la prospettiva del mockup
+
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, Double>> {
+        get { AnimatablePair(AnimatablePair(x, y), AnimatablePair(scala, inclina)) }
+        set { x = newValue.first.first; y = newValue.first.second; scala = newValue.second.first; inclina = newValue.second.second }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let w = size.width, h = size.height, s = scala, a = inclina * .pi / 180
+        let ca = CGFloat(cos(a)), sa = CGFloat(sin(a)), d = Proiezione.distanza
+        // un punto (px, py) della pagina: X = s(px − w/2), Y = s(py − h/2); ruotato: Y·cos, profondità Y·sin; poi 1100 / (1100 − z)
+        let m23 = -(s * sa) / d, m33 = 1 + (s * sa / d) * (h / 2)
+        var t = ProjectionTransform()
+        t.m11 = s
+        t.m12 = 0
+        t.m13 = 0
+        t.m21 = (w / 2) * m23
+        t.m22 = (h / 2) * m23 + s * ca
+        t.m23 = m23
+        t.m31 = (w / 2) * m33 - s * (w / 2) + x
+        t.m32 = (h / 2) * m33 - s * ca * (h / 2) + y
+        t.m33 = m33
+        return t
+    }
+}
+
+/// La maschera del laser sulla pagina, come nel mockup: piena fino al 3% sopra la riga, trasparente dall'1% sotto.
+/// `riga` va da 0 (cima) a 1 (fondo); da 1,015 in su non taglia niente.
+struct MascheraLaser: View {
+    let riga: Double
+    var body: some View {
+        if riga >= 1.015 {
+            Rectangle().padding(-3000)                        // fermo: non taglia niente (nemmeno l'ombra)
+        } else {
+            let a = riga - 0.03, b = riga + 0.01
+            let p0 = max(0, min(1, a)), p1 = max(0, min(1, b))
+            LinearGradient(stops: [.init(color: .black.opacity(MascheraLaser.pieno(0, a, b)), location: 0),
+                                   .init(color: .black.opacity(MascheraLaser.pieno(p0, a, b)), location: p0),
+                                   .init(color: .black.opacity(MascheraLaser.pieno(p1, a, b)), location: p1),
+                                   .init(color: .black.opacity(MascheraLaser.pieno(1, a, b)), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    /// Quanto è piena la maschera al punto `v` (1 sopra `a`, 0 sotto `b`, in mezzo in linea retta, come il gradiente del mockup).
+    nonisolated static func pieno(_ v: Double, _ a: Double, _ b: Double) -> Double { max(0, min(1, (b - v) / (b - a))) }
 }
 
 struct StratoSezioniVista<Vista: View>: View {
@@ -120,9 +177,16 @@ struct StratoSezioniVista<Vista: View>: View {
     @State private var trackpad = TrackpadSezioni()  // sul Mac: due dita in orizzontale
     @State private var basso = GestoBassoSezioni()   // su dal basso, poco sopra la barretta di iOS
     @State private var tiro = TiroPagina()           // la pagina in mano, a 120 Hz
+    @State private var telai: [UUID: CGRect] = [:]   // dove sta ogni pagina a riposo (coordinate globali)
 
     private var altezza: CGFloat { FasciaAlta.finestra?.bounds.height ?? 852 }
     private var larghezza: CGFloat { FasciaAlta.finestra?.bounds.width ?? 393 }
+
+    /// Dove sta la pagina `id` a riposo (coordinate globali); se non è ancora misurata, tutto lo schermo.
+    private func telaio(_ id: UUID) -> CGRect {
+        if let r = telai[id], r.width > 1, r.height > 1 { return r }
+        return CGRect(x: 0, y: 0, width: larghezza, height: altezza)
+    }
 
     /// Le pagine dello sfoglio: le sezioni aperte, nell'ordine d'apertura.
     private var carte: [PilaSezioni.Voce] { pila.voci }
@@ -162,11 +226,13 @@ struct StratoSezioniVista<Vista: View>: View {
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
-            if naviga.modo == .aggancio, let da = naviga.aggancioDa, let volo = naviga.volo {
-                LuceAggancio(inizio: da, reattore: reattore, volo: volo, altezza: altezza, larghezza: larghezza)
+            if naviga.modo == .aggancio, let da = naviga.aggancioDa, let volo = naviga.volo, let id = naviga.agganciata {
+                // sopra la pagina che vola (come la tela del mockup): laser, scintille, staffe e mirino le stanno davanti
+                LuceAggancio(orologio: tiro.orologio, reattore: reattore, volo: volo, telaio: telaio(id))
                     .id(da)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
+                    .zIndex(150)
             }
             bordi
         }
@@ -185,9 +251,10 @@ struct StratoSezioniVista<Vista: View>: View {
                 .environment(\.sezioneAperta, v.id)
                 .environment(\.sezioneDietro, pila.davanti != v.id)        // dietro: fotocamera e microfono in pausa
                 .environment(\.jarvisCoperto, false)
-                .modifier(AggancioPagina(attivo: naviga.agganciata == v.id, inizio: naviga.aggancioDa))
                 .modifier(SegueTiro(tiro: tiro, id: v.id))
                 .modifier(PosaPagina(posa: p))
+                // dove sta la pagina a riposo (coordinate globali): da lì parte il volo dell'AGGANCIO e lì si posa la sua luce
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { telai[v.id] = $0 }
                 .transition(.offset(y: altezza + 2))               // sale e scende di tutta l'altezza, come prima
     }
 
@@ -540,17 +607,20 @@ struct StratoSezioniVista<Vista: View>: View {
         }
     }
 
-    // MARK: AGGANCIO (lo stile «mix» del mockup): la pagina continua il lancio e vola dentro il reattore
+    // MARK: AGGANCIO (ORIGINE · AGGANCIO II del mockup, scelto dal signore il 4 nov notte): la pagina continua il lancio e vola
+    // dentro il reattore
 
     /// `base`: dove sta la pagina; `velocita`: il lancio del dito (punti al secondo); `scala`: quanto stava rimpicciolendo (1/s).
     /// Il suono parte a un istante preciso; gli effetti partono quando si sente, la pagina subito (continua il dito) e arriva nel
-    /// reattore all'aggancio (0,44 s dopo il suono: il colpo è a 0,466 s).
+    /// reattore all'aggancio (0,44 s dopo il suono: il colpo è a 0,466 s). Tutto spento a 1,1 s dal dito alzato.
     private func aggancio(id: UUID, base: TiroPagina.Viva, velocita: CGVector, scala: CGFloat) {
         Suoni.zittisciOlo()
         let fra = min(Suoni.sparisce(), TempiAggancio.attesaMassima)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        let verso = CGPoint(x: reattore.x - larghezza / 2, y: reattore.y - altezza / 2)
-        let scalaReattore = max(0.08, min(0.25, diametroReattore * 0.5 / altezza))
+        // il centro vero della pagina (non sempre quello dello schermo: dipende dai margini della sezione) va sul reattore
+        let r = telaio(id)
+        let verso = CGPoint(x: reattore.x - r.midX, y: reattore.y - r.midY)
+        let scalaReattore = max(0.08, min(0.25, diametroReattore * 0.5 / r.height))
         let volo = Volo.crea(da: base, velocita: velocita, scala: scala, verso: verso, scalaFinale: scalaReattore, ritardo: fra)
         var subito = Transaction(); subito.disablesAnimations = true
         withTransaction(subito) {
@@ -569,7 +639,8 @@ struct StratoSezioniVista<Vista: View>: View {
                 portaDavanti(nil)                                         // la sezione va dietro (viva), davanti JARVIS
                 naviga.dopoAggancio = true
             }
-            try? await Task.sleep(for: .milliseconds(Int((TempiAggancio.fine - TempiAggancio.fase) * 1000)))
+            // la luce si spegne a 1,1 s dal dito alzato (TempiAggancio.fine); 20 ms dopo si torna al modo normale
+            try? await Task.sleep(for: .milliseconds(Int((TempiAggancio.fine - TempiAggancio.fase - fra) * 1000) + 20))
             guard naviga.modo == .aggancio, naviga.agganciata == id else { return }
             withTransaction(senza) {
                 naviga.modo = .normale
@@ -649,19 +720,61 @@ struct StratoSezioniVista<Vista: View>: View {
     }
 }
 
-/// I tempi dell'AGGANCIO, uguali nel mockup, a tempo col suono «sparisce» (misurato sul file: colpi a 0,466 e 1,002 s). L'animazione
-/// anticipa i colpi di 10–20 ms: l'occhio la sente insieme al suono.
-enum TempiAggancio {
-    /// Fino a 0,44 s la pagina si inclina e si scioglie dal basso mentre vola; a 0,44 arriva nel reattore, le staffe agganciano e il
-    /// mirino scatta.
+/// I tempi dell'AGGANCIO (ORIGINE · AGGANCIO II), uguali nel mockup, a tempo col suono «sparisce» (misurato sul file: colpi a 0,466
+/// e 1,002 s). Due orologi, come nel mockup: dal dito alzato (`tau`, quello dei fotogrammi) e dal suono (`t = tau − ritardo`: aggancio,
+/// lampo, battiti). L'animazione anticipa i colpi di 10–20 ms: l'occhio la sente insieme al suono. Solo calcoli: senza attore.
+nonisolated enum TempiAggancio {
+    /// A 0,44 s dal suono la pagina arriva nel reattore, le staffe agganciano e il mirino scatta.
     static let fase: Double = 0.44
-    /// Il lampo nel reattore: da 0,43, pieno a 0,45, spento a 0,60.
+    /// Il lampo nel reattore: da 0,43, pieno a 0,45, spento a 0,60 (orologio del suono).
     static let lampo: Double = 0.43
-    /// I due battiti del reattore, sui due colpi del suono.
-    static let battiti: [(Double, Double)] = [(0.455, 1), (0.99, 0.75)]
-    static let fine: Double = 1.5
+    /// I due battiti del reattore, sui due colpi del suono (inizio, forza, durata): il secondo breve, dentro i 1100 ms.
+    static let battiti: [(Double, Double, Double)] = [(0.455, 1, 0.5), (0.99, 0.75, 0.12)]
+    /// Tutto spento a 1,1 s dal dito alzato.
+    static let fine: Double = 1.1
     /// Con cuffie Bluetooth lente l'animazione aspetta il suono al massimo 0,15 s (oltre, il gesto sembrerebbe lento).
     static let attesaMassima: Double = 0.15
+
+    // le curve del mockup
+    static func c01(_ u: Double) -> Double { u < 0 ? 0 : (u > 1 ? 1 : u) }
+    /// smoothstep
+    static func lisc(_ u: Double) -> Double { let v = c01(u); return v * v * (3 - 2 * v) }
+    /// ease-out cubica
+    static func usc(_ u: Double) -> Double { 1 - pow(1 - c01(u), 3) }
+    /// «ease in-out» quadratica
+    static func ease(_ u: Double) -> Double { u < 0.5 ? 2 * u * u : 1 - pow(-2 * u + 2, 2) / 2 }
+
+    /// Il passaggio da ORIGINE ad AGGANCIO II: da 170 a 260 ms dal dito alzato.
+    static func passaggio(_ tau: Double) -> Double { lisc((tau - 0.17) / 0.09) }
+
+    /// La riga del laser sulla pagina, in % dell'altezza dall'alto (102 = sotto la pagina, −4 = sopra la cima): parte nel passaggio e
+    /// raggiunge senza scatti quella di AGGANCIO II, che sale con la curva «ease in-out» in 0,44 s dal suono.
+    static func laser(_ tau: Double, ritardo: Double) -> Double {
+        let t = max(0, tau - ritardo), agg = 102 - ease(c01(t / fase)) * 106
+        return 102 - (102 - agg) * passaggio(tau)
+    }
+
+    /// L'inclinazione all'indietro (gradi) dal dito alzato: 38° in 150 ms (ORIGINE), 19° a 222 ms, poi fino a 42° all'aggancio.
+    static func inclinazione(_ tau: Double, durata: Double) -> Double {
+        if tau < 0.15 { return 38 * usc(tau / 0.15) }
+        if tau < 0.222 { return 38 - 19 * lisc((tau - 0.15) / 0.072) }
+        return 19 + 23 * lisc((tau - 0.222) / max(0.05, durata - 0.222))
+    }
+
+    /// Il giro dell'anello di luce: nel mockup cresce di (2,2 + 3·passaggio) al secondo dal suono; qui il suo integrale esatto.
+    static func giroAnello(_ tau: Double, ritardo: Double) -> Double {
+        let t = max(0, tau - ritardo), x = (tau - 0.17) / 0.09
+        let g = x <= 0 ? 0 : (x < 1 ? x * x * x - x * x * x * x / 2 : 0.5 + (x - 1))   // ∫ smoothstep
+        return 2.2 * t + 3 * 0.09 * g
+    }
+
+    /// Il caso dei pixel che si staccano sotto il laser (lo stesso numero del mockup, bit per bit).
+    static func pixelCaso(_ n0: Int) -> Double {
+        var n = UInt32(truncatingIfNeeded: n0)
+        n = (n ^ (n >> 16)) &* 0x45d9f3b
+        n = (n ^ (n >> 16)) &* 0x45d9f3b
+        return Double(n ^ (n >> 16)) / 4_294_967_296
+    }
 }
 
 /// Una molla smorzata come quelle di iOS (risposta e smorzamento): la distanza dalla meta nel tempo, partendo con una velocità.
@@ -698,7 +811,7 @@ struct Volo {
                     durata: durata, ritardo: ritardo)
     }
 
-    /// Dove sta la pagina dopo `tau` secondi dal lancio: lo spostamento dal centro dello schermo e la scala.
+    /// Dove sta la pagina dopo `tau` secondi dal lancio: lo spostamento dal suo centro a riposo e la scala.
     func stato(_ tau: Double) -> (x: CGFloat, y: CGFloat, scala: CGFloat) {
         let u = CGFloat(max(0, min(1, tau / durata)))
         let h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u, h01 = -2 * u * u * u + 3 * u * u
@@ -707,12 +820,23 @@ struct Volo {
                 scala: max(0.02, h00 * s0 + h10 * ms0 + h01 * s1))
     }
 
-    /// Dove sta la pagina sullo schermo all'istante `t` dell'orologio degli effetti (inclinata indietro fino a 42°).
-    func rettangolo(_ t: Double, larghezza: CGFloat, altezza: CGFloat) -> CGRect {
-        let st = stato(t + ritardo), e = AggancioPagina.curva(min(1, max(0, t) / TempiAggancio.fase))
-        let w = larghezza * st.scala, h = altezza * st.scala * CGFloat(cos(42 * e * .pi / 180))
-        let cx = larghezza / 2 + st.x, cy = altezza / 2 + st.y
-        return CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
+    /// La pagina sullo schermo a `tau` secondi dal lancio (fino all'aggancio; dopo resta dov'è arrivata): la stessa prospettiva di
+    /// `Proiezione`. `telaio`: dove sta la pagina a riposo (coordinate globali).
+    func proiezione(_ tau: Double, telaio: CGRect) -> ProiezionePagina {
+        let k = min(max(0, tau), durata), st = stato(k), a = TempiAggancio.inclinazione(k, durata: durata) * .pi / 180
+        return ProiezionePagina(cx: Double(telaio.midX), cy: Double(telaio.midY), w: Double(telaio.width), h: Double(telaio.height),
+                                x: Double(st.x), y: Double(st.y), s: Double(st.scala), ca: cos(a), sa: sin(a))
+    }
+}
+
+/// Dove va sullo schermo un punto della pagina (u, v da 0 a 1) con la posa del volo: `posaSchermo` del mockup (1100, dal centro).
+nonisolated struct ProiezionePagina {
+    let cx: Double, cy: Double, w: Double, h: Double
+    let x: Double, y: Double, s: Double, ca: Double, sa: Double
+
+    func punto(_ u: Double, _ v: Double) -> CGPoint {
+        let X = (u - 0.5) * w * s, Y = (v - 0.5) * h * s, k = 1100 / (1100 - Y * sa)
+        return CGPoint(x: cx + (X + x) * k, y: cy + (Y * ca + y) * k)
     }
 }
 
@@ -729,7 +853,13 @@ final class TiroPagina: NSObject, ObservableObject {
         var raggio: CGFloat = 0
         var tinta: Double = 0
         var ombra: Double = 0
+        /// AGGANCIO: l'inclinazione all'indietro (gradi) e la riga del laser (0 cima … 1 fondo; da 1,015 in su la pagina è intera).
+        var inclina: Double = 0
+        var riga: Double = 2
     }
+
+    /// L'orologio dell'AGGANCIO (secondi dal dito alzato), lo stesso fotogramma della pagina: lo legge solo la luce.
+    let orologio = OrologioAggancio()
 
     // le misure (uguali al mockup)
     static let sMeta: CGFloat = 0.78                   // la pagina olografica a metà pagina («almeno il 30% più grandi», 3 nov sera)
@@ -770,6 +900,7 @@ final class TiroPagina: NSObject, ObservableObject {
     private var molla: MollaPosa?
     private var fineMolla: (() -> Void)?
     private var volo: Volo?
+    private var voloPosato = false
     private var t0Volo: CFTimeInterval = 0
     private var baseVolo = Viva()
     private var f0Volo: Double = 0
@@ -856,6 +987,8 @@ final class TiroPagina: NSObject, ObservableObject {
         t0Volo = CACurrentMediaTime()
         baseVolo = viva
         f0Volo = fondo
+        voloPosato = false
+        orologio.tau = 0
         fase = .volo
         avvia()
     }
@@ -933,115 +1066,323 @@ final class TiroPagina: NSObject, ObservableObject {
                 f?()
             }
         case .volo:
+            // ORIGINE · AGGANCIO II: la pagina continua il lancio, si inclina (38° → 19° → 42°) e il laser la scioglie dal basso; il
+            // tempo è quello in cui il fotogramma si vedrà, lo stesso per la pagina e per la luce
             guard let v = volo else { fase = .ferma; return }
-            let tau = ora - t0Volo, st = v.stato(tau)
-            viva = Viva(x: st.x, y: st.y, scala: st.scala, raggio: baseVolo.raggio, tinta: baseVolo.tinta, ombra: baseVolo.ombra)
-            fondo = f0Volo * (1 - AggancioPagina.curva(max(0, min(1, (tau - v.ritardo) / TempiAggancio.fase))))
-            if tau >= v.durata + 0.05 { ferma() }
+            let tau = max(0, l.targetTimestamp - t0Volo)
+            if !voloPosato {
+                let k = min(tau, v.durata), st = v.stato(k)
+                viva = Viva(x: st.x, y: st.y, scala: st.scala, raggio: baseVolo.raggio, tinta: baseVolo.tinta, ombra: baseVolo.ombra,
+                            inclina: TempiAggancio.inclinazione(k, durata: v.durata), riga: TempiAggancio.laser(k, ritardo: v.ritardo) / 100)
+                fondo = f0Volo * (1 - TempiAggancio.lisc(k / v.durata))
+                voloPosato = tau >= v.durata                          // arrivata: tutta sciolta, resta lì finché la sezione va dietro
+            }
+            orologio.tau = tau
+            if tau >= TempiAggancio.fine { ferma() }
         case .ferma:
             ferma()
         }
     }
 }
 
-/// AGGANCIO, la pagina: si inclina indietro (fino a 42°) mentre la riga di scansione la percorre dal basso in alto e se la porta
-/// via (0–0,44 s dell'orologio degli effetti, curva «ease in-out»), come nel mockup. Il volo lo dà `SegueTiro`.
-struct AggancioPagina: ViewModifier {
-    let attivo: Bool
-    let inizio: Date?
-
-    /// «ease in-out» quadratica (la stessa del mockup).
-    nonisolated static func curva(_ a: Double) -> Double { a < 0.5 ? 2 * a * a : 1 - pow(-2 * a + 2, 2) / 2 }   // solo calcolo
-
-    // sempre dentro lo stesso TimelineView (fermo quando non serve): la sezione non viene mai ricreata
-    func body(content: Content) -> some View {
-        TimelineView(.animation(minimumInterval: nil, paused: !attivo)) { ctx in
-            let dt = attivo ? max(0, ctx.date.timeIntervalSince(inizio ?? ctx.date)) : 0
-            let e = AggancioPagina.curva(min(1, dt / TempiAggancio.fase))
-            let yy = 1.02 - e * 1.06                                   // la riga: dal 102% (sotto) al −4% (sopra la cima)
-            content
-                .overlay(alignment: .top) {
-                    GeometryReader { g in
-                        ZStack(alignment: .bottom) {
-                            LinearGradient(colors: [Color.ciano.opacity(0), Color.ciano.opacity(0.22)], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 70)
-                            Rectangle()
-                                .fill(Color(red: 0.875, green: 0.98, blue: 1))
-                                .frame(height: 2)
-                                .shadow(color: .ciano, radius: 5)
-                                .shadow(color: .ciano.opacity(0.85), radius: 13)
-                        }
-                        .frame(height: 72)
-                        .offset(y: g.size.height * yy - 72)
-                        .opacity(attivo && yy > -0.04 && yy < 1.02 ? 1 : 0)
-                    }
-                    .allowsHitTesting(false)
-                }
-                .mask {
-                    if attivo {
-                        LinearGradient(stops: [.init(color: .black, location: max(0, min(1, yy - 0.03))),
-                                               .init(color: .clear, location: max(0, min(1, yy + 0.01)))],
-                                       startPoint: .top, endPoint: .bottom)
-                    } else {
-                        Rectangle().padding(-3000)                     // fermo: non taglia niente
-                    }
-                }
-                .rotation3DEffect(.degrees(42 * e), axis: (x: 1, y: 0, z: 0), anchor: .center, perspective: 0.5)
-        }
-    }
+/// L'orologio dell'AGGANCIO: i secondi dal dito alzato, aggiornati da `TiroPagina` nello stesso fotogramma della pagina (120 Hz).
+/// Lo legge solo la luce, così la pagina e la luce sono sempre allo stesso istante.
+final class OrologioAggancio: ObservableObject {
+    @Published var tau: Double = 0
 }
 
-/// AGGANCIO, la luce (lo stile «mix» del mockup, stessi numeri): le staffe inquadrano la pagina in volo e all'aggancio (0,44 s) si
-/// chiudono sul reattore; le scintille nascono sulla riga di scansione (950 al secondo) e corrono nel reattore; il mirino a tre
-/// anelli si stringe, scatta all'aggancio e gira; il lampo (pieno a 0,45 s) e i due battiti (0,455 e 0,99 s) sui colpi del suono;
-/// tutto si spegne a 1,5 s. Un orologio solo, a 120 Hz.
+/// AGGANCIO, la luce: ORIGINE · AGGANCIO II del mockup (scelto dal signore il 4 nov notte, «ok bellissimo»), stessi numeri e stessi
+/// tempi. Due orologi, come nel mockup: dal dito alzato (`tau`, quello dei fotogrammi) e dal suono (`t`: aggancio, lampo, battiti).
+///   0–170 ms   ORIGINE: il reattore si apre (diaframma) e gli anelli giroscopici gli si aprono attorno; la pagina comincia a
+///              diventare luce.
+///   170–260    il passaggio: dal basso parte il laser di AGGANCIO II (tendina di luce, pixel, scintille con la scia) e raggiunge il
+///              suo senza scatti; le staffe compaiono sugli angoli veri della pagina; il mirino arriva largo e si stringe mentre il
+///              diaframma si chiude nel nucleo; gli anelli giroscopici diventano l'anello di luce inclinato, che si carica.
+///   dopo       l'aggancio a 0,44 s dal suono: le staffe girando diventano un rombo, l'anello si chiude, il mirino scatta, lampo, onda
+///              e primo battito; il secondo battito, breve; tutto spento a 1,1 s dal dito alzato.
+/// Si disegna in coordinate globali, sopra la pagina che vola e con la sua stessa prospettiva (`Volo.proiezione`).
 struct LuceAggancio: View {
-    let inizio: Date
+    @ObservedObject var orologio: OrologioAggancio
     let reattore: CGPoint
     let volo: Volo
-    let altezza: CGFloat
-    let larghezza: CGFloat
+    let telaio: CGRect
     @State private var scintille: [Scintilla]
 
+    /// Una scintilla di AGGANCIO II: nasce sulla riga del laser e va nel reattore a vortice (una curva, girata attorno al reattore).
     struct Scintilla {
-        let x0: Double, y0: Double, t0: Double, dur: Double, cx: Double, cy: Double, s: Double
+        let t0: Double, dur: Double, x0: Double, y0: Double, cx: Double, cy: Double, giro: Double, s: Double
     }
 
-    init(inizio: Date, reattore: CGPoint, volo: Volo, altezza: CGFloat, larghezza: CGFloat) {
-        self.inizio = inizio
+    private enum Luce { case punto, alone, lampo }
+
+    init(orologio: OrologioAggancio, reattore: CGPoint, volo: Volo, telaio: CGRect) {
+        _orologio = ObservedObject(wrappedValue: orologio)
         self.reattore = reattore
         self.volo = volo
-        self.altezza = altezza
-        self.larghezza = larghezza
-        _scintille = State(initialValue: LuceAggancio.genera(volo: volo, altezza: altezza, larghezza: larghezza))
+        self.telaio = telaio
+        _scintille = State(initialValue: LuceAggancio.genera(volo: volo, telaio: telaio))
     }
 
-    /// Le scintille, tutte prima (come le nasce il mockup fotogramma per fotogramma): sulla riga di scansione di quell'istante.
-    static func genera(volo: Volo, altezza: CGFloat, larghezza: CGFloat) -> [Scintilla] {
-        let F = TempiAggancio.fase, n = Int(950 * F)
-        return (0..<n).map { i in
-            let t0 = F * (Double(i) + Double.random(in: 0..<1)) / Double(n)
-            let r = volo.rettangolo(t0, larghezza: larghezza, altezza: altezza)
-            let e = AggancioPagina.curva(min(1, t0 / F))
-            let yy = max(0, min(1, 1.02 - e * 1.06))
-            let ly = Double(r.minY) + Double(r.height) * yy
-            return Scintilla(x0: Double(r.minX) + Double.random(in: 0..<1) * Double(r.width),
-                             y0: ly + (Double.random(in: 0..<1) - 0.5) * 6,
-                             t0: t0,
-                             dur: 0.36 + Double.random(in: 0..<1) * 0.2 + (F - t0) * 0.3,
-                             cx: (Double.random(in: 0..<1) - 0.5) * 120,
-                             cy: -10 - Double.random(in: 0..<1) * min(110, ly * 0.5),
-                             s: 0.7 + Double.random(in: 0..<1) * 1.4)
+    /// Le scintille, tutte prima: tante quante la pagina che il laser scioglie (2,7 per ogni 1% di pagina, circa 286, come nel
+    /// mockup), ognuna nel suo istante e nel suo punto della riga del laser, sulla pagina in prospettiva di quell'istante.
+    static func genera(volo: Volo, telaio: CGRect) -> [Scintilla] {
+        var out: [Scintilla] = []
+        out.reserveCapacity(300)
+        let F = TempiAggancio.fase, passo = 1.0 / 480
+        var precedente = 102.0, conto = 0.0, tau = 0.0
+        while tau < volo.durata {
+            let tau1 = min(volo.durata, tau + passo), yy = TempiAggancio.laser(tau1, ritardo: volo.ritardo)
+            if yy < 101.5 {
+                conto += max(0, precedente - yy) * 2.7
+                precedente = yy
+                while conto >= 1 {
+                    conto -= 1
+                    let tn = tau + Double.random(in: 0..<1) * (tau1 - tau)
+                    let pr = volo.proiezione(tn, telaio: telaio)
+                    let v1 = TempiAggancio.c01(TempiAggancio.laser(tn, ritardo: volo.ritardo) / 100)
+                    let e = pr.punto(0, v1), g = pr.punto(1, v1), f = Double.random(in: 0..<1)
+                    let x0 = Double(e.x) + Double(g.x - e.x) * f
+                    let y0 = Double(e.y) + Double(g.y - e.y) * f + (Double.random(in: 0..<1) - 0.5) * 4
+                    let t0 = max(0, tn - volo.ritardo)
+                    out.append(Scintilla(t0: t0,
+                                         dur: 0.34 + Double.random(in: 0..<1) * 0.2 + max(0, F - t0) * 0.3,
+                                         x0: x0, y0: y0,
+                                         cx: (Double.random(in: 0..<1) - 0.5) * 130,
+                                         cy: -12 - Double.random(in: 0..<1) * min(110, max(24, y0 * 0.45)),
+                                         giro: 1.1 + Double.random(in: 0..<1) * 0.7,
+                                         s: 0.7 + Double.random(in: 0..<1) * 1.1))
+                }
+            }
+            tau = tau1
+        }
+        return out
+    }
+
+    var body: some View {
+        let tau = orologio.tau
+        GeometryReader { g in
+            let o = g.frame(in: .global).origin
+            Canvas { gc, _ in
+                gc.translateBy(x: -o.x, y: -o.y)                       // si disegna in coordinate globali, come reattore e pagina
+                disegna(&gc, tau: tau)
+            }
         }
     }
+
+    // MARK: il disegno di un fotogramma (stesso ordine del mockup; tutto in luce additiva)
+
+    private func disegna(_ gc: inout GraphicsContext, tau: Double) {
+        typealias T = TempiAggancio
+        guard tau < T.fine else { return }
+        let F = T.fase, durata = volo.durata, rit = volo.ritardo
+        let t = max(0, tau - rit), u = T.c01(tau / durata), finito = tau >= durata
+        let R = reattore, RX = Double(R.x), RY = Double(R.y)
+        let pas = T.passaggio(tau)
+        let yy = T.laser(tau, ritardo: rit), sv = yy / 100
+        let fineT = 1 - T.lisc((tau - 1) / 0.1)                         // tutto spento entro 1100 ms
+        let pr = volo.proiezione(tau, telaio: telaio)                   // la pagina adesso (dopo l'aggancio: dov'è arrivata)
+        let asp = Double(telaio.width / max(1, telaio.height)), m = 0.025, mv = m * asp
+        let angoli: [(Double, Double)] = [(-m, -mv), (1 + m, -mv), (1 + m, 1 + mv), (-m, 1 + mv)]
+        gc.blendMode = .plusLighter
+
+        // 1) ORIGINE: il diaframma del reattore che si apre; nel passaggio si chiude nel nucleo e lascia il posto al mirino
+        let ap = T.usc(t / 0.2), apA = ap * (1 - pas)
+        if apA > 0.01 {
+            let r = 40 * ap * (1 - 0.6 * pas), r2 = 30 * ap * (1 - 0.6 * pas)
+            var p = Path()
+            for i in 0..<6 { LuceAggancio.arco(&p, R, r, da: Double(i) * 1.0472 + t * 1.6, lungo: 0.7) }
+            gc.stroke(p, with: .color(LuceAggancio.colore(143, 240, 255, 0.7 * apA)), style: LuceAggancio.tratto(1.4))
+            gc.stroke(Path(ellipseIn: CGRect(x: RX - r2, y: RY - r2, width: r2 * 2, height: r2 * 2)),
+                      with: .color(LuceAggancio.colore(79, 227, 255, 0.35 * apA)), style: LuceAggancio.tratto(1))
+        }
+
+        // 2) gli anelli giroscopici di ORIGINE, che nel passaggio diventano l'anello di luce inclinato di AGGANCIO II (si carica,
+        //    all'aggancio si chiude); il secondo anello si spegne
+        let ag = T.c01((t - 0.04) / 0.14)
+        let carica = t < F ? T.lisc(t / F) : 1 - T.c01((t - F) / 0.12)
+        let kr = t < F ? 1 : 1 - 0.8 * T.usc((t - F) / 0.09)
+        let fase1 = T.giroAnello(tau, ritardo: rit), fase2 = 1.7 - 1.7 * t
+        let rxE = 78 + (66 * kr - 78) * pas, ryE = 14 + (66 * 0.3 * kr - 14) * pas, incl = 0.14 + (-0.32 - 0.14) * pas
+        let aB = (1 - pas) * 0.2 * ag + pas * 0.3 * carica, aA = (1 - pas) * ag + pas * carica
+        if aA > 0.01 {
+            gc.stroke(LuceAggancio.ellisse(R, rxE, ryE, incl), with: .color(LuceAggancio.colore(79, 227, 255, aB)), style: LuceAggancio.tratto(1))
+            for k in 0..<2 {
+                let a = fase1 + Double(k) * .pi, davanti = sin(a + 0.35) > 0
+                let al = ((1 - pas) * (davanti ? 0.85 : 0.3) + pas * 0.85) * aA
+                var p = Path()
+                LuceAggancio.arcoEllisse(&p, R, rxE, ryE, incl, da: a, lungo: 0.8 + 0.1 * pas)
+                gc.stroke(p, with: .color(LuceAggancio.colore((143 + 80 * pas).rounded(), (240 + 10 * pas).rounded(), 255, al)),
+                          style: LuceAggancio.tratto(1.6 + 0.2 * pas))
+            }
+        }
+        let a2 = ag * (1 - pas)
+        if a2 > 0.01 {
+            gc.stroke(LuceAggancio.ellisse(R, 68, 11, -0.1), with: .color(LuceAggancio.colore(79, 227, 255, 0.2 * a2)), style: LuceAggancio.tratto(1))
+            for k in 0..<2 {
+                let a = fase2 + Double(k) * .pi, davanti = sin(a + 0.35) > 0
+                var p = Path()
+                LuceAggancio.arcoEllisse(&p, R, 68, 11, -0.1, da: a, lungo: 0.8)
+                gc.stroke(p, with: .color(LuceAggancio.colore(143, 240, 255, (davanti ? 0.85 : 0.3) * a2)), style: LuceAggancio.tratto(1.6))
+            }
+        }
+        if pas > 0.01 { LuceAggancio.luce(&gc, .alone, R, 50 + 30 * carica, 0.5 * carica * pas) }
+
+        // 3) ORIGINE: la pagina che diventa luce (solo la parte che il laser non ha ancora sciolto); si spegne fra 260 e 400 ms
+        let lw = 0.5 * T.lisc((u - 0.28) / 0.4) * (1 - T.lisc((tau - 0.26) / 0.14))
+        if !finito && lw > 0.01 && sv > 0.01 {
+            let v1 = T.c01(sv)
+            var q = Path()
+            q.move(to: pr.punto(0, 0))
+            q.addLine(to: pr.punto(1, 0))
+            q.addLine(to: pr.punto(1, v1))
+            q.addLine(to: pr.punto(0, v1))
+            q.closeSubpath()
+            gc.fill(q, with: .color(LuceAggancio.colore(143, 240, 255, lw)))
+        }
+
+        // 4) AGGANCIO II sulla pagina: la tendina di luce, i pixel che si staccano sotto il laser, il laser con i bagliori ai lati
+        if !finito && yy < 101.5 && sv > -0.03 {
+            let al = pas, v1 = T.c01(sv), v2 = T.c01(sv - 0.07)
+            let e = pr.punto(0, v1), g = pr.punto(1, v1)
+            if v1 - v2 > 0.005 {
+                let su = pr.punto(1, v2), so = pr.punto(0, v2)
+                var q = Path()
+                q.move(to: e)
+                q.addLine(to: g)
+                q.addLine(to: su)
+                q.addLine(to: so)
+                q.closeSubpath()
+                gc.fill(q, with: .linearGradient(Gradient(colors: [LuceAggancio.colore(79, 227, 255, 0.26 * al), LuceAggancio.colore(79, 227, 255, 0)]),
+                                                 startPoint: CGPoint(x: (e.x + g.x) / 2, y: (e.y + g.y) / 2),
+                                                 endPoint: CGPoint(x: (so.x + su.x) / 2, y: (so.y + su.y) / 2)))
+            }
+            let cs = 1.0 / 36, dvc = cs * asp, fr = Int((t * 40).rounded(.down))
+            let lato = Double(hypot(g.x - e.x, g.y - e.y)) / 36 * 0.27
+            var chiari = Path(), scuri = Path()
+            for j in 0..<4 {
+                let v = sv + (Double(j) + 0.5) * dvc
+                if v > 1 || v < 0 { continue }
+                let soglia = j == 0 ? 0.62 : (j == 1 ? 0.45 : (j == 2 ? 0.3 : 0.16))
+                for i in 0..<36 where T.pixelCaso(i * 7 + j * 131 + fr * 977) <= soglia {
+                    let o = pr.punto((Double(i) + 0.5) * cs, v)
+                    let r = CGRect(x: Double(o.x) - lato, y: Double(o.y) - lato, width: lato * 2, height: lato * 2)
+                    if j < 2 { chiari.addRect(r) } else { scuri.addRect(r) }
+                }
+            }
+            gc.fill(chiari, with: .color(LuceAggancio.colore(191, 246, 255, 0.8 * al)))
+            gc.fill(scuri, with: .color(LuceAggancio.colore(79, 227, 255, 0.45 * al)))
+            let a = pr.punto(-0.04, sv), b = pr.punto(1.04, sv)
+            var raggio = Path()
+            raggio.move(to: a)
+            raggio.addLine(to: b)
+            gc.stroke(raggio, with: .color(LuceAggancio.colore(79, 227, 255, 0.16 * al)), style: LuceAggancio.tratto(9))
+            gc.stroke(raggio, with: .color(LuceAggancio.colore(143, 240, 255, 0.4 * al)), style: LuceAggancio.tratto(3.2))
+            gc.stroke(raggio, with: .color(LuceAggancio.colore(240, 253, 255, 0.95 * al)), style: LuceAggancio.tratto(1.3))
+            LuceAggancio.luce(&gc, .punto, a, 10, al)
+            LuceAggancio.luce(&gc, .punto, b, 10, al)
+        }
+
+        // 5) AGGANCIO II: le scintille con la scia, a vortice nel reattore (raccolte per colore: quattro disegni in tutto)
+        var scia1 = Path(), scia2 = Path(), teste1 = Path(), teste2 = Path()
+        for p in scintille {
+            let w = (t - p.t0) / p.dur
+            guard w >= 0, w <= 1 else { continue }
+            let h = LuceAggancio.dove(p, w * w * (3 - 2 * w), R)
+            var prima = h
+            for j in 0..<2 {
+                let w2 = w - Double(j + 1) * 0.065
+                if w2 <= 0 { break }
+                let q = LuceAggancio.dove(p, w2 * w2 * (3 - 2 * w2), R)
+                if j == 0 {
+                    scia1.move(to: prima)
+                    scia1.addLine(to: q)
+                } else {
+                    scia2.move(to: prima)
+                    scia2.addLine(to: q)
+                }
+                prima = q
+            }
+            let r = p.s * 0.8, c = CGRect(x: Double(h.x) - r, y: Double(h.y) - r, width: r * 2, height: r * 2)
+            if p.s > 1.25 { teste1.addEllipse(in: c) } else { teste2.addEllipse(in: c) }
+        }
+        gc.stroke(scia1, with: .color(LuceAggancio.colore(79, 227, 255, 0.55)), style: LuceAggancio.tratto(1.3))
+        gc.stroke(scia2, with: .color(LuceAggancio.colore(79, 227, 255, 0.26)), style: LuceAggancio.tratto(0.95))
+        gc.fill(teste1, with: .color(LuceAggancio.colore(240, 253, 255, 0.95)))
+        gc.fill(teste2, with: .color(LuceAggancio.colore(191, 246, 255, 0.72)))
+
+        // 6) AGGANCIO II: le staffe sugli angoli veri della pagina (compaiono nel passaggio); all'aggancio volano sul reattore e
+        //    girando diventano un rombo
+        let K0 = angoli.map { pr.punto($0.0, $0.1) }
+        let lB = max(8, min(26, Double(hypot(K0[2].x - K0[3].x, K0[2].y - K0[3].y)) * 0.12))
+        if !finito {
+            LuceAggancio.staffe(&gc, K0, lB, 0.95 * T.lisc((tau - 0.17) / 0.05))
+        } else if t < F + 0.26 {
+            let e = T.usc((t - F) / 0.1), gi = Double.pi / 4 * e, rr = 48.0
+            let al = 0.95 * (t < F + 0.12 ? 1 : 1 - (t - F - 0.12) / 0.14)
+            var K: [CGPoint] = []
+            for i in 0..<4 {
+                let sx: Double = (i == 0 || i == 3) ? -1 : 1, sy: Double = i < 2 ? -1 : 1
+                let tx = RX + (sx * cos(gi) - sy * sin(gi)) * rr, ty = RY + (sx * sin(gi) + sy * cos(gi)) * rr
+                K.append(CGPoint(x: Double(K0[i].x) + (tx - Double(K0[i].x)) * e, y: Double(K0[i].y) + (ty - Double(K0[i].y)) * e))
+            }
+            LuceAggancio.staffe(&gc, K, lB + (14 - lB) * e, al)
+        }
+
+        // 7) il mirino a tre anelli (arriva nel passaggio, largo, e si stringe; all'aggancio scatta) e le quattro tacche
+        let stringe = t < F ? 1.9 - 0.9 * T.lisc(t / F) : (t < F + 0.08 ? 1 - 0.12 * sin((t - F) / 0.08 * .pi) : 1)
+        let alM = T.lisc((tau - 0.17) / 0.08) * fineT
+        if alM > 0 {
+            let giro = t * (t < F ? 1.2 : 3)
+            let anelli: [(Double, Int, Double, Double, Double)] = [(46, 12, 1.6, 2, 0.55), (60, 36, -0.9, 1, 0.4), (74, 6, 0.6, 3, 0.3)]
+            for (r, n, vel, lw, a0) in anelli {
+                var anello = Path()
+                let passo = 2 * Double.pi / Double(n)
+                for i in 0..<n { LuceAggancio.arco(&anello, R, r * stringe, da: giro * vel + Double(i) * passo, lungo: passo * 0.55) }
+                gc.stroke(anello, with: .color(LuceAggancio.colore(143, 240, 255, alM * a0 * 1.6)),
+                          style: StrokeStyle(lineWidth: lw, lineCap: .butt, lineJoin: .round))
+            }
+        }
+        if alM > 0.01 {
+            var tacche = Path()
+            for i in 0..<4 {
+                let a = Double(i) * .pi / 2 + (t < F ? 0 : (t - F) * 4), r1 = 86 * stringe, r2 = r1 + 9
+                tacche.move(to: CGPoint(x: RX + cos(a) * r1, y: RY + sin(a) * r1))
+                tacche.addLine(to: CGPoint(x: RX + cos(a) * r2, y: RY + sin(a) * r2))
+            }
+            gc.stroke(tacche, with: .color(LuceAggancio.colore(191, 246, 255, alM * 0.8)), style: LuceAggancio.tratto(1.2))
+        }
+
+        // 8) l'aggancio: il lampo sul colpo, l'onda, il primo battito; il secondo battito, sul secondo colpo, breve
+        if t > T.lampo && t < T.lampo + 0.17 {
+            let v = (t - T.lampo) / 0.17
+            LuceAggancio.luce(&gc, .lampo, R, 60 + v * 40, 0.85 * (v < 0.12 ? v / 0.12 : (1 - v) / 0.88))
+        }
+        if t > F && t < F + 0.3 {
+            let v = (t - F) / 0.3, r = 36 + 120 * T.usc(v)
+            gc.stroke(Path(ellipseIn: CGRect(x: RX - r, y: RY - r, width: r * 2, height: r * 2)),
+                      with: .color(LuceAggancio.colore(191, 246, 255, 0.7 * (1 - v))), style: LuceAggancio.tratto(2 * (1 - v) + 0.4))
+        }
+        for (tb, forza, dur) in T.battiti {
+            let v = (t - tb) / dur
+            guard v > 0, v < 1 else { continue }
+            let e = 1 - pow(1 - v, 2.5), al = (1 - v) * forza * fineT, r = 28 + e * 96
+            LuceAggancio.luce(&gc, .alone, R, 70 + e * 50, al)
+            gc.stroke(Path(ellipseIn: CGRect(x: RX - r, y: RY - r, width: r * 2, height: r * 2)),
+                      with: .color(LuceAggancio.colore(143, 240, 255, al * 0.9)), style: LuceAggancio.tratto(2 * (1 - v) + 0.5))
+        }
+    }
+
+    // MARK: i pezzi
 
     private static func colore(_ r: Double, _ g: Double, _ b: Double, _ a: Double) -> Color {
         Color(red: r / 255, green: g / 255, blue: b / 255).opacity(max(0, min(1, a)))
     }
 
-    /// Un arco come spezzata (il verso è sempre quello giusto, a schermo).
-    private static func arco(_ p: inout Path, centro c: CGPoint, raggio r: Double, da a0: Double, lungo l: Double) {
-        let passi = max(3, Int(l * r / 6))
+    private static func tratto(_ w: Double) -> StrokeStyle { StrokeStyle(lineWidth: w, lineCap: .round, lineJoin: .round) }
+
+    /// Un arco di cerchio come spezzata, da `a0` per `l` radianti (il verso è sempre quello del mockup, a schermo).
+    private static func arco(_ p: inout Path, _ c: CGPoint, _ r: Double, da a0: Double, lungo l: Double) {
+        let passi = max(3, Int(l * r / 5))
         for i in 0...passi {
             let a = a0 + l * Double(i) / Double(passi)
             let q = CGPoint(x: Double(c.x) + cos(a) * r, y: Double(c.y) + sin(a) * r)
@@ -1049,110 +1390,63 @@ struct LuceAggancio: View {
         }
     }
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: nil, paused: false)) { ctx in
-            let t = max(0, ctx.date.timeIntervalSince(inizio))
-            Canvas { gc, _ in disegna(&gc, t: t) }
+    /// Un'ellisse inclinata (in radianti, come `ellipse()` del mockup).
+    private static func ellisse(_ c: CGPoint, _ rx: Double, _ ry: Double, _ incl: Double) -> Path {
+        Path(ellipseIn: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2))
+            .applying(CGAffineTransform(rotationAngle: incl).concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
+    }
+
+    /// Un arco d'ellisse inclinata come spezzata (l'angolo è quello del parametro, come `ellipse()` del mockup).
+    private static func arcoEllisse(_ p: inout Path, _ c: CGPoint, _ rx: Double, _ ry: Double, _ incl: Double, da a0: Double, lungo l: Double) {
+        let passi = max(4, Int(l * max(rx, ry) / 5)), ci = cos(incl), si = sin(incl)
+        for i in 0...passi {
+            let a = a0 + l * Double(i) / Double(passi), ex = rx * cos(a), ey = ry * sin(a)
+            let q = CGPoint(x: Double(c.x) + ex * ci - ey * si, y: Double(c.y) + ex * si + ey * ci)
+            if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
         }
     }
 
-    private func disegna(_ gc: inout GraphicsContext, t: Double) {
-        guard t < TempiAggancio.fine else { return }
-        gc.blendMode = .plusLighter
-        let F = TempiAggancio.fase, R = reattore
+    /// Dove sta una scintilla al punto `e` del suo viaggio: la curva verso il reattore, girata attorno al reattore di giro·e².
+    private static func dove(_ p: Scintilla, _ e: Double, _ R: CGPoint) -> CGPoint {
+        let RX = Double(R.x), RY = Double(R.y), b = 1 - e
+        let X = b * b * p.x0 + 2 * b * e * (p.x0 + p.cx) + e * e * RX
+        let Y = b * b * p.y0 + 2 * b * e * (p.y0 + p.cy) + e * e * RY
+        let f = p.giro * e * e, cf = cos(f), sf = sin(f), dx = X - RX, dy = Y - RY
+        return CGPoint(x: RX + dx * cf - dy * sf, y: RY + dx * sf + dy * cf)
+    }
 
-        // le staffe: inquadrano la pagina in volo fino all'aggancio, poi si chiudono sul reattore (0,44–0,54 s) e si spengono (0,62)
-        var riquadro: CGRect?
-        var alS = 0.0
-        if t < F {
-            riquadro = volo.rettangolo(t, larghezza: larghezza, altezza: altezza)
-            alS = min(1, t / 0.08)
-        } else if t < F + 0.18 {
-            let b0 = volo.rettangolo(F, larghezza: larghezza, altezza: altezza)
-            let u = min(1, (t - F) / 0.10), e = CGFloat(1 - pow(1 - u, 3))
-            let w = b0.width + (104 - b0.width) * e, h = b0.height + (104 - b0.height) * e
-            let cx = b0.midX + (R.x - b0.midX) * e, cy = b0.midY + (R.y - b0.midY) * e
-            riquadro = CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
-            alS = t < F + 0.10 ? 1 : 1 - (t - F - 0.10) / 0.08
+    /// Le staffe del mirino su quattro angoli qualsiasi (la pagina in prospettiva, o il rombo sul reattore): i bracci vanno verso gli
+    /// angoli vicini, lunghi `l` (al massimo il 30% del lato).
+    private static func staffe(_ gc: inout GraphicsContext, _ K: [CGPoint], _ l: Double, _ al: Double) {
+        guard al > 0.01, K.count == 4 else { return }
+        var p = Path()
+        for i in 0..<4 {
+            let k = K[i], a = K[(i + 3) % 4], n = K[(i + 1) % 4]
+            let la = Double(hypot(a.x - k.x, a.y - k.y)), ln = Double(hypot(n.x - k.x, n.y - k.y))
+            let lp = la > 0 ? la : 1, lq = ln > 0 ? ln : 1, da = min(l, lp * 0.3), db = min(l, lq * 0.3)
+            p.move(to: CGPoint(x: Double(k.x) + Double(a.x - k.x) / lp * da, y: Double(k.y) + Double(a.y - k.y) / lp * da))
+            p.addLine(to: k)
+            p.addLine(to: CGPoint(x: Double(k.x) + Double(n.x - k.x) / lq * db, y: Double(k.y) + Double(n.y - k.y) / lq * db))
         }
-        if let b = riquadro?.insetBy(dx: -5, dy: -5), alS > 0 {
-            let l = max(8, min(26, b.width * 0.12))
-            var st = Path()
-            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] as [(CGFloat, CGFloat)] {
-                let px = b.midX + sx * b.width / 2, py = b.midY + sy * b.height / 2
-                st.move(to: CGPoint(x: px - sx * l, y: py))
-                st.addLine(to: CGPoint(x: px, y: py))
-                st.addLine(to: CGPoint(x: px, y: py - sy * l))
-            }
-            gc.stroke(st, with: .color(LuceAggancio.colore(143, 240, 255, alS * 0.95)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-        }
+        gc.stroke(p, with: .color(colore(143, 240, 255, min(1, al))), style: tratto(2))
+    }
 
-        // le scintille: dalla riga di scansione, lungo una curva, dentro il reattore (a gruppi: poche passate di disegno a 120 Hz)
-        var tratti = [Path](repeating: Path(), count: 12), punti = [Path](repeating: Path(), count: 12)
-        for p in scintille {
-            let u = (t - p.t0) / p.dur
-            guard u >= 0, u <= 1 else { continue }
-            func qb(_ v: Double) -> CGPoint {
-                let a = 1 - v
-                return CGPoint(x: a * a * p.x0 + 2 * a * v * (p.x0 + p.cx) + v * v * Double(R.x),
-                               y: a * a * p.y0 + 2 * a * v * (p.y0 + p.cy) + v * v * Double(R.y))
-            }
-            let e1 = u * u * (3 - 2 * u), u2 = max(0, u - 0.1), e2 = u2 * u2 * (3 - 2 * u2)
-            let qa = qb(e1), qs = qb(e2)
-            let k = min(3, Int(u * 4)) * 3 + min(2, Int((p.s - 0.7) / 1.4 * 3))
-            tratti[k].move(to: qs)
-            tratti[k].addLine(to: qa)
-            punti[k].addEllipse(in: CGRect(x: Double(qa.x) - p.s, y: Double(qa.y) - p.s, width: p.s * 2, height: p.s * 2))
+    /// Le luci già pronte del mockup (punto, alone, lampo): un tondo sfumato di raggio `r`, con opacità `a`.
+    private static func luce(_ gc: inout GraphicsContext, _ tipo: Luce, _ c: CGPoint, _ r: Double, _ a: Double) {
+        guard a > 0.004, r > 0.5 else { return }
+        let k = min(1, a)
+        let stops: [Gradient.Stop]
+        switch tipo {
+        case .punto:
+            stops = [.init(color: colore(240, 253, 255, k), location: 0), .init(color: colore(191, 246, 255, 0.85 * k), location: 0.16),
+                     .init(color: colore(79, 227, 255, 0.25 * k), location: 0.42), .init(color: colore(79, 227, 255, 0), location: 1)]
+        case .alone:
+            stops = [.init(color: colore(223, 250, 255, 0.55 * k), location: 0), .init(color: colore(79, 227, 255, 0), location: 1)]
+        case .lampo:
+            stops = [.init(color: colore(240, 253, 255, k), location: 0), .init(color: colore(79, 227, 255, 0), location: 1)]
         }
-        for k in 0..<12 where !tratti[k].isEmpty {
-            let uMedio = (Double(k / 3) + 0.5) / 4, sMedio = 0.7 + (Double(k % 3) + 0.5) / 3 * 1.4
-            gc.stroke(tratti[k], with: .color(LuceAggancio.colore(79, 227, 255, 0.5 * (1 - uMedio * 0.3))),
-                      style: StrokeStyle(lineWidth: sMedio * 0.9, lineCap: .round))
-            gc.fill(punti[k], with: .color(LuceAggancio.colore(223, 250, 255, 1 - uMedio * 0.45)))
-        }
-
-        // il mirino sul reattore: si stringe mentre la pagina vola, scatta all'aggancio, poi gira e si spegne
-        let stringe = t < F ? 1.9 - 0.9 * AggancioPagina.curva(t / F) : (t < F + 0.08 ? 1 - 0.12 * sin((t - F) / 0.08 * .pi) : 1)
-        let alM = t < 0.1 ? t / 0.1 : max(0, 1 - max(0, t - 1) / 0.5)
-        if alM > 0 {
-            let giro = t * (t < F ? 1.2 : 3)
-            let anelli: [(Double, Int, Double, Double, Double)] = [(46, 12, 1.6, 2, 0.55), (60, 36, -0.9, 1, 0.4), (74, 6, 0.6, 3, 0.3)]
-            for (r, n, vel, lw, a0) in anelli {
-                var anello = Path()
-                let passo = 2 * Double.pi / Double(n)
-                for i in 0..<n { LuceAggancio.arco(&anello, centro: R, raggio: r * stringe, da: giro * vel + Double(i) * passo, lungo: passo * 0.55) }
-                gc.stroke(anello, with: .color(LuceAggancio.colore(143, 240, 255, alM * a0 * 1.6)), style: StrokeStyle(lineWidth: lw, lineCap: .butt))
-            }
-            var tacche = Path()
-            for i in 0..<4 {
-                let a = Double(i) * .pi / 2 + (t < F ? 0 : (t - F) * 4), r1 = 86 * stringe, r2 = r1 + 9
-                tacche.move(to: CGPoint(x: Double(R.x) + cos(a) * r1, y: Double(R.y) + sin(a) * r1))
-                tacche.addLine(to: CGPoint(x: Double(R.x) + cos(a) * r2, y: Double(R.y) + sin(a) * r2))
-            }
-            gc.stroke(tacche, with: .color(LuceAggancio.colore(191, 246, 255, alM * 0.8)), lineWidth: 1.2)
-        }
-
-        // il lampo dell'aggancio: da 0,43 s, pieno a 0,45 (sul colpo del suono), spento a 0,60
-        let L = TempiAggancio.lampo
-        if t > L && t < L + 0.17 {
-            let u = (t - L) / 0.17, al = 0.8 * (u < 0.12 ? u / 0.12 : (1 - u) / 0.88), raggio = 60 + u * 40
-            gc.fill(Path(ellipseIn: CGRect(x: Double(R.x) - 100, y: Double(R.y) - 100, width: 200, height: 200)),
-                    with: .radialGradient(Gradient(colors: [LuceAggancio.colore(240, 253, 255, al), LuceAggancio.colore(79, 227, 255, 0)]),
-                                          center: R, startRadius: 0, endRadius: raggio))
-        }
-
-        // i due battiti del reattore, sui due colpi del suono
-        for (tb, forza) in TempiAggancio.battiti {
-            let u = (t - tb) / 0.5
-            guard u > 0, u < 1 else { continue }
-            let e = 1 - pow(1 - u, 2.5), al = (1 - u) * forza
-            let rg = 70 + e * 50, ra = 28 + e * 96
-            gc.fill(Path(ellipseIn: CGRect(x: Double(R.x) - rg, y: Double(R.y) - rg, width: rg * 2, height: rg * 2)),
-                    with: .radialGradient(Gradient(colors: [LuceAggancio.colore(223, 250, 255, al * 0.55), LuceAggancio.colore(79, 227, 255, 0)]),
-                                          center: R, startRadius: 0, endRadius: rg))
-            gc.stroke(Path(ellipseIn: CGRect(x: Double(R.x) - ra, y: Double(R.y) - ra, width: ra * 2, height: ra * 2)),
-                      with: .color(LuceAggancio.colore(143, 240, 255, al * 0.9)), lineWidth: 2 * (1 - u) + 0.5)
-        }
+        gc.fill(Path(ellipseIn: CGRect(x: Double(c.x) - r, y: Double(c.y) - r, width: r * 2, height: r * 2)),
+                with: .radialGradient(Gradient(stops: stops), center: c, startRadius: 0, endRadius: r))
     }
 }
 
