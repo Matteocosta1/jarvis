@@ -34,6 +34,7 @@ struct VistaShazam: View {
     @State private var inLibreria = Set<String>()
     @State private var giu: CGFloat = 0                 // lo swipe giù del player
     @ObservedObject private var lettore = LettoreMusica.condiviso
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: dietro (MARK XI) il logo olografico si ferma
 
     var body: some View {
         CorniceScheda(titolo: "Shazam", sottotitolo: sottotitolo, icona: "shazam.logo", tinta: tinta) {
@@ -75,7 +76,7 @@ struct VistaShazam: View {
 
     private var logoOlografico: some View {
         Button { Task { await ascolta() } } label: {
-            TimelineView(.animation(paused: UIAccessibility.isReduceMotionEnabled)) { tl in
+            TimelineView(.animation(paused: UIAccessibility.isReduceMotionEnabled || dietro)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 let ascolto = stato == .ascolto
                 let angolo = ascolto ? (t * 160).truncatingRemainder(dividingBy: 360) : sin(t * 0.9) * 38
@@ -433,6 +434,7 @@ struct VistaFotoScheda: View {
         .fullScreenCover(isPresented: Binding(get: { aperta != nil }, set: { if !$0 { aperta = nil } })) {
             if let foto, let k = aperta { VistaImmagini(immagini: foto, iniziale: k) }
         }
+        .chiudiFoglioDietro { aperta = nil }                    // 4 nov: il visore (iOS) non resta sopra la sezione che sale
     }
 
     private func carica() async {

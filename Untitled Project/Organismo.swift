@@ -578,7 +578,11 @@ struct VistaOlogramma: UIViewRepresentable {
         return v
     }
 
-    func updateUIView(_ v: SCNView, context: Context) {}
+    func updateUIView(_ v: SCNView, context: Context) {
+        // 4 nov · MARK XI: Vitals dietro (un'altra sezione davanti): la scena 3D non si ridisegna più; davanti riparte
+        let dietro = context.environment.sezioneDietro
+        if v.isPlaying == dietro { v.isPlaying = !dietro }
+    }
 
     static func dismantleUIView(_ v: SCNView, coordinator: Coordinatore) {
         v.isPlaying = false
@@ -651,6 +655,7 @@ struct PannelloOrganismo: View {
         .task { storia = await SaluteStorica.giorni(31) }
         .onAppear { ologramma.pausa(false); ologramma.aggiorna(d) }
         .onDisappear { ologramma.pausa(true) }
+        .pausaDietro(ferma: { ologramma.pausa(true) }, riprendi: { ologramma.pausa(false) })   // 4 nov: dietro (MARK XI) tutto fermo
         .onChange(of: d) { _, nuovi in ologramma.aggiorna(nuovi) }
     }
 

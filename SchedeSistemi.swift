@@ -619,6 +619,8 @@ struct VistaArchivio: View {
             Button("Elimina", role: .destructive) { if let f = daEliminare { Task { await elimina(f) } } }
             Button("Annulla", role: .cancel) { daEliminare = nil }
         } message: { Text(daEliminare?.s("nome") ?? "") }
+        // 4 nov: la fotocamera, il foglio del link, la scelta dei file e la domanda (iOS) non restano sopra la sezione che sale
+        .chiudiFoglioDietro { scatta = false; daCondividere = nil; scegliFile = false; daEliminare = nil }
     }
 
     private func chip(_ testo: String, attiva: Bool, azione: @escaping () -> Void) -> some View {

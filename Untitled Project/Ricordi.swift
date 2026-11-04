@@ -88,6 +88,7 @@ struct VistaRicordi: View {
                     }
                 }
             }
+            .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
         }
         .preferredColorScheme(.dark)
         .aperturaHUD("Ricordi")

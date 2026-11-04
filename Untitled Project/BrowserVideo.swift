@@ -77,6 +77,7 @@ struct VisoreVideo: View {
     @State private var errore: String?
     @State private var aperto: Int?
     @State private var cornici = false
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: il Browser dietro (MARK XI): la scansione si ferma
 
     var body: some View {
         ZStack {
@@ -165,7 +166,7 @@ struct VisoreVideo: View {
 
     /// La scansione: una riga di luce che scende, solo mentre carica (deciso dal signore: non continua sul video aperto).
     private var scansione: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { tl in
             GeometryReader { g in
                 let y = CGFloat(tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4) * g.size.height
                 Rectangle().fill(LinearGradient(colors: [.clear, accento.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom))

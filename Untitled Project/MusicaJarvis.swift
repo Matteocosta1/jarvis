@@ -831,11 +831,12 @@ private struct BarraTempoMusica: View {
 /// le misure sono quelle del suo disegno da 480, in scala).
 struct DiscoMusica: View {
     @ObservedObject var lettore: LettoreMusica
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) la musica suona, il disco non si disegna
 
     var body: some View {
         GeometryReader { g in
             let W = min(g.size.width, g.size.height)
-            TimelineView(.animation) { ctx in
+            TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
                 let a = lettore.angolo(ctx.date)
                 let ms = ctx.date.timeIntervalSinceReferenceDate * 1000
                 let suona = lettore.suona

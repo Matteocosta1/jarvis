@@ -402,7 +402,7 @@ struct Occhi: View {
         .animation(.easeOut(duration: 0.3), value: cielo.foglio)
         .onChange(of: zoom) { aggiornaCampo() }
         // MARK XI: dietro la fotocamera si ferma (l'ultima immagine resta), davanti riparte col suo suono
-        .pausaDietro(ferma: { motore.ferma() },
+        .pausaDietro(ferma: { motore.ferma(); fonte = nil },                    // 4 nov: anche la pagina della fonte (iOS) si chiude
                      riprendi: { motore.avvia(posizione: davanti ? .front : .back) { _ in }; Suoni.aperturaCamera() })
         .onDisappear {
             cielo.spegni(); ComandoOcchi.aereoAgganciato = false
@@ -913,9 +913,10 @@ struct MirinoHUD: View {
     let agganciato: Bool
     let scattando: Bool
     var tinta: Color = .ciano
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) il mirino si ferma
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let w = Double(size.width), h = Double(size.height)
@@ -1215,10 +1216,11 @@ nonisolated final class MotoreOcchi: NSObject, AVCapturePhotoCaptureDelegate, AV
 struct AnelloOcchi: View {
     let icona: String
     let tinta: Color
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) l'arco si ferma
     var body: some View {
         ZStack {
             Circle().stroke(tinta.opacity(0.25), lineWidth: 1)
-            TimelineView(.animation) { t in
+            TimelineView(.animation(minimumInterval: nil, paused: dietro)) { t in
                 Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
             }

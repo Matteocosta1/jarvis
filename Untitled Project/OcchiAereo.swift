@@ -450,10 +450,11 @@ struct VistaCieloOcchi: View {
     /// Il campo visivo verticale di adesso (con lo zoom).
     let campo: () -> Double
     let apriFoglio: () -> Void
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: Occhi dietro (MARK XI): il disegno si ferma
 
     var body: some View {
         GeometryReader { g in
-            TimelineView(.animation(paused: !cielo.acceso)) { tl in
+            TimelineView(.animation(paused: !cielo.acceso || dietro)) { tl in
                 let adesso = tl.date
                 let c = campo()
                 ZStack(alignment: .topLeading) {
@@ -490,8 +491,9 @@ struct VistaCieloOcchi: View {
 
 /// Il radar della ricerca: un cerchio con la scia che gira e la N in cima.
 private struct RadarOcchi: View {
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) si ferma
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { tl in
             let a = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4 * 360
             ZStack {
                 Circle().fill(AngularGradient(colors: [Color.ciano.opacity(0.45), Color.ciano.opacity(0), Color.ciano.opacity(0)],
@@ -586,6 +588,7 @@ private struct FiloAereo: View {
 private struct SchedaAereo: View {
     @ObservedObject var cielo: CieloOcchi
     let apri: () -> Void
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) la riga di scansione si ferma
 
     var body: some View {
         Button { Suoni.tocco(); apri() } label: {
@@ -593,7 +596,7 @@ private struct SchedaAereo: View {
                 ZStack(alignment: .top) {
                     RadialGradient(colors: [Color.ciano.opacity(0.16), .clear], center: UnitPoint(x: 0.5, y: 0.7), startRadius: 0, endRadius: 70)
                     AereoOlografico(lunghezza: DatiAerei.lunghezza(cielo.agganciato?.tipo ?? ""))
-                    TimelineView(.animation) { tl in
+                    TimelineView(.animation(minimumInterval: nil, paused: dietro)) { tl in
                         let k = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
                         Rectangle().fill(Color.ciano.opacity(0.35)).frame(height: 1).shadow(color: Color.ciano, radius: 3)
                             .padding(.horizontal, 10).offset(y: 6 + 80 * k)

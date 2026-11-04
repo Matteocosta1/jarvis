@@ -214,12 +214,13 @@ struct VistaAR: View {
     /// Creato una volta sola, quando serve: con `= MotoreOcchi()` ogni ridisegno ne costruirebbe uno nuovo (e una sessione).
     @State private var motore: MotoreOcchi?
     @State private var camera = false
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: Ricordi dietro (MARK XI): frecce e fotocamera in pausa
 
     var body: some View {
         ZStack {
             Color(red: 0.02, green: 0.03, blue: 0.035)          // #050809, se la fotocamera non c'è
             if camera, let m = motore { AnteprimaOcchi(sessione: m.sessione) }
-            TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: a 120 Hz come tutta l'app (prima 30)
+            TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
             }
             .allowsHitTesting(false)
@@ -234,6 +235,9 @@ struct VistaAR: View {
             if !Task.isCancelled { camera = ok } else { m.ferma() }
         }
         .onDisappear { motore?.ferma(); camera = false }
+        // 4 nov · MARK XI: con Ricordi dietro la fotocamera della Guida restava accesa; ora si ferma (l'ultima immagine resta)
+        // e davanti riparte, come nelle altre sezioni con la fotocamera
+        .pausaDietro(ferma: { motore?.ferma() }, riprendi: { if camera { motore?.avvia { _ in } } })
     }
 
     private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double) {

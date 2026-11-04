@@ -598,9 +598,10 @@ struct RiconoscimentoHUD: View {
     /// I pezzi dell'interfaccia sopra la ripresa (coordinate dello schermo): i nomi piccoli non ci vanno mai sopra.
     let riservati: [CGRect]
     let guida: GuidaCondivisa.Stato?
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: Occhi dietro (MARK XI): il disegno si ferma
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in                    // 4 nov: a 120 Hz come tutta l'app (prima 60)
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in    // 4 nov: a 120 Hz come tutta l'app (prima 60)
             Canvas { gc, size in
                 let adesso = ctx.date
                 let t = adesso.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10_000)

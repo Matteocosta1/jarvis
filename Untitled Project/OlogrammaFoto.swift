@@ -115,10 +115,11 @@ struct OlogrammaAnalisi: View {
     @State private var regia = RegiaAnalisi()
     @State private var foto = 0                       // sale a ogni foto pronta: col disegno fermo lo fa ridisegnare
     @Environment(\.accessibilityReduceMotion) private var riduci
+    @Environment(\.sezioneDietro) private var dietro  // 4 nov: la sezione dietro (MARK XI): l'ologramma si ferma
 
     var body: some View {
         let finita = !analisi.attivo, avanti = analisi.totale > 0 ? min(1, Double(analisi.fatte) / Double(analisi.totale)) : 0
-        TimelineView(.animation(minimumInterval: nil, paused: riduci)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
             let adesso = ctx.date, giro = foto
             Canvas { gc, size in
                 _ = giro
@@ -141,6 +142,13 @@ struct OlogrammaAnalisi: View {
 
 enum DisegnoAnalisi {
     private static let e = 0.14, s = 0.78, a0 = 1.16, a1 = 0.22
+
+    /// Il nome che sta in `posti` caratteri: se è più lungo, i primi e «…» (4 nov, i nomi lunghi sugli iPhone piccoli).
+    nonisolated static func accorcia(_ nome: String, _ posti: Int) -> String {
+        guard nome.count > posti else { return nome }
+        guard posti > 1 else { return posti == 1 ? "…" : "" }
+        return String(nome.prefix(posti - 1)).trimmingCharacters(in: .whitespaces) + "…"
+    }
 
     /// La foto in luce: il contrasto tirato, la luce della foto col colore dell'ologramma, il fondo mai spento, l'interlinea.
     static func luce(_ foto: UIImage, lato: CGFloat) -> UIImage {
@@ -269,6 +277,10 @@ enum DisegnoAnalisi {
         }
         // le cose trovate: compaiono quando il laser ci passa sopra, con il filo dalla foto e la barra della fiducia
         let tx = cx + p / 2 + 44, n = cur.cose.count
+        // 4 nov: un nome lungo (iPhone piccoli) si accorcia con «…» prima della percentuale. La scritta è monospaziata: basta la
+        // larghezza di un carattere, misurata una volta per disegno.
+        let carattere = Double(gc.resolve(Text("M").font(.system(size: 10, weight: .bold, design: .monospaced)))
+            .measure(in: CGSize(width: 200, height: 50)).width)
         gc.blendMode = .normal
         for (i, cosa) in cur.cose.enumerated() {
             let soglia = 0.12 + 0.72 * (Double(i) + 0.5) / Double(max(1, n)), du = u - e - s * soglia
@@ -298,8 +310,11 @@ enum DisegnoAnalisi {
             rombo.addLine(to: CGPoint(x: tx - 8, y: ry0 - 3.5))
             rombo.closeSubpath()
             gc.fill(rombo, with: .color(Olo.ciano.opacity(qt * fuori)))
-            Olo.scritta(&gc, cosa.nome, tx + 5, ry0 - 3.5, corpo: 10, peso: .bold, Olo.bianco.opacity(qt * fuori), ancora: .leading)
-            Olo.scritta(&gc, "\(Int((cosa.fiducia * 100).rounded()))%", w - 4, ry0 - 3.5, corpo: 10, peso: .bold, Olo.ciano.opacity(qt * fuori), ancora: .trailing)
+            let percento = "\(Int((cosa.fiducia * 100).rounded()))%"
+            // lo spazio del nome: fino alla percentuale, con un carattere vuoto in mezzo
+            let posti = carattere > 0 ? Int(((w - 4 - Double(percento.count + 1) * carattere) - (tx + 5)) / carattere) : cosa.nome.count
+            Olo.scritta(&gc, DisegnoAnalisi.accorcia(cosa.nome, posti), tx + 5, ry0 - 3.5, corpo: 10, peso: .bold, Olo.bianco.opacity(qt * fuori), ancora: .leading)
+            Olo.scritta(&gc, percento, w - 4, ry0 - 3.5, corpo: 10, peso: .bold, Olo.ciano.opacity(qt * fuori), ancora: .trailing)
             let bw = w - 4 - (tx + 5)
             gc.fill(Path(CGRect(x: tx + 5, y: ry0 + 4, width: bw, height: 2)), with: .color(Olo.azzurro.opacity(0.16 * fuori)))
             gc.fill(Path(CGRect(x: tx + 5, y: ry0 + 4, width: bw * cosa.fiducia * Olo.liscia(min(1, qt * 1.4)), height: 2)),
@@ -397,23 +412,48 @@ struct Rivela: ViewModifier, Animatable {
 struct ParoleCapite: View {
     let parole: [String]
     let tinta: Color
+    @Environment(\.accessibilityReduceMotion) private var riduci
+
+    /// Una parola in fila, con la sua identità.
+    nonisolated private struct Voce: Identifiable {
+        let id: String
+        let k: Int
+        let parola: String
+    }
+
+    /// 4 nov: l'identità di ogni parola è la parola stessa (e quante volte è già comparsa prima, se si ripete), non il posto
+    /// in fila: togliendo la prima, le altre restano quelle che erano e non rifanno l'aggancio, come nel mockup (lì si aggancia
+    /// solo una parola che prima non c'era).
+    private var voci: [Voce] {
+        var viste: [String: Int] = [:]
+        return parole.enumerated().map { k, p in
+            let chiave = p.lowercased()
+            let n = viste[chiave, default: 0]
+            viste[chiave] = n + 1
+            return Voce(id: "\(chiave)#\(n)", k: k, parola: p)
+        }
+    }
+
+    /// L'aggancio (arriva più grande, si stringe con un lampo); con «Riduci movimento» solo la dissolvenza (4 nov).
+    private var entrata: AnyTransition {
+        riduci ? .opacity : .asymmetric(insertion: .modifier(active: Aggancio(p: 0), identity: Aggancio(p: 1)), removal: .opacity)
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(Array(parole.enumerated()), id: \.offset) { k, p in
-                    if k > 0 {
+                ForEach(voci) { v in
+                    if v.k > 0 {
                         Text("+").font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(Color.tenue)
                     }
                     HStack(spacing: 6) {
                         Rectangle().fill(tinta).frame(width: 5, height: 5).rotationEffect(.degrees(45))
-                        Text(p.uppercased()).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1.5).foregroundStyle(tinta)
+                        Text(v.parola.uppercased()).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1.5).foregroundStyle(tinta)
                     }
                     .padding(.leading, 7).padding(.trailing, 8).padding(.vertical, 4)
                     .background(tinta.opacity(0.06))
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(tinta.opacity(0.4), lineWidth: 1))
-                    .id("\(k)·\(p)")
-                    .transition(.asymmetric(insertion: .modifier(active: Aggancio(p: 0), identity: Aggancio(p: 1)), removal: .opacity))
+                    .transition(entrata)
                 }
             }
         }

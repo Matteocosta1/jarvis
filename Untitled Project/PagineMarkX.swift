@@ -22,6 +22,10 @@ struct AperturaPagina: Identifiable {
     var didascalia: String? = nil       // Social dagli Occhi: la didascalia scritta prima di andare agli Occhi (26 ott sera)
     var video: URL? = nil               // Social dagli Occhi: il video già pronto per Instagram (VideoSocial), la foto è la copertina
     var secondiVideo = 0
+
+    /// Arriva con una richiesta (una frase, una foto o un video, una scansione di LiDAR, una scheda di Social): non è solo
+    /// «apri», la pagina deve eseguirla (4 nov: prima la scansione di LiDAR non contava).
+    var conRichiesta: Bool { voce != nil || foto != nil || video != nil || lidar != nil || scheda != nil }
 }
 
 enum PaginaMarkX {

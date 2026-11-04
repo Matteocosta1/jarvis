@@ -99,9 +99,14 @@ struct OlogrammaCuore: View {
     var piccolo = false
     @Environment(\.accessibilityReduceMotion) private var riduci
     @State private var inizio = Date()
+    #if os(iOS)
+    @Environment(\.sezioneDietro) private var dietro      // 4 nov: la sezione dietro (MARK XI): l'ologramma si ferma
+    #else
+    private let dietro = false                            // sul polso non c'è il contenitore delle sezioni
+    #endif
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil, paused: riduci)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
             let t = riduci ? 1 : ctx.date.timeIntervalSince(inizio)
             Canvas { gc, size in DisegnoCuore.disegna(&gc, size, t: t, d: dati, piccolo: piccolo) }
         }
@@ -303,9 +308,14 @@ struct OlogrammaCielo: View {
     var piccolo = false
     @Environment(\.accessibilityReduceMotion) private var riduci
     @State private var inizio = Date()
+    #if os(iOS)
+    @Environment(\.sezioneDietro) private var dietro      // 4 nov: la sezione dietro (MARK XI): l'ologramma si ferma
+    #else
+    private let dietro = false                            // sul polso non c'è il contenitore delle sezioni
+    #endif
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil, paused: riduci)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
             let t = riduci ? 1 : ctx.date.timeIntervalSince(inizio)
             Canvas { gc, size in DisegnoCielo.disegna(&gc, size, t: t, s: stato, piccolo: piccolo) }
         }

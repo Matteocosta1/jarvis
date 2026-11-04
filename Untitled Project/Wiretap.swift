@@ -240,7 +240,13 @@ struct VistaWiretap: View {
                     TestataScheda(titolo: "Wiretap",
                                   sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
                                   icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)
-                    Button("Chiudi") { Suoni.tocco(); w.cancella(); chiudi() }
+                    Button("Chiudi") {
+                        Suoni.tocco()
+                        // 4 nov (il signore): come «Jarvis, chiudi» a voce, niente si perde: con del testo parte il verbale
+                        w.ferma()
+                        let testo = w.testo
+                        if !testo.isEmpty { verbale(testo, w.minuti) } else { w.cancella(); chiudi() }
+                    }
                         .font(.system(size: 17, weight: .semibold))
                         .tint(Color.ciano)
                 }
@@ -379,8 +385,9 @@ extension VistaWiretap {
 struct OndaWiretap: View {
     let livello: Float
     let attivo: Bool
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) registra ancora, ma l'onda non si disegna
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil, paused: !attivo)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: !attivo || dietro)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let barre = 28

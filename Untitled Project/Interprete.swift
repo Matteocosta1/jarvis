@@ -152,11 +152,13 @@ struct Interprete: View {
         }
         .onChange(of: automatico) { _, v in motore.automatico = v }
         .onDisappear { chiuso = true; orecchio.ferma(); motore.ferma() }
-        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },                          // MARK XI: dietro in pausa
+        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma(); scegliLingua = false },   // MARK XI: dietro in pausa
                      riprendi: { if !chiuso, motore.fase == .attesa { orecchio.avvia() } })
-        .confirmationDialog("Interprete: in che lingua?", isPresented: $scegliLingua, titleVisibility: .visible) {
-            ForEach(Lingua.tutte) { l in Button("\(l.bandiera) \(l.nome)") { cambia(l) } }
-            Button("Annulla", role: .cancel) {}
+        // 4 nov (il signore): «Jarvis, cambia lingua» apre la scheda di JARVIS con le lingue, come all'apertura (SceltaLingua),
+        // non più il menu di iOS con le bandierine. La conversazione resta.
+        .fullScreenCover(isPresented: $scegliLingua) {
+            SceltaLingua { l in cambia(l) }
+                .paginaPiena()
         }
         .aperturaHUD("Interprete")
     }
@@ -187,6 +189,7 @@ struct Interprete: View {
     }
 
     private func cambia(_ l: Lingua) {
+        scegliLingua = false                                // anche a voce («passa al francese») con la scheda delle lingue aperta
         scelta = l
         motore.prepara(lingua: l)
         orecchio.ferma()
@@ -221,6 +224,27 @@ struct Interprete: View {
         }
         .buttonStyle(StileStark())
         .disabled(motore.fase == .traduco || motore.fase == .parlo)
+    }
+}
+
+/// La scelta della lingua dell'Interprete: la scheda di JARVIS (caricamento, icona animata, tasti ciano con le bandierine), non
+/// il menu di iOS. 26 ott notte (il signore) per l'apertura; 4 nov anche per «Jarvis, cambia lingua» dentro l'Interprete.
+struct SceltaLingua: View {
+    let scegli: (Lingua) -> Void
+
+    var body: some View {
+        CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
+            Pannello(titolo: "LINGUA", tinta: Color.ciano) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(Lingua.tutte) { l in
+                        TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
+                            Suoni.tocco()
+                            scegli(l)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

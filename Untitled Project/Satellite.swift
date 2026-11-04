@@ -205,6 +205,7 @@ struct VistaSatellite: View {
                 }
             }
         }
+        .chiudiFoglioDietro { if pagina != nil { apri(nil) } }  // 4 nov: Naviga, Guida, Travel o il Dossier non restano sopra a tutto
         .task { await carica() }
         .task(id: scelto?.chiave) { await caricaMeteo() }
         .onAppear { bussola.accendi() }
@@ -513,6 +514,8 @@ struct MappaSatellite: View {
     let meteo: String?
     /// Coperta da NAVIGA, GUIDA o DOSSIER: la camera sta ferma (niente lavoro inutile).
     var ferma = false
+    /// 4 nov: anche con SATELLITE dietro (MARK XI, un'altra sezione davanti) la camera sta ferma; davanti riparte.
+    @Environment(\.sezioneDietro) private var dietro
 
     @State private var posizione: MapCameraPosition = .automatic
     @State private var camera: MapCamera?
@@ -585,10 +588,10 @@ struct MappaSatellite: View {
             if let da = centro { volo = (da, a, Date()) } else { centro = a }
         }
         .onChange(of: lei == nil) { _, _ in if centro == nil, let lei { centro = lei } }
-        .task(id: ferma) {
+        .task(id: ferma || dietro) {
             // la camera a ogni fotogramma dello schermo, fino a 120 Hz (4 nov; prima 30 volte al secondo): il giro lento, il volo,
-            // il dito (coperta da un'altra schermata: ferma)
-            guard !ferma else { return }
+            // il dito (coperta da un'altra schermata, o la sezione dietro: ferma)
+            guard !ferma, !dietro else { return }
             prima = Date()
             let ritmo = RitmoSatellite { passo() }
             ritmo.avvia()
@@ -723,6 +726,7 @@ private struct AstaSat: View {
     static let arancio = Color(red: 1.0, green: 0.706, blue: 0.353)        // #ffb45a
     /// Dalla base (il luogo) alla cima dell'asta, dove poggia il cartellino: l'anello (12) e l'asta (64).
     static let alta: CGFloat = 12 + 64
+    @Environment(\.sezioneDietro) private var dietro                       // 4 nov: dietro (MARK XI) l'anello si ferma
 
     var body: some View {
         let tinta = scelta ? AstaSat.arancio : Color.ciano
@@ -730,7 +734,7 @@ private struct AstaSat: View {
             CartellinoSat(testo: testo, tinta: tinta, scritta: scelta ? Color(red: 1, green: 0.85, blue: 0.66) : ColoriHUD.chiaro, alone: scelta)
                 .offset(sposta)
             Rectangle().fill(tinta.opacity(0.85)).frame(width: 2.2, height: 64).shadow(color: tinta, radius: 4)
-            TimelineView(.animation(minimumInterval: nil)) { ctx in                   // 4 nov: a 120 Hz come tutta l'app (prima 30)
+            TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in   // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 let p = (ctx.date.timeIntervalSinceReferenceDate * 0.8).truncatingRemainder(dividingBy: 1)
                 Ellipse().stroke(tinta, lineWidth: 2)
                     .frame(width: 22, height: 9)
@@ -750,12 +754,13 @@ private struct PuntoLei: View {
     private static let verde = Color(red: 0.47, green: 0.90, blue: 0.59)          // #78e696
     /// Il punto con l'anello sotto il cartellino LEI (che poggia 4 punti più su).
     static let alto: CGFloat = 30
+    @Environment(\.sezioneDietro) private var dietro                       // 4 nov: dietro (MARK XI) l'anello si ferma
     var body: some View {
         VStack(spacing: 4) {
             CartellinoSat(testo: "LEI", tinta: PuntoLei.verde, scritta: Color(red: 0.79, green: 0.96, blue: 0.84))
                 .offset(sposta)
             ZStack {
-                TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: a 120 Hz come tutta l'app (prima 30)
+                TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in // 4 nov: a 120 Hz come tutta l'app (prima 30)
                     let p = (ctx.date.timeIntervalSinceReferenceDate * 0.9).truncatingRemainder(dividingBy: 1)
                     Circle().stroke(PuntoLei.verde, lineWidth: 2).frame(width: 20, height: 20)
                         .scaleEffect(1 + p * 1.5).opacity((1 - p) * 0.9)

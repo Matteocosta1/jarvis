@@ -105,6 +105,12 @@ extension View {
     func pausaDietro(ferma: @escaping () -> Void, riprendi: @escaping () -> Void) -> some View {
         modifier(PausaDietro(ferma: ferma, riprendi: riprendi))
     }
+    /// 4 nov · MARK XI: la sezione va dietro (un'altra sale davanti, anche chiesta a voce): il suo foglio di iOS (il Dossier di
+    /// SATELLITE, il visore delle foto, il Registro…) si chiude, perché iOS lo terrebbe sopra a tutto, anche sopra la sezione
+    /// nuova. La sezione resta viva dietro; tornata davanti si rivede la sua pagina.
+    func chiudiFoglioDietro(_ chiudi: @escaping () -> Void) -> some View {
+        modifier(PausaDietro(ferma: chiudi, riprendi: {}))
+    }
 }
 
 /// Chiude la sezione del contenitore, o il foglio di iOS se la vista è presentata.

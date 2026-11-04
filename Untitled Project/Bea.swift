@@ -102,6 +102,7 @@ struct VistaBea: View {
                     .id(pensiero)                                   // «Scrivine un altro»: il testo nuovo rimpiazza il vecchio
                     .presentationDetents([.medium])
             }
+            .chiudiFoglioDietro { sceltaContatto = false; pensiero = nil }   // 4 nov: i fogli (iOS) non restano sopra la sezione che sale
         }
         .preferredColorScheme(.dark)
     }

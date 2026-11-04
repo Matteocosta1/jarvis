@@ -833,12 +833,9 @@ final class Jarvis: NSObject, ObservableObject {
             } else {
                 annuncia(PaginaMarkX.annuncio(a))
             }
-            let coperta = occhi != nil || schermataAperta
-            if occhi != nil { occhiChiusi([]) } else if schermataAperta { chiudiChiesto = true }
-            Task { @MainActor in
-                if coperta { try? await Task.sleep(for: .milliseconds(700)) }   // il tempo che la schermata sopra si chiuda
-                PaginaMarkX.apri(a)
-            }
+            // 4 nov · MARK XI: niente più «chiudi» prima (chiudeva la sezione davanti, Occhi compresi): Studio o Social salgono
+            // e quella davanti va dietro da sola, viva, come nel mockup (ContentView, .jarvisApriPagina)
+            PaginaMarkX.apri(a)
             return true
         case .interprete(let codice)? where !lidarAperto:
             apriInterprete(codice)
@@ -987,12 +984,10 @@ final class Jarvis: NSObject, ObservableObject {
     func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil) async -> [Data] {
         // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
         if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
-        // una scheda o un'altra schermata aperta sopra: prima si chiude, se no Occhi non riesce ad aprirsi e JARVIS resterebbe in attesa
         if soccorsoAperto { return [] }               // il Tocco d'aiuto di Bea è aperto: non si copre mai
-        if schermataAperta && occhi == nil {
-            chiudiChiesto = true
-            try? await Task.sleep(for: .milliseconds(700))
-        }
+        // 4 nov · MARK XI: la sezione davanti non si chiude più prima («cosa vedi?» dal Meteo chiudeva il Meteo): gli Occhi salgono
+        // e lei va dietro da sola, viva, come nel mockup. Quello che sta sopra a tutto (la pagina web, il menu SISTEMI) lo chiude
+        // la schermata principale (ContentView, liberaSopra).
         occhiChiusi([])                        // se ne era rimasta aperta una, si chiude
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c

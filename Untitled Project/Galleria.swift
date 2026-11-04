@@ -142,13 +142,14 @@ struct VistaImmagini: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))
             .background(Color.black.ignoresSafeArea())
+            // 4 nov: «Chiudi» a destra e ciano, come in tutte le sezioni (era a sinistra); «Apri la pagina» passa a sinistra
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { chiudi() } }
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     if let s = attuale?.pagina, let url = URL(string: s) {
                         Button { pagina = PaginaWeb(url: url) } label: { Label("Apri la pagina", systemImage: "safari") }
                     }
                 }
+                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
             }
             .toolbarBackground(.black, for: .navigationBar)
             .sheet(item: $pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea() }

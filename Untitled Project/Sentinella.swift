@@ -334,6 +334,7 @@ struct VistaSentinella: View {
     @State private var orecchio = OrecchioComandi()
     @State private var oscurato = false
     @State private var registro = false
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: dietro (MARK XI) il lampeggio si ferma
 
     private var colore: Color { s.violato ? .red : (s.notte ? Color(red: 0.35, green: 1, blue: 0.45) : .ciano) }
 
@@ -353,7 +354,7 @@ struct VistaSentinella: View {
 
             // bordo rosso che lampeggia durante l'allarme
             // 27 ott: il lampeggio lo dà l'orologio (come gli anelli), non un'animazione infinita: il bordo non può vagare
-            TimelineView(.animation(minimumInterval: nil, paused: !s.violato)) { t in
+            TimelineView(.animation(minimumInterval: nil, paused: !s.violato || dietro)) { t in
                 RoundedRectangle(cornerRadius: 36)
                     .stroke(Color.red, lineWidth: 6)
                     .opacity(s.violato ? (1 - cos(t.date.timeIntervalSinceReferenceDate * .pi / 0.35)) / 2 : 0)
@@ -441,10 +442,11 @@ struct VistaSentinella: View {
             }
         }
         .onDisappear { orecchio.ferma(); s.ferma() }
-        .pausaDietro(ferma: { orecchio.ferma(); s.ferma() },                              // MARK XI: dietro in pausa
+        .pausaDietro(ferma: { orecchio.ferma(); s.ferma(); registro = false },            // MARK XI: dietro in pausa (4 nov: e il Registro si chiude)
                      riprendi: { Task { if await s.avvia() { Suoni.aperturaCamera(); orecchio.avvia() } } })
         .aperturaHUD("Sentinella", fotocamera: true)
-        .sheet(isPresented: $registro) { RegistroSentinella() }
+        // 4 nov: il Registro come nel mockup (il foglio che sale dal basso, la ✕ nel cerchio), non più la lista di iOS
+        .fullScreenCover(isPresented: $registro) { RegistroSentinella() }
     }
 
     /// Il mirino che insegue: un riquadro ad angoli su ogni persona o animale, con la sua etichetta.
@@ -498,8 +500,9 @@ struct AngoliMirino: Shape {
 /// Un fascio di radar che gira piano sopra l'immagine.
 struct RadarSentinella: View {
     let colore: Color
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: dietro (MARK XI) il radar si ferma
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
             let a = ctx.date.timeIntervalSinceReferenceDate * 1.2
             Canvas { gc, size in
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -514,39 +517,75 @@ struct RadarSentinella: View {
     }
 }
 
-/// Il registro: chi è passato e quando, con il fotogramma.
+/// Il registro: chi è passato e quando, con il fotogramma. 4 nov: come nel mockup (il foglio che sale dal basso, come il Dossier
+/// di SATELLITE): REGISTRO · CHI È PASSATO · OGGI, la ✕ nel cerchio a destra (la Sentinella ha la fotocamera), le righe
+/// «SOGGETTO: …» con l'ora, dal più recente; vuoto: NESSUN PASSAGGIO.
 struct RegistroSentinella: View {
     @ObservedObject private var s = Sentinella.condiviso
     @Environment(\.chiudiOVia) private var chiudi
 
     var body: some View {
-        NavigationStack {
-            List {
-                if s.eventi.isEmpty {
-                    Text("Nessun passaggio registrato, Sir. Tutto tranquillo.").foregroundStyle(Color.tenue)
-                }
-                ForEach(s.eventi) { e in
-                    HStack(spacing: 12) {
-                        if let img = UIImage(data: e.foto) {
-                            Image(uiImage: img).resizable().scaledToFill()
-                                .frame(width: 64, height: 84).clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(e.quando.formatted(date: .omitted, time: .shortened))
-                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                            Text(e.cosa.prefix(1).uppercased() + e.cosa.dropFirst()).foregroundStyle(Color.tenue)
-                        }
+        ZStack {
+            Color.fondo.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("REGISTRO").font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
+                        Text("CHI È PASSATO · OGGI").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.75)
                     }
-                    .listRowBackground(Color.ciano.opacity(0.05))
+                    .foregroundStyle(Color.ciano)
+                    Spacer(minLength: 4)
+                    Button { Suoni.tocco(); chiudi() } label: {
+                        Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
+                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                    }
+                    .buttonStyle(StileStark())
+                    .accessibilityLabel("Chiudi")
+                }
+                .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 10)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if s.eventi.isEmpty {
+                            Text("NESSUN PASSAGGIO")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
+                                .foregroundStyle(Color.tenue).multilineTextAlignment(.center)
+                                .padding(14).frame(maxWidth: .infinity)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                        }
+                        ForEach(s.eventi) { e in riga(e) }
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 24)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.fondo)
-            .navigationTitle("Registro")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) } }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// Una riga: il fotogramma, SOGGETTO e l'ora (ore, minuti e secondi, come nel mockup).
+    private func riga(_ e: Sentinella.Evento) -> some View {
+        HStack(spacing: 12) {
+            if let img = UIImage(data: e.foto) {
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: 64, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.ciano.opacity(0.3), lineWidth: 1))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("SOGGETTO: \(e.cosa.uppercased())")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(1)
+                    .foregroundStyle(.white)
+                Text(e.quando.formatted(date: .omitted, time: .standard))
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.ciano)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 10).padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.ciano.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.18), lineWidth: 1))
     }
 }
 #endif

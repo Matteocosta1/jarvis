@@ -278,12 +278,25 @@ struct ContentView: View {
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
-            // 26 ott (Occhi → Studio che non si apriva): iOS non apre una schermata mentre un'altra si sta ancora chiudendo
-            // (gli Occhi, LiDAR). Si aspetta che sia davvero chiusa (al massimo 3 s), poi si apre lo Studio o Social.
+            // 4 nov: Studio e Social salgono nel contenitore e la sezione davanti va dietro da sola (sincronizzaSezioni), viva,
+            // come nel mockup. Si chiude solo quello che sta sopra a tutto (liberaSopra); se era aperta la pagina web o la
+            // fotocamera di sistema (schermate di iOS) si aspetta che siano giù (al massimo 3 s), come prima.
+            let coperta = jarvis.pagina != nil || sorgenteFoto != nil
+            // 4 nov (il signore, scelta A): Studio o Social già davanti e una richiesta nuova per loro («Jarvis, crea una
+            // piastra…»): prima si perdeva. Ora la pagina scende (il lavoro dello Studio si salva uscendo) e risale subito con
+            // la richiesta, come nella MARK X.
+            let rifai = aperturaPagina?.sezione == a.sezione && a.conRichiesta
+            liberaSopra()
             Task { @MainActor in
-                for _ in 0..<60 {
-                    if PaginaMarkX.schermoLibero() { break }
-                    try? await Task.sleep(for: .milliseconds(50))
+                if rifai {
+                    aperturaPagina = nil
+                    try? await Task.sleep(for: .milliseconds(550))            // la discesa finita: poi sale quella nuova
+                }
+                if coperta {
+                    for _ in 0..<60 {
+                        try? await Task.sleep(for: .milliseconds(50))
+                        if PaginaMarkX.schermoLibero() { break }
+                    }
                 }
                 alzaPagina(a)
             }
@@ -336,6 +349,10 @@ struct ContentView: View {
             apriReparto(r)
         }
         .onChange(of: mostraLidar, initial: true) { _, aperto in jarvis.lidarAperto = aperto }
+        // 4 nov: gli Occhi e l'Interprete aperti da JARVIS («cosa vedi?», «traduci in inglese») salgono nel contenitore e la
+        // sezione davanti va dietro da sola; si chiude solo quello che starebbe sopra di loro (la pagina web, il menu SISTEMI…)
+        .onChange(of: jarvis.occhi != nil) { _, aperti in if aperti { liberaSopra() } }
+        .onChange(of: jarvis.interprete != nil) { _, aperto in if aperto { liberaSopra() } }
         .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
             Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
                 jarvis.impostaFoto(immagine)
@@ -1122,9 +1139,13 @@ struct ContentView: View {
     /// Una sezione si è accesa: davanti (se un'altra era davanti, va dietro). Una si è spenta: dietro o chiusa.
     private func sincronizzaSezioni(prima: [Sezione], adesso: [Sezione]) {
         let unaScheda: (Sezione) -> Bool = { if case .scheda = $0 { return true } else { return false } }
+        let unaPagina: (Sezione) -> Bool = { if case .pagina = $0 { return true } else { return false } }
         for s in prima where !adesso.contains(s) {
             // una scheda al posto di un'altra (lo stato delle schede è uno solo): quella di prima va dietro, non si chiude
             if unaScheda(s), adesso.contains(where: unaScheda) { pila.vaDietro(s) }
+            // 4 nov: lo stesso per Studio e Social (anche la pagina ha uno stato solo): Social aperto sopra Studio (o il
+            // contrario) e quello di prima resta vivo dietro, con il suo lavoro («tutte restano vive dietro, anche Studio e Social»)
+            if unaPagina(s), adesso.contains(where: unaPagina) { pila.vaDietro(s) }
             var chiusa = false
             withAnimation(StratoPagina.discesa()) { chiusa = pila.spenta(s) }
             if chiusa { sezioneChiusa(s) }
@@ -1158,7 +1179,7 @@ struct ContentView: View {
         case .interprete: return v.lingua?.id != jarvis.interprete?.id
         case .pagina:
             guard let a = aperturaPagina else { return false }
-            return a.voce != nil || a.foto != nil || a.scheda != nil
+            return a.conRichiesta
         default: return false
         }
     }
@@ -1296,22 +1317,13 @@ struct ContentView: View {
                             aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
         case .lingua:
             // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
-            // ciano), non più nel menu di iOS con le bandierine
-            CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
-                Pannello(titolo: "LINGUA", tinta: Color.ciano) {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        ForEach(Lingua.tutte) { l in
-                            TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
-                                Suoni.tocco()
-                                jarvis.interrompi()
-                                scegliLingua = false
-                                Task { @MainActor in
-                                    try? await Task.sleep(for: .milliseconds(450))     // l'Interprete sale a scheda chiusa
-                                    jarvis.interprete = l
-                                }
-                            }
-                        }
-                    }
+            // ciano), non più nel menu di iOS con le bandierine. 4 nov: la stessa scheda (SceltaLingua) di «Jarvis, cambia lingua».
+            SceltaLingua { l in
+                jarvis.interrompi()
+                scegliLingua = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(450))     // l'Interprete sale a scheda chiusa
+                    jarvis.interprete = l
                 }
             }
             .paginaPiena()
@@ -1453,6 +1465,20 @@ struct ContentView: View {
         jarvis.allenatore = false
         mostraLidar = false
         jarvis.occhiChiusi([])
+        aperturaPagina = nil                              // 4 nov: anche Studio e Social («Jarvis, chiudi» non li chiudeva)
+    }
+
+    /// 4 nov · MARK XI: prima che salga una sezione chiesta da JARVIS (Studio, Social, gli Occhi, l'Interprete) si chiude solo
+    /// quello che sta sopra a tutto: la tendina PROTOCOLLI (decisione 15), la tastiera, il menu SISTEMI, la pagina web e la
+    /// fotocamera di sistema, la domanda «Pulire la conversazione?». La sezione davanti no: va dietro da sola
+    /// (sincronizzaSezioni) e resta viva, come nel mockup.
+    private func liberaSopra() {
+        if tendinaAperta || tendinaTrascina != 0 { chiudiTendina() }
+        if telefono { tastiera = false }
+        if mostraSistemi { withAnimation(.spring(duration: 0.3)) { mostraSistemi = false } }
+        jarvis.pagina = nil
+        sorgenteFoto = nil
+        chiediPulizia = false
     }
 
     /// 26 ott sera: Studio o Social salgono come strato sopra JARVIS (StratoPagina), con la salita delle altre schede. A salita

@@ -36,47 +36,15 @@ struct CorniceScheda<Contenuto: View>: View {
                 GrigliaSfumata()
                 RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
                     .ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if marchio {
-                            // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
-                            HStack(alignment: .center) {
-                                TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
-                                Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(tinta)
-                            }
-                        } else {
-                            TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
-                        }
-                        if mostrato {
-                            contenuto()
-                                .mask(alignment: .top) {
-                                    // la scheda si «stampa» dall'alto, riga per riga
-                                    GeometryReader { g in
-                                        VStack(spacing: 0) {
-                                            Rectangle().frame(height: g.size.height * stampa)
-                                            Spacer(minLength: 0)
-                                        }
-                                    }
-                                }
-                                .overlay(alignment: .top) {
-                                    GeometryReader { g in
-                                        Rectangle().fill(tinta).frame(height: 2)
-                                            .shadow(color: tinta, radius: 6)
-                                            .offset(y: g.size.height * stampa)
-                                            .opacity(stampa < 1 ? 1 : 0)
-                                    }
-                                }
-                        }
+                // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX)
+                if fotocamera {
+                    VStack(spacing: 0) {
+                        tastoX
+                        pagina
                     }
-                    .padding(16)
-                    .padding(.bottom, 30)
-                    // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
-                    // larga esattamente quanto lo schermo e scorre solo in verticale, come nel mockup.
-                    .containerRelativeFrame(.horizontal)
+                } else {
+                    pagina
                 }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                .scrollDismissesKeyboard(.interactively)
-                .modifier(OsservaCima(attivo: barraDalloScorrimento, scorsa: $scorsa))
                 if !mostrato {
                     CaricamentoHUD(titolo: titolo, tinta: tinta)
                         .padding(.top, 120)
@@ -86,7 +54,8 @@ struct CorniceScheda<Contenuto: View>: View {
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
             .modifier(SfondoBarra(attivo: barraDalloScorrimento, visibile: scorsa))
-            .toolbar(marchio ? .hidden : .automatic, for: .navigationBar)   // marchio: «Chiudi» è nella testata, come Studio e Social
+            // marchio: «Chiudi» è nella testata, come Studio e Social; fotocamera: la X nel cerchio qui sopra
+            .toolbar(marchio || fotocamera ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) }
             }
@@ -103,6 +72,69 @@ struct CorniceScheda<Contenuto: View>: View {
             withAnimation(.easeOut(duration: 0.9)) { stampa = 1 }
         }
     }
+
+    /// La pagina che scorre: la testata e il contenuto, che si «stampa» dall'alto.
+    private var pagina: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if marchio {
+                    // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
+                    HStack(alignment: .center) {
+                        TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
+                        Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(tinta)
+                    }
+                } else {
+                    TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
+                }
+                if mostrato {
+                    contenuto()
+                        .mask(alignment: .top) {
+                            // la scheda si «stampa» dall'alto, riga per riga
+                            GeometryReader { g in
+                                VStack(spacing: 0) {
+                                    Rectangle().frame(height: g.size.height * stampa)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .overlay(alignment: .top) {
+                            GeometryReader { g in
+                                Rectangle().fill(tinta).frame(height: 2)
+                                    .shadow(color: tinta, radius: 6)
+                                    .offset(y: g.size.height * stampa)
+                                    .opacity(stampa < 1 ? 1 : 0)
+                            }
+                        }
+                }
+            }
+            .padding(16)
+            .padding(.bottom, 30)
+            // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
+            // larga esattamente quanto lo schermo e scorre solo in verticale, come nel mockup.
+            .containerRelativeFrame(.horizontal)
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .scrollDismissesKeyboard(.interactively)
+        .modifier(OsservaCima(attivo: barraDalloScorrimento, scorsa: $scorsa))
+    }
+
+    /// 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio, nello stesso posto del
+    /// «Chiudi» delle altre (come nel mockup: lo stesso tasto, a cerchio). Fuori dalla barra di iOS, che la vestirebbe di vetro.
+    private var tastoX: some View {
+        HStack {
+            Spacer()
+            Button { Suoni.tocco(); chiudi() } label: {
+                Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(tinta).frame(width: 44, height: 44)
+                    .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(StileStark())
+            .accessibilityLabel("Chiudi")
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+    }
 }
 
 /// La testata: icona dentro un anello che gira, nome della scheda in grande, una riga di stato.
@@ -115,6 +147,8 @@ struct TestataScheda: View {
     var marchio = false
     /// Sentinella: anche il titolo del colore della sezione (verde in visione notturna), non bianco.
     var titoloColorato = false
+    /// 4 nov: la sezione è dietro (MARK XI, invisibile o pagina olografica non davanti): l'arco si ferma, davanti riparte.
+    @Environment(\.sezioneDietro) private var dietro
 
     var body: some View {
         HStack(spacing: 14) {
@@ -124,7 +158,7 @@ struct TestataScheda: View {
                 // un'animazione infinita accesa all'apertura; se nello stesso istante la pagina si spostava (la salita, la barra
                 // in alto) iOS ripeteva all'infinito anche lo spostamento e l'arco vagava fuori dall'anello. Ora l'angolo lo dà
                 // l'orologio: stesso arco, un giro ogni 3 secondi, sempre centrato sull'icona, in tutte le schede.
-                TimelineView(.animation) { t in
+                TimelineView(.animation(minimumInterval: nil, paused: dietro)) { t in
                     Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
                 }
@@ -207,9 +241,10 @@ struct CaricamentoHUD: View {
     // 27 ott (il signore): la prima voce è quella della sezione (TestiCaricamento), poi i sistemi di sempre
     private var sistemi: [String] { [TestiCaricamento.di(titolo).uppercased(), "LETTURA SENSORI", "ANALISI", "COMPILAZIONE SCHEDA"] }
     @State private var inizio = Date()
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro si ferma (MARK XI)
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let passato = ctx.date.timeIntervalSince(inizio)
             let avanzamento = min(0.92, 1 - exp(-passato / 1.6))          // sale svelto, poi aspetta i dati

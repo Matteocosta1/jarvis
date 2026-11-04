@@ -477,6 +477,7 @@ struct PaginaBrowser: View {
                 nav.apri(url)
             }
         }
+        .chiudiFoglioDietro { mostraCronologia = false }    // 4 nov: la cronologia (iOS) non resta sopra la sezione che sale
     }
 
     /// MARK X: VIDEO cerca quello che è scritto nella barra (non l'indirizzo della pagina aperta); se non c'è niente, si scrive.
@@ -678,8 +679,9 @@ struct AngoliOlo: View {
 /// Il globo olografico del Browser (come il mockup): meridiani che ruotano e paralleli, linee sottili del colore del Browser.
 struct GloboOlo: View {
     let tinta: Color
+    @Environment(\.sezioneDietro) private var dietro    // 4 nov: il Browser dietro (MARK XI): il globo si ferma
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { t in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { t in
             Canvas { gc, size in
                 let r = min(size.width, size.height) / 2 - 1, c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let giro = t.date.timeIntervalSinceReferenceDate * 0.6

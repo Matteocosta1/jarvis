@@ -174,9 +174,10 @@ struct ScheletroHUD: View {
         (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist), (.neck, .root), (.root, .leftHip), (.root, .rightHip),
         (.leftHip, .leftKnee), (.leftKnee, .leftAnkle), (.rightHip, .rightKnee), (.rightKnee, .rightAnkle),
     ]
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) il disegno si ferma
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 guard let posa else { return }
@@ -262,9 +263,10 @@ struct OlogrammaHUD: View {
     private static let visoCorpo: Set<G> = [.nose, .leftEye, .rightEye, .leftEar, .rightEar]
     /// Le dita: catene di punti della mano (polso 0, pollice 1-4, indice 5-8, medio 9-12, anulare 13-16, mignolo 17-20).
     private static let dita: [[Int]] = [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [5, 9, 10, 11, 12], [9, 13, 14, 15, 16], [13, 17], [0, 17, 18, 19, 20]]
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) il disegno si ferma
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in                    // 4 nov: a 120 Hz come tutta l'app (prima 60)
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in    // 4 nov: a 120 Hz come tutta l'app (prima 60)
             Canvas { gc, size in
                 DisegnoOlo.vignetta(gc, W: size.width, H: size.height, interno: 0.35, alfa: 0.55)
                 guard let scena, !scena.persone.isEmpty else { return }

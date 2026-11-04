@@ -302,9 +302,10 @@ struct VistaProfiler: View {
 struct MirinoProfiler: View {
     let agganciato: Bool
     let acquisito: Bool
+    @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro (MARK XI) il mirino si ferma
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: nil)) { ctx in
+        TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 let ambra = VistaProfiler.ambra
