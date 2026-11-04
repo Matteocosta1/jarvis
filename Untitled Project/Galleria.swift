@@ -147,6 +147,7 @@ struct VistaImmagini: View {
                 ToolbarItem(placement: .topBarLeading) {
                     if let s = attuale?.pagina, let url = URL(string: s) {
                         Button { pagina = PaginaWeb(url: url) } label: { Label("Apri la pagina", systemImage: "safari") }
+                            .tint(Color.ciano)                     // 4 nov (il signore): ciano come il resto, mai il blu di iOS
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
