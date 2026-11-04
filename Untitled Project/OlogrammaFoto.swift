@@ -340,7 +340,8 @@ struct Materializza: ViewModifier {
 struct Rivela: ViewModifier, Animatable {
     var p: Double
     let altezza: CGFloat
-    var animatableData: Double {
+    // nonisolated: SwiftUI la legge e la scrive dall'animazione (come i Shape del progetto, che sono già nonisolated)
+    nonisolated var animatableData: Double {
         get { p }
         set { p = newValue }
     }
@@ -377,10 +378,16 @@ struct Rivela: ViewModifier, Animatable {
         var a = 0.0, b = 1.0, t = x
         for _ in 0..<24 {
             t = (a + b) / 2
-            let xt = 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t
-            if xt < x { a = t } else { b = t }
+            if Rivela.bezier(t, x1, x2) < x { a = t } else { b = t }
         }
-        return 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t
+        return Rivela.bezier(t, y1, y2)
+    }
+
+    /// Un punto della curva di Bézier da 0 a 1 con i due punti di controllo `p1` e `p2` (una coordinata).
+    private static func bezier(_ t: Double, _ p1: Double, _ p2: Double) -> Double {
+        let m = 1 - t
+        let b1 = 3 * m * m * t, b2 = 3 * m * t * t, b3 = t * t * t
+        return b1 * p1 + b2 * p2 + b3
     }
 }
 
@@ -417,7 +424,8 @@ struct ParoleCapite: View {
 /// L'aggancio di una parola appena capita: arriva più grande, si stringe al suo posto con un lampo.
 struct Aggancio: ViewModifier, Animatable {
     var p: Double
-    var animatableData: Double {
+    // nonisolated: come in Rivela
+    nonisolated var animatableData: Double {
         get { p }
         set { p = newValue }
     }

@@ -67,6 +67,7 @@ comandi Allenatore/Interprete/rapidi — una build per pezzo, provata ogni volta
 - **Rapporti:** `docs/controlli/` (DIALOGO-27, AUDIT-DIALOGO-25OTT, DECISIONI-24OTT, MAC-29).
 
 ## Apprendimenti
+- **4 nov (11.0 (3), prima prova di compilazione):** sull'orologio (arm64_32) anche un numero scritto nel codice più grande di 2.147.483.647 non entra in un `Int` e non compila (`n &* 2_654_435_761` in `Olo.caso`): i conti con numeri grandi (i numeri «a caso» sempre uguali) si fanno in `UInt32`/`UInt64`. Nei file in comune con l'orologio va cercato ogni numero grande prima di consegnare. E nei `ViewModifier` animabili (`Animatable`) `animatableData` si scrive `nonisolated`, come consiglia Apple: così SwiftUI può usarlo dalle sue animazioni anche fuori dal thread principale.
 - **25 ott:** l'Apple Watch SE 2 (arm64_32) ha `Int` a 32 bit: `Int(ms dal 1970)` chiude l'app → usare `Int64` per tempi in millisecondi; i log dei dispositivi si riconoscono dallo user agent (`…/NN` = numero di build installato).
 - **25 ott (polso, build 30):** nei log delle funzioni il `timestamp` è la **fine** della richiesta (start = timestamp − execution_time_ms); `response.headers.content_length` di 53 byte da jarvis-ascolto = «Sottotitoli a cura di QTSS», la frase che Whisper inventa sull'audio senza voce. Al polso la soglia del microfono a solo volume va legata alla voce vera del signore e l'aggiunta non deve mai potersi riaprire da sola, altrimenti diventa un giro infinito.
 
@@ -337,4 +338,6 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - **60 Hz** (il massimo dell'orologio) per lo sfondo, l'anello che gira, il caricamento delle schede, il logo di Shazam, l'ologramma delle icone, il reattore (prima 15 in attesa e 30 al lavoro, per la batteria) e l'ologramma di Vitals (era 30).
 
 **Da provare sul telefono e sull'orologio**: il Cuore (il battito, l'anello coi numeri di oggi), il Meteo con il cielo di adesso, Foto durante l'analisi (pannello, conto, chiusura alla fine; la ricerca con le parole capite e i quadratini col laser), Satellite (la mappa che gira fluida), Trainer, Traccia, Occhi e Vitals a 120 Hz; al polso Cuore e Meteo, e la batteria con il reattore a 60 Hz.
+
+**Compilazione su GitHub**: 1ª prova (9e310a2) 1 errore sull'orologio: in `Olo.caso` un numero troppo grande per l'`Int` a 32 bit del polso. Corretto facendo il conto in `UInt32` (sull'iPhone escono gli stessi numeri di prima: le gocce, i fiocchi, le stelle e i fulmini non cambiano). Poi ricontrollato a mano tutto il codice nuovo: in Foto `animatableData` di `Rivela` e `Aggancio` è ora `nonisolated` (le animazioni dei quadratini e delle parole capite funzionano con SwiftUI anche fuori dal thread principale) e la curva del laser è scritta in due pezzi più semplici (stessi valori). 2ª prova: in corso.
 

@@ -57,9 +57,10 @@ enum Olo {
                 at: CGPoint(x: x, y: y), anchor: ancora)
     }
 
-    /// Un numero a caso ma sempre uguale per lo stesso seme (le gocce, i fiocchi, le stelle, i fulmini).
+    /// Un numero a caso ma sempre uguale per lo stesso seme (le gocce, i fiocchi, le stelle, i fulmini). Tutto in UInt32:
+    /// sull'orologio Int è a 32 bit.
     nonisolated static func caso(_ n: Int) -> Double {
-        var x = UInt32(truncatingIfNeeded: n &* 2_654_435_761 &+ 1_013_904_223)
+        var x = UInt32(truncatingIfNeeded: n) &* 2_654_435_761 &+ 1_013_904_223
         x ^= x >> 15; x = x &* 0x2C1B_3C6D; x ^= x >> 12; x = x &* 0x297A_2D39; x ^= x >> 15
         return Double(x) / Double(UInt32.max)
     }
