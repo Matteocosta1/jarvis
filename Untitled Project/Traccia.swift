@@ -219,7 +219,7 @@ struct VistaAR: View {
         ZStack {
             Color(red: 0.02, green: 0.03, blue: 0.035)          // #050809, se la fotocamera non c'è
             if camera, let m = motore { AnteprimaOcchi(sessione: m.sessione) }
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { ctx in
+            TimelineView(.animation(minimumInterval: nil)) { ctx in               // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
             }
             .allowsHitTesting(false)

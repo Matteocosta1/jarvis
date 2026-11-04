@@ -600,7 +600,7 @@ struct RiconoscimentoHUD: View {
     let guida: GuidaCondivisa.Stato?
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in                    // 4 nov: a 120 Hz come tutta l'app (prima 60)
             Canvas { gc, size in
                 let adesso = ctx.date
                 let t = adesso.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10_000)

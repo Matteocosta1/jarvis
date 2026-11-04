@@ -569,7 +569,7 @@ struct VistaOlogramma: UIViewRepresentable {
         v.pointOfView = ologramma.camera
         v.backgroundColor = .clear
         v.antialiasingMode = .multisampling2X
-        v.preferredFramesPerSecond = 30
+        v.preferredFramesPerSecond = 120                                            // 4 nov: a 120 Hz come tutta l'app (prima 30)
         v.allowsCameraControl = false
         v.isPlaying = true
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinatore.trascina(_:)))

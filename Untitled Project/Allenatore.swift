@@ -264,7 +264,7 @@ struct OlogrammaHUD: View {
     private static let dita: [[Int]] = [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [5, 9, 10, 11, 12], [9, 13, 14, 15, 16], [13, 17], [0, 17, 18, 19, 20]]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60)) { ctx in
+        TimelineView(.animation(minimumInterval: nil)) { ctx in                    // 4 nov: a 120 Hz come tutta l'app (prima 60)
             Canvas { gc, size in
                 DisegnoOlo.vignetta(gc, W: size.width, H: size.height, interno: 0.35, alfa: 0.55)
                 guard let scena, !scena.persone.isEmpty else { return }
