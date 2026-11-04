@@ -1672,7 +1672,7 @@ struct ContentView: View {
         case .ricordi: return jarvis.richiestaTraccia
         case .satellite: return RichiestaSatellite.condivisa.azione != nil
         case .lidar: return LidarAperta.richiesta != nil
-        case .browser: return CercaVideo.richiesta != nil
+        case .browser: return CercaVideo.richiesta != nil || CercaWeb.richiesta != nil
         default: return false
         }
     }

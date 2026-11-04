@@ -268,6 +268,22 @@ enum ComandoVocale: Equatable {
         return nil
     }
 
+    /// 4 nov (il signore: «ok»): la ricerca su Google detta per esteso, da ovunque: «cerca su Google ristoranti a Milano»,
+    /// «cercami su Google…», «googla…», «googlami…», anche «cerca ristoranti a Milano su Google». Cosa cercare; nil se non è una
+    /// ricerca su Google («cerca…» da solo resta a JARVIS, che risponde lui).
+    static func ricercaGoogle(_ t: [String]) -> String? {
+        guard let verbo = t.first else { return nil }
+        var resto = Array(t.dropFirst())
+        if !["googla", "googlami"].contains(verbo) {
+            guard ["cerca", "cercami", "trova", "trovami"].contains(verbo), resto.count > 2 else { return nil }
+            let su: Set<String> = ["su", "in", "con"]
+            if su.contains(resto[0]), resto[1] == "google" { resto.removeFirst(2) }                                   // «cerca su google …»
+            else if resto[resto.count - 1] == "google", su.contains(resto[resto.count - 2]) { resto.removeLast(2) }   // «cerca … su google»
+            else { return nil }
+        }
+        return resto.isEmpty ? nil : resto.joined(separator: " ")
+    }
+
     /// MARK X · le frasi di STUDIO e SOCIAL (VOCI del mockup). Studio: «apri lo studio», «apri l'archivio dello studio», «fai il plastico
     /// della stanza», «porta il giardino nello studio», «crea/fammi/progettami» + un oggetto da stampare (o «in 3D», «da stampare»).
     /// Social: «apri Instagram», «leggimi i messaggi di Instagram», «com'è andata la settimana su Instagram?», «cosa ho in programma su
@@ -391,6 +407,14 @@ enum ComandoVocale: Equatable {
         if dentro != .profiler { t = Pronunce.sistema(t) }        // «laidar» → lidar, «idit» → edith… (nel Profiler no: lì si dettano nomi)
         // MARK XI: «sezioni aperte», «quella di prima», «mettila da parte», «chiudi tutto» (prima di togliere «sezione»)
         if let n = navigazione(t) { return n }
+        #if os(iOS)
+        // 4 nov (il signore: «ok»): «cerca su Google …», «googla …» aprono il Browser da ovunque (anche chiuso o dietro) e cercano
+        // lì; col Browser davanti ci pensa già BrowserVoce, prima di qui. Prima di «sezione», dello Studio e dei video: «su Google» vince
+        if let q = ricercaGoogle(t) {
+            CercaWeb.richiesta = (q, Date())                    // il Browser la prende appena si apre o torna davanti (entro 8 s)
+            return .apri(.browser)
+        }
+        #endif
         // «apri la sezione meteo», «attiva sezione LiDAR»: la parola «sezione» (con l'articolo) non cambia il comando
         if let k = t.firstIndex(where: { $0 == "sezione" || $0 == "sezioni" }), k + 1 < t.count {
             t.remove(at: k)

@@ -4,6 +4,17 @@ import Combine
 import WebKit
 import LocalAuthentication
 
+/// 4 nov (il signore: «ok»): «Jarvis, cerca su Google …» detto col Browser chiuso o dietro: la frase (ComandoVocale.ricercaGoogle)
+/// lascia qui cosa cercare; il Browser lo prende appena si apre o torna davanti (entro 8 s), come i video (CercaVideo).
+enum CercaWeb {
+    @MainActor static var richiesta: (testo: String, quando: Date)?
+    @MainActor static func prendiRichiesta() -> String? {
+        defer { richiesta = nil }
+        guard let r = richiesta, Date().timeIntervalSince(r.quando) < 8 else { return nil }
+        return r.testo
+    }
+}
+
 /// Il Browser a voce: «Jarvis, scrivi …» scrive nel campo attivo (la barra degli indirizzi o un campo della pagina),
 /// «Jarvis, invia» (o «vai», «cerca», «premi invio») lo manda. JARVIS non legge la pagina: scrive solo dove c'è il cursore.
 enum BrowserVoce {
@@ -458,19 +469,30 @@ struct PaginaBrowser: View {
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
         .onChange(of: attivo) {
             if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }
+            if attivo, let q = CercaWeb.prendiRichiesta() { scrivendo = false; nav.vai(q) }        // 4 nov: «cerca su Google …»
         }
         .onAppear {
             if attivo, let q = CercaVideo.prendiRichiesta() { barra = q; visoreVideo = q }      // «Jarvis, fammi vedere dei video di …»
+            if attivo, let q = CercaWeb.prendiRichiesta() { scrivendo = false; nav.vai(q) }    // 4 nov: «Jarvis, cerca su Google …»
             registraVoce()
         }
-        // 4 nov (il signore, strada B): il Browser già aperto (davanti o dietro) e «Jarvis, fammi vedere dei video di …»: la
-        // ricerca nuova qui, sul posto (prima tornava com'era e non cercava). Ancora chiuso col Face ID: la prende lo sblocco
+        // 4 nov (il signore, strada B): il Browser già aperto (davanti o dietro) e «Jarvis, fammi vedere dei video di …» o «cerca
+        // su Google …»: la ricerca nuova qui, sul posto (prima tornava com'era e non cercava). Ancora chiuso col Face ID: la prende
+        // lo sblocco (sopra)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
-            guard (n.userInfo?["reparto"] as? String) == Reparto.browser.rawValue, attivo, let q = CercaVideo.prendiRichiesta() else { return }
-            scrivendo = false
-            mostraCronologia = false
-            barra = q
-            withAnimation(.easeOut(duration: 0.3)) { visoreVideo = q }
+            guard (n.userInfo?["reparto"] as? String) == Reparto.browser.rawValue, attivo else { return }
+            if let q = CercaWeb.prendiRichiesta() {                       // la pagina di Google: il visore aperto sopra si chiude
+                scrivendo = false
+                mostraCronologia = false
+                nav.vai(q)
+                if visoreVideo != nil { withAnimation(.easeOut(duration: 0.25)) { visoreVideo = nil } }
+            }
+            if let q = CercaVideo.prendiRichiesta() {
+                scrivendo = false
+                mostraCronologia = false
+                barra = q
+                withAnimation(.easeOut(duration: 0.3)) { visoreVideo = q }
+            }
         }
         .overlay {
             if let q = visoreVideo {
