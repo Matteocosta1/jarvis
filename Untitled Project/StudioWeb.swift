@@ -220,7 +220,9 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "apriURL":                                                  // SERVICE: la pagina di stampa 3D di Vectorealism, dentro l'app
             guard let t = o["url"] as? String, let u = URL(string: t), u.scheme == "https", u.host?.hasSuffix("vectorealism.com") == true,
                   let sopra = RegiaStudio.inCima(web) else { return }
-            sopra.present(SFSafariViewController(url: u), animated: true)
+            let pagina = SFSafariViewController(url: u)
+            pagina.preferredControlTintColor = UIColor(Color.ciano)     // 4 nov: tasti in ciano come il resto, mai il blu di iOS
+            sopra.present(pagina, animated: true)
         case "copia":                                                    // CONDIVIDI › Copia: l'immagine del banco negli appunti
             if let b64 = o["b64"] as? String, let d = Data(base64Encoded: b64), let img = UIImage(data: d) { UIPasteboard.general.image = img }
         case "vaiA":                                                     // LIDAR e OCCHI dello Studio: quelli veri dell'iPhone
