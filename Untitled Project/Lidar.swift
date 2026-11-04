@@ -158,8 +158,16 @@ struct VistaLidar: View {
     @State private var inizioFine = Date()
     @State private var nomePersona: String?                   // «gemello digitale di Marco»
     @State private var mandando = false                       // MARK X: la scansione sta andando allo Studio
+    // 4 nov (il signore): «SALVARE LA SCANSIONE?» come lo Studio; ELIMINA › CONFERMA nell'archivio come Studio e Satellite
+    @State private var chiediSalva = false
+    @State private var nomeSalva = ""
+    @State private var dopoSalva: DopoSalva = .chiudi            // cosa fa dopo SALVA o NON SALVARE: chiude, o torna ai modi
+    @State private var scartata = false                       // NON SALVARE (o mandata allo Studio): uscendo non si salva da sola
+    @State private var daEliminare: UUID?                     // ARCHIVIO: la scansione che aspetta CONFERMA (3 s)
+    @State private var giroElimina = 0
 
     enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
+    enum DopoSalva { case chiudi, menu }
     enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
 
     /// Il modo vero: in Corpo, Postura (lo scheletro) o Texture (la «Statua»).
@@ -170,7 +178,7 @@ struct VistaLidar: View {
             Color.fondo.ignoresSafeArea()
             GrigliaSfumata()
             VStack(spacing: 0) {
-                ChiudiLidar { esci() }
+                ChiudiLidar { chiudiChiedendo() }
                 switch fase {
                 case .menu:
                     ScrollView {
@@ -186,7 +194,7 @@ struct VistaLidar: View {
                         ScrollView {
                             RisultatoModoVista(r: r, stile: $stile, salvato: salvati.contains(r.id),
                                                salva: { salvaModo(r) },
-                                               altra: { pulisciModo(); risultatoModo = nil; fase = .menu },
+                                               altra: { chiediPrima(.menu) },
                                                chiedi: { chiedi(r.domanda) },
                                                studio: { alloStudio(r.modello, modo: r.modo) })
                                 .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
@@ -194,6 +202,7 @@ struct VistaLidar: View {
                     }
                 }
             }
+            if chiediSalva { foglioSalva }
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(fase == .scansione || fase == .elaboro)
@@ -201,7 +210,11 @@ struct VistaLidar: View {
             LidarAperta.aperta = true
             if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; parti(r.modo, nome: r.nome) }   // aperta a voce già su un modo
         }
-        .onDisappear { LidarAperta.aperta = false }
+        .onDisappear {
+            LidarAperta.aperta = false
+            // chiusa in un altro modo (a voce, dalle pagine olografiche, «chiudi tutto», l'undicesima): la scansione non si perde
+            if !scartata { salvaDaSola() }
+        }
         .pausaDietro(ferma: {                                                                  // MARK XI: dietro in pausa
             LidarAperta.aperta = false
             if OcchiLidar.scatta != nil { OcchiLidar.inPausa = OcchiLidar.scatta; OcchiLidar.scatta = nil }
@@ -450,11 +463,101 @@ struct VistaLidar: View {
         }
     }
 
-    /// Uscendo, il modello 3D di una scansione non salvata si cancella: non resta a occupare spazio.
+    /// Uscendo senza salvare, il modello 3D di una scansione non salvata si cancella: non resta a occupare spazio.
     private func esci() {
+        scartata = true
         if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D) }
         pulisciModo()
         chiudi()
+    }
+
+    // MARK: «SALVARE LA SCANSIONE?» (4 nov, il signore: come lo Studio)
+
+    /// Il nome della scansione che si vede e non è salvata (nil: niente da salvare).
+    private var nomeDaSalvare: String? {
+        if fase == .risultato, let r = risultato, !archivio.contiene(r) { return r.nome }
+        if fase == .risultatoModo, let r = risultatoModo, !salvati.contains(r.id) {
+            return r.nome ?? r.modo.nome + " del " + r.data.formatted(date: .numeric, time: .shortened)
+        }
+        return nil
+    }
+
+    /// ✕: con una scansione non salvata chiede, come lo Studio; altrimenti chiude.
+    private func chiudiChiedendo() { chiediPrima(.chiudi) }
+
+    /// Prima di chiudere (✕) o di tornare ai modi (Modalità) con una scansione non salvata: la domanda, come lo Studio quando
+    /// si chiude o si cambia progetto. Niente da salvare: lo fa subito.
+    private func chiediPrima(_ dopo: DopoSalva) {
+        guard let n = nomeDaSalvare else { fai(dopo); return }
+        dopoSalva = dopo
+        nomeSalva = n
+        Suoni.schedaApre()
+        withAnimation(.salitaFoglio) { chiediSalva = true }
+    }
+
+    /// Dopo la domanda (o senza): chiude, oppure torna ai modi (il modello di Texture non salvato si cancella).
+    private func fai(_ dopo: DopoSalva) {
+        switch dopo {
+        case .chiudi: esci()
+        case .menu: pulisciModo(); risultatoModo = nil; fase = .menu
+        }
+    }
+
+    private var foglioSalva: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.001).ignoresSafeArea()               // sotto il foglio non si tocca niente
+            FoglioSalva(titolo: "SALVARE LA SCANSIONE?",
+                        sotto: (dopoSalva == .chiudi ? "Chiudo LiDAR" : "Cambio modalità") + " · la scansione non è salvata", nome: $nomeSalva,
+                        nota: "NON SALVARE butta la scansione: non è mai stata salvata.",
+                        salva: {
+                            let n = nomeSalva.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                            let finale = n.isEmpty ? (nomeDaSalvare ?? "") : n
+                            salvaCon(nome: n)
+                            jarvis.annuncia("Salvata nell'archivio, Sir: «\(finale)».")
+                            withAnimation(.salitaFoglio) { chiediSalva = false }
+                            fai(dopoSalva)
+                        },
+                        nonSalvare: { withAnimation(.salitaFoglio) { chiediSalva = false }; fai(dopoSalva) },
+                        annulla: { withAnimation(.salitaFoglio) { chiediSalva = false } })
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
+        .transition(.move(edge: .bottom))
+        .zIndex(10)
+    }
+
+    /// La scansione che si vede, nell'archivio (con il nome scelto; vuoto: quello che aveva).
+    private func salvaCon(nome n: String) {
+        if fase == .risultato, var r = risultato, !archivio.contiene(r) {
+            if !n.isEmpty { r.nome = n }
+            archivio.salva(r)
+            risultato = r
+        } else if fase == .risultatoModo, var r = risultatoModo, !salvati.contains(r.id) {
+            if !n.isEmpty { r.nome = n }
+            risultatoModo = r
+            salvaModo(r)
+        }
+    }
+
+    /// Chiusa da fuori con una scansione non salvata: si salva da sola, con il suo nome.
+    private func salvaDaSola() {
+        guard nomeDaSalvare != nil else { return }
+        salvaCon(nome: "")
+    }
+
+    /// ARCHIVIO: il primo tocco chiede CONFERMA per 3 secondi (come Satellite), il secondo elimina.
+    private func elimina(_ s: ScansioneLidar) {
+        guard daEliminare == s.id else {
+            Suoni.tocco()
+            daEliminare = s.id
+            giroElimina += 1
+            let mio = giroElimina
+            Task { try? await Task.sleep(for: .seconds(3)); if giroElimina == mio { daEliminare = nil } }
+            return
+        }
+        Suoni.pronto()
+        daEliminare = nil
+        if risultato?.id == s.id { risultato = nil }
+        archivio.cancella(s)
     }
     private func apri(_ s: ScansioneLidar) {
         risultato = s
@@ -512,10 +615,20 @@ struct VistaLidar: View {
                                     .font(.system(size: 12, design: .monospaced)).foregroundStyle(Color.tenue)
                             }
                         }
-                        Button { Suoni.tocco(); if risultato?.id == s.id { risultato = nil }; archivio.cancella(s) } label: {
-                            Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(Color.tenue).padding(.leading, 8)
+                        // 4 nov (il signore): ELIMINA › CONFERMA, come lo Studio e Satellite (prima il cestino cancellava subito)
+                        let sicuro = daEliminare == s.id
+                        let rosso = Color(red: 1, green: 107 / 255, blue: 107 / 255)                                    // #ff6b6b
+                        Button { elimina(s) } label: {
+                            Text(sicuro ? "CONFERMA" : "ELIMINA")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1)
+                                .foregroundStyle(sicuro ? rosso : Color.ciano)
+                                .padding(.vertical, 6).padding(.horizontal, 8)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(sicuro ? rosso.opacity(0.6) : Color.ciano.opacity(0.3), lineWidth: 1))
+                                .contentShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .accessibilityLabel("Cancella \(s.nome)")
+                        .buttonStyle(StileStark())
+                        .padding(.leading, 8)
+                        .accessibilityLabel(sicuro ? "Conferma: elimina \(s.nome)" : "Elimina \(s.nome)")
                     }
                     .padding(.horizontal, 14).padding(.vertical, 11)
                     if s.id != archivio.scansioni.last?.id { Divider().overlay(Color.ciano.opacity(0.12)) }

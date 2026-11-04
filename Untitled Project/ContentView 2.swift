@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import AVFoundation
 import QuartzCore
+import UIKit
 
 /// Le schede delle icone della corona.
 /// Le ultime righe di stato del menu SISTEMI, ricordate sul telefono: all'apertura si vedono subito, poi si aggiornano.
@@ -70,6 +71,7 @@ struct ContentView: View {
     @State private var naviga = NavigaSezioni()                // i gesti fra le sezioni (letti solo dal contenitore)
     @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)
     @State private var riprendo: Sezione?                      // la sezione che torna davanti da dietro (non una richiesta nuova)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
+    @State private var giroDavanti: [UUID] = []                // le sezioni state davanti, dall'ultima: «Jarvis, quella di prima»
     @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
     private enum ModoCorona { case ruota, tendina }
     @Environment(\.scenePhase) private var scena
@@ -169,13 +171,11 @@ struct ContentView: View {
                 guard let id = n.userInfo?["id"] as? UUID, let v = pila.voci.first(where: { $0.id == id }) else { return }
                 spegniStato(v.sezione)
             }
-            .onChange(of: pila.davanti) { _, d in
-                if d == nil { pilaCopre = false; return }
-                Task { @MainActor in                                 // a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma
-                    try? await Task.sleep(for: .milliseconds(550))
-                    if pila.davanti == d { pilaCopre = true }
-                }
+            // 4 nov: le sezioni aperte a voce («sezioni aperte», «quella di prima», «chiudi il meteo», «mettila da parte»…)
+            .onReceive(NotificationCenter.default.publisher(for: .jarvisComandoSezioni)) { n in
+                if let c = n.userInfo?["comando"] as? ComandoVocale { comandoSezioni(c) }
             }
+            .onChange(of: pila.davanti) { _, d in davantiCambiata(d) }
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
             .onChange(of: jarvis.repartoRichiesto) { _, r in
                 guard let r else { return }
@@ -1281,12 +1281,101 @@ struct ContentView: View {
                            chiudiDietro: { id in chiudiDietro(id) })
     }
 
-    /// Dalle pagine olografiche: la pagina spinta in su si chiude (davanti o dietro che sia).
+    /// Dalle pagine olografiche (o a voce, «chiudi il meteo»): la sezione si chiude, davanti o dietro che sia.
     private func chiudiDietro(_ id: UUID) {
         guard let v = pila.voci.first(where: { $0.id == id }) else { return }
+        if v.sezione == .wiretap { chiudiWiretap(); return }       // 4 nov (il signore): con del testo parte il verbale
         if pila.davanti == id { spegniStato(v.sezione); return }
         pila.togli(v.sezione)
         sezioneChiusa(v.sezione)
+    }
+
+    /// 4 nov (il signore): il Wiretap chiuso da fuori (pagine olografiche, «chiudi tutto», «chiudi il Wiretap») fa come il suo
+    /// «Chiudi»: con del testo parte il verbale, niente si perde. Dietro, poi esce anche dall'elenco.
+    private func chiudiWiretap() {
+        guard let v = pila.voce(.wiretap) else { return }
+        let dietro = pila.davanti != v.id
+        if let comeIlSuoChiudi = WiretapAperto.chiudi { comeIlSuoChiudi() } else if !dietro { mostraWiretap = false }
+        if dietro { pila.togli(.wiretap) }
+    }
+
+    /// «Jarvis, chiudi tutto» (4 nov, il signore): si chiudono tutte le sezioni aperte, anche quelle dietro, e quello che sta
+    /// sopra (come «Jarvis, chiudi»). Il Wiretap con del testo prepara il verbale.
+    private func chiudiTutteLeSezioni() {
+        if tendinaAperta || tendinaTrascina != 0 { chiudiTendina() }
+        for v in pila.voci where v.id != pila.davanti && v.sezione != .wiretap {
+            pila.togli(v.sezione)
+            sezioneChiusa(v.sezione)
+        }
+        chiudiWiretap()
+        chiudiTutto()
+    }
+
+    /// MARK XI (4 nov, il signore): i comandi a voce delle sezioni aperte. JARVIS parla solo quando non si vede cosa è successo
+    /// (una sezione chiusa dietro, una che non c'è) e solo se il microfono è il suo: dalle sezioni col microfono (Wiretap,
+    /// Interprete, Trainer…) la sua voce finirebbe nell'ascolto, e lì basta la vibrazione.
+    private func comandoSezioni(_ c: ComandoVocale) {
+        let parla = schermoLibero
+        let fatto = { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }   // il comando è arrivato, come gli altri
+        let dici: (String) -> Void = { frase in
+            if parla { jarvis.annuncia(frase) } else { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+        }
+        switch c {
+        case .chiudiSezioni:
+            fatto()
+            chiudiTutteLeSezioni()
+        case .chiudiSezione(let nome):
+            guard let v = pila.voci.first(where: { $0.sezione.nome == nome }) else { dici("La sezione \(nome) non è aperta, Sir."); return }
+            fatto()
+            let dietro = pila.davanti != v.id
+            chiudiDietro(v.id)
+            if dietro && parla { jarvis.annuncia("Sezione \(nome) chiusa, Sir.") }      // non si vede: lo dice
+        case .sezioniAperte:
+            guard !pila.voci.isEmpty else { dici("Nessuna sezione aperta, Sir."); return }
+            fatto()
+            liberaSopra()
+            naviga.chiesta = .sfoglio
+        case .sezionePrima:
+            guard let id = sezioneDiPrima() else {
+                dici(pila.voci.isEmpty ? "Nessuna sezione aperta, Sir." : "Non c'è un'altra sezione aperta, Sir.")
+                return
+            }
+            fatto()
+            liberaSopra()
+            naviga.chiesta = .porta(id)
+        case .daParte:
+            guard pila.voceDavanti != nil || naviga.modo == .sfoglio else {
+                dici(pila.voci.isEmpty ? "Nessuna sezione aperta, Sir." : "Nessuna sezione davanti, Sir.")
+                return
+            }
+            fatto()
+            liberaSopra()
+            naviga.chiesta = .aggancio
+        default:
+            break
+        }
+    }
+
+    /// È cambiata la sezione davanti: a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma; e si ricorda l'ordine
+    /// in cui sono state davanti (le chiuse escono), per «Jarvis, quella di prima».
+    private func davantiCambiata(_ d: UUID?) {
+        if let d {
+            giroDavanti.removeAll { id in id == d || !pila.voci.contains { $0.id == id } }
+            giroDavanti.append(d)
+        }
+        if d == nil { pilaCopre = false; return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(550))
+            if pila.davanti == d { pilaCopre = true }
+        }
+    }
+
+    /// La sezione che era davanti prima di quella di adesso (con JARVIS davanti: l'ultima che c'era).
+    private func sezioneDiPrima() -> UUID? {
+        let vive = Set(pila.voci.map(\.id))
+        let davanti = pila.davanti
+        if let id = giroDavanti.last(where: { vive.contains($0) && $0 != davanti }) { return id }
+        return pila.voci.last(where: { $0.id != davanti })?.id
     }
 
     /// La vista di ogni sezione: quella che prima stava nella sua schermata di iOS, uguale.
@@ -1464,7 +1553,7 @@ struct ContentView: View {
         if telefono { tastiera = false }
         if !tendinaAperta { tendinaTrascina = 0 }        // una tirata rimasta a metà (gesto interrotto) non resta appesa
         mostraSentinella = false
-        mostraWiretap = false
+        if mostraWiretap { chiudiWiretap() }              // 4 nov: davanti con del testo, parte il verbale (niente si perde)
         mostraProfiler = false
         scheda = nil
         mostraVitals = false
@@ -1508,12 +1597,68 @@ struct ContentView: View {
         aperturaPagina = nil
     }
 
+    /// La sezione del contenitore che apre un reparto (nil: non è una sezione, oppure ogni richiesta riparte da capo, come gli
+    /// Occhi, il giro e la Cucina).
+    private func sezione(di r: Reparto) -> Sezione? {
+        switch r {
+        case .sentinella: return .sentinella
+        case .wiretap: return .wiretap
+        case .profiler: return .profiler
+        case .occhi, .giro, .cucina: return nil
+        case .vitals: return .vitals
+        case .confidente: return .confidente
+        case .allenatore: return .allenatore
+        case .ricordi: return .ricordi
+        case .interprete: return .lingua
+        case .browser: return .browser
+        case .lidar: return .lidar
+        case .impostazioni: return .impostazioni
+        case .sistemi, .pulisci: return nil
+        case .scanner: return .scheda(.scanner)
+        case .satellite: return .scheda(.satellite)
+        case .diario: return .scheda(.diario)
+        case .sonno: return .scheda(.sonno)
+        case .cuore: return .scheda(.cuore)
+        case .bea: return .scheda(.bea)
+        case .briefing: return .scheda(.briefing)
+        case .meteo: return .scheda(.meteo)
+        case .email: return .scheda(.email)
+        case .spesa: return .scheda(.spesa)
+        case .shazam: return .scheda(.shazam)
+        case .foto: return .scheda(.foto)
+        case .serata: return .scheda(.serata)
+        case .messaggi: return .scheda(.messaggi)
+        case .telefono: return .scheda(.telefono)
+        case .github: return .scheda(.github)
+        case .supabase: return .scheda(.supabase)
+        case .archivio: return .scheda(.archivio)
+        case .costi: return .scheda(.costi)
+        case .edith: return .scheda(.edith)
+        case .musica: return .scheda(.musica)
+        }
+    }
+
+    /// Il reparto è chiesto con qualcosa da fare appena aperto (la guida di Ricordi, una ricognizione di SATELLITE, un modo di
+    /// LiDAR, i video del Browser): allora non è solo «apri» e la strada resta quella di prima.
+    private func conRichiesta(_ r: Reparto) -> Bool {
+        switch r {
+        case .ricordi: return jarvis.guidaTraccia || jarvis.salvaTraccia
+        case .satellite: return RichiestaSatellite.condivisa.azione != nil
+        case .lidar: return LidarAperta.richiesta != nil
+        case .browser: return CercaVideo.richiesta != nil
+        default: return false
+        }
+    }
+
     /// Apre un reparto chiesto a voce; se ce n'è già uno aperto, prima lo chiude.
     private func apriReparto(_ r: Reparto) {
         // MARK XI: le sezioni stanno nel contenitore: quella davanti va dietro (resta viva) e la nuova sale subito. Solo la pagina
         // web e la fotocamera di sistema sono ancora schermate di iOS: lì si aspetta che si chiudano.
         let aperto = jarvis.pagina != nil || sorgenteFoto != nil
         if tendinaAperta { chiudiTendina() }      // come nel mockup: la sezione chiesta a voce non si apre con la tendina PROTOCOLLI rimasta giù dietro
+        // 4 nov (il signore): chiesta mentre è già davanti («Jarvis, apri il meteo» col Meteo aperto) resta ferma, senza andare dietro
+        // e tornare; JARVIS risponde lo stesso (la sua frase l'ha già detta)
+        if let s = sezione(di: r), pila.voceDavanti?.sezione == s, !conRichiesta(r) { liberaSopra(); return }
         mandaDietroDavanti()
         chiudiTutto()
         Task {
@@ -1576,9 +1721,9 @@ struct ContentView: View {
         case .apri(let r):
             apriReparto(r)
         case .interprete(let codice):
-            mostraSentinella = false
-            mostraWiretap = false
-            Task { try? await Task.sleep(for: .milliseconds(700)); jarvis.apriInterprete(codice) }
+            // 4 nov · MARK XI: come da JARVIS, l'Interprete sale e la sezione davanti va dietro da sola, viva (prima si chiudeva:
+            // il Wiretap perdeva il testo senza verbale)
+            jarvis.apriInterprete(codice)
         default:
             break                                   // gli altri li gestisce il reparto stesso
         }
@@ -2118,6 +2263,9 @@ struct ImpostazioniView: View {
             }
             .onAppear { voci = Jarvis.vociItaliane() }
         }
+        // 4 nov (il signore: «ciano come il resto, mai il blu di iOS»): interruttori, «Fatto», il ritorno da «La mia voce» e il
+        // cursore in ciano, come nel mockup
+        .tint(Color.ciano)
     }
 
     private func caricaVociCloud() async {

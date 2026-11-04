@@ -843,6 +843,10 @@ final class Jarvis: NSObject, ObservableObject {
         case .rapido(let azione)?:
             rapido(azione)
             return true
+        case let c? where c.navigaSezioni:         // MARK XI: «sezioni aperte», «quella di prima», «chiudi il meteo»… (ContentView)
+            chiudiInterruzione()
+            ComandiSezioni.invia(c)
+            return true
         case .domanda(let testo)?:                 // dentro una scheda, come il suo tasto «Chieda a JARVIS»: chiude e chiede
             chiudiChiesto = true
             Task { try? await Task.sleep(for: .milliseconds(350)); await invia(testo) }

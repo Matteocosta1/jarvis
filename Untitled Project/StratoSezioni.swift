@@ -14,6 +14,29 @@ import Combine
 // La regola che tiene tutto in ordine: lo «stato» di sempre di ogni sezione (mostraVitals, scheda, jarvis.occhi…) acceso vuol
 // dire «davanti». Mandata dietro, il suo stato si spegne ma la sezione resta nell'elenco (`dietro`); chiusa davvero, esce.
 
+extension Notification.Name {
+    /// MARK XI: un comando a voce delle sezioni aperte («sezioni aperte», «quella di prima», «chiudi il meteo»…).
+    static let jarvisComandoSezioni = Notification.Name("jarvisComandoSezioni")
+}
+
+/// MARK XI (4 nov, approvati dal signore): i comandi a voce delle sezioni aperte arrivano da JARVIS o dal microfono di una
+/// sezione (Wiretap, Sentinella, Interprete, Trainer, Profiler, Scanner); li esegue la schermata principale, che ha l'elenco.
+enum ComandiSezioni {
+    static func invia(_ c: ComandoVocale) {
+        NotificationCenter.default.post(name: .jarvisComandoSezioni, object: nil, userInfo: ["comando": c])
+    }
+}
+
+/// MARK XI (4 nov): il Wiretap aperto, per chiuderlo da fuori come il suo «Chiudi» (pagine olografiche, «chiudi tutto», «chiudi
+/// il Wiretap»): con del testo parte il verbale, niente si perde. Il padrone è il registratore della vista, così una vista
+/// vecchia che se ne va non cancella quella nuova.
+enum WiretapAperto {
+    private(set) static var chiudi: (() -> Void)?
+    private static var padrone: ObjectIdentifier?
+    static func registra(_ id: ObjectIdentifier, chiudi c: @escaping () -> Void) { padrone = id; chiudi = c }
+    static func lascia(_ id: ObjectIdentifier) { if padrone == id { padrone = nil; chiudi = nil } }
+}
+
 /// Una sezione del contenitore.
 enum Sezione: Hashable {
     case impostazioni, browser, occhi, interprete, sentinella, wiretap, profiler, allenatore, lidar, vitals, ricordi, confidente, lingua
@@ -112,7 +135,8 @@ final class PilaSezioni: ObservableObject {
         v.pagina = pagina
         voci.append(v)
         davanti = v.id
-        if voci.count > PilaSezioni.massimo, let vecchia = voci.first(where: { $0.id != davanti }) {
+        // la più vecchia, mai quella davanti né il Wiretap (4 nov, il signore: la registrazione non si chiude mai da sola)
+        if voci.count > PilaSezioni.massimo, let vecchia = voci.first(where: { $0.id != davanti && $0.sezione != .wiretap }) {
             return vecchia.sezione
         }
         return nil

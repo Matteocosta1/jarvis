@@ -181,6 +181,92 @@ enum ComandoVocale: Equatable {
     case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
     case domanda(String)                    // dentro una scheda: «dimmi», «com'ho dormito?»: chiude la scheda e chiede a JARVIS come il suo tasto
     case pagina(sezione: String, voce: String?, scheda: String?)   // MARK X: STUDIO («crea una piastra…») e SOCIAL («apri Instagram»)
+    // MARK XI (4 nov, approvati dal signore): le sezioni aperte, a voce. Li esegue la schermata principale, anche da dentro un
+    // reparto col microfono. Sull'orologio (niente sezioni dietro) la frase va al cervello come prima.
+    case chiudiSezioni                      // «Jarvis, chiudi tutto»: tutte le sezioni aperte, anche quelle dietro
+    case chiudiSezione(String)              // «Jarvis, chiudi il meteo»: quella sezione (il suo nome, come `Sezione.nome`), anche se è dietro
+    case sezioniAperte                      // «Jarvis, sezioni aperte»: le pagine olografiche da sfogliare
+    case sezionePrima                       // «Jarvis, quella di prima»: torna davanti la sezione di prima
+    case daParte                            // «Jarvis, mettila da parte»: quella davanti vola nel reattore (AGGANCIO) e va dietro
+
+    /// Un comando delle sezioni aperte (MARK XI): lo esegue la schermata principale.
+    var navigaSezioni: Bool {
+        switch self {
+        case .chiudiSezioni, .chiudiSezione, .sezioniAperte, .sezionePrima, .daParte: return true
+        default: return false
+        }
+    }
+
+    /// Il nome della sezione (come `Sezione.nome`) detto a voce dopo «chiudi»: «meteo» → «Meteo», «posta» → «Email»… nil: non è
+    /// il nome di una sezione («app», «scheda», «sistemi», «fotocamera»…), e allora si chiude quella davanti.
+    static func nomeSezione(_ p: String) -> String? {
+        switch p {
+        case "lidar", "laidar", "planimetria": return "LiDAR"
+        case "occhi", "cucina": return "Occhi"
+        case "meteo", "tempo": return "Meteo"
+        case "browser", "internet": return "Browser"
+        case "impostazioni": return "Impostazioni"
+        case "costi": return "Costi"
+        case "edith", "edit": return "EDITH"
+        case "diario": return "Diario"
+        case "sonno": return "Sonno"
+        case "cuore": return "Cuore"
+        case "vitals": return "Vitals"
+        case "briefing": return "Briefing"
+        case "posta", "email", "mail": return "Email"
+        case "spesa": return "Spesa"
+        case "foto", "galleria": return "Foto"
+        case "serata": return "Serata"
+        case "messaggi": return "Messaggi"
+        case "telefono", "rubrica": return "Telefono"
+        case "bea": return "Bea"
+        case "ricordi": return "Ricordi"
+        case "confidente": return "Confidente"
+        case "github": return "GitHub"
+        case "supabase": return "Supabase"
+        case "archivio": return "Archivio"
+        case "scanner": return "Scanner"
+        case "profiler": return "Profiler"
+        case "shazam": return "Shazam"
+        case "wiretap": return "Wiretap"
+        case "sentinella": return "Sentinella"
+        case "interprete", "traduttore": return "Interprete"
+        case "allenatore", "allenamento", "trainer", "treiner", "personal": return "Trainer"
+        case "satellite": return "Satellite"
+        case "studio": return "Studio"
+        case "social", "instagram", "insta": return "Social"      // «apri Instagram» apre Social: «chiudi Instagram» lo chiude
+        default: return nil
+        }
+    }
+
+    /// MARK XI · le sezioni aperte a voce (4 nov, approvati dal signore), a frase esatta: «sezioni aperte», «quella di prima»,
+    /// «mettila da parte», «chiudi tutto». Si guardano prima di togliere la parola «sezione» dalla frase.
+    static func navigazione(_ t: [String]) -> ComandoVocale? {
+        guard !t.isEmpty, t.count <= 7 else { return nil }
+        let s = t.joined(separator: " ")
+        let aperte: Set<String> = ["sezioni", "le sezioni", "sezioni aperte", "le sezioni aperte", "tutte le sezioni", "pagine aperte", "le pagine aperte",
+                                   "mostrami le sezioni", "mostrami le sezioni aperte", "mostrami tutte le sezioni", "mostrami le pagine aperte",
+                                   "fammi vedere le sezioni", "fammi vedere le sezioni aperte", "vediamo le sezioni aperte", "apri le sezioni aperte",
+                                   "apri le sezioni", "mostra le sezioni", "mostra le sezioni aperte",
+                                   "sfoglia le sezioni", "quali sezioni sono aperte", "che sezioni sono aperte", "che sezioni ho aperto",
+                                   "quali sezioni ho aperto", "cosa ho aperto", "che cosa ho aperto"]
+        if aperte.contains(s) { return .sezioniAperte }
+        // («la pagina di prima» no: nel Browser è la pagina web di prima)
+        let prima: Set<String> = ["quella di prima", "la sezione di prima", "sezione di prima", "di nuovo quella di prima",
+                                  "torna a quella di prima", "tornami a quella di prima", "torna alla sezione di prima", "torna alla precedente",
+                                  "torna alla sezione precedente", "rimetti quella di prima", "rimettimi quella di prima", "riapri quella di prima",
+                                  "ridammi quella di prima", "riportami quella di prima", "fammi vedere quella di prima", "mostrami quella di prima",
+                                  "apri quella di prima", "la precedente", "sezione precedente", "la sezione precedente"]
+        if prima.contains(s) { return .sezionePrima }
+        let parte: Set<String> = ["mettila da parte", "mettilo da parte", "metti da parte", "mettila via", "mettilo via", "mettila dietro",
+                                  "mettilo dietro", "metti dietro", "mandala dietro", "mandalo dietro", "manda dietro"]
+        if parte.contains(s) { return .daParte }
+        let tutte: Set<String> = ["chiudi tutto", "chiudimi tutto", "chiudi tutto quanto", "chiudi tutte", "chiudile tutte", "chiudi le sezioni",
+                                  "chiudi tutte le sezioni", "chiudi le sezioni aperte", "chiudi tutte le sezioni aperte", "chiudimi tutte le sezioni",
+                                  "chiudi tutte le pagine"]
+        if tutte.contains(s) { return .chiudiSezioni }
+        return nil
+    }
 
     /// MARK X · le frasi di STUDIO e SOCIAL (VOCI del mockup). Studio: «apri lo studio», «apri l'archivio dello studio», «fai il plastico
     /// della stanza», «porta il giardino nello studio», «crea/fammi/progettami» + un oggetto da stampare (o «in 3D», «da stampare»).
@@ -303,6 +389,8 @@ enum ComandoVocale: Equatable {
         }
         if serveJarvis && !chiamato { return nil }
         if dentro != .profiler { t = Pronunce.sistema(t) }        // «laidar» → lidar, «idit» → edith… (nel Profiler no: lì si dettano nomi)
+        // MARK XI: «sezioni aperte», «quella di prima», «mettila da parte», «chiudi tutto» (prima di togliere «sezione»)
+        if let n = navigazione(t) { return n }
         // «apri la sezione meteo», «attiva sezione LiDAR»: la parola «sezione» (con l'articolo) non cambia il comando
         if let k = t.firstIndex(where: { $0 == "sezione" || $0 == "sezioni" }), k + 1 < t.count {
             t.remove(at: k)
@@ -334,8 +422,9 @@ enum ComandoVocale: Equatable {
         // tornare indietro / chiudere il reparto
         // da soli («chiudi», «indietro»…) o in poche frasi esatte: «torna a casa» e «chiudi Spotify» restano a JARVIS
         if t.count == 1, ["torna", "indietro", "chiudi", "chiudimi", "chiudila", "chiudilo", "esci", "basta"].contains(t[0]) { return .torna }
-        if [" torna indietro ", " chiudi tutto ", " torna alla home ", " torna alla schermata principale ", " chiudi la scheda ",
-             " chiudi questa scheda ", " esci da qui ", " chiudi qui ", " chiudimi tutto ", " chiudimi questa ", " chiudimi questo ", " torna alla schermata iniziale ",
+        // («chiudi tutto» non è più qui: dal 4 nov chiude tutte le sezioni aperte, anche quelle dietro, vedi `navigazione`)
+        if [" torna indietro ", " torna alla home ", " torna alla schermata principale ", " chiudi la scheda ",
+             " chiudi questa scheda ", " esci da qui ", " chiudi qui ", " chiudimi questa ", " chiudimi questo ", " torna alla schermata iniziale ",
             " torna all inizio ", " vai alla home ", " portami alla home ", " esci pure ", " ok chiudi ", " grazie chiudi ", " a posto chiudi ", " fatto chiudi "].contains(where: { s == $0 }) { return .torna }
         // «chiudi l'app», «chiudi la sezione», «chiudi qui», oppure «chiudi» + il nome di una sezione di JARVIS («chiudi LiDAR», «chiudi il meteo»).
         // «chiudi Spotify», «chiudi la porta», «chiudi la musica» restano a JARVIS.
@@ -347,8 +436,14 @@ enum ComandoVocale: Equatable {
                                         "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
                                         "confidente", "github", "supabase", "archivio", "scanner", "profiler",
                                         "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner", "personal",
-                                        "satellite"]
-            if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) { return .torna }
+                                        "satellite", "studio", "social", "instagram", "insta"]
+            if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) {
+                // MARK XI (4 nov, il signore): con il nome si chiude quella sezione, anche se è dietro («chiudi il meteo»);
+                // senza («chiudi la scheda», «chiudi qui», «chiudi la fotocamera») quella davanti, come sempre
+                let nomi = Set(resto.compactMap { nomeSezione($0) })
+                if nomi.count == 1, let n = nomi.first { return .chiudiSezione(n) }
+                return .torna
+            }
         }
         // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
         if t.count <= 4, ["spegni", "disattiva", "ferma"].contains(t[0]),
@@ -729,7 +824,8 @@ final class OrecchioComandi {
         compito?.cancel()
         compito = nil
         if let c = ComandoVocale.riconosci(frase, serveJarvis: true, dentro: dentro) {
-            comando?(c)
+            // MARK XI: «sezioni aperte», «quella di prima», «chiudi il meteo»… li esegue la schermata principale
+            if c.navigaSezioni { ComandiSezioni.invia(c) } else { comando?(c) }
         }
         nuovaFrase()       // si continua ad ascoltare
     }

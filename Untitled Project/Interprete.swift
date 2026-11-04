@@ -165,6 +165,8 @@ struct Interprete: View {
 
     /// I comandi a voce dentro l'Interprete.
     private func comando(_ c: ComandoVocale) {
+        // MARK XI: «sezioni aperte», «quella di prima», «chiudi il meteo»… li esegue la schermata principale
+        if c.navigaSezioni { ComandiSezioni.invia(c); return }
         switch c {
         case .torna:
             chiuso = true; orecchio.ferma(); motore.ferma(); chiudi()

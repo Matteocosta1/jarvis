@@ -109,6 +109,38 @@ struct RigaContatto: View {
     }
 }
 
+// MARK: - Le bozze (4 nov, il signore)
+
+/// Le bozze restano, come in Messaggi e Mail di iOS: il messaggio che sta scrivendo (con il contatto) e la conversazione
+/// incollata nel Confidente si ritrovano riaprendo, anche dopo aver chiuso l'app. Solo sul telefono, in un file protetto
+/// (cifrato quando l'iPhone è bloccato); con l'invio, o con «Cancella», la bozza sparisce.
+nonisolated enum Bozze {
+    nonisolated struct Messaggio: Codable, Sendable { var contatto: String; var nome: String; var numero: String?; var testo: String }
+    nonisolated struct Confidente: Codable, Sendable { var testo: String; var domanda: String }
+
+    private static func file(_ nome: String) -> URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let u = base.appendingPathComponent("Bozze", isDirectory: true)
+        try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+        return u.appendingPathComponent(nome + ".json")
+    }
+
+    static func leggi<T: Decodable>(_ nome: String, come: T.Type) -> T? {
+        guard let u = file(nome), let d = try? Data(contentsOf: u) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: d)
+    }
+
+    static func scrivi<T: Encodable>(_ nome: String, _ valore: T) {
+        guard let u = file(nome), let d = try? JSONEncoder().encode(valore) else { return }
+        try? d.write(to: u, options: [.atomic, .completeFileProtection])
+    }
+
+    static func cancella(_ nome: String) {
+        guard let u = file(nome) else { return }
+        try? FileManager.default.removeItem(at: u)
+    }
+}
+
 // MARK: - MESSAGGI: si detta a voce, si manda su iMessage o WhatsApp
 
 struct VistaMessaggi: View {
@@ -126,6 +158,7 @@ struct VistaMessaggi: View {
     @State private var registro: [VoceRegistro] = Registro.leggi("registroMessaggi")
     @State private var esito: String?
     @State private var caricato = false
+    @State private var giroBozza = 0
     @FocusState private var scrivendo: Bool
 
     var body: some View {
@@ -164,8 +197,36 @@ struct VistaMessaggi: View {
         .task {
             contatti = await Rubrica.tutti()
             caricato = true
+            riprendiBozza()
         }
         .onDisappear { dettatura.ferma() }
+        // 4 nov (il signore): la bozza resta, come in Messaggi di iOS
+        .onChange(of: testo) { salvaBozza() }
+        .onChange(of: numeroScelto) { salvaBozza() }
+        .onChange(of: scelto) { salvaBozza() }
+    }
+
+    /// Riaprendo: il messaggio lasciato a metà, con il suo contatto.
+    private func riprendiBozza() {
+        guard scelto == nil, testo.isEmpty, let b = Bozze.leggi("messaggio", come: Bozze.Messaggio.self),
+              !b.testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let numeri: [(etichetta: String, numero: String)] = b.numero.map { [(etichetta: "", numero: $0)] } ?? []
+        let c = contatti.first(where: { $0.id == b.contatto }) ?? Contatto(id: b.contatto, nome: b.nome, numeri: numeri)
+        scelto = c
+        numeroScelto = b.numero ?? c.primoNumero
+        testo = b.testo
+    }
+
+    /// La bozza si scrive un attimo dopo l'ultimo tasto; senza testo (inviato, «Cancella», contatto tolto) sparisce.
+    private func salvaBozza() {
+        giroBozza += 1
+        let mio = giroBozza
+        guard let s = scelto, !testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { Bozze.cancella("messaggio"); return }
+        let b = Bozze.Messaggio(contatto: s.id, nome: s.nome, numero: numeroScelto, testo: testo)
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if mio == giroBozza { Bozze.scrivi("messaggio", b) }
+        }
     }
 
     private var filtrati: [Contatto] {

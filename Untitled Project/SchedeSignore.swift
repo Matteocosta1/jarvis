@@ -411,6 +411,118 @@ struct TastoJarvis: View {
     }
 }
 
+/// 4 nov (il signore): la domanda prima di chiudere con un lavoro non salvato, uguale a quella dello Studio («SALVARE IN
+/// ARCHIVIO?», .sd-foglio.sd-chiedi di markx.html): sale dal basso con la tacca; l'icona dell'archivio, il titolo e il perché;
+/// il NOME; SALVA · NON SALVARE; ANNULLA; la nota. `extra`, sopra il nome: quello che serve in più (il Trainer).
+struct FoglioSalva<Extra: View>: View {
+    let titolo: String
+    let sotto: String
+    @Binding var nome: String
+    let nota: String
+    let salva: () -> Void
+    let nonSalvare: () -> Void
+    let annulla: () -> Void
+    @ViewBuilder var extra: () -> Extra
+
+    private static var grigio: Color { Color(red: 159 / 255, green: 179 / 255, blue: 185 / 255) }   // #9fb3b9
+    private static var testo: Color { Color(red: 230 / 255, green: 244 / 255, blue: 248 / 255) }    // #e6f4f8
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Capsule().fill(Color.white.opacity(0.25)).frame(width: 40, height: 5)
+            HStack(spacing: 12) {
+                Image(systemName: "archivebox")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.ciano)
+                    .frame(width: 54, height: 54)
+                    .background(RadialGradient(colors: [Color.ciano.opacity(0.18), Color(red: 2 / 255, green: 6 / 255, blue: 10 / 255).opacity(0.9)],
+                                               center: UnitPoint(x: 0.5, y: 0.4), startRadius: 0, endRadius: 42))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(titolo).font(.system(size: 13, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
+                    Text(sotto).font(.system(size: 12)).foregroundStyle(Self.grigio)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            extra()
+            VStack(alignment: .leading, spacing: 6) {
+                Text("NOME").font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.6).foregroundStyle(Color.ciano.opacity(0.7))
+                TextField("", text: $nome)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Self.testo)
+                    .submitLabel(.done)
+                    .onSubmit(salva)
+                    .onChange(of: nome) { _, n in if n.count > 32 { nome = String(n.prefix(32)) } }
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 2 / 255, green: 8 / 255, blue: 12 / 255).opacity(0.8)))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                    .accessibilityLabel("Nome")
+            }
+            HStack(spacing: 8) {
+                Button { Suoni.tocco(); salva() } label: {
+                    Text("SALVA").font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(2)
+                        .foregroundStyle(Color(red: 0, green: 24 / 255, blue: 32 / 255))
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.ciano))
+                }
+                .buttonStyle(StileStark())
+                Button { Suoni.tocco(); nonSalvare() } label: {
+                    Text("NON SALVARE").font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(2)
+                        .foregroundStyle(Color.ciano)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(StileStark())
+            }
+            Button { Suoni.tocco(); annulla() } label: {
+                Text("ANNULLA").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
+                    .foregroundStyle(Color.ciano)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(0.3), lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(StileStark())
+            Text(nota).font(.system(size: 14)).foregroundStyle(Self.testo)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 14)
+        }
+        .padding(.top, 10).padding(.horizontal, 16).padding(.bottom, 28)
+        .background(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22, style: .continuous)
+            .fill(Color(red: 8 / 255, green: 14 / 255, blue: 17 / 255).opacity(0.98))
+            .shadow(color: .black.opacity(0.6), radius: 20, y: -10))
+        .overlay(BordoAlto(raggio: 22).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
+    }
+}
+
+extension Animation {
+    /// La salita del foglio «Salvare?», come lo Studio: 0,32 s, cubic-bezier(.2, .8, .2, 1).
+    static var salitaFoglio: Animation { .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.32) }
+}
+
+extension FoglioSalva where Extra == EmptyView {
+    init(titolo: String, sotto: String, nome: Binding<String>, nota: String,
+         salva: @escaping () -> Void, nonSalvare: @escaping () -> Void, annulla: @escaping () -> Void) {
+        self.init(titolo: titolo, sotto: sotto, nome: nome, nota: nota, salva: salva, nonSalvare: nonSalvare, annulla: annulla) { EmptyView() }
+    }
+}
+
+/// Il bordo di sopra di un foglio con gli angoli arrotondati (come border-top con border-radius): solo la riga in alto.
+struct BordoAlto: Shape {
+    let raggio: CGFloat
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY + raggio))
+        p.addArc(center: CGPoint(x: r.minX + raggio, y: r.minY + raggio), radius: raggio, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        p.addLine(to: CGPoint(x: r.maxX - raggio, y: r.minY))
+        p.addArc(center: CGPoint(x: r.maxX - raggio, y: r.minY + raggio), radius: raggio, startAngle: .degrees(270), endAngle: .degrees(0), clockwise: false)
+        return p
+    }
+}
+
 /// Il colore delle schede: lo stesso azzurro di JARVIS per tutte.
 enum Tinte {
     static let diario = Color.ciano

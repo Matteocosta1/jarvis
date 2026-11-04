@@ -13,6 +13,7 @@ struct VistaConfidente: View {
     @State private var testo = ""
     @State private var stato: SaluteOggi?          // corpo e mente insieme: lo stato fisico di oggi accompagna ogni domanda
     @State private var domanda = ""
+    @State private var giroBozza = 0
     @FocusState private var scrivendo: Bool
 
     @Environment(\.chiudiOVia) private var chiudi
@@ -100,6 +101,15 @@ struct VistaConfidente: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))   // 27 ott: la cornice olografica
 
+                        // 4 nov (il signore): la bozza resta riaprendo; «Cancella», come in Messaggi, la svuota
+                        if !testo.isEmpty || !domanda.isEmpty {
+                            HStack {
+                                Spacer()
+                                Button { Suoni.tocco(); svuota() } label: { Text("Cancella").font(.system(size: 12)) }.tint(Color.ciano)
+                            }
+                            .padding(.top, -8)
+                        }
+
                         TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
                             .lineLimit(1...3)
                             .padding(12)
@@ -111,7 +121,9 @@ struct VistaConfidente: View {
                         Button {
                             Suoni.tocco()
                             let d = domanda.trimmingCharacters(in: .whitespacesAndNewlines)
-                            invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(testo.trimmingCharacters(in: .whitespacesAndNewlines))")
+                            let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                            svuota()                                  // mandata: la bozza non serve più
+                            invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
                         } label: {
                             Label("Chieda a JARVIS", systemImage: "person.2.wave.2")
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
@@ -152,11 +164,19 @@ struct VistaConfidente: View {
                     }
                     guard !t.isEmpty else { return false }
                     let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+                    svuota()                                      // mandata: la bozza non serve più
                     invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
                     return true
                 }
+                // riaprendo: la conversazione incollata e la domanda di prima
+                if testo.isEmpty, domanda.isEmpty, let b = Bozze.leggi("confidente", come: Bozze.Confidente.self) {
+                    testo = b.testo
+                    domanda = b.domanda
+                }
             }
             .onDisappear { ConfidenteAperto.domanda = nil }
+            .onChange(of: testo) { salvaBozza() }
+            .onChange(of: domanda) { salvaBozza() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -165,6 +185,26 @@ struct VistaConfidente: View {
         }
         .preferredColorScheme(.dark)
         .aperturaHUD("Confidente")
+    }
+
+    /// La bozza si scrive un attimo dopo l'ultimo tasto (sul telefono, protetta); vuota, sparisce.
+    private func salvaBozza() {
+        giroBozza += 1
+        let mio = giroBozza
+        guard !testo.isEmpty || !domanda.isEmpty else { Bozze.cancella("confidente"); return }
+        let b = Bozze.Confidente(testo: testo, domanda: domanda)
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if mio == giroBozza { Bozze.scrivi("confidente", b) }
+        }
+    }
+
+    /// «Cancella», o mandata a JARVIS: via la conversazione, la domanda e la bozza.
+    private func svuota() {
+        giroBozza += 1
+        testo = ""
+        domanda = ""
+        Bozze.cancella("confidente")
     }
 }
 #endif

@@ -1112,6 +1112,7 @@ struct VistaCuore: View {
             }
             Section {
                 Toggle("Sorveglianza", isOn: $cuore.sorveglianza)
+                    .tint(TintaOrologio.ciano)                     // 4 nov: ciano come gli altri interruttori del polso
             } footer: {
                 Text("Sopra \(Int(Cuore.soglia)) o sotto \(Int(Cuore.sogliaBassa)) bpm a riposo: \(Cuore.secondiPerAnnullare) secondi per annullare, poi SMS e chiamata al contatto di emergenza, con la posizione.")
             }

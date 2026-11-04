@@ -45,6 +45,10 @@ final class NavigaSezioni: ObservableObject {
     var suonoPagine = false
     /// Su dal basso fermo: la tendina PROTOCOLLI è aperta (o tirata), come nel mockup.
     var bassoFermo = false
+    /// 4 nov: chiesto a voce (ContentView), lo fa il contenitore come col dito: le pagine olografiche («sezioni aperte»), l'AGGANCIO
+    /// («mettila da parte»), una sezione che torna davanti («quella di prima»).
+    enum Chiesta: Equatable { case sfoglio, aggancio, porta(UUID) }
+    @Published var chiesta: Chiesta?
 }
 
 /// Dove e come sta una pagina (gli stessi modificatori in tutti i modi: cambiano solo i valori).
@@ -238,7 +242,84 @@ struct StratoSezioniVista<Vista: View>: View {
         }
         .gesture(gestoSfoglio, including: naviga.modo == .sfoglio ? .all : .subviews)
         .onAppear { preparaTrackpad(); preparaBasso() }
-        .onChange(of: pila.voci.isEmpty) { basso.installa() }            // se all'avvio la finestra non c'era ancora
+        .onChange(of: pila.voci.isEmpty) { _, vuota in
+            basso.installa()                                              // se all'avvio la finestra non c'era ancora
+            // tutte chiuse a voce («Jarvis, chiudi tutto») con le pagine olografiche aperte: si torna a JARVIS
+            if vuota, naviga.modo == .sfoglio {
+                Suoni.zittisciOlo()
+                withAnimation(.easeOut(duration: 0.3)) { naviga.modo = .normale; naviga.alzata = 0; naviga.rivela = 0; tiro.fondo = 0 }
+            }
+        }
+        .onChange(of: naviga.chiesta) { _, c in
+            guard let c else { return }
+            naviga.chiesta = nil
+            switch c {
+            case .sfoglio: sfoglioAVoce()
+            case .aggancio: aggancioAVoce()
+            case .porta(let id): portaAVoce(id)
+            }
+        }
+    }
+
+    // MARK: a voce (4 nov, approvati dal signore): le stesse animazioni del dito
+
+    /// «Jarvis, sezioni aperte»: da una sezione la pagina si solleva e si ferma a metà (la vibrazione, il suono e le altre pagine,
+    /// come sollevata piano col dito); da JARVIS le pagine compaiono. Già aperte: restano.
+    private func sfoglioAVoce() {
+        guard naviga.modo == .normale, !tiro.occupato, !carte.isEmpty else { return }
+        naviga.suonoPagine = false
+        naviga.bassoDaSfoglio = false
+        var senza = Transaction(); senza.disablesAnimations = true
+        if let d = pila.voceDavanti {
+            tiro.prendi(pagina: d.id, posa: TiroPagina.Viva(), larghezza: larghezza, altezza: altezza)
+            withTransaction(senza) {
+                naviga.P = Double(carte.firstIndex { $0.id == d.id } ?? 0)
+                naviga.alzata = 0
+                naviga.rivela = 0
+                naviga.modo = .tira
+            }
+            formaSfoglio()
+        } else {
+            withTransaction(senza) {
+                naviga.P = 0
+                naviga.alzata = 0
+                naviga.rivela = 0
+                naviga.modo = .tira
+            }
+            entraSfoglio()
+        }
+    }
+
+    /// «Jarvis, mettila da parte»: la sezione davanti vola nel reattore come lanciata col dito (AGGANCIO) e resta dietro, viva.
+    /// Dalle pagine olografiche: quella al centro, come lo swipe su dalla fascia.
+    private func aggancioAVoce() {
+        guard !tiro.occupato else { return }
+        if naviga.modo == .sfoglio { tornaAJarvis(velocita: TiroPagina.lancioVoce); return }
+        guard naviga.modo == .normale, let d = pila.voceDavanti else { return }
+        tiro.prendi(pagina: d.id, posa: TiroPagina.Viva(), larghezza: larghezza, altezza: altezza)
+        aggancio(id: d.id, base: TiroPagina.Viva(), velocita: TiroPagina.lancioVoce, scala: TiroPagina.lancioVoceScala, olo: true)
+    }
+
+    /// «Jarvis, quella di prima»: la sezione torna davanti. Dalle pagine olografiche girano fino a lei e si apre, come toccata;
+    /// altrimenti sale come ogni sezione che torna davanti. Con il dito in mezzo a un gesto, vince il dito.
+    private func portaAVoce(_ id: UUID) {
+        switch naviga.modo {
+        case .sfoglio:
+            guard let k = carte.firstIndex(where: { $0.id == id }) else { return }
+            let o = scarto(k)
+            if abs(o) < 0.01 { scegli(); return }
+            withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.3)) { naviga.P += o }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                let q = quale(naviga.P)
+                guard naviga.modo == .sfoglio, carte.indices.contains(q), carte[q].id == id else { return }
+                scegli()
+            }
+        case .normale:
+            portaDavanti(id)
+        default:
+            break
+        }
     }
 
     // MARK: le pagine
@@ -613,7 +694,8 @@ struct StratoSezioniVista<Vista: View>: View {
     /// `base`: dove sta la pagina; `velocita`: il lancio del dito (punti al secondo); `scala`: quanto stava rimpicciolendo (1/s).
     /// Il suono parte a un istante preciso; gli effetti partono quando si sente, la pagina subito (continua il dito) e arriva nel
     /// reattore all'aggancio (0,44 s dopo il suono: il colpo è a 0,466 s). Tutto spento a 1,1 s dal dito alzato.
-    private func aggancio(id: UUID, base: TiroPagina.Viva, velocita: CGVector, scala: CGFloat) {
+    /// `olo`: a voce la pagina parte intera e diventa ologramma nei primi istanti del volo (col dito lo è già).
+    private func aggancio(id: UUID, base: TiroPagina.Viva, velocita: CGVector, scala: CGFloat, olo: Bool = false) {
         Suoni.zittisciOlo()
         let fra = min(Suoni.sparisce(), TempiAggancio.attesaMassima)
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -631,7 +713,7 @@ struct StratoSezioniVista<Vista: View>: View {
             naviga.modo = .aggancio
             naviga.rivela = 0
         }
-        tiro.lancia(volo)
+        tiro.lancia(volo, olo: olo)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(Int((fra + TempiAggancio.fase) * 1000)))
             var senza = Transaction(); senza.disablesAnimations = true
@@ -870,6 +952,11 @@ final class TiroPagina: NSObject, ObservableObject {
     static let lancioVOlo: CGFloat = 750               // …750 se le pagine sono già comparse
     static let lancioMin: CGFloat = 24                 // dopo almeno 24 punti
     static let giuV: CGFloat = 350                     // tirata giù: oltre 350 punti al secondo, torna com'era
+    /// 4 nov, «Jarvis, mettila da parte»: il lancio di un dito medio (900 punti al secondo in su, la pagina che rimpicciolisce
+    /// di 1,2 al secondo, come a 150 punti di corsa); l'ologramma arriva in 0,15 s.
+    static let lancioVoce = CGVector(dx: 0, dy: -900)
+    static let lancioVoceScala: CGFloat = -1.2
+    static let entrataOlo: Double = 0.15
 
     @Published private(set) var viva = Viva()
     @Published var fondo: Double = 0
@@ -901,6 +988,7 @@ final class TiroPagina: NSObject, ObservableObject {
     private var fineMolla: (() -> Void)?
     private var volo: Volo?
     private var voloPosato = false
+    private var voloOlo = false
     private var t0Volo: CFTimeInterval = 0
     private var baseVolo = Viva()
     private var f0Volo: Double = 0
@@ -981,13 +1069,15 @@ final class TiroPagina: NSObject, ObservableObject {
         avvia()
     }
 
-    /// Il volo nel reattore (la pagina continua il lancio).
-    func lancia(_ v: Volo) {
+    /// Il volo nel reattore (la pagina continua il lancio). `olo`: la pagina parte intera (a voce) e diventa ologramma, angoli,
+    /// velo e ombra, nei primi 0,15 s.
+    func lancia(_ v: Volo, olo: Bool = false) {
         volo = v
         t0Volo = CACurrentMediaTime()
         baseVolo = viva
         f0Volo = fondo
         voloPosato = false
+        voloOlo = olo
         orologio.tau = 0
         fase = .volo
         avvia()
@@ -1072,7 +1162,14 @@ final class TiroPagina: NSObject, ObservableObject {
             let tau = max(0, l.targetTimestamp - t0Volo)
             if !voloPosato {
                 let k = min(tau, v.durata), st = v.stato(k)
-                viva = Viva(x: st.x, y: st.y, scala: st.scala, raggio: baseVolo.raggio, tinta: baseVolo.tinta, ombra: baseVolo.ombra,
+                var b = baseVolo
+                if voloOlo {                                           // a voce: diventa ologramma (curva che si posa piano)
+                    let q = 1 - pow(1 - min(1, tau / TiroPagina.entrataOlo), 3)
+                    b.raggio += (28 - b.raggio) * CGFloat(q)
+                    b.tinta += (1 - b.tinta) * q
+                    b.ombra += (0.45 - b.ombra) * q
+                }
+                viva = Viva(x: st.x, y: st.y, scala: st.scala, raggio: b.raggio, tinta: b.tinta, ombra: b.ombra,
                             inclina: TempiAggancio.inclinazione(k, durata: v.durata), riga: TempiAggancio.laser(k, ritardo: v.ritardo) / 100)
                 fondo = f0Volo * (1 - TempiAggancio.lisc(k / v.durata))
                 voloPosato = tau >= v.durata                          // arrivata: tutta sciolta, resta lì finché la sezione va dietro
