@@ -822,20 +822,7 @@ final class Jarvis: NSObject, ObservableObject {
             azioneLidar = azione
             return true
         case .pagina(let sezione, let voce, let scheda)?:     // MARK X: STUDIO e SOCIAL, la pagina del mockup
-            chiudiInterruzione()
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            var a = AperturaPagina(sezione: sezione, voce: voce, scheda: scheda)
-            if sezione == "Studio", let v = voce, v.contains("plastico") || v.contains("nello studio") {   // la sala vera, non quella d'esempio
-                let p = PaginaMarkX.plasticoDaArchivio(PaginaMarkX.tipoPlastico(v))
-                annuncia(p.frase)
-                guard let json = p.json else { return true }
-                a = AperturaPagina(sezione: "Studio", lidar: json)
-            } else {
-                annuncia(PaginaMarkX.annuncio(a))
-            }
-            // 4 nov · MARK XI: niente più «chiudi» prima (chiudeva la sezione davanti, Occhi compresi): Studio o Social salgono
-            // e quella davanti va dietro da sola, viva, come nel mockup (ContentView, .jarvisApriPagina)
-            PaginaMarkX.apri(a)
+            apriPagina(sezione, voce: voce, scheda: scheda)
             return true
         case .interprete(let codice)? where !lidarAperto:
             apriInterprete(codice)
@@ -958,6 +945,25 @@ final class Jarvis: NSObject, ObservableObject {
     func annuncia(_ frase: String) {
         flussoFinito = true
         accodaVoce(frase, forza: true)
+    }
+
+    /// MARK X: STUDIO e SOCIAL, la pagina del mockup («crea una piastra…», «apri Instagram»). `parla`: JARVIS dice la sua frase;
+    /// no quando la frase arriva dal microfono del Wiretap (4 nov: la sua voce finirebbe nella registrazione).
+    func apriPagina(_ sezione: String, voce: String?, scheda: String?, parla: Bool = true) {
+        chiudiInterruzione()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        var a = AperturaPagina(sezione: sezione, voce: voce, scheda: scheda)
+        if sezione == "Studio", let v = voce, v.contains("plastico") || v.contains("nello studio") {   // la sala vera, non quella d'esempio
+            let p = PaginaMarkX.plasticoDaArchivio(PaginaMarkX.tipoPlastico(v))
+            if parla { annuncia(p.frase) }
+            guard let json = p.json else { return }
+            a = AperturaPagina(sezione: "Studio", lidar: json)
+        } else if parla {
+            annuncia(PaginaMarkX.annuncio(a))
+        }
+        // 4 nov · MARK XI: niente più «chiudi» prima (chiudeva la sezione davanti, Occhi compresi): Studio o Social salgono
+        // e quella davanti va dietro da sola, viva, come nel mockup (ContentView, .jarvisApriPagina)
+        PaginaMarkX.apri(a)
     }
 
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).

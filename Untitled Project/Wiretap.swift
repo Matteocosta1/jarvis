@@ -23,6 +23,9 @@ final class Wiretap: ObservableObject {
     private var pause: TimeInterval = 0
     /// Un comando detto durante la registrazione («Jarvis, torna», «Jarvis, apri la Sentinella»): non finisce nel verbale.
     var comando: ((ComandoVocale) -> Void)?
+    /// MARK XI (4 nov, il signore): il Wiretap sta dietro un'altra sezione e registra ancora: «Jarvis, chiudi» vale per la sezione
+    /// davanti e la registrazione continua (lo dice la vista, da `sezioneDietro`).
+    var dietro = false
 
     private let motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
@@ -133,8 +136,10 @@ final class Wiretap: ObservableObject {
         compito = nil
         if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true, dentro: .wiretap) {   // «Jarvis, fai il verbale»
             comando?(c)                       // la frase di comando non entra nel verbale
-            // MARK XI: «Jarvis, quella di prima», «mettila da parte»… muovono le sezioni: la registrazione continua
-            if c.navigaSezioni, attivo { nuovaFrase() }
+            // MARK XI: «Jarvis, quella di prima», «mettila da parte»… muovono le sezioni, «Jarvis, apri…» manda il Wiretap dietro e,
+            // col Wiretap dietro, «Jarvis, chiudi» vale per la sezione davanti: la registrazione continua, se il comando non l'ha
+            // fermata (la vista del Wiretap ferma da sé quando serve). Le dettature (Messaggi, Studio) come prima.
+            if attivo, comando != nil || c.navigaSezioni { nuovaFrase() }
             return
         }
         if !chiuso.isEmpty { confermato.append(chiuso) }
@@ -224,6 +229,10 @@ struct VistaWiretap: View {
     let chiudi: () -> Void
     /// Comandi a voce durante l'intercettazione: «Jarvis, torna» chiude (e se c'è testo, prepara il verbale).
     var comando: (ComandoVocale) -> Void = { _ in }
+    /// MARK XI: i comandi che valgono per JARVIS e la sezione davanti (li esegue la schermata principale): le sezioni aperte a
+    /// voce, «Jarvis, apri…» (4 nov, il signore: davanti, il Wiretap va dietro) e, col Wiretap dietro, «Jarvis, chiudi».
+    /// La registrazione continua.
+    var aJarvis: (ComandoVocale) -> Void = { _ in }
     /// «Registra la riunione»: parte già registrando, come toccare REC (dopo il suono d'apertura).
     var avviaSubito = false
     @State private var chiusa = false              // chiusa prima che partisse: non registra più
@@ -231,6 +240,7 @@ struct VistaWiretap: View {
     @StateObject private var w = Wiretap()
     @State private var copiato = false
     @Environment(\.scenePhase) private var scena
+    @Environment(\.sezioneDietro) private var dietro      // MARK XI: dietro registra ancora, e i comandi valgono per la sezione davanti
 
     var body: some View {
         ZStack {
@@ -355,8 +365,10 @@ struct VistaWiretap: View {
                 VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
             }
             w.comando = { c in
-                // le sezioni aperte a voce («quella di prima», «mettila da parte», «chiudi il meteo»): la registrazione continua
-                if c.navigaSezioni { ComandiSezioni.invia(c); return }
+                // le sezioni aperte a voce («quella di prima», «mettila da parte», «chiudi il meteo», «fai il verbale»), «Jarvis,
+                // apri…» (4 nov, il signore: il Wiretap va dietro e continua a registrare, come mandato dietro col dito) e, col
+                // Wiretap dietro, «Jarvis, chiudi» per la sezione davanti: li esegue la schermata principale, la registrazione continua
+                if c.navigaSezioni || VistaWiretap.apre(c) || (w.dietro && c == .torna) { aJarvis(c); return }
                 w.ferma()
                 let testo = w.testo
                 if c == .torna, !testo.isEmpty { verbale(testo, w.minuti) }    // niente si perde: parte il verbale
@@ -370,6 +382,7 @@ struct VistaWiretap: View {
             }
         }
         .onDisappear { chiusa = true; w.ferma(); IsolaJarvis.fineRec(); IsolaJarvis.rec = nil; WiretapAperto.lascia(ObjectIdentifier(w)) }
+        .onChange(of: dietro, initial: true) { _, d in w.dietro = d }
         // 26 ott sera: REC nella Dynamic Island. Fuori dall'app la registrazione continua e l'isola mostra il tempo, Pausa e Stop;
         // tornando in JARVIS l'isola si spegne (qui si vede tutto)
         .onChange(of: scena) { _, f in
@@ -380,6 +393,15 @@ struct VistaWiretap: View {
 }
 
 extension VistaWiretap {
+    /// «Jarvis, apri…» (anche Studio e Social), 4 nov, il signore: il Wiretap va dietro (o ci resta) e continua a registrare.
+    /// «Traduci in…» no: il microfono serve all'Interprete e la registrazione si ferma (il testo resta).
+    static func apre(_ c: ComandoVocale) -> Bool {
+        switch c {
+        case .apri, .pagina: return true
+        default: return false
+        }
+    }
+
     /// «Chiudi» (il tasto, o da fuori: pagine olografiche, «chiudi tutto»): con del testo parte il verbale, altrimenti chiude.
     static func chiudiConVerbale(_ w: Wiretap, verbale: (String, Int) -> Void, chiudi: () -> Void) {
         w.ferma()

@@ -445,9 +445,12 @@ enum ComandoVocale: Equatable {
                 return .torna
             }
         }
-        // «spegni la Sentinella», «ferma il Wiretap»: come «torna» (il Wiretap prepara comunque il verbale)
-        if t.count <= 4, ["spegni", "disattiva", "ferma"].contains(t[0]),
-           c(" sentinella ") || c(" wiretap ") || c(" wire tap ") || c(" registrazione ") { return .torna }
+        // «spegni la Sentinella»: come «torna». «Ferma il Wiretap», «ferma la registrazione» (4 nov, MARK XI): il Wiretap per nome,
+        // anche se registra dietro un'altra sezione (con del testo parte il verbale), non la sezione davanti
+        if t.count <= 4, ["spegni", "disattiva", "ferma"].contains(t[0]) {
+            if c(" wiretap ") || c(" wire tap ") || c(" registrazione ") { return .chiudiSezione("Wiretap") }
+            if c(" sentinella ") { return .torna }
+        }
 
         // i comandi che valgono solo dentro un reparto
         switch dentro {
@@ -463,7 +466,8 @@ enum ComandoVocale: Equatable {
             if c(" chi e passato ") || c(" chi c e stato ") || c(" registro ") || c(" cosa hai visto ") { return .sentinella(.registro) }
             if c(" schermo nero ") || c(" oscura ") || c(" spegni lo schermo ") || c(" buio ") { return .sentinella(.schermoNero) }
         case .wiretap?:
-            if t.count <= 4 && (c(" verbale ") || c(" fine riunione ") || c(" riunione finita ")) { return .torna }   // il verbale parte da «torna»
+            // il verbale: il Wiretap per nome (4 nov, MARK XI), così vale anche da dietro; con del testo parte il verbale
+            if t.count <= 4 && (c(" verbale ") || c(" fine riunione ") || c(" riunione finita ")) { return .chiudiSezione("Wiretap") }
         case .allenatore?:
             if c(" fine serie ") || c(" serie finita ") || c(" ho finito ") || c(" serie chiusa ") { return .allenatore(.fineSerie) }
             if c(" azzera ") || c(" ricomincia ") || c(" da capo ") { return .allenatore(.azzera) }

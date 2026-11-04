@@ -1356,6 +1356,33 @@ struct ContentView: View {
         }
     }
 
+    /// MARK XI · i comandi sentiti dal Wiretap che valgono per JARVIS e la sezione davanti: le sezioni aperte a voce («quella di
+    /// prima», «chiudi il meteo», «fai il verbale»…), «Jarvis, apri…» (4 nov, il signore: il Wiretap davanti va dietro e continua a
+    /// registrare) e, col Wiretap dietro, «Jarvis, chiudi».
+    /// Il richiamo di JARVIS tace (il microfono è del Wiretap): qui si fa quello che farebbe lui, senza la sua voce, che finirebbe
+    /// nella registrazione (basta la vibrazione). Con davanti una sezione col suo microfono (Trainer, Interprete, Sentinella,
+    /// Profiler, Scanner) il comando l'ha già sentito lei: qui si fanno solo quelli del Wiretap.
+    private func comandoDalWiretap(_ c: ComandoVocale) {
+        let delWiretap: Bool = c == .chiudiSezione(Sezione.wiretap.nome)      // «fai il verbale», «ferma la registrazione»…
+        let altroOrecchio: Bool = jarvis.interprete != nil || jarvis.allenatore || mostraSentinella || mostraProfiler || scheda == .scanner
+        guard delWiretap || !altroOrecchio else { return }
+        if c.navigaSezioni { comandoSezioni(c); return }
+        switch c {
+        case .torna:                                     // come «Jarvis, chiudi» da JARVIS: la sezione davanti (il Wiretap dietro resta)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if tendinaAperta { chiudiTendina() }
+            chiudiTutto()
+        case .apri(let r):
+            if r == .scanner && LidarAperta.aperta { return }      // come JARVIS: dentro LiDAR «scansione» è la stanza
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            apriReparto(r)
+        case .pagina(let nome, let voce, let cosa):              // Studio e Social
+            jarvis.apriPagina(nome, voce: voce, scheda: cosa, parla: false)
+        default:
+            break
+        }
+    }
+
     /// È cambiata la sezione davanti: a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma; e si ricorda l'ordine
     /// in cui sono state davanti (le chiuse escono), per «Jarvis, quella di prima».
     private func davantiCambiata(_ d: UUID?) {
@@ -1399,7 +1426,7 @@ struct ContentView: View {
             VistaWiretap(verbale: { testo, minuti in
                 mostraWiretap = false
                 jarvis.verbaleWiretap(testo, minuti: minuti)
-            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, avviaSubito: jarvis.riunioneSubito)
+            }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, aJarvis: comandoDalWiretap, avviaSubito: jarvis.riunioneSubito)
         case .profiler:
             VistaProfiler { dati, nome in
                 mostraProfiler = false
