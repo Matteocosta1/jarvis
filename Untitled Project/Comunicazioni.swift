@@ -163,6 +163,7 @@ struct VistaMessaggi: View {
 
     var body: some View {
         CorniceScheda(titolo: "Messaggi", sottotitolo: scelto.map { "a \($0.nome) · \(canale.rawValue)" } ?? "scelga a chi scrivere", icona: "message", tinta: tinta, pronto: caricato) {
+            OlogrammaMessaggi(dati: messaggiOlo).corniceOlo(tinta)          // v267: BOLLE, in testa come nelle altre sezioni
             if let s = scelto {
                 destinatario(s)
                 dettatore
@@ -204,6 +205,12 @@ struct VistaMessaggi: View {
         .onChange(of: testo) { salvaBozza() }
         .onChange(of: numeroScelto) { salvaBozza() }
         .onChange(of: scelto) { salvaBozza() }
+    }
+
+    /// v267: i messaggi di JARVIS per l'ologramma BOLLE (i più nuovi, la persona scelta, il canale).
+    private var messaggiOlo: MessaggiOlo {
+        MessaggiOlo(voci: registro.prefix(5).map { MessaggiOlo.Voce(id: $0.id, nome: $0.nome, testo: $0.testo ?? "", quando: $0.quando, tipo: $0.tipo) },
+                    totale: registro.count, scelto: scelto?.nome, canale: canale.rawValue)
     }
 
     /// Riaprendo: il messaggio lasciato a metà, con il suo contatto.

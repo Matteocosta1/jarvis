@@ -367,6 +367,7 @@ struct VistaPosta: View {
         CorniceScheda(titolo: "Email", sottotitolo: posta.map { p in
                           inArrivo ? "\(p.filter { !$0.letta }.count) non lette · ultime \(ore / 24 == 1 ? "24 ore" : "\(ore / 24) giorni")" : "\(nomeCartella) · ultimi 30 giorni" } ?? "apro la casella iCloud",
                       icona: "envelope", tinta: tinta, pronto: posta != nil || errore != nil) {
+            OlogrammaPosta(dati: postaOlo).corniceOlo(tinta)       // v267: SMISTA, in testa come nelle altre sezioni
             PannelloPriorita(posta: priorita, errore: erroreP)     // in testa, come nel mockup
             // le cartelle (build 22): Arrivo è la posta di sempre; le altre mostrano gli ultimi 30 giorni
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
@@ -453,6 +454,12 @@ struct VistaPosta: View {
         .tastiAVoce { a in
             if a == .postaRiassumi { chiedi("Riassumimi la posta delle ultime \(ore) ore: cosa conta davvero e cosa posso ignorare?") }
         }
+    }
+
+    /// v267: la casella per l'ologramma SMISTA (la lista a schermo, nil mentre apre la casella; le PRIORITÀ del cervello).
+    private var postaOlo: PostaOlo {
+        PostaOlo(posta: posta.map { l in l.map { PostaOlo.Mail(nome: $0.nome, oggetto: $0.oggetto, data: $0.data, letta: $0.letta) } },
+                 prio: (priorita?.importanti ?? []).map { PostaOlo.Prio(nome: $0.mittente, oggetto: $0.riassunto.isEmpty ? $0.oggetto : $0.riassunto, quando: $0.quando) })
     }
 
     private func carica() async {

@@ -490,7 +490,15 @@ struct VistaPostaOrologio: View {
             NavigationLink { VistaPrioritaOrologio() } label: { Label("Priorità", systemImage: "exclamationmark.circle") }   // build 22: PRIORITÀ
             if let posta {
                 let nonLette = posta.filter { !(($0["letta"] as? Bool) ?? true) }.count
-                Text("\(nonLette) non lette · ultimi 3 giorni").font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
+                // v267: SMISTA in piccolo, come le altre sezioni (la riga con l'ologramma e il numero)
+                HStack(spacing: 8) {
+                    OlogrammaPosta(dati: postaOlo(posta), piccolo: true).frame(width: 46, height: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("NON LETTE").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                        Text("\(nonLette) su \(posta.count)").font(.system(size: 16, weight: .semibold, design: .rounded))
+                        Text("ultimi 3 giorni").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                    }
+                }
                 TastoJarvisOrologio(testo: "Riassumi", frase: "Riassumimi la posta degli ultimi tre giorni: cosa conta davvero?")
                 if posta.isEmpty { Text("Nessuna email, Sir.").font(.footnote).foregroundStyle(.secondary) }
                 ForEach(Array(posta.prefix(20).enumerated()), id: \.offset) { _, m in
@@ -514,6 +522,14 @@ struct VistaPostaOrologio: View {
             if let e = o["errore"] as? String { errore = e; return }
             posta = o["email"] as? [[String: Any]] ?? []
         }
+    }
+
+    /// v267: le mail per l'ologramma SMISTA (il nome senza l'indirizzo, come nella lista).
+    private func postaOlo(_ posta: [[String: Any]]) -> PostaOlo {
+        PostaOlo(posta: posta.prefix(8).map { m in
+            PostaOlo.Mail(nome: (m["da"] as? String ?? "").components(separatedBy: " <").first ?? "", oggetto: m["oggetto"] as? String ?? "",
+                          data: m["data"] as? String ?? "", letta: (m["letta"] as? Bool) ?? true)
+        })
     }
 }
 

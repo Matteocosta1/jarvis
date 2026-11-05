@@ -383,7 +383,7 @@ final class ProveBea {
             for i in 0..<n {
                 let a = (Double(i) + 0.5 * Double(j % 2)) / Double(n) * OP.due
                 let ch = P3(Rh * cos(b) * cos(a), Rh * cos(b) * sin(a), Rz * sin(b))
-                let d = ((ch.x - C0.x) * (ch.x - C0.x) + (ch.y - C0.y) * (ch.y - C0.y) + (ch.z - C0.z) * (ch.z - C0.z)).squareRoot()
+                let dd = ch - C0, d = (dd * dd).sum().squareRoot()
                 let luce = exp(-pow((d - onda) / 0.16, 2)) * (1 - u)
                 let c = P(ch.x, ch.y, ch.z), dav = c.z < 0
                 let g = min(6, (dav ? 2 : 0) + Int((luce * 4.5).rounded()))
@@ -416,7 +416,8 @@ final class ProveBea {
             let per = 2.6 + 0.37 * Double(k), s = (t + Double(k) * 1.13).truncatingRemainder(dividingBy: per) / per
             let a0 = Double(k) * 2.39 + 0.6, b0 = 0.25 + 0.18 * Double((k * 7) % 4)
             let via = { (ss: Double) -> P3 in
-                ss < 0.55 ? dir(a0, b0) * (2.5 - 1.5 * ss / 0.55) : dir(a0 + 0.5, b0 + 0.35) * (1 + 1.4 * (ss - 0.55) / 0.45)
+                if ss < 0.55 { return dir(a0, b0) * (2.5 - 1.5 * ss / 0.55) }
+                return dir(a0 + 0.5, b0 + 0.35) * (1 + 1.4 * (ss - 0.55) / 0.45)
             }
             let vis = s < 0.55 ? min(1, s * 6) : max(0, 1 - (s - 0.55) / 0.45)
             let v1 = via(s), v0 = via(max(0, s - 0.04)), p1 = P(v1.x, v1.y, v1.z), p0 = P(v0.x, v0.y, v0.z)

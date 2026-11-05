@@ -110,6 +110,7 @@
 				ProveSpesa.swift,
 				ProveSerata.swift,
 				ProveBea.swift,
+				ProvePosta.swift,
 				Organismo.swift,
 				pronto.m4a,
 				ComandiVocali.swift,

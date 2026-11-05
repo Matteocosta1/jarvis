@@ -91,6 +91,22 @@ enum OP {
     static func lettera(_ d: Date) -> String { String(giorni[max(0, min(6, Calendar.current.component(.weekday, from: d) - 1))].prefix(1)) }
     static func durata(_ minuti: Double) -> String { Olo.durata(Int(minuti.rounded())) }
     static func euro(_ v: Double) -> String { Olo.numero(v) + " €" }
+    /// v267 · quantoFaOlo: da quanto, «ORA», «5 MIN», «2 H», «IERI», «3 G».
+    static func quantoFa(_ d: Date?, ora: Date = Date()) -> String {
+        guard let d else { return "" }
+        let m = max(0, ora.timeIntervalSince(d) / 60)
+        return m < 1 ? "ORA" : m < 60 ? "\(Int(m)) MIN" : m < 1440 ? "\(Int(m / 60)) H" : m < 2880 ? "IERI" : "\(Int(m / 1440)) G"
+    }
+    /// v267 · cortoOlo: la prima parola, in maiuscolo, al massimo `n` lettere.
+    static func corto(_ s: String, _ n: Int = 10) -> String {
+        let p = s.trimmingCharacters(in: .whitespacesAndNewlines).split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).first.map(String.init)?.uppercased() ?? ""
+        return p.count > n ? String(p.prefix(n - 1)) + "…" : p
+    }
+    /// v267 · tagliaOlo: al massimo `n` caratteri, con i puntini.
+    static func taglia(_ s: String, _ n: Int) -> String {
+        let u = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return u.count > n ? String(u.prefix(max(1, n - 1))) + "…" : u
+    }
     /// fraOlo: «50 MIN», «7 H 20».
     static func fra(_ m: Double) -> String {
         m < 60 ? "\(max(0, Int(m.rounded()))) MIN" : "\(Int(m / 60)) H \(String(format: "%02d", Int(m.truncatingRemainder(dividingBy: 60).rounded()) % 60))"
@@ -431,6 +447,28 @@ enum MotoreOlo {
     }
 }
 
+/// v267 · un ologramma solo, in piccolo (il polso: Email), senza scritte e senza dita.
+struct OloPiccolaVista: View {
+    let disegna: (inout GraphicsContext, Double, Double, Double, ManoOlo) -> Void
+    @State private var mano = ManoOlo()
+    @State private var inizio = Date()
+    @Environment(\.accessibilityReduceMotion) private var riduci
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: nil, paused: riduci)) { ctx in
+            let t = riduci ? 6 : ctx.date.timeIntervalSince(inizio)
+            Canvas { gc, size in
+                let W = Double(size.width), H = Double(size.height)
+                guard W > 4, H > 4 else { return }
+                gc.blendMode = .plusLighter
+                disegna(&gc, W, H, t, mano)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Sull'orologio (e ovunque serva in piccolo): la prova scelta sull'iPhone, senza scritte e senza dita, al ritmo del polso.
 struct ProvaOloPiccola: View {
     let sezione: SezioneOlo
@@ -483,6 +521,49 @@ struct ChipOlo: View {
         }
         .buttonStyle(StileStark())
         .accessibilityAddTraits(acceso ? .isSelected : [])
+    }
+}
+
+/// v267 · un ologramma solo nella sezione (Messaggi, Email, Confidente), come le prove ma senza chip: la tela, il dito di lato che
+/// lo gira (con lo slancio), il tocco su un elemento che apre il suo riquadro, la scansione che lo porta all'apertura e il suggerimento
+/// finché non si tocca. Si ferma con «Riduci movimento» (resta il disegno finito) e quando la sezione è dietro.
+struct OloSingolaVista: View {
+    let altezza: CGFloat
+    let aiuto: String
+    let etichetta: String
+    let disegna: (inout GraphicsContext, Double, Double, Double, ManoOlo) -> Void
+
+    @State private var mano = ManoOlo()
+    @State private var inizio = Date()
+    @State private var ritocco = 0
+    @Environment(\.accessibilityReduceMotion) private var riduci
+    @Environment(\.sezioneDietro) private var dietro
+
+    var body: some View {
+        let tocchi = ritocco, aiuto = self.aiuto
+        TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
+            let t = riduci ? 6 : ctx.date.timeIntervalSince(inizio)
+            Canvas { gc, size in
+                _ = tocchi                                        // con «Riduci movimento»: un tocco ridisegna
+                MotoreOlo.fotogramma(&gc, size, t, mano, aiuto: aiuto) { g, W, H in disegna(&g, W, H, t, mano) }
+            }
+        }
+        .frame(height: altezza)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { v in mano.muove(inizio: v.startLocation, punto: v.location) }
+                .onEnded { v in
+                    guard let p = mano.lascia(inizio: v.startLocation, punto: v.location) else { return }
+                    switch mano.tocca(p) {
+                    case .scelto, .chiuso: Suoni.tocco()
+                    case .fatto, .niente: break
+                    }
+                    ritocco += 1
+                }
+        )
+        .accessibilityElement()
+        .accessibilityLabel(etichetta)
     }
 }
 

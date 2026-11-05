@@ -67,6 +67,9 @@ struct VistaConfidente: View {
                             .font(.system(size: 14))
                             .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
 
+                        // v267: la BILANCIA, sotto le parole di JARVIS: la conversazione sui piatti, il cuore di oggi nel perno
+                        OlogrammaConfidente(dati: ConfidenteOlo(testo: testo, battito: stato?.battito)).corniceOlo(Color.ciano)
+
                         statoFisico
 
                         Button { Suoni.tocco(); aVoce() } label: {
