@@ -19,6 +19,11 @@ import UIKit
 // · swipe dai BORDI destro e sinistro: la sezione accanto nel cerchio delle aperte (con JARVIS fra l'ultima e la prima), con il
 //   giro olografico della pagina.
 // I Protocolli scendono dall'alto come sempre: qui non si tocca niente lassù.
+// · 5 nov sera (mockup v268, il signore: «identico, la voglio identico»): le pagine olografiche sono la PILA, come l'App Switcher di
+//   iOS (misure dal video del suo iPhone): le sezioni aperte in ordine d'uso, la più recente davanti a destra, le altre sotto a
+//   sinistra, alla scala 0,683; sopra ognuna l'icona e il nome; vetro olografico con trasparenza dinamica (la pagina al centro si
+//   legge, le altre trasparenti); dietro JARVIS sfocato; il dito di lato scorre la pila, in su chiude qualsiasi pagina, il tocco su
+//   una pagina la apre e fuori dalle pagine torna a JARVIS; da JARVIS le pagine entrano da sinistra. Al posto dello SFOGLIO in 3D.
 
 final class NavigaSezioni: ObservableObject {
     enum Modo: Equatable { case normale, tira, aggancio, sfoglio, bordo }
@@ -58,6 +63,29 @@ final class NavigaSezioni: ObservableObject {
     /// nell'angolo in alto a sinistra invece che nel reattore (la luce, disegnata dalla vista, era invece al posto giusto).
     var reattore: CGPoint = .zero
     var diametroReattore: CGFloat = 290
+    /// PILA (5 nov sera, come l'App Switcher di iOS): la pagina spinta in su (la sua `alzata`), da JARVIS quanto mancano le pagine
+    /// che entrano da sinistra (1 → 0), tornando a JARVIS col tocco fuori dalle pagine, e lo scarto (in pagine) che si chiude
+    /// quando una pagina chiusa lascia il suo posto.
+    @Published var alzataId: UUID?
+    @Published var daCasa: Double = 0
+    @Published var via = false
+    @Published var scosta: [UUID: Double] = [:]
+}
+
+/// Le misure della PILA, prese dal video dell'iPhone 15 Pro del signore (5 nov 20:31) e dalla foto di Instagram (20:40), uguali al
+/// mockup v268: la pagina davanti è il 68,3% dello schermo, al centro, col centro all'1% sopra la metà; la precedente sporge a
+/// sinistra di 0,198 pagine (il bordo al 2% dello schermo), quella prima di 0,264; a destra le pagine escono veloci dallo schermo.
+nonisolated enum PilaOlo {
+    static let scala: CGFloat = 0.683
+    static let y: CGFloat = -0.0105
+    /// Gli angoli dello schermo (rimpiccioliti con la pagina, come iOS).
+    static let raggio: CGFloat = 55
+    /// Il dito di lato: una pagina ogni 0,8 larghezze di pagina.
+    static let passo: CGFloat = 0.8
+    /// Dove sta una pagina (in punti) rispetto a quella davanti, a `o` pagine di distanza; `cw` è la larghezza della pagina.
+    static func x(_ o: Double, _ cw: CGFloat) -> CGFloat {
+        o >= 0 ? CGFloat(o) * cw * 1.06 : -cw * 0.297 * CGFloat(1 - exp(1.1 * o))
+    }
 }
 
 /// Dove e come sta una pagina (gli stessi modificatori in tutti i modi: cambiano solo i valori).
@@ -72,6 +100,8 @@ struct Posa {
     var ombra: Double = 0
     var z: Double = 0
     var tocchi = false
+    /// PILA: la pagina è vetro olografico; quanto è in primo piano (0…1: vetro quasi pieno e sfocatura forte di ciò che ha dietro).
+    var vetro: Double?
 }
 
 /// Il ritaglio delle pagine: arrotondato quando sono pagine; a tutto schermo (raggio 0) non taglia niente, nemmeno sotto l'ora.
@@ -94,7 +124,7 @@ struct PosaPagina: ViewModifier {
         content
             .environment(\.tintaOlo, TiroPagina.passoOlo(posa.tinta))
             .allowsHitTesting(posa.tocchi)
-            .overlay { if posa.tinta > 0.001 { VeloOlo(forza: posa.tinta, web: web) } }
+            .overlay { if posa.tinta > 0.001 { VeloOlo(forza: posa.tinta, web: web, raggio: posa.vetro == nil ? 28 : posa.raggio, pila: posa.vetro != nil) } }
             .clipShape(Ritaglio(raggio: posa.raggio))
             // 5 nov (il signore: «le pagine da sfogliare non sono trasparenti e cool come nel mockup»): come .foglio.ologramma del
             // mockup, la pagina diventa luce (mix-blend-mode: screen): il nero si fonde col fondo olografico e resta il disegno ciano
@@ -102,14 +132,16 @@ struct PosaPagina: ViewModifier {
             // 5 nov pomeriggio (il signore, foto: «più trasparenti, che si veda il sotto, IDENTICI al mockup; nell'app sono troppo
             // luminosi»): sull'iPhone la fusione «screen» non passa fuori dalla pagina girata in 3D (la pagina restava piena).
             // Come nel mockup la pagina olografica lascia vedere il fondo e la griglia: è luce, metà trasparente.
-            .opacity(1 - TiroPagina.trasparenza * posa.tinta)
-            .modifier(AloneOlo(forza: posa.ombra, alfa: 1 - TiroPagina.trasparenza * posa.tinta))
+            // 5 nov sera (PILA, il signore: «ologrammi trasparenti… la trasparenza deve essere dinamica»): sotto la pagina il vetro
+            // ciano, più pieno e più sfocato quando la pagina è in primo piano; la pagina sopra è luce («screen»), senza mezza opacità
+            .background { if let f = posa.vetro { VetroOlo(fuoco: f, forza: posa.tinta, raggio: posa.raggio) } }
+            .opacity(posa.vetro == nil ? 1 - TiroPagina.trasparenza * posa.tinta : 1)
+            .modifier(AloneOlo(forza: posa.ombra, alfa: posa.vetro == nil ? 1 - TiroPagina.trasparenza * posa.tinta : 1))
             .scaleEffect(posa.scala)
             .rotation3DEffect(.degrees(posa.rotY), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
             .offset(x: posa.x, y: posa.y)
             .opacity(posa.opacita)
             .accessibilityHidden(!posa.tocchi)
-            .zIndex(posa.z)
     }
 }
 
@@ -127,11 +159,12 @@ struct SegueTiro: ViewModifier {
         let v = tiro.pagina == id ? tiro.viva : TiroPagina.Viva()
         content
             .environment(\.tintaOlo, max(tintaPosa, TiroPagina.passoOlo(v.tinta)))
-            .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta, web: web) } }
+            .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta, web: web, raggio: v.raggio, pila: true) } }
             .clipShape(Ritaglio(raggio: v.raggio))
             .blendMode(v.tinta > 0.001 ? .screen : .normal)             // 5 nov: la pagina in mano è luce, come nel mockup
-            .opacity(1 - TiroPagina.trasparenza * v.tinta)               // e lascia vedere il fondo, come nel mockup
-            .modifier(AloneOlo(forza: v.ombra, alfa: 1 - TiroPagina.trasparenza * v.tinta))
+            // 5 nov sera (PILA): sotto, il vetro in primo piano (la pagina in mano è sempre quella davanti)
+            .background { if v.tinta > 0.001 { VetroOlo(fuoco: 1, forza: v.tinta, raggio: v.raggio) } }
+            .modifier(AloneOlo(forza: v.ombra))
             .mask { MascheraLaser(riga: v.riga) }
             .modifier(Proiezione(x: v.x, y: v.y, scala: v.scala, inclina: v.inclina))
     }
@@ -201,6 +234,8 @@ struct StratoSezioniVista<Vista: View>: View {
     let vista: (PilaSezioni.Voce) -> Vista
     let portaDavanti: (UUID?) -> Void
     let chiudiDietro: (UUID) -> Void
+    /// PILA: il simbolo di ogni sezione (dal nome, come sulla corona), per l'etichetta sopra la pagina.
+    var icone: [String: String] = [:]
 
     @State private var P0: Double = 0
     @State private var assePagina: Int = 0           // 0 da decidere, 1 orizzontale (sfoglia), 2 verticale (alza)
@@ -208,6 +243,8 @@ struct StratoSezioniVista<Vista: View>: View {
     @State private var basso = GestoBassoSezioni()   // su dal basso, poco sopra la barretta di iOS
     @State private var tiro = TiroPagina()           // la pagina in mano, a 120 Hz
     @State private var telai: [UUID: CGRect] = [:]   // dove sta ogni pagina a riposo (coordinate globali)
+    @State private var usate: [UUID] = []            // PILA: le sezioni in ordine d'uso (l'ultima è la più recente)
+    @State private var cartaDito: UUID?              // PILA: la pagina sotto il dito quando è partito
 
     private var altezza: CGFloat { FasciaAlta.finestra?.bounds.height ?? 852 }
     private var larghezza: CGFloat { FasciaAlta.finestra?.bounds.width ?? 393 }
@@ -218,26 +255,27 @@ struct StratoSezioniVista<Vista: View>: View {
         return CGRect(x: 0, y: 0, width: larghezza, height: altezza)
     }
 
-    /// Le pagine dello sfoglio: le sezioni aperte, nell'ordine d'apertura.
+    /// Le pagine: le sezioni aperte.
     private var carte: [PilaSezioni.Voce] { pila.voci }
-    private var cerchio: Bool { carte.count > 1 }
 
-    private func quale(_ p: Double) -> Int {
-        let n = carte.count
-        guard n > 0 else { return 0 }
-        let r = Int(p.rounded())
-        return cerchio ? ((r % n) + n) % n : max(0, min(n - 1, r))
-    }
-    private func scarto(_ k: Int) -> Double {
-        var o = Double(k) - naviga.P
-        if cerchio {
-            let n = Double(carte.count)
-            o = o.truncatingRemainder(dividingBy: n)
-            if o < 0 { o += n }
-            if o > n / 2 { o -= n }
+    /// PILA (come iOS): le pagine in ordine d'uso, dalla più vecchia (a sinistra, sotto) alla più recente (a destra, sopra).
+    /// `naviga.P` è il posto in quest'ordine della pagina al centro.
+    private var ordine: [PilaSezioni.Voce] {
+        let ix = Dictionary(uniqueKeysWithValues: carte.enumerated().map { ($1.id, $0) })
+        return carte.sorted {
+            let a = usate.firstIndex(of: $0.id) ?? -1, b = usate.firstIndex(of: $1.id) ?? -1
+            return a != b ? a < b : (ix[$0.id] ?? 0) < (ix[$1.id] ?? 0)
         }
-        return o
     }
+    private func rango(_ id: UUID) -> Int { ordine.firstIndex { $0.id == id } ?? 0 }
+    /// La pagina al centro.
+    private var alCentro: PilaSezioni.Voce? {
+        let o = ordine
+        guard !o.isEmpty else { return nil }
+        return o[max(0, min(o.count - 1, Int(naviga.P.rounded())))]
+    }
+    /// A quante pagine dal centro sta la pagina (negativo: a sinistra), con lo scarto che si chiude dopo una chiusura.
+    private func scarto(_ id: UUID) -> Double { Double(rango(id)) - naviga.P + (naviga.scosta[id] ?? 0) }
 
     var body: some View {
         ZStack {
@@ -247,13 +285,12 @@ struct StratoSezioniVista<Vista: View>: View {
             ForEach(pila.voci) { v in
                 pagina(v)
             }
+            // PILA: sopra ogni pagina l'icona e il nome (come iOS; niente più il conto «2 / 3»)
             if !carte.isEmpty && (naviga.modo == .sfoglio || (naviga.modo == .tira && naviga.rivela > 0.001)) {
-                Text("\(quale(naviga.P) + 1) / \(carte.count)")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(2)
-                    .foregroundStyle(Color.tenue)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 54)
-                    .allowsHitTesting(false)
+                EtichettePila(tiro: tiro, dati: datiEtichette, mano: naviga.modo == .tira ? tiro.pagina : nil, rivela: naviga.rivela,
+                              daCasa: naviga.daCasa, larghezza: larghezza, altezza: altezza)
+                    .ignoresSafeArea()
+                    .zIndex(120)
                     .transition(.opacity)
             }
             if naviga.modo == .aggancio, let da = naviga.aggancioDa, let volo = naviga.volo, let id = naviga.agganciata {
@@ -268,6 +305,11 @@ struct StratoSezioniVista<Vista: View>: View {
         }
         .gesture(gestoSfoglio, including: naviga.modo == .sfoglio ? .all : .subviews)
         .onAppear { preparaTrackpad(); preparaBasso() }
+        .onChange(of: pila.davanti, initial: true) { _, d in                // PILA: l'ordine d'uso
+            guard let d else { return }
+            usate.removeAll { $0 == d }
+            usate.append(d)
+        }
         .onChange(of: reattore, initial: true) { _, r in naviga.reattore = r }
         .onChange(of: diametroReattore, initial: true) { _, d in naviga.diametroReattore = d }
         .onChange(of: pila.voci.isEmpty) { _, vuota in
@@ -301,7 +343,7 @@ struct StratoSezioniVista<Vista: View>: View {
         if let d = pila.voceDavanti {
             tiro.prendi(pagina: d.id, posa: TiroPagina.Viva(), larghezza: larghezza, altezza: altezza)
             withTransaction(senza) {
-                naviga.P = Double(carte.firstIndex { $0.id == d.id } ?? 0)
+                naviga.P = Double(rango(d.id))
                 naviga.alzata = 0
                 naviga.rivela = 0
                 naviga.modo = .tira
@@ -309,9 +351,10 @@ struct StratoSezioniVista<Vista: View>: View {
             formaSfoglio()
         } else {
             withTransaction(senza) {
-                naviga.P = 0
+                naviga.P = Double(carte.count - 1)                        // PILA: al centro la più recente
                 naviga.alzata = 0
                 naviga.rivela = 0
+                naviga.daCasa = 0
                 naviga.modo = .tira
             }
             entraSfoglio()
@@ -333,15 +376,14 @@ struct StratoSezioniVista<Vista: View>: View {
     private func portaAVoce(_ id: UUID) {
         switch naviga.modo {
         case .sfoglio:
-            guard let k = carte.firstIndex(where: { $0.id == id }) else { return }
-            let o = scarto(k)
-            if abs(o) < 0.01 { scegli(); return }
-            withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.3)) { naviga.P += o }
+            guard carte.contains(where: { $0.id == id }) else { return }
+            let o = scarto(id)
+            if abs(o) < 0.01 { scegli(id); return }
+            withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.3)) { naviga.P = Double(rango(id)) }
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(300))
-                let q = quale(naviga.P)
-                guard naviga.modo == .sfoglio, carte.indices.contains(q), carte[q].id == id else { return }
-                scegli()
+                guard naviga.modo == .sfoglio, alCentro?.id == id else { return }
+                scegli(id)
             }
         case .normale:
             portaDavanti(id)
@@ -365,6 +407,11 @@ struct StratoSezioniVista<Vista: View>: View {
                 .overlay { if naviga.materia == v.id { MaterializzaOlo(web: web) { if naviga.materia == v.id { naviga.materia = nil } } } }
                 .modifier(SegueTiro(tiro: tiro, id: v.id, web: web))
                 .modifier(PosaPagina(posa: p, web: web))
+                // PILA: mentre la pagina in mano sale, le altre le stanno attorno (alla sua scala, la pila a sinistra)
+                .modifier(AttornoAlTiro(tiro: tiro, attivo: naviga.modo == .tira && tiro.pagina != nil && tiro.pagina != v.id,
+                                        o: Double(rango(v.id) - (tiro.pagina.map { rango($0) } ?? 0)), rivela: naviga.rivela,
+                                        larghezza: larghezza))
+                .zIndex(p.z)
                 // dove sta la pagina a riposo (coordinate globali): da lì parte il volo dell'AGGANCIO e lì si posa la sua luce
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { telai[v.id] = $0 }
                 .transition(.offset(y: altezza + 2))               // sale e scende di tutta l'altezza, come prima
@@ -375,7 +422,7 @@ struct StratoSezioniVista<Vista: View>: View {
         let davanti = pila.davanti == v.id
         switch naviga.modo {
         case .sfoglio:
-            p = posaSfoglio(v)
+            p = posaPila(v)
         case .bordo:
             let vado = naviga.verso.flatMap { $0 } == v.id
             guard davanti || vado else { p.opacita = 0; return p }
@@ -392,7 +439,13 @@ struct StratoSezioniVista<Vista: View>: View {
             if tiro.pagina == v.id {
                 p.z = 100                                             // la posa viva la dà SegueTiro
             } else if naviga.rivela > 0.001 {
-                p = posaSfoglio(v)
+                p = posaPila(v)
+                if tiro.pagina != nil {                                     // attorno alla pagina in mano: lo fa AttornoAlTiro
+                    p.scala = 1
+                    p.x = 0
+                    p.y = 0
+                    p.vetro = 0
+                }
                 p.opacita *= naviga.rivela
             } else {
                 p.opacita = 0
@@ -414,29 +467,71 @@ struct StratoSezioniVista<Vista: View>: View {
         return p
     }
 
-    /// Le pagine olografiche, come nel mockup: a metà pagina (scala 0,78, centro al 48% dell'altezza), una alla volta in 3D (le
-    /// accanto girate di 50° per pagina, indietro di 320 in prospettiva 1100, che si vedono sfogliando); spinta in su sfuma.
-    private func posaSfoglio(_ v: PilaSezioni.Voce) -> Posa {
+    /// La PILA (5 nov sera, mockup v268 approvato: «identico»), come l'App Switcher di iOS: le pagine olografiche alla stessa scala
+    /// (0,683), la più recente a destra e sopra, le altre sotto a sinistra (PilaOlo.x); la pagina spinta in su sale e sfuma; quella
+    /// scelta torna a tutto schermo e le altre se ne vanno di lato; col tocco fuori rimpiccioliscono e spariscono (si torna a JARVIS);
+    /// da JARVIS entrano da sinistra. Il vetro è più pieno per la pagina al centro (trasparenza dinamica).
+    private func posaPila(_ v: PilaSezioni.Voce) -> Posa {
         var p = Posa()
-        let k = carte.firstIndex(where: { $0.id == v.id }) ?? 0
-        let o = scarto(k), a = abs(o), mat = naviga.scelta == v.id
-        let centro = a < 0.5 && !mat
-        p.scala = mat ? 1 : TiroPagina.sMeta * CGFloat(1100 / (1100 + min(a, 1.3) * 320))
-        p.rotY = mat ? 0 : o * 50
-        p.x = mat ? 0 : CGFloat(o) * larghezza * 0.74
-        p.y = mat ? 0 : -altezza * 0.02 + (centro ? naviga.alzata : 0)
-        let via = centro ? max(0, 1 + Double(min(0, naviga.alzata) / (altezza * 0.55))) : 1
-        p.opacita = mat ? 1 : max(0, 1 - a * 1.25) * via
-        p.raggio = mat ? 0 : 28
-        p.tinta = mat ? 0 : 1
-        p.ombra = mat ? 0 : 0.45
-        p.z = mat ? 100 : 50 - a * 10
+        let r = rango(v.id), o = scarto(v.id), mat = naviga.scelta == v.id
+        if mat {
+            p.z = 100
+            p.vetro = 1
+            return p                                                      // a tutto schermo, senza tinta: si materializza
+        }
+        let cw = larghezza * PilaOlo.scala
+        let su = naviga.alzataId == v.id ? naviga.alzata : 0
+        p.scala = PilaOlo.scala
+        p.x = PilaOlo.x(o, cw) - CGFloat(naviga.daCasa) * larghezza * 1.15
+        p.y = altezza * PilaOlo.y + su
+        let lontana = o < -3 ? max(0, 1 - (-o - 3)) : 1
+        p.opacita = lontana * max(0, 1 + Double(min(0, su) / (altezza * 0.55)))
+        if naviga.scelta != nil { p.x *= 1.6; p.opacita = 0 }            // un'altra è stata scelta: questa va di lato e sparisce
+        if naviga.via { p.scala *= 0.8; p.opacita = 0 }                    // tocco fuori: si torna a JARVIS
+        p.raggio = PilaOlo.raggio
+        p.tinta = 1
+        p.ombra = 0.45
+        p.vetro = max(0, 1 - abs(o))
+        p.z = 20 + Double(r)
         return p
     }
 
-    /// La pagina al centro delle pagine olografiche, come posa viva (per farla volare nel reattore).
+    /// La pagina al centro della PILA, come posa viva (per fermarla lì e per farla volare nel reattore).
     private var vivaCentro: TiroPagina.Viva {
-        TiroPagina.Viva(x: 0, y: -altezza * 0.02 + naviga.alzata, scala: TiroPagina.sMeta, raggio: 28, tinta: 1, ombra: 0.45)
+        TiroPagina.Viva(x: 0, y: altezza * PilaOlo.y + naviga.alzata, scala: PilaOlo.scala, raggio: PilaOlo.raggio, tinta: 1, ombra: 0.45)
+    }
+
+    /// Le etichette della PILA, in ordine d'uso.
+    private var datiEtichette: [EtichettePila.Dato] {
+        let mano = naviga.modo == .tira ? tiro.pagina : nil
+        let rm = mano.map { rango($0) } ?? 0
+        let nascoste = naviga.scelta != nil || naviga.via
+        return ordine.enumerated().map { r, v -> EtichettePila.Dato in
+            let p = posaPila(v)
+            let o = mano != nil ? Double(r - rm) : scarto(v.id)
+            let a = nascoste ? 0 : (naviga.modo == .tira ? naviga.rivela : p.opacita)
+            return EtichettePila.Dato(id: v.id, nome: v.sezione.nome, icona: icone[v.sezione.nome] ?? iconaDiRiserva(v.sezione), o: o, alfa: a)
+        }
+    }
+
+    private func iconaDiRiserva(_ s: Sezione) -> String {
+        switch s {
+        case .impostazioni: return "gearshape"
+        case .browser: return "safari"
+        case .pagina: return "globe"
+        default: return "square.grid.2x2"
+        }
+    }
+
+    /// PILA: la pagina sotto il dito (coordinate globali): la più in alto fra quelle che lo contengono.
+    private func cartaSotto(_ q: CGPoint) -> UUID? {
+        for v in ordine.reversed() {
+            let p = posaPila(v), r = telaio(v.id)
+            guard p.opacita > 0.05 else { continue }
+            let cx = r.midX + p.x, cy = r.midY + p.y, w = r.width * p.scala, h = r.height * p.scala
+            if abs(q.x - cx) <= w / 2 && abs(q.y - cy) <= h / 2 { return v.id }
+        }
+        return nil
     }
 
     // MARK: i bordi ai lati (la sezione accanto). Su dal basso: `GestoBassoSezioni`, sulla finestra.
@@ -477,16 +572,19 @@ struct StratoSezioniVista<Vista: View>: View {
         if let d = pila.voceDavanti {                                     // da una sezione: la pagina al dito
             tiro.inizia(pagina: d.id, tocco: punto, larghezza: larghezza, altezza: altezza)
             withTransaction(senza) {
-                naviga.P = Double(carte.firstIndex { $0.id == d.id } ?? 0)
+                naviga.P = Double(rango(d.id))
                 naviga.alzata = 0
+                naviga.alzataId = nil
                 naviga.rivela = 0
                 naviga.modo = .tira
             }
-        } else {                                                          // da JARVIS: le pagine compaiono col dito
+        } else {                                                          // da JARVIS: le pagine entrano da sinistra col dito
             withTransaction(senza) {
-                naviga.P = 0
+                naviga.P = Double(carte.count - 1)                        // PILA: al centro la più recente
                 naviga.alzata = 0
+                naviga.alzataId = nil
                 naviga.rivela = 0
+                naviga.daCasa = 1
                 naviga.modo = .tira
             }
         }
@@ -512,7 +610,9 @@ struct StratoSezioniVista<Vista: View>: View {
         }
         let q = Double(min(1, max(0, -t.y) / (altezza * 0.45)))
         naviga.rivela = min(1, q * 2.5)
-        tiro.fondo = min(1, q * 2.2)
+        let e = min(1, q * 2.2)
+        naviga.daCasa = 1 - e * (2 - e)                                   // PILA: entrano da sinistra mentre JARVIS si sfoca
+        tiro.fondo = e
         if q > 0.1 && !naviga.suonoPagine { naviga.suonoPagine = true; Suoni.caricaOlo() }
     }
 
@@ -595,8 +695,9 @@ struct StratoSezioniVista<Vista: View>: View {
         guard !carte.isEmpty else { pagineSpente(); return }
         tiro.vibra()
         if !naviga.suonoPagine { naviga.suonoPagine = true; Suoni.caricaOlo() }
-        withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.2)) {
+        withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.32)) {          // PILA: finiscono di entrare da sinistra (0,32 s)
             naviga.rivela = 1
+            naviga.daCasa = 0
             tiro.fondo = 1
             naviga.modo = .sfoglio
         }
@@ -608,6 +709,7 @@ struct StratoSezioniVista<Vista: View>: View {
         var senza = Transaction(); senza.disablesAnimations = true
         withTransaction(senza) {
             naviga.rivela = 0
+            naviga.daCasa = 0
             tiro.fondo = 0
             naviga.modo = .normale
         }
@@ -616,79 +718,90 @@ struct StratoSezioniVista<Vista: View>: View {
     /// Dalle pagine, di nuovo su dalla fascia: la pagina al centro va nel reattore (AGGANCIO col suo suono) e torna JARVIS.
     private func tornaAJarvis(velocita: CGVector) {
         Suoni.zittisciOlo()
-        let k = quale(naviga.P)
-        guard carte.indices.contains(k) else {
+        guard let id = alCentro?.id else {
             portaDavanti(nil)
             withAnimation(.easeOut(duration: 0.3)) { naviga.modo = .normale; naviga.alzata = 0; naviga.rivela = 0; tiro.fondo = 0 }
             return
         }
-        let id = carte[k].id
+        naviga.alzataId = nil
         tiro.prendi(pagina: id, posa: vivaCentro, larghezza: larghezza, altezza: altezza)
         aggancio(id: id, base: vivaCentro, velocita: velocita, scala: 0)
     }
 
+    /// PILA, come iOS: il dito di lato scorre la pila (una pagina ogni 0,8 larghezze di pagina, poi si ferma sulla più vicina con lo
+    /// slancio); in su su una pagina la chiude; il tocco su una pagina la apre, fuori dalle pagine torna a JARVIS.
     private var gestoSfoglio: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { v in
                 // nella fascia in basso il gesto può partire un attimo dopo il tocco (aspetta lo swipe su): la pagina di partenza
                 // si prende finché l'asse non è deciso, non solo al primo istante
                 if v.translation == .zero { assePagina = 0 }
-                if assePagina == 0 { P0 = naviga.P }
+                if assePagina == 0 { P0 = naviga.P; cartaDito = cartaSotto(v.startLocation) }
                 if v.translation == .zero { return }
                 if assePagina == 0, hypot(v.translation.width, v.translation.height) > 8 {
-                    // in su solo dalla pagina al centro (si chiude); altrimenti si sfoglia
-                    let c = CGPoint(x: larghezza / 2, y: altezza / 2)
-                    let sulCentro = abs(v.startLocation.x - c.x) < larghezza * 0.4 && abs(v.startLocation.y - c.y + altezza * 0.03) < altezza * 0.4
-                    assePagina = abs(v.translation.width) >= abs(v.translation.height) || v.translation.height > 0 || !sulCentro ? 1 : 2
+                    // in su solo da una pagina (si chiude); altrimenti si scorre
+                    assePagina = abs(v.translation.width) >= abs(v.translation.height) || v.translation.height > 0 || cartaDito == nil ? 1 : 2
+                    if assePagina == 2 { naviga.alzataId = cartaDito }
                     Suoni.zittisciOlo()
                 }
                 if assePagina == 1 {
-                    var p = P0 - Double(v.translation.width / (larghezza * 0.75))
-                    if !cerchio { p = max(-0.35, min(Double(carte.count) - 0.65, p)) }
-                    naviga.P = p
+                    let passo = Double(larghezza * PilaOlo.scala * PilaOlo.passo)
+                    naviga.P = max(-0.35, min(Double(carte.count) - 0.65, P0 - Double(v.translation.width) / passo))
                 } else if assePagina == 2 {
                     naviga.alzata = min(0, v.translation.height)
                 }
             }
             .onEnded { v in
-                if assePagina == 0 {                                         // un tocco: sulla pagina al centro, si apre
-                    let c = CGPoint(x: larghezza / 2, y: altezza / 2)
-                    if abs(v.location.x - c.x) < larghezza * 0.4 && abs(v.location.y - c.y + altezza * 0.03) < altezza * 0.4 { scegli() }
+                defer { assePagina = 0 }
+                if assePagina == 0 {                                         // un tocco: sulla pagina si apre, fuori si torna a JARVIS
+                    if let id = cartaDito { scegli(id) } else { pilaACasa() }
                     return
                 }
                 if assePagina == 1 {
-                    // come nel mockup: una pagina per volta, con lo slancio del dito (0,3 s), il tono «olo» quando cambia
-                    let giro = P0.rounded(), vx = Double(v.velocity.width) / 1000
-                    var meta = (naviga.P - vx * 180 / Double(larghezza * 0.75)).rounded()
-                    meta = max(giro - 1, min(giro + 1, meta))
-                    if !cerchio { meta = max(0, min(Double(carte.count - 1), meta)) }
-                    withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.3)) { naviga.P = meta }
-                    if meta != giro {
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .milliseconds(300))
-                            Suoni.tonoOlo()
-                            Aptica.sfoglia()                                  // 5 nov: più forte (era «leggero»)
-                        }
-                    }
-                } else if assePagina == 2 {
-                    if naviga.alzata < -altezza * 0.16 || v.velocity.height < -600 { chiudiCarta() }   // come nel mockup
+                    // come il mockup: si ferma sulla pagina più vicina con lo slancio del dito (0,26 s)
+                    let passo = Double(larghezza * PilaOlo.scala * PilaOlo.passo), vx = Double(v.velocity.width) / 1000
+                    let meta = max(0, min(Double(carte.count - 1), (naviga.P - vx * 180 / passo).rounded()))
+                    withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.26)) { naviga.P = meta }
+                } else if assePagina == 2, let id = naviga.alzataId {
+                    if naviga.alzata < -altezza * 0.16 || v.velocity.height < -600 { chiudiCarta(id) }   // come nel mockup
                     else { withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.2)) { naviga.alzata = 0 } }
                 }
-                assePagina = 0
             }
     }
 
-    /// La pagina al centro si materializza a tutto schermo (0,32 s) e torna davanti; il click «scelta» quando arriva, come nel mockup.
-    private func scegli() {
-        let k = quale(naviga.P)
-        guard carte.indices.contains(k) else { return }
-        let v = carte[k]
+    /// PILA: tocco fuori dalle pagine (il signore, 5 nov: «mi deve far tornare alla pagina principale col reattore, come iOS»):
+    /// le pagine rimpiccioliscono e spariscono (0,3 s), JARVIS torna nitido e davanti.
+    private func pilaACasa() {
+        Suoni.zittisciOlo()
+        withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.3)) {
+            naviga.via = true
+            tiro.fondo = 0
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) { portaDavanti(nil) }
+            await Task.yield()
+            withTransaction(t) {
+                naviga.modo = .normale
+                naviga.via = false
+                naviga.alzata = 0
+                naviga.alzataId = nil
+                naviga.rivela = 0
+                naviga.daCasa = 0
+            }
+        }
+    }
+
+    /// La pagina toccata (o al centro) si materializza a tutto schermo (0,32 s) e torna davanti; le altre vanno di lato e spariscono;
+    /// il click «scelta» quando arriva, come nel mockup.
+    private func scegli(_ id: UUID? = nil) {
+        guard let v = id.flatMap({ i in carte.first { $0.id == i } }) ?? alCentro else { return }
         Suoni.zittisciOlo()
         if !v.sezione.conFotocamera { Suoni.sceltaPagina(fra: 0.32) }
         Aptica.sceltaPagina()                                         // 5 nov: più forte (era «leggero»)
         withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.32)) {
             naviga.scelta = v.id
-            naviga.P = Double(k)
             tiro.fondo = 0.7
         }
         Task { @MainActor in
@@ -701,34 +814,56 @@ struct StratoSezioniVista<Vista: View>: View {
                 naviga.materia = v.id                                 // come il mockup: ora si materializza
                 naviga.scelta = nil
                 naviga.alzata = 0
+                naviga.alzataId = nil
                 naviga.rivela = 0
                 tiro.fondo = 0
             }
         }
     }
 
-    /// La pagina al centro, spinta in su, si chiude.
-    private func chiudiCarta() {
-        let k = quale(naviga.P)
-        guard carte.indices.contains(k) else { return }
-        let id = carte[k].id
+    /// PILA: una pagina spinta in su si chiude (sale e sfuma, 0,22 s); le altre si stringono nel suo posto (0,24 s), come iOS:
+    /// se era a sinistra del centro, quelle a sinistra scorrono a destra; se era al centro, arriva la successiva (o la precedente).
+    private func chiudiCarta(_ id: UUID) {
+        guard carte.contains(where: { $0.id == id }) else { return }
+        let r = rango(id), P0 = naviga.P.rounded()
         Suoni.zittisciOlo()
         Aptica.chiusaPagina()
+        naviga.alzataId = id
         withAnimation(.easeIn(duration: 0.22)) { naviga.alzata = -altezza * 0.9 }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(230))
             var t = Transaction(); t.disablesAnimations = true
-            withTransaction(t) {
-                naviga.alzata = 0
-                chiudiDietro(id)
-                if pila.voci.isEmpty {
+            withTransaction(t) { chiudiDietro(id) }
+            // quella davanti si chiude spegnendo il suo stato: esce dall'elenco un attimo dopo
+            for _ in 0..<40 where carte.contains(where: { $0.id == id }) { try? await Task.sleep(for: .milliseconds(16)) }
+            if carte.contains(where: { $0.id == id }) {                   // non si è chiusa (il Wiretap col suo verbale): torna giù
+                withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.2)) { naviga.alzata = 0 }
+                return
+            }
+            if pila.voci.isEmpty {
+                withTransaction(t) {
+                    naviga.alzata = 0
+                    naviga.alzataId = nil
                     naviga.modo = .normale
                     naviga.rivela = 0
                     tiro.fondo = 0
-                } else {
-                    naviga.P = Double(quale(naviga.P))
                 }
+                return
             }
+            let n = Double(carte.count)
+            let P1 = Double(r) < P0 ? P0 - 1 : min(P0, n - 1)
+            var scosta: [UUID: Double] = [:]
+            for v in ordine {
+                let rn = Double(rango(v.id)), ro = rn >= Double(r) ? rn + 1 : rn
+                scosta[v.id] = (ro - P0) - (rn - P1)
+            }
+            withTransaction(t) {
+                naviga.alzata = 0
+                naviga.alzataId = nil
+                naviga.P = max(0, P1)
+                naviga.scosta = scosta
+            }
+            withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.24)) { naviga.scosta = [:] }
         }
     }
 
@@ -1097,7 +1232,7 @@ final class TiroPagina: NSObject, ObservableObject {
     /// Il punto toccato resta sotto il dito; il tono olografico cresce nei primi 120 punti.
     private func posaDito() -> Viva {
         let s = TiroPagina.scala(corsa), ax = tocco.x - larghezza / 2, ay = tocco.y - altezza / 2, q = Double(min(1, corsa / 120))
-        return Viva(x: dx + ax * (1 - s), y: -corsa + ay * (1 - s), scala: s, raggio: 28 * min(1, corsa / 40),
+        return Viva(x: dx + ax * (1 - s), y: -corsa + ay * (1 - s), scala: s, raggio: PilaOlo.raggio * min(1, corsa / 40),
                     tinta: q, ombra: 0.45 * Double(min(1, corsa / 40)))
     }
 
@@ -1626,7 +1761,14 @@ struct FondoVivo: View {
     @ObservedObject var tiro: TiroPagina
     let tocca: Bool
     var body: some View {
-        FondoOlo()
+        // 5 nov sera (PILA, scelta del signore «JARVIS sfocato, come iOS»): al posto del fondo a griglia, JARVIS che sta sotto,
+        // molto sfocato e scurito, come la Home dietro le app
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            Color(red: 2 / 255, green: 8 / 255, blue: 11 / 255).opacity(0.38)
+        }
+            .environment(\.colorScheme, .dark)
+            .contentShape(Rectangle())
             .opacity(tiro.fondo)
             .allowsHitTesting(tocca)
             .accessibilityHidden(true)
@@ -1647,18 +1789,159 @@ struct VeloOlo: View {
     /// fusioni di SwiftUI non arrivano dentro la WKWebView (vista UIKit). Il ciano e il velo al 7% li mette la pagina stessa,
     /// con la stessa fusione del mockup (OloWeb); qui restano il bagliore, le righe e il bordo.
     var web = false
+    /// Gli angoli della pagina (28 nello sfoglio dai bordi; nella PILA quelli dello schermo).
+    var raggio: CGFloat = 28
+    /// PILA (5 nov sera, come il mockup v268): la tinta è luce ciano sul vetro (VetroOlo), non «color»; righe più leggere.
+    var pila = false
     var body: some View {
         ZStack {
-            if !web {
+            if !web && !pila {
                 Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
                 Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
             }
-            RigheOlo().opacity(forza)
-            // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (era #8ff0ff all'85%)
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.55 * forza), lineWidth: 1.5)
+            RigheOlo().opacity(forza * (pila ? 0.57 : 1))
+            // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (60% nella PILA)
+            RoundedRectangle(cornerRadius: raggio, style: .continuous)
+                .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity((pila ? 0.6 : 0.55) * forza), lineWidth: 1.5)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// PILA (5 nov sera, il signore: «devono sembrare davvero ologrammi trasparenti… la trasparenza deve essere dinamica, così da
+/// mostrare e capire bene»): il vetro sotto ogni pagina, come il mockup v268. `fuoco` 1 = la pagina in primo piano (in mano, o al
+/// centro): vetro scuro all'88% e sfocatura piena di ciò che ha dietro, così si legge e non si mescola; 0 = una pagina dietro: vetro
+/// al 50% e poca sfocatura. Scorrendo, il fuoco passa dall'una all'altra. `forza`: quanto è olografica la pagina (si scioglie quando
+/// la scelta torna a tutto schermo).
+struct VetroOlo: View {
+    let fuoco: Double
+    var forza: Double = 1
+    let raggio: CGFloat
+    var body: some View {
+        let forma = RoundedRectangle(cornerRadius: raggio, style: .continuous)
+        let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+        ZStack {
+            forma.fill(.ultraThinMaterial).opacity((0.3 + 0.7 * fuoco) * forza)
+            forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
+            forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
+                                              .init(color: ciano.opacity(0.03 * forza), location: 0.4),
+                                              .init(color: ciano.opacity(0.06 * forza), location: 1)],
+                                      startPoint: .top, endPoint: .bottom))
+        }
+        .environment(\.colorScheme, .dark)
+        .allowsHitTesting(false)
+    }
+}
+
+/// PILA: mentre la pagina in mano sale col dito, le altre le stanno attorno (stessa scala e altezza, la pila alla sua sinistra) e
+/// la seguono 120 volte al secondo; mentre compaiono arrivano un po' da più a sinistra. Ferma (`attivo` falso) non sposta niente.
+struct AttornoAlTiro: ViewModifier {
+    @ObservedObject var tiro: TiroPagina
+    let attivo: Bool
+    /// A quante pagine sta dalla pagina in mano (negativo: a sinistra).
+    let o: Double
+    let rivela: Double
+    let larghezza: CGFloat
+    func body(content: Content) -> some View {
+        let v = tiro.viva
+        let entra: CGFloat = o < 0 ? CGFloat(1 + 0.5 * (1 - min(1, max(0, rivela)))) : 1
+        content.modifier(Proiezione(x: attivo ? v.x + PilaOlo.x(o, larghezza * v.scala) * entra : 0, y: attivo ? v.y : 0,
+                                    scala: attivo ? v.scala : 1, inclina: 0))
+    }
+}
+
+/// PILA: l'icona e il nome sopra ogni pagina, come le app di iOS (misure del video): l'icona di 26 punti all'11,4% della pagina dal
+/// suo bordo sinistro, 8 punti sopra la pagina; il nome a 8 punti dall'icona, che sparisce se arriva all'icona della pagina dopo;
+/// l'etichetta di una pagina quasi tutta coperta sparisce; una sopra l'altra come le pagine. Segue la pagina in mano 120 volte al
+/// secondo (legge il tiro solo lei).
+struct EtichettePila: View {
+    struct Dato: Identifiable {
+        let id: UUID
+        let nome: String
+        let icona: String
+        /// A quante pagine sta dal centro (a riposo), o dalla pagina in mano.
+        let o: Double
+        let alfa: Double
+    }
+    @ObservedObject var tiro: TiroPagina
+    /// In ordine d'uso: dalla più vecchia alla più recente.
+    let dati: [Dato]
+    /// La pagina in mano (mentre si tira): le altre attorno a lei.
+    let mano: UUID?
+    let rivela: Double
+    let daCasa: Double
+    let larghezza: CGFloat
+    let altezza: CGFloat
+
+    private struct Dove { let sx: CGFloat; let cima: CGFloat; let s: CGFloat; let a: Double }
+
+    private func dove(_ d: Dato) -> Dove {
+        let W = larghezza, H = altezza
+        if let m = mano {
+            let v = tiro.viva
+            if d.id == m { return Dove(sx: W / 2 + v.x - W * v.scala / 2, cima: H / 2 + v.y - H * v.scala / 2, s: v.scala, a: rivela) }
+            let entra: CGFloat = d.o < 0 ? CGFloat(1 + 0.5 * (1 - min(1, max(0, rivela)))) : 1
+            let x = v.x + PilaOlo.x(d.o, W * v.scala) * entra
+            return Dove(sx: W / 2 + x - W * v.scala / 2, cima: H / 2 + v.y - H * v.scala / 2, s: v.scala, a: d.alfa)
+        }
+        let s = PilaOlo.scala, x = PilaOlo.x(d.o, W * s) - CGFloat(daCasa) * W * 1.15
+        return Dove(sx: W / 2 + x - W * s / 2, cima: H / 2 + H * PilaOlo.y - H * s / 2, s: s, a: d.alfa)
+    }
+
+    /// La larghezza del nome (15 punti, semibold), misurata una volta per nome.
+    private static var larghezze: [String: CGFloat] = [:]
+    private static func larghezzaNome(_ n: String) -> CGFloat {
+        if let w = larghezze[n] { return w }
+        let w = ceil((n as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 15, weight: .semibold)]).width)
+        larghezze[n] = w
+        return w
+    }
+
+    var body: some View {
+        let pose = dati.map { dove($0) }
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(dati.enumerated()), id: \.element.id) { i, d in
+                let p = pose[i], dopo: Dove? = i + 1 < pose.count ? pose[i + 1] : nil
+                let lx = p.sx + larghezza * p.s * 0.114
+                let sxs = dopo.map { $0.sx } ?? .infinity
+                let lxs = dopo.map { $0.sx + larghezza * $0.s * 0.114 } ?? .infinity
+                let vista = Double(max(0, min(1, (sxs - max(-12, p.sx)) / 30)))
+                let corto = lxs - lx < 34 + EtichettePila.larghezzaNome(d.nome) + 8
+                HStack(spacing: 8) {
+                    IconaPila(icona: d.icona)
+                    Text(d.nome)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .opacity(corto ? 0 : 1)
+                        .animation(.easeOut(duration: 0.15), value: corto)
+                }
+                .offset(x: lx, y: p.cima - 34)
+                .opacity(max(0, min(1, p.a * vista)))
+                .zIndex(Double(i))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// L'icona dell'etichetta della PILA: il simbolo della sezione (come sulla corona) in ciano, in un quadrato di 26 punti col bordo di luce.
+struct IconaPila: View {
+    let icona: String
+    var body: some View {
+        let forma = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        Group {
+            if icona == "profiler" { IconaProfiler() } else if icona == "satellite" { IconaSatellite(lato: 15) } else { Image(systemName: icona).font(.system(size: 13)) }
+        }
+        .symbolRenderingMode(.monochrome)
+        .foregroundStyle(Color.ciano)
+        .frame(width: 26, height: 26)
+        .background(forma.fill(Color.ciano.opacity(0.1)))
+        .overlay(forma.strokeBorder(Color.ciano.opacity(0.55), lineWidth: 1))
+        .shadow(color: Color.ciano.opacity(0.35), radius: 5)
     }
 }
 

@@ -1337,7 +1337,8 @@ struct ContentView: View {
                            diametroReattore: rettCorona.height * 290 / ContentView.latoCorona,
                            vista: { v in vistaSezione(v) },
                            portaDavanti: { id in portaDavanti(id) },
-                           chiudiDietro: { id in chiudiDietro(id) })
+                           chiudiDietro: { id in chiudiDietro(id) },
+                           icone: Dictionary(tutteLeIcone.map { ($0.nome, $0.icona) }, uniquingKeysWith: { a, _ in a }))
     }
 
     /// Dalle pagine olografiche (o a voce, «chiudi il meteo»): la sezione si chiude, davanti o dietro che sia.

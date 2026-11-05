@@ -152,3 +152,5 @@ RoomPlan (Apple) per la cattura, con numeri dal vivo (pareti, m², altezza); poi
 ---
 
 *Per ripartire: allega questo file e di' «continuiamo JARVIS». Gusti, persone e decisioni sono nella memoria dell'account.*
+
+- **5 nov sera · swipe su lento = la PILA, come l'App Switcher di iOS** (11.0 (6), mockup v268 approvato «identico»): sezioni aperte in ordine d'uso (la più recente davanti a destra), pagina al 68,3% al centro, la precedente sporge di 0,198 pagine, icona e nome sopra ogni pagina, vetro olografico con trasparenza dinamica (al centro si legge, le altre trasparenti), dietro JARVIS sfocato; dito di lato scorre, in su chiude, tocco apre, tocco fuori torna a JARVIS; da JARVIS le pagine entrano da sinistra.
