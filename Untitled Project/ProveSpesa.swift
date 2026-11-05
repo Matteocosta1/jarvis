@@ -85,7 +85,7 @@ final class ProveSpesa {
 
     private func cassa(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ S: SpesaOlo, _ piccolo: Bool) {
         let V = S.voci
-        let cx = W * 0.47, cy = H * 0.6, sz = min(W * 0.235, H * 0.35), ang = -0.28 + 0.06 * sin(t * 0.3) + M.giro, al = 0.45
+        let cx = W * 0.47, cy = H * 0.6, sz = piccolo ? W * 0.29 : min(W * 0.235, H * 0.35), ang = -0.28 + 0.06 * sin(t * 0.3) + M.giro, al = 0.45
         let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
         var F = FasciOlo(6)
         let quota = 0.3, sulNastro = V.filter { !$0.presa }, inBorsa = V.filter { $0.presa }

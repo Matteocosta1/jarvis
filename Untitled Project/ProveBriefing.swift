@@ -245,17 +245,27 @@ final class ProveBriefing {
             OP.alone(&gc, pm.x, pm.y, piccolo ? 5 : 10, 0.9, bianco: true)
             gc.fill(Path(CGRect(x: pm.x - 1.5, y: pm.y - 1.5, width: 3, height: 3)), with: .color(OP.b(1)))
             if !piccolo {
-                OP.scritta(&gc, B.gradi.map { "\(B.luogo) \($0)°" } ?? B.luogo, pt.x, pt.y - 4, 8, 700, OP.b(0.95))
-                OP.scritta(&gc, hm(ora), pt.x, pt.y + 6, 6.5, 600, OP.c(0.8))
+                OP.dentro(&gc, W, B.gradi.map { "\(B.luogo) \($0)°" } ?? B.luogo, pt.x, pt.y - 4, 8, 700, OP.b(0.95))
+                OP.dentro(&gc, W, hm(ora), pt.x, pt.y + 6, 6.5, 600, OP.c(0.8))
                 M.zona(pm.x, pm.y, 18, 1)
             }
         }
         guard !piccolo else { return }
         let elev = asin(max(-1, min(1, dot(mi, sole)))) * 180 / .pi, luce = B.tramonto - B.alba
-        let partiMeteo: [String?] = [B.gradi.map { "\($0)°" }, B.cielo.isEmpty ? nil : B.cielo.uppercased()]
-        let meteo = partiMeteo.compactMap { $0 }.joined(separator: " ")
-        OP.scritta(&gc, meteo.isEmpty ? B.luogo : "\(B.luogo) · \(meteo)", 10, 14, 8, 600, OP.c(0.85), .leading)
-        OP.scritta(&gc, "ALBA \(Olo.ora(B.alba)) · TRAMONTO \(Olo.ora(B.tramonto))", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
+        // a sinistra il posto e il meteo, a destra alba e tramonto: se il nome del posto e il cielo sono lunghi («Parzialmente
+        // nuvoloso»), prima si toglie il cielo, poi si accorcia il nome, così le due scritte non si toccano mai
+        let destra = "ALBA \(Olo.ora(B.alba)) · TRAMONTO \(Olo.ora(B.tramonto))"
+        let spazio = W - 28 - OP.larghezza(gc, destra, 8, 700)
+        let gradi = B.gradi.map { " · \($0)°" } ?? ""
+        let tutto = B.cielo.isEmpty ? "\(B.luogo)\(gradi)" : "\(B.luogo)\(gradi) \(B.cielo.uppercased())"
+        let prove: [String] = [tutto, "\(B.luogo)\(gradi)"]
+        var sinistra = prove.first { OP.larghezza(gc, $0, 8, 600) <= spazio } ?? ""
+        if sinistra.isEmpty {
+            var n = B.luogo.count
+            repeat { n -= 1; sinistra = String(B.luogo.prefix(max(1, n))) + "…" + gradi } while n > 3 && OP.larghezza(gc, sinistra, 8, 600) > spazio
+        }
+        OP.scritta(&gc, sinistra, 10, 14, 8, 600, OP.c(0.85), .leading)
+        OP.scritta(&gc, destra, W - 10, 14, 8, 700, OP.b(0.95), .trailing)
         OP.scritta(&gc, "LUCE \(OP.fra(luce)) · SOLE \(Int(elev.rounded()))°", W - 10, 25, 7, 600, OP.c(0.7), .trailing)
         if M.scelta == 1 && vis {
             var righe = [B.gradi.map { "\(B.luogo) · \($0)°" } ?? B.luogo]
@@ -351,12 +361,13 @@ final class ProveBriefing {
         }
         if !piccolo { for r in righe { OP.dentro(&gc, W, r.s, r.p.x + 4, r.p.y + 3, max(6, 8 - r.z * 0.3), 700, OP.b(0.85), .leading) } }
         // adesso: il segno sotto di noi
-        let zn = Zm(ora), n0 = S(0, zn, 0)
+        let zn = Zm(ora), n0 = S(0, zn, 0), kn = piccolo ? 0.55 : 1.0              // sul polso il segno più piccolo
         if zn > -0.45 {
             var tri = Path()
-            tri.move(to: CGPoint(x: n0.x, y: n0.y - 5)); tri.addLine(to: CGPoint(x: n0.x + 6, y: n0.y + 3)); tri.addLine(to: CGPoint(x: n0.x - 6, y: n0.y + 3)); tri.closeSubpath()
+            tri.move(to: CGPoint(x: n0.x, y: n0.y - 5 * kn)); tri.addLine(to: CGPoint(x: n0.x + 6 * kn, y: n0.y + 3 * kn))
+            tri.addLine(to: CGPoint(x: n0.x - 6 * kn, y: n0.y + 3 * kn)); tri.closeSubpath()
             gc.fill(tri, with: .color(OP.b(0.95)))
-            OP.alone(&gc, n0.x, n0.y, 14, 0.6, bianco: true)
+            OP.alone(&gc, n0.x, n0.y, 14 * kn, 0.6, bianco: true)
         }
         guard !piccolo else { return }
         let diff = vista - ora

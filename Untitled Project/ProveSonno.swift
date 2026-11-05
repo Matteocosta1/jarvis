@@ -79,7 +79,7 @@ final class ProveSonno {
 
     private func onda(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ N: SonnoOlo, _ piccolo: Bool) {
         guard !N.fasi.isEmpty, N.durata > 1 else { ProveSonno.vuoto(&gc, W, H, t, "NESSUN DATO DELLA NOTTE", piccolo); return }
-        let cx = W / 2, cy = H * 0.62, sz = piccolo ? W * 0.28 : min(W * 0.25, H * 0.42)
+        let cx = W / 2, cy = H * 0.62, sz = piccolo ? W * 0.22 : min(W * 0.25, H * 0.42)
         let ang = -0.36 + 0.1 * sin(t * 0.21) + M.giro, al = 0.4
         let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
         let X = { (m: Double) -> Double in -1.5 + 3 * m / N.durata }
@@ -235,7 +235,7 @@ final class ProveSonno {
     private func notti(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ N: SonnoOlo, _ piccolo: Bool) {
         let n = N.notti.count
         guard n > 0 else { ProveSonno.vuoto(&gc, W, H, t, "NESSUNA NOTTE REGISTRATA", piccolo); return }
-        let cx = W / 2, cy = H * 0.7, sz = piccolo ? W * 0.3 : min(W * 0.3, H * 0.4), ang = M.giro + 0.12 * sin(t * 0.25), al = 0.36
+        let cx = W / 2, cy = H * (piccolo ? 0.76 : 0.7), sz = piccolo ? W * 0.26 : min(W * 0.3, H * 0.4), ang = M.giro + 0.12 * sin(t * 0.25), al = 0.36
         let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
         let th = { (i: Int) -> Double in -Double.pi / 2 + Double(i - (n - 1)) * OP.due / Double(n) }   // stanotte davanti
         let R = 1.12, sale = OP.lis(t / 1.1)

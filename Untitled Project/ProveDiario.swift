@@ -196,7 +196,7 @@ final class ProveDiario {
 
     private func rilievo(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ d: DiarioOlo, _ piccolo: Bool) {
         let G = d.giorni, n = G.count
-        let cx = W / 2, cy = H * (piccolo ? 0.6 : 0.64), sz = piccolo ? W * 0.27 : min(W * 0.255, H * 0.46)
+        let cx = W / 2, cy = H * (piccolo ? 0.6 : 0.64), sz = piccolo ? W * 0.22 : min(W * 0.255, H * 0.46)
         let ang = -0.32 + 0.2 * sin(t * 0.18) + M.giro, al = 0.5
         let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
         let X = { (i: Int) -> Double in -1.4 + 2.8 * Double(i) / Double(n - 1) }
