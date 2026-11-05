@@ -191,7 +191,7 @@ final class ProveBea {
         let zs = (t * 0.3).truncatingRemainder(dividingBy: 1.2) * 1.45 - 0.05
         if let im = B.foto, let C = campioni(im, piccolo ? 34 : 84) {
             let hh = 1.5, ww = hh * C.rapporto, nasce = OP.lis(t / 1.2)
-            for j in stride(from: 0, to: C.righe, by: piccolo ? 3 : 2) {
+            for j in stride(from: 0, to: C.righe, by: piccolo ? 4 : 2) {            // sul polso una riga ogni 4: resta il vuoto fra le righe
                 let Z = (1 - Double(j) / Double(C.righe)) * hh
                 if Z > hh * nasce + 0.02 { continue }
                 let vicino = exp(-pow((Z - zs) / 0.05, 2))
@@ -205,8 +205,9 @@ final class ProveBea {
                 }
             }
         } else {
-            for k in 0...40 {
-                let z = Double(k) / 40 * 1.22, b = ProveBea.busto(z), vicino = exp(-pow((z - zs) / 0.05, 2))
+            let anelli = piccolo ? 13 : 40                                      // sul polso 14 anelli (a 46 punti 41 si toccano)
+            for k in 0...anelli {
+                let z = Double(k) / Double(anelli) * 1.22, b = ProveBea.busto(z), vicino = exp(-pow((z - zs) / 0.05, 2))
                 var q: P3?
                 for s in 0...48 {
                     let a = Double(s) / 48 * OP.due, o = P(cos(a) * b.x * 1.15, sin(a) * b.y * 1.15, z * 1.15)
@@ -217,7 +218,7 @@ final class ProveBea {
             if !piccolo { OP.scritta(&gc, "SCELGA UNA FOTO", cx, 30, 8, 700, OP.c(0.9)) }
         }
         F.linee(&gc, colore: { $0 >= 5 ? OP.b(0.9) : $0 == 4 ? OP.b(0.55) : OP.c(0.08 + 0.17 * Double($0)) },
-                spessore: { 0.7 + Double($0) * 0.12 }, alone: { $0 >= 4 ? OP.s(0.06) : nil })
+                spessore: { piccolo ? 0.45 + Double($0) * 0.08 : 0.7 + Double($0) * 0.12 }, alone: { $0 >= 4 && !piccolo ? OP.s(0.06) : nil })
         guard !piccolo else { return }
         OP.scritta(&gc, "BEA · RILIEVO", 10, 14, 8, 600, OP.c(0.85), .leading)
     }

@@ -3,6 +3,7 @@ import Security
 import WatchConnectivity
 import CoreLocation
 import UIKit
+import EventKit
 
 /// Decisione del signore (24 ott, M8): mentre usa l'orologio, l'iPhone per 10 secondi non risponde alle frasi senza «Jarvis».
 /// Prima rispondevano tutti e due, e l'iPhone sentiva perfino la voce dell'orologio e le rispondeva.
@@ -200,6 +201,11 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
             replyHandler(FotoBea.perPolso(seNonE: message["versione"] as? String ?? ""))
             return
         }
+        // 11.0 (6): il Briefing al polso chiede gli impegni di oggi (l'orologio non ha il calendario: li legge l'iPhone)
+        if message["impegni"] as? String == "oggi" {
+            replyHandler(["impegni": PonteTelefono.impegniDiOggi()])
+            return
+        }
         // l'orologio chiede di cercare tra le foto (stanno sull'iPhone)
         if let richiesta = message["foto"] as? String {
             nonisolated(unsafe) let rispondi = replyHandler
@@ -208,6 +214,21 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         }
         // l'orologio chiede la parola d'ordine
         replyHandler(PonteTelefono.datiDaConsegnare())
+    }
+
+    /// 11.0 (6): gli impegni di oggi con un orario (quelli di tutto il giorno non ce l'hanno), al massimo 8, come l'ologramma del
+    /// Briefing sull'iPhone: «m» i minuti dalla mezzanotte (l'ora dell'orologio), «nome» il titolo. Vuoto senza il permesso.
+    nonisolated static func impegniDiOggi() -> [[String: Any]] {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        let negozio = EKEventStore(), cal = Calendar.current, oggi = cal.startOfDay(for: Date())
+        let domani = cal.date(byAdding: .day, value: 1, to: oggi) ?? oggi.addingTimeInterval(86_400)
+        let eventi = negozio.events(matching: negozio.predicateForEvents(withStart: oggi, end: domani, calendars: nil))
+            .filter { !$0.isAllDay && $0.startDate >= oggi && $0.startDate < domani }
+            .sorted { $0.startDate < $1.startDate }
+        return eventi.prefix(8).map { e -> [String: Any] in
+            let c = cal.dateComponents([.hour, .minute], from: e.startDate)
+            return ["m": Double((c.hour ?? 0) * 60 + (c.minute ?? 0)), "nome": e.title ?? ""]
+        }
     }
 
     /// Cerca nella galleria per l'orologio: testo per il cervello e miniature piccole (il messaggio deve restare leggero).

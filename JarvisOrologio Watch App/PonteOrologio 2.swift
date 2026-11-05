@@ -85,6 +85,32 @@ final class PonteOrologio: NSObject {
         }
     }
 
+    /// 11.0 (6): un impegno di oggi, arrivato dall'iPhone (minuti dalla mezzanotte e titolo).
+    nonisolated struct ImpegnoPolso: Sendable {
+        let m: Double
+        let nome: String
+    }
+
+    /// 11.0 (6): gli impegni di oggi per il Briefing al polso: li legge l'iPhone dal suo calendario (l'orologio non ha il permesso).
+    /// Vuoto se l'iPhone non risponde.
+    func impegniDiOggi() async -> [ImpegnoPolso] {
+        guard WCSession.isSupported() else { return [] }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return [] }
+        return await withCheckedContinuation { (c: CheckedContinuation<[ImpegnoPolso], Never>) in
+            s.sendMessage(["impegni": "oggi"], replyHandler: { @Sendable r in
+                let lista = (r["impegni"] as? [[String: Any]] ?? []).compactMap { d -> ImpegnoPolso? in
+                    guard let m = (d["m"] as? NSNumber)?.doubleValue else { return nil }
+                    return ImpegnoPolso(m: m, nome: d["nome"] as? String ?? "")
+                }
+                c.resume(returning: lista)
+            }, errorHandler: { @Sendable _ in
+                c.resume(returning: [])
+            })
+        }
+    }
+
     /// La risposta della Sentinella sull'iPhone.
     nonisolated struct RispostaSentinella: Sendable {
         let attiva: Bool

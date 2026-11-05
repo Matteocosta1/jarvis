@@ -374,6 +374,9 @@ struct VistaBriefingOrologio: View {
             }
             caricato = true
             await sole()
+            // 11.0 (6): gli impegni di oggi dall'iPhone, per i bersagli del RADAR e i fari della PISTA
+            let impegni = await PonteOrologio.condiviso.impegniDiOggi()
+            giornata.impegni = impegni.map { BriefingOlo.Impegno(m: $0.m, nome: $0.nome, corto: BriefingOlo.corto($0.nome)) }
             if let o = await VistaVitalsOrologio.chiama(["ricordi": true]) {
                 spesa = (o["spesa"] as? [Any])?.count ?? 0
                 promesse = (o["promesse"] as? [[String: Any]] ?? []).prefix(3).compactMap { $0["testo"] as? String }
