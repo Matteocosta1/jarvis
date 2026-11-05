@@ -12,10 +12,13 @@ private let scuro = Color(red: 0.016, green: 0.039, blue: 0.047)          // rgb
 
 // MARK: - I pezzi comuni
 
-/// L'intestazione delle schermate a tutto schermo (come Trainer e Occhi): J.A.R.V.I.S., la riga sotto, la bussola, la X.
+/// L'intestazione delle schermate a tutto schermo (come Trainer e Occhi): J.A.R.V.I.S., la riga sotto, la bussola e la chiusura.
+/// 5 nov sera (il signore, regola fissa): la X nel cerchio solo dove la fotocamera è aperta (GUIDA); NAVIGA mostra la vista da
+/// strada e si chiude con la scritta «Chiudi», come le altre schede senza fotocamera.
 struct TestaSat: View {
     let sotto: String
     let bussola: String
+    var conFotocamera = false
     let chiudi: () -> Void
 
     var body: some View {
@@ -32,10 +35,16 @@ struct TestaSat: View {
                 .padding(.vertical, 6).padding(.horizontal, 10)
                 .background(Capsule().fill(Color.black.opacity(0.45)))
             Button(action: chiudi) {
-                Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.black.opacity(0.2)))
-                    .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                if conFotocamera {
+                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.black.opacity(0.2)))
+                        .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                } else {
+                    Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
             }
             .buttonStyle(StileStark())
             .accessibilityLabel("Chiudi")
@@ -532,7 +541,7 @@ struct SchermoGuida: View {
             if cameraAccesa, let m = camera { AnteprimaOcchi(sessione: m.sessione).ignoresSafeArea() }
             FrecceGuida(relativa: relativa, testo: cartellino, arrivato: motore.arrivato).ignoresSafeArea()
             VStack(spacing: 0) {
-                TestaSat(sotto: "GUIDA · \(luogo.nome.uppercased())", bussola: motore.direzione.map { Rotta.bussola($0) } ?? "N · 0°") {
+                TestaSat(sotto: "GUIDA · \(luogo.nome.uppercased())", bussola: motore.direzione.map { Rotta.bussola($0) } ?? "N · 0°", conFotocamera: true) {
                     Suoni.tocco(); apri(nil)                       // la guida resta attiva: negli Occhi e al polso
                 }
                 su

@@ -310,6 +310,9 @@ struct StratoSezioniVista<Vista: View>: View {
             usate.removeAll { $0 == d }
             usate.append(d)
         }
+        .onChange(of: pila.voci.map(\.id)) { _, aperte in                   // chiusa una sezione, esce anche dall'ordine d'uso
+            usate.removeAll { !aperte.contains($0) }
+        }
         .onChange(of: reattore, initial: true) { _, r in naviga.reattore = r }
         .onChange(of: diametroReattore, initial: true) { _, d in naviga.diametroReattore = d }
         .onChange(of: pila.voci.isEmpty) { _, vuota in
@@ -514,11 +517,24 @@ struct StratoSezioniVista<Vista: View>: View {
         }
     }
 
+    /// Le sezioni che non stanno sulla corona hanno la loro icona di sempre (5 nov sera, il signore: «devono avere la loro icona
+    /// come tutte le altre»): Social e Studio quelle in alto, Musica il vinile, Impostazioni l'ingranaggio, le schede di Sistemi
+    /// quelle del loro menu (GitHub, Supabase, Archivio, Costi, EDITH).
     private func iconaDiRiserva(_ s: Sezione) -> String {
         switch s {
         case .impostazioni: return "gearshape"
         case .browser: return "safari"
-        case .pagina: return "globe"
+        case .pagina(let n): return n == "Studio" ? "studio" : "social"
+        case .scheda(let a):
+            switch a {
+            case .musica: return "vinile"
+            case .github: return "logo:github-logo"
+            case .supabase: return "logo:supabase-logo"
+            case .archivio: return "archivio"
+            case .costi: return "costi"
+            case .edith: return "eyeglasses"
+            default: return "square.grid.2x2"
+            }
         default: return "square.grid.2x2"
         }
     }
@@ -1934,7 +1950,26 @@ struct IconaPila: View {
     var body: some View {
         let forma = RoundedRectangle(cornerRadius: 7, style: .continuous)
         Group {
-            if icona == "profiler" { IconaProfiler() } else if icona == "satellite" { IconaSatellite(lato: 15) } else { Image(systemName: icona).font(.system(size: 13)) }
+            switch icona {
+            case "profiler": IconaProfiler()
+            case "satellite": IconaSatellite(lato: 15)
+            case "social": IconaSocial()
+            case "studio": IconaStudio(pieno: true).frame(width: 15, height: 15)
+            case "vinile": IconaVinile().frame(width: 15, height: 15)
+            case "archivio": IconaArchivio().frame(width: 22, height: 22).scaleEffect(0.68)
+            case "costi":
+                if UIImage(named: "langfuse-logo") != nil {
+                    Image("langfuse-logo").resizable().renderingMode(.template).scaledToFit().frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 13))
+                }
+            default:
+                if icona.hasPrefix("logo:") {
+                    Image(String(icona.dropFirst(5))).resizable().renderingMode(.template).scaledToFit().frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: icona).font(.system(size: 13))
+                }
+            }
         }
         .symbolRenderingMode(.monochrome)
         .foregroundStyle(Color.ciano)

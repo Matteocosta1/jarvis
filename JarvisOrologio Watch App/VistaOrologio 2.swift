@@ -303,7 +303,10 @@ struct VistaOrologio: View {
 
     private func accendi() {
         guard !acceso else { return }
-        vibra(.start)
+        // 5 nov sera (il signore: «all'avvio, con la musica e le icone, si sentono diversi beep simili a quelli del microfono: vanno
+        // tolti»): sul polso ogni vibrazione ha anche il suo suono; .start (il bip del microfono), .directionUp e .success suonavano
+        // sopra la musica. All'avvio resta solo il tocco leggero (.click), sui colpi di sempre, senza bip.
+        vibra(.click)
         Task { @MainActor in
             let v = AvvioOrologio.velocita
             SuoniOrologio.preparaAvvio()
@@ -338,7 +341,7 @@ struct VistaOrologio: View {
                 while kv < elenco.count && colpi[kv] <= quando {
                     let fineGruppo = kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo
                     if fineGruppo {
-                        let tocco: WKHapticType = kv == elenco.count - 1 ? .success : .directionUp
+                        let tocco: WKHapticType = .click
                         let fra = colpi[kv] - Date().timeIntervalSince(zero)
                         if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
                     }
@@ -360,7 +363,7 @@ struct VistaOrologio: View {
             }
             while kv < elenco.count {                                  // i tocchi rimasti (la raffica finale è partita in anticipo)
                 if kv == elenco.count - 1 || elenco[kv + 1].gruppo != elenco[kv].gruppo {
-                    let tocco: WKHapticType = kv == elenco.count - 1 ? .success : .directionUp
+                    let tocco: WKHapticType = .click
                     let fra = colpi[kv] - Date().timeIntervalSince(zero)
                     if fra > 0.005 { Task { @MainActor in try? await Task.sleep(for: .seconds(fra)); vibra(tocco) } } else { vibra(tocco) }
                 }

@@ -332,10 +332,11 @@ struct VistaFotoSat: View {
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer()
+                    // 5 nov sera (regola fissa): la foto di un luogo non apre la fotocamera: si chiude con «Chiudi», come il DOSSIER
                     Button { Suoni.tocco(); chiudi() } label: {
-                        Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                        Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(StileStark())
                     .accessibilityLabel("Chiudi")
