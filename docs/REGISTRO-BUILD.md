@@ -464,7 +464,7 @@ Prova della 11.0 (4) (il signore, 13:55): «l'app funziona molto bene ma gli olo
 - **Browser** (BrowserPrivato.swift): nelle pagine olografiche la pagina web vuota (bianca) passava sopra il visore spento: senza indirizzo ora non si vede.
 - Da fare dopo, prima nel mockup: i «puntini bianchi» che salgono alla creazione dell'ologramma della ruota (il signore: «vanno rivisti con un effetto più cool alla Stark»), e le tre prove per ognuno degli ologrammi nuovi.
 
-## 11.0 (6) — 5 nov sera: in lavorazione (non ancora compilata, numero da confermare col signore)
+## 11.0 (6) — 5 nov sera (numero confermato dal signore alle 16:48: «11.6 perfetto»)
 Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo quando la build è pronta).
 - **Studio, Social e Browser** nelle pagine olografiche ciano e trasparenti come le altre (la tinta entra nella pagina web con un velo CSS, `OloWeb` in StudioWeb.swift); la materializzazione alla scelta anche lì.
 - **Bea sul polso**: l'ologramma della foto scelta nella riga PROSSIMA (la foto piccola arriva dal telefono, resta in cache sul polso, si aggiorna quando cambia).
