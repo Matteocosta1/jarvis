@@ -409,3 +409,27 @@ Quello che si è imparato lavorando, per non ripetere gli stessi errori. Aggiorn
 - Mockup v254: la frase d'esempio del Browser è «Jarvis, cerca su Google ristoranti a Milano» (era «cerca ristoranti a Milano»). Provato col Browser chiuso e dietro: 0 errori.
 - **Compilazione**: la 7ª prova (20:18 ora italiana, 41895632990, la strada B) è fallita come le altre: GitHub non ha dato il Mac. Il signore: «se git non la dà la facciamo a mano» (Pull + Archive come sempre; errori o avvisi di Xcode a me).
 - **Compilazione dell'8ª prova (e3f489f, 41916179307): verde, 0 errori e 0 avvisi** (Xcode 27.1; dentro c'è anche la strada B). Questa è la 11.0 (3) da caricare (Pull + Archive + TestFlight).
+
+## Prova della 11.0 (3) sul telefono e sul polso — 5 nov notte (03:10–04:01): cosa c'è da fare
+Il signore ha installato la 11.0 (3) e ha mandato foto e un video (ScreenRecording 05-11-2026 03:20). Sulla click wheel: «nella realtà è quasi perfetto», con le correzioni sotto «sarà perfetto». Poi: «tutto giusto, più gli errori del video, più feedback aptico più forte»; «iniziamo a risolvere e creare». Numero della build nuova: da chiedere.
+
+**Errori dell'iPhone**
+1. In ogni sezione, scorrendo in basso compare una barra grigia col «Chiudi» (lo sfondo della barra di navigazione di iOS).
+2. Studio e Social: la testata finisce sotto la barra di stato; la vista dei post in ologramma è sbagliata; lo swipe dal bordo basso lo prende iOS, l'app va alla Home e poi riparte da capo (iOS la chiude): l'errore più grave.
+3. Le pagine olografiche da sfogliare (salita lenta): non si sente il feedback aptico e non sono trasparenti e «cool» come nel mockup. Il feedback aptico va reso più forte.
+4. Sentinella: l'animazione scatta. Trainer: alla chiusura l'animazione si ferma a metà per circa 1 s.
+5. Le icone in alto (Social, Sound, Studio, Sistemi, cestino, Impostazioni) si aprono da sole e si toccano male: nel video Sound si apre da solo all'avvio.
+6. Shazam parte da solo: deve ascoltare solo quando si tocca il logo olografico.
+7. Bea, «Ti penso»: compare «JARVIS scrive…» e non succede nulla. Causa: credito dell'API Anthropic finito (registro del cervello: «credit balance is too low»), da ricaricare su https://console.anthropic.com/settings/billing. Nell'app: un messaggio d'errore quando il cervello non risponde.
+8. L'animazione dell'aggancio (swipe veloce) dentro il reattore sale troppo in alto, verso destra, ed è diversa dal mockup: da studiare e rifare da capo.
+
+**Design (prima nel mockup, poi nell'app)**
+9. Click wheel: solo la GHIERA (NODI e FASCIO scartati; freccina e mirino tolti). Il reattore davvero in secondo piano: molto trasparente e meno luminoso; la ghiera prende la scena. L'ologramma tenue mentre si ruota, si illumina quando l'animazione finisce ed è fermo.
+10. Un ologramma ciascuno per Diario, Sonno, Briefing e Spesa (come Cuore e Meteo); per Serata un'animazione dove arrivano i soldi.
+11. Bea: un ologramma bello da una foto (il signore ha mandato una foto). Proposta: la foto si sceglie nell'app, Vision ritaglia la persona e la disegna in ologramma ciano; la foto resta sul telefono. In attesa del suo sì.
+12. Apertura delle sezioni più veloce: il caricamento olografico da circa 1 s a 0,4–0,5 s, uguale per tutte.
+
+**Apple Watch (per ultimo, il signore: «lasciamolo per ultimo»)**
+13. Ruotando a destra o a sinistra le icone scorrono velocissime e non si fermano più, finché l'app non si chiude.
+14. Mentre scorrono, JARVIS si illumina d'arancio e prova ad ascoltare: il microfono va spento mentre le icone ruotano, e si riapre dopo la scelta.
+15. La corona non deve più comandare le icone (il signore: «avevo sbagliato io»; annulla la scelta del 4 nov).
