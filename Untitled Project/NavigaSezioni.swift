@@ -88,10 +88,13 @@ struct Ritaglio: Shape {
 
 struct PosaPagina: ViewModifier {
     let posa: Posa
+    /// Studio, Social o Browser: il ciano lo mette la pagina web stessa (OloWeb).
+    var web = false
     func body(content: Content) -> some View {
         content
+            .environment(\.tintaOlo, TiroPagina.passoOlo(posa.tinta))
             .allowsHitTesting(posa.tocchi)
-            .overlay { if posa.tinta > 0.001 { VeloOlo(forza: posa.tinta) } }
+            .overlay { if posa.tinta > 0.001 { VeloOlo(forza: posa.tinta, web: web) } }
             .clipShape(Ritaglio(raggio: posa.raggio))
             // 5 nov (il signore: «le pagine da sfogliare non sono trasparenti e cool come nel mockup»): come .foglio.ologramma del
             // mockup, la pagina diventa luce (mix-blend-mode: screen): il nero si fonde col fondo olografico e resta il disegno ciano
@@ -116,10 +119,15 @@ struct PosaPagina: ViewModifier {
 struct SegueTiro: ViewModifier {
     @ObservedObject var tiro: TiroPagina
     let id: UUID
+    /// Studio, Social o Browser: il ciano lo mette la pagina web stessa (OloWeb).
+    var web = false
+    /// La tinta data dalla posa (PosaPagina, fuori): alla pagina va la più forte delle due.
+    @Environment(\.tintaOlo) private var tintaPosa
     func body(content: Content) -> some View {
         let v = tiro.pagina == id ? tiro.viva : TiroPagina.Viva()
         content
-            .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta) } }
+            .environment(\.tintaOlo, max(tintaPosa, TiroPagina.passoOlo(v.tinta)))
+            .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta, web: web) } }
             .clipShape(Ritaglio(raggio: v.raggio))
             .blendMode(v.tinta > 0.001 ? .screen : .normal)             // 5 nov: la pagina in mano è luce, come nel mockup
             .opacity(1 - TiroPagina.trasparenza * v.tinta)               // e lascia vedere il fondo, come nel mockup
@@ -348,13 +356,15 @@ struct StratoSezioniVista<Vista: View>: View {
 
     @ViewBuilder private func pagina(_ v: PilaSezioni.Voce) -> some View {
         let p = posa(v)
+        let web = v.sezione.paginaWeb
         vista(v)
                 .environment(\.sezioneAperta, v.id)
                 .environment(\.sezioneDietro, pila.davanti != v.id)        // dietro: fotocamera e microfono in pausa
                 .environment(\.jarvisCoperto, false)
-                .overlay { if naviga.materia == v.id { MaterializzaOlo { if naviga.materia == v.id { naviga.materia = nil } } } }
-                .modifier(SegueTiro(tiro: tiro, id: v.id))
-                .modifier(PosaPagina(posa: p))
+                .environment(\.materiaOlo, naviga.materia == v.id)        // le pagine web si materializzano anche dentro (OloWeb)
+                .overlay { if naviga.materia == v.id { MaterializzaOlo(web: web) { if naviga.materia == v.id { naviga.materia = nil } } } }
+                .modifier(SegueTiro(tiro: tiro, id: v.id, web: web))
+                .modifier(PosaPagina(posa: p, web: web))
                 // dove sta la pagina a riposo (coordinate globali): da lì parte il volo dell'AGGANCIO e lì si posa la sua luce
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { telai[v.id] = $0 }
                 .transition(.offset(y: altezza + 2))               // sale e scende di tutta l'altezza, come prima
@@ -1022,6 +1032,10 @@ final class TiroPagina: NSObject, ObservableObject {
     /// Quanto è trasparente una pagina olografica piena (il fondo e la griglia si vedono attraverso, come nel mockup).
     static let trasparenza = 0.45
 
+    /// La tinta olografica a passi di un decimo, per le pagine web (OloWeb): la pagina si chiama una volta per passo, non 120
+    /// volte al secondo; fra un passo e l'altro sfuma la pagina stessa.
+    static func passoOlo(_ t: Double) -> Double { (min(1, max(0, t)) * 10).rounded() / 10 }
+
     static func scala(_ t: CGFloat) -> CGFloat { 1 - 0.62 * (1 - exp(-t / 230)) }
     static func dScala(_ t: CGFloat) -> CGFloat { -0.62 / 230 * exp(-t / 230) }
 
@@ -1614,16 +1628,37 @@ struct FondoVivo: View {
 /// Non va data all'insieme: un'opacità sul gruppo fonderebbe il ciano col vuoto invece che con la pagina (pagina tutta ciano).
 struct VeloOlo: View {
     var forza: Double = 1
+    /// 5 nov (il signore: «Studio e Social come gli altri, più trasparenti, identici al mockup»): sopra una pagina web le due
+    /// fusioni di SwiftUI non arrivano dentro la WKWebView (vista UIKit). Il ciano e il velo al 7% li mette la pagina stessa,
+    /// con la stessa fusione del mockup (OloWeb); qui restano il bagliore, le righe e il bordo.
+    var web = false
     var body: some View {
         ZStack {
-            Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
-            Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
+            if !web {
+                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
+                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
+            }
             RigheOlo().opacity(forza)
             // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (era #8ff0ff all'85%)
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.55 * forza), lineWidth: 1.5)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Quanto è olografica la pagina (0…1, a passi di un decimo) e se si sta materializzando: le pagine web (Studio, Social,
+/// Browser) li leggono per mettersi il velo ciano dentro la pagina (OloWeb).
+private struct ChiaveTintaOlo: EnvironmentKey { static let defaultValue: Double = 0 }
+private struct ChiaveMateriaOlo: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var tintaOlo: Double {
+        get { self[ChiaveTintaOlo.self] }
+        set { self[ChiaveTintaOlo.self] = newValue }
+    }
+    var materiaOlo: Bool {
+        get { self[ChiaveMateriaOlo.self] }
+        set { self[ChiaveMateriaOlo.self] = newValue }
     }
 }
 
@@ -1668,6 +1703,8 @@ struct AloneOlo: ViewModifier {
 /// la riga (2 punti, #dffaff, con l'alone) scende in 0,43 s con la sua scia di 70 punti; le staffe arrivano dagli angoli in
 /// 0,62 s e spariscono. Finito, si toglie da sola.
 struct MaterializzaOlo: View {
+    /// Studio, Social o Browser: sotto la riga il ciano lo mette la pagina web stessa (OloWeb, con la stessa corsa).
+    var web = false
     let fatto: () -> Void
     @State private var inizio = Date()
 
@@ -1680,7 +1717,7 @@ struct MaterializzaOlo: View {
                 ZStack(alignment: .top) {
                     if q < 1 {
                         let a = max(0, y - 0.05)
-                        VeloOlo(forza: 1)
+                        VeloOlo(forza: 1, web: web)
                             .mask(LinearGradient(stops: [.init(color: .clear, location: a), .init(color: .black, location: max(a + 0.0001, y))],
                                                  startPoint: .top, endPoint: .bottom))
                         LinearGradient(colors: [ciano.opacity(0), ciano.opacity(0.22)], startPoint: .top, endPoint: .bottom)

@@ -83,6 +83,14 @@ enum Sezione: Hashable {
         }
     }
 
+    /// Studio, Social e Browser: pagine web (WKWebView). Nelle pagine olografiche il ciano se lo mettono dentro (OloWeb).
+    var paginaWeb: Bool {
+        switch self {
+        case .pagina, .browser: return true
+        default: return false
+        }
+    }
+
     /// Le sezioni con la fotocamera: scelte dalle pagine olografiche hanno già il loro suono d'apertura (niente «scelta»).
     var conFotocamera: Bool {
         switch self {

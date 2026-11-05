@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit                // UIImage (c'è anche sull'orologio): la foto di Bea in ologramma
 
 // MARK: - GLI OLOGRAMMI NUOVI (11.0 (4), 5 nov notte) — come il mockup v261
 // Il signore: «Diario, Sonno, Briefing, Spesa: ognuna col suo ologramma, come Cuore e Meteo»; «Serata ha bisogno di un'animazione
@@ -11,6 +12,7 @@ import SwiftUI
 // BRIEFING il quadrante della giornata (24 ore): la luce da alba a tramonto, il sole sul suo arco, adesso, gli impegni;
 // SPESA    il carrello: le cose da prendere girano sopra, quelle prese ci cadono dentro, l'anello del pavimento si riempie;
 // SERATA   da dove arrivano i soldi: l'anello di monete (una fetta per voce, alta quanto pesa), i soldi che arrivano, il totale.
+// BEA      la sua foto in luce ciano sopra il proiettore (preparata una volta sull'iPhone; 11.0 (6): anche sul polso).
 // Sull'orologio (piccolo) solo l'oggetto, senza scritte, come il cuore e il cielo. Con «Riduci movimento» il disegno resta
 // fermo. Questo file è sia dell'iPhone sia dell'orologio.
 
@@ -838,6 +840,112 @@ enum DisegnoSoldi {
         let conta = tot * Olo.liscia((t - 0.2) / 1.4)
         Olo.testo(&gc, "\(Olo.numero(conta.rounded())) €", cx, cy + 3, corpo: 17, peso: .bold, Olo.bianco)
         Olo.testo(&gc, "INCASSO LORDO", cx, cy + 16, corpo: 7, peso: .semibold, Olo.ciano.opacity(0.85))
+    }
+}
+
+// MARK: - BEA (11.0 (4) sull'iPhone; 11.0 (6) anche sul polso, in piccolo)
+
+/// La foto scelta in ologramma sopra il proiettore: tutta ciano, coi contorni che brillano, il respiro della luce e la banda che
+/// la ripercorre dal basso ogni 3,2 s; ogni tanto un guizzo (due strisce che scivolano). Senza foto: un busto di luce e
+/// SCELGA UNA FOTO. Sull'orologio (piccolo) l'ologramma arriva già fatto dall'iPhone (FotoBea.perPolso): stesso disegno, senza
+/// scritte, come gli altri ologrammi del polso.
+struct OlogrammaBea: View {
+    let foto: UIImage?
+    var piccolo = false
+
+    var body: some View {
+        TelaOlo { gc, size, t, _ in
+            let immagine = foto.map { gc.resolve(Image(uiImage: $0)) }
+            let rapporto = foto.map { Double($0.size.width / max(1, $0.size.height)) } ?? 1
+            DisegnoBea.disegna(&gc, size, t: t, foto: immagine, rapporto: rapporto, piccolo: piccolo)
+        }
+    }
+}
+
+enum DisegnoBea {
+    /// Il busto di luce (senza foto): mezza larghezza e mezza profondità all'altezza z (0 = petto, 1,22 = cima della testa).
+    private static func busto(_ z: Double) -> (Double, Double) {
+        if z > 0.63 { let f = max(0, 1 - pow((z - 0.9) / 0.27, 2)).squareRoot(); return (0.2 * f, 0.23 * f) }
+        if z > 0.46 { return (0.09, 0.085) }
+        if z > 0.28 {
+            let f = max(0, 1 - pow((z - 0.28) / 0.19, 2)).squareRoot()
+            return (max(0.09, 0.62 * pow(f, 0.7)), max(0.085, 0.26 * f))
+        }
+        return (0.62, 0.26)
+    }
+
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, foto: GraphicsContext.ResolvedImage?, rapporto: Double,
+                        piccolo: Bool = false) {
+        let w = Double(size.width), h = Double(size.height)
+        guard w > 4, h > 4 else { return }
+        gc.blendMode = .plusLighter
+        let cx = w / 2, base = piccolo ? h - 4 : h - 16, rx = piccolo ? w * 0.36 : min(w * 0.24, 90)
+        let ry = Olo.pavimento(&gc, cx, base, rx, t, n: piccolo ? 20 : 48)
+        let cima = piccolo ? 2.0 : 18.0, alto = base - ry * 0.4 - cima
+        Olo.cono(&gc, cx, base, rx, cima + (piccolo ? 3 : 10), rx * 1.15, a: 0.1)
+        // la polvere di luce che sale nel cono
+        let grani = piccolo ? 8 : 26, grano = piccolo ? 1.0 : 1.3
+        for i in 0..<grani {
+            let p = (t * 0.22 + Double(i) / Double(grani)).truncatingRemainder(dividingBy: 1), s = sin(Double(i) * 91.7)
+            let x = cx + s * rx * 0.55 * (0.4 + 0.6 * p), y = base - p * alto
+            gc.fill(Path(CGRect(x: x, y: y, width: grano, height: grano)), with: .color(Olo.ciano.opacity(0.6 * sin(p * .pi) * 0.8)))
+        }
+        if let foto {
+            var fh = alto, fw = fh * rapporto
+            if piccolo && fw > w * 0.96 { fw = w * 0.96; fh = fw / max(0.01, rapporto) }     // sul polso: sempre dentro il riquadro
+            let x0 = cx - fw / 2, y0 = base - ry * 0.4 - fh
+            let rett = CGRect(x: x0, y: y0, width: fw, height: fh)
+            var c = gc
+            c.opacity = 0.86 + 0.14 * (0.5 + 0.5 * sin(t * 2.1)) * (0.7 + 0.3 * sin(t * 13))    // il respiro della luce
+            c.draw(foto, in: rett)
+            // la banda che la ripercorre dal basso in alto (ogni 3,2 s)
+            let yb = y0 + fh * (1 - t.truncatingRemainder(dividingBy: 3.2) / 3.2), bh = piccolo ? 5.0 : 16.0
+            var banda = gc
+            banda.clip(to: Path(CGRect(x: x0, y: yb - bh, width: fw, height: bh)))
+            banda.opacity = 0.75
+            banda.draw(foto, in: rett)
+            var riga = Path()
+            Olo.linea(&riga, x0 + fw * 0.1, yb, x0 + fw * 0.9, yb)
+            gc.stroke(riga, with: .color(Olo.bianco.opacity(0.35)), lineWidth: piccolo ? 0.6 : 1)
+            // il guizzo: due strisce che scivolano di lato, una volta ogni 4,3 s per 0,12 s
+            if t.truncatingRemainder(dividingBy: 4.3) < 0.12 {
+                let strisce: [(Double, Double)] = piccolo ? [(0.3, 2), (0.62, -2)] : [(0.3, 6), (0.62, -5)]
+                let margine = piccolo ? 3.0 : 10.0, alta = piccolo ? 3.0 : 9.0
+                for (f, dx) in strisce {
+                    var g = gc
+                    g.clip(to: Path(CGRect(x: x0 - margine, y: y0 + fh * f, width: fw + margine * 2, height: alta)))
+                    g.opacity = 0.9
+                    g.draw(foto, in: CGRect(x: x0 + dx, y: y0, width: fw, height: fh))
+                }
+            }
+        } else {
+            // il busto di luce: sezioni orizzontali che girano piano
+            let sz = alto * 0.8, ang = 0.45 * sin(t * 0.4), al = 0.12, cy = base - ry * 0.4
+            let piani = piccolo ? 14 : 27, giro = piccolo ? 20 : 40, meridiani = piccolo ? 6 : 8, ogni = piccolo ? 2 : 4
+            var g = GruppiOlo(5)
+            for k in 0...piani {
+                let z = Double(k) / Double(piani) * 1.22, (bx, by) = busto(z)
+                var o = Olo.proietta(bx, 0, z, ang, al, cx, cy, sz)
+                for i in 1...giro {
+                    let a = Double(i) / Double(giro) * 2 * .pi, q = Olo.proietta(cos(a) * bx, sin(a) * by, z, ang, al, cx, cy, sz)
+                    g.metti((o.z + q.z < 0 ? 2 : 0) + (k % ogni == 0 ? 1 : 0), o, q)
+                    o = q
+                }
+            }
+            for m in 0..<meridiani {                                      // i meridiani: si vede il volume
+                let a = Double(m) / Double(meridiani) * 2 * .pi
+                for k in 0..<piani {
+                    let z0 = Double(k) / Double(piani) * 1.22, z1 = Double(k + 1) / Double(piani) * 1.22
+                    let (a0, b0) = busto(z0), (a1, b1) = busto(z1)
+                    let o = Olo.proietta(cos(a) * a0, sin(a) * b0, z0, ang, al, cx, cy, sz)
+                    let q = Olo.proietta(cos(a) * a1, sin(a) * b1, z1, ang, al, cx, cy, sz)
+                    g.metti(o.z + q.z < 0 ? 1 : 0, o, q)
+                }
+            }
+            g.linee(&gc, colore: { Olo.ciano.opacity(0.12 + 0.17 * Double($0)) },
+                    spessore: { piccolo ? 0.6 + Double($0) * 0.08 : 0.8 + Double($0) * 0.1 })
+            if !piccolo { Olo.testo(&gc, "SCELGA UNA FOTO", cx, 14, corpo: 8, peso: .bold, Olo.ciano.opacity(0.9)) }
+        }
     }
 }
 

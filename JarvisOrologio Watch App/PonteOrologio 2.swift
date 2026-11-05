@@ -67,6 +67,24 @@ final class PonteOrologio: NSObject {
         }
     }
 
+    /// 11.0 (6) · Bea sul polso: chiede all'iPhone l'ologramma di Bea con la versione che c'è già sull'orologio (arriva solo
+    /// se è cambiato). Senza iPhone vicino resta quello che c'è.
+    func chiediBea() async {
+        guard WCSession.isSupported() else { return }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return }
+        let versione = FotoBeaPolso.versione
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            s.sendMessage(["bea": "ologramma", "versione": versione], replyHandler: { @Sendable r in
+                FotoBeaPolso.ricevi(r)
+                c.resume()
+            }, errorHandler: { @Sendable _ in
+                c.resume()
+            })
+        }
+    }
+
     /// La risposta della Sentinella sull'iPhone.
     nonisolated struct RispostaSentinella: Sendable {
         let attiva: Bool
@@ -224,17 +242,20 @@ extension PonteOrologio: WCSessionDelegate {
 
     // la Sentinella sull'iPhone: allarmi (subito, oppure in coda se l'app dormiva) e cambi di stato
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if FotoBeaPolso.ricevi(message) { return }  // 11.0 (6): una foto nuova di Bea, già in ologramma
         PonteOrologio.smistaSentinella(message)
         GuidaPolso.ricevi(message)                  // build 23: la GUIDA di SATELLITE in corso sull'iPhone
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        if FotoBeaPolso.ricevi(message) { replyHandler([:]); return }
         PonteOrologio.smistaSentinella(message)
         GuidaPolso.ricevi(message)
         replyHandler([:])
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        if FotoBeaPolso.ricevi(userInfo) { return }  // 11.0 (6): Bea in ologramma, arrivata in coda
         // un allarme in coda vecchio di oltre 10 minuti non suona più: resta solo come «ultimo allarme»
         if let t = userInfo["quando"] as? Double, Date().timeIntervalSince1970 - t > 600 {
             var vecchio = userInfo

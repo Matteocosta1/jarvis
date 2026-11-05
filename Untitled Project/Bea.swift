@@ -179,6 +179,8 @@ struct VistaBea: View {
         }
         Suoni.pronto()
         fotoOlo = im
+        // 11.0 (6): anche sul polso (solo l'ologramma piccolo, mai la foto), preparato fuori dal thread principale
+        Task.detached(priority: .utility) { PonteTelefono.condiviso.inviaBea() }
     }
 
     // MARK: Contatto

@@ -42,6 +42,21 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         try? s.updateApplicationContext(dati)
     }
 
+    /// 11.0 (6): una foto nuova di Bea è diventata ologramma: all'orologio subito se è raggiungibile, altrimenti in coda
+    /// (arriva appena l'app dell'orologio si sveglia). Viaggia solo l'ologramma piccolo, mai la foto.
+    nonisolated func inviaBea() {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled else { return }
+        let messaggio = FotoBea.perPolso(seNonE: "")
+        guard messaggio["jpeg"] != nil else { return }
+        if s.isReachable {
+            s.sendMessage(messaggio, replyHandler: nil) { _ in s.transferUserInfo(messaggio) }
+        } else {
+            s.transferUserInfo(messaggio)
+        }
+    }
+
     // MARK: Build 23: la GUIDA di SATELLITE al polso
 
     private let chiaveGuida = NSLock()
@@ -177,6 +192,11 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         if let comando = message["musica"] as? String {
             nonisolated(unsafe) let rispondi = replyHandler
             Task { @MainActor in rispondi(await PonteMusica.esegui(comando)) }
+            return
+        }
+        // 11.0 (6): Bea sul polso. L'orologio chiede l'ologramma di Bea con la versione che ha già: torna solo se è cambiato
+        if message["bea"] as? String == "ologramma" {
+            replyHandler(FotoBea.perPolso(seNonE: message["versione"] as? String ?? ""))
             return
         }
         // l'orologio chiede di cercare tra le foto (stanno sull'iPhone)

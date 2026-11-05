@@ -33,8 +33,12 @@ struct VistaStudio: View {
     /// il dito sta lavorando dentro la pagina (banco 3D, schizzo, cursori, PIANO) o la pagina è scorsa giù: lì il trascinamento
     /// è della pagina. Lo dice la pagina al tocco (messaggio «presa»).
     @State private var presa = false
+    /// Nelle pagine olografiche: quanto è olografica la pagina e se si sta materializzando (il velo ciano dentro la pagina, OloWeb).
+    @Environment(\.tintaOlo) private var tintaOlo
+    @Environment(\.materiaOlo) private var materiaOlo
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 })
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
+                     olo: tintaOlo, materia: materiaOlo)
             .background(Color.fondo)
             .ignoresSafeArea()
             .overlay {
@@ -78,9 +82,11 @@ private struct PaginaStudio: UIViewRepresentable {
     let chiudi: () -> Void
     let pronta: () -> Void
     let presa: (Bool) -> Void
+    let olo: Double
+    let materia: Bool
     func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta, presa: presa) }
     func makeUIView(context: Context) -> WKWebView { context.coordinator.costruisci() }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) { context.coordinator.olo(forza: olo, materia: materia) }
     static func dismantleUIView(_ uiView: WKWebView, coordinator: RegiaStudio) { coordinator.smonta() }
 }
 
@@ -101,6 +107,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private var videoScelto: URL?                    // Social: il video scelto dalla galleria (lo carica l'app, non la pagina)
     private var sceltaRitratto: SceltaRitratto?      // 3 nov · RITRATTO: il delegato della galleria (il picker lo tiene debole)
     private var fonteAR: FonteAR?                    // 3 nov · AR: la fonte di AR Quick Look (anche lei tenuta debole)
+    private let velo = VeloWeb()                     // 5 nov: il velo olografico dentro la pagina (pagine olografiche)
 
     init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {},
          presa: @escaping (Bool) -> Void = { _ in }) {
@@ -142,6 +149,17 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if let u = URL(string: "\(Self.schema)://app/markx.html") { w.load(URLRequest(url: u)) }
         }
         return w
+    }
+
+    /// Nelle pagine olografiche: il velo ciano dentro la pagina (solo quando cambia).
+    func olo(forza: Double, materia: Bool) {
+        guard let web else { return }
+        velo.metti(forza: forza, materia: materia, a: web)
+    }
+
+    /// La pagina è stata caricata (anche di nuovo) mentre era olografica: il velo torna.
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        velo.rimetti(a: webView)
     }
 
     func smonta() {
@@ -717,6 +735,103 @@ private final class PonteDebole: NSObject, WKScriptMessageHandler {
     weak var regia: RegiaStudio?
     init(_ r: RegiaStudio) { regia = r }
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) { regia?.userContentController(c, didReceive: m) }
+}
+
+// MARK: - 5 nov (il signore: «Studio e Social, la vista dei post in ologramma: falli come gli altri, più trasparenti, identici al mockup»)
+// Nelle pagine olografiche le pagine di SwiftUI diventano luce ciano col velo di VeloOlo (il ciano #4fe3ff in «color»), ma quella
+// fusione non arriva dentro una WKWebView (è una vista UIKit): Studio, Social e Browser restavano a colori pieni, coi post accesi.
+// Qui il velo lo mette la pagina stessa, come .olo-tinta del mockup: due strati fissi sopra tutta la pagina, senza tocchi, con le
+// fusioni di WebKit (che usa le stesse di Core Animation): il ciano in «color» (la pagina diventa ciano con le sue luci e le sue
+// ombre) e il velo ciano al 7% in «screen». Bagliore, righe e bordo restano quelli di VeloOlo, disegnati sopra la pagina.
+
+/// Il velo olografico dentro una pagina web.
+enum OloWeb {
+    /// `forza` 0…1 (a passi di un decimo: fra un passo e l'altro sfuma la pagina in 90 ms); `materia`: la pagina scelta si
+    /// materializza, il velo si scioglie dall'alto con la riga di MaterializzaOlo (0,43 s, la stessa curva). A forza 0 il velo
+    /// sfuma e si toglie dalla pagina.
+    static func applica(forza: Double, materia: Bool, a web: WKWebView) {
+        web.evaluateJavaScript("(\(funzione))(\(forza), \(materia));", in: nil, in: .defaultClient, completionHandler: nil)
+    }
+
+    /// Nel mondo di JavaScript di JARVIS (.defaultClient): la pagina non vede le nostre variabili e non le tocca.
+    private static let funzione = """
+    function (f, m) {
+      var D = document, R = D.documentElement;
+      if (!R) { return 0; }
+      var G = window.__jarvisOlo || (window.__jarvisOlo = { giro: 0, mat: false });
+      var C = D.getElementById('jarvis-olo-c'), S = D.getElementById('jarvis-olo-s');
+      var metti = function (e, p) { for (var k in p) { e.style.setProperty(k, p[k], 'important'); } };
+      var via = function () { if (C) { C.remove(); } if (S) { S.remove(); } C = null; S = null; };
+      var giro = ++G.giro;
+      if (!m && f <= 0 && (!C || !S || G.mat)) { G.mat = false; via(); return 0; }
+      if (!C || !S) {
+        via();
+        var crea = function (id, fondo, fusione) {
+          var e = D.createElement('div');
+          e.id = id;
+          e.setAttribute('aria-hidden', 'true');
+          metti(e, { position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', margin: '0', padding: '0', border: '0',
+            'pointer-events': 'none', 'z-index': '2147483647', background: fondo, 'mix-blend-mode': fusione, opacity: '0',
+            transition: 'opacity 90ms linear', '-webkit-mask-repeat': 'no-repeat', 'mask-repeat': 'no-repeat',
+            '-webkit-mask-size': '100% 200%', 'mask-size': '100% 200%' });
+          R.appendChild(e);
+          return e;
+        };
+        C = crea('jarvis-olo-c', '#4fe3ff', 'color');
+        S = crea('jarvis-olo-s', 'rgba(79, 227, 255, 0.07)', 'screen');
+        void C.offsetWidth;
+      }
+      if (m) {
+        if (G.mat) { return 0; }
+        G.mat = true;
+        var maschera = 'linear-gradient(to bottom, transparent 47.5%, #000 50%)';
+        [C, S].forEach(function (e) {
+          metti(e, { transition: 'none', opacity: '1', '-webkit-mask-image': maschera, 'mask-image': maschera,
+            '-webkit-mask-position': '0 103%', 'mask-position': '0 103%' });
+        });
+        void C.offsetWidth;
+        var corsa = '430ms cubic-bezier(0.455, 0.03, 0.515, 0.955)';
+        [C, S].forEach(function (e) {
+          metti(e, { transition: '-webkit-mask-position ' + corsa + ', mask-position ' + corsa,
+            '-webkit-mask-position': '0 -3%', 'mask-position': '0 -3%' });
+        });
+        return 0;
+      }
+      if (G.mat) {
+        G.mat = false;
+        [C, S].forEach(function (e) { metti(e, { transition: 'none', opacity: '0' }); });
+        void C.offsetWidth;
+      }
+      var ora = parseFloat(C.style.getPropertyValue('opacity')) || 0, salto = Math.abs(f - ora);
+      var tempo = salto > 0.15 ? Math.round(salto * 320) : 90;
+      var curva = salto > 0.15 ? 'cubic-bezier(0.33, 1, 0.68, 1)' : 'linear';
+      [C, S].forEach(function (e) {
+        metti(e, { transition: 'opacity ' + tempo + 'ms ' + curva, '-webkit-mask-image': 'none', 'mask-image': 'none',
+          opacity: String(f) });
+      });
+      if (f <= 0) { setTimeout(function () { if (G.giro === giro) { via(); } }, tempo + 50); }
+      return 0;
+    }
+    """
+}
+
+/// L'ultimo velo messo in una pagina web: la pagina si chiama solo quando cambia.
+final class VeloWeb {
+    private var forza = 0.0
+    private var materia = false
+
+    func metti(forza f: Double, materia m: Bool, a web: WKWebView) {
+        guard f != forza || m != materia else { return }
+        forza = f
+        materia = m
+        OloWeb.applica(forza: f, materia: m, a: web)
+    }
+
+    /// Una pagina nuova (caricata mentre era olografica) non ha il velo: si rimette.
+    func rimetti(a web: WKWebView) {
+        guard forza > 0 || materia else { return }
+        OloWeb.applica(forza: forza, materia: materia, a: web)
+    }
 }
 
 /// L'icona STUDIO del mockup (il cubo a tasselli con i tre assi), disegnata uguale.

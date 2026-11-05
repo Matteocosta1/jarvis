@@ -239,8 +239,14 @@ final class Navigatore: NSObject, ObservableObject, WKNavigationDelegate, WKUIDe
 
 struct WebVista: UIViewRepresentable {
     let web: WKWebView
+    /// 5 nov: nelle pagine olografiche il velo ciano lo mette la pagina web stessa (OloWeb), come Studio e Social.
+    @Environment(\.tintaOlo) private var tintaOlo
+    @Environment(\.materiaOlo) private var materiaOlo
+    func makeCoordinator() -> VeloWeb { VeloWeb() }
     func makeUIView(context: Context) -> WKWebView { web }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.metti(forza: tintaOlo, materia: materiaOlo, a: uiView)
+    }
 }
 
 /// Contenitore: sblocco con Face ID e scelta Incognito/Normale (cambiando modalità si riapre una pagina nuova).
