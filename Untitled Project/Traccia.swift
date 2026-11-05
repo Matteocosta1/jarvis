@@ -19,6 +19,7 @@ struct PannelliTraccia: View {
     /// Dopo un salvataggio: ricarica i ricordi (il luogo nuovo arriva in testa) e dice quale id scegliere.
     let ricarica: () async -> Void
     @StateObject private var bussola = Bussola()
+    @State private var sentiero = SentieroTraccia()
     @State private var sceltoId: Int?
     @State private var elenco = false
     @State private var salvo = false
@@ -30,6 +31,12 @@ struct PannelliTraccia: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // v270 (il signore: «crea anche un ologramma per Traccia»): SENTIERO, in testa come nel mockup
+            let luogo = scelto, metri = luogo.flatMap { l in l.lat.flatMap { la in l.lon.flatMap { lo in bussola.verso(lat: la, lon: lo)?.metri } } }
+            OloSingolaVista(altezza: 260, aiuto: "↔ GIRA · TOCCA IL LUOGO", etichetta: "Ologramma della strada fino al luogo") { gc, W, H, t, M in
+                sentiero.disegna(&gc, W, H, t, M, nome: luogo?.testo ?? "LUOGO", metri: metri)
+            }
+            .corniceOlo(tinta)
             Pannello(titolo: "TRACCIA", tinta: tinta) {
                 if let avviso { AvvisoJarvis(testo: avviso) }
                 if let l = scelto, let lat = l.lat, let lon = l.lon {
@@ -160,6 +167,136 @@ struct PannelliTraccia: View {
         c.userInfo = ["jarvis_azione": "avviso"]                          // toccata: niente da leggere, l'ha già vista
         let r = UNNotificationRequest(identifier: "luogo-\(Date().timeIntervalSince1970)", content: c, trigger: nil)
         try? await UNUserNotificationCenter.current().add(r)
+    }
+}
+
+
+// MARK: - TR1 · SENTIERO (v270) — la strada fino al luogo, in ologramma: un pezzo di città di luce sul proiettore (le vie, gli isolati
+// che si alzano), il punto dove è il signore che pulsa col suo cono di direzione, il luogo salvato con il faro che sale e gli anelli
+// che si allargano sul pavimento, e la scia che li unisce lungo le vie, con le frecce di luce che ci corrono sopra. La bussola ai
+// bordi (N E S O), i metri e il tempo a piedi scritti. Il dito gira la città; toccato il faro: il riquadro del luogo.
+// Uguale al mockup v270 (olo_extra/nuovi.js, sentieroTraccia).
+final class SentieroTraccia {
+    private var firma: String?
+    private var primo = 0.0
+    private var lato = 1.0
+    private static let isolati: [(x0: Double, y0: Double, x1: Double, y1: Double)] = [
+        (-0.95, -0.95, -0.2, -0.4), (0.2, -0.95, 0.95, -0.4), (-0.95, -0.1, -0.2, 0.42), (0.2, -0.1, 0.95, 0.42), (-0.95, 0.78, -0.2, 0.95), (0.2, 0.78, 0.95, 0.95),
+    ]
+    private static let luogoId = 0
+
+    func disegna(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, nome: String, metri: Double?) {
+        if nome != firma {                                                // un luogo nuovo: la scia rinasce, la via gira da un lato
+            firma = nome
+            primo = t
+            var h: Int32 = 0
+            for u in nome.unicodeScalars {
+                let v = u.value, c = v > 0xFFFF ? 0xD800 + ((v - 0x10000) >> 10) : v
+                h = h &* 31 &+ Int32(truncatingIfNeeded: c)
+            }
+            lato = h % 2 != 0 ? 1 : -1
+        }
+        let cx = W / 2, base = H - 14, rx = min(W * 0.22, 84)
+        Olo.pavimento(&gc, cx, base, rx, t, n: 48)
+        let al = 0.95, sz = min(W * 0.3, H * 0.4), cy = base - sz * 0.95
+        let ang = -0.5 + 0.18 * sin(t * 0.2) + M.giro, nasce = OP.lis((t - primo) / 0.8)
+        let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
+        var F = FasciOlo(6)
+        // il pavimento della città: il bordo e le vie a griglia
+        for k in -4...4 {
+            let v = Double(k) / 4, g = k % 4 != 0 ? 0 : 1
+            F.metti(g, P(v, -1, 0), P(v, 1, 0))
+            F.metti(g, P(-1, v, 0), P(1, v, 0))
+        }
+        // gli isolati che si alzano
+        for (i, b) in SentieroTraccia.isolati.enumerated() {
+            let hz = (0.1 + 0.08 * Double((i * 7 + 3) % 4)) * nasce
+            let c = [P(b.x0, b.y0, hz), P(b.x1, b.y0, hz), P(b.x1, b.y1, hz), P(b.x0, b.y1, hz)]
+            gc.fill(OP.poligono(c), with: .color(OP.s(0.045)))
+            for k in 0..<4 { F.metti(2, c[k], c[(k + 1) % 4]) }
+            let piedi: [(Double, Double)] = [(b.x0, b.y0), (b.x1, b.y0), (b.x1, b.y1), (b.x0, b.y1)]
+            for q in piedi { F.metti(1, P(q.0, q.1, 0), P(q.0, q.1, hz)) }
+        }
+        // la scia: dal signore (in basso) al luogo, lungo le vie
+        let via: [(Double, Double)] = [(0, -0.88), (0, 0.6), (lato * 0.6, 0.6)]
+        var lun: [Double] = []
+        var tot = 0.0
+        for k in 1..<via.count {
+            let l = hypot(via[k].0 - via[k - 1].0, via[k].1 - via[k - 1].1)
+            lun.append(l)
+            tot += l
+        }
+        let lungo = { (u: Double) -> (Double, Double) in
+            var d = u * tot
+            for k in lun.indices {
+                if d <= lun[k] || k == lun.count - 1 {
+                    let f = min(1, d / lun[k])
+                    return (via[k].0 + (via[k + 1].0 - via[k].0) * f, via[k].1 + (via[k + 1].1 - via[k].1) * f)
+                }
+                d -= lun[k]
+            }
+            return via[via.count - 1]
+        }
+        let fatto = OP.lis((t - primo - 0.4) / 1.1), passi = 40
+        for k in 0..<passi {
+            let u0 = Double(k) / Double(passi), u1 = Double(k + 1) / Double(passi)
+            if u1 > fatto { break }
+            let a = lungo(u0), b = lungo(u1)
+            F.metti(5, P(a.0, a.1, 0.01), P(b.0, b.1, 0.01))
+        }
+        F.linee(&gc, colore: { $0 >= 5 ? OP.b(0.95) : OP.c(0.08 + 0.15 * Double($0)) },
+                spessore: { $0 >= 5 ? 2.2 : 0.7 + Double($0) * 0.15 }, alone: { $0 >= 5 ? OP.s(0.12) : nil })
+        // le frecce di luce che corrono sulla scia
+        if fatto >= 1 {
+            for k in 0..<6 {
+                let u = (t * 0.22 + Double(k) / 6).truncatingRemainder(dividingBy: 1), p = lungo(u), q = P(p.0, p.1, 0.02)
+                OP.alone(&gc, q.x, q.y, 6, 0.7 * sin(u * .pi), bianco: true)
+            }
+        }
+        // il signore: il punto che pulsa e il cono verso la prima via
+        let io = P(0, -0.88, 0.01), pulsa = 0.5 + 0.5 * sin(t * 3)
+        var anello = Path()
+        for s in 0...24 {
+            let a = Double(s) / 24 * OP.due, r = 0.07 + 0.03 * pulsa, p = P(cos(a) * r, -0.88 + sin(a) * r, 0.01)
+            if s == 0 { anello.move(to: CGPoint(x: p.x, y: p.y)) } else { anello.addLine(to: CGPoint(x: p.x, y: p.y)) }
+        }
+        gc.stroke(anello, with: .color(OP.b(0.8)), lineWidth: 1)
+        OP.alone(&gc, io.x, io.y, 9, 0.9, bianco: true)
+        gc.fill(OP.poligono([io, P(-0.09, -0.62, 0.01), P(0.09, -0.62, 0.01)]), with: .color(OP.s(0.16)))
+        // il luogo: gli anelli sul pavimento e il faro che sale
+        let lx = lato * 0.6, ly = 0.6
+        for k in 0..<2 {
+            let u = (t * 0.6 + Double(k) * 0.5).truncatingRemainder(dividingBy: 1), r = 0.05 + 0.3 * u
+            var giro = Path()
+            for s in 0...28 {
+                let a = Double(s) / 28 * OP.due, p = P(lx + cos(a) * r, ly + sin(a) * r, 0.01)
+                if s == 0 { giro.move(to: CGPoint(x: p.x, y: p.y)) } else { giro.addLine(to: CGPoint(x: p.x, y: p.y)) }
+            }
+            gc.stroke(giro, with: .color(OP.c(0.7 * (1 - u))), lineWidth: 1)
+        }
+        let f0 = P(lx, ly, 0), f1 = P(lx, ly, 0.75 * fatto)
+        var faro = Path()
+        Olo.linea(&faro, f0.x, f0.y, f1.x, f1.y)
+        gc.stroke(faro, with: .linearGradient(Gradient(colors: [OP.b(0.9), OP.c(0)]), startPoint: CGPoint(x: f0.x, y: f0.y), endPoint: CGPoint(x: f1.x, y: f1.y)),
+                  lineWidth: 2.6)
+        OP.alone(&gc, f0.x, f0.y, 12, 0.9, bianco: true)
+        // la bussola ai bordi
+        let rose: [(String, Double, Double)] = [("N", 0, 1.12), ("E", 1.12, 0), ("S", 0, -1.12), ("O", -1.12, 0)]
+        for (s, X, Y) in rose {
+            let p = P(X, Y, 0)
+            OP.scritta(&gc, s, p.x, p.y + 3, 8, 700, s == "N" ? OP.b(0.95) : OP.c(0.6))
+        }
+        let cima = P(lx, ly, 0.78), titolo = OP.taglia(nome.uppercased(), 18)
+        OP.dentro(&gc, W, titolo, cima.x, cima.y - 6, 7, 700, OP.b(0.95))
+        M.zona(f0.x, (f0.y + cima.y) / 2, 22, SentieroTraccia.luogoId)
+        OP.scritta(&gc, "TRACCIA", 10, 14, 8, 600, OP.c(0.85), .leading)
+        let distanza = metri.map { Rotta.distanza($0).uppercased() }, piedi = metri.map { "A PIEDI \(Rotta.aPiedi($0))".uppercased() }
+        if let distanza { OP.scritta(&gc, distanza, W - 10, 14, 8, 700, OP.b(0.95), .trailing) }
+        if let piedi { OP.scritta(&gc, piedi, W - 10, 24, 6.5, 600, OP.c(0.8), .trailing) }
+        if M.scelta == SentieroTraccia.luogoId {
+            OP.riquadro(&gc, W, H, f0.x, f0.y, [OP.taglia(nome.uppercased(), 20), distanza ?? "CERCO LA POSIZIONE", piedi ?? "IL LUOGO SALVATO"],
+                        t - M.sceltaT, codice: "LUOGO")
+        }
     }
 }
 

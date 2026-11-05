@@ -136,7 +136,7 @@ struct VistaBea: View {
 
     // MARK: Ologramma (11.0 (4), come il mockup v261)
 
-    /// Bea in ologramma sopra il proiettore, con le sue tre prove (11.0 (6), come il mockup v264: PUNTI, LINEE, VETRO, scelte con le
+    /// Bea in ologramma sopra il proiettore, con le sue tre prove (11.0 (7), come il mockup v270: VETRO, SCUDO, RITRATTO, scelte con le
     /// chip); FOTO, in alto a destra come nel mockup, sceglie la foto dal rullino (col selettore di Apple: l'app vede solo quella).
     private var ologramma: some View {
         VStack(spacing: 6) {

@@ -51,6 +51,8 @@ struct Interprete: View {
     private var lin: Lingua { scelta ?? lingua }
 
     var body: some View {
+        let frasi = motore.scambi.map { PonteInterprete.Frase(altro: $0.chi == .altro, testo: $0.originale, trad: $0.tradotto) }
+        let codice = lin.codice.uppercased()
         ZStack {
             SfondoHUD(fase: motore.faseHUD)
             VStack(spacing: 12) {
@@ -69,6 +71,13 @@ struct Interprete: View {
                         .frame(minHeight: 44)
                 }
                 .padding(.horizontal, 20).padding(.top, 8)
+
+                // v270 (il signore: «crea anche un ologramma per interprete»): il PONTE fra le due lingue, in testa come nel mockup
+                OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
+                    PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: codice, frasi: frasi)
+                }
+                .corniceOlo(Color.ciano)
+                .padding(.horizontal, 12)
 
                 // le due lingue, con il lato attivo che si illumina
                 HStack(spacing: 10) {
@@ -226,6 +235,121 @@ struct Interprete: View {
         }
         .buttonStyle(StileStark())
         .disabled(motore.fase == .traduco || motore.fase == .parlo)
+    }
+}
+
+// MARK: - IN1 · PONTE (v270) — le due lingue sono due piattaforme di luce ai lati del proiettore (la sua, IT, e quella dell'altro),
+// ognuna con il codice grande sopra e l'equalizzatore della voce attorno, che si accende quando quella parte parla. Fra le due un
+// ponte di luce ad arco, con i suoi binari e le traversine: le frasi lo attraversano come capsule, partono nella lingua di chi parla
+// e a metà ponte si traducono (il testo si scompone e si ricompone nell'altra lingua), lasciando una scia di scintille. Il dito gira
+// la scena; toccata una capsula: la frase e la sua traduzione. Uguale al mockup v270 (olo_extra/nuovi.js, ponteInterprete).
+enum PonteInterprete {
+    struct Frase { let altro: Bool; let testo: String; let trad: String }
+    private static let fraseId = 0
+    private static let latoId = 10
+
+    static func disegna(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, la: String, lb: String, frasi: [Frase]) {
+        let cx = W / 2, base = H - 14, rx = min(W * 0.22, 84)
+        Olo.pavimento(&gc, cx, base, rx, t, n: 48)
+        let al = 0.3, sz = min(W * 0.36, H * 0.55), cy = base - 14
+        let ang = 0.15 * sin(t * 0.22) + M.giro * 0.6, nasce = OP.lis(t / 0.9)
+        let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
+        var F = FasciOlo(6)
+        let periodo = 4.2, n = max(1, frasi.count), corrente = Int(t / periodo) % n, u = t.truncatingRemainder(dividingBy: periodo) / periodo
+        let parla = frasi.isEmpty ? Int(t / 5) % 2 : (frasi[corrente].altro ? 1 : 0)
+        // le due piattaforme con l'equalizzatore
+        let lati = [-0.95, 0.95]
+        for (i, X) in lati.enumerated() {
+            let vivo = i == parla, rg = 0.32
+            var q: P3?
+            for s in 0...36 {
+                let a = Double(s) / 36 * OP.due, p = P(X + cos(a) * rg, sin(a) * rg, 0.02)
+                if let q { F.metti(vivo ? 3 : 1, q, p) }
+                q = p
+            }
+            q = nil
+            for s in 0...36 {
+                let a = Double(s) / 36 * OP.due, p = P(X + cos(a) * rg * 0.6, sin(a) * rg * 0.6, 0.02)
+                if let q { F.metti(0, q, p) }
+                q = p
+            }
+            for b in 0..<18 {
+                let a = Double(b) / 18 * OP.due + t * 0.3
+                let onda = vivo ? 0.5 + 0.5 * abs(sin(t * 7 + Double(b) * 1.7) * sin(t * 3.1 + Double(b))) : 0.12
+                let r0 = rg * 0.75, z1 = 0.05 + 0.3 * onda * nasce
+                F.metti(vivo ? 4 : 1, P(X + cos(a) * r0, sin(a) * r0, 0.03), P(X + cos(a) * r0, sin(a) * r0, z1))
+            }
+        }
+        // il ponte: due binari ad arco e le traversine
+        let A = P3(-0.95, 0, 0.42), C = P3(0, 0, 1.05), B2 = P3(0.95, 0, 0.42)
+        let arco = { (s: Double, dy: Double) -> P3 in
+            let v = 1 - s, p = A * (v * v) + C * (2 * v * s) + B2 * (s * s)
+            return P(p.x, p.y + dy, p.z)
+        }
+        let pezzi = 40
+        for k in 0..<pezzi {
+            let s0 = Double(k) / Double(pezzi), s1 = Double(k + 1) / Double(pezzi)
+            if s1 > nasce { break }
+            F.metti(3, arco(s0, -0.07), arco(s1, -0.07))
+            F.metti(3, arco(s0, 0.07), arco(s1, 0.07))
+            if k % 3 == 0 { F.metti(1, arco(s0, -0.07), arco(s0, 0.07)) }
+        }
+        for X in lati { F.metti(1, P(X, 0, 0.05), P(X, 0, 0.42)) }        // i piloni
+        F.linee(&gc, colore: { $0 >= 4 ? OP.b(0.85) : OP.c(0.1 + 0.17 * Double($0)) },
+                spessore: { 0.7 + Double($0) * 0.14 }, alone: { $0 >= 3 ? OP.s(0.08) : nil })
+        // la capsula che attraversa (dalla lingua di chi parla all'altra), con la scia di scintille
+        let s = parla == 1 ? 1 - OP.lis(u) : OP.lis(u), cap = arco(s, 0)
+        for k in 1...8 {
+            let sk = parla == 1 ? min(1, s + Double(k) * 0.018) : max(0, s - Double(k) * 0.018), q = arco(sk, 0.03 * sin(t * 9 + Double(k)))
+            OP.alone(&gc, q.x, q.y, 3.5, 0.5 * (1 - Double(k) / 9))
+        }
+        OP.alone(&gc, cap.x, cap.y, 14, 0.6, bianco: true)
+        // i codici delle lingue sopra le piattaforme
+        for (i, X) in lati.enumerated() {
+            let p = P(X, 0, 0.55), vivo = i == parla
+            OP.scritta(&gc, i == 1 ? lb : la, p.x, p.y - 4, vivo ? 15 : 12, 800, vivo ? OP.b(0.98) : OP.c(0.6))
+            OP.scritta(&gc, i == 1 ? "L'ALTRO" : "LEI", p.x, p.y + 8, 6.5, 600, OP.c(0.75))
+            M.zona(p.x, p.y, 20, latoId + i)
+        }
+        // la capsula: il testo nella lingua di chi parla, a metà ponte si traduce
+        if !frasi.isEmpty {
+            let f = frasi[corrente], meta = abs(s - 0.5) < 0.06, tradotta = parla == 1 ? s < 0.5 : s > 0.5
+            let testo = OP.taglia(tradotta ? (f.trad.isEmpty ? "…" : f.trad) : f.testo, 22)
+            let w = min(150, 14 + Double(testo.count) * 5.2), hC = 20.0, bx = cap.x - w / 2, by = cap.y - hC - 8
+            gc.fill(Path(CGRect(x: bx, y: by, width: w, height: hC)), with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82)))
+            var tacche = Path()
+            let spigoli: [(x: Double, y: Double, dx: Double, dy: Double)] = [(bx, by, 1, 1), (bx + w, by, -1, 1), (bx, by + hC, 1, -1), (bx + w, by + hC, -1, -1)]
+            for g in spigoli {
+                tacche.move(to: CGPoint(x: g.x, y: g.y + g.dy * 5))
+                tacche.addLine(to: CGPoint(x: g.x, y: g.y))
+                tacche.addLine(to: CGPoint(x: g.x + g.dx * 5, y: g.y))
+            }
+            gc.stroke(tacche, with: .color(M.scelta == fraseId ? OP.b(1) : OP.c(0.85)), lineWidth: 1)
+            var mescola = testo
+            if meta {                                                     // a metà ponte il testo si scompone
+                let segni = Array("01#<>/*"), passo = Int(t * 30)
+                mescola = String(testo.enumerated().map { e -> Character in
+                    if e.element.isWhitespace || (e.offset + passo) % 3 == 0 { return e.element }
+                    return segni[min(6, Int((t * 50 + Double(e.offset)).truncatingRemainder(dividingBy: 7)))]
+                })
+            }
+            OP.scritta(&gc, mescola, cap.x, by + 13, 6.8, 700, OP.b(0.95))
+            var gamba = Path()
+            Olo.linea(&gamba, cap.x, by + hC, cap.x, cap.y - 3)
+            gc.stroke(gamba, with: .color(OP.s(0.5)), lineWidth: 1)
+            M.zona(cap.x, by + hC / 2, max(18, w / 2), fraseId)
+            if M.scelta == fraseId {
+                OP.riquadro(&gc, W, H, cap.x, cap.y, [OP.taglia(f.testo, 30), OP.taglia(f.trad, 30), f.altro ? "L'ALTRO → LEI · \(lb) → \(la)" : "LEI → L'ALTRO · \(la) → \(lb)"],
+                            t - M.sceltaT, codice: "FRASE \(corrente + 1)/\(n)")
+            }
+        }
+        OP.scritta(&gc, "INTERPRETE", 10, 14, 8, 600, OP.c(0.85), .leading)
+        OP.scritta(&gc, "\(la) ⇄ \(lb)", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
+        if let k = M.scelta, k >= latoId, k - latoId < lati.count {
+            let i = k - latoId, p = P(lati[i], 0, 0.55)
+            OP.riquadro(&gc, W, H, p.x, p.y, [i == 1 ? lb : la, i == 1 ? "LA LINGUA DELL'ALTRO" : "LA SUA LINGUA", parla == i ? "STA PARLANDO" : "ASCOLTA"],
+                        t - M.sceltaT, codice: i == 1 ? "L'ALTRO" : "LEI")
+        }
     }
 }
 

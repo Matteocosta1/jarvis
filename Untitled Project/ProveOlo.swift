@@ -15,7 +15,19 @@ typealias P3 = SIMD3<Double>
 nonisolated enum SezioneOlo: String, CaseIterable {
     case diario, sonno, briefing, spesa, serata, bea
 
-    var chiave: String { "oloProva." + rawValue }
+    /// v270: Bea ha una chiave nuova (le prove sono cambiate: VETRO, SCUDO, RITRATTO); la scelta di prima si ritrova (SCUDO resta SCUDO).
+    var chiave: String {
+        guard self == .bea else { return "oloProva." + rawValue }
+        SezioneOlo.passaBea()
+        return "oloProva.bea2"
+    }
+
+    /// Una volta sola: la prova di Bea scelta prima (PUNTI, LINEE, VETRO, SCUDO) passa alle tre di adesso.
+    private static func passaBea() {
+        let d = UserDefaults.standard
+        guard d.object(forKey: "oloProva.bea2") == nil else { return }
+        d.set(d.integer(forKey: "oloProva.bea") == 3 ? 1 : 0, forKey: "oloProva.bea2")
+    }
 
     var nomi: [String] {
         switch self {
@@ -24,7 +36,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .briefing: return ["RADAR", "GLOBO", "PISTA"]
         case .spesa: return ["CASSA", "SCAFFALE", "ANELLO"]
         case .serata: return ["FLUSSO", "TORRI", "REATTORE"]
-        case .bea: return ["PUNTI", "LINEE", "VETRO", "SCUDO"]           // v266: SCUDO, la quarta
+        case .bea: return ["VETRO", "SCUDO", "RITRATTO"]                 // v270: tolte PUNTI e LINEE, il RITRATTO come l'Armadio
         }
     }
 
@@ -36,11 +48,11 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .briefing: return ["↔ GIRA · TOCCA UN IMPEGNO", "↔ GIRA · TOCCA MILANO O IL SOLE", "↔ AVANTI E INDIETRO NEL TEMPO"]
         case .spesa: return ["TOCCA UNA COSA: PASSA IN CASSA", "↔ GIRA · TOCCA UNA COSA: PRESA", "↔ GIRA · TOCCA UN SETTORE: PRESA"]
         case .serata: return ["TOCCA UNA VOCE", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA UN SETTORE"]
-        case .bea: return ["↔ GIRA", "↔ GIRA", "↔ GIRA · TOCCA UNA DATA", "↔ GIRA · TOCCA IL CUORE"]
+        case .bea: return ["↔ GIRA · TOCCA UNA DATA", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA LEI O UNA DATA"]
         }
     }
 
-    /// La prova scelta (da 0; Bea ne ha quattro).
+    /// La prova scelta (da 0).
     var scelta: Int { min(nomi.count - 1, max(0, UserDefaults.standard.integer(forKey: chiave))) }
 
     /// Tutte le scelte in una riga, per l'orologio: «diario:0,sonno:2,…».
@@ -567,7 +579,7 @@ struct OloSingolaVista: View {
     }
 }
 
-/// Le prove di un ologramma nella sezione, come il mockup v262: la tela col disegno scelto e, sotto, le chip (tre; Bea quattro). Il dito di lato lo
+/// Le prove di un ologramma nella sezione, come il mockup v262: la tela col disegno scelto e, sotto, le chip (tre). Il dito di lato lo
 /// gira (con lo slancio), il tocco su un elemento apre il suo riquadro; passando a un'altra prova, una scansione scende e la ridisegna.
 /// La scelta resta (anche sul polso). Si ferma con «Riduci movimento» (resta il disegno finito) e quando la sezione è dietro.
 struct ProveOloVista: View {
