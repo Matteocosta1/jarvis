@@ -33,6 +33,9 @@ final class NavigaSezioni: ObservableObject {
     @Published var rivela: Double = 0
     /// La pagina scelta che si sta materializzando.
     @Published var scelta: UUID?
+    /// 5 nov (il signore: «manca l'animazione quando li seleziono, come nel mockup»): la sezione appena tornata davanti dalle
+    /// pagine olografiche (o dal bordo) che si materializza: la riga di scansione che scende e le staffe agli angoli.
+    @Published var materia: UUID?
     /// BORDO: di quanto (−1…1, negativo verso sinistra) e verso quale sezione (nil = JARVIS).
     @Published var bordo: CGFloat = 0
     @Published var verso: UUID?? = nil
@@ -93,6 +96,10 @@ struct PosaPagina: ViewModifier {
             // 5 nov (il signore: «le pagine da sfogliare non sono trasparenti e cool come nel mockup»): come .foglio.ologramma del
             // mockup, la pagina diventa luce (mix-blend-mode: screen): il nero si fonde col fondo olografico e resta il disegno ciano
             .blendMode(posa.tinta > 0.001 ? .screen : .normal)
+            // 5 nov pomeriggio (il signore, foto: «più trasparenti, che si veda il sotto, IDENTICI al mockup; nell'app sono troppo
+            // luminosi»): sull'iPhone la fusione «screen» non passa fuori dalla pagina girata in 3D (la pagina restava piena).
+            // Come nel mockup la pagina olografica lascia vedere il fondo e la griglia: è luce, metà trasparente.
+            .opacity(1 - TiroPagina.trasparenza * posa.tinta)
             .modifier(AloneOlo(forza: posa.ombra))
             .scaleEffect(posa.scala)
             .rotation3DEffect(.degrees(posa.rotY), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
@@ -115,6 +122,7 @@ struct SegueTiro: ViewModifier {
             .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta) } }
             .clipShape(Ritaglio(raggio: v.raggio))
             .blendMode(v.tinta > 0.001 ? .screen : .normal)             // 5 nov: la pagina in mano è luce, come nel mockup
+            .opacity(1 - TiroPagina.trasparenza * v.tinta)               // e lascia vedere il fondo, come nel mockup
             .modifier(AloneOlo(forza: v.ombra))
             .mask { MascheraLaser(riga: v.riga) }
             .modifier(Proiezione(x: v.x, y: v.y, scala: v.scala, inclina: v.inclina))
@@ -344,6 +352,7 @@ struct StratoSezioniVista<Vista: View>: View {
                 .environment(\.sezioneAperta, v.id)
                 .environment(\.sezioneDietro, pila.davanti != v.id)        // dietro: fotocamera e microfono in pausa
                 .environment(\.jarvisCoperto, false)
+                .overlay { if naviga.materia == v.id { MaterializzaOlo { if naviga.materia == v.id { naviga.materia = nil } } } }
                 .modifier(SegueTiro(tiro: tiro, id: v.id))
                 .modifier(PosaPagina(posa: p))
                 // dove sta la pagina a riposo (coordinate globali): da lì parte il volo dell'AGGANCIO e lì si posa la sua luce
@@ -667,6 +676,7 @@ struct StratoSezioniVista<Vista: View>: View {
             await Task.yield()                                        // la sezione è davanti: ora le pagine se ne vanno
             withTransaction(t) {
                 naviga.modo = .normale
+                naviga.materia = v.id                                 // come il mockup: ora si materializza
                 naviga.scelta = nil
                 naviga.alzata = 0
                 naviga.rivela = 0
@@ -778,7 +788,7 @@ struct StratoSezioniVista<Vista: View>: View {
                         var t = Transaction(); t.disablesAnimations = true
                         withTransaction(t) { portaDavanti(r) }
                         await Task.yield()
-                        withTransaction(t) { naviga.modo = .normale; naviga.bordo = 0; naviga.verso = nil }
+                        withTransaction(t) { naviga.modo = .normale; naviga.bordo = 0; naviga.verso = nil; naviga.materia = r }
                     }
                 } else {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { naviga.bordo = 0 }
@@ -806,7 +816,7 @@ struct StratoSezioniVista<Vista: View>: View {
                     var t = Transaction(); t.disablesAnimations = true
                     withTransaction(t) { portaDavanti(r) }
                     await Task.yield()
-                    withTransaction(t) { naviga.modo = .normale; naviga.bordo = 0; naviga.verso = nil }
+                    withTransaction(t) { naviga.modo = .normale; naviga.bordo = 0; naviga.verso = nil; naviga.materia = r }
                 }
             } else {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { naviga.bordo = 0 }
@@ -1008,6 +1018,9 @@ final class TiroPagina: NSObject, ObservableObject {
     private var baseVolo = Viva()
     private var f0Volo: Double = 0
     private var collegamento: CADisplayLink?
+
+    /// Quanto è trasparente una pagina olografica piena (il fondo e la griglia si vedono attraverso, come nel mockup).
+    static let trasparenza = 0.45
 
     static func scala(_ t: CGFloat) -> CGFloat { 1 - 0.62 * (1 - exp(-t / 230)) }
     static func dScala(_ t: CGFloat) -> CGFloat { -0.62 / 230 * exp(-t / 230) }
@@ -1606,8 +1619,9 @@ struct VeloOlo: View {
             Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
             Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
             RigheOlo().opacity(forza)
+            // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (era #8ff0ff all'85%)
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color(red: 143 / 255, green: 240 / 255, blue: 1).opacity(0.85 * forza), lineWidth: 1.5)
+                .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.55 * forza), lineWidth: 1.5)
         }
         .allowsHitTesting(false)
     }
@@ -1638,14 +1652,83 @@ struct RigheOlo: View {
     }
 }
 
-/// Il bagliore attorno alla pagina olografica, come nel mockup (0 0 26px al 55% e 0 0 70px al 25%); `forza` 0,45 = quello pieno.
+/// Il bagliore attorno alla pagina olografica, come .foglio.in-vista del mockup (0 0 46px al 22%); `forza` 0,45 = quello pieno.
+/// 5 nov pomeriggio (il signore: «troppo luminosi»): prima era quello più forte (26 px al 55% e 70 px al 25%).
 struct AloneOlo: ViewModifier {
     let forza: Double
     func body(content: Content) -> some View {
         let k = min(1, max(0, forza / 0.45))
         content
-            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.55 * k), radius: k > 0 ? 13 : 0)
-            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.25 * k), radius: k > 0 ? 35 : 0)
+            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.22 * k), radius: k > 0 ? 23 : 0)
+    }
+}
+
+/// 5 nov pomeriggio (il signore: «manca l'animazione quando li seleziono, come nel mockup»): la pagina scelta si materializza
+/// come `materializza` del mockup. Sotto la riga di scansione è ancora luce ciano (il velo olografico), sopra è la sezione vera;
+/// la riga (2 punti, #dffaff, con l'alone) scende in 0,43 s con la sua scia di 70 punti; le staffe arrivano dagli angoli in
+/// 0,62 s e spariscono. Finito, si toglie da sola.
+struct MaterializzaOlo: View {
+    let fatto: () -> Void
+    @State private var inizio = Date()
+
+    var body: some View {
+        TimelineView(.animation) { ctx in
+            let t = ctx.date.timeIntervalSince(inizio)
+            let q = min(1, t / 0.43), e = q < 0.5 ? 2 * q * q : 1 - pow(-2 * q + 2, 2) / 2, y = e * 1.06 - 0.03
+            GeometryReader { g in
+                let h = g.size.height, yy = CGFloat(y), ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+                ZStack(alignment: .top) {
+                    if q < 1 {
+                        let a = max(0, y - 0.05)
+                        VeloOlo(forza: 1)
+                            .mask(LinearGradient(stops: [.init(color: .clear, location: a), .init(color: .black, location: max(a + 0.0001, y))],
+                                                 startPoint: .top, endPoint: .bottom))
+                        LinearGradient(colors: [ciano.opacity(0), ciano.opacity(0.22)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 70)
+                            .offset(y: yy * h - 72)
+                        Rectangle()
+                            .fill(Color(red: 223 / 255, green: 250 / 255, blue: 1))
+                            .frame(height: 2)
+                            .shadow(color: ciano, radius: 5)
+                            .shadow(color: ciano.opacity(0.85), radius: 13)
+                            .offset(y: yy * h)
+                            .opacity(q < 0.85 ? 1 : (1 - q) / 0.15)
+                    }
+                    StaffeOlo(t: t, misura: g.size)
+                }
+                .frame(width: g.size.width, height: h, alignment: .top)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .task {
+            try? await Task.sleep(for: .milliseconds(680))
+            fatto()
+        }
+    }
+}
+
+/// Le quattro staffe del mockup (.olo-staffe: 28 punti, 2 punti #8ff0ff con l'alone): arrivano da 60 e 120 punti verso gli
+/// angoli (al 70% di 0,62 s), si accendono al 30% e si spengono alla fine. Stanno a 20 punti dai bordi (nel mockup 10 dal bordo
+/// del telefono disegnato; qui lo schermo ha gli angoli tondi e a 10 punti si taglierebbero).
+struct StaffeOlo: View {
+    let t: Double
+    let misura: CGSize
+
+    var body: some View {
+        let u = min(1, t / 0.62), m = min(1, u / 0.7), e = 1 - pow(1 - m, 3)
+        let alfa = u < 0.3 ? u / 0.3 : u < 0.7 ? 1 : max(0, 1 - (u - 0.7) / 0.3)
+        let w = misura.width, h = misura.height, l: CGFloat = 28, d: CGFloat = 20
+        Path { p in
+            for (cx, cy, sx, sy, dx, dy) in [(d, d, 1.0, 1.0, 60.0, 120.0), (w - d, d, -1, 1, -60, 120), (d, h - d, 1, -1, 60, -120),
+                                              (w - d, h - d, -1, -1, -60, -120)] as [(CGFloat, CGFloat, CGFloat, CGFloat, CGFloat, CGFloat)] {
+                let k = CGFloat(1 - e), x = cx + dx * k, y = cy + dy * k
+                p.move(to: CGPoint(x: x, y: y + sy * l)); p.addLine(to: CGPoint(x: x, y: y)); p.addLine(to: CGPoint(x: x + sx * l, y: y))
+            }
+        }
+        .stroke(Color(red: 143 / 255, green: 240 / 255, blue: 1), style: StrokeStyle(lineWidth: 2, lineCap: .square))
+        .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1), radius: 3)
+        .opacity(alfa)
     }
 }
 

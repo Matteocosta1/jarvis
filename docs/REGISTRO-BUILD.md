@@ -455,3 +455,10 @@ Mockup aggiornato prima dell'app: v260 (aperture 0,45 s, Dock) e v261 (ologrammi
 | 13 | Polso, icone che non si fermano | Fatto: la molla della barra risolta esatta (prima divergeva coi fotogrammi lenti); la barra si ridisegna solo quando cambia |
 | 14 | Polso, microfono durante la rotazione | Fatto: con la ruota viva niente ascolto d'attesa; si riapre spenta la ruota (scelta o 5 s) |
 | 15 | Polso, corona | Fatto: tolta CoronaBarra, la corona resta della pagina |
+
+## 11.0 (5) — 5 nov pomeriggio: le pagine olografiche come il mockup
+Prova della 11.0 (4) (il signore, 13:55): «l'app funziona molto bene ma gli ologrammi non sono come nel mockup: devono essere più trasparenti, che si veda il sotto, IDENTICI; nell'app sono troppo luminosi»; «manca l'animazione quando li seleziono come nel mockup» (foto e due video).
+- **Pagine olografiche** (NavigaSezioni.swift): sull'iPhone la fusione «screen» non passava fuori dalla pagina girata in 3D e la pagina restava piena. Ora la pagina olografica è trasparente (opacità 1 − 0,45 × tinta) e lascia vedere fondo e griglia; bordo e bagliore come `.foglio.in-vista` del mockup (bordo ciano al 55%, alone 46 px al 22%; prima #8ff0ff all'85% e due aloni forti).
+- **Selezione** (MaterializzaOlo, StaffeOlo): la pagina scelta si materializza come `materializza` del mockup: la riga di scansione scende in 0,43 s (sotto è ancora luce ciano), le quattro staffe arrivano agli angoli in 0,62 s e spariscono. Anche passando di sezione dal bordo e col trackpad del Mac. Le staffe stanno a 20 punti dai bordi (a 10, come nel mockup, gli angoli tondi dello schermo le taglierebbero).
+- **Browser** (BrowserPrivato.swift): nelle pagine olografiche la pagina web vuota (bianca) passava sopra il visore spento: senza indirizzo ora non si vede.
+- Da fare dopo, prima nel mockup: i «puntini bianchi» che salgono alla creazione dell'ologramma della ruota (il signore: «vanno rivisti con un effetto più cool alla Stark»), e le tre prove per ognuno degli ologrammi nuovi.

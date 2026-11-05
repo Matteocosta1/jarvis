@@ -414,6 +414,9 @@ struct PaginaBrowser: View {
             .padding(.vertical, 8)
 
             WebVista(web: nav.web)
+                // 5 nov pomeriggio (video del signore): nelle pagine olografiche la pagina web vuota (bianca) passava sopra il
+                // visore spento e la sezione diventava un rettangolo bianco acceso. Senza indirizzo la pagina web non si vede.
+                .opacity(nav.indirizzo.isEmpty && !nav.carica ? 0 : 1)
                 .overlay {
                     if nav.indirizzo.isEmpty && !nav.carica {          // niente pagina bianca: il visore spento, in attesa
                         // 27 ott (il signore): come il mockup, la pagina tutta nera con il globo olografico che gira
