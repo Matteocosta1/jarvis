@@ -457,6 +457,7 @@ Mockup aggiornato prima dell'app: v260 (aperture 0,45 s, Dock) e v261 (ologrammi
 | 15 | Polso, corona | Fatto: tolta CoronaBarra, la corona resta della pagina |
 
 ## 11.0 (5) — 5 nov pomeriggio: le pagine olografiche come il mockup
+Controllo di compilazione su GitHub (commit 697560b): **verde, 0 errori e 0 avvisi**.
 Prova della 11.0 (4) (il signore, 13:55): «l'app funziona molto bene ma gli ologrammi non sono come nel mockup: devono essere più trasparenti, che si veda il sotto, IDENTICI; nell'app sono troppo luminosi»; «manca l'animazione quando li seleziono come nel mockup» (foto e due video).
 - **Pagine olografiche** (NavigaSezioni.swift): sull'iPhone la fusione «screen» non passava fuori dalla pagina girata in 3D e la pagina restava piena. Ora la pagina olografica è trasparente (opacità 1 − 0,45 × tinta) e lascia vedere fondo e griglia; bordo e bagliore come `.foglio.in-vista` del mockup (bordo ciano al 55%, alone 46 px al 22%; prima #8ff0ff all'85% e due aloni forti).
 - **Selezione** (MaterializzaOlo, StaffeOlo): la pagina scelta si materializza come `materializza` del mockup: la riga di scansione scende in 0,43 s (sotto è ancora luce ciano), le quattro staffe arrivano agli angoli in 0,62 s e spariscono. Anche passando di sezione dal bordo e col trackpad del Mac. Le staffe stanno a 20 punti dai bordi (a 10, come nel mockup, gli angoli tondi dello schermo le taglierebbero).
