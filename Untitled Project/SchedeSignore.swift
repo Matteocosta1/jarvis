@@ -767,11 +767,11 @@ struct VistaSonno: View {
 
     var body: some View {
         CorniceScheda(titolo: "Sonno", sottotitolo: oggi?.orari.map { "stanotte \($0)" } ?? "la notte scorsa", icona: "bed.double", tinta: tinta, pronto: caricato) {
-            // 11.0 (6), come il mockup v264: l'ologramma della notte con le sue tre prove (ONDA, CICLI, NOTTI), scelte con le chip
-            if !fasi.isEmpty || notti.count > 1 {
-                OlogrammaSonnoProve(dati: SonnoOlo(fasi: fasi.map { t -> (Date, Date, Int) in (t.da, t.a, t.fase.rawValue) }, notti: notti))
-                    .corniceOlo(tinta)
-            }
+            // 11.0 (6), come il mockup v264: l'ologramma della notte con le sue tre prove (LETTO, CICLI, NOTTI), scelte con le chip.
+            // 5 nov sera (il signore: «sonno nell'app non ha ologrammi, perché?»): c'era solo con i dati della notte; ora c'è sempre,
+            // come nelle altre sezioni (senza dati scrive «NESSUN DATO DELLA NOTTE», come il mockup)
+            OlogrammaSonnoProve(dati: SonnoOlo(fasi: fasi.map { t -> (Date, Date, Int) in (t.da, t.a, t.fase.rawValue) }, notti: notti))
+                .corniceOlo(tinta)
             HStack(spacing: 10) {
                 Valore(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari, tinta: tinta)
                 Valore(titolo: "MEDIA 14 NOTTI", valore: media.map { String(format: "%.1f h", $0) } ?? "—", sotto: confronto, tinta: tinta)
