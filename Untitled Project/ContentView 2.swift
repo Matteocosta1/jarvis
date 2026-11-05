@@ -2114,9 +2114,11 @@ struct AnelliHUD: View {
                     var archi = Path()
                     for q in 0..<quanti {
                         let inizio = Angle(radians: t * vel * fretta + Double(q) * 2 * .pi / Double(quanti))
-                        var arco = Path()                              // un pezzo a sé: addPath non lo lega al precedente
-                        arco.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
-                        archi.addPath(arco)
+                        // 5 nov sera (foto del signore 21:32: «le linee intorno al reattore»): l'arco aggiunto a un percorso già iniziato
+                        // partiva con una linea dritta dalla fine dell'arco prima (triangoli e pentagoni attorno al reattore). Ora ogni arco
+                        // comincia col suo punto di partenza: pezzi staccati, il disegno di sempre.
+                        archi.move(to: CGPoint(x: c.x + R * fr * cos(inizio.radians), y: c.y + R * fr * sin(inizio.radians)))
+                        archi.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
                     }
                     gc.stroke(archi, with: .color(base.opacity(0.5)), style: StrokeStyle(lineWidth: fr > 0.85 ? 2.2 : 1.2, lineCap: .round))
                 }
