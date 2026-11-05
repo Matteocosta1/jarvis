@@ -296,12 +296,16 @@ struct CaricamentoHUD: View {
 }
 
 /// 5 nov (il signore: «apertura delle sezioni da circa 1 s a 0,4-0,5 s, uguale ovunque», come il mockup v260): i tempi di
-/// apertura di tutte le sezioni in un posto solo.
+/// apertura di tutte le sezioni in un posto solo. 5 nov pomeriggio (punti 1 e 2 approvati: «le app si aprano nel modo più veloce
+/// possibile»): caricamento 0,28 s, stampa 0,32 s, la copertura del caricamento sfuma in 0,25 s. Il caricamento è un minimo: se i
+/// dati del cervello arrivano dopo, la scheda li aspetta (non si mostrano mai dati vecchi).
 enum Apertura {
-    /// Il caricamento HUD (prima 1,1 s nelle sezioni dal vivo, 0,9 s nelle schede).
-    static let caricamento = 0.45
-    /// La pagina che si «stampa» dall'alto (prima 0,9 s).
-    static let stampa = 0.5
+    /// Il caricamento HUD (prima 0,45 s; ancora prima 1,1 s nelle sezioni dal vivo, 0,9 s nelle schede).
+    static let caricamento = 0.28
+    /// La pagina che si «stampa» dall'alto (prima 0,5 s; ancora prima 0,9 s).
+    static let stampa = 0.32
+    /// La copertura del caricamento che sfuma sulla sezione (prima 0,4 s).
+    static let dissolvenza = 0.25
     /// L'ascolto dei comandi a voce dentro le sezioni: cambia la sessione audio, quindi parte a suoni d'apertura finiti
     /// (il caricamento più il clic di fine caricamento, 0,7 s; prima 1,8 s).
     static let orecchio = caricamento + 0.7
@@ -332,7 +336,7 @@ struct AperturaHUD: ViewModifier {
                 try? await Task.sleep(for: .seconds(durata))
                 if soloSfuma { Suoni.schedaPronta(soloSfuma: true) }
                 else if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
-                withAnimation(.easeOut(duration: 0.4)) { coperto = false }
+                withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
             }
     }
 }

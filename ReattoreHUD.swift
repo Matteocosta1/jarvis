@@ -40,6 +40,16 @@ struct Reattore: View {
     }()
     private static let arancio = (r: 1.00, g: 0.47, b: 0.10)
 
+    /// 5 nov (punto 8 approvato: «stesso disegno, meno lavoro»): i seni e coseni degli angoli dell'anello di plasma, calcolati
+    /// una volta sola. Per ogni filo, a ogni fotogramma, sin(n·θ + b) = sin(n·θ)·cos b + cos(n·θ)·sin b: 2 funzioni per onda
+    /// e per filo invece di una per punto (da circa 10.000 a circa 200 al fotogramma). Gli stessi numeri di prima.
+    private struct Angolo { let c, s, s3, c3, s5, c5, s8, c8: Double }
+    private static let puntiPlasma = 110
+    private static let angoli: [Angolo] = (0...puntiPlasma).map { k in
+        let th = Double(k) / Double(puntiPlasma) * 2 * .pi
+        return Angolo(c: cos(th), s: sin(th), s3: sin(3 * th), c3: cos(3 * th), s5: sin(5 * th), c5: cos(5 * th), s8: sin(8 * th), c8: cos(8 * th))
+    }
+
     var body: some View {
         TimelineView(.animation(paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
@@ -106,19 +116,20 @@ struct Reattore: View {
         var plasma = gc
         plasma.blendMode = .plusLighter
         let fili = 30
-        let punti = 110
+        let spinta: Double = 0.6 + 0.4 * battito
         for i in 0..<fili {
             let fi = Double(i)
             let raggio: Double = R * (0.86 + 0.0045 * fi) * (1 + 0.05 * energia)   // l'anello si allarga col discorso
+            let b1: Double = tv * 1.3 + fi * 0.21, b2: Double = -tv * 1.7 + fi * 0.37, b3: Double = tv * 2.3 + fi * 0.11
+            let (cb1, sb1, cb2, sb2, cb3, sb3) = (cos(b1), sin(b1), cos(b2), sin(b2), cos(b3), sin(b3))
+            let k0: Double = ampiezza * spinta
             var p = Path()
-            for k in 0...punti {
-                let th: Double = Double(k) / Double(punti) * 2 * .pi
-                let o1: Double = sin(3 * th + tv * 1.3 + fi * 0.21) * 0.55
-                let o2: Double = sin(5 * th - tv * 1.7 + fi * 0.37) * 0.30
-                let o3: Double = sin(8 * th + tv * 2.3 + fi * 0.11) * 0.15
-                let spinta: Double = 0.6 + 0.4 * battito
-                let r: Double = raggio * (1 + ampiezza * (o1 + o2 + o3) * spinta)
-                let pt = CGPoint(x: cx + r * cos(th), y: cy + r * sin(th))
+            for (k, a) in Reattore.angoli.enumerated() {
+                let o1: Double = (a.s3 * cb1 + a.c3 * sb1) * 0.55          // sin(3θ + b1)
+                let o2: Double = (a.s5 * cb2 + a.c5 * sb2) * 0.30          // sin(5θ + b2)
+                let o3: Double = (a.s8 * cb3 + a.c8 * sb3) * 0.15          // sin(8θ + b3)
+                let r: Double = raggio * (1 + k0 * (o1 + o2 + o3))
+                let pt = CGPoint(x: cx + r * a.c, y: cy + r * a.s)
                 if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
             }
             let luce: Double = 0.17 + 0.14 * (0.5 + 0.5 * sin(fi * 0.9 + t * 0.8)) + 0.2 * vol
@@ -127,6 +138,7 @@ struct Reattore: View {
 
         // 3. scintille che scorrono lungo l'anello
         let scintille = 90
+        var puntini = Path()                                   // 5 nov (punto 8): un riempimento solo, stesso colore per tutte
         for s in 0..<scintille {
             let fs = Double(s)
             let th: Double = fs / Double(scintille) * 2 * .pi + tv * (0.15 + 0.1 * sin(fs))
@@ -136,8 +148,9 @@ struct Reattore: View {
             let r: Double = R * (0.86 + 0.14 * caso) * (1 + ampiezza * (o1 + o2))
             let lato: Double = 1.2 + 1.3 * (0.5 + 0.5 * sin(fs * 3.1 + t * 3))
             let rett = CGRect(x: cx + r * cos(th) - lato / 2, y: cy + r * sin(th) - lato / 2, width: lato, height: lato)
-            plasma.fill(Path(ellipseIn: rett), with: .color(colore(mix, 0.8, schiarisci: 0.55)))
+            puntini.addEllipse(in: rett)
         }
+        plasma.fill(puntini, with: .color(colore(mix, 0.8, schiarisci: 0.55)))
 
         // 4. archi HUD che girano in senso opposto
         let archi: [(Double, Double, Double, Double)] = [(0.66, 0.25, 0.70, 1.5), (0.60, -0.4, 0.45, 3.0), (0.71, 0.12, 0.25, 1.0)]
@@ -151,16 +164,21 @@ struct Reattore: View {
         }
         // tacche sull'anello interno
         let tacche = 60
+        var lunghe = Path(), corte = Path()                    // 5 nov (punto 8): due tratti invece di 60, stessi segni
         for k in 0..<tacche {
             let th: Double = Double(k) / Double(tacche) * 2 * .pi - t * 0.08
             let lunga = k % 5 == 0
             let r1: Double = R * 0.54
             let r2: Double = R * (lunga ? 0.575 : 0.56)
-            var tac = Path()
-            tac.move(to: CGPoint(x: cx + r1 * cos(th), y: cy + r1 * sin(th)))
-            tac.addLine(to: CGPoint(x: cx + r2 * cos(th), y: cy + r2 * sin(th)))
-            gc.stroke(tac, with: .color(colore(mix, lunga ? 0.5 : 0.22)), lineWidth: 1)
+            let (ct, st) = (cos(th), sin(th))
+            if lunga {
+                lunghe.move(to: CGPoint(x: cx + r1 * ct, y: cy + r1 * st)); lunghe.addLine(to: CGPoint(x: cx + r2 * ct, y: cy + r2 * st))
+            } else {
+                corte.move(to: CGPoint(x: cx + r1 * ct, y: cy + r1 * st)); corte.addLine(to: CGPoint(x: cx + r2 * ct, y: cy + r2 * st))
+            }
         }
+        gc.stroke(lunghe, with: .color(colore(mix, 0.5)), lineWidth: 1)
+        gc.stroke(corte, with: .color(colore(mix, 0.22)), lineWidth: 1)
 
         // 5. il cuore: una sfera di particelle collegate da filamenti (una rete neurale) che ruota in 3D.
         //    In attesa respira piano; ascoltando si gonfia; pensando collassa in un nucleo e lancia scintille;
@@ -183,7 +201,8 @@ struct Reattore: View {
         let forzaOnda: Double = 0.25 + 0.9 * vol
         func onda(_ n: (x: Double, y: Double, z: Double)) -> Double {
             let p1 = n.x * 0.6 + n.y * 0.8, p2 = -n.x * 0.7 + n.y * 0.2 + n.z * 0.68
-            let a = exp(-pow((p1 - fronte1) / 0.18, 2)), b = exp(-pow((p2 - fronte2) / 0.18, 2))
+            let d1 = (p1 - fronte1) / 0.18, d2 = (p2 - fronte2) / 0.18
+            let a = exp(-d1 * d1), b = exp(-d2 * d2)
             return max(a, b) * forzaOnda
         }
         var proiettati: [(CGPoint, Double, Double)] = []           // punto, profondità, onda

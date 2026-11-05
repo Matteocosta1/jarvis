@@ -103,7 +103,7 @@ struct PosaPagina: ViewModifier {
             // luminosi»): sull'iPhone la fusione «screen» non passa fuori dalla pagina girata in 3D (la pagina restava piena).
             // Come nel mockup la pagina olografica lascia vedere il fondo e la griglia: è luce, metà trasparente.
             .opacity(1 - TiroPagina.trasparenza * posa.tinta)
-            .modifier(AloneOlo(forza: posa.ombra))
+            .modifier(AloneOlo(forza: posa.ombra, alfa: 1 - TiroPagina.trasparenza * posa.tinta))
             .scaleEffect(posa.scala)
             .rotation3DEffect(.degrees(posa.rotY), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
             .offset(x: posa.x, y: posa.y)
@@ -131,7 +131,7 @@ struct SegueTiro: ViewModifier {
             .clipShape(Ritaglio(raggio: v.raggio))
             .blendMode(v.tinta > 0.001 ? .screen : .normal)             // 5 nov: la pagina in mano è luce, come nel mockup
             .opacity(1 - TiroPagina.trasparenza * v.tinta)               // e lascia vedere il fondo, come nel mockup
-            .modifier(AloneOlo(forza: v.ombra))
+            .modifier(AloneOlo(forza: v.ombra, alfa: 1 - TiroPagina.trasparenza * v.tinta))
             .mask { MascheraLaser(riga: v.riga) }
             .modifier(Proiezione(x: v.x, y: v.y, scala: v.scala, inclina: v.inclina))
     }
@@ -497,6 +497,17 @@ struct StratoSezioniVista<Vista: View>: View {
         guard !naviga.bassoDaSfoglio, naviga.modo == .tira else { return }
         if tiro.pagina != nil {
             tiro.segui(t, v)
+            // 5 nov pomeriggio (punto 6 approvato): salendo piano, le pagine accanto si intravedono già dal 18% dell'altezza
+            // (al 25% sono al 40%); alla pausa oltre il 28% si completano come prima, con la vibrazione e il suono (paginePronte).
+            // Tornando sotto il 18% spariscono di nuovo.
+            if !tiro.agganciata && !naviga.suonoPagine {
+                let q = (max(0, -t.y) / altezza - TiroPagina.intravede) / (TiroPagina.intravedePiena - TiroPagina.intravede)
+                let si = TiroPagina.intravedeQuanto * Double(min(1, max(0, q)))
+                if abs(si - naviga.rivela) > 0.002 {
+                    var senza = Transaction(); senza.disablesAnimations = true
+                    withTransaction(senza) { naviga.rivela = si }
+                }
+            }
             return
         }
         let q = Double(min(1, max(0, -t.y) / (altezza * 0.45)))
@@ -566,6 +577,7 @@ struct StratoSezioniVista<Vista: View>: View {
     /// Poco, o tirata giù: la pagina torna com'era, con la velocità del dito (molla 0,36 s, smorzata 0,92).
     private func tornaGiu() {
         if tiro.agganciata { pagineVia() }
+        else if naviga.rivela > 0.001 { withAnimation(.easeOut(duration: 0.15)) { naviga.rivela = 0 } }   // quelle intraviste se ne vanno
         let id = tiro.pagina
         tiro.assesta(verso: TiroPagina.Viva(), fondo: 0, risposta: 0.36, smorza: 0.92) {
             guard naviga.modo == .tira, tiro.pagina == id else { return }
@@ -981,6 +993,9 @@ final class TiroPagina: NSObject, ObservableObject {
     // le misure (uguali al mockup)
     static let sMeta: CGFloat = 0.78                   // la pagina olografica a metà pagina («almeno il 30% più grandi», 3 nov sera)
     static let soglia: CGFloat = 0.28                  // le pagine: oltre il 28% dell'altezza
+    static let intravede: CGFloat = 0.18               // 5 nov (punto 6): le pagine accanto si intravedono dal 18%…
+    static let intravedePiena: CGFloat = 0.25          // …e al 25% sono al massimo prima della pausa…
+    static let intravedeQuanto: Double = 0.4           // …cioè al 40%
     static let pausaV: CGFloat = 140                   // fermo: sotto 140 punti al secondo…
     static let pausaT: Double = 0.06                   // …per 60 ms
     static let lancioV: CGFloat = 550                  // lanciata: oltre 550 punti al secondo…
@@ -1689,13 +1704,44 @@ struct RigheOlo: View {
 
 /// Il bagliore attorno alla pagina olografica, come .foglio.in-vista del mockup (0 0 46px al 22%); `forza` 0,45 = quello pieno.
 /// 5 nov pomeriggio (il signore: «troppo luminosi»): prima era quello più forte (26 px al 55% e 70 px al 25%).
+/// 5 nov pomeriggio (punto 5 approvato: «alone disegnato una volta»): prima era l'ombra della pagina intera, ricalcolata a ogni
+/// fotogramma (120 al secondo) mentre la pagina si muove. Ora è un'immagine sola, disegnata una volta all'avvio (il rettangolo
+/// arrotondato della pagina, sfocato di 23 punti, nel ciano), stirata alla misura della pagina e messa dietro: stessa luce, stesso
+/// colore, stessa forza (22%, e come prima segue quanto la pagina è piena). La pagina sopra non si ridisegna più per l'alone.
 struct AloneOlo: ViewModifier {
     let forza: Double
+    /// Quanto è piena la pagina (1 − trasparenza × tinta): l'ombra di prima prendeva la trasparenza della pagina.
+    var alfa: Double = 1
     func body(content: Content) -> some View {
         let k = min(1, max(0, forza / 0.45))
         content
-            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.22 * k), radius: k > 0 ? 23 : 0)
+            .background {
+                if k > 0.001 {
+                    Image(uiImage: AloneOlo.immagine)
+                        .resizable(capInsets: EdgeInsets(top: AloneOlo.bordo, leading: AloneOlo.bordo, bottom: AloneOlo.bordo, trailing: AloneOlo.bordo))
+                        .padding(-AloneOlo.fuori)
+                        .opacity(0.22 * k * alfa)
+                        .allowsHitTesting(false)
+                }
+            }
     }
+
+    /// Quanto la luce esce dalla pagina e quanto entra (la sfocatura di 23 punti si spegne entro 4 volte tanto).
+    static let fuori: CGFloat = 92
+    static let bordo: CGFloat = 184
+    /// L'alone in nove pezzi: gli angoli restano com'erano, il centro (4 punti) si stira a ogni misura di pagina.
+    static let immagine: UIImage = {
+        let lato = 2 * bordo + 4, forma = lato - 2 * fuori
+        let vista = RoundedRectangle(cornerRadius: 28, style: .continuous)
+            .fill(Color(red: 79 / 255, green: 227 / 255, blue: 1))
+            .frame(width: forma, height: forma)
+            .blur(radius: 23)
+            .frame(width: lato, height: lato)
+        let r = ImageRenderer(content: vista)
+        r.scale = 3
+        r.isOpaque = false
+        return r.uiImage ?? UIImage()
+    }()
 }
 
 /// 5 nov pomeriggio (il signore: «manca l'animazione quando li seleziono, come nel mockup»): la pagina scelta si materializza
@@ -1829,6 +1875,17 @@ final class GestoBassoSezioni: NSObject, UIGestureRecognizerDelegate {
     var finisce: (CGPoint, CGPoint) -> Void = { _, _ in }
     private weak var finestra: UIWindow?
     private var riconoscitore: UIPanGestureRecognizer?
+    /// 5 nov pomeriggio (punto 4 approvato: «partenza senza scatto, come Apple»): iOS riconosce lo swipe dopo una decina di
+    /// punti, e prima la pagina saltava subito di quei punti. Ora parte da ferma sotto il dito e li recupera dolcemente nei 48
+    /// punti successivi: dopo, il punto toccato è di nuovo esattamente sotto il dito, come prima.
+    private var scatto: CGPoint = .zero
+    private static let recupero: CGFloat = 48
+
+    private func senzaScatto(_ t: CGPoint) -> CGPoint {
+        let d = CGPoint(x: t.x - scatto.x, y: t.y - scatto.y)
+        let u = min(1, hypot(d.x, d.y) / GestoBassoSezioni.recupero), k = u * u * (3 - 2 * u)
+        return CGPoint(x: d.x + scatto.x * k, y: d.y + scatto.y * k)
+    }
 
     func installa() {
         guard riconoscitore == nil, let w = FasciaAlta.finestra else { return }
@@ -1845,10 +1902,11 @@ final class GestoBassoSezioni: NSObject, UIGestureRecognizerDelegate {
         switch r.state {
         case .began:
             let p = r.location(in: finestra)
+            scatto = t
             inizia(CGPoint(x: p.x - t.x, y: p.y - t.y))
-            segue(t, v)
+            segue(senzaScatto(t), v)
         case .changed:
-            segue(t, v)
+            segue(senzaScatto(t), v)
         case .ended:
             finisce(t, v)
         case .cancelled, .failed:

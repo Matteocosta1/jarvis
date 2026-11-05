@@ -11,11 +11,14 @@ enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 
 /// 5 nov (il signore: «apertura delle sezioni da circa 1 s a 0,4-0,5 s, uguale ovunque»): i tempi di apertura di tutte le
 /// schede e schermate del polso, come sull'iPhone.
+/// 5 nov pomeriggio (punti 1 e 2 approvati, come l'iPhone): caricamento 0,28 s, stampa 0,32 s, copertura che sfuma in 0,25 s.
 enum AperturaPolso {
-    /// Il caricamento HUD (prima 0,9 s nelle schede, 1,1 s nelle pagine).
-    static let caricamento = 0.45
-    /// La scheda che si «stampa» dall'alto (prima 0,8 s).
-    static let stampa = 0.5
+    /// Il caricamento HUD (prima 0,45 s; ancora prima 0,9 s nelle schede, 1,1 s nelle pagine).
+    static let caricamento = 0.28
+    /// La scheda che si «stampa» dall'alto (prima 0,5 s; ancora prima 0,8 s).
+    static let stampa = 0.32
+    /// La copertura del caricamento che sfuma (prima 0,4 s).
+    static let dissolvenza = 0.25
 }
 
 /// Una scheda sull'orologio: il nome in alto, il caricamento HUD (anelli, barra, sistemi) e poi il contenuto
@@ -150,7 +153,7 @@ struct AperturaOrologio: ViewModifier {
                 guard !Task.isCancelled else { return }   // uscito prima della fine: niente «pronta» a pagina chiusa
                 WKInterfaceDevice.current().play(.success)
                 SuoniOrologio.schedaPronta()
-                withAnimation(.easeOut(duration: 0.4)) { coperto = false }
+                withAnimation(.easeOut(duration: AperturaPolso.dissolvenza)) { coperto = false }
             }
     }
 }

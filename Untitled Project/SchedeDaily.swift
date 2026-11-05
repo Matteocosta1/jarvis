@@ -574,7 +574,7 @@ struct VistaSpesa: View {
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(caricata ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
-                .animation(.easeOut(duration: 0.4), value: caricata)
+                .animation(.easeOut(duration: Apertura.dissolvenza), value: caricata)
                 .modifier(ConBarraChiudi(tinta: tinta) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
                 if !caricata && !errore {
                     // il titolo resta in alto mentre carica, come nelle altre schede

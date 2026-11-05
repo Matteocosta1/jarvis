@@ -65,7 +65,7 @@ struct VistaBea: View {
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
-                .animation(.easeOut(duration: 0.4), value: dati != nil)
+                .animation(.easeOut(duration: Apertura.dissolvenza), value: dati != nil)
                 .modifier(ConBarraChiudi(tinta: tinta) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
                 if dati == nil && !errore {
                     // il titolo resta in alto mentre carica, come nelle altre schede

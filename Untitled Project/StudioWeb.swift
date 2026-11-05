@@ -71,7 +71,7 @@ struct VistaStudio: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard coperto else { return }
             Suoni.schedaPronta()
-            withAnimation(.easeOut(duration: 0.4)) { coperto = false }
+            withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
         }
     }
 }

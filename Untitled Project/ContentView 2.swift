@@ -2073,31 +2073,43 @@ struct AnelliHUD: View {
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let R = Double(min(size.width, size.height)) / 2
                 let base = caldo ? Color.orange : Color.ciano
-                // corona esterna: 72 tacche, ogni sesta più lunga, che scorrono piano
+                // corona esterna: 72 tacche, ogni sesta più lunga, che scorrono piano. 5 nov (punto 9 approvato: «stesso disegno,
+                // meno lavoro»): due tratti invece di 72 (le tacche non si toccano, quindi il disegno è lo stesso)
+                var lunghe = Path(), corte = Path()
                 for k in 0..<72 {
                     let th = Double(k) / 72 * 2 * .pi + t * 0.05 * fretta
                     let lunga = k % 6 == 0
-                    var p = Path()
-                    p.move(to: CGPoint(x: c.x + R * 0.97 * cos(th), y: c.y + R * 0.97 * sin(th)))
-                    p.addLine(to: CGPoint(x: c.x + R * (lunga ? 0.91 : 0.945) * cos(th), y: c.y + R * (lunga ? 0.91 : 0.945) * sin(th)))
-                    gc.stroke(p, with: .color(base.opacity(lunga ? 0.55 : 0.25)), lineWidth: lunga ? 1.4 : 0.8)
-                }
-                // segmenti che girano in senso opposto su due raggi
-                let segmenti: [(Double, Double, Double, Int)] = [(0.88, 0.35, 0.18, 3), (0.80, -0.6, 0.08, 5)]
-                for (fr, vel, lung, quanti) in segmenti {
-                    for q in 0..<quanti {
-                        let inizio = Angle(radians: t * vel * fretta + Double(q) * 2 * .pi / Double(quanti))
-                        var arco = Path()
-                        arco.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
-                        gc.stroke(arco, with: .color(base.opacity(0.5)), style: StrokeStyle(lineWidth: fr > 0.85 ? 2.2 : 1.2, lineCap: .round))
+                    let (ct, st) = (cos(th), sin(th)), r2 = R * (lunga ? 0.91 : 0.945)
+                    if lunga {
+                        lunghe.move(to: CGPoint(x: c.x + R * 0.97 * ct, y: c.y + R * 0.97 * st)); lunghe.addLine(to: CGPoint(x: c.x + r2 * ct, y: c.y + r2 * st))
+                    } else {
+                        corte.move(to: CGPoint(x: c.x + R * 0.97 * ct, y: c.y + R * 0.97 * st)); corte.addLine(to: CGPoint(x: c.x + r2 * ct, y: c.y + r2 * st))
                     }
                 }
-                // piccoli numeri «telemetrici» ai quattro punti cardinali
-                let etichette = ["0", "90", "180", "270"]
-                for (n, e) in etichette.enumerated() {
+                gc.stroke(lunghe, with: .color(base.opacity(0.55)), lineWidth: 1.4)
+                gc.stroke(corte, with: .color(base.opacity(0.25)), lineWidth: 0.8)
+                // segmenti che girano in senso opposto su due raggi (uno per raggio: gli archi dello stesso raggio non si toccano)
+                let segmenti: [(Double, Double, Double, Int)] = [(0.88, 0.35, 0.18, 3), (0.80, -0.6, 0.08, 5)]
+                for (fr, vel, lung, quanti) in segmenti {
+                    var archi = Path()
+                    for q in 0..<quanti {
+                        let inizio = Angle(radians: t * vel * fretta + Double(q) * 2 * .pi / Double(quanti))
+                        var arco = Path()                              // un pezzo a sé: addPath non lo lega al precedente
+                        arco.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
+                        archi.addPath(arco)
+                    }
+                    gc.stroke(archi, with: .color(base.opacity(0.5)), style: StrokeStyle(lineWidth: fr > 0.85 ? 2.2 : 1.2, lineCap: .round))
+                }
+                // piccoli numeri «telemetrici» ai quattro punti cardinali: scritti una volta (i simboli della tela), poi solo spostati
+                for n in 0..<4 {
                     let th = Double(n) * .pi / 2 - .pi / 2 + t * 0.05 * fretta
                     let pt = CGPoint(x: c.x + R * 0.86 * cos(th), y: c.y + R * 0.86 * sin(th))
-                    gc.draw(Text(e).font(.system(size: 7, weight: .medium, design: .monospaced)).foregroundStyle(base.opacity(0.6)), at: pt)
+                    if let s = gc.resolveSymbol(id: n) { gc.draw(s, at: pt) }
+                }
+            } symbols: {
+                ForEach(0..<4, id: \.self) { n in
+                    Text(["0", "90", "180", "270"][n]).font(.system(size: 7, weight: .medium, design: .monospaced))
+                        .foregroundStyle((caldo ? Color.orange : Color.ciano).opacity(0.6)).tag(n)
                 }
             }
             .animation(.easeInOut(duration: 0.8), value: caldo)
