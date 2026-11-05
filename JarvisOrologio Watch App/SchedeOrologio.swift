@@ -291,7 +291,8 @@ struct VistaSonnoOrologio: View {
     var body: some View {
         CorniceOrologio(titolo: "Sonno", pronto: caricato) {
             HStack(spacing: 6) {
-                if let n = notte { OlogrammaSonnoProve(dati: n, piccolo: true).frame(width: 46, height: 46) }
+                // 5 nov sera (come l'iPhone): l'ologramma c'è sempre, anche senza i dati della notte
+                OlogrammaSonnoProve(dati: notte ?? SonnoOlo(), piccolo: true).frame(width: 46, height: 46)
                 ValoreOrologio(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari)
             }
             if let f = oggi?.fasi { Text(f).font(.system(size: 10)).foregroundStyle(.secondary) }
