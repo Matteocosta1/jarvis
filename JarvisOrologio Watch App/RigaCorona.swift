@@ -16,7 +16,7 @@ struct RigaCorona<Contenuto: View>: View {
 
     /// La pagina avvisa di ogni tocco (coordinate globali): fuori dalla riga, la corona torna alla pagina.
     static var toccoPagina: Notification.Name { Notification.Name("JarvisPolsoToccoPagina") }
-    /// La riga ha lasciato la corona (4 nov: nella schermata principale la riprendono le icone, `CoronaBarra`).
+    /// La riga ha lasciato la corona: torna alla pagina (5 nov: le icone non la prendono più, la corona non le comanda).
     static var lascia: Notification.Name { Notification.Name("JarvisPolsoRigaLascia") }
 
     var body: some View {

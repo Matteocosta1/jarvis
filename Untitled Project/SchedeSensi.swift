@@ -1,5 +1,7 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
+import Combine
 import Charts
 import MusicKit
 import UIKit
@@ -24,6 +26,10 @@ struct VistaShazam: View {
     }
 
     enum Stato: Equatable { case fermo, ascolto, trovata, niente(String) }
+    /// 5 nov (il signore: «Shazam deve attivarsi quando tocco il logo, invece parte da solo»): aperto dall'icona aspetta il tocco
+    /// sul logo; chiesto a voce («Jarvis, che canzone è?», «Jarvis, shazam») ascolta subito, come nel mockup (ASCOLTA). Lo mette
+    /// ContentView prima di aprirlo (o di riportarlo davanti).
+    static var ascoltaSubito = false
 
     @State private var stato: Stato = .fermo
     @State private var storico: [Trovata] = []
@@ -53,9 +59,18 @@ struct VistaShazam: View {
         .overlay(alignment: .bottom) { if let t = aperta { player(t) } }
         .onAppear { storico = VistaShazam.leggi() }
         .task {
-            try? await Task.sleep(for: .seconds(1.7))
+            guard VistaShazam.ascoltaSubito else { return }                // dall'icona: aspetta il tocco sul logo
+            VistaShazam.ascoltaSubito = false
+            try? await Task.sleep(for: .seconds(Apertura.caricamento + 0.8))   // dopo i suoni d'apertura (il microfono cambia l'audio)
             guard !Task.isCancelled else { return }
             await ascolta()
+        }
+        // già aperto (davanti o dietro) e chiesto di nuovo a voce: ascolta lì, sul posto (strada B)
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+            guard (n.userInfo?["reparto"] as? String) == Reparto.shazam.rawValue, VistaShazam.ascoltaSubito else { return }
+            VistaShazam.ascoltaSubito = false
+            guard stato != .ascolto else { return }
+            Task { await ascolta() }
         }
         .task { await lettore.segui() }
         .confirmationDialog("Cancellare tutte le canzoni riconosciute?", isPresented: $chiediCancella, titleVisibility: .visible) {
@@ -564,19 +579,17 @@ struct VistaSerata: View {
             Valore(titolo: "BAR", valore: euro(n(tot["bar_lordo"])), sotto: "contanti \(euro(n(bar["contanti"]))) · POS \(euro(n(bar["pos"])))", tinta: tinta)
         }
 
-        Pannello(titolo: "DA DOVE ARRIVANO I SOLDI", tinta: tinta) {
+        Pannello(titolo: "DA DOVE ARRIVANO I SOLDI", tinta: tinta, olografico: true) {
             let fette: [(String, Double)] = [("Ingressi contanti", n(ing["contanti"])), ("Ingressi POS", n(ing["pos"])),
                                               ("Resident Advisor", n(ing["resident_advisor"])), ("Bar contanti", n(bar["contanti"])), ("Bar POS", n(bar["pos"]))].filter { $0.1 > 0 }
             if fette.isEmpty { Text("Nessun incasso registrato.").font(.footnote).foregroundStyle(Color.tenue) }
             else {
-                Chart(fette, id: \.0) { nome, v in
-                    SectorMark(angle: .value("Euro", v), innerRadius: .ratio(0.6), angularInset: 1.5)
-                        .foregroundStyle(by: .value("Voce", nome))
-                        .cornerRadius(3)
-                }
-                .chartForegroundStyleScale(range: [tinta, tinta.opacity(0.6), Color(red: 1.0, green: 0.8, blue: 0.4), Color(red: 0.4, green: 0.8, blue: 1.0), Color(red: 0.4, green: 0.6, blue: 1.0)])
-                .chartLegend(position: .bottom, spacing: 8)
-                .frame(height: 190)
+                // 11.0 (4), come il mockup v261: l'anello di monete (una fetta per voce, alta quanto pesa), i soldi che arrivano
+                // e l'incasso che sale al centro; sotto, voce per voce, quanto e che parte del totale
+                OlogrammaSoldi(dati: DatiSoldi(fonti: fette.map { DatiSoldi.Fonte(nome: $0.0, valore: $0.1) }))
+                    .frame(height: 220)
+                    .id(scelta?.id)                              // un'altra serata: l'anello riparte da capo
+                legendaSoldi(fette)
             }
         }
 
@@ -621,6 +634,25 @@ struct VistaSerata: View {
         if let note = c["note"] as? String { Text(note).font(.system(size: 11)).foregroundStyle(Color.tenue) }
         TastoJarvis(testo: "Analisi di JARVIS", icona: "waveform", tinta: tinta) {
             chiedi("Analizzami la serata \(scelta?.nome ?? "") del \(scelta?.data ?? ""): cosa ha funzionato, dove abbiamo perso soldi e cosa cambierei la prossima volta.")
+        }
+    }
+
+    /// La legenda dell'anello: il quadretto (più acceso dove si incassa di più), la voce, gli euro e la percentuale.
+    private func legendaSoldi(_ fette: [(String, Double)]) -> some View {
+        let tot = max(1, fette.reduce(0) { $0 + $1.1 }), massimo = max(1, fette.map(\.1).max() ?? 1)
+        return VStack(spacing: 7) {
+            ForEach(fette, id: \.0) { nome, v in
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 2).fill(tinta).frame(width: 8, height: 8)
+                        .shadow(color: tinta.opacity(0.7), radius: 3)
+                        .opacity(0.45 + 0.55 * v / massimo)
+                    Text(nome).font(.system(size: 13)).foregroundStyle(.white)
+                    Spacer(minLength: 6)
+                    Text(euro(v)).font(.system(size: 13, weight: .semibold, design: .monospaced)).foregroundStyle(tinta).monospacedDigit()
+                    Text("\(Int((v / tot * 100).rounded()))%").font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.tenue).frame(width: 40, alignment: .trailing)
+                }
+            }
         }
     }
 

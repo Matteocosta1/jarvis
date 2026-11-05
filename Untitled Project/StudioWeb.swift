@@ -63,7 +63,7 @@ struct VistaStudio: View {
     private func scopri() {
         guard coperto else { return }
         Task { @MainActor in
-            let resta = 1.1 - Date().timeIntervalSince(apertaDa)        // come AperturaHUD delle altre schede
+            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)        // come AperturaHUD delle altre schede
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard coperto else { return }
             Suoni.schedaPronta()
@@ -628,13 +628,17 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         }
         let conFoto = a.sezione == "Social"
             ? "window.SOCIAL_DA = { foto: im, da: 'occhi', dida: \(js(a.didascalia ?? ""))\(a.video != nil ? ", video: \(max(1, a.secondiVideo))" : "") };" : "window.STUDIO_DA = { foto: im, nome: \(js(a.nomeFoto)) };"
+        // 5 nov (foto e video del signore: in Studio e Social la testata finiva sotto l'ora e la Dynamic Island): nel contenitore
+        // della MARK XI la pagina web non riceve più il margine dell'ora (env(safe-area-inset-top) vale 0). Il margine vero lo dà
+        // l'app, dalla finestra: la testata scende sotto l'ora come prima, su ogni iPhone.
+        let alto = Int((FasciaAlta.finestra?.safeAreaInsets.top ?? 59).rounded())
         return """
         (function(){
           var post = function(o){ try { window.webkit.messageHandlers.jarvis.postMessage(o); } catch (e) {} };
           var st = document.createElement('style');
           st.textContent = 'html,:root{padding:0!important}body{padding:0!important;margin:0!important;display:block!important;background:#020304!important;overflow:hidden!important}'
             + 'body>*:not(#cornice){display:none!important}#cornice,#cornice>.telefono{width:100vw!important;height:100vh!important;transform:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}'
-            + '.isola{opacity:0!important}.sd-su,.sc-su{padding-top:calc(env(safe-area-inset-top,0px) + 6px)!important}'
+            + '.isola{opacity:0!important}.sd-su,.sc-su{padding-top:calc(max(env(safe-area-inset-top,0px), \(alto)px) + 6px)!important}'
             + '.sd-banco{min-height:min(240px,26vh)!important}'
             + '#tendina{display:none!important}';   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
           document.head.appendChild(st);

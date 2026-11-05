@@ -421,7 +421,7 @@ Il signore ha installato la 11.0 (3) e ha mandato foto e un video (ScreenRecordi
 5. Le icone in alto (Social, Sound, Studio, Sistemi, cestino, Impostazioni) si aprono da sole e si toccano male: nel video Sound si apre da solo all'avvio.
 6. Shazam parte da solo: deve ascoltare solo quando si tocca il logo olografico.
 7. Bea, «Ti penso»: compare «JARVIS scrive…» e non succede nulla. Causa: credito dell'API Anthropic finito (registro del cervello: «credit balance is too low»), da ricaricare su https://console.anthropic.com/settings/billing. Nell'app: un messaggio d'errore quando il cervello non risponde.
-8. L'animazione dell'aggancio (swipe veloce) dentro il reattore sale troppo in alto, verso destra, ed è diversa dal mockup: da studiare e rifare da capo.
+8. L'animazione dell'aggancio (swipe veloce) dentro il reattore sale troppo in alto, verso destra, ed è diversa dal mockup: da studiare e rifare da capo. Il signore (04:07): «deve essere IDENTICO al mockup di ORIGINE · AGGANCIO II» (`dissolviOrigineAggancio2`).
 
 **Design (prima nel mockup, poi nell'app)**
 9. Click wheel: solo la GHIERA (NODI e FASCIO scartati; freccina e mirino tolti). Il reattore davvero in secondo piano: molto trasparente e meno luminoso; la ghiera prende la scena. L'ologramma tenue mentre si ruota, si illumina quando l'animazione finisce ed è fermo.
@@ -433,3 +433,24 @@ Il signore ha installato la 11.0 (3) e ha mandato foto e un video (ScreenRecordi
 13. Ruotando a destra o a sinistra le icone scorrono velocissime e non si fermano più, finché l'app non si chiude.
 14. Mentre scorrono, JARVIS si illumina d'arancio e prova ad ascoltare: il microfono va spento mentre le icone ruotano, e si riapre dopo la scelta.
 15. La corona non deve più comandare le icone (il signore: «avevo sbagliato io»; annulla la scelta del 4 nov).
+
+## Build dopo la 11.0 (3) — 5 nov mattina: cosa è fatto (numero di build da chiedere al signore)
+Mockup aggiornato prima dell'app: v260 (aperture 0,45 s, Dock) e v261 (ologrammi nuovi), pubblicato. Dialogo e cervello non toccati (il signore: «voglio che non vengano toccati dialogo e cervello»); l'unico ritocco nel motore del polso è l'interruttore del microfono chiesto al punto 14.
+
+| # | Cosa | Stato |
+|---|------|-------|
+| 1 | Barra grigia col «Chiudi» | Fatto: «Chiudi» in una riga sua sopra la pagina (BarraChiudi / ConBarraChiudi), barra di iOS nascosta in tutte le sezioni; Impostazioni: «Fatto» uguale |
+| 2 | Studio e Social | Testata sotto l'ora: fatto (margine preso dalla finestra). Vista dei post in ologramma: **non fatta**, serve sapere quale schermata e cosa non va (foto). Swipe dal basso → Home e riavvio: **non risolto**, serve il registro del crash (Impostazioni › Privacy e sicurezza › Analisi e miglioramenti › Dati analisi, file «Jarvis-2026-11-05…» o «JetsamEvent-2026-11-05…») |
+| 3 | Pagine olografiche | Fatto: colpi Core Haptics più forti (anche col microfono aperto); pagina in luce come il mockup (ciano in «color», righe al 42%, bordo, pagina in «screen») |
+| 4 | Sentinella e Trainer | Sentinella: immagine a 30 al secondo su un CALayer, Vision su una coda sua. Trainer: il richiamo «Jarvis» si riaccende 0,45 s dopo la chiusura (prima fermava la discesa). Da verificare sul telefono |
+| 5 | Icone in alto | Fatto come il Dock: un po' più distanziate (3,5 punti per lato), il primo tocco le ingrandisce, il tocco sull'icona grande la apre; alzando il dito non si apre niente; restano grandi 2,5 s |
+| 6 | Shazam | Fatto (iPhone e polso): dall'icona aspetta il tocco sul logo; chiesto a voce ascolta subito |
+| 7 | «Ti penso» | Fatto l'avviso a schermo. Il credito Anthropic va ricaricato dal signore |
+| 8 | Aggancio | Causa trovata e corretta (il reattore letto da gesti preparati prima della misura: la pagina volava in alto a sinistra); vola nel reattore come ORIGINE · AGGANCIO II. Da verificare sul telefono |
+| 9 | Ghiera | Fatta come il mockup v259 (anello, 120 tacche, numeri, contatore; reattore velato al 3%, ologramma tenue mentre gira) |
+| 10 | Ologrammi Diario, Sonno, Briefing, Spesa, Serata | Fatti come il mockup v261, sull'iPhone e (piccoli) sul polso (OlogrammiNuovi.swift). Serata: l'anello dei soldi al posto della ciambella, con la legenda. Sul polso il Briefing non ha gli impegni (l'orologio non ha il permesso del calendario) |
+| 11 | Bea dalla foto | Fatto sull'iPhone: FOTO › selettore di Apple › Vision ritaglia la persona › ologramma salvato solo sul telefono (fuori dal backup iCloud). Sul polso no (servirebbe mandare l'immagine all'orologio: da decidere) |
+| 12 | Aperture 0,45 s | Fatto ovunque, iPhone e polso (Apertura / AperturaPolso); i comandi a voce dentro le sezioni partono a suoni finiti (1,15 s) |
+| 13 | Polso, icone che non si fermano | Fatto: la molla della barra risolta esatta (prima divergeva coi fotogrammi lenti); la barra si ridisegna solo quando cambia |
+| 14 | Polso, microfono durante la rotazione | Fatto: con la ruota viva niente ascolto d'attesa; si riapre spenta la ruota (scelta o 5 s) |
+| 15 | Polso, corona | Fatto: tolta CoronaBarra, la corona resta della pagina |

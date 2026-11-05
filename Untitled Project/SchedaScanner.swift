@@ -55,7 +55,7 @@ struct VistaScanner: View {
             // i comandi a voce, come nella Sentinella: l'ascolto parte a suono d'apertura finito
             orecchio.dentro = .scanner
             orecchio.comando = { c in voce(c) }
-            try? await Task.sleep(for: .seconds(1.8))
+            try? await Task.sleep(for: .seconds(Apertura.orecchio))
             guard !Task.isCancelled else { return }
             orecchio.avvia()
         }

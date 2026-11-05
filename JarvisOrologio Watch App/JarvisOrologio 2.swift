@@ -153,6 +153,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     var principaleVisibile = true {
         didSet { if principaleVisibile { programmaAttesa() } else { chiudiAttesa() } }
     }
+    /// 5 nov (il signore: «mentre scorro le icone JARVIS si illumina di arancio e cerca di ascoltare: il microfono va spento
+    /// mentre le icone sono in rotazione, fino alla scelta»): la ruota delle icone è viva (la imposta `VistaOrologio`). Intanto
+    /// niente attesa col microfono (gli scatti e i click della ruota sembravano la sua voce); si riapre quando la ruota si spegne.
+    var iconeInMoto = false {
+        didSet {
+            guard iconeInMoto != oldValue else { return }
+            if iconeInMoto { chiudiAttesa() } else { programmaAttesa() }
+        }
+    }
     /// Quanto forte arriva di solito la voce del signore al microfono del polso (dB), imparato dalle sue frasi vere.
     private static var voceNota: Float? {
         get { UserDefaults.standard.object(forKey: "voceNotaOrologio") as? Float }
@@ -821,7 +830,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Si può ascoltare in attesa? Schermata principale davanti, polso alzato, microfono non spento a mano, «Riascolto» acceso,
     /// nessun altro che usa l'audio (Shazam, la voce della Sentinella, l'avviso della linea).
     private var attesaPossibile: Bool {
-        avvioFinito && fase == .attesa && primoPiano && principaleVisibile && !micSpento
+        avvioFinito && fase == .attesa && primoPiano && principaleVisibile && !iconeInMoto && !micSpento
             && (UserDefaults.standard.object(forKey: ImpostazioniPolso.riascolto) as? Bool ?? true)
             && !Musica.inAscolto && !SentinellaOrologio.condiviso.parla && !sintesiInciso.isSpeaking
             && AVAudioApplication.shared.recordPermission == .granted

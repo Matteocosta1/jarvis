@@ -139,7 +139,7 @@ struct Interprete: View {
             motore.suComando = { c in comando(c) }          // «Jarvis, …» detto durante il suo turno: è un comando, non si traduce
         }
         .task {
-            try? await Task.sleep(for: .seconds(1.8))      // dopo il suono d'apertura, come nella Sentinella
+            try? await Task.sleep(for: .seconds(Apertura.orecchio))      // dopo il suono d'apertura, come nella Sentinella
             if !Task.isCancelled, !chiuso, motore.fase == .attesa { orecchio.avvia() }
         }
         // il microfono dei comandi resta acceso solo tra un turno e l'altro: nei turni il microfono è dell'Interprete

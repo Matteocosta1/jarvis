@@ -130,7 +130,7 @@ struct Allenatore: View {
             if MotoreAllenatore.ologrammaRichiesto { MotoreAllenatore.ologrammaRichiesto = false; motore.giunto = .ologramma }
             await motore.avvia()
             // i comandi a voce: dopo il suono d'apertura (come nella Sentinella), sempre con «Jarvis» davanti
-            try? await Task.sleep(for: .seconds(1.8))
+            try? await Task.sleep(for: .seconds(Apertura.orecchio))
             guard !Task.isCancelled else { return }
             orecchio.dentro = .allenatore
             orecchio.comando = { c in

@@ -76,6 +76,32 @@ nonisolated enum SaluteStorica {
         return perGiorno.mapValues { unione($0) / 3600 }
     }
 
+    /// 11.0 (4), per l'ologramma del Sonno sull'orologio: la notte scorsa a tratti (da, a, fase: 0 sveglio, 1 REM, 2 leggero,
+    /// 3 profondo), dalle 18 di ieri alle 10 di oggi. Se c'è l'orologio, solo i suoi dati (come la scheda Sonno dell'iPhone).
+    static func notte() async -> [(Date, Date, Int)] {
+        guard HKHealthStore.isHealthDataAvailable() else { return [] }
+        try? await negozio.requestAuthorization(toShare: [], read: [HKCategoryType(.sleepAnalysis)])
+        let oggi = Calendar.current.startOfDay(for: Date())
+        let da = oggi.addingTimeInterval(-6 * 3600), a = oggi.addingTimeInterval(10 * 3600)
+        let campioni: [HKCategorySample] = await withCheckedContinuation { (c: CheckedContinuation<[HKCategorySample], Never>) in
+            let q = HKSampleQuery(sampleType: HKCategoryType(.sleepAnalysis), predicate: HKQuery.predicateForSamples(withStart: da, end: a),
+                                  limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]) { _, s, _ in
+                c.resume(returning: s as? [HKCategorySample] ?? [])
+            }
+            negozio.execute(q)
+        }
+        let daOrologio = campioni.filter { ($0.sourceRevision.productType ?? "").hasPrefix("Watch") }
+        return (daOrologio.isEmpty ? campioni : daOrologio).compactMap { s -> (Date, Date, Int)? in
+            switch s.value {
+            case HKCategoryValueSleepAnalysis.awake.rawValue: return (s.startDate, s.endDate, 0)
+            case HKCategoryValueSleepAnalysis.asleepREM.rawValue: return (s.startDate, s.endDate, 1)
+            case HKCategoryValueSleepAnalysis.asleepCore.rawValue, HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue: return (s.startDate, s.endDate, 2)
+            case HKCategoryValueSleepAnalysis.asleepDeep.rawValue: return (s.startDate, s.endDate, 3)
+            default: return nil                                    // «a letto» non è sonno
+            }
+        }
+    }
+
     /// Secondi coperti da intervalli che possono sovrapporsi, contati una volta sola.
     private static func unione(_ campioni: [HKCategorySample]) -> TimeInterval {
         let ordinati = campioni.map { ($0.startDate, $0.endDate) }.sorted { $0.0 < $1.0 }

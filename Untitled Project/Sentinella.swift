@@ -30,7 +30,13 @@ final class Sentinella: ObservableObject {
     }
 
     @Published private(set) var attiva = false
-    @Published private(set) var quadro: CGImage?          // l'immagine da mostrare (già in visione notturna se serve)
+    /// 5 nov (il signore: «l'animazione di Sentinella scatta»): l'immagine arrivava a 12 fotogrammi al secondo e passava da
+    /// SwiftUI, che ridisegnava tutta la schermata a ogni fotogramma. Ora arriva a 30 al secondo e la disegna un CALayer
+    /// (SchermoSentinella), fuori da SwiftUI: qui restano solo «c'è l'immagine» e le sue proporzioni.
+    @Published private(set) var inVista = false
+    @Published private(set) var proporzione = CGSize(width: 3, height: 4)
+    /// Lo schermo che mostra l'immagine (quello della schermata aperta).
+    weak var schermo: SchermoSentinella.Vista?
     @Published private(set) var bersagli: [Bersaglio] = []
     @Published private(set) var notte = false
     @Published private(set) var violato = false           // allarme in corso: tutto rosso per qualche secondo
@@ -87,7 +93,8 @@ final class Sentinella: ObservableObject {
         motore.ferma()
         attiva = false
         bersagli = []
-        quadro = nil
+        inVista = false
+        schermo?.layer.contents = nil
         violato = false
         UIApplication.shared.isIdleTimerDisabled = false
         if let a = restaSveglio { ProcessInfo.processInfo.endActivity(a); restaSveglio = nil }   // il Mac torna a fare come sempre
@@ -97,7 +104,10 @@ final class Sentinella: ObservableObject {
 
     private func nuovoQuadro(_ immagine: CGImage, notte: Bool) {
         guard attiva else { return }
-        quadro = immagine
+        schermo?.layer.contents = immagine
+        let p = CGSize(width: immagine.width, height: immagine.height)
+        if proporzione != p { proporzione = p }
+        if !inVista { inVista = true }
         if self.notte != notte { withAnimation(.easeInOut(duration: 0.6)) { self.notte = notte } }
     }
 
@@ -205,6 +215,10 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
     private let sessione = AVCaptureSession()
     private let uscita = AVCaptureVideoDataOutput()
     private let coda = DispatchQueue(label: "it.discosizer.jarvis.sentinella")
+    /// 5 nov: il riconoscimento su una coda sua, così mentre Vision lavora (30–60 ms) le immagini continuano ad arrivare a 30 al
+    /// secondo (prima, sulla stessa coda della fotocamera, faceva saltare fotogrammi tre volte al secondo).
+    private let codaAnalisi = DispatchQueue(label: "it.discosizer.jarvis.sentinella.analisi", qos: .userInitiated)
+    private var analizzando = false                    // solo sulla coda della fotocamera
     private let contesto = CIContext(options: [.cacheIntermediates: false])
     private var configurata = false
     private var notte = false
@@ -273,20 +287,37 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
         let mac = ProcessInfo.processInfo.isiOSAppOnMac
         let raddrizzata = CIImage(cvPixelBuffer: pixel).oriented(mac ? .upMirrored : .right)
 
-        // 1) l'immagine da mostrare, circa 12 al secondo
-        if adesso.timeIntervalSince(ultimoQuadro) > 0.08, let f = suQuadro {
+        // 1) l'immagine da mostrare: tutti i fotogrammi della fotocamera, 30 al secondo (5 nov: prima 12, e «scattava»)
+        if adesso.timeIntervalSince(ultimoQuadro) > 0.025, let f = suQuadro {
             ultimoQuadro = adesso
             let vista = notte ? MotoreSentinella.visioneNotturna(raddrizzata) : raddrizzata
             if let cg = contesto.createCGImage(vista, from: vista.extent) { f(cg, notte) }
         }
 
-        // 2) riconoscimento di persone e animali, circa 3 volte al secondo
-        guard adesso.timeIntervalSince(ultimaAnalisi) > 0.33, let a = suAnalisi else { return }
+        // 2) riconoscimento di persone e animali, circa 3 volte al secondo, sulla sua coda (uno alla volta)
+        guard adesso.timeIntervalSince(ultimaAnalisi) > 0.33, !analizzando, let a = suAnalisi else { return }
         ultimaAnalisi = adesso
+        analizzando = true
+        let f = Fotogramma(pixel: pixel, immagine: raddrizzata, notte: notte, mac: mac)
+        codaAnalisi.async {
+            self.analizza(f, consegna: a)
+            self.coda.async { self.analizzando = false }
+        }
+    }
+
+    /// Un fotogramma da analizzare (il buffer della fotocamera resta in mano solo per l'analisi, uno alla volta).
+    private nonisolated struct Fotogramma: @unchecked Sendable {
+        let pixel: CVPixelBuffer
+        let immagine: CIImage
+        let notte: Bool
+        let mac: Bool
+    }
+
+    private func analizza(_ f: Fotogramma, consegna a: @Sendable ([Sentinella.Bersaglio], Data?) -> Void) {
         let persone = VNDetectHumanRectanglesRequest()
         persone.upperBodyOnly = false
         let animali = VNRecognizeAnimalsRequest()
-        let gestore = VNImageRequestHandler(cvPixelBuffer: pixel, orientation: mac ? .upMirrored : .right)
+        let gestore = VNImageRequestHandler(cvPixelBuffer: f.pixel, orientation: f.mac ? .upMirrored : .right)
         try? gestore.perform([persone, animali])
         var trovati: [Sentinella.Bersaglio] = []
         for p in persone.results ?? [] where p.confidence > 0.5 {
@@ -297,7 +328,7 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
             trovati.append(.init(rect: MotoreSentinella.inAlto(o.boundingBox), tipo: "ANIMALE · \(nome)"))
         }
         // fotogramma leggero (per l'allarme e per «Guarda ora» sull'orologio): lato lungo 480 px, JPEG
-        let vista = notte ? MotoreSentinella.visioneNotturna(raddrizzata) : raddrizzata
+        let vista = f.notte ? MotoreSentinella.visioneNotturna(f.immagine) : f.immagine
         let scala = 480 / max(vista.extent.width, vista.extent.height)
         let piccola = vista.transformed(by: CGAffineTransform(scaleX: scala, y: scala))
         let jpeg = contesto.jpegRepresentation(of: piccola, colorSpace: CGColorSpaceCreateDeviceRGB(),
@@ -342,10 +373,9 @@ struct VistaSentinella: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let q = s.quadro {
-                Image(decorative: q, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+            if s.inVista {
+                SchermoSentinella()
+                    .aspectRatio(s.proporzione, contentMode: .fit)
                     .overlay { mirini }
                     .overlay { RadarSentinella(colore: colore).opacity(0.5).allowsHitTesting(false) }
             } else {
@@ -428,9 +458,9 @@ struct VistaSentinella: View {
                 if c == .torna { s.ferma() }
                 comando(c)
             }
-            // l'ascolto dei comandi cambia la sessione audio: si accende dopo il clic di fine caricamento (1,1 s + 0,7 s),
+            // l'ascolto dei comandi cambia la sessione audio: si accende dopo il clic di fine caricamento (0,45 s + 0,7 s),
             // altrimenti il suono si perde
-            let resta = 1.8 - Date().timeIntervalSince(aperta)
+            let resta = Apertura.orecchio - Date().timeIntervalSince(aperta)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard !Task.isCancelled else { return }
             orecchio.avvia()
@@ -481,6 +511,28 @@ struct VistaSentinella: View {
             .background(Color.black.opacity(0.45))
             .clipShape(Circle())
             .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+    }
+}
+
+/// 5 nov · l'immagine della Sentinella: un CALayer a cui la Sentinella dà ogni fotogramma (30 al secondo), senza passare da
+/// SwiftUI. Stessa misura e stesso posto dell'immagine di prima (adattata, senza tagli).
+struct SchermoSentinella: UIViewRepresentable {
+    final class Vista: UIView {
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            backgroundColor = .black
+            layer.contentsGravity = .resizeAspect
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) non usato") }
+    }
+    func makeUIView(context: Context) -> Vista {
+        let v = Vista()
+        Sentinella.condiviso.schermo = v
+        return v
+    }
+    func updateUIView(_ v: Vista, context: Context) {
+        if Sentinella.condiviso.schermo !== v { Sentinella.condiviso.schermo = v }
     }
 }
 

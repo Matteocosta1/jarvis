@@ -376,7 +376,7 @@ struct VistaWiretap: View {
             }
             if avviaSubito {
                 Task {
-                    try? await Task.sleep(for: .seconds(1.8))
+                    try? await Task.sleep(for: .seconds(Apertura.orecchio))
                     if !chiusa && !w.attivo && w.confermato.isEmpty { await w.avvia() }
                 }
             }

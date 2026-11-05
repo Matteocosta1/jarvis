@@ -68,12 +68,10 @@ struct VistaRicordi: View {
                         Spacer()
                     }
                 }
+                .modifier(ConBarraChiudi(tinta: Color.ciano) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
-            }
             .onAppear { scheda = iniziale; guidaAccesa = guida; salvaDaFare = salva }
             // 4 nov (il signore, strada B): Ricordi già aperto (davanti o dietro) e TRACCIA chiesta a voce («traccia il luogo»,
             // «portami al luogo», «ricorda questo luogo»): la fa qui, sul posto (prima tornava com'era e la guida non partiva)

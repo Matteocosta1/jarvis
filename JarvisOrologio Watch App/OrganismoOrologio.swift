@@ -65,7 +65,7 @@ struct VistaOrganismoOrologio: View {
         .onAppear { if !mostrato { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() } }
         .task {
             guard !mostrato else { return }
-            try? await Task.sleep(for: .seconds(0.9))
+            try? await Task.sleep(for: .seconds(AperturaPolso.caricamento))
             guard !Task.isCancelled else { return }
             WKInterfaceDevice.current().play(.success)
             SuoniOrologio.schedaPronta()

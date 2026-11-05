@@ -178,8 +178,7 @@ struct VistaSatellite: View {
     private var visibili: [LuogoSat] { tutti.filter { filtro == .tutti || categoria($0) == filtro } }
 
     var body: some View {
-        CorniceScheda(titolo: "Satellite", sottotitolo: "pronta", icona: "satellite", tinta: tinta, pronto: caricato,
-                      barraDalloScorrimento: true) {
+        CorniceScheda(titolo: "Satellite", sottotitolo: "pronta", icona: "satellite", tinta: tinta, pronto: caricato) {
             ScrollViewReader { lettore in
                 VStack(alignment: .leading, spacing: 16) {
                     pannelloSatellite.id("mappa")

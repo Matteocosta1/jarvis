@@ -36,7 +36,9 @@ final class RuotaCorona: NSObject, ObservableObject {
     private var ultimoScatto: CFTimeInterval = 0
     private var ultimoPasso: CFTimeInterval = 0
     private var collegamento: CADisplayLink?
-    private let selezione = UISelectionFeedbackGenerator()
+    /// 5 nov (il signore: «più feedback aptico, più forte»): lo scatto di ogni icona è un tocco secco (rigido, 0,55), non più la
+    /// «selezione» di iOS, quasi impercettibile.
+    private let selezione = UIImpactFeedbackGenerator(style: .rigid)
 
     /// Il dito si è appena mosso sull'anello: comincia a girare (gli angoli di partenza delle icone, l'angolo del dito).
     func inizia(base: [Double], angolo: Double) {
@@ -45,6 +47,7 @@ final class RuotaCorona: NSObject, ObservableObject {
         dito = (angolo: angolo, campioni: [(t: CACurrentMediaTime(), g: giro)])
         creataDa = nil
         if !vivo { vivo = true; scelta = -1 }
+        Aptica.permettiColMicrofono()                       // col microfono aperto iOS spegnerebbe gli scatti
         selezione.prepare()
         aggiornaScelta(suona: false)
         spegniAlle = CACurrentMediaTime() + RuotaCorona.resta
@@ -124,7 +127,7 @@ final class RuotaCorona: NSObject, ObservableObject {
         guard ora - ultimoScatto >= 0.035 else { return }
         ultimoScatto = ora
         Suoni.scattoRuota()
-        selezione.selectionChanged()
+        selezione.impactOccurred(intensity: 0.55)
         selezione.prepare()
     }
 

@@ -49,6 +49,12 @@ final class NavigaSezioni: ObservableObject {
     /// («mettila da parte»), una sezione che torna davanti («quella di prima»).
     enum Chiesta: Equatable { case sfoglio, aggancio, porta(UUID) }
     @Published var chiesta: Chiesta?
+    /// 5 nov (video del signore: «l'animazione dell'aggancio sale troppo in alto»): dov'è il reattore (coordinate globali) e
+    /// quanto è grande, sempre aggiornati qui. Lo swipe su dal basso chiama l'aggancio da chiusure preparate al primo disegno
+    /// (GestoBassoSezioni), che si portavano dietro il reattore di allora: (0, 0), non ancora misurato. La pagina volava
+    /// nell'angolo in alto a sinistra invece che nel reattore (la luce, disegnata dalla vista, era invece al posto giusto).
+    var reattore: CGPoint = .zero
+    var diametroReattore: CGFloat = 290
 }
 
 /// Dove e come sta una pagina (gli stessi modificatori in tutti i modi: cambiano solo i valori).
@@ -82,9 +88,12 @@ struct PosaPagina: ViewModifier {
     func body(content: Content) -> some View {
         content
             .allowsHitTesting(posa.tocchi)
-            .overlay { VeloOlo().opacity(posa.tinta) }
+            .overlay { if posa.tinta > 0.001 { VeloOlo(forza: posa.tinta) } }
             .clipShape(Ritaglio(raggio: posa.raggio))
-            .shadow(color: .ciano.opacity(posa.ombra), radius: posa.ombra > 0 ? 18 : 0)
+            // 5 nov (il signore: «le pagine da sfogliare non sono trasparenti e cool come nel mockup»): come .foglio.ologramma del
+            // mockup, la pagina diventa luce (mix-blend-mode: screen): il nero si fonde col fondo olografico e resta il disegno ciano
+            .blendMode(posa.tinta > 0.001 ? .screen : .normal)
+            .modifier(AloneOlo(forza: posa.ombra))
             .scaleEffect(posa.scala)
             .rotation3DEffect(.degrees(posa.rotY), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
             .offset(x: posa.x, y: posa.y)
@@ -103,9 +112,10 @@ struct SegueTiro: ViewModifier {
     func body(content: Content) -> some View {
         let v = tiro.pagina == id ? tiro.viva : TiroPagina.Viva()
         content
-            .overlay { if v.tinta > 0.001 { VeloOlo().opacity(v.tinta) } }
+            .overlay { if v.tinta > 0.001 { VeloOlo(forza: v.tinta) } }
             .clipShape(Ritaglio(raggio: v.raggio))
-            .shadow(color: .ciano.opacity(v.ombra), radius: v.ombra > 0 ? 18 : 0)
+            .blendMode(v.tinta > 0.001 ? .screen : .normal)             // 5 nov: la pagina in mano è luce, come nel mockup
+            .modifier(AloneOlo(forza: v.ombra))
             .mask { MascheraLaser(riga: v.riga) }
             .modifier(Proiezione(x: v.x, y: v.y, scala: v.scala, inclina: v.inclina))
     }
@@ -242,6 +252,8 @@ struct StratoSezioniVista<Vista: View>: View {
         }
         .gesture(gestoSfoglio, including: naviga.modo == .sfoglio ? .all : .subviews)
         .onAppear { preparaTrackpad(); preparaBasso() }
+        .onChange(of: reattore, initial: true) { _, r in naviga.reattore = r }
+        .onChange(of: diametroReattore, initial: true) { _, d in naviga.diametroReattore = d }
         .onChange(of: pila.voci.isEmpty) { _, vuota in
             basso.installa()                                              // se all'avvio la finestra non c'era ancora
             // tutte chiuse a voce («Jarvis, chiudi tutto») con le pagine olografiche aperte: si torna a JARVIS
@@ -624,7 +636,7 @@ struct StratoSezioniVista<Vista: View>: View {
                         Task { @MainActor in
                             try? await Task.sleep(for: .milliseconds(300))
                             Suoni.tonoOlo()
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            Aptica.sfoglia()                                  // 5 nov: più forte (era «leggero»)
                         }
                     }
                 } else if assePagina == 2 {
@@ -642,7 +654,7 @@ struct StratoSezioniVista<Vista: View>: View {
         let v = carte[k]
         Suoni.zittisciOlo()
         if !v.sezione.conFotocamera { Suoni.sceltaPagina(fra: 0.32) }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Aptica.sceltaPagina()                                         // 5 nov: più forte (era «leggero»)
         withAnimation(.timingCurve(0.33, 1, 0.68, 1, duration: 0.32)) {
             naviga.scelta = v.id
             naviga.P = Double(k)
@@ -669,7 +681,7 @@ struct StratoSezioniVista<Vista: View>: View {
         guard carte.indices.contains(k) else { return }
         let id = carte[k].id
         Suoni.zittisciOlo()
-        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        Aptica.chiusaPagina()
         withAnimation(.easeIn(duration: 0.22)) { naviga.alzata = -altezza * 0.9 }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(230))
@@ -698,11 +710,14 @@ struct StratoSezioniVista<Vista: View>: View {
     private func aggancio(id: UUID, base: TiroPagina.Viva, velocita: CGVector, scala: CGFloat, olo: Bool = false) {
         Suoni.zittisciOlo()
         let fra = min(Suoni.sparisce(), TempiAggancio.attesaMassima)
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        // il centro vero della pagina (non sempre quello dello schermo: dipende dai margini della sezione) va sul reattore
+        Aptica.lancioPagina()
+        // il centro vero della pagina (non sempre quello dello schermo: dipende dai margini della sezione) va sul reattore;
+        // 5 nov: il reattore di adesso (naviga), non quello copiato quando sono stati preparati i gesti
         let r = telaio(id)
-        let verso = CGPoint(x: reattore.x - r.midX, y: reattore.y - r.midY)
-        let scalaReattore = max(0.08, min(0.25, diametroReattore * 0.5 / r.height))
+        let misurato = naviga.reattore == .zero ? reattore : naviga.reattore
+        let centro = misurato == .zero ? CGPoint(x: larghezza / 2, y: altezza * 0.485) : misurato   // non ancora misurato: il suo posto
+        let verso = CGPoint(x: centro.x - r.midX, y: centro.y - r.midY)
+        let scalaReattore = max(0.08, min(0.25, naviga.diametroReattore * 0.5 / r.height))
         let volo = Volo.crea(da: base, velocita: velocita, scala: scala, verso: verso, scalaFinale: scalaReattore, ritardo: fra)
         var subito = Transaction(); subito.disablesAnimations = true
         withTransaction(subito) {
@@ -993,7 +1008,6 @@ final class TiroPagina: NSObject, ObservableObject {
     private var baseVolo = Viva()
     private var f0Volo: Double = 0
     private var collegamento: CADisplayLink?
-    private let vibrazione = UIImpactFeedbackGenerator(style: .medium)
 
     static func scala(_ t: CGFloat) -> CGFloat { 1 - 0.62 * (1 - exp(-t / 230)) }
     static func dScala(_ t: CGFloat) -> CGFloat { -0.62 / 230 * exp(-t / 230) }
@@ -1015,7 +1029,6 @@ final class TiroPagina: NSObject, ObservableObject {
         volo = nil
         viva = Viva()
         fase = .dito
-        vibrazione.prepare()
         avvia()
     }
 
@@ -1053,7 +1066,7 @@ final class TiroPagina: NSObject, ObservableObject {
         return (x: velDito.dx - (tocco.x - larghezza / 2) * vs, y: velDito.dy - (tocco.y - altezza / 2) * vs, s: vs)
     }
 
-    func vibra() { vibrazione.impactOccurred() }
+    func vibra() { Aptica.pagine() }                              // 5 nov: il colpo pieno delle pagine (era «medio»)
 
     // MARK: dopo il dito
 
@@ -1124,7 +1137,7 @@ final class TiroPagina: NSObject, ObservableObject {
                         if ora - d >= TiroPagina.pausaT {
                             agganciata = true
                             lentoDa = nil
-                            vibrazione.impactOccurred()
+                            Aptica.pagine()                               // 5 nov: si sente anche col microfono aperto, più forte
                             aggancia()
                         }
                     } else {
@@ -1578,21 +1591,61 @@ struct FondoVivo: View {
     }
 }
 
-/// Il tono olografico delle pagine: un velo ciano con le righe di scansione.
+/// Il tono olografico delle pagine, uguale al mockup (5 nov, il signore: «trasparenti e cool come nel mockup»):
+/// - .olo-tinta: il ciano #4fe3ff in «color» (la pagina diventa tutta ciano, con le sue luci e le sue ombre), più un velo ciano
+///   al 7% in «screen» e il bagliore interno sui bordi (inset 60 px al 25%);
+/// - .olo-righe: le righe di scansione, una riga nera al 42% ogni 3 punti;
+/// - il bordo che brilla (1,5 punti, #8ff0ff all'85%).
+/// La pagina sotto, in «screen» (PosaPagina, SegueTiro), lascia vedere il fondo olografico dove è scura.
+/// `forza` (0…1) è l'opacità di ogni strato, data prima della fusione: come nel mockup (tintaDito), dove la tinta cresce col dito.
+/// Non va data all'insieme: un'opacità sul gruppo fonderebbe il ciano col vuoto invece che con la pagina (pagina tutta ciano).
 struct VeloOlo: View {
+    var forza: Double = 1
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color.ciano.opacity(0.22), Color.ciano.opacity(0.06)], startPoint: .top, endPoint: .bottom)
-                .blendMode(.screen)
-            Canvas { gc, size in
-                var y: CGFloat = 0
-                var righe = Path()
-                while y < size.height { righe.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)); y += 3 }
-                gc.fill(righe, with: .color(.black.opacity(0.18)))
-            }
-            RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.ciano.opacity(0.7), lineWidth: 1.2)
+            Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
+            Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
+            RigheOlo().opacity(forza)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color(red: 143 / 255, green: 240 / 255, blue: 1).opacity(0.85 * forza), lineWidth: 1.5)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Il bagliore interno e le righe di scansione del velo olografico. Una vista senza dati: SwiftUI non la ridisegna mentre la
+/// pagina si muove o la tinta cresce (si ridisegna solo se cambia la misura).
+struct RigheOlo: View {
+    var body: some View {
+        Canvas { gc, size in
+            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+            let fondo: CGFloat = 60, w = size.width, h = size.height
+            // il bagliore interno dai quattro bordi (box-shadow: inset 0 0 60px rgba(79,227,255,.25))
+            let bordi: [(CGRect, CGPoint, CGPoint)] = [
+                (CGRect(x: 0, y: 0, width: w, height: fondo), CGPoint(x: 0, y: 0), CGPoint(x: 0, y: fondo)),
+                (CGRect(x: 0, y: h - fondo, width: w, height: fondo), CGPoint(x: 0, y: h), CGPoint(x: 0, y: h - fondo)),
+                (CGRect(x: 0, y: 0, width: fondo, height: h), CGPoint(x: 0, y: 0), CGPoint(x: fondo, y: 0)),
+                (CGRect(x: w - fondo, y: 0, width: fondo, height: h), CGPoint(x: w, y: 0), CGPoint(x: w - fondo, y: 0)),
+            ]
+            for (r, da, a) in bordi {
+                gc.fill(Path(r), with: .linearGradient(Gradient(colors: [ciano.opacity(0.25), ciano.opacity(0)]), startPoint: da, endPoint: a))
+            }
+            var righe = Path()
+            var y: CGFloat = 0
+            while y < h { righe.addRect(CGRect(x: 0, y: y, width: w, height: 1)); y += 3 }
+            gc.fill(righe, with: .color(.black.opacity(0.42)))
+        }
+    }
+}
+
+/// Il bagliore attorno alla pagina olografica, come nel mockup (0 0 26px al 55% e 0 0 70px al 25%); `forza` 0,45 = quello pieno.
+struct AloneOlo: ViewModifier {
+    let forza: Double
+    func body(content: Content) -> some View {
+        let k = min(1, max(0, forza / 0.45))
+        content
+            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.55 * k), radius: k > 0 ? 13 : 0)
+            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.25 * k), radius: k > 0 ? 35 : 0)
     }
 }
 

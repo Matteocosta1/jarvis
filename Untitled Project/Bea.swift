@@ -2,6 +2,7 @@
 import SwiftUI
 import UserNotifications
 import MapKit
+import PhotosUI
 
 /// BEA: il reparto dedicato a Beatrice. Le cose che ama e quelle che non sopporta, le date che contano,
 /// le promesse che il signore le ha fatto, le idee per sorprenderla, il suo lavoro di oggi al pilates,
@@ -26,8 +27,13 @@ struct VistaBea: View {
     @State private var sceltaContatto = false
     @State private var pensiero: String?          // «Ti penso»: il messaggio pronto, da ritoccare e mandare
     @State private var scrivePensiero = false
+    @State private var errorePensiero: String?    // 5 nov: «Ti penso» non riuscito, detto a schermo (prima non succedeva niente)
     @State private var chiama112 = false
     @State private var chiama112AVoce = false     // «Jarvis, emergenza»: la stessa domanda, aperta a voce (il «sì» resta col dito)
+    @State private var fotoOlo: UIImage?          // 11.0 (4): Bea in ologramma (preparata e salvata solo sul telefono)
+    @State private var sceltaFoto: PhotosPickerItem?
+    @State private var preparaFoto = false
+    @State private var erroreFoto: String?
     @FocusState private var scrivendo: Bool
 
     var body: some View {
@@ -40,6 +46,7 @@ struct VistaBea: View {
                     Section {
                         TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "link", tinta: tinta)
                             .listRowBackground(Color.clear)
+                        ologramma.listRowBackground(Color.clear)
                         contatto.listRowBackground(Color.clear)
                     }
                     pensieri
@@ -59,6 +66,7 @@ struct VistaBea: View {
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: 0.4), value: dati != nil)
+                .modifier(ConBarraChiudi(tinta: tinta) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
                 if dati == nil && !errore {
                     // il titolo resta in alto mentre carica, come nelle altre schede
                     VStack {
@@ -71,9 +79,15 @@ struct VistaBea: View {
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) } }
             .onAppear { Suoni.schedaApre() }
-            .task { await carica(); if dati != nil { Suoni.schedaPronta() } }   // come tutte le altre schede
+            .task {
+                if let d = FotoBea.salvata() { fotoOlo = UIImage(data: d) }
+                await carica(); if dati != nil { Suoni.schedaPronta() }   // come tutte le altre schede
+            }
+            .onChange(of: sceltaFoto) { _, scelta in
+                guard let scelta else { return }
+                Task { await nuovaFoto(scelta) }
+            }
             .tastiAVoce { a in
                 let n = Rubrica.pulisci(numero)
                 switch a {
@@ -120,6 +134,53 @@ struct VistaBea: View {
         return "prendersi cura di lei"
     }
 
+    // MARK: Ologramma (11.0 (4), come il mockup v261)
+
+    /// Bea in ologramma sopra il proiettore; FOTO sceglie la foto dal rullino (col selettore di Apple: l'app vede solo quella).
+    private var ologramma: some View {
+        VStack(spacing: 6) {
+            OlogrammaBea(foto: fotoOlo)
+                .frame(height: 280)
+                .corniceOlo(tinta)
+                .overlay(alignment: .bottomTrailing) {
+                    PhotosPicker(selection: $sceltaFoto, matching: .images) {
+                        HStack(spacing: 6) {
+                            if preparaFoto { ProgressView().controlSize(.mini).tint(tinta) }
+                            Text("FOTO")
+                        }
+                        .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(1.5)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .foregroundStyle(tinta)
+                        .background(Color.fondo.opacity(0.55))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(tinta.opacity(0.5), lineWidth: 1))
+                    }
+                    .buttonStyle(StileStark())
+                    .simultaneousGesture(TapGesture().onEnded { Suoni.tocco() })
+                    .disabled(preparaFoto)
+                    .padding(10)
+                    .accessibilityLabel("Scegli la foto di Bea per l'ologramma")
+                }
+            if let e = erroreFoto {
+                Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center).frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    /// La foto scelta: Vision ritaglia la persona e la luce ciano si prepara una volta sola; si salva solo l'ologramma.
+    private func nuovaFoto(_ scelta: PhotosPickerItem) async {
+        preparaFoto = true
+        erroreFoto = nil
+        defer { preparaFoto = false; sceltaFoto = nil }
+        guard let dati = try? await scelta.loadTransferable(type: Data.self), let png = await FotoBea.prepara(dati), let im = UIImage(data: png) else {
+            erroreFoto = "Questa foto non riesco a prepararla, Sir. Ne scelga un'altra."
+            Suoni.errore()
+            return
+        }
+        Suoni.pronto()
+        fotoOlo = im
+    }
+
     // MARK: Contatto
 
     @ViewBuilder private var contatto: some View {
@@ -150,6 +211,10 @@ struct VistaBea: View {
             }
             .buttonStyle(StileStark())
             .disabled(scrivePensiero)
+            if let e = errorePensiero {
+                Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center).frame(maxWidth: .infinity)
+                    .transition(.opacity)
+            }
             Button { sceltaContatto = true } label: {
                 Text("\(nomeContatto) · \(numero) · cambia").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
             }
@@ -445,10 +510,26 @@ struct VistaBea: View {
     private func nuovoPensiero() async {
         scrivePensiero = true
         defer { scrivePensiero = false }
+        withAnimation(.easeOut(duration: 0.2)) { errorePensiero = nil }
         Suoni.tocco()
         let ultimi = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
-        guard let o = await VistaVitals.chiama(["bea_pensiero": true, "evita": ultimi]), let t = o["testo"] as? String, !t.isEmpty else { return }
+        let o = await VistaVitals.chiama(["bea_pensiero": true, "evita": ultimi])
+        guard let t = o?["testo"] as? String, !t.isEmpty else {
+            // 5 nov (il signore: «resta su JARVIS scrive… e non succede nulla»): ora si dice perché
+            withAnimation(.easeOut(duration: 0.2)) { errorePensiero = VistaBea.spiega(o) }
+            return
+        }
         pensiero = t
+    }
+
+    /// Il motivo di un «Ti penso» non riuscito, in parole semplici. La domanda e il cervello restano quelli di sempre.
+    static func spiega(_ risposta: [String: Any]?) -> String {
+        guard let risposta else { return "Non raggiungo il cervello, Sir: controlli la connessione e riprovi." }
+        let e = (risposta["errore"] as? String ?? "").lowercased()
+        if e.contains("credit balance") || e.contains("billing") {
+            return "Il cervello è senza credito Anthropic, Sir: va ricaricato (console.anthropic.com › Billing)."
+        }
+        return "JARVIS non riesce a scrivere adesso, Sir. Riprovi tra poco."
     }
 
     private func azione(_ corpo: [String: Any]) async {

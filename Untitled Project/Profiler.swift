@@ -206,7 +206,7 @@ struct VistaProfiler: View {
             chiudi([])
             return
         }
-        let resta = 1.1 - Date().timeIntervalSince(inizio)          // 26 ott notte: sotto c'è il caricamento delle schede (AperturaHUD)
+        let resta = Apertura.caricamento - Date().timeIntervalSince(inizio)          // 26 ott notte: sotto c'è il caricamento delle schede (AperturaHUD)
         if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
         agganciato = true
         Suoni.aperturaCamera()

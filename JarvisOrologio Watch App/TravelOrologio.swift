@@ -247,8 +247,8 @@ struct VistaTravelOrologio: View {
             meta = detto.isEmpty ? luoghi.first : (LuogoSat.trova(detto, in: luoghi) ?? luoghi.first)
         }
         if meta == nil { errore = detto.isEmpty ? "Nessun luogo salvato, Sir." : "Non trovo «\(detto)» tra i suoi luoghi, Sir." }
-        // come le altre schede del polso: 0,9 s di caricamento con i suoni, poi la pagina
-        let resta = 0.9 - Date().timeIntervalSince(apertaDa)
+        // come le altre schede del polso: 0,45 s di caricamento con i suoni, poi la pagina
+        let resta = AperturaPolso.caricamento - Date().timeIntervalSince(apertaDa)
         if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
         guard !Task.isCancelled else { return }
         WKInterfaceDevice.current().play(.success)

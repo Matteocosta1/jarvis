@@ -102,6 +102,7 @@
 				clicktesta.m4a,
 				corpo.bin,
 				OlogrammiSezioni.swift,
+				OlogrammiNuovi.swift,
 				Organismo.swift,
 				pronto.m4a,
 				ComandiVocali.swift,

@@ -15,11 +15,6 @@ struct CorniceScheda<Contenuto: View>: View {
     let tinta: Color
     var pronto = true
     var fotocamera = false          // Scanner: quando è pronta, il suono delle sezioni con fotocamera al posto di «pronta»
-    /// 26 ott sera (SATELLITE, foto del signore 22:07): appena compariva la mappa 3D, iOS dava alla barra in alto (quella di
-    /// «Chiudi») lo sfondo grigio anche con la pagina ferma in cima; nelle altre schede in cima è trasparente e diventa grigia
-    /// solo quando il contenuto le passa sotto. Acceso, lo sfondo della barra lo decide lo scorrimento vero della pagina:
-    /// trasparente in cima, quello di iOS appena si scorre. Così è uguale alle altre. Spento (tutte le altre): come sempre.
-    var barraDalloScorrimento = false
     /// 26 ott notte (il signore, «JARVIS Music»): la testata come Studio e Social, «J.A.R.V.I.S.» e sotto il nome della sezione.
     var marchio = false
     @ViewBuilder let contenuto: () -> Contenuto
@@ -27,7 +22,6 @@ struct CorniceScheda<Contenuto: View>: View {
     @State private var mostrato = false
     @State private var stampa: CGFloat = 0           // quanto della scheda è già «stampato» (0 → 1)
     @State private var apertaDa = Date()
-    @State private var scorsa = false                // il contenuto passa sotto la barra in alto (solo con barraDalloScorrimento)
 
     var body: some View {
         NavigationStack {
@@ -36,13 +30,12 @@ struct CorniceScheda<Contenuto: View>: View {
                 GrigliaSfumata()
                 RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
                     .ignoresSafeArea()
-                // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX)
-                if fotocamera {
-                    VStack(spacing: 0) {
-                        tastoX
-                        pagina
-                    }
-                } else {
+                // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX).
+                // 5 nov (il signore: «se scorro in basso, in ogni sezione si vede quella barra grigia col Chiudi»): «Chiudi» non è
+                // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:
+                // la pagina scorre sotto la riga e la riga resta trasparente.
+                VStack(spacing: 0) {
+                    if fotocamera { tastoX } else if !marchio { BarraChiudi(tinta: tinta) { chiudi() } }
                     pagina
                 }
                 if !mostrato {
@@ -52,24 +45,19 @@ struct CorniceScheda<Contenuto: View>: View {
                         .allowsHitTesting(false)
                 }
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .modifier(SfondoBarra(attivo: barraDalloScorrimento, visibile: scorsa))
-            // marchio: «Chiudi» è nella testata, come Studio e Social; fotocamera: la X nel cerchio qui sopra
-            .toolbar(marchio || fotocamera ? .hidden : .automatic, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(tinta) }
-            }
+            // marchio: «Chiudi» è nella testata, come Studio e Social; fotocamera: la X nel cerchio; le altre: BarraChiudi
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .onAppear { apertaDa = Date(); Suoni.schedaApre() }
         .task(id: pronto) {
             guard pronto, !mostrato else { return }
-            // il caricamento si vede almeno per un attimo, anche se i dati arrivano subito
-            let resta = 0.9 - Date().timeIntervalSince(apertaDa)
+            // il caricamento si vede almeno per un attimo, anche se i dati arrivano subito (5 nov: 0,45 s, uguale ovunque)
+            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
             mostrato = true
-            withAnimation(.easeOut(duration: 0.9)) { stampa = 1 }
+            withAnimation(.easeOut(duration: Apertura.stampa)) { stampa = 1 }
         }
     }
 
@@ -115,7 +103,6 @@ struct CorniceScheda<Contenuto: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollDismissesKeyboard(.interactively)
-        .modifier(OsservaCima(attivo: barraDalloScorrimento, scorsa: $scorsa))
     }
 
     /// 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio, nello stesso posto del
@@ -195,41 +182,41 @@ struct TestataScheda: View {
     }
 }
 
-/// Vedi CorniceScheda.barraDalloScorrimento: segue lo scorrimento vero della pagina (da iOS 18; prima resta in cima).
-private struct OsservaCima: ViewModifier {
-    let attivo: Bool
-    @Binding var scorsa: Bool
+/// 5 nov · «Chiudi» delle sezioni senza fotocamera, in una riga sua sopra la pagina (al posto della barra di iOS, che scorrendo
+/// diventava grigia): stesso posto, stessa misura e stessa scritta di prima; la pagina scorre sotto e la riga resta trasparente.
+struct BarraChiudi: View {
+    let tinta: Color
+    /// «Chiudi»; nelle Impostazioni «Fatto», come prima.
+    var testo = "Chiudi"
+    let chiudi: () -> Void
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if attivo {
-            if #available(iOS 18.0, *) {
-                content.onScrollGeometryChange(for: Bool.self) { g in
-                    g.contentOffset.y + g.contentInsets.top > 0.5            // in cima la somma è zero
-                } action: { _, sotto in
-                    withAnimation(.easeInOut(duration: 0.2)) { scorsa = sotto }
-                }
-            } else {
-                content
-            }
-        } else {
-            content
+    var body: some View {
+        HStack {
+            Spacer()
+            Button(testo) { chiudi() }
+                .font(.system(size: 17, weight: .semibold))
+                .tint(tinta)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
     }
 }
 
-/// Vedi CorniceScheda.barraDalloScorrimento: lo sfondo della barra in alto, trasparente in cima, quello di iOS sotto.
-private struct SfondoBarra: ViewModifier {
-    let attivo: Bool
-    let visibile: Bool
+/// Le sezioni con una pagina che scorre propria (Vitals, Confidente, Ricordi, Bea, Diario…): la riga di «Chiudi» sopra la
+/// pagina e la barra di iOS nascosta (vedi BarraChiudi).
+struct ConBarraChiudi: ViewModifier {
+    let tinta: Color
+    var testo = "Chiudi"
+    let chiudi: () -> Void
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if attivo {
-            content.toolbarBackground(visibile ? .visible : .hidden, for: .navigationBar)
-        } else {
+        VStack(spacing: 0) {
+            BarraChiudi(tinta: tinta, testo: testo, chiudi: chiudi)
             content
         }
+        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -308,11 +295,23 @@ struct CaricamentoHUD: View {
     }
 }
 
+/// 5 nov (il signore: «apertura delle sezioni da circa 1 s a 0,4-0,5 s, uguale ovunque», come il mockup v260): i tempi di
+/// apertura di tutte le sezioni in un posto solo.
+enum Apertura {
+    /// Il caricamento HUD (prima 1,1 s nelle sezioni dal vivo, 0,9 s nelle schede).
+    static let caricamento = 0.45
+    /// La pagina che si «stampa» dall'alto (prima 0,9 s).
+    static let stampa = 0.5
+    /// L'ascolto dei comandi a voce dentro le sezioni: cambia la sessione audio, quindi parte a suoni d'apertura finiti
+    /// (il caricamento più il clic di fine caricamento, 0,7 s; prima 1,8 s).
+    static let orecchio = caricamento + 0.7
+}
+
 /// L'apertura da HUD per le sezioni che non caricano dati dal cervello (Sentinella, Wiretap, Interprete, Allenatore, Browser…)
 /// e per quelle che hanno già la loro pagina (Vitals, Ricordi, Confidente): un attimo di caricamento con i suoni, poi la sezione.
 struct AperturaHUD: ViewModifier {
     let titolo: String
-    var durata = 1.1
+    var durata = Apertura.caricamento
     var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
     var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
     @State private var coperto = true
@@ -564,6 +563,10 @@ struct VistaDiario: View {
 
     var body: some View {
         CorniceScheda(titolo: "Diario", sottotitolo: sottotitolo, icona: "book.closed", tinta: tinta, pronto: pagine != nil || errore != nil) {
+            // 11.0 (4), come il mockup v261: il libro di oggi in ologramma e l'umore degli ultimi 7 giorni
+            if let p = pagine {
+                OlogrammaDiario(dati: datiOlo(p)).frame(height: 210).corniceOlo(tinta)
+            }
             oggi
             if let p = pagine {
                 if p.count > 1 { andamento(p) }
@@ -606,6 +609,13 @@ struct VistaDiario: View {
     private var sottotitolo: String {
         guard let p = pagine else { return "sfoglio le pagine" }
         return p.isEmpty ? "nessuna pagina" : "\(p.count) pagin\(p.count == 1 ? "a" : "e") scritte"
+    }
+
+    /// Per l'ologramma: il voto dell'umore di ogni giorno che ha la pagina e se quella di oggi è scritta.
+    private func datiOlo(_ p: [Pagina]) -> DatiDiario {
+        var voti: [Date: Int] = [:]
+        for x in p { if let g = x.giorno, let s = x.punteggio { voti[Calendar.current.startOfDay(for: g)] = s } }
+        return DatiDiario(voti: voti, oggi: paginaDiOggi != nil)
     }
 
     private var paginaDiOggi: Pagina? {
@@ -751,6 +761,10 @@ struct VistaSonno: View {
 
     var body: some View {
         CorniceScheda(titolo: "Sonno", sottotitolo: oggi?.orari.map { "stanotte \($0)" } ?? "la notte scorsa", icona: "bed.double", tinta: tinta, pronto: caricato) {
+            // 11.0 (4), come il mockup v261: la luna e l'anello della notte, alto quanto è profondo il sonno
+            if !fasi.isEmpty {
+                OlogrammaNotte(dati: DatiNotte(fasi: fasi.map { t -> (Date, Date, Int) in (t.da, t.a, t.fase.rawValue) })).frame(height: 230).corniceOlo(tinta)
+            }
             HStack(spacing: 10) {
                 Valore(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari, tinta: tinta)
                 Valore(titolo: "MEDIA 14 NOTTI", valore: media.map { String(format: "%.1f h", $0) } ?? "—", sotto: confronto, tinta: tinta)

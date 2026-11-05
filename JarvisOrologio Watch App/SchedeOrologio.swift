@@ -9,6 +9,15 @@ import CoreLocation
 /// Il ciano di JARVIS, lo stesso dell'iPhone.
 enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0) }
 
+/// 5 nov (il signore: «apertura delle sezioni da circa 1 s a 0,4-0,5 s, uguale ovunque»): i tempi di apertura di tutte le
+/// schede e schermate del polso, come sull'iPhone.
+enum AperturaPolso {
+    /// Il caricamento HUD (prima 0,9 s nelle schede, 1,1 s nelle pagine).
+    static let caricamento = 0.45
+    /// La scheda che si «stampa» dall'alto (prima 0,8 s).
+    static let stampa = 0.5
+}
+
 /// Una scheda sull'orologio: il nome in alto, il caricamento HUD (anelli, barra, sistemi) e poi il contenuto
 /// che si stampa dall'alto. Stesso ciano di JARVIS, stesso ritmo dell'iPhone, in piccolo.
 /// 27 ott: la GrigliaSfumata delle sezioni dell'iPhone, in scala col polso (schermo largo la metà): passo 28 → 14, sfumatura 520 → 260,
@@ -70,13 +79,13 @@ struct CorniceOrologio<Contenuto: View>: View {
         }
         .task(id: pronto) {
             guard pronto, !mostrato else { return }
-            let resta = 0.9 - Date().timeIntervalSince(apertaDa)
+            let resta = AperturaPolso.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard !Task.isCancelled else { return }       // uscito prima della fine: niente «pronta» a scheda chiusa
             WKInterfaceDevice.current().play(.success)
             SuoniOrologio.schedaPronta()
             mostrato = true
-            withAnimation(.easeOut(duration: 0.8)) { stampa = 1 }
+            withAnimation(.easeOut(duration: AperturaPolso.stampa)) { stampa = 1 }
         }
     }
 }
@@ -137,7 +146,7 @@ struct AperturaOrologio: ViewModifier {
             .onAppear { if coperto { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() } }
             .task {
                 guard coperto else { return }
-                try? await Task.sleep(for: .seconds(1.1))
+                try? await Task.sleep(for: .seconds(AperturaPolso.caricamento))
                 guard !Task.isCancelled else { return }   // uscito prima della fine: niente «pronta» a pagina chiusa
                 WKInterfaceDevice.current().play(.success)
                 SuoniOrologio.schedaPronta()
@@ -203,11 +212,21 @@ struct TastoJarvisOrologio: View {
 
 struct VistaDiarioOrologio: View {
     @State private var pagine: [DatiVitals.Pagina]?
+    @State private var olo: DatiDiario?           // 11.0 (4): il libro in ologramma, come sull'iPhone
     @State private var errore = false
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Diario", pronto: pagine != nil || errore) {
+            if let d = olo {
+                HStack(spacing: 8) {
+                    OlogrammaDiario(dati: d, piccolo: true).frame(width: 46, height: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("UMORE · 7 GIORNI").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                        Text(media(d)).font(.system(size: 18, weight: .semibold, design: .rounded))
+                    }
+                }
+            }
             TastoJarvisOrologio(testo: "Scrivi la pagina di oggi", frase: "Jarvis, voglio scrivere il diario di oggi.")
             if let p = pagine {
                 if p.isEmpty { Text("Ancora nessuna pagina, Sir.").font(.footnote).foregroundStyle(.secondary) }
@@ -228,8 +247,22 @@ struct VistaDiarioOrologio: View {
         }
         .task {
             guard let o = await VistaVitalsOrologio.chiama(["vitals": true, "giorni": 60]) else { errore = true; return }
-            pagine = DatiVitals(o, giorni: 60).pagine
+            let dv = DatiVitals(o, giorni: 60)
+            var voti: [Date: Int] = [:]
+            for g in dv.giorni { if let p = g.punteggio { voti[Calendar.current.startOfDay(for: g.data)] = Int(p.rounded()) } }
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd"
+            let oggi = f.string(from: Date())
+            olo = DatiDiario(voti: voti, oggi: dv.pagine.contains { $0.giorno == oggi })
+            pagine = dv.pagine
         }
+    }
+
+    /// La media dell'umore degli ultimi 7 giorni con la pagina, all'italiana («6,6»).
+    private func media(_ d: DatiDiario) -> String {
+        let v = d.giorni.compactMap(\.voto)
+        return v.isEmpty ? "—" : Olo.numero(Double(v.reduce(0, +)) / Double(v.count), decimali: 1)
     }
 }
 
@@ -238,12 +271,16 @@ struct VistaDiarioOrologio: View {
 struct VistaSonnoOrologio: View {
     @State private var oggi: SaluteOggi?
     @State private var notti: [(Date, Double)] = []
+    @State private var notte: DatiNotte?          // 11.0 (4): la luna e l'anello della notte, come sull'iPhone
     @State private var caricato = false
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Sonno", pronto: caricato) {
-            ValoreOrologio(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari)
+            HStack(spacing: 6) {
+                if let n = notte { OlogrammaNotte(dati: n, piccolo: true).frame(width: 46, height: 46) }
+                ValoreOrologio(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari)
+            }
             if let f = oggi?.fasi { Text(f).font(.system(size: 10)).foregroundStyle(.secondary) }
             if let p = oggi?.pisolini { Text("Pisolino \(p)").font(.system(size: 10)).foregroundStyle(ciano) }
             if notti.count > 1 {
@@ -265,9 +302,11 @@ struct VistaSonnoOrologio: View {
         .task {
             async let o = SaluteOggi.leggi()
             async let g = SaluteStorica.giorni(14)
-            let (a, b) = await (o, g)
+            async let f = SaluteStorica.notte()
+            let (a, b, c) = await (o, g, f)
             oggi = a
             notti = b.compactMap { d, v in v.sonnoOre.map { (d, $0) } }.sorted { $0.0 < $1.0 }
+            notte = c.isEmpty ? nil : DatiNotte(fasi: c)
             caricato = true
         }
     }
@@ -282,11 +321,15 @@ struct VistaBriefingOrologio: View {
     @State private var promesse: [String] = []
     @State private var posta: String?
     @State private var caricato = false
+    @State private var giornata = DatiGiornata()   // 11.0 (4): la giornata in ologramma, come sull'iPhone
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Briefing", pronto: caricato) {
-            Text(saluto).font(.system(size: 14, weight: .medium))
+            HStack(spacing: 8) {
+                OlogrammaGiornata(dati: giornata, piccolo: true).frame(width: 46, height: 46)
+                Text(saluto).font(.system(size: 14, weight: .medium))
+            }
             TastoJarvisOrologio(testo: "Briefing a voce", frase: "Buongiorno Jarvis, il briefing per favore.")
             HStack(spacing: 6) {
                 ValoreOrologio(titolo: "METEO", valore: meteo ?? "—")
@@ -317,6 +360,7 @@ struct VistaBriefingOrologio: View {
                 meteo = "\(t)° \(a["cielo"] as? String ?? "")"
             }
             caricato = true
+            await sole()
             if let o = await VistaVitalsOrologio.chiama(["ricordi": true]) {
                 spesa = (o["spesa"] as? [Any])?.count ?? 0
                 promesse = (o["promesse"] as? [[String: Any]] ?? []).prefix(3).compactMap { $0["testo"] as? String }
@@ -330,6 +374,14 @@ struct VistaBriefingOrologio: View {
     private var saluto: String {
         let h = Calendar.current.component(.hour, from: Date())
         return h < 12 ? "Buongiorno, Sir." : h < 18 ? "Buon pomeriggio, Sir." : "Buonasera, Sir."
+    }
+
+    /// Alba e tramonto di oggi dove si trova (Apple Meteo), per l'ologramma della giornata.
+    private func sole() async {
+        var dove = CLLocation(latitude: 45.4642, longitude: 9.19)
+        if let p = await PosizioneOrologio.attuale(), let lat = p["lat"] as? Double, let lon = p["lon"] as? Double { dove = CLLocation(latitude: lat, longitude: lon) }
+        guard let g = try? await WeatherService.shared.weather(for: dove, including: .daily).forecast.first else { return }
+        giornata = DatiGiornata(alba: g.sun.sunrise.map { DatiGiornata.minuti($0) }, tramonto: g.sun.sunset.map { DatiGiornata.minuti($0) })
     }
 }
 
@@ -450,6 +502,7 @@ struct VistaPostaOrologio: View {
 
 struct VistaSpesaOrologio: View {
     @State private var voci: [[String: Any]]?
+    @State private var presi = 0                  // 11.0 (4): spuntate in questa visita (il carrello in ologramma)
     @State private var errore = false
     private let ciano = TintaOrologio.ciano
 
@@ -458,6 +511,16 @@ struct VistaSpesaOrologio: View {
         List {
             if let voci {
                 Section {
+                    if !voci.isEmpty || presi > 0 {
+                        HStack(spacing: 8) {
+                            OlogrammaSpesa(totale: voci.count + presi, presi: presi, piccolo: true).frame(width: 46, height: 46)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("PRESE").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                                Text("\(presi) su \(voci.count + presi)").font(.system(size: 16, weight: .semibold, design: .rounded))
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                    }
                     ForEach(Array(voci.enumerated()), id: \.element.chiaveRiga) { _, r in
                         let testo = r["testo"] as? String ?? ""
                         Button { Task { await spunta(r) } } label: {
@@ -485,15 +548,17 @@ struct VistaSpesaOrologio: View {
         .task { await carica() }
     }
 
-    private func carica() async {
+    /// `presa`: appena spuntata una voce; la lista nuova e il carrello cambiano insieme (il cubo cade dentro una volta sola).
+    private func carica(presa: Bool = false) async {
         guard let o = await VistaVitalsOrologio.chiama(["ricordi": true]) else { errore = true; return }
         voci = o["spesa"] as? [[String: Any]] ?? []
+        if presa { presi += 1 }
     }
     private func spunta(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
         SuoniOrologio.fatto()
-        _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id]); await carica()
+        _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id]); await carica(presa: true)
     }
     private func elimina(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
@@ -504,8 +569,9 @@ struct VistaSpesaOrologio: View {
 // MARK: - SHAZAM
 
 struct VistaShazamOrologio: View {
-    enum Stato: Equatable { case ascolto, trovata, niente(String) }
-    @State private var stato: Stato = .ascolto
+    enum Stato: Equatable { case fermo, ascolto, trovata, niente(String) }
+    /// 5 nov (il signore: «Shazam deve attivarsi quando tocco il logo, invece parte da solo»): aperto aspetta il tocco sul logo.
+    @State private var stato: Stato = .fermo
     @State private var brano: Musica.Brano?
     @State private var suona = false                 // MARK X: la canzone suona sull'iPhone; dal polso pausa e play
     @State private var avviso: String?
@@ -518,6 +584,7 @@ struct VistaShazamOrologio: View {
                     .frame(width: 92, height: 92)
                     .onTapGesture { Task { await ascolta() } }
                 switch stato {
+                case .fermo: Text("Tocchi il logo per ascoltare.").font(.footnote).foregroundStyle(.secondary)
                 case .ascolto: Text("Ascolto la musica…").font(.footnote).foregroundStyle(.secondary)
                 case .trovata:
                     if let b = brano {
@@ -540,7 +607,6 @@ struct VistaShazamOrologio: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .task { await ascolta() }
     }
 
     /// Il logo olografico come sull'iPhone (più leggero: 5 strati), gira mentre ascolta e oscilla a riposo.
@@ -564,7 +630,7 @@ struct VistaShazamOrologio: View {
     }
 
     private func ascolta() async {
-        guard stato != .ascolto || brano == nil else { return }
+        guard stato != .ascolto else { return }
         stato = .ascolto; brano = nil; suona = false; avviso = nil
         switch await Musica.riconosci(secondi: 12) {
         case .trovato(let b):
@@ -600,8 +666,18 @@ struct VistaSerataOrologio: View {
                 let tot = c["totali"] as? [String: Any] ?? [:]
                 let ing = c["ingressi"] as? [String: Any] ?? [:]
                 let margine = n(tot["margine_netto_iva"])
+                let bar = c["bar"] as? [String: Any] ?? [:]
                 Text(nome).font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
-                ValoreOrologio(titolo: "INCASSO LORDO", valore: euro(n(tot["incasso_lordo"])), sotto: "netto IVA \(euro(n(tot["incasso_netto_iva"])))")
+                // 11.0 (4): l'anello dei soldi in ologramma, come sull'iPhone (una fetta per voce, i soldi che arrivano)
+                HStack(spacing: 6) {
+                    OlogrammaSoldi(dati: DatiSoldi(fonti: [DatiSoldi.Fonte(nome: "Ingressi contanti", valore: n(ing["contanti"])),
+                                                           DatiSoldi.Fonte(nome: "Ingressi POS", valore: n(ing["pos"])),
+                                                           DatiSoldi.Fonte(nome: "Resident Advisor", valore: n(ing["resident_advisor"])),
+                                                           DatiSoldi.Fonte(nome: "Bar contanti", valore: n(bar["contanti"])),
+                                                           DatiSoldi.Fonte(nome: "Bar POS", valore: n(bar["pos"]))]), piccolo: true)
+                        .frame(width: 46, height: 46)
+                    ValoreOrologio(titolo: "INCASSO LORDO", valore: euro(n(tot["incasso_lordo"])), sotto: "netto IVA \(euro(n(tot["incasso_netto_iva"])))")
+                }
                 HStack(spacing: 6) {
                     ValoreOrologio(titolo: "INGRESSI", valore: euro(n(tot["ingressi_lordo"])), sotto: "\(Int(n(ing["biglietti_totali"]))) biglietti")
                     ValoreOrologio(titolo: "BAR", valore: euro(n(tot["bar_lordo"])))

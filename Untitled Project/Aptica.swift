@@ -24,6 +24,7 @@ enum Aptica {
     private static let notifica = UINotificationFeedbackGenerator()
     private static let medio = UIImpactFeedbackGenerator(style: .medium)
     private static let morbido = UIImpactFeedbackGenerator(style: .soft)
+    private static let forte = UIImpactFeedbackGenerator(style: .heavy)
 
     static var disponibile: Bool { CHHapticEngine.capabilitiesForHardware().supportsHaptics && !ProcessInfo.processInfo.isiOSAppOnMac }
 
@@ -32,8 +33,76 @@ enum Aptica {
         guard disponibile else { return }
         // con il microfono aperto (ascolto all'apertura, richiamo) iOS spegne le vibrazioni dell'app: qui si lasciano passare
         try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
-        selezione.prepare(); notifica.prepare(); medio.prepare(); morbido.prepare()
+        selezione.prepare(); notifica.prepare(); medio.prepare(); morbido.prepare(); forte.prepare()
         _ = accendi()
+    }
+
+    /// Con il microfono aperto iOS spegne le vibrazioni dell'app se il permesso non c'è più (la voce riconfigura la sessione
+    /// audio): si rimette prima di ogni vibrazione delle pagine, solo se serve.
+    static func permettiColMicrofono() {
+        let s = AVAudioSession.sharedInstance()
+        if !s.allowHapticsAndSystemSoundsDuringRecording { try? s.setAllowHapticsAndSystemSoundsDuringRecording(true) }
+    }
+
+    /// Un colpo secco, con un filo di corpo sotto (0 = solo il colpo).
+    private static func colpo(intensita: Float, nitidezza: Float, corpo: Double) -> CHHapticPattern? {
+        var eventi = [CHHapticEvent(eventType: .hapticTransient,
+                                    parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensita),
+                                                 CHHapticEventParameter(parameterID: .hapticSharpness, value: nitidezza)],
+                                    relativeTime: 0)]
+        if corpo > 0 {
+            eventi.append(CHHapticEvent(eventType: .hapticContinuous,
+                                        parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensita * 0.7),
+                                                     CHHapticEventParameter(parameterID: .hapticSharpness, value: nitidezza * 0.45)],
+                                        relativeTime: 0, duration: corpo))
+        }
+        return try? CHHapticPattern(events: eventi, parameters: [])
+    }
+
+    /// Suona il colpo col motore (o, se non c'è, col generatore forte di iOS).
+    private static func suona(intensita: Float, nitidezza: Float, corpo: Double = 0) {
+        BattitoMani.ignora(per: 0.5)
+        permettiColMicrofono()
+        if let m = accendi(), let pat = colpo(intensita: intensita, nitidezza: nitidezza, corpo: corpo), let p = try? m.makePlayer(with: pat) {
+            try? p.start(atTime: CHHapticTimeImmediate)
+        } else {
+            forte.impactOccurred(intensity: CGFloat(intensita))
+            forte.prepare()
+        }
+    }
+
+    // MARK: MARK XI · le pagine (5 nov, il signore: «non c'è il feedback aptico come quando selezioni le pagine con lo swipe up
+    // lento di Apple», «più forte»). Prima erano i tocchi «leggero» e «medio» di iOS, che col microfono aperto si perdevano.
+
+    /// Le pagine olografiche compaiono (la pagina sollevata piano si aggancia): un colpo pieno e deciso, con un filo di corpo.
+    static func pagine() {
+        guard disponibile else { return }
+        ultimoTransitorio = Date()
+        suona(intensita: 1, nitidezza: 0.75, corpo: 0.06)
+    }
+
+    /// Sfogliando, arriva la pagina nuova al centro: un tocco secco e netto.
+    static func sfoglia() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.8, nitidezza: 0.85)
+    }
+
+    /// La pagina scelta si apre a tutto schermo.
+    static func sceltaPagina() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.85, nitidezza: 0.6)
+    }
+
+    /// La pagina spinta in su si chiude: il colpo più secco.
+    static func chiusaPagina() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 1, nitidezza: 0.95)
+    }
+
+    /// La pagina lanciata vola nel reattore (AGGANCIO): un colpo pieno e morbido alla partenza.
+    static func lancioPagina() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.9, nitidezza: 0.35, corpo: 0.05)
     }
 
     private static func accendi() -> CHHapticEngine? {

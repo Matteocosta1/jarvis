@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import UIKit
 import WatchKit
 import Charts
@@ -690,7 +691,7 @@ struct VistaOrologio: View {
         // come prima la barra taglia ai lati; finito l'avvio la lente può uscire un poco sopra e sotto (come nel mockup)
         .mask { Rectangle().padding(.vertical, accese >= n ? -14 : 0) }
         .contentShape(Rectangle())
-        // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona), con l'ologramma; la corona la fa scorrere normalmente
+        // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona), con l'ologramma (5 nov: la corona non più)
         .highPriorityGesture(
             DragGesture(minimumDistance: 5)
                 .onChanged { v in if accese >= n { ruota.trascina(v.location.x) } }
@@ -698,8 +699,9 @@ struct VistaOrologio: View {
         )
         .onChange(of: barraInFondo) { _, si in if si { ruota.inFondo() } }
         .onChange(of: scorriA) { _, k in if let k { ruota.scorriA(k, durata: passoBarra) } }
-        // 4 nov: la corona muove le icone normalmente (senza ologramma); il dito resta la ruota con l'ologramma
-        .modifier(CoronaBarra(ruota: ruota, attiva: accese >= n))
+        // 5 nov (il signore: «mentre le scorro JARVIS si illumina di arancio e cerca di ascoltare»): con la ruota viva il
+        // microfono d'attesa è spento; si riapre fatta la scelta (o spenta la ruota dopo 5 s)
+        .onReceive(ruota.$vivo.removeDuplicates()) { vivo in jarvis.iconeInMoto = vivo }
         .disabled(jarvis.fase == .elaboro)
     }
 

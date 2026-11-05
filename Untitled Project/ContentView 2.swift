@@ -73,6 +73,7 @@ struct ContentView: View {
     @State private var riprendo: Sezione?                      // la sezione che torna davanti da dietro (non una richiesta nuova)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var giroDavanti: [UUID] = []                // le sezioni state davanti, dall'ultima: «Jarvis, quella di prima»
     @State private var modoTestata: ModoCorona?                // il dito sulla testata: scorre sul Dock (.ruota) o tira giù la tendina
+    @State private var turnoRichiamo = 0                       // 5 nov: il richiamo si riaccende a discesa della sezione finita
     private enum ModoCorona { case ruota, tendina }
     @Environment(\.scenePhase) private var scena
 
@@ -135,7 +136,7 @@ struct ContentView: View {
             .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
             .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
             .onChange(of: tastiera) { _, aperta in if aperta { ruota.spegni() } }       // MARK XI: si scrive, l'ologramma della ruota si spegne
-            .onChange(of: schermoLibero, initial: true) { _, libero in jarvis.richiamoConsentito = libero }
+            .onChange(of: schermoLibero, initial: true) { _, libero in consentiRichiamo(libero) }
             .onChange(of: qualcosaAperto, initial: true) { _, aperto in jarvis.schermataAperta = aperto }
             .onChange(of: sezioneAperta, initial: true) { _, r in jarvis.sezioneAperta = r }
             .onChange(of: aiutoBea != nil, initial: true) { _, aperto in jarvis.soccorsoAperto = aperto }
@@ -601,6 +602,9 @@ struct ContentView: View {
     static let marca = "MARK XI"                         // 3 nov: MARK XI, Version 11.0 (approvata dal signore)
     /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra). Studio e Social arrivano con le tappe 2 e 3.
     enum postoTesta { static let social = 0, musica = 1, studio = 2, sistemi = 3, cestino = 4, impostazioni = 5, totale = 6 }
+    /// 5 nov (il signore: «vanno distanziate un minimo»): il margine per lato di ogni icona in alto, 3,5 punti (era 2): fra due
+    /// icone 3 punti in più, e un tocco più largo. Con la tastiera aperta resta 1 (lì c'è il reattore piccolo).
+    static let margineDock: CGFloat = 3.5
 
     /// `mini`: con la tastiera aperta (solo iPhone) qui c'è il posto del reattore piccolo, tra il titolo e i tasti: il reattore vero
     /// ci vola sopra dal centro (`reattoreVolante`). Build 23: le icone sono quattro (MUSICA, SISTEMI, cestino, Impostazioni); come nel
@@ -660,10 +664,10 @@ struct ContentView: View {
                 .accessibilityHidden(true)                          // per VoiceOver c'è il reattore stesso («Chiudi la tastiera»)
             }
             // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.social) } label: {
+            Button { toccaDock(ContentView.postoTesta.social) } label: {
                 IconaSocial()
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -671,12 +675,12 @@ struct ContentView: View {
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.social))
             .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.musica) } label: {
+            Button { toccaDock(ContentView.postoTesta.musica) } label: {
                 IconaVinile()
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
                     // 27 ott notte (il signore): il disco un poco più a destra, verso Studio
-                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) + 0.6).padding(.trailing, (mini ? 1 : 2) - 0.6)
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.6).padding(.trailing, (mini ? 1 : ContentView.margineDock) - 0.6)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
@@ -684,37 +688,37 @@ struct ContentView: View {
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.studio) } label: {
+            Button { toccaDock(ContentView.postoTesta.studio) } label: {
                 IconaStudio(pieno: true)                            // 27 ott: alta 15 punti come le altre 5 (misurate sulla foto), cubo più grande
                     .frame(width: 18, height: 18)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
                     .foregroundStyle(Color.ciano)
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
                     .padding(.vertical, 8)
-                    .padding(.leading, (mini ? 1 : 2) + 0.55).padding(.trailing, (mini ? 1 : 2) + 0.25)   // spazi a vista uguali
+                    .padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.55).padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.25)   // spazi a vista uguali
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.studio))
             .accessibilityLabel("Studio")
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.sistemi) } label: {
+            Button { toccaDock(ContentView.postoTesta.sistemi) } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 11.8, weight: .semibold))   // 27 ott notte (il signore): linee spesse come Social (1,33 pt, misurate sulla foto)                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : 2)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
+                    .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sistemi))
             .accessibilityLabel("Sistemi")
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.cestino) } label: {
+            Button { toccaDock(ContentView.postoTesta.cestino) } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13.9, weight: .semibold))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
-                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : 2) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
@@ -726,11 +730,11 @@ struct ContentView: View {
             } message: {
                 Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
             }
-            Button { Suoni.clickDock(); azioneDock(ContentView.postoTesta.impostazioni) } label: {
+            Button { toccaDock(ContentView.postoTesta.impostazioni) } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
-                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : 2) + 0.35).padding(.trailing, mini ? 1 : 2)   // foto 02:49: spazio 7
+                    .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.35).padding(.trailing, mini ? 1 : ContentView.margineDock)   // foto 02:49: spazio 7
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
@@ -897,6 +901,9 @@ struct ContentView: View {
             ArchiRuota(ruota: ruota, gruppi: elenco.map(\.gruppo), angoli: ang, accese: accese, raggio: r)
             // più alto della corona (stesso centro): il nome INTELLIGENCE, sotto le icone in basso, non viene più tagliato
             .frame(height: ContentView.latoCorona + 80)
+            // 5 nov: la GHIERA (mockup v259), dentro le icone, solo mentre la ruota è viva
+            GhieraRuota(ruota: ruota, angoli: ang, raggio: r)
+                .frame(height: ContentView.latoCorona + 80)
 
             // il reattore al centro, della misura di sempre (sull'iPhone solo il suo posto: il reattore vola sopra)
             if reattoreFuori {
@@ -1069,7 +1076,36 @@ struct ContentView: View {
             .onEnded { v in tendinaLasciata(v.translation, previsto: v.predictedEndTranslation) }
     }
 
-    /// MARK XI: cosa fa ogni icona del Dock (dal tocco o alzando il dito dopo averci scorso sopra).
+    /// 5 nov (il signore: «si aprono involontariamente e si cliccano male… come il Dock di Apple»): il tocco su un'icona in alto.
+    /// Sul Mac (il puntatore le ha già ingrandite) apre; sull'iPhone apre solo se le icone sono già ingrandite (dopo il dito che
+    /// scorre o un primo tocco): altrimenti le ingrandisce attorno all'icona toccata, e il tocco dopo apre quella giusta.
+    private func toccaDock(_ i: Int) {
+        guard testaArrivate >= ContentView.postoTesta.totale else { return }          // durante l'arrivo delle icone non si apre niente
+        if ProcessInfo.processInfo.isiOSAppOnMac || dock.trattenuta || UIAccessibility.isVoiceOverRunning {   // VoiceOver: apre subito
+            Suoni.clickDock()
+            azioneDock(i)
+        } else {
+            dock.mostra(i)
+        }
+    }
+
+    /// 5 nov (video del signore: «chiudendo il Trainer l'animazione si ferma a metà per circa un secondo»): riaccendere il
+    /// richiamo («Jarvis» in attesa) prepara il microfono sul thread principale (sessione audio e motore nuovo) e capitava a metà
+    /// della discesa della sezione, fermandola. Ora, quando il microfono torna libero, il richiamo si riaccende a discesa finita
+    /// (0,45 s dopo); quando si deve spegnere, subito come prima. Il richiamo resta quello di sempre: cambia solo l'istante.
+    private func consentiRichiamo(_ libero: Bool) {
+        turnoRichiamo += 1
+        guard libero else { jarvis.richiamoConsentito = false; return }
+        guard !jarvis.richiamoConsentito else { return }
+        let mio = turnoRichiamo
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard mio == turnoRichiamo, schermoLibero else { return }
+            jarvis.richiamoConsentito = true
+        }
+    }
+
+    /// MARK XI: cosa fa ogni icona del Dock (dal tocco sull'icona ingrandita).
     private func azioneDock(_ i: Int) {
         // 4 nov: la lente si spegne sempre quando un'icona apre qualcosa. Sul Mac il puntatore era ancora sopra l'icona quando la
         // sezione la copriva: l'icona restava ingrandita (anche dopo lo swipe veloce); ora le icone tornano sempre allineate.
@@ -1096,12 +1132,16 @@ struct ContentView: View {
     private var gestoTestata: some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { v in
-                if modoTestata == nil { modoTestata = sulDock(v.startLocation) ? .ruota : .tendina }
+                if modoTestata == nil {
+                    modoTestata = sulDock(v.startLocation) ? .ruota : .tendina
+                    if modoTestata == .tendina, dock.x != nil { dock.lascia() }          // tirata altrove: le icone tornano piccole
+                }
                 if modoTestata == .ruota { dock.segui(v.location.x) } else { tendinaSegue(v.translation) }
             }
             .onEnded { v in
                 if modoTestata == .ruota {
-                    if let i = dock.lascia() { azioneDock(i) }
+                    // 5 nov: alzando il dito non si apre niente: le icone restano grandi e aspettano il tocco (come il Dock)
+                    dock.trattieni()
                 } else {
                     tendinaLasciata(v.translation, previsto: v.predictedEndTranslation)
                 }
@@ -1673,6 +1713,7 @@ struct ContentView: View {
         case .satellite: return RichiestaSatellite.condivisa.azione != nil
         case .lidar: return LidarAperta.richiesta != nil
         case .browser: return CercaVideo.richiesta != nil || CercaWeb.richiesta != nil
+        case .shazam: return VistaShazam.ascoltaSubito                  // 5 nov: a voce Shazam ascolta subito, anche se è già aperto
         default: return false
         }
     }
@@ -1690,6 +1731,7 @@ struct ContentView: View {
         // MARK XI: le sezioni stanno nel contenitore: quella davanti va dietro (resta viva) e la nuova sale subito. Solo la pagina
         // web e la fotocamera di sistema sono ancora schermate di iOS: lì si aspetta che si chiudano.
         let aperto = jarvis.pagina != nil || sorgenteFoto != nil
+        if r == .shazam { VistaShazam.ascoltaSubito = true }               // 5 nov: chiesto a voce, Shazam ascolta subito
         if tendinaAperta { chiudiTendina() }      // come nel mockup: la sezione chiesta a voce non si apre con la tendina PROTOCOLLI rimasta giù dietro
         // 4 nov (il signore, strada B): già aperta, davanti o dietro, e con una richiesta nuova: la fa sul posto (sotto)
         let s: Sezione? = sezione(di: r)
@@ -2304,15 +2346,12 @@ struct ImpostazioniView: View {
                     Text("Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.")
                 }
             }
+            // 5 nov (il signore: «se scorro si vede quella barra grigia»): «Fatto» in una riga sua sopra la pagina, come «Chiudi»
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto") {
+                Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))
+                chiudi()
+            })
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Fatto") {
-                        Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))
-                        chiudi()
-                    }
-                }
-            }
             .onAppear { voci = Jarvis.vociItaliane() }
         }
         // 4 nov (il signore: «ciano come il resto, mai il blu di iOS»): interruttori, «Fatto», il ritorno da «La mia voce» e il

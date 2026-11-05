@@ -52,7 +52,7 @@ struct SchermoPolso<Contenuto: View>: View {
         .onAppear { guard !mostrato else { return }; apertaDa = Date(); WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }
         .task(id: pronto) {
             guard pronto, !mostrato else { return }
-            let resta = 0.9 - Date().timeIntervalSince(apertaDa)
+            let resta = AperturaPolso.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard !Task.isCancelled else { return }       // uscito prima della fine: niente «pronta» a schermata chiusa
             WKInterfaceDevice.current().play(.success)
@@ -159,8 +159,8 @@ struct VistaProtocolliOrologio: View {
         }
         .task {
             guard let avvia else { return }               // detto a voce: la schermata si vede, poi parte
-            // come il mockup: 0,9 s di caricamento, poi la schermata si vede per 2 secondi e parte (prima partiva 1,1 s dopo)
-            try? await Task.sleep(for: .seconds(2.9))
+            // come il mockup: il caricamento (0,45 s), poi la schermata si vede per 2 secondi e parte
+            try? await Task.sleep(for: .seconds(AperturaPolso.caricamento + 2))
             guard !Task.isCancelled else { return }
             parti(avvia)
         }

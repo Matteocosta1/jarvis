@@ -141,6 +141,7 @@ struct VistaConfidente: View {
                     .padding(16)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .modifier(ConBarraChiudi(tinta: Color.ciano) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
             }
             .task { stato = await SaluteOggi.leggi() }
             .tastiAVoce { a in
@@ -179,9 +180,6 @@ struct VistaConfidente: View {
             .onChange(of: domanda) { salvaBozza() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
-            }
         }
         .preferredColorScheme(.dark)
         .aperturaHUD("Confidente")

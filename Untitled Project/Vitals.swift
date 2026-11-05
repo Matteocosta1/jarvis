@@ -61,12 +61,10 @@ struct VistaVitals: View {
                     }
                     .padding(16)
                 }
+                .modifier(ConBarraChiudi(tinta: Color.ciano) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() }.tint(Color.ciano) }
-            }
             .task(id: giorni) { await carica() }
             .confirmationDialog("Cancellare tutto il diario? Non si può tornare indietro.", isPresented: $confermaTutto, titleVisibility: .visible) {
                 Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
