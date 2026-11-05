@@ -531,11 +531,11 @@ struct ProveOloVista: View {
     }
 
     private var tela: some View {
-        let k = self.k, aiuto = sezione.aiuti[k], ritocco = self.ritocco
+        let k = self.k, aiuto = sezione.aiuti[k], tocchi = ritocco
         return TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
             let t = riduci ? 6 : ctx.date.timeIntervalSince(inizio)
             Canvas { gc, size in
-                _ = ritocco                                       // con «Riduci movimento»: un tocco ridisegna
+                _ = tocchi                                        // con «Riduci movimento»: un tocco ridisegna
                 MotoreOlo.fotogramma(&gc, size, t, mano, aiuto: aiuto) { g, W, H in disegna(k, &g, W, H, t, mano) }
             }
         }
