@@ -435,6 +435,7 @@ Il signore ha installato la 11.0 (3) e ha mandato foto e un video (ScreenRecordi
 15. La corona non deve più comandare le icone (il signore: «avevo sbagliato io»; annulla la scelta del 4 nov).
 
 ## Build dopo la 11.0 (3) — 5 nov mattina: cosa è fatto (numero di build da chiedere al signore)
+Controllo di compilazione su GitHub (commit c744d0b, Xcode 27): **verde, 0 errori e 0 avvisi** su iPhone, polso, complicazione e isola. Il numero di build è ancora quello della 11.0 (3): si alza dopo il sì del signore.
 Mockup aggiornato prima dell'app: v260 (aperture 0,45 s, Dock) e v261 (ologrammi nuovi), pubblicato. Dialogo e cervello non toccati (il signore: «voglio che non vengano toccati dialogo e cervello»); l'unico ritocco nel motore del polso è l'interruttore del microfono chiesto al punto 14.
 
 | # | Cosa | Stato |
