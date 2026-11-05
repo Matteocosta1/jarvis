@@ -190,11 +190,14 @@ struct VistaBriefing: View {
     @State private var promesse: [(String, String)] = []
     @State private var caricato = false
     @State private var sole: (alba: Double?, tramonto: Double?) = (nil, nil)     // 11.0 (4): per l'ologramma della giornata
+    @State private var massimaOlo: Int?                                         // 11.0 (6): per le prove dell'ologramma (GLOBO)
+    @State private var dove: (lat: Double, lon: Double) = (lat: 45.4642, lon: 9.19)
+    @State private var luogo = "MILANO"
 
     var body: some View {
         CorniceScheda(titolo: "Briefing", sottotitolo: Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)), icona: "sun.horizon", tinta: tinta, pronto: caricato) {
-            // 11.0 (4), come il mockup v261: la giornata in ologramma, la luce da alba a tramonto, adesso e gli impegni
-            OlogrammaGiornata(dati: giornata).frame(height: 220).corniceOlo(tinta)
+            // 11.0 (6), come il mockup v264: l'ologramma della giornata con le sue tre prove (RADAR, GLOBO, PISTA), scelte con le chip
+            OlogrammaBriefingProve(dati: briefingOlo).corniceOlo(tinta)
             Text(saluto).font(.system(size: 20, weight: .medium)).foregroundStyle(.white)
             TastoJarvis(testo: "Briefing a voce", icona: "waveform", tinta: tinta) { chiedi("Buongiorno Jarvis, il briefing per favore.") }
 
@@ -264,11 +267,23 @@ struct VistaBriefing: View {
         return h < 12 ? "Buongiorno, Sir." : h < 18 ? "Buon pomeriggio, Sir." : "Buonasera, Sir."
     }
 
-    /// Per l'ologramma: alba, tramonto e l'ora d'inizio degli impegni di oggi (quelli di tutto il giorno non hanno un'ora).
-    private var giornata: DatiGiornata {
-        let oggi = Calendar.current.startOfDay(for: Date())
-        let ore = eventi.filter { !$0.isAllDay && $0.startDate >= oggi }.map { DatiGiornata.minuti($0.startDate) }
-        return DatiGiornata(alba: sole.alba, tramonto: sole.tramonto, impegni: ore)
+    /// Per le prove dell'ologramma (11.0 (6)): alba e tramonto, il meteo, dove si è e gli impegni di oggi (quelli di tutto il giorno
+    /// non hanno un'ora; al massimo 8, come stanno nel disegno).
+    private var briefingOlo: BriefingOlo {
+        let oggi = Calendar.current.startOfDay(for: Date()), domani = oggi.addingTimeInterval(86_400)
+        var b = BriefingOlo()
+        if let a = sole.alba { b.alba = a }
+        if let tr = sole.tramonto { b.tramonto = tr }
+        b.gradi = meteo.map { Int($0.temperature.converted(to: .celsius).value.rounded()) }
+        b.massima = massimaOlo
+        b.cielo = meteo?.condition.description ?? ""
+        b.lat = dove.lat
+        b.lon = dove.lon
+        b.luogo = luogo
+        b.impegni = eventi.filter { !$0.isAllDay && $0.startDate >= oggi && $0.startDate < domani }.prefix(8).map { e in
+            BriefingOlo.Impegno(m: BriefingOlo.minuti(e.startDate), nome: e.title ?? "", corto: BriefingOlo.corto(e.title ?? ""))
+        }
+        return b
     }
 
     private func carica() async {
@@ -285,17 +300,26 @@ struct VistaBriefing: View {
                 .sorted { $0.startDate < $1.startDate }
         } else { calendarioNegato = true }
         // meteo
-        var dove = CLLocation(latitude: 45.4642, longitude: 9.19)
-        if let pos = await Posizione.attuale(), let lat = pos["lat"] as? Double, let lon = pos["lon"] as? Double { dove = CLLocation(latitude: lat, longitude: lon) }
-        if let w = try? await WeatherService.shared.weather(for: dove, including: .current, .daily) {
+        var qui = CLLocation(latitude: 45.4642, longitude: 9.19)
+        if let pos = await Posizione.attuale(), let lat = pos["lat"] as? Double, let lon = pos["lon"] as? Double {
+            qui = CLLocation(latitude: lat, longitude: lon)
+            dove = (lat: lat, lon: lon)
+        }
+        if let w = try? await WeatherService.shared.weather(for: qui, including: .current, .daily) {
             meteo = w.0
             if let g = w.1.forecast.first {
-                massima = "max \(Int(g.highTemperature.converted(to: .celsius).value.rounded()))°"
+                let alta = Int(g.highTemperature.converted(to: .celsius).value.rounded())
+                massima = "max \(alta)°"
+                massimaOlo = alta
                 sole = (g.sun.sunrise.map { DatiGiornata.minuti($0) }, g.sun.sunset.map { DatiGiornata.minuti($0) })
             }
         }
         salute = await s
         caricato = true            // agenda, meteo e salute ci sono: il resto arriva mentre legge
+        // 11.0 (6): il nome del posto per il GLOBO (come il meteo); se non si sa, resta Milano
+        if let geo = try? await CLGeocoder().reverseGeocodeLocation(qui).first, let citta = geo.locality, !citta.isEmpty {
+            luogo = citta.uppercased()
+        }
         if let o = await VistaVitals.chiama(["ricordi": true]) {
             spesa = (o["spesa"] as? [Any])?.count ?? 0
             promesse = (o["promesse"] as? [[String: Any]] ?? []).prefix(4).map { ($0["testo"] as? String ?? "", [$0["persona"] as? String, $0["quando_leggibile"] as? String].compactMap { $0 }.joined(separator: " · ")) }
@@ -477,9 +501,10 @@ struct VistaSpesa: View {
                     Section {
                         TestataScheda(titolo: "Spesa", sottotitolo: sottotitolo, icona: "cart", tinta: tinta)
                             .listRowBackground(Color.clear)
-                        // 11.0 (4), come il mockup v261: il carrello in ologramma; spuntata una voce, il cubo ci cade dentro
-                        OlogrammaSpesa(totale: daComprare.count + nelCarrello.count, presi: nelCarrello.count)
-                            .frame(height: 200).corniceOlo(tinta)
+                        // 11.0 (6), come il mockup v264: l'ologramma della spesa con le sue tre prove (CASSA, SCAFFALE, ANELLO);
+                        // toccata una cosa nell'ologramma è come toccarla nella lista: si spunta o torna da prendere
+                        OlogrammaSpesaProve(dati: spesaOlo)
+                            .corniceOlo(tinta)
                             .listRowBackground(Color.clear)
                         progresso.listRowBackground(Color.clear)
                         HStack(spacing: 8) {
@@ -633,6 +658,25 @@ struct VistaSpesa: View {
                 .frame(height: 6)
             }
             .animation(.spring(duration: 0.4), value: nelCarrello.count)
+        }
+    }
+
+    /// Per le prove dell'ologramma (11.0 (6)): le cose della lista, nell'ordine in cui sono state scritte (così non saltano di posto
+    /// quando si spuntano), al massimo 12; quelle nel carrello sono prese.
+    private var spesaOlo: SpesaOlo {
+        var tutte: [(v: Voce, presa: Bool)] = daComprare.map { (v: $0, presa: false) }
+        tutte += nelCarrello.map { (v: $0, presa: true) }
+        tutte.sort { $0.v.id < $1.v.id }
+        return SpesaOlo(voci: tutte.prefix(12).map { SpesaOlo.Voce(id: $0.v.id, nome: $0.v.testo, qta: "", presa: $0.presa) },
+                        tocca: { id in toccaOlo(id) })
+    }
+
+    /// Il tocco su una cosa nell'ologramma: come toccarla nella lista (con il suo suono).
+    private func toccaOlo(_ id: Int) {
+        if let v = daComprare.first(where: { $0.id == id }) {
+            Task { await spunta(v) }
+        } else if let v = nelCarrello.first(where: { $0.id == id }) {
+            Task { await rimetti(v) }
         }
     }
 

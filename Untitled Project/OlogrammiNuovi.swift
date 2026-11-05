@@ -963,3 +963,118 @@ extension View {
     }
 }
 #endif
+
+/// 5 nov sera (il signore: «bello che l'icona olografica sia tagliata da linee come nel mockup, nell'app non c'era», l'icona della
+/// click wheel): le righe di scansione dell'icona, come `.rolo .rolo-ico svg` del mockup: dal basso, 2 punti pieni e 1 al 40%.
+/// Si usa come maschera dell'icona (iPhone e polso), prima dell'alone: anche l'alone segue le righe, come nel mockup.
+struct RigheIcona: View {
+    var body: some View {
+        Canvas { gc, size in
+            var piene = Path(), tenui = Path()
+            var y = size.height
+            while y > 0 {
+                piene.addRect(CGRect(x: 0, y: y - 2, width: size.width, height: 2))
+                tenui.addRect(CGRect(x: 0, y: y - 3, width: size.width, height: 1))
+                y -= 3
+            }
+            gc.fill(piene, with: .color(.black))
+            gc.fill(tenui, with: .color(.black.opacity(0.4)))
+        }
+    }
+}
+
+/// 5 nov sera (il signore: «griglia va bene, mi piace»): come nasce l'ologramma dell'icona della click wheel quando la ruota si ferma
+/// (iPhone e polso), al posto dei puntini: la GRIGLIA del mockup v263–v264. Linee di costruzione: quattro spigoli salgono dal
+/// proiettore, si chiude una gabbia di luce attorno all'icona, il piano di stampa sale con sotto la sua griglia (e l'icona si rivela
+/// dietro di lui); poi la gabbia si ritira negli angoli e si spegne. Tempi del mockup: accensione 0–90 ms, stampa 90–380 ms,
+/// chiusura 380–470 ms. Tutto deterministico: uguale a ogni fotogramma, a 60 o a 120 Hz. Coordinate del mockup: centro 0,0 a metà
+/// del quadrato di 200, l'icona 64 × 64 da −32 a 32 e da −50 a 14, il proiettore a y 70.
+enum NascitaGriglia {
+    static func ease(_ p: Double) -> Double { let q = max(0, min(1, p)); return 1 - pow(1 - q, 3) }
+
+    /// Il piano di stampa: dal fondo dell'icona alla cima, 90–380 ms (la stessa curva della rivelazione dell'icona).
+    static func piano(_ T: Double) -> Double { 14 - 64 * ease((T - 90) / 290) }
+
+    private static let davanti: [(x: Double, y: Double)] = [(-36, 18), (36, 18), (36, -54), (-36, -54)]
+    private static let dietro: [(x: Double, y: Double)] = [(-36 * 0.86 + 4, 12), (36 * 0.86 + 4, 12), (36 * 0.86 + 4, -60), (-36 * 0.86 + 4, -60)]
+    private static let basi: [(x: Double, y: Double)] = [(-26, 73), (26, 73), (18, 66), (-18, 66)]
+    private static let bianco = Color(red: 223 / 255, green: 250 / 255, blue: 1)
+
+    /// La nascita al tempo `T` (ms dalla creazione), nel contesto già spostato al centro.
+    static func disegna(_ g: GraphicsContext, _ T: Double) {
+        let F = davanti, D = dietro, B = basi
+        let y = piano(T), via = ease((T - 300) / 170)                    // dopo 300 ms la gabbia si ritira negli angoli
+        let tratto = { (x0: Double, y0: Double, x1: Double, y1: Double, col: Color, w: Double) -> Void in
+            var p = Path()
+            p.move(to: CGPoint(x: x0, y: y0))
+            p.addLine(to: CGPoint(x: x1, y: y1))
+            g.stroke(p, with: .color(col), lineWidth: w)
+        }
+        // 1) gli spigoli di costruzione: salgono dal proiettore agli angoli in alto della gabbia (0–150 ms), poi si spengono
+        let sale = ease(T / 150), spigoli = 1 - ease((T - 230) / 130)
+        if spigoli > 0.01 {
+            let coppie: [(a: (x: Double, y: Double), b: (x: Double, y: Double))] = [(B[0], F[3]), (B[1], F[2]), (B[2], D[2]), (B[3], D[3])]
+            for (i, c) in coppie.enumerated() {
+                let tx = c.a.x + (c.b.x - c.a.x) * sale, ty = c.a.y + (c.b.y - c.a.y) * sale
+                tratto(c.a.x, c.a.y, tx, ty, Olo.azzurro.opacity((i < 2 ? 0.5 : 0.25) * spigoli), 0.8)
+                if sale < 1 {                                             // la punta che sale, bianca
+                    tratto(tx - (c.b.x - c.a.x) * 0.04, ty - (c.b.y - c.a.y) * 0.04, tx, ty, Color.white.opacity(0.95 * spigoli), 1.2)
+                }
+            }
+        }
+        // 2) la gabbia: i lati si disegnano dal centro verso gli angoli (120–260 ms), poi si ritirano negli angoli
+        let chiude = ease((T - 120) / 140), spegne = 1 - ease((T - 400) / 80)
+        if chiude > 0.01 && spegne > 0.01 {
+            let facce: [(Q: [(x: Double, y: Double)], alfa: Double, w: Double)] = [(Q: D, alfa: 0.22, w: 0.7), (Q: F, alfa: 0.55, w: 1)]
+            for f in facce {
+                let col = Olo.ciano.opacity(f.alfa * spegne)
+                for i in 0..<4 {
+                    let a = f.Q[i], b = f.Q[(i + 1) % 4], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2
+                    if via <= 0 {
+                        tratto(mx + (a.x - mx) * chiude, my + (a.y - my) * chiude, mx + (b.x - mx) * chiude, my + (b.y - my) * chiude, col, f.w)
+                    } else {                                              // ritirata: da lato intero a un'unghia del 9% per angolo
+                        let q = 0.5 * (1 - via) + 0.09 * via
+                        tratto(a.x, a.y, a.x + (b.x - a.x) * q, a.y + (b.y - a.y) * q, col, f.w)
+                        tratto(b.x, b.y, b.x + (a.x - b.x) * q, b.y + (a.y - b.y) * q, col, f.w)
+                    }
+                }
+            }
+        }
+        // 3) i lampi agli angoli davanti quando la gabbia si chiude (260 ms)
+        let lampo = T > 255 && T < 345 ? 1 - (T - 255) / 90 : 0
+        if lampo > 0 {
+            for p in F {
+                tratto(p.x - 4, p.y, p.x + 4, p.y, Color.white.opacity(lampo), 0.8)
+                tratto(p.x, p.y - 4, p.x, p.y + 4, Color.white.opacity(lampo), 0.8)
+            }
+        }
+        // 4) il piano di stampa con la sua griglia: quattro righe sotto, sempre più tenui, e le tacche ogni 8 punti
+        if T >= 90 && T < 380 {
+            stampa(g, y, 0.85)
+            for k in 1...4 { tratto(-32, y + Double(k) * 4, 32, y + Double(k) * 4, Olo.azzurro.opacity(0.42 / Double(k)), 0.6) }
+            var tacche = Path()
+            var px = -32.0
+            while px <= 32 {
+                tacche.move(to: CGPoint(x: px, y: y - 1.5))
+                tacche.addLine(to: CGPoint(x: px, y: y + 16))
+                px += 8
+            }
+            g.stroke(tacche, with: .color(Olo.ciano.opacity(0.55)), lineWidth: 0.6)
+        }
+    }
+
+    /// Il piano di stampa vero e proprio: una linea chiara con il suo alone, larga quanto l'icona.
+    private static func stampa(_ g: GraphicsContext, _ y: Double, _ a: Double) {
+        guard a > 0.01 else { return }
+        var l = Path()
+        l.move(to: CGPoint(x: -38, y: y))
+        l.addLine(to: CGPoint(x: 38, y: y))
+        let riga: [Gradient.Stop] = [Gradient.Stop(color: bianco.opacity(0), location: 0), Gradient.Stop(color: bianco.opacity(0.9 * a), location: 0.5),
+                                     Gradient.Stop(color: bianco.opacity(0), location: 1)]
+        g.stroke(l, with: .linearGradient(Gradient(stops: riga), startPoint: CGPoint(x: -38, y: y), endPoint: CGPoint(x: 38, y: y)), lineWidth: 1)
+        let alone: [Gradient.Stop] = [Gradient.Stop(color: Olo.azzurro.opacity(0), location: 0), Gradient.Stop(color: Olo.azzurro.opacity(0.28 * a), location: 0.5),
+                                      Gradient.Stop(color: Olo.azzurro.opacity(0), location: 1)]
+        g.fill(Path(CGRect(x: -36, y: y - 5, width: 72, height: 10)),
+               with: .linearGradient(Gradient(stops: alone), startPoint: CGPoint(x: 0, y: y - 5), endPoint: CGPoint(x: 0, y: y + 5)))
+    }
+}

@@ -584,11 +584,10 @@ struct VistaSerata: View {
                                               ("Resident Advisor", n(ing["resident_advisor"])), ("Bar contanti", n(bar["contanti"])), ("Bar POS", n(bar["pos"]))].filter { $0.1 > 0 }
             if fette.isEmpty { Text("Nessun incasso registrato.").font(.footnote).foregroundStyle(Color.tenue) }
             else {
-                // 11.0 (4), come il mockup v261: l'anello di monete (una fetta per voce, alta quanto pesa), i soldi che arrivano
-                // e l'incasso che sale al centro; sotto, voce per voce, quanto e che parte del totale
-                OlogrammaSoldi(dati: DatiSoldi(fonti: fette.map { DatiSoldi.Fonte(nome: $0.0, valore: $0.1) }))
-                    .frame(height: 220)
-                    .id(scelta?.id)                              // un'altra serata: l'anello riparte da capo
+                // 11.0 (6), come il mockup v264: l'ologramma dei soldi con le sue tre prove (FLUSSO, TORRI, REATTORE), scelte con le
+                // chip; sotto, voce per voce, quanto e che parte del totale
+                OlogrammaSerataProve(dati: DatiSoldi(fonti: fette.map { DatiSoldi.Fonte(nome: $0.0, valore: $0.1) }))
+                    .id(scelta?.id)                              // un'altra serata: la prova riparte da capo
                 legendaSoldi(fette)
             }
         }

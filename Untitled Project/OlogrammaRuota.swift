@@ -185,9 +185,10 @@ struct VeloRuota: ViewModifier {
 
 /// L'ologramma dell'icona in alto, nel reattore (mockup approvato). Mentre gira: l'anteprima tenue, che cambia di scatto con un
 /// guizzo. Ferma: si crea alla Tony Stark sul tono «olo» — 0–90 ms il proiettore si accende (lampo alla base, colonna di luce che
-/// sale, poi il cono); 40–330 ms le particelle salgono dalla base e si posano sull'icona; 90–380 ms l'icona si disegna dal basso
-/// mentre il disco di scansione la percorre; 120–420 ms il nome si decodifica; 150–420 ms gli anelli giroscopici si aprono;
-/// 100–320 ms le staffe attorno al nome. Toccato: apre la sezione.
+/// sale, poi il cono); 0–470 ms la GRIGLIA (11.0 (6), al posto dei puntini: spigoli di costruzione, gabbia di luce, piano di
+/// stampa con la sua griglia); 90–380 ms l'icona si disegna dal basso dietro il piano di stampa, col disco di scansione;
+/// 120–420 ms il nome si decodifica; 150–420 ms gli anelli giroscopici si aprono; 100–320 ms le staffe attorno al nome.
+/// Toccato: apre la sezione.
 struct OlogrammaRuota: View {
     @ObservedObject var ruota: RuotaCorona
     /// Nome, gruppo e simbolo di ogni icona della corona, nell'ordine.
@@ -197,9 +198,7 @@ struct OlogrammaRuota: View {
     let apri: (Int) -> Void
 
     @State private var cambiataDa = Date.distantPast
-    @State private var particelle: [Particella] = []
 
-    private struct Particella { let x0: Double, x: Double, y: Double, da: Double, dur: Double }
     private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
     private static let chiaro = Color(red: 0.56, green: 0.94, blue: 1.0)      // #8ff0ff
     private static let bianco = Color(red: 0.75, green: 0.96, blue: 1.0)      // #bff6ff
@@ -238,7 +237,6 @@ struct OlogrammaRuota: View {
         .accessibilityHidden(!vivo)
         .accessibilityLabel(etichetta)
         .onChange(of: ruota.scelta) { cambiataDa = Date() }
-        .onChange(of: ruota.creataDa) { _, d in if d != nil { particelle = OlogrammaRuota.nuoveParticelle() } }
     }
 
     /// Il guizzo quando cambia l'icona in alto (0,2 s): un tremolio di luce.
@@ -246,13 +244,6 @@ struct OlogrammaRuota: View {
         let s = ora.timeIntervalSince(cambiataDa)
         guard s < 0.2 else { return 1 }
         return 0.55 + 0.45 * abs(sin(s * 60))
-    }
-
-    private static func nuoveParticelle() -> [Particella] {
-        (0..<40).map { _ in
-            Particella(x0: Double.random(in: -22...22), x: Double.random(in: -28...28), y: Double.random(in: -46...10),
-                       da: 40 + Double.random(in: 0...110), dur: 150 + Double.random(in: 0...80))
-        }
     }
 
     private static func ease(_ p: Double) -> Double { let q = max(0, min(1, p)); return 1 - pow(1 - q, 3) }
@@ -276,6 +267,7 @@ struct OlogrammaRuota: View {
             }
             .frame(height: 64)
         }
+        .mask { RigheIcona() }                                                     // 5 nov sera: le righe come nel mockup
         .shadow(color: .ciano.opacity(0.45 + 0.35 * luce), radius: 3 + 3 * luce)   // mentre gira: alone corto e tenue
         .opacity(0.3 + 0.7 * luce)
         .offset(x: creata && T > 380 && T < 520 ? sin(T * 0.25) * 0.8 : 0)      // due tremolii, poi resta sospesa
@@ -342,17 +334,9 @@ struct OlogrammaRuota: View {
         fascio.addLine(to: CGPoint(x: 56 * cono, y: -50)); fascio.addLine(to: CGPoint(x: -56 * cono, y: -50)); fascio.closeSubpath()
         g.fill(fascio, with: .linearGradient(Gradient(colors: [ciano.opacity((0.26 + lampo * 0.3) * cono), ciano.opacity(0)]),
                                              startPoint: CGPoint(x: 0, y: 70), endPoint: CGPoint(x: 0, y: -50)))
-        // 2) le particelle che salgono e si posano sull'icona (con la scia); a riposo qualche granello nel cono
+        // 2) 11.0 (6): la GRIGLIA, come nasce l'ologramma (al posto dei puntini); a riposo qualche granello nel cono
         if nuova {
-            for q in particelle {
-                let p = (T - q.da) / q.dur
-                guard p >= 0, p <= 1.4 else { continue }
-                let e = OlogrammaRuota.ease(min(1, p)), e2 = OlogrammaRuota.ease(min(1, p - 0.12)), a = p > 1 ? 1 - (p - 1) / 0.4 : 1
-                let x = q.x0 + (q.x - q.x0) * e, y = 70 + (q.y - 70) * e
-                var scia = Path(); scia.move(to: CGPoint(x: q.x0 + (q.x - q.x0) * e2, y: 70 + (q.y - 70) * e2)); scia.addLine(to: CGPoint(x: x, y: y))
-                g.stroke(scia, with: .color(OlogrammaRuota.chiaro.opacity(0.5 * a)), lineWidth: 1)
-                g.fill(Path(ellipseIn: CGRect(x: x - 1.1, y: y - 1.1, width: 2.2, height: 2.2)), with: .color(Color.white.opacity(a)))
-            }
+            NascitaGriglia.disegna(g, T)
         } else {
             for i in 0..<6 {
                 let p = (t * 0.35 + Double(i) / 6).truncatingRemainder(dividingBy: 1)
@@ -360,9 +344,9 @@ struct OlogrammaRuota: View {
                 g.fill(Path(ellipseIn: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8)), with: .color(OlogrammaRuota.chiaro.opacity(0.5 * sin(p * .pi))))
             }
         }
-        // 3) il disco di scansione: alla creazione sale una volta sull'icona; poi passa lento
+        // 3) il disco di scansione: alla creazione sale con il piano di stampa; poi passa lento
         let sale = nuova && T < 380
-        let ys = sale ? 18 - 72 * OlogrammaRuota.ease((T - 60) / 300) : -54 + (t * 40).truncatingRemainder(dividingBy: 72)
+        let ys = sale ? NascitaGriglia.piano(T) : -54 + (t * 40).truncatingRemainder(dividingBy: 72)
         let forzaDisco = sale ? 0.95 : 0.35
         if !nuova || T > 60 {
             g.stroke(ellisse(0, ys, 42, 5), with: .color(OlogrammaRuota.bianco.opacity(forzaDisco)), lineWidth: 1)

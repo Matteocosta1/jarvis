@@ -136,13 +136,13 @@ struct VistaBea: View {
 
     // MARK: Ologramma (11.0 (4), come il mockup v261)
 
-    /// Bea in ologramma sopra il proiettore; FOTO sceglie la foto dal rullino (col selettore di Apple: l'app vede solo quella).
+    /// Bea in ologramma sopra il proiettore, con le sue tre prove (11.0 (6), come il mockup v264: PUNTI, LINEE, VETRO, scelte con le
+    /// chip); FOTO, in alto a destra come nel mockup, sceglie la foto dal rullino (col selettore di Apple: l'app vede solo quella).
     private var ologramma: some View {
         VStack(spacing: 6) {
-            OlogrammaBea(foto: fotoOlo)
-                .frame(height: 280)
+            OlogrammaBeaProve(dati: beaOlo)
                 .corniceOlo(tinta)
-                .overlay(alignment: .bottomTrailing) {
+                .overlay(alignment: .topTrailing) {
                     PhotosPicker(selection: $sceltaFoto, matching: .images) {
                         HStack(spacing: 6) {
                             if preparaFoto { ProgressView().controlSize(.mini).tint(tinta) }
@@ -158,13 +158,22 @@ struct VistaBea: View {
                     .buttonStyle(StileStark())
                     .simultaneousGesture(TapGesture().onEnded { Suoni.tocco() })
                     .disabled(preparaFoto)
-                    .padding(10)
+                    .padding(8)
                     .accessibilityLabel("Scegli la foto di Bea per l'ologramma")
                 }
             if let e = erroreFoto {
                 Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center).frame(maxWidth: .infinity)
             }
         }
+    }
+
+    /// Per le prove dell'ologramma: la foto in luce e, in orbita nel VETRO, le cose da non dimenticare (le prime due date e la prima
+    /// promessa della scheda).
+    private var beaOlo: BeaOlo {
+        var tag: [BeaOlo.Tag] = []
+        for r in (dati?.date ?? []).prefix(2) { tag.append(BeaOlo.Tag(data: true, titolo: BeaOlo.corto(r.testo), sotto: BeaOlo.fra(r.traGiorni))) }
+        if let p = dati?.promesse.first { tag.append(BeaOlo.Tag(data: false, titolo: BeaOlo.corto(p.testo), sotto: "DA MANTENERE")) }
+        return BeaOlo(foto: fotoOlo, tags: tag)
     }
 
     /// La foto scelta: Vision ritaglia la persona e la luce ciano si prepara una volta sola; si salva solo l'ologramma.

@@ -105,7 +105,7 @@ struct VistaBeaOrologio: View {
         let prossima = (dati?["date"] as? [[String: Any]])?.first
         let tra = (prossima?["tra_giorni"] as? NSNumber)?.intValue ?? 0
         return HStack(spacing: 8) {
-            OlogrammaBea(foto: fotoOlo, piccolo: true).frame(width: 46, height: 46)
+            OlogrammaBeaProve(dati: BeaOlo(foto: fotoOlo), piccolo: true).frame(width: 46, height: 46)   // 11.0 (6): la prova scelta sull'iPhone
             VStack(alignment: .leading, spacing: 1) {
                 Text("PROSSIMA").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
                 Text(prossima?["testo"] as? String ?? "—")

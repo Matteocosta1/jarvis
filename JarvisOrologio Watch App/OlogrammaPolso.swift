@@ -3,8 +3,9 @@ import SwiftUI
 import Combine
 
 /// MARK XI · l'ologramma dell'icona al centro della barra, nel reattore del polso: lo stesso disegno e gli stessi tempi dell'iPhone
-/// (proiettore, cono, particelle, disco di scansione, anelli giroscopici, staffe, nome che si decodifica), in piccolo (0,6) e con
-/// il nome più grande (15 punti) per il polso, come nel mockup. Toccato, apre la sezione.
+/// (proiettore, cono, GRIGLIA di costruzione (11.0 (6), al posto delle particelle), disco di scansione, anelli giroscopici, staffe,
+/// nome che si decodifica), in piccolo (0,6) e con il nome più grande (15 punti) per il polso, come nel mockup. Toccato, apre la
+/// sezione.
 struct OlogrammaPolso<Icona: View>: View {
     @ObservedObject var ruota: RuotaPolso
     let nomi: [String]
@@ -12,9 +13,7 @@ struct OlogrammaPolso<Icona: View>: View {
     @ViewBuilder let icona: (Int) -> Icona
     let apri: (Int) -> Void
 
-    @State private var particelle: [Particella] = []
     @State private var cambiataDa = Date.distantPast
-    private struct Particella { let x0: Double, x: Double, y: Double, da: Double, dur: Double }
     private static var glifi: [Character] { Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|") }
     private let ciano = TintaOrologio.ciano
     private let chiaro = Color(red: 0.56, green: 0.94, blue: 1.0)
@@ -41,6 +40,7 @@ struct OlogrammaPolso<Icona: View>: View {
                             }
                             .frame(height: 64)
                         }
+                        .mask { RigheIcona() }                                  // 5 nov sera: le righe come nel mockup
                         .shadow(color: ciano.opacity(0.8), radius: 6)
                         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)
                     Text(nome(nomi[k], T: T))
@@ -66,14 +66,6 @@ struct OlogrammaPolso<Icona: View>: View {
         .accessibilityHidden(!vivo)
         .accessibilityLabel(etichetta)
         .onChange(of: ruota.scelta) { cambiataDa = Date() }
-        .onChange(of: ruota.creataDa) { _, d in
-            if d != nil {
-                particelle = (0..<40).map { _ in
-                    Particella(x0: Double.random(in: -22...22), x: Double.random(in: -28...28), y: Double.random(in: -46...10),
-                               da: 40 + Double.random(in: 0...110), dur: 150 + Double.random(in: 0...80))
-                }
-            }
-        }
     }
 
     private func guizzo(_ ora: Date) -> Double {
@@ -126,17 +118,9 @@ struct OlogrammaPolso<Icona: View>: View {
         fascio.addLine(to: CGPoint(x: 56 * cono, y: -50)); fascio.addLine(to: CGPoint(x: -56 * cono, y: -50)); fascio.closeSubpath()
         g.fill(fascio, with: .linearGradient(Gradient(colors: [ciano.opacity((0.26 + lampo * 0.3) * cono), ciano.opacity(0)]),
                                              startPoint: CGPoint(x: 0, y: 70), endPoint: CGPoint(x: 0, y: -50)))
-        if nuova {
-            for q in particelle {
-                let p = (T - q.da) / q.dur
-                guard p >= 0, p <= 1.4 else { continue }
-                let e = OlogrammaPolso.ease(min(1, p)), a = p > 1 ? 1 - (p - 1) / 0.4 : 1
-                let x = q.x0 + (q.x - q.x0) * e, y = 70 + (q.y - 70) * e
-                g.fill(Path(ellipseIn: CGRect(x: x - 1.1, y: y - 1.1, width: 2.2, height: 2.2)), with: .color(Color.white.opacity(a)))
-            }
-        }
+        if nuova { NascitaGriglia.disegna(g, T) }                         // 11.0 (6): la GRIGLIA, come sull'iPhone
         let sale = nuova && T < 380
-        let ys = sale ? 18 - 72 * OlogrammaPolso.ease((T - 60) / 300) : -54 + (t * 40).truncatingRemainder(dividingBy: 72)
+        let ys = sale ? NascitaGriglia.piano(T) : -54 + (t * 40).truncatingRemainder(dividingBy: 72)
         if !nuova || T > 60 {
             g.stroke(ellisse(ys, 42, 5), with: .color(bianco.opacity(sale ? 0.95 : 0.35)), lineWidth: 1)
         }

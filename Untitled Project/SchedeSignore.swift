@@ -567,9 +567,9 @@ struct VistaDiario: View {
 
     var body: some View {
         CorniceScheda(titolo: "Diario", sottotitolo: sottotitolo, icona: "book.closed", tinta: tinta, pronto: pagine != nil || errore != nil) {
-            // 11.0 (4), come il mockup v261: il libro di oggi in ologramma e l'umore degli ultimi 7 giorni
+            // 11.0 (6), come il mockup v264: l'ologramma del diario con le sue tre prove (ELICA, RILIEVO, ORBITA), scelte con le chip
             if let p = pagine {
-                OlogrammaDiario(dati: datiOlo(p)).frame(height: 210).corniceOlo(tinta)
+                OlogrammaDiarioProve(dati: diarioOlo(p)).corniceOlo(tinta)
             }
             oggi
             if let p = pagine {
@@ -615,11 +615,13 @@ struct VistaDiario: View {
         return p.isEmpty ? "nessuna pagina" : "\(p.count) pagin\(p.count == 1 ? "a" : "e") scritte"
     }
 
-    /// Per l'ologramma: il voto dell'umore di ogni giorno che ha la pagina e se quella di oggi è scritta.
-    private func datiOlo(_ p: [Pagina]) -> DatiDiario {
-        var voti: [Date: Int] = [:]
-        for x in p { if let g = x.giorno, let s = x.punteggio { voti[Calendar.current.startOfDay(for: g)] = s } }
-        return DatiDiario(voti: voti, oggi: paginaDiOggi != nil)
+    /// Per le prove dell'ologramma (11.0 (6)): le ultime 20 sere e oggi, con umore, energia, l'umore in parole, la pagina e i temi.
+    private func diarioOlo(_ p: [Pagina]) -> DiarioOlo {
+        var sere: [(giorno: Date, v: Int?, e: Int?, u: String?, p: String?, temi: [String])] = []
+        for x in p {
+            if let g = x.giorno { sere.append((giorno: g, v: x.punteggio, e: x.energia, u: x.umore, p: x.risposta, temi: x.temi)) }
+        }
+        return DiarioOlo(pagine: sere)
     }
 
     private var paginaDiOggi: Pagina? {
@@ -765,9 +767,10 @@ struct VistaSonno: View {
 
     var body: some View {
         CorniceScheda(titolo: "Sonno", sottotitolo: oggi?.orari.map { "stanotte \($0)" } ?? "la notte scorsa", icona: "bed.double", tinta: tinta, pronto: caricato) {
-            // 11.0 (4), come il mockup v261: la luna e l'anello della notte, alto quanto è profondo il sonno
-            if !fasi.isEmpty {
-                OlogrammaNotte(dati: DatiNotte(fasi: fasi.map { t -> (Date, Date, Int) in (t.da, t.a, t.fase.rawValue) })).frame(height: 230).corniceOlo(tinta)
+            // 11.0 (6), come il mockup v264: l'ologramma della notte con le sue tre prove (ONDA, CICLI, NOTTI), scelte con le chip
+            if !fasi.isEmpty || notti.count > 1 {
+                OlogrammaSonnoProve(dati: SonnoOlo(fasi: fasi.map { t -> (Date, Date, Int) in (t.da, t.a, t.fase.rawValue) }, notti: notti))
+                    .corniceOlo(tinta)
             }
             HStack(spacing: 10) {
                 Valore(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari, tinta: tinta)

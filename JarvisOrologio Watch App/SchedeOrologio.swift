@@ -215,7 +215,8 @@ struct TastoJarvisOrologio: View {
 
 struct VistaDiarioOrologio: View {
     @State private var pagine: [DatiVitals.Pagina]?
-    @State private var olo: DatiDiario?           // 11.0 (4): il libro in ologramma, come sull'iPhone
+    @State private var olo: DatiDiario?           // 11.0 (4): l'umore degli ultimi 7 giorni (la media accanto all'ologramma)
+    @State private var sere = DiarioOlo()         // 11.0 (6): le prove dell'ologramma, la stessa scelta dell'iPhone
     @State private var errore = false
     private let ciano = TintaOrologio.ciano
 
@@ -223,7 +224,7 @@ struct VistaDiarioOrologio: View {
         CorniceOrologio(titolo: "Diario", pronto: pagine != nil || errore) {
             if let d = olo {
                 HStack(spacing: 8) {
-                    OlogrammaDiario(dati: d, piccolo: true).frame(width: 46, height: 46)
+                    OlogrammaDiarioProve(dati: sere, piccolo: true).frame(width: 46, height: 46)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("UMORE · 7 GIORNI").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
                         Text(media(d)).font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -258,6 +259,15 @@ struct VistaDiarioOrologio: View {
             f.dateFormat = "yyyy-MM-dd"
             let oggi = f.string(from: Date())
             olo = DatiDiario(voti: voti, oggi: dv.pagine.contains { $0.giorno == oggi })
+            // le prove: l'umore di ogni sera (sul polso senza scritte: niente energia, parole e temi) e la pagina di oggi
+            var righe: [(giorno: Date, v: Int?, e: Int?, u: String?, p: String?, temi: [String])] = []
+            for g in dv.giorni {
+                if let v = g.punteggio { righe.append((giorno: g.data, v: Int(v.rounded()), e: nil, u: nil, p: nil, temi: [])) }
+            }
+            if dv.pagine.contains(where: { $0.giorno == oggi }) && !righe.contains(where: { Calendar.current.isDateInToday($0.giorno) }) {
+                righe.append((giorno: Date(), v: nil, e: nil, u: nil, p: nil, temi: []))
+            }
+            sere = DiarioOlo(pagine: righe)
             pagine = dv.pagine
         }
     }
@@ -274,14 +284,14 @@ struct VistaDiarioOrologio: View {
 struct VistaSonnoOrologio: View {
     @State private var oggi: SaluteOggi?
     @State private var notti: [(Date, Double)] = []
-    @State private var notte: DatiNotte?          // 11.0 (4): la luna e l'anello della notte, come sull'iPhone
+    @State private var notte: SonnoOlo?           // 11.0 (6): le prove dell'ologramma della notte, la stessa scelta dell'iPhone
     @State private var caricato = false
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Sonno", pronto: caricato) {
             HStack(spacing: 6) {
-                if let n = notte { OlogrammaNotte(dati: n, piccolo: true).frame(width: 46, height: 46) }
+                if let n = notte { OlogrammaSonnoProve(dati: n, piccolo: true).frame(width: 46, height: 46) }
                 ValoreOrologio(titolo: "DORMITO", valore: oggi?.sonno ?? "—", sotto: oggi?.orari)
             }
             if let f = oggi?.fasi { Text(f).font(.system(size: 10)).foregroundStyle(.secondary) }
@@ -309,7 +319,7 @@ struct VistaSonnoOrologio: View {
             let (a, b, c) = await (o, g, f)
             oggi = a
             notti = b.compactMap { d, v in v.sonnoOre.map { (d, $0) } }.sorted { $0.0 < $1.0 }
-            notte = c.isEmpty ? nil : DatiNotte(fasi: c)
+            notte = c.isEmpty && notti.count < 2 ? nil : SonnoOlo(fasi: c, notti: notti)
             caricato = true
         }
     }
@@ -324,13 +334,13 @@ struct VistaBriefingOrologio: View {
     @State private var promesse: [String] = []
     @State private var posta: String?
     @State private var caricato = false
-    @State private var giornata = DatiGiornata()   // 11.0 (4): la giornata in ologramma, come sull'iPhone
+    @State private var giornata = BriefingOlo()    // 11.0 (6): le prove dell'ologramma della giornata, la stessa scelta dell'iPhone
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
         CorniceOrologio(titolo: "Briefing", pronto: caricato) {
             HStack(spacing: 8) {
-                OlogrammaGiornata(dati: giornata, piccolo: true).frame(width: 46, height: 46)
+                OlogrammaBriefingProve(dati: giornata, piccolo: true).frame(width: 46, height: 46)
                 Text(saluto).font(.system(size: 14, weight: .medium))
             }
             TastoJarvisOrologio(testo: "Briefing a voce", frase: "Buongiorno Jarvis, il briefing per favore.")
@@ -383,8 +393,11 @@ struct VistaBriefingOrologio: View {
     private func sole() async {
         var dove = CLLocation(latitude: 45.4642, longitude: 9.19)
         if let p = await PosizioneOrologio.attuale(), let lat = p["lat"] as? Double, let lon = p["lon"] as? Double { dove = CLLocation(latitude: lat, longitude: lon) }
+        giornata.lat = dove.coordinate.latitude
+        giornata.lon = dove.coordinate.longitude
         guard let g = try? await WeatherService.shared.weather(for: dove, including: .daily).forecast.first else { return }
-        giornata = DatiGiornata(alba: g.sun.sunrise.map { DatiGiornata.minuti($0) }, tramonto: g.sun.sunset.map { DatiGiornata.minuti($0) })
+        if let a = g.sun.sunrise { giornata.alba = DatiGiornata.minuti(a) }
+        if let t = g.sun.sunset { giornata.tramonto = DatiGiornata.minuti(t) }
     }
 }
 
@@ -506,6 +519,7 @@ struct VistaPostaOrologio: View {
 struct VistaSpesaOrologio: View {
     @State private var voci: [[String: Any]]?
     @State private var presi = 0                  // 11.0 (4): spuntate in questa visita (il carrello in ologramma)
+    @State private var prese: [SpesaOlo.Voce] = []  // 11.0 (6): quali (per le prove dell'ologramma: passano dalla cassa)
     @State private var errore = false
     private let ciano = TintaOrologio.ciano
 
@@ -516,7 +530,7 @@ struct VistaSpesaOrologio: View {
                 Section {
                     if !voci.isEmpty || presi > 0 {
                         HStack(spacing: 8) {
-                            OlogrammaSpesa(totale: voci.count + presi, presi: presi, piccolo: true).frame(width: 46, height: 46)
+                            OlogrammaSpesaProve(dati: spesaOlo(voci), piccolo: true).frame(width: 46, height: 46)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text("PRESE").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
                                 Text("\(presi) su \(voci.count + presi)").font(.system(size: 16, weight: .semibold, design: .rounded))
@@ -561,7 +575,22 @@ struct VistaSpesaOrologio: View {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
         WKInterfaceDevice.current().play(.success)
         SuoniOrologio.fatto()
-        _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id]); await carica(presa: true)
+        _ = await VistaVitalsOrologio.chiama(["ricordo_fatto": id])
+        prese.append(SpesaOlo.Voce(id: id, nome: r["testo"] as? String ?? "", qta: "", presa: true))
+        await carica(presa: true)
+    }
+
+    /// Per le prove dell'ologramma (11.0 (6)): le cose da comprare e quelle spuntate qui, nell'ordine in cui sono state scritte
+    /// (così non saltano di posto), al massimo 12.
+    private func spesaOlo(_ voci: [[String: Any]]) -> SpesaOlo {
+        let gia = Set(prese.map(\.id))
+        var tutte: [SpesaOlo.Voce] = voci.compactMap { r in
+            guard let id = (r["id"] as? NSNumber)?.intValue, !gia.contains(id) else { return nil }
+            return SpesaOlo.Voce(id: id, nome: r["testo"] as? String ?? "", qta: "", presa: false)
+        }
+        tutte += prese
+        tutte.sort { $0.id < $1.id }
+        return SpesaOlo(voci: Array(tutte.prefix(12)))
     }
     private func elimina(_ r: [String: Any]) async {
         guard let id = (r["id"] as? NSNumber)?.intValue else { return }
@@ -671,13 +700,13 @@ struct VistaSerataOrologio: View {
                 let margine = n(tot["margine_netto_iva"])
                 let bar = c["bar"] as? [String: Any] ?? [:]
                 Text(nome).font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
-                // 11.0 (4): l'anello dei soldi in ologramma, come sull'iPhone (una fetta per voce, i soldi che arrivano)
+                // 11.0 (6): l'ologramma dei soldi con la prova scelta sull'iPhone (FLUSSO, TORRI o REATTORE), le voci che incassano
                 HStack(spacing: 6) {
-                    OlogrammaSoldi(dati: DatiSoldi(fonti: [DatiSoldi.Fonte(nome: "Ingressi contanti", valore: n(ing["contanti"])),
-                                                           DatiSoldi.Fonte(nome: "Ingressi POS", valore: n(ing["pos"])),
-                                                           DatiSoldi.Fonte(nome: "Resident Advisor", valore: n(ing["resident_advisor"])),
-                                                           DatiSoldi.Fonte(nome: "Bar contanti", valore: n(bar["contanti"])),
-                                                           DatiSoldi.Fonte(nome: "Bar POS", valore: n(bar["pos"]))]), piccolo: true)
+                    OlogrammaSerataProve(dati: DatiSoldi(fonti: [DatiSoldi.Fonte(nome: "Ingressi contanti", valore: n(ing["contanti"])),
+                                                                 DatiSoldi.Fonte(nome: "Ingressi POS", valore: n(ing["pos"])),
+                                                                 DatiSoldi.Fonte(nome: "Resident Advisor", valore: n(ing["resident_advisor"])),
+                                                                 DatiSoldi.Fonte(nome: "Bar contanti", valore: n(bar["contanti"])),
+                                                                 DatiSoldi.Fonte(nome: "Bar POS", valore: n(bar["pos"]))].filter { $0.valore > 0 }), piccolo: true)
                         .frame(width: 46, height: 46)
                     ValoreOrologio(titolo: "INCASSO LORDO", valore: euro(n(tot["incasso_lordo"])), sotto: "netto IVA \(euro(n(tot["incasso_netto_iva"])))")
                 }

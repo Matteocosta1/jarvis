@@ -144,8 +144,9 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
 
     nonisolated static func datiDaConsegnare() -> [String: String] {
         let indirizzo = UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito
-        // il numero di Bea: per il «Ti penso» dal polso
-        return ["token": leggiToken(), "indirizzo": indirizzo, "numeroBea": UserDefaults.standard.string(forKey: "numeroBea") ?? ""]
+        // il numero di Bea: per il «Ti penso» dal polso; 11.0 (6): le prove scelte degli ologrammi (il polso mostra le stesse)
+        return ["token": leggiToken(), "indirizzo": indirizzo, "numeroBea": UserDefaults.standard.string(forKey: "numeroBea") ?? "",
+                "oloProve": SezioneOlo.scelteInRiga]
     }
 
     nonisolated static func leggiToken() -> String {

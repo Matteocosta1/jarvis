@@ -201,6 +201,7 @@ final class PonteOrologio: NSObject {
             UserDefaults.standard.set(indirizzo, forKey: "indirizzo")
         }
         if let bea = d["numeroBea"] { UserDefaults.standard.set(bea, forKey: "numeroBea") }
+        if let prove = d["oloProve"] { SezioneOlo.salva(scelteInRiga: prove) }        // 11.0 (6): le prove scelte sull'iPhone
         guard let token = d["token"], !token.isEmpty else { return false }
         PortachiaviOrologio.salva(token)
         return true
