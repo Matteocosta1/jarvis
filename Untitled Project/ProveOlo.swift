@@ -20,11 +20,11 @@ nonisolated enum SezioneOlo: String, CaseIterable {
     var nomi: [String] {
         switch self {
         case .diario: return ["ELICA", "RILIEVO", "ORBITA"]
-        case .sonno: return ["ONDA", "CICLI", "NOTTI"]
+        case .sonno: return ["LETTO", "CICLI", "NOTTI"]                  // v266: LETTO al posto di ONDA
         case .briefing: return ["RADAR", "GLOBO", "PISTA"]
         case .spesa: return ["CASSA", "SCAFFALE", "ANELLO"]
         case .serata: return ["FLUSSO", "TORRI", "REATTORE"]
-        case .bea: return ["PUNTI", "LINEE", "VETRO"]
+        case .bea: return ["PUNTI", "LINEE", "VETRO", "SCUDO"]           // v266: SCUDO, la quarta
         }
     }
 
@@ -36,12 +36,12 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .briefing: return ["↔ GIRA · TOCCA UN IMPEGNO", "↔ GIRA · TOCCA MILANO O IL SOLE", "↔ AVANTI E INDIETRO NEL TEMPO"]
         case .spesa: return ["TOCCA UNA COSA: PASSA IN CASSA", "↔ GIRA · TOCCA UNA COSA: PRESA", "↔ GIRA · TOCCA UN SETTORE: PRESA"]
         case .serata: return ["TOCCA UNA VOCE", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA UN SETTORE"]
-        case .bea: return ["↔ GIRA", "↔ GIRA", "↔ GIRA · TOCCA UNA DATA"]
+        case .bea: return ["↔ GIRA", "↔ GIRA", "↔ GIRA · TOCCA UNA DATA", "↔ GIRA · TOCCA IL CUORE"]
         }
     }
 
-    /// La prova scelta (0, 1 o 2).
-    var scelta: Int { min(2, max(0, UserDefaults.standard.integer(forKey: chiave))) }
+    /// La prova scelta (da 0; Bea ne ha quattro).
+    var scelta: Int { min(nomi.count - 1, max(0, UserDefaults.standard.integer(forKey: chiave))) }
 
     /// Tutte le scelte in una riga, per l'orologio: «diario:0,sonno:2,…».
     static var scelteInRiga: String { allCases.map { "\($0.rawValue):\($0.scelta)" }.joined(separator: ",") }
@@ -51,7 +51,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         for coppia in riga.split(separator: ",") {
             let p = coppia.split(separator: ":")
             guard p.count == 2, let s = SezioneOlo(rawValue: String(p[0])), let k = Int(p[1]) else { continue }
-            if UserDefaults.standard.integer(forKey: s.chiave) != k { UserDefaults.standard.set(min(2, max(0, k)), forKey: s.chiave) }
+            if UserDefaults.standard.integer(forKey: s.chiave) != k { UserDefaults.standard.set(min(s.nomi.count - 1, max(0, k)), forKey: s.chiave) }
         }
     }
 }
@@ -447,7 +447,7 @@ struct ProvaOloPiccola: View {
     }
 
     var body: some View {
-        let k = min(2, max(0, scelta))
+        let k = min(sezione.nomi.count - 1, max(0, scelta))
         TimelineView(.animation(minimumInterval: nil, paused: riduci)) { ctx in
             let t = riduci ? 6 : ctx.date.timeIntervalSince(inizio)
             Canvas { gc, size in
@@ -486,7 +486,7 @@ struct ChipOlo: View {
     }
 }
 
-/// Le prove di un ologramma nella sezione, come il mockup v262: la tela col disegno scelto e, sotto, le tre chip. Il dito di lato lo
+/// Le prove di un ologramma nella sezione, come il mockup v262: la tela col disegno scelto e, sotto, le chip (tre; Bea quattro). Il dito di lato lo
 /// gira (con lo slancio), il tocco su un elemento apre il suo riquadro; passando a un'altra prova, una scansione scende e la ridisegna.
 /// La scelta resta (anche sul polso). Si ferma con «Riduci movimento» (resta il disegno finito) e quando la sezione è dietro.
 struct ProveOloVista: View {
@@ -515,13 +515,13 @@ struct ProveOloVista: View {
         _scelta = AppStorage(wrappedValue: 0, sezione.chiave)
     }
 
-    private var k: Int { min(2, max(0, scelta)) }
+    private var k: Int { min(sezione.nomi.count - 1, max(0, scelta)) }
 
     var body: some View {
         VStack(spacing: 0) {
             tela
             HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
+                ForEach(sezione.nomi.indices, id: \.self) { i in
                     ChipOlo(testo: sezione.nomi[i], acceso: i == k) { scegli(i) }
                 }
             }

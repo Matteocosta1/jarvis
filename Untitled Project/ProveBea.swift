@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit                // UIImage (c'è anche sull'orologio): la foto di Bea in ologramma
 import CoreGraphics
 
-// MARK: - BEA · le tre prove (mockup v262–v264): PUNTI, LINEE, VETRO
+// MARK: - BEA · le quattro prove (mockup v262–v266): PUNTI, LINEE, VETRO e SCUDO (v266)
 // La foto scelta, già in luce ciano (FotoBea: la persona la ritaglia Vision e la foto resta sul telefono; sul polso arriva in piccolo,
 // su nero). Senza foto: il busto di luce. Le date e la promessa sono quelle della sezione.
 
@@ -82,7 +82,7 @@ struct CampioniBea {
     }
 }
 
-/// Le tre prove di Bea.
+/// Le quattro prove di Bea.
 final class ProveBea {
     #if os(watchOS)
     private static let suNero = true
@@ -99,6 +99,7 @@ final class ProveBea {
         switch k {
         case 1: linee(&gc, W, H, t, M, B, piccolo)
         case 2: vetro(&gc, W, H, t, M, B, piccolo)
+        case 3: scudo(&gc, W, H, t, M, B, piccolo)
         default: punti(&gc, W, H, t, M, B, piccolo)
         }
     }
@@ -320,9 +321,150 @@ final class ProveBea {
                         t - M.sceltaT, codice: "OLOGRAMMA")
         }
     }
+
+    // MARK: BE4 · SCUDO (v266, il signore 5 nov 18:31: «anche Bea sarebbe carino che ci fosse qualcosa che sa di amore e protezione»)
+    // — Bea in punti di luce dentro una cupola a esagoni: la protezione. Il cuore le batte nel petto (due colpi, come un cuore vero) e a
+    // ogni battito parte un'onda a forma di cuore che si allarga e accende gli esagoni che tocca: l'amore. Da fuori arrivano scintille
+    // che rimbalzano sulla cupola con un lampo. Toccato il cuore, il riquadro. Uguale al mockup v266 (olo_extra/scudo.js).
+
+    private static let cuoreId = 101
+    private static let cuorePetto = P3(0, 0, 0.5)
+
+    /// La curva del cuore (x fra −1 e 1, y in su).
+    private static func cuore(_ u: Double) -> (x: Double, y: Double) {
+        (x: pow(sin(u), 3), y: (13 * cos(u) - 5 * cos(2 * u) - 2 * cos(3 * u) - cos(4 * u)) / 16)
+    }
+
+    private func scudo(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ B: BeaOlo, _ piccolo: Bool) {
+        let base = scena(&gc, W, H, t, piccolo), cx = W / 2
+        let sz = piccolo ? min(W * 0.42, H * 0.4) : min(W * 0.22, H * 0.32), cy = piccolo ? base - 2 : base - 6
+        let ang = 0.4 * sin(t * 0.25) + M.giro, al = 0.16, nasce = OP.lis(t / 1.2), C0 = ProveBea.cuorePetto
+        let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
+        let Rh = 1.0, Rz = 1.75                                                    // la cupola: mezzo ellissoide attorno a lei
+        let batte = 1.15, u = t.truncatingRemainder(dividingBy: batte) / batte
+        let colpo = exp(-pow(u / 0.05, 2)) + 0.6 * exp(-pow((u - 0.2) / 0.05, 2))
+        let onda = u * 2.6                                                         // il raggio dell'onda, dal petto in fuori
+        // Bea, in punti (come PUNTI, più piccola); il petto si accende a ogni battito
+        var G = PuntiOlo(6)
+        if let im = B.foto, let C = campioni(im, piccolo ? 26 : 64) {
+            let hh = 1.4, ww = hh * C.rapporto
+            for j in 0..<C.righe {
+                let Z = (1 - Double(j) / Double(C.righe)) * hh
+                if Z > hh * nasce + 0.02 { continue }
+                for i in 0..<C.colonne {
+                    let k = j * C.colonne + i, a = C.A[k]
+                    if a < 0.14 { continue }
+                    let L = C.L[k], X = (Double(i) / Double(C.colonne) - 0.5) * ww
+                    let petto = exp(-(pow(X / 0.25, 2) + pow((Z - C0.z) / 0.2, 2))) * colpo
+                    let o = P(X, -(L - 0.45) * 0.4 * nasce, Z)
+                    G.metti(Int(((a * (0.25 + 0.7 * L) + 0.8 * petto) * 5).rounded()), o.x, o.y, (1 + 0.8 * L + petto) * (piccolo ? 0.55 : 0.9))
+                }
+            }
+        } else {
+            for k in 0...40 {
+                let z = Double(k) / 40 * 1.22, b = ProveBea.busto(z), giro = max(10, Int((48 * b.x).rounded()))
+                for s in 0..<giro {
+                    let a = Double(s) / Double(giro) * OP.due + Double(k) * 0.17
+                    let o = Olo.proietta(cos(a) * b.x, sin(a) * b.y, z * 1.12, ang, al, cx, cy, sz * 1.05)
+                    let petto = exp(-pow((z * 1.12 - C0.z) / 0.2, 2)) * colpo * (o.z < 0 ? 1 : 0.3)
+                    G.metti(Int((((o.z < 0 ? 0.6 : 0.22) + 0.8 * petto) * 5).rounded()), o.x, o.y, (1.2 + petto) * (piccolo ? 0.55 : 1))
+                }
+            }
+        }
+        G.disegna(&gc, colore: { $0 >= 4 ? OP.b(0.5 + 0.12 * Double($0)) : OP.c(0.12 + 0.16 * Double($0)) })
+        // la cupola a esagoni: dietro tenue, davanti più chiara; l'onda del cuore la accende passando
+        var F = FasciOlo(7)
+        let righe = piccolo ? 5 : 8, db = (Double.pi / 2) / (Double(righe) + 0.3), alza = OP.lis((t - 0.5) / 1.0)
+        var luci = Path()
+        for j in 0..<righe {
+            let b = (Double(j) + 0.5) * db
+            if b > Double.pi / 2 * alza + 0.05 { continue }
+            let n = max(6, Int(((piccolo ? 12 : 22) * cos(b)).rounded())), da = Double.pi / Double(n)
+            for i in 0..<n {
+                let a = (Double(i) + 0.5 * Double(j % 2)) / Double(n) * OP.due
+                let ch = P3(Rh * cos(b) * cos(a), Rh * cos(b) * sin(a), Rz * sin(b))
+                let d = ((ch.x - C0.x) * (ch.x - C0.x) + (ch.y - C0.y) * (ch.y - C0.y) + (ch.z - C0.z) * (ch.z - C0.z)).squareRoot()
+                let luce = exp(-pow((d - onda) / 0.16, 2)) * (1 - u)
+                let c = P(ch.x, ch.y, ch.z), dav = c.z < 0
+                let g = min(6, (dav ? 2 : 0) + Int((luce * 4.5).rounded()))
+                var q: P3?
+                for v in 0...6 {
+                    let th = Double(v % 6) * 1.0472 + 0.5236, aa = a + da * 0.92 * cos(th), bb = b + db * 0.6 * sin(th)
+                    let p = P(Rh * cos(bb) * cos(aa), Rh * cos(bb) * sin(aa), Rz * max(0, sin(bb)))
+                    if let q { F.metti(g, q, p) }
+                    q = p
+                }
+                if luce > 0.35 && dav && !piccolo {
+                    let r = 3 + 4 * luce
+                    luci.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+                }
+            }
+        }
+        if !luci.isEmpty { gc.fill(luci, with: .color(OP.s(0.1))) }
+        // l'orlo della cupola, a terra
+        var q: P3?
+        for i in 0...64 {
+            let a = Double(i) / 64 * OP.due, p = P(Rh * cos(a), Rh * sin(a), 0)
+            if let q { F.metti(p.z + q.z < 0 ? 4 : 1, q, p) }
+            q = p
+        }
+        // le scintille da fuori: arrivano, sbattono sulla cupola con un lampo, rimbalzano via
+        let scintille = piccolo ? 3 : 6
+        var lampi: [(p: P3, l: Double)] = []
+        let dir = { (a: Double, b: Double) -> P3 in P3(Rh * cos(b) * cos(a), Rh * cos(b) * sin(a), Rz * sin(b)) }
+        for k in 0..<scintille {
+            let per = 2.6 + 0.37 * Double(k), s = (t + Double(k) * 1.13).truncatingRemainder(dividingBy: per) / per
+            let a0 = Double(k) * 2.39 + 0.6, b0 = 0.25 + 0.18 * Double((k * 7) % 4)
+            let via = { (ss: Double) -> P3 in
+                ss < 0.55 ? dir(a0, b0) * (2.5 - 1.5 * ss / 0.55) : dir(a0 + 0.5, b0 + 0.35) * (1 + 1.4 * (ss - 0.55) / 0.45)
+            }
+            let vis = s < 0.55 ? min(1, s * 6) : max(0, 1 - (s - 0.55) / 0.45)
+            let v1 = via(s), v0 = via(max(0, s - 0.04)), p1 = P(v1.x, v1.y, v1.z), p0 = P(v0.x, v0.y, v0.z)
+            var scia = Path()
+            scia.move(to: CGPoint(x: p0.x, y: p0.y)); scia.addLine(to: CGPoint(x: p1.x, y: p1.y))
+            gc.stroke(scia, with: .color(OP.b(0.85 * vis)), style: Olo.tratto(piccolo ? 0.6 : 1.1))
+            let lampo = exp(-pow((s - 0.55) / 0.035, 2))
+            if lampo > 0.05 { let d0 = dir(a0, b0); lampi.append((p: P(d0.x, d0.y, d0.z), l: lampo)) }
+        }
+        F.linee(&gc, colore: { $0 >= 5 ? OP.b(0.9) : $0 == 4 ? OP.b(0.6) : OP.c(0.06 + 0.13 * Double($0)) },
+                spessore: { piccolo ? 0.4 + Double($0) * 0.07 : 0.6 + Double($0) * 0.11 }, alone: { $0 >= 4 && !piccolo ? OP.s(0.07) : nil })
+        for (p, l) in lampi {
+            OP.alone(&gc, p.x, p.y, piccolo ? 5 : 12, 0.9 * l, bianco: true)
+            if !piccolo {
+                let r = 6 + 10 * (1 - l)
+                gc.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: .color(OP.b(0.8 * l)), style: Olo.tratto(1))
+            }
+        }
+        // il cuore nel petto (batte) e l'onda a forma di cuore che parte a ogni battito
+        let cp = P(C0.x, C0.y, C0.z), sc = piccolo ? 0.45 : 1.0
+        let tracciaCuore = { (s: Double) -> Path in
+            var h = Path()
+            for i in 0...40 {
+                let c = ProveBea.cuore(Double(i) / 40 * OP.due), pt = CGPoint(x: cp.x + c.x * s, y: cp.y - c.y * s)
+                if i == 0 { h.move(to: pt) } else { h.addLine(to: pt) }
+            }
+            h.closeSubpath()
+            return h
+        }
+        let piccoloCuore = tracciaCuore((8 + 3 * colpo) * sc)
+        gc.fill(piccoloCuore, with: .color(OP.s(0.12 + 0.25 * colpo)))
+        gc.stroke(piccoloCuore, with: .color(OP.b(0.75 + 0.25 * colpo)), style: Olo.tratto(piccolo ? 0.8 : 1.4))
+        gc.stroke(tracciaCuore((10 + onda * sz * 0.55) * sc), with: .color(OP.b(0.6 * pow(1 - u, 1.6))), style: Olo.tratto(piccolo ? 0.6 : 1))
+        OP.alone(&gc, cp.x, cp.y, (piccolo ? 6 : 16) + 6 * colpo, 0.35 + 0.45 * colpo, bianco: true)
+        guard !piccolo else { return }
+        M.zona(cp.x, cp.y, 26, ProveBea.cuoreId)
+        if B.foto == nil { OP.scritta(&gc, "SCELGA UNA FOTO", cx, 30, 8, 700, OP.c(0.9)) }
+        OP.scritta(&gc, "BEA · SCUDO", 10, 14, 8, 600, OP.c(0.85), .leading)
+        OP.scritta(&gc, "PROTEZIONE · ATTIVA", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
+        if M.scelta == ProveBea.cuoreId {
+            var righe = ["BEA", "SEMPRE AL SICURO"]
+            if let tag = B.tags.first { righe.append("\(tag.titolo) \(tag.sotto)") }
+            OP.riquadro(&gc, W, H, cp.x, cp.y, righe, t - M.sceltaT, codice: "CUORE")
+        }
+    }
 }
 
-/// L'ologramma di Bea con le sue tre prove (iPhone: grande, con le chip; polso: piccolo, la prova scelta sull'iPhone).
+/// L'ologramma di Bea con le sue quattro prove (iPhone: grande, con le chip; polso: piccolo, la prova scelta sull'iPhone).
 struct OlogrammaBeaProve: View {
     let dati: BeaOlo
     var piccolo = false

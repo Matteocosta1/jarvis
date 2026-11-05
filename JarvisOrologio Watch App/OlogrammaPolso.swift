@@ -25,13 +25,16 @@ struct OlogrammaPolso<Icona: View>: View {
         let etichetta: String = vivo ? "Apri \(nomi[k])" : ""
         TimelineView(.animation(minimumInterval: nil, paused: !vivo)) { ctx in    // 4 nov: al massimo dell'orologio, 60 Hz (prima 30)
             let t = ctx.date.timeIntervalSinceReferenceDate
-            let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1000 } ?? 1e9
+            // v266 (5 nov sera, come l'iPhone e il mockup): la nascita a 1,5× e, mentre gira, tutto tenue; ferma, si accende
+            let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1500 } ?? 1e9
+            let luce = T < 1e8 ? OlogrammaPolso.ease(T / 350) : 0
             ZStack {
                 if vivo {
                     Canvas { gc, _ in disegna(gc, t: t, T: T) }
                         .frame(width: 200, height: 200)
                     icona(k)
                         .foregroundStyle(chiaro)
+                        .brightness(0.12 * luce)
                         .frame(width: 64, height: 64)
                         .mask {
                             VStack(spacing: 0) {
@@ -41,17 +44,20 @@ struct OlogrammaPolso<Icona: View>: View {
                             .frame(height: 64)
                         }
                         .mask { RigheIcona() }                                  // 5 nov sera: le righe come nel mockup
-                        .shadow(color: ciano.opacity(0.8), radius: 6)
+                        .shadow(color: ciano.opacity(0.45 + 0.55 * luce), radius: 3 + 5 * luce)
+                        .opacity(0.2 + 0.8 * luce)                                     // girando 20%, scelta piena
                         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)
                     Text(nome(nomi[k], T: T))
                         .font(.system(size: 15, weight: .bold, design: .monospaced)).tracking(3)
                         .foregroundStyle(bianco)
-                        .shadow(color: ciano.opacity(0.8), radius: 4)
+                        .shadow(color: ciano.opacity(0.8 * luce), radius: 4)
+                        .opacity(0.25 + 0.75 * luce)
                         .lineLimit(1).fixedSize()
                         .position(x: 100, y: 130)
                     Text(gruppi.indices.contains(k) ? gruppi[k] : "")
                         .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
                         .foregroundStyle(Color(red: 0.30, green: 0.40, blue: 0.44))
+                        .opacity(luce)
                         .position(x: 100, y: 148)
                 }
             }

@@ -165,7 +165,7 @@ final class RuotaCorona: NSObject, ObservableObject {
             }
             spegniAlle = ora + RuotaCorona.resta
             aggiornaScelta(suona: true)
-            if vivo, abs(x) < 0.012, s > 0.05 { crea() }
+            if vivo, abs(x) < 0.04, s > 0.05 { crea() }        // v266: appena arriva sull'icona (era 0,012: aspettava la molla quasi ferma)
         }
         if vivo, dito == nil, molla == nil { crea() }
         if vivo, dito == nil, molla == nil, ora > spegniAlle { spegni() }
@@ -188,7 +188,9 @@ final class RuotaCorona: NSObject, ObservableObject {
     }
 
     /// L'icona `k` è in alto con l'ologramma acceso (per l'anello di selezione).
-    func selezionata(_ k: Int) -> Bool { vivo && scelta == k }
+    /// v266 (il signore: «quando ruoti devono essere tutte alla stessa bassa luminosità, diventano luminose quando le scegli»):
+    /// l'anello si accende solo quando l'ologramma è nato, non mentre gira.
+    func selezionata(_ k: Int) -> Bool { vivo && scelta == k && creataDa != nil }
 
     /// La lente sull'icona di angolo `x`: cresce fino a 1,5 in alto (a metà fra due, 1,25 tutte e due).
     func scala(base x: Double, passo: Double) -> CGFloat {

@@ -462,6 +462,23 @@ struct ContentView: View {
                     withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = j + 1 }
                 }
             }
+            // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
+            let inLinea = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v)
+            // v266 (5 nov sera, il signore: «la chat deve partire subito a fine animazione» e «nello stesso istante che arriva
+            // l'ultima icona, l'ultimo click, loading, carica la chat»): sul colpo dell'ultima icona (Bea) parte il caricamento HUD,
+            // poi la stampa. Prima: «Sistemi in linea», 0,9 s di respiro, il caricamento, la stampa. Come il mockup v266.
+            let chatStampa: Task<Void, Never>?
+            if chatDaCaricare {
+                chatStampa = Task { @MainActor in
+                    let manca = zero + fineMusica - CACurrentMediaTime()
+                    if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
+                    guard preparaChat() else { return }
+                    try? await Task.sleep(for: .seconds(TempiChat.carica))
+                    await stampaChat()
+                }
+            } else {
+                chatStampa = nil
+            }
             var prima = 0.0
             for k in 0..<elenco.count {                             // la corona e, in fondo, INTELLIGENCE sulla curva
                 // da Interprete in poi l'icona parte 110 ms prima del colpo (SINCRO): la molla svelta arriva sul beep
@@ -472,17 +489,13 @@ struct ContentView: View {
                 accese = k + 1                                       // la molla la dà ogni icona (svelta nella coda)
                 if k > 0 { Suoni.plim(k) }
             }
-            // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
-            let resta = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v) - CACurrentMediaTime()
+            let resta = inLinea - CACurrentMediaTime()
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
             testaArrivate = ContentView.postoTesta.totale                 // per sicurezza: a sistemi in linea ci sono tutte
             withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
-            if chatDaCaricare {
-                try? await Task.sleep(for: .seconds(0.9 / v))           // un respiro prima che la chat si carichi
-                await caricaChat()
-            }
+            await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
             if !Impostazioni.richiamo { await Suoni.fineAvvioAudio() }   // col «Jarvis» acceso l'audio lo prende lui, come nella 12
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
@@ -497,12 +510,18 @@ struct ContentView: View {
         }
     }
 
-    /// La chat si carica come una scheda: caricamento HUD, poi si stampa dall'alto e i caratteri si decodificano.
-    private func caricaChat() async {
-        guard regiaChat.fase == .nascosta else { return }
-        if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return }
+    /// La chat si carica come una scheda: caricamento HUD (`preparaChat`), poi si stampa dall'alto e i caratteri si decodificano
+    /// (`stampaChat`). v266: all'avvio il caricamento parte sul colpo dell'ultima icona.
+    /// Il caricamento HUD (dura `TempiChat.carica`). Falso: non c'è niente da caricare.
+    private func preparaChat() -> Bool {
+        guard regiaChat.fase == .nascosta else { return false }
+        if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return false }
         withAnimation(.easeOut(duration: 0.2)) { regiaChat.fase = .carica }
-        try? await Task.sleep(for: .seconds(TempiChat.carica))
+        return true
+    }
+
+    /// v266: la stampa dall'alto, con i caratteri che si decodificano.
+    private func stampaChat() async {
         Suoni.chatCarica()                    // il suono dei caratteri parte con la stampa: dura quanto la decodifica
         regiaChat.fase = .stampa(Date())
         try? await Task.sleep(for: .seconds(TempiChat.stampa + TempiChat.decodifica + 0.1))

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-// MARK: - SONNO · le tre prove (mockup v262–v264): ONDA, CICLI, NOTTI
+// MARK: - SONNO · le tre prove (mockup v262–v266): LETTO (v266, al posto di ONDA), CICLI, NOTTI
 
 /// La notte come il mockup: le fasi in minuti dall'addormentarsi, l'ora d'inizio e le ultime notti (ore; profondo e REM se si sanno).
 struct SonnoOlo {
@@ -64,7 +64,7 @@ final class ProveSonno {
         switch k {
         case 1: cicli(&gc, W, H, t, M, N, piccolo)
         case 2: notti(&gc, W, H, t, M, N, piccolo)
-        default: onda(&gc, W, H, t, M, N, piccolo)
+        default: letto(&gc, W, H, t, M, N, piccolo)
         }
     }
 
@@ -73,60 +73,145 @@ final class ProveSonno {
         if !piccolo { OP.scritta(&gc, testo, W / 2, H * 0.45, 8, 700, OP.c(0.85)) }
     }
 
-    // MARK: S1 · ONDA — l'ipnogramma in 3D: la notte è un nastro di luce che corre da sinistra (l'addormentarsi) a destra (la sveglia),
-    // alto quanto è profondo il sonno, steso in profondità come un'onda. Un velo di scansione ripercorre la notte ogni 9 s e dice l'ora e
-    // la fase; sul pavimento le ore. Toccata una fase, il riquadro con gli orari e i minuti.
+    // MARK: S1 · LETTO (v266, il signore 5 nov 18:29: «in Sonno potevi metterci un letto invece che solo onde e cicli… inventati
+    // qualcosa di cool legato al sonno») — la notte sul letto: il letto di luce in 3D, chi dorme sul cuscino, e la coperta È la notte
+    // (dal petto ai piedi, dall'addormentarsi alla sveglia), morbida: si alza dove il sonno è profondo, il REM brilla. Il petto respira
+    // (lento nel profondo, svelto nel REM); una lama ripercorre la notte ogni 9 s, dice l'ora e la fase e, quando passa sul REM, dalla
+    // testa salgono i sogni. Toccata una fase, il riquadro con gli orari e i minuti. Uguale al mockup v266 (olo_extra/letto.js).
 
-    private func onda(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ N: SonnoOlo, _ piccolo: Bool) {
+    /// La coperta morbida: la profondità del sonno lisciata (gaussiana di 9 minuti), 96 campioni dalla sera alla sveglia. Calcolata
+    /// una volta per notte, non a ogni fotogramma.
+    private var coperta: (chiave: Double, prof: [Double]) = (-1, [])
+
+    private func profondita(_ N: SonnoOlo) -> [Double] {
+        let chiave = N.durata * 7 + Double(N.fasi.count) * 1000 + N.inizio
+        if coperta.chiave == chiave { return coperta.prof }
+        let n = 96
+        var v = [Double](repeating: 0, count: n)
+        for i in 0..<n {
+            let m = Double(i) / Double(n - 1) * N.durata
+            var s = 0.0, w = 0.0
+            for d in stride(from: -27.0, through: 27.0, by: 3.0) {
+                let mm = max(0, min(N.durata - 0.01, m + d)), g = exp(-pow(d / 9, 2))
+                s += SonnoOlo.alto[N.fase(mm)] * g
+                w += g
+            }
+            v[i] = s / w
+        }
+        coperta = (chiave, v)
+        return v
+    }
+
+    private func letto(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ N: SonnoOlo, _ piccolo: Bool) {
         guard !N.fasi.isEmpty, N.durata > 1 else { ProveSonno.vuoto(&gc, W, H, t, "NESSUN DATO DELLA NOTTE", piccolo); return }
-        let cx = W / 2, cy = H * 0.62, sz = piccolo ? W * 0.22 : min(W * 0.25, H * 0.42)
-        let ang = -0.36 + 0.1 * sin(t * 0.21) + M.giro, al = 0.4
+        let prof = profondita(N), n = prof.count
+        let profA = { (m: Double) -> Double in
+            let f = max(0, min(Double(n - 1), m / N.durata * Double(n - 1))), i = min(n - 2, Int(f)), u = f - Double(i)
+            return prof[i] * (1 - u) + prof[i + 1] * u
+        }
+        let cx = W / 2, cy = H * 0.6, sz = piccolo ? W * 0.24 : min(W * 0.21, H * 0.36)
+        let ang = -0.55 + 0.12 * sin(t * 0.2) + M.giro, al = 0.5
         let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
-        let X = { (m: Double) -> Double in -1.5 + 3 * m / N.durata }
-        let cresce = OP.lis(t / 0.9)
-        let alto = { (tipo: Int) -> Double in SonnoOlo.alto[tipo] * 0.95 * cresce }
         var F = FasciOlo(6)
-        // il pavimento: il bordo, la riga di ogni ora
-        F.metti(1, P(-1.55, -0.5, 0), P(1.55, -0.5, 0)); F.metti(0, P(-1.55, 0.5, 0), P(1.55, 0.5, 0))
-        var ore: [(m: Double, h: Int)] = []
-        var hm = (N.inizio / 60).rounded(.up) * 60
-        while hm - N.inizio <= N.durata { ore.append((hm - N.inizio, Int(hm / 60) % 24)); hm += 60 }
-        for o in ore { F.metti(0, P(X(o.m), -0.5, 0), P(X(o.m), 0.5, 0)) }
-        // il nastro: cinque file in profondità (la davanti la più chiara); ogni fase è un gradino alto quanto è profondo il sonno
-        for j in 0..<5 {
-            let y = -0.4 + Double(j) * 0.2, g = j == 0 ? 3 : j == 4 ? 1 : 2
-            var q: P3?
-            for f in N.fasi {
-                let z = alto(f.tipo), p0 = P(X(f.a), y, z), p1 = P(X(f.b), y, z)
-                if let q { F.metti(g - 1, q, p0) }
-                F.metti(g + (f.tipo == 3 ? 1 : 0), p0, p1)
-                q = p1
+        let cresce = OP.lis(t / 1.0), L = 1.2, Wl = 0.55, zt = 0.3
+        let X = { (m: Double) -> Double in -0.72 + 1.86 * m / N.durata }                 // la notte sulla coperta: dal petto ai piedi
+        let m = t.truncatingRemainder(dividingBy: 9) / 9 * N.durata, fs = N.fase(m), sx = X(m)
+        let ritmo: [Double] = [3.4, 2.9, 2.2, 1.6]                                       // sveglio, REM, core, profondo
+        let fiato = sin(t * ritmo[fs])                                                   // il respiro della fase sotto la lama
+        let bordo = { (y: Double) -> Double in 1 - pow(abs(y) / 0.58, 2) }
+        let cima = { (mm: Double, y: Double) -> Double in zt + 0.04 + (0.05 + profA(mm) * 0.3 * cresce) * bordo(y) }
+        let petto = { (x0: Double) -> Double in max(0, 1 - abs(x0 + 0.5) / 0.32) * 0.04 * fiato }
+        func rettangolo(_ x0: Double, _ x1: Double, _ z: Double, _ g: Int) {
+            F.metti(g, P(x0, -Wl, z), P(x1, -Wl, z)); F.metti(g, P(x1, -Wl, z), P(x1, Wl, z))
+            F.metti(g, P(x1, Wl, z), P(x0, Wl, z)); F.metti(g, P(x0, Wl, z), P(x0, -Wl, z))
+        }
+        // la pedana: l'anello graduato attorno al letto
+        OP.ghiera(&F, { a, r, z in P(cos(a) * r * 1.2, sin(a) * r * 0.72, z) }, 1.25, 0, 96, 4, lunga: 0.05, corta: 0.025)
+        // il letto: telaio, materasso, gambe, testiera con le doghe, pediera bassa
+        rettangolo(-L, L, 0.16, 1)
+        rettangolo(-L, L, zt, 2)
+        let angoli: [(Double, Double)] = [(-L, -Wl), (L, -Wl), (L, Wl), (-L, Wl)]
+        for (px, py) in angoli { F.metti(1, P(px, py, 0), P(px, py, 0.16)); F.metti(2, P(px, py, 0.16), P(px, py, zt)) }
+        F.metti(2, P(-L, -Wl, zt), P(-L, -Wl, 0.95)); F.metti(2, P(-L, Wl, zt), P(-L, Wl, 0.95)); F.metti(3, P(-L, -Wl, 0.95), P(-L, Wl, 0.95))
+        for k in 1...4 { let z = zt + (0.95 - zt) * Double(k) / 5; F.metti(0, P(-L, -Wl, z), P(-L, Wl, z)) }
+        F.metti(1, P(L, -Wl, zt), P(L, -Wl, 0.46)); F.metti(1, P(L, Wl, zt), P(L, Wl, 0.46)); F.metti(2, P(L, -Wl, 0.46), P(L, Wl, 0.46))
+        // il cuscino e la testa
+        var q: P3?
+        for i in 0...32 {
+            let a = Double(i) / 32 * 2 * .pi, o = P(-0.98 + cos(a) * 0.16, sin(a) * 0.36, zt + 0.08 + 0.025 * cos(2 * a))
+            if let q { F.metti(2, q, o) }
+            q = o
+        }
+        let hx = -0.96, hz = zt + 0.23
+        for piano in 0..<2 {
+            q = nil
+            for i in 0...28 {
+                let a = Double(i) / 28 * 2 * .pi
+                let o = piano == 1 ? P(hx + cos(a) * 0.12, sin(a) * 0.12, hz) : P(hx + cos(a) * 0.12, 0, hz + sin(a) * 0.12)
+                if let q { F.metti(3, q, o) }
+                q = o
             }
         }
-        for f in N.fasi { F.metti(0, P(X(f.a), -0.4, 0), P(X(f.a), -0.4, alto(f.tipo))) }   // i montanti davanti: si vede il volume
-        // il velo di scansione: la notte rivista, ogni 9 s
-        let m = t.truncatingRemainder(dividingBy: 9) / 9 * N.durata, fs = N.fase(m), sx = X(m)
-        OP.lama(&gc, &F, P, (sx, -0.5), (sx, 0.5), 1.06)
-        F.linee(&gc, colore: { $0 >= 5 ? OP.b(0.95) : $0 == 4 ? OP.b(0.6) : OP.c(0.08 + 0.16 * Double($0)) },
-                spessore: { 0.75 + Double($0) * 0.14 }, alone: { $0 >= 4 ? OP.s(0.08) : nil })
-        // le facce dei gradini (più piene dove il sonno è più profondo) e le zone da toccare
+        // la coperta è la notte: sette file da un lato all'altro, morbide, alte quanto è profondo il sonno (il REM più chiaro); il petto respira
+        for j in 0..<7 {
+            let y = -0.48 + Double(j) * 0.16, g0 = j == 0 ? 3 : 1 + (j % 2)
+            q = nil
+            for i in 0..<n {
+                let mm = Double(i) / Double(n - 1) * N.durata, x0 = X(mm), p = P(x0, y, cima(mm, y) + petto(x0) * bordo(y))
+                if let q {
+                    let f = N.fase(mm)
+                    F.metti(min(5, g0 + (f == 1 ? 1 : 0) + (j == 0 && f == 3 ? 1 : 0)), q, p)
+                }
+                q = p
+            }
+        }
+        // l'orlo della coperta davanti: una faccia per fase (più piena dove il sonno è profondo) e le zone da toccare
         for (i, f) in N.fasi.enumerated() {
-            let z = alto(f.tipo)
-            let c = [P(X(f.a), -0.4, z), P(X(f.b), -0.4, z), P(X(f.b), 0.4, z), P(X(f.a), 0.4, z)]
-            let pieno = f.tipo == 3 ? 0.15 : f.tipo == 1 ? 0.09 : 0.05
-            gc.fill(OP.poligono(c), with: .color(OP.s(pieno + (M.scelta == i ? 0.18 : 0))))
+            let passi = max(2, Int((f.b - f.a) / N.durata * Double(n)))
+            var punti: [P3] = [P(X(f.a), -0.5, zt)]
+            for k in 0...passi { let mm = f.a + (f.b - f.a) * Double(k) / Double(passi); punti.append(P(X(mm), -0.5, cima(mm, -0.5))) }
+            punti.append(P(X(f.b), -0.5, zt))
+            let pieno = f.tipo == 3 ? 0.16 : f.tipo == 1 ? 0.1 : 0.05
+            gc.fill(OP.poligono(punti), with: .color(OP.s(pieno + (M.scelta == i ? 0.18 : 0))))
             if !piccolo {
-                let cc = P(X((f.a + f.b) / 2), -0.4, z)
+                let cc = P(X((f.a + f.b) / 2), -0.5, cima((f.a + f.b) / 2, -0.5))
                 M.zona(cc.x, cc.y, max(12, (X(f.b) - X(f.a)) * sz * 0.45), i)
             }
         }
-        let sp = P(sx, -0.4, alto(fs))
+        // la lama di scansione che ripercorre la notte
+        OP.lama(&gc, &F, P, (sx, -Wl), (sx, Wl), 1.0)
+        F.linee(&gc, colore: { $0 >= 5 ? OP.b(0.95) : $0 == 4 ? OP.b(0.6) : OP.c(0.08 + 0.16 * Double($0)) },
+                spessore: { piccolo ? 0.5 + Double($0) * 0.1 : 0.75 + Double($0) * 0.14 }, alone: { $0 >= 4 && !piccolo ? OP.s(0.08) : nil })
+        // i sogni: quando la lama passa sul REM, dalla testa salgono anelli di luce
+        if fs == 1 {
+            for k in 0..<3 {
+                let u = (t * 0.5 + Double(k) / 3).truncatingRemainder(dividingBy: 1), r = 0.07 + 0.2 * u, z = hz + 0.16 + u * 0.6
+                var anello = Path()
+                for i in 0...28 {
+                    let a = Double(i) / 28 * 2 * .pi, o = P(hx + cos(a) * r, sin(a) * r, z)
+                    if i == 0 { anello.move(to: CGPoint(x: o.x, y: o.y)) } else { anello.addLine(to: CGPoint(x: o.x, y: o.y)) }
+                }
+                gc.stroke(anello, with: .color(OP.b(0.8 * (1 - u) * min(1, u * 5))), style: Olo.tratto(piccolo ? 0.7 : 1))
+            }
+        }
+        let sp = P(sx, -0.5, cima(m, -0.5))
         OP.alone(&gc, sp.x, sp.y, piccolo ? 6 : 15, 0.85, bianco: true)
+        let hp = P(hx, 0, hz)
+        OP.alone(&gc, hp.x, hp.y, (piccolo ? 6 : 14) + 3 * fiato, fs == 1 ? 0.55 : 0.3, bianco: true)
         guard !piccolo else { return }
-        let cima = P(sx, -0.5, 1.13)
-        OP.dentro(&gc, W, Olo.ora(N.inizio + m), cima.x, cima.y - 3, 8, 700, OP.b(0.95))
-        OP.dentro(&gc, W, SonnoOlo.nome[fs], cima.x, cima.y + 7, 6.5, 600, OP.c(0.85))
-        for o in ore { let p = P(X(o.m), -0.64, 0); OP.scritta(&gc, String(format: "%02d", o.h), p.x, p.y + 3, 6.5, 600, OP.c(0.55)) }
+        let top = P(sx, -Wl, 1.06)
+        OP.dentro(&gc, W, Olo.ora(N.inizio + m), top.x, top.y - 3, 8, 700, OP.b(0.95))
+        OP.dentro(&gc, W, fs == 1 ? "REM · SOGNA" : SonnoOlo.nome[fs], top.x, top.y + 7, 6.5, 600, OP.c(0.85))
+        // le ore sul fianco del letto
+        var ore = Path()
+        var hm = (N.inizio / 60).rounded(.up) * 60
+        while hm - N.inizio <= N.durata {
+            let xx = X(hm - N.inizio), p0 = P(xx, -Wl, 0.16), p1 = P(xx, -Wl - 0.08, 0.16), et = P(xx, -Wl - 0.2, 0.12)
+            ore.move(to: CGPoint(x: p0.x, y: p0.y)); ore.addLine(to: CGPoint(x: p1.x, y: p1.y))
+            OP.scritta(&gc, String(format: "%02d", Int(hm / 60) % 24), et.x, et.y + 3, 6.5, 600, OP.c(0.55))
+            hm += 60
+        }
+        gc.stroke(ore, with: .color(OP.c(0.5)), style: Olo.tratto(1))
         // la scala delle fasi, a destra: quanto pesa ognuna stanotte
         var yy = 28.0
         for tipo in [3, 2, 1, 0] {
@@ -136,7 +221,7 @@ final class ProveSonno {
         OP.scritta(&gc, "NOTTE · \(OP.durata(N.durata))", 10, 14, 8, 600, OP.c(0.85), .leading)
         OP.scritta(&gc, "\(Olo.ora(N.inizio)) → \(Olo.ora(N.fine))", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
         if let s = M.scelta, s < N.fasi.count {
-            let f = N.fasi[s], c = P(X((f.a + f.b) / 2), -0.4, alto(f.tipo))
+            let f = N.fasi[s], c = P(X((f.a + f.b) / 2), -0.5, cima((f.a + f.b) / 2, -0.5))
             OP.riquadro(&gc, W, H, c.x, c.y, [SonnoOlo.nome[f.tipo], "\(Olo.ora(N.inizio + f.a)) – \(Olo.ora(N.inizio + f.b))", "\(Int((f.b - f.a).rounded())) MIN"],
                         t - M.sceltaT, codice: "FASE \(s + 1)/\(N.fasi.count)")
         }

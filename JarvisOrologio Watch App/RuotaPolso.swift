@@ -177,7 +177,8 @@ final class RuotaPolso: ObservableObject {
             aggiorna(suona: true)
             spegniAlle = Date().addingTimeInterval(RuotaPolso.resta)
         }
-        if vivo, dito == nil, meta == nil, creataDa == nil, scelta >= 0 {
+        // v266: nasce appena arriva sull'icona (a 0,02 dalla meta, come il mockup), senza aspettare la molla del tutto ferma
+        if vivo, dito == nil, meta.map({ abs($0 - p) < 0.02 }) ?? true, creataDa == nil, scelta >= 0 {
             creataDa = Date()
             SuoniOrologio.tonoOlo()
         }
@@ -190,7 +191,8 @@ final class RuotaPolso: ObservableObject {
         return vivo || dito != nil || meta != nil || lente > 0
     }
 
-    func selezionata(_ k: Int) -> Bool { vivo && scelta == k }
+    /// v266: l'anello si accende solo quando l'ologramma è nato, non mentre gira.
+    func selezionata(_ k: Int) -> Bool { vivo && scelta == k && creataDa != nil }
 
     /// La lente sull'icona `k`: cresce fino a 1,32 al centro, solo mentre si muove.
     func scala(_ k: Int) -> CGFloat {

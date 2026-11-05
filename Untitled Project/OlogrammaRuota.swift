@@ -209,9 +209,11 @@ struct OlogrammaRuota: View {
         let etichetta: String = vivo ? "Apri \(voci[k].nome)" : ""
         TimelineView(.animation(minimumInterval: nil, paused: !vivo)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
-            let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1000 } ?? 1e9     // ms dalla creazione
+            // ms dalla creazione, a 1,5× (5 nov sera, il signore: «l'animazione è lenta, troppo lenta» e poi «un minimo più lenta,
+            // che si veda il target come prima, ma fluida»; mockup v266): GRIGLIA in 0,31 s, luce piena in 0,23 s, nome in 0,2 s
+            let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1500 } ?? 1e9
             // 5 nov (il signore: «il primo ologramma deve essere poco luminoso mentre ruoto, poi si illumina quando è fermo»),
-            // come il mockup v259: mentre gira icona al 30%, nome al 35%, gruppo spento, proiettore al 26%; ferma, in 0,35 s pieni
+            // come il mockup v266: mentre gira icona al 20%, nome al 25%, gruppo spento, proiettore al 26%; ferma, pieni e più chiari
             let luce = T < 1e8 ? OlogrammaRuota.ease(T / 350) : 0
             ZStack {
                 if vivo {
@@ -253,11 +255,12 @@ struct OlogrammaRuota: View {
         // l'icona si disegna dal basso in alto mentre il disco di scansione la percorre (90–380 ms)
         let rivela = creata ? OlogrammaRuota.ease((T - 90) / 290) : 1
         Group {
-            if simbolo == "profiler" { IconaProfiler() } else if simbolo == "satellite" { IconaSatellite(lato: 40) } else { Image(systemName: simbolo) }
+            if simbolo == "profiler" { IconaProfiler().scaleEffect(2) } else if   // v266: grande come le altre (era 20 × 15) simbolo == "satellite" { IconaSatellite(lato: 40) } else { Image(systemName: simbolo) }
         }
         .font(.system(size: 40, weight: .light))
         .symbolRenderingMode(.monochrome)
         .foregroundStyle(OlogrammaRuota.chiaro)
+        .brightness(0.12 * luce)                                                   // v266: scelta, più luminosa
         .frame(width: 64, height: 64)
         .mask {
             VStack(spacing: 0) {
@@ -268,8 +271,8 @@ struct OlogrammaRuota: View {
             .frame(height: 64)
         }
         .mask { RigheIcona() }                                                     // 5 nov sera: le righe come nel mockup
-        .shadow(color: .ciano.opacity(0.45 + 0.35 * luce), radius: 3 + 3 * luce)   // mentre gira: alone corto e tenue
-        .opacity(0.3 + 0.7 * luce)
+        .shadow(color: .ciano.opacity(0.45 + 0.55 * luce), radius: 3 + 5 * luce)   // mentre gira: alone corto e tenue; scelta, pieno
+        .opacity(0.2 + 0.8 * luce)                                                 // v266: girando 20% (era 30%)
         .offset(x: creata && T > 380 && T < 520 ? sin(T * 0.25) * 0.8 : 0)      // due tremolii, poi resta sospesa
         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)                              // sospesa: respira appena
     }
@@ -287,7 +290,7 @@ struct OlogrammaRuota: View {
             .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(4)
             .foregroundStyle(OlogrammaRuota.bianco)
             .shadow(color: .ciano.opacity(0.8 * luce), radius: 4)                    // mentre gira: senza alone
-            .opacity(0.35 + 0.65 * luce)
+            .opacity(0.25 + 0.75 * luce)                                              // v266: girando 25% (era 35%)
             .lineLimit(1)
             .fixedSize()
             .position(x: 100, y: 130)
