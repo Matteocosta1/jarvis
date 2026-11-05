@@ -500,6 +500,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
     - pagine di vetro olografico con trasparenza dinamica: quella al centro (o in mano) vetro all'88% e sfocatura piena di ciò che ha dietro, le altre al 50%; scorrendo il fuoco passa dall'una all'altra; dietro JARVIS sfocato e scurito al posto del fondo a griglia;
     - mentre la pagina sale col dito le altre le stanno attorno alla sua scala (si intravedono dal 18%, piene alla pausa come prima); da JARVIS entrano da sinistra mentre JARVIS si sfoca;
     - il dito di lato scorre la pila (una pagina ogni 0,8 pagine, si ferma sulla più vicina con lo slancio); in su chiude qualsiasi pagina e le altre si stringono nel suo posto; tocco su una pagina la apre (le altre vanno di lato); **tocco fuori dalle pagine: si torna a JARVIS** (20:34 «come iOS»); su dalla fascia in basso: la pagina al centro nel reattore, come prima.
+    - **Compilazione: 7bd65e8, run 42099739952: verde, 0 errori e 0 avvisi** (iPhone, polso e complicazione).
     - Da verificare sul telefono: le proporzioni contro l'App Switcher vero, la fluidità a 120 Hz col vetro sfocato su tante pagine, il tocco fuori, la chiusura di una pagina a sinistra e di quella al centro.
 - Da verificare sul telefono: le prove a 120 Hz senza scatti (soprattutto PUNTI e LINEE di Bea con la foto, il GLOBO); il tocco sull'ologramma della Spesa dentro la lista; le prove piccole sul polso dopo aver cambiato prova sull'iPhone (arrivano col contesto dell'orologio).
 
