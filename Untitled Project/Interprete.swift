@@ -169,7 +169,7 @@ struct Interprete: View {
             SceltaLingua { l in cambia(l) }
                 .paginaPiena()
         }
-        .aperturaHUD("Interprete")
+        .aperturaHUD("Interprete", icona: "globe.europe.africa")
     }
 
     /// I comandi a voce dentro l'Interprete.

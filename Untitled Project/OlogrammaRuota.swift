@@ -176,8 +176,8 @@ struct VeloRuota: ViewModifier {
     @ObservedObject var ruota: RuotaCorona
     func body(content: Content) -> some View {
         content
-            .opacity(ruota.vivo ? 0.03 : 1)
-            .scaleEffect(ruota.vivo ? 0.86 : 1)
+            .opacity(ruota.vivo ? 0.015 : 1)              // 7 nov (il signore: «ancora più trasparente ed in secondo piano»): 0,03 → 0,015
+            .scaleEffect(ruota.vivo ? 0.78 : 1)           // e più indietro: 0,86 → 0,78 (mockup v274: opacità 0,03, scala 0,78)
             .animation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.3), value: ruota.vivo)
             .allowsHitTesting(!ruota.vivo)
     }
@@ -261,7 +261,7 @@ struct OlogrammaRuota: View {
         .font(.system(size: 40, weight: .light))
         .symbolRenderingMode(.monochrome)
         .foregroundStyle(OlogrammaRuota.chiaro)
-        .brightness(0.12 * luce)                                                   // v266: scelta, più luminosa
+        .brightness(0.25 * luce)                                                   // 7 nov (il signore: «scelte ancora più luminose»): 0,25 (era 0,12)
         .frame(width: 64, height: 64)
         .mask {
             VStack(spacing: 0) {
@@ -273,7 +273,8 @@ struct OlogrammaRuota: View {
         }
         .mask { RigheIcona() }                                                     // 5 nov sera: le righe come nel mockup
         .shadow(color: .ciano.opacity(0.45 + 0.55 * luce), radius: 3 + 5 * luce)   // mentre gira: alone corto e tenue; scelta, pieno
-        .opacity(0.2 + 0.8 * luce)                                                 // v266: girando 20% (era 30%)
+        .shadow(color: .ciano.opacity(0.7 * luce), radius: 14 * luce)              // 7 nov: scelta, un secondo alone più largo (mockup v274)
+        .opacity(0.3 + 0.7 * luce)                                                 // 7 nov (il signore: «un pochino più luminose»): girando 30% (era 20%)
         .offset(x: creata && T > 380 && T < 520 ? sin(T * 0.25) * 0.8 : 0)      // due tremolii, poi resta sospesa
         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)                              // sospesa: respira appena
     }
@@ -291,7 +292,7 @@ struct OlogrammaRuota: View {
             .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(4)
             .foregroundStyle(OlogrammaRuota.bianco)
             .shadow(color: .ciano.opacity(0.8 * luce), radius: 4)                    // mentre gira: senza alone
-            .opacity(0.25 + 0.75 * luce)                                              // v266: girando 25% (era 35%)
+            .opacity(0.35 + 0.65 * luce)                                              // 7 nov: girando 35% (era 25%)
             .lineLimit(1)
             .fixedSize()
             .position(x: 100, y: 130)
@@ -302,7 +303,7 @@ struct OlogrammaRuota: View {
         var g = gc
         g.translateBy(x: 100, y: 100)
         let creata = T < 1e8, nuova = T < 600
-        let forza = 0.26 + 0.74 * luce                               // 5 nov: mentre gira il proiettore al 26% (era 45%)
+        let forza = 0.32 + 0.68 * luce                               // 7 nov: mentre gira il proiettore al 32% (era 26%)
         g.opacity = forza
         let ciano = Color.ciano
         func ellisse(_ cx: Double, _ cy: Double, _ rx: Double, _ ry: Double) -> Path {

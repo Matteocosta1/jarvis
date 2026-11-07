@@ -39,27 +39,27 @@ struct Allenatore: View {
             }
 
             VStack(spacing: 10) {
+                // 7 nov sera (il signore: «o le fai tutte uguali»): i tasti nella riga in alto (a sinistra della X), la testata sotto,
+                // nello stesso punto di tutte le sezioni
+                VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button { Suoni.tocco(); motore.cambiaCamera() } label: { TondoX(simbolo: "arrow.triangle.2.circlepath.camera") }
+                    .accessibilityLabel("Cambia fotocamera")
+                    Button { Suoni.tocco(); motore.ferma(); chiudi() } label: { TondoX() }
+                    .accessibilityLabel("Chiudi")
+                }
+                .frame(height: 44)
                 HStack {
                     AnelloOcchi(icona: "figure.pilates", tinta: Color.ciano)      // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("PERSONAL TRAINER").font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 26 ott notte: solo «Personal Trainer»
+                        Text("TRAINER").font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 7 nov: una parola, come tutte le sezioni
                     }
                     .foregroundStyle(Color.ciano)
-                    Spacer()
-                    Button { Suoni.tocco(); motore.cambiaCamera() } label: {
-                        Image(systemName: "arrow.triangle.2.circlepath.camera").font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-                    }
-                    .accessibilityLabel("Cambia fotocamera")
-                    Button { Suoni.tocco(); motore.ferma(); chiudi() } label: {
-                        Image(systemName: "xmark").font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-                    }
-                    .accessibilityLabel("Chiudi")
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 20).padding(.top, 8)
+                }
+                .padding(.horizontal, 16)
 
                 // telemetria in alto (nell'Ologramma i riquadri scendono in basso: il viso resta libero)
                 if motore.giunto != .ologramma {
@@ -146,7 +146,7 @@ struct Allenatore: View {
         .onDisappear { orecchio.ferma(); motore.ferma() }
         .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },                         // MARK XI: dietro in pausa
                      riprendi: { Task { await motore.avvia(); Suoni.aperturaCamera(); orecchio.avvia() } })
-        .aperturaHUD("Trainer", fotocamera: true)
+        .aperturaHUD("Trainer", icona: "figure.pilates", conX: true, fotocamera: true)
     }
 
     private func dato(_ titolo: String, _ valore: String, caldo: Bool) -> some View {

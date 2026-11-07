@@ -208,6 +208,16 @@ struct Occhi: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 14) {
+                // 7 nov sera (il signore: «o le fai tutte uguali o non ci siamo»): come tutte le sezioni, la X nella sua riga in alto
+                // (alta 44, a 16 punti dal bordo) e sotto la testata, nello stesso punto delle altre (16 punti sotto la riga)
+                VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Spacer()
+                    Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: tinta) }
+                    .accessibilityLabel("Chiudi")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["chiudi"] = $0 }
+                }
+                .frame(height: 44)
                 HStack(alignment: manualeStark ? .top : .center) {
                     // 26 ott notte: l'icona con l'anello che gira, come nelle altre schede
                     AnelloOcchi(icona: cucina ? "fork.knife" : "eye", tinta: tinta)
@@ -242,19 +252,11 @@ struct Occhi: View {
                     }
                     .foregroundStyle(tinta)                         // 27 ott: niente bagliore su titolo e modo, come le altre sezioni
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["testa"] = $0 }
-                    Spacer()
-                    Button { Suoni.tocco(); chiudi([]) } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(tinta)
-                            .frame(width: 44, height: 44)
-                            .background(Color.black.opacity(0.4))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
-                    }
-                    .accessibilityLabel("Chiudi")
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["chiudi"] = $0 }
+                    Spacer(minLength: 0)
                 }
+                }
+                .padding(.horizontal, -4)          // la riga e la testata a 16 punti dai bordi, come le altre sezioni (il resto a 20)
+                .padding(.top, -12)                // e attaccate al bordo sicuro in alto
                 Spacer()
                 if !manualeStark {
                     Text(stato)

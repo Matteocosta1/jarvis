@@ -32,7 +32,8 @@ struct CorniceScheda<Contenuto: View>: View {
                 // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:
                 // la pagina scorre sotto la riga e la riga resta trasparente.
                 VStack(spacing: 0) {
-                    if fotocamera { tastoX } else if !marchio { BarraChiudi(tinta: tinta) { chiudi() } }
+                    // 7 nov sera: anche col marchio (JARVIS Music) il caricamento è quello di tutte: «Chiudi» in alto e la testata sotto
+                    if fotocamera { tastoX } else if !marchio || !mostrato { BarraChiudi(tinta: tinta) { chiudi() } }
                     pagina
                 }
                 if !mostrato {
@@ -62,7 +63,7 @@ struct CorniceScheda<Contenuto: View>: View {
     private var pagina: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if marchio {
+                if marchio && mostrato {
                     // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
                     HStack(alignment: .center) {
                         TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
@@ -107,12 +108,7 @@ struct CorniceScheda<Contenuto: View>: View {
     private var tastoX: some View {
         HStack {
             Spacer()
-            Button { Suoni.tocco(); chiudi() } label: {
-                Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(tinta).frame(width: 44, height: 44)
-                    .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
-                    .contentShape(Circle())
-            }
+            Button { Suoni.tocco(); chiudi() } label: { TondoX(tinta: tinta) }
             .buttonStyle(StileStark())
             .accessibilityLabel("Chiudi")
         }
@@ -150,6 +146,10 @@ struct TestataScheda: View {
                     IconaSatellite(lato: 17).font(.system(size: 16, weight: .medium)).foregroundStyle(tinta)
                 } else if icona == "vinile" {               // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
                     IconaVinile().frame(width: 17, height: 17).foregroundStyle(tinta)
+                } else if icona == "studio" {               // 7 nov: il caricamento di Studio e Social con le loro icone del dock
+                    IconaStudio(pieno: true).frame(width: 17, height: 17).foregroundStyle(tinta)
+                } else if icona == "social" {
+                    IconaSocial().frame(width: 17, height: 17).foregroundStyle(tinta)
                 } else {
                     Image(systemName: icona)
                         .font(.system(size: 16, weight: .medium))
@@ -191,7 +191,7 @@ struct BarraChiudi: View {
         HStack {
             Spacer()
             Button(testo) { chiudi() }
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))       // 7 nov: «le scritte più piccole stanno meglio» (prima 17)
                 .tint(tinta)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -308,10 +308,80 @@ enum Apertura {
     static let orecchio = caricamento + 0.7
 }
 
+/// 7 nov sera (il signore: «l'altezza sia la stessa del bottone con la X e della scritta Chiudi» · «tutte uguali nelle altezze»):
+/// il tondo delle sezioni con la fotocamera, uguale ovunque. A vista 28 punti (7 nov: «più piccole stanno meglio»), alto come la riga di «Chiudi»; al tocco 44, come
+/// vuole iOS. Lo usano la X e i tasti accanto (cambia fotocamera, registro, schermo nero), come nel mockup (v274).
+struct TondoX: View {
+    var simbolo = "xmark"
+    var tinta: Color = .ciano
+    var body: some View {
+        Image(systemName: simbolo)
+            .font(.system(size: 12, weight: .semibold))   // 7 nov: «le X più piccole stanno meglio»: 28 a vista
+            .foregroundStyle(tinta)
+            .frame(width: 28, height: 28)
+            .background(Color.black.opacity(0.4))
+            .clipShape(Circle())
+            .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+    }
+}
+
+/// 7 nov sera (il signore: «stesso sfondo, stesso caricamento centrale, le pagine con la fotocamera hanno la X per chiudere, le
+/// altre la scritta Chiudi» · «deve esserci continuità grafica e di comportamento»): lo schermo di caricamento, UNO SOLO per tutte
+/// le sezioni, uguale al mockup (v274): lo sfondo della sezione, la riga con «Chiudi» (o la X nel cerchio con la fotocamera), la
+/// testata al suo posto (icona animata, NOME, testo di caricamento) e il caricamento al centro dello spazio sotto, 120 punti sotto
+/// il bordo sicuro come in CorniceScheda. Nelle sezioni col marchio (Studio, Social) la testata è «J.A.R.V.I.S.» con «Chiudi»
+/// sulla stessa riga. Non prende i tocchi: sotto, nello stesso posto, c'è il «Chiudi» vero della sezione.
+struct SchermoCaricamento: View {
+    let titolo: String
+    let icona: String
+    var conX = false
+    var marchio = false
+    private let tinta = Color.ciano
+
+    var body: some View {
+        ZStack {
+            SfondoSezione()
+            VStack(alignment: .leading, spacing: 0) {
+                if marchio {
+                    HStack(alignment: .center) {
+                        TestataScheda(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
+                        Text("Chiudi").font(.system(size: 16, weight: .semibold)).foregroundStyle(tinta)
+                    }
+                    .padding(16)
+                } else {
+                    HStack {
+                        Spacer()
+                        if conX {
+                            TondoX(tinta: tinta)
+                        } else {
+                            Text("Chiudi").font(.system(size: 15, weight: .semibold)).foregroundStyle(tinta)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    TestataScheda(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
+                        .padding(16)
+                }
+                Spacer(minLength: 0)
+            }
+            CaricamentoHUD(titolo: titolo, tinta: tinta)
+                .padding(.top, 120)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// L'apertura da HUD per le sezioni che non caricano dati dal cervello (Sentinella, Wiretap, Interprete, Allenatore, Browser…)
 /// e per quelle che hanno già la loro pagina (Vitals, Ricordi, Confidente): un attimo di caricamento con i suoni, poi la sezione.
+/// 7 nov sera: il caricamento è SchermoCaricamento, lo stesso di tutte le sezioni (prima copriva anche il titolo).
 struct AperturaHUD: ViewModifier {
     let titolo: String
+    let icona: String
+    var conX = false                // le sezioni con la fotocamera: la X nel cerchio al posto di «Chiudi»
     var durata = Apertura.caricamento
     var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
     var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
@@ -321,11 +391,8 @@ struct AperturaHUD: ViewModifier {
         content
             .overlay {
                 if coperto {
-                    ZStack {
-                        SfondoSezione()                           // 7 nov: il caricamento sullo stesso sfondo della pagina
-                        CaricamentoHUD(titolo: titolo, tinta: .ciano)
-                    }
-                    .transition(.opacity)
+                    SchermoCaricamento(titolo: titolo, icona: icona, conX: conX)
+                        .transition(.opacity)
                 }
             }
             .onAppear { Suoni.schedaApre() }
@@ -340,8 +407,8 @@ struct AperturaHUD: ViewModifier {
 
 extension View {
     /// Apre la sezione con il caricamento HUD di JARVIS.
-    func aperturaHUD(_ titolo: String, fotocamera: Bool = false, soloSfuma: Bool = false) -> some View {
-        modifier(AperturaHUD(titolo: titolo, fotocamera: fotocamera, soloSfuma: soloSfuma))
+    func aperturaHUD(_ titolo: String, icona: String, conX: Bool = false, fotocamera: Bool = false, soloSfuma: Bool = false) -> some View {
+        modifier(AperturaHUD(titolo: titolo, icona: icona, conX: conX, fotocamera: fotocamera, soloSfuma: soloSfuma))
     }
 }
 
@@ -1153,7 +1220,7 @@ enum TestiCaricamento {
         "foto": "scansione galleria", "serata": "collegamento sala", "telefono": "apertura linea sicura",
         "bea": "protective instinct", "github": "sincronizzazione repository", "supabase": "interrogazione database",
         "archivio": "recupero file classificati", "costi": "calcolo consumi", "edith": "attivazione protocolli difesa",
-        "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "riscaldamento amplificatori",
+        "scanner": "ottiche in posizione", "satellite": "aggancio orbita", "sound": "riscaldamento amplificatori", "musica": "allineamento canali audio",
         "vitals": "lettura parametri vitali", "ricordi": "richiamo memoria", "confidente": "canale riservato",
         "wiretap": "microfoni in ascolto", "interprete": "caricamento dizionari", "trainer": "calibrazione scheletro",
         "occhi": "sistemi ottici in linea", "cucina": "analisi ingredienti", "lidar": "proiezione griglia laser",

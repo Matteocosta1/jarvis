@@ -246,19 +246,11 @@ struct VistaWiretap: View {
         ZStack {
             SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 14) {
-                HStack(alignment: .top) {
-                    // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e «Chiudi»: qui non c'è la fotocamera
-                    TestataScheda(titolo: "Wiretap",
-                                  sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
-                                  icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)
-                    Button("Chiudi") {
-                        Suoni.tocco()
-                        // 4 nov (il signore): come «Jarvis, chiudi» a voce, niente si perde: con del testo parte il verbale
-                        VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
-                    }
-                        .font(.system(size: 17, weight: .semibold))
-                        .tint(Color.ciano)
-                }
+                // 7 nov sera (il signore: continuità in tutte le sezioni): «Chiudi» nella sua riga in alto e sotto la testata, come
+                // tutte le sezioni senza fotocamera (prima «Chiudi» stava sulla riga della testata)
+                TestataScheda(titolo: "Wiretap",
+                              sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
+                              icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)
 
                 // durata e onda
                 HStack(spacing: 10) {
@@ -343,6 +335,10 @@ struct VistaWiretap: View {
                 }
             }
             .padding(16)
+            .modifier(ConBarraChiudi(tinta: Color.ciano) {
+                // 4 nov (il signore): come «Jarvis, chiudi» a voce, niente si perde: con del testo parte il verbale
+                VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
+            })
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -387,7 +383,7 @@ struct VistaWiretap: View {
         .onChange(of: scena) { _, f in
             if f == .background, w.attivo { isolaRec() } else if f == .active { IsolaJarvis.fineRec() }
         }
-        .aperturaHUD("Wiretap")
+        .aperturaHUD("Wiretap", icona: "waveform.and.mic")
     }
 }
 

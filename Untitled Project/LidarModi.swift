@@ -385,15 +385,7 @@ struct ChiudiLidar: View {
     var body: some View {
         HStack {
             Spacer()
-            Button { Suoni.tocco(); azione() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.ciano)
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.4))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-            }
+            Button { Suoni.tocco(); azione() } label: { TondoX() }
             .accessibilityLabel("Chiudi")
         }
         .padding(.horizontal, 16)

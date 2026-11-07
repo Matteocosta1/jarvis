@@ -43,11 +43,10 @@ struct VistaStudio: View {
             .ignoresSafeArea()
             .overlay {
                 if coperto {
-                    ZStack {
-                        SfondoSezione()                           // 7 nov: il caricamento sullo stesso sfondo della pagina
-                        CaricamentoHUD(titolo: apertura.sezione, tinta: .ciano)
-                    }
-                    .transition(.opacity)
+                    // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
+                    // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
+                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
+                        .transition(.opacity)
                 }
             }
             .statusBarHidden(false)

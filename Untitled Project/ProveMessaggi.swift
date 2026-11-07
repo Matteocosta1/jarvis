@@ -7,11 +7,14 @@ import SwiftUI
 // messaggio, e un raggio che lo lega alla colonna. Scelta una persona per scriverle, in fondo compare il fumetto che scrive («…» che
 // pulsa) e i suoi messaggi restano chiari, gli altri si abbassano; mandato, il fumetto nuovo nasce lì, gli altri salgono di un posto
 // lungo l'elica e un lampo corre su per la colonna. Toccato un fumetto: chi, il messaggio, il canale e da quanto.
+// 7 nov sera (il signore: «almeno gli ultimi 5 ricevuti, poi sostituiti dai nuovi»): sull'elica anche i messaggi RICEVUTI
+// (l'automazione di Comandi «Messaggio ricevuto», vedi MessaggioRicevuto in Comunicazioni.swift), con «DA MATTEO» sul fumetto;
+// quelli mandati da JARVIS «A MATTEO». Gli ultimi 5 fra tutti, il più nuovo in basso.
 // Uguale al mockup (olo_extra/tre.js, bolleMessaggi). Solo iPhone (sul polso Messaggi non è una sezione).
 
 /// I messaggi per BOLLE: quelli che JARVIS ha mandato (dal registro, il più nuovo per primo), la persona scelta e il canale.
 struct MessaggiOlo {
-    struct Voce { let id: UUID; let nome: String; let testo: String; let quando: Date?; let tipo: String }
+    struct Voce { let id: UUID; let nome: String; let testo: String; let quando: Date?; let tipo: String; var ricevuto = false }
     var voci: [Voce] = []
     var totale = 0
     var scelto: String?
@@ -103,7 +106,7 @@ final class ProveMessaggi {
             if piccolo { _ = ProveMessaggi.fumetto(&gc, b, 34, 14, alfa, chiaro: b.i == 0, W: W); continue }
             let f = ProveMessaggi.fumetto(&gc, b, 92, 28, alfa, chiaro: b.i == 0 || scelto == v.nome || M.scelta == b.i, W: W)
             let caratteri = max(8, Int((f.w - 14) / (3.9 * f.s)))
-            OP.scritta(&gc, OP.corto(v.nome, 12), f.x + 7 * f.s, f.y + 10.5 * f.s, 7 * f.s, 700, OP.b(0.95 * alfa), .leading)
+            OP.scritta(&gc, (v.ricevuto ? "DA " : "A ") + OP.corto(v.nome, 9), f.x + 7 * f.s, f.y + 10.5 * f.s, 7 * f.s, 700, OP.b(0.95 * alfa), .leading)
             if v.quando != nil { OP.scritta(&gc, OP.quantoFa(v.quando), f.x + f.w - 7 * f.s, f.y + 10.5 * f.s, 6 * f.s, 600, OP.c(0.8 * alfa), .trailing) }
             OP.scritta(&gc, OP.taglia(v.testo, caratteri), f.x + 7 * f.s, f.y + 21 * f.s, 6.5 * f.s, 500, OP.c(0.9 * alfa), .leading)
             centri.append((x: f.x + f.w / 2, y: f.y + f.h / 2, i: b.i, davanti: davanti))
@@ -119,7 +122,7 @@ final class ProveMessaggi {
         if let s = M.scelta, s >= 0, s < voci.count, let c = centri.first(where: { $0.i == s }) {
             let v = voci[s]
             let tipo = v.tipo == "whatsapp" ? "WHATSAPP" : v.tipo == "imessage" ? "IMESSAGE" : v.tipo.uppercased()
-            OP.riquadro(&gc, W, H, c.x, c.y, [OP.taglia(v.nome.uppercased(), 18), "«\(OP.taglia(v.testo, 26))»", v.quando != nil ? "\(tipo) · \(OP.quantoFa(v.quando))" : tipo],
+            OP.riquadro(&gc, W, H, c.x, c.y, [OP.taglia((v.ricevuto ? "DA " : "A ") + v.nome.uppercased(), 18), "«\(OP.taglia(v.testo, 26))»", v.quando != nil ? "\(tipo) · \(OP.quantoFa(v.quando))" : tipo],
                         t - M.sceltaT, codice: "MESSAGGIO \(s + 1)/\(voci.count)")
         }
     }

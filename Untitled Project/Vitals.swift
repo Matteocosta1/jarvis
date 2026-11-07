@@ -71,7 +71,7 @@ struct VistaVitals: View {
             }
         }
         .preferredColorScheme(.dark)
-        .aperturaHUD("Vitals")
+        .aperturaHUD("Vitals", icona: "waveform.path.ecg")
     }
 
     // MARK: Pezzi della pagina

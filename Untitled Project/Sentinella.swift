@@ -393,9 +393,15 @@ struct VistaSentinella: View {
                 .allowsHitTesting(false)
 
             VStack {
-                // 27 ott: come il mockup, la testata (icona animata, del colore della sentinella) e i tre tasti sulla stessa riga:
-                // con il nome della sezione a 18 punti ci stanno
-                HStack(alignment: .top) {
+                // 7 nov sera (il signore: «o le fai tutte uguali»): i tre tasti nella riga in alto (la X a destra), la testata sotto,
+                // nello stesso punto di tutte le sezioni (prima stavano sulla stessa riga)
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Spacer()
+                        Button { Suoni.tocco(); s.ferma(); chiudi() } label: { tasto("xmark") }
+                            .accessibilityLabel("Disattiva la sentinella")
+                    }
+                    .frame(height: 44)
                     VStack(alignment: .leading, spacing: 3) {
                         TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "perimetro sotto controllo",
                                       icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
@@ -405,14 +411,17 @@ struct VistaSentinella: View {
                         }
                         .foregroundStyle(colore)      // 27 ott: niente bagliore sulle scritte della testata
                     }
-                    Button { Suoni.tocco(); registro = true } label: { tasto("list.bullet.rectangle") }
-                        .accessibilityLabel("Registro")
-                    Button { Suoni.tocco(); oscurato = true } label: { tasto("moon.fill") }
-                        .accessibilityLabel("Schermo nero")
-                    Button { Suoni.tocco(); s.ferma(); chiudi() } label: { tasto("xmark") }
-                        .accessibilityLabel("Disattiva la sentinella")
                 }
+                .padding(.horizontal, -4)          // la riga e la testata a 16 punti dai bordi, come le altre sezioni
+                .padding(.top, -12)
                 Spacer()
+                // 7 nov sera (il signore: «la luna e il registro sopra PERIMETRO SICURO, così sono simili ad Occhi»): tondi col nome
+                // sotto, come ETICHETTE e OLOGRAMMA di Occhi
+                HStack(alignment: .top, spacing: 18) {
+                    tastoGiu("list.bullet.rectangle", "REGISTRO") { registro = true }
+                    tastoGiu("moon.fill", "BUIO") { oscurato = true }
+                }
+                .padding(.bottom, 6)
                 Text(s.violato ? "PERIMETRO VIOLATO" : (s.bersagli.isEmpty ? "PERIMETRO SICURO" : "SOGGETTI IN VISTA · \(s.bersagli.count)"))
                     .font(.system(size: 13, weight: .bold, design: .monospaced)).tracking(3)
                     .foregroundStyle(s.violato ? .white : colore)
@@ -474,7 +483,7 @@ struct VistaSentinella: View {
         .onDisappear { orecchio.ferma(); s.ferma() }
         .pausaDietro(ferma: { orecchio.ferma(); s.ferma(); registro = false },            // MARK XI: dietro in pausa (4 nov: e il Registro si chiude)
                      riprendi: { Task { if await s.avvia() { Suoni.aperturaCamera(); orecchio.avvia() } } })
-        .aperturaHUD("Sentinella", fotocamera: true)
+        .aperturaHUD("Sentinella", icona: "dot.radiowaves.left.and.right", conX: true, fotocamera: true)
         // 4 nov: il Registro come nel mockup (il foglio che sale dal basso, la ✕ nel cerchio), non più la lista di iOS
         .fullScreenCover(isPresented: $registro) { RegistroSentinella() }
     }
@@ -503,14 +512,26 @@ struct VistaSentinella: View {
         .allowsHitTesting(false)
     }
 
+    /// I tasti in basso, come quelli di Occhi (TastoOcchi): il tondo da 40 e il nome sotto.
+    private func tastoGiu(_ icona: String, _ titolo: String, _ azione: @escaping () -> Void) -> some View {
+        Button { Suoni.tocco(); azione() } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icona).font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.ciano.opacity(0.7))
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Color.black.opacity(0.5)))
+                    .overlay(Circle().stroke(Color.ciano.opacity(0.55), lineWidth: 1))
+                Text(titolo).font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(0.5)
+                    .foregroundStyle(Color.ciano.opacity(0.7))
+            }
+            .frame(width: 50)
+        }
+        .buttonStyle(StileStark())
+        .accessibilityLabel(titolo == "BUIO" ? "Schermo nero" : "Registro")
+    }
+
     private func tasto(_ icona: String) -> some View {
-        Image(systemName: icona)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(Color.ciano)
-            .frame(width: 42, height: 42)
-            .background(Color.black.opacity(0.45))
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+        TondoX(simbolo: icona)                            // 7 nov sera: il tondo di tutte le sezioni (28 a vista, 44 al tocco)
     }
 }
 
@@ -587,11 +608,7 @@ struct RegistroSentinella: View {
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer(minLength: 4)
-                    Button { Suoni.tocco(); chiudi() } label: {
-                        Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                            .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
-                    }
+                    Button { Suoni.tocco(); chiudi() } label: { TondoX() }
                     .buttonStyle(StileStark())
                     .accessibilityLabel("Chiudi")
                 }

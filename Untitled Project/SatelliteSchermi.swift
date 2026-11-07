@@ -37,12 +37,9 @@ struct TestaSat: View {
                 .background(Capsule().fill(Color.black.opacity(0.45)))
             Button(action: chiudi) {
                 if conFotocamera {
-                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.ciano).frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.black.opacity(0.2)))
-                        .overlay(Circle().stroke(Color.ciano.opacity(0.5), lineWidth: 1))
+                    TondoX()                                     // 7 nov sera: il tondo di tutte le sezioni (28 a vista, 44 al tocco)
                 } else {
-                    Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                    Text("Chiudi").font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }

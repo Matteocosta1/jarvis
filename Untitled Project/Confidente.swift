@@ -184,7 +184,7 @@ struct VistaConfidente: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
-        .aperturaHUD("Confidente")
+        .aperturaHUD("Confidente", icona: "person.2.wave.2")
     }
 
     /// La bozza si scrive un attimo dopo l'ultimo tasto (sul telefono, protetta); vuota, sparisce.

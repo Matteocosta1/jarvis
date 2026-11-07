@@ -8,7 +8,8 @@ import UIKit
 /// Il dito sull'anello delle icone gira la corona; lasciata, gira ancora per inerzia e si ferma a scatto con un'icona esattamente
 /// in alto. Ogni icona che passa in alto: lo scatto (suono «ruota» + vibrazione, uno ogni 35 ms al massimo). Mentre gira il reattore
 /// si vela e al suo posto c'è l'ologramma dell'icona in alto, col nome; ferma, l'ologramma si crea sul tono «olo». Toccato, apre la
-/// sezione. 5 s senza toccare niente e si spegne (deciso il 3 nov). L'icona che passa in alto, solo mentre gira, cresce come nel
+/// sezione. 3 s senza toccare niente e si spegne (5 s il 3 nov, 3 s dal 7 nov); spenta torna al suo posto, e al suo posto la si può
+/// anche rimettere a mano (7 nov): è una tacca come le icone. L'icona che passa in alto, solo mentre gira, cresce come nel
 /// Dock (la lente); ferma, torna normale. Niente freccina sopra l'icona scelta (tolta dal signore il 3 nov).
 ///
 /// Il movimento lo fa un CADisplayLink a 120 Hz (ProMotion) e lo pubblica qui: lo leggono solo le icone, gli archi e l'ologramma
@@ -26,7 +27,7 @@ final class RuotaCorona: NSObject, ObservableObject {
     @Published private(set) var lente: Double = 0
 
     static let alto = -Double.pi / 2
-    static let resta: TimeInterval = 5
+    static let resta: TimeInterval = 3          // 7 nov (il signore: «se non scelgo nulla deve tornare a posto in 2/3 s»; prima 5)
     private static let due = 2 * Double.pi
 
     private var base: [Double] = []
@@ -86,6 +87,19 @@ final class RuotaCorona: NSObject, ObservableObject {
             let primo = RuotaCorona.alto - x
             let g = primo + (((proiezione - primo) / RuotaCorona.due).rounded()) * RuotaCorona.due
             if abs(g - proiezione) < minimo { minimo = abs(g - proiezione); meta = g }
+        }
+        // 7 nov (il signore: «voglio poterla rimettere io in posizione corretta»): anche il suo posto di riposo è una tacca.
+        // Lasciata più vicino al posto che a un'icona (lì in alto c'è lo spazio fra DAILY e SENSI), ci va con lo slancio,
+        // con lo scatto, e si spegne: il reattore torna com'era, come quando si spegne da sola dopo 5 s.
+        let casa = (proiezione / RuotaCorona.due).rounded() * RuotaCorona.due
+        if abs(casa - proiezione) < minimo {
+            vivo = false
+            creataDa = nil
+            scelta = -1
+            scatto()
+            molla = (meta: casa, x0: giro - casa, v0: v, t0: ora)
+            avvia()
+            return
         }
         molla = (meta: meta, x0: giro - meta, v0: v, t0: ora)
         avvia()

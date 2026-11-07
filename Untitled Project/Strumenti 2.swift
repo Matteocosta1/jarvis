@@ -242,6 +242,8 @@ final class Strumenti {
             : "sms:\(numero)&body=\(testo)"
         guard let url = URL(string: indirizzo) else { throw Problema("Non riesco a preparare il messaggio.") }
         daAprire.append(url)
+        let testoVero = i["testo"] as? String ?? ""                        // 7 nov: anche questo nell'ologramma di Messaggi
+        Task { await RegistroMessaggi.mandato(a: numero, testo: testoVero, whatsapp: whatsapp) }
         return json(["ok": true, "nota": "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia il signore"])
     }
 
@@ -266,6 +268,7 @@ final class Strumenti {
             throw Problema("Non riesco a preparare il messaggio.")
         }
         daAprire.append(url)
+        Task { await RegistroMessaggi.mandato(a: numero, testo: testo, whatsapp: false) }   // 7 nov: anche questo nell'ologramma di Messaggi
         return json(["ok": true, "nota": "il Comando rapido «\(Strumenti.comandoInvio)» lo invia appena hai finito di parlare, senza conferma"])
     }
 

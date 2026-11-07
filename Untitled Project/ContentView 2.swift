@@ -364,7 +364,7 @@ struct ContentView: View {
                 if let p = Protocolli.condiviso.prendiRichiesto() { Protocolli.condiviso.avvia(p) }
             }
         }
-        .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser").paginaPiena() }
+        .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser", icona: "globe").paginaPiena() }
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }
@@ -983,11 +983,12 @@ struct ContentView: View {
         .frame(maxWidth: .infinity).frame(height: altezza, alignment: .top)       // sotto resta lo spazio per la chat
     }
 
-    /// Il reattore: gli anelli (290) e il cuore (220) nel quadrato di 240, come sempre.
+    /// Il reattore: la ghiera (290), il cuore (308: il 140% dal 7 nov) e le coordinate, nel quadrato di 240.
     private var reattore: some View {
         ZStack {
             AnelliHUD(fase: jarvis.fase).frame(width: 290, height: 290)
-            Reattore(fase: jarvis.fase).frame(width: 220, height: 220)
+            Reattore(fase: jarvis.fase).frame(width: 308, height: 308)        // 7 nov sera (il signore: «140 il cuore»): era 220
+            EtichetteGhiera(fase: jarvis.fase).frame(width: 290, height: 290)   // le coordinate sopra il cuore, niente sopra di loro
         }
         .frame(width: 240, height: 240)
         // MARK XI: si tocca il cerchio del reattore, non il quadrato degli anelli (290): l'anello delle icone resta della ruota
@@ -1476,7 +1477,7 @@ struct ContentView: View {
             if let o = v.occhiata {
                 Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                       oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
-                    .aperturaHUD(o.cucina ? "Cucina" : "Occhi", soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
+                    .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "fork.knife" : "eye", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
             if let l = v.lingua { Interprete(lingua: l) { jarvis.interprete = nil } }
@@ -1492,12 +1493,12 @@ struct ContentView: View {
                 mostraProfiler = false
                 if !dati.isEmpty { jarvis.profila(dati, nome: nome) }
             }
-            .aperturaHUD("Profiler", soloSfuma: true)                                 // 26 ott notte: il caricamento come tutte le sezioni
+            .aperturaHUD("Profiler", icona: "person.text.rectangle", conX: true, soloSfuma: true)                                 // 26 ott notte: il caricamento come tutte le sezioni
         case .allenatore:
             Allenatore { jarvis.allenatore = false }
         case .lidar:
             VistaLidar(chiudi: { mostraLidar = false }, chiedi: { frase in mostraLidar = false; chiedi(frase) })
-                .aperturaHUD("LiDAR")                                                  // 26 ott notte: il caricamento come le altre schede
+                .aperturaHUD("LiDAR", icona: "cube.transparent", conX: true)                                                  // 26 ott notte: il caricamento come le altre schede
                 .environmentObject(jarvis)          // i comandi a voce di LiDAR («fine scansione», «salva»…)
         case .vitals:
             VistaVitals { frase in mostraVitals = false; chiedi(frase) }.paginaPiena()
@@ -2079,8 +2080,8 @@ struct ContentView: View {
     }
 }
 
-/// Anelli da HUD attorno al reattore: tre corone con tacche e segmenti che girano a velocità diverse,
-/// più veloci quando JARVIS pensa, arancioni quando lavora. Puro contorno: il reattore resta il cuore.
+/// Le fasce attorno al reattore (dal 7 nov la GHIERA): più veloci quando JARVIS ascolta e pensa, arancioni quando lavora e parla.
+/// Puro contorno: il reattore resta il cuore.
 struct AnelliHUD: View {
     let fase: Fase
     @Environment(\.jarvisCoperto) private var coperto    // 26 ott sera: sotto Studio o Social si ferma sull'ultimo fotogramma
@@ -2090,60 +2091,81 @@ struct AnelliHUD: View {
             let caldo = fase == .elaboro || fase == .parlo
             let fretta: Double = fase == .elaboro ? 2.2 : (fase == .ascolto ? 1.4 : 1)
             Canvas { gc, size in
+                // 7 nov sera (il signore: «la mia scelta per il reattore è Ghiera»): la GHIERA, come il mockup v274 (prova GHIERA
+                // di «Fasce reattore»). Una ghiera tecnica alla Stark: 120 tacche graduate (ogni 10 lunga), il controanello
+                // tratteggiato che gira al contrario, il binario con tre archi e i fermi alle estremità, il raggio di scansione che
+                // passa piano, l'anello interno. Le coordinate 000 · 090 · 180 · 270 le disegna EtichetteGhiera, sopra il cuore.
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let R = Double(min(size.width, size.height)) / 2
                 let base = caldo ? Color.orange : Color.ciano
-                // corona esterna: 72 tacche, ogni sesta più lunga, che scorrono piano. 5 nov (punto 9 approvato: «stesso disegno,
-                // meno lavoro»): due tratti invece di 72 (le tacche non si toccano, quindi il disegno è lo stesso)
-                var lunghe = Path(), corte = Path()
-                for k in 0..<72 {
-                    let th = Double(k) / 72 * 2 * .pi + t * 0.05 * fretta
-                    let lunga = k % 6 == 0
-                    let (ct, st) = (cos(th), sin(th)), r2 = R * (lunga ? 0.91 : 0.945)
-                    if lunga {
-                        lunghe.move(to: CGPoint(x: c.x + R * 0.97 * ct, y: c.y + R * 0.97 * st)); lunghe.addLine(to: CGPoint(x: c.x + r2 * ct, y: c.y + r2 * st))
-                    } else {
-                        corte.move(to: CGPoint(x: c.x + R * 0.97 * ct, y: c.y + R * 0.97 * st)); corte.addLine(to: CGPoint(x: c.x + r2 * ct, y: c.y + r2 * st))
-                    }
+                func punto(_ r: Double, _ a: Double) -> CGPoint { CGPoint(x: c.x + r * cos(a), y: c.y + r * sin(a)) }
+                func cerchio(_ r: Double) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
+                // il bordo e le 120 tacche che scorrono piano
+                gc.stroke(cerchio(R * 0.99), with: .color(base.opacity(0.32)), lineWidth: 0.8)
+                var lunghe = Path(), medie = Path(), corte = Path()
+                for k in 0..<120 {
+                    let a = Double(k) / 120 * 2 * .pi + t * 0.03 * fretta
+                    if k % 10 == 0 { lunghe.move(to: punto(R * 0.985, a)); lunghe.addLine(to: punto(R * 0.925, a)) }
+                    else if k % 5 == 0 { medie.move(to: punto(R * 0.985, a)); medie.addLine(to: punto(R * 0.945, a)) }
+                    else { corte.move(to: punto(R * 0.985, a)); corte.addLine(to: punto(R * 0.962, a)) }
                 }
-                gc.stroke(lunghe, with: .color(base.opacity(0.55)), lineWidth: 1.4)
-                gc.stroke(corte, with: .color(base.opacity(0.25)), lineWidth: 0.8)
-                // segmenti che girano in senso opposto su due raggi (uno per raggio: gli archi dello stesso raggio non si toccano)
-                let segmenti: [(Double, Double, Double, Int)] = [(0.88, 0.35, 0.18, 3), (0.80, -0.6, 0.08, 5)]
-                for (fr, vel, lung, quanti) in segmenti {
-                    var archi = Path()
-                    for q in 0..<quanti {
-                        let inizio = Angle(radians: t * vel * fretta + Double(q) * 2 * .pi / Double(quanti))
-                        // 5 nov sera (foto del signore 21:32: «le linee intorno al reattore»): l'arco aggiunto a un percorso già iniziato
-                        // partiva con una linea dritta dalla fine dell'arco prima (triangoli e pentagoni attorno al reattore). Ora ogni arco
-                        // comincia col suo punto di partenza: pezzi staccati, il disegno di sempre.
-                        archi.move(to: CGPoint(x: c.x + R * fr * cos(inizio.radians), y: c.y + R * fr * sin(inizio.radians)))
-                        archi.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
-                    }
-                    gc.stroke(archi, with: .color(base.opacity(0.5)), style: StrokeStyle(lineWidth: fr > 0.85 ? 2.2 : 1.2, lineCap: .round))
+                gc.stroke(lunghe, with: .color(base.opacity(0.75)), lineWidth: 1.4)
+                gc.stroke(medie, with: .color(base.opacity(0.42)), lineWidth: 0.8)
+                gc.stroke(corte, with: .color(base.opacity(0.2)), lineWidth: 0.8)
+                // il controanello tratteggiato, che gira al contrario (la fase del tratteggio lo fa girare)
+                gc.stroke(cerchio(R * 0.9), with: .color(base.opacity(0.45)),
+                          style: StrokeStyle(lineWidth: 1, dash: [1.6, 4.2], dashPhase: t * 0.12 * fretta * R * 0.9))
+                // il binario e i tre archi coi fermi
+                gc.stroke(cerchio(R * 0.855), with: .color(base.opacity(0.1)), lineWidth: 3.2)
+                var archi = Path(), fermi = Path()
+                for q in 0..<3 {
+                    let a = t * 0.32 * fretta + Double(q) * 2 * .pi / 3
+                    let l = 0.5 + (caldo ? 0.12 * sin(t * 3 + Double(q)) : 0)
+                    archi.move(to: punto(R * 0.855, a))
+                    archi.addArc(center: c, radius: R * 0.855, startAngle: .radians(a), endAngle: .radians(a + l), clockwise: false)
+                    for e in [a, a + l] { fermi.move(to: punto(R * 0.825, e)); fermi.addLine(to: punto(R * 0.885, e)) }
                 }
-                // piccoli numeri «telemetrici» ai quattro punti cardinali: scritti una volta (i simboli della tela), poi solo spostati.
-                // 7 nov (il signore: «le linee curve che girano intorno al reattore vanno sopra ai numeri»): gli archi passano sullo
-                // stesso giro dei numeri; ora sotto ogni numero si apre un varco e gli archi ci passano dietro, i numeri restano puliti
-                let numeri = ["0", "90", "180", "270"]
-                var varchi = gc
-                varchi.blendMode = .destinationOut
-                for n in 0..<4 {
-                    let th = Double(n) * .pi / 2 - .pi / 2 + t * 0.05 * fretta
-                    let pt = CGPoint(x: c.x + R * 0.86 * cos(th), y: c.y + R * 0.86 * sin(th))
-                    let largo = 6 + 4.6 * Double(numeri[n].count)
-                    varchi.fill(Path(roundedRect: CGRect(x: pt.x - largo / 2, y: pt.y - 6, width: largo, height: 12), cornerRadius: 3), with: .color(.black))
-                    if let s = gc.resolveSymbol(id: n) { gc.draw(s, at: pt) }
+                gc.stroke(archi, with: .color(base.opacity(0.85)), lineWidth: 2.4)
+                gc.stroke(fermi, with: .color(base.opacity(0.85)), lineWidth: 1.2)
+                // il raggio di scansione: una scia che sfuma dietro
+                let sa = t * 0.7 * fretta
+                for i in 0..<18 {
+                    let a0 = sa - Double(i) * 0.035
+                    var p = Path(); p.addArc(center: c, radius: R * 0.9, startAngle: .radians(a0 - 0.035), endAngle: .radians(a0), clockwise: false)
+                    gc.stroke(p, with: .color(base.opacity(0.16 * (1 - Double(i) / 18))), lineWidth: R * 0.17)
                 }
-            } symbols: {
-                ForEach(0..<4, id: \.self) { n in
-                    Text(["0", "90", "180", "270"][n]).font(.system(size: 7, weight: .medium, design: .monospaced))
-                        .foregroundStyle((caldo ? Color.orange : Color.ciano).opacity(0.6)).tag(n)
-                }
+                // l'anello interno, sottile
+                gc.stroke(cerchio(R * 0.78), with: .color(base.opacity(0.3)), lineWidth: 0.8)
             }
             .animation(.easeInOut(duration: 0.8), value: caldo)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// 7 nov sera (il signore: «nessuna sovrapposizione su numeri o scritte»): le coordinate della GHIERA, fisse e sempre dritte, sopra
+/// il cuore del reattore. Ognuna nel suo riquadro scuro, così sopra i numeri non passa niente (mockup v274, ghieraEtichette).
+struct EtichetteGhiera: View {
+    let fase: Fase
+    var body: some View {
+        let base = fase == .elaboro || fase == .parlo ? Color.orange : Color.ciano
+        GeometryReader { g in
+            let R = Double(min(g.size.width, g.size.height)) / 2
+            let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
+            ForEach(0..<4, id: \.self) { n in
+                let a = Double(n) * .pi / 2 - .pi / 2
+                Text(["000", "090", "180", "270"][n])
+                    .font(.system(size: 7, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(base.opacity(0.95))
+                    .frame(width: 26, height: 12)
+                    .background(Color(red: 0.02, green: 0.03, blue: 0.035).opacity(0.82))
+                    .overlay(Rectangle().stroke(base.opacity(0.6), lineWidth: 0.8))
+                    .position(x: c.x + R * 0.9 * cos(a), y: c.y + R * 0.9 * sin(a))
+            }
+        }
+        .animation(.easeInOut(duration: 0.8), value: fase == .elaboro || fase == .parlo)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

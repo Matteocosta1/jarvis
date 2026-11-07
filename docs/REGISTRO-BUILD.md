@@ -528,3 +528,11 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Reattore: varchi sotto 0/90/180/270. Click wheel: spenta torna al suo posto (5 s senza scelta o sezione aperta).
 - Posta: lettore dentro JARVIS (tocco sulla mail), «Chiedi a JARVIS» col testo solo al cervello, «Apri in Mail» col Message-ID. Cervello **v120** pubblicato alle 17:38 (prova generale superata): nuovo `posta_testo` in sola lettura. La copia del cervello su GitHub ora è quella pubblicata (era ferma al 22 ott).
 - Mockup v271 pubblicato (pulito e di lavoro).
+
+
+## Verso la 11.0 (9) — 7 nov sera (in preparazione, numero da confermare)
+- Mockup v272–v274 (pulito e di lavoro) con le stesse cose: lettore della posta nel mockup; Messaggi con i ricevuti (v273); un solo caricamento per tutte le sezioni (SchermoCaricamento: sfondo, «Chiudi» o X in alto, testata al suo posto, caricamento al centro sotto, 0,28 s + 0,25 s) anche per Occhi, Cucina, Profiler, Trainer, Sentinella, LiDAR, Browser, Studio, Social, Musica; una sola disposizione per tutte (riga di chiusura alta 44, testata 16 punti sotto); X e «Chiudi» più piccoli e della stessa altezza (X 28 a vista, 44 al tocco, TondoX; «Chiudi» 15); Browser, Studio, Social e Musica col nome della sezione al posto di J.A.R.V.I.S.; Trainer di una parola; Sentinella con Registro e Buio sopra PERIMETRO SICURO come Occhi; Wiretap con «Chiudi» in alto (e nel mockup com'è nell'app).
+- Click wheel: torna a posto da sola in 3 s (era 5) e si rimette a posto anche a mano (il posto è una tacca); reattore più trasparente e più indietro mentre gira (0,015, scala 0,78); anteprima olografica un po' più luminosa, scelta ancora di più.
+- Reattore: la GHIERA (scelta del signore alle 19:34) al posto delle 72 tacche, cuore al 140% (308 punti), coordinate 000 · 090 · 180 · 270 sopra il cuore senza niente sopra (EtichetteGhiera). Il mockup ora ha il cuore vero dell'app (plasma e sfera).
+- Messaggi: nell'ologramma gli ultimi 5 fra mandati e RICEVUTI; i ricevuti li porta l'azione «Messaggio ricevuto» (automazione di Comandi «Quando ricevo un messaggio»); anche i messaggi mandati a voce e da Ti penso entrano nel registro.
+- Pagine di prova: «Fasce reattore» (13 fasce) e «JARVIS Fasce» (mockup vero con fasce, cuore, stato e 3 prove di nanotecnologia sulla ruota: FLUSSO, SCAGLIE, MAGLIA — in attesa della scelta).

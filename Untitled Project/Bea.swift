@@ -646,6 +646,8 @@ struct TiPenso: View {
             var mandati = UserDefaults.standard.stringArray(forKey: "pensieriBea") ?? []
             mandati.insert(testo, at: 0)
             UserDefaults.standard.set(Array(mandati.prefix(12)), forKey: "pensieriBea")
+            let n = numero, t = testo, wa = titolo == "WhatsApp"                // 7 nov: anche Ti penso nell'ologramma di Messaggi
+            Task { await RegistroMessaggi.mandato(a: n, testo: t, whatsapp: wa) }
             if let url = URL(string: indirizzo) { apriURL(url) }
             chiudi()
         } label: {

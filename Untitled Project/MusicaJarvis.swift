@@ -358,7 +358,7 @@ struct VistaMusica: View {
     @State private var conti: [String: Int] = [:]        // quanti brani ha ogni playlist / album (id → numero)
 
     var body: some View {
-        CorniceScheda(titolo: "Sound", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto, marchio: true) {   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
+        CorniceScheda(titolo: "Musica", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
             PannelloOraMusica(lettore: lettore)
             if let avviso {
                 Pannello(tinta: .ciano) { Text(avviso).font(.footnote).foregroundStyle(.orange) }

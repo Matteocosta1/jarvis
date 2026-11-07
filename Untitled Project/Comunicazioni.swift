@@ -2,6 +2,8 @@
 import SwiftUI
 import Contacts
 import UIKit
+import AppIntents
+import Combine
 
 // MARK: - La rubrica, condivisa da Messaggi e Telefono
 
@@ -87,6 +89,68 @@ enum Registro {
     static func svuota(_ chiave: String) { UserDefaults.standard.removeObject(forKey: chiave) }
 }
 
+extension Notification.Name {
+    /// Un messaggio nuovo nel registro (mandato da JARVIS o ricevuto): l'ologramma di Messaggi si rilegge.
+    nonisolated static let messaggiCambiati = Notification.Name("jarvisMessaggiCambiati")
+}
+
+/// 7 nov sera (il signore: «vorrei si vedessero almeno gli ultimi 5 ricevuti, poi sostituiti da quelli nuovi»): iOS non lascia
+/// leggere Messaggi a nessuna app, quindi i messaggi li porta l'automazione di Comandi «Quando ricevo un messaggio» (iMessage e
+/// SMS) con l'azione «Messaggio ricevuto» di JARVIS. Restano sul telefono (registroRicevuti, gli ultimi 100). Anche i messaggi
+/// mandati da JARVIS da ogni parte (a voce, Ti penso di Bea) entrano nel registro di Messaggi: prima solo quelli della sezione.
+enum RegistroMessaggi {
+    static let ricevuti = "registroRicevuti"
+    static let mandati = "registroMessaggi"
+
+    static func ricevuto(da mittente: String, testo: String) async {
+        let m = mittente.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !m.isEmpty || !t.isEmpty else { return }
+        let nome = await nome(di: m)
+        Registro.aggiungi(VoceRegistro(nome: nome, numero: m, quando: Date(), tipo: "imessage", testo: t), a: ricevuti)
+        NotificationCenter.default.post(name: .messaggiCambiati, object: nil)
+    }
+
+    /// Un messaggio mandato da JARVIS fuori dalla sezione Messaggi (a voce, Bea): il nome dalla rubrica, se c'è.
+    static func mandato(a numero: String, testo: String, whatsapp: Bool) async {
+        let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !numero.isEmpty, !t.isEmpty else { return }
+        let nome = await nome(di: numero)
+        Registro.aggiungi(VoceRegistro(nome: nome, numero: numero, quando: Date(), tipo: whatsapp ? "whatsapp" : "imessage", testo: t), a: mandati)
+        NotificationCenter.default.post(name: .messaggiCambiati, object: nil)
+    }
+
+    /// Il nome in rubrica di un numero (le ultime 9 cifre); un nome già scritto resta com'è.
+    static func nome(di mittente: String) async -> String {
+        let cifre = mittente.filter(\.isNumber)
+        guard cifre.count >= 6 else { return mittente.isEmpty ? "Sconosciuto" : mittente }
+        let coda = String(cifre.suffix(9))
+        for c in await Rubrica.tutti() where c.numeri.contains(where: { $0.numero.filter(\.isNumber).hasSuffix(coda) }) {
+            return c.nome
+        }
+        return mittente
+    }
+}
+
+/// L'azione per l'automazione di Comandi: «Quando ricevo un messaggio» (Mittente: chiunque) → «Messaggio ricevuto» di JARVIS, con
+/// il mittente e il contenuto del messaggio. Non apre l'app.
+struct MessaggioRicevuto: AppIntent {
+    nonisolated static var title: LocalizedStringResource { "Messaggio ricevuto" }
+    nonisolated static var description: IntentDescription {
+        IntentDescription("Passa a Jarvis un messaggio appena arrivato (chi lo manda e il testo): resta sul telefono e compare nell'ologramma di Messaggi.")
+    }
+    @Parameter(title: "Mittente") var mittente: String
+    @Parameter(title: "Testo") var testo: String
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        let m = mittente, t = testo
+        await RegistroMessaggi.ricevuto(da: m, testo: t)
+        return .result()
+    }
+}
+
 /// La riga di un contatto, con l'iniziale nel cerchio.
 struct RigaContatto: View {
     let c: Contatto
@@ -156,6 +220,7 @@ struct VistaMessaggi: View {
     @AppStorage("messaggiCanale") private var canale: Canale = .imessage
     @State private var testo = ""
     @State private var registro: [VoceRegistro] = Registro.leggi("registroMessaggi")
+    @State private var ricevuti: [VoceRegistro] = Registro.leggi(RegistroMessaggi.ricevuti)   // 7 nov: dall'automazione di Comandi
     @State private var esito: String?
     @State private var caricato = false
     @State private var giroBozza = 0
@@ -200,6 +265,11 @@ struct VistaMessaggi: View {
             caricato = true
             riprendiBozza()
         }
+        // 7 nov: un messaggio arrivato (o mandato da JARVIS altrove) mentre la sezione è aperta: l'ologramma lo fa nascere subito
+        .onReceive(NotificationCenter.default.publisher(for: .messaggiCambiati)) { _ in
+            registro = Registro.leggi(RegistroMessaggi.mandati)
+            ricevuti = Registro.leggi(RegistroMessaggi.ricevuti)
+        }
         .onDisappear { dettatura.ferma() }
         // 4 nov (il signore): la bozza resta, come in Messaggi di iOS
         .onChange(of: testo) { salvaBozza() }
@@ -207,10 +277,13 @@ struct VistaMessaggi: View {
         .onChange(of: scelto) { salvaBozza() }
     }
 
-    /// v267: i messaggi di JARVIS per l'ologramma BOLLE (i più nuovi, la persona scelta, il canale).
+    /// v267: i messaggi per l'ologramma BOLLE (i più nuovi, la persona scelta, il canale). 7 nov: mandati da JARVIS e ricevuti,
+    /// gli ultimi 5 fra tutti.
     private var messaggiOlo: MessaggiOlo {
-        MessaggiOlo(voci: registro.prefix(5).map { MessaggiOlo.Voce(id: $0.id, nome: $0.nome, testo: $0.testo ?? "", quando: $0.quando, tipo: $0.tipo) },
-                    totale: registro.count, scelto: scelto?.nome, canale: canale.rawValue)
+        let mandati = registro.prefix(5).map { MessaggiOlo.Voce(id: $0.id, nome: $0.nome, testo: $0.testo ?? "", quando: $0.quando, tipo: $0.tipo) }
+        let arrivati = ricevuti.prefix(5).map { MessaggiOlo.Voce(id: $0.id, nome: $0.nome, testo: $0.testo ?? "", quando: $0.quando, tipo: $0.tipo, ricevuto: true) }
+        let tutti = (mandati + arrivati).sorted { ($0.quando ?? .distantPast) > ($1.quando ?? .distantPast) }
+        return MessaggiOlo(voci: Array(tutti.prefix(5)), totale: registro.count + ricevuti.count, scelto: scelto?.nome, canale: canale.rawValue)
     }
 
     /// Riaprendo: il messaggio lasciato a metà, con il suo contatto.

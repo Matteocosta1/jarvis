@@ -53,6 +53,8 @@ struct VistaProfiler: View {
 
             VStack(spacing: 14) {
                 intestazione
+                    .padding(.horizontal, -4)      // 7 nov sera: la riga della X e la testata come tutte le sezioni (16 punti dai bordi)
+                    .padding(.top, -12)
                 Spacer()
                 if foto == nil { comandi } else { scheda }
             }
@@ -67,7 +69,20 @@ struct VistaProfiler: View {
 
     // MARK: Pezzi
 
+    /// 7 nov sera (il signore: «o le fai tutte uguali»): la X nella sua riga in alto, la testata sotto, come tutte le sezioni.
     private var intestazione: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Spacer()
+                Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: ambra) }
+                .accessibilityLabel("Chiudi")
+            }
+            .frame(height: 44)
+            testata
+        }
+    }
+
+    private var testata: some View {
         HStack(spacing: 12) {
             IconaProfiler()
                 .foregroundStyle(ambra)
@@ -81,17 +96,7 @@ struct VistaProfiler: View {
                     .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).opacity(0.75)
             }
             .foregroundStyle(ambra)                                // 27 ott: niente bagliore sul titolo, come le altre sezioni
-            Spacer()
-            Button { Suoni.tocco(); chiudi([]) } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ambra)
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.4))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(ambra.opacity(0.5), lineWidth: 1))
-            }
-            .accessibilityLabel("Chiudi")
+            Spacer(minLength: 0)
         }
     }
 

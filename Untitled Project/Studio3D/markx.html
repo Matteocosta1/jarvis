@@ -1241,6 +1241,16 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 #provaMain > :not(.voce22):not(.di-pan):not(.avvio-m) { display: none !important; }
 #provaMain > .avvio-m { order: -1; } #provaMain > .avvio-m #avviaVuota { display: none; } #provaMain > .avvio-m .comando { flex: 1; padding: 14px; font-size: 14px; letter-spacing: 3px; }   /* MARK X: il tasto AVVIA per provare l'accensione */
 .di-guida { position: absolute; left: 16px; right: 16px; bottom: 150px; text-align: center; font: 600 10px var(--mono); letter-spacing: 1.5px; color: rgba(255,255,255,.75); }
+
+/* v274 · Browser, Studio, Social come tutte le sezioni */
+.sd-su, .sc-su, .bp-testa { flex-wrap: wrap !important; justify-content: flex-end !important; align-items: center !important; padding: 50px 16px 6px !important; column-gap: 14px !important; row-gap: 0 !important; }
+.sd-su::before, .sc-su::before, .bp-testa::before { content: ""; order: 1; flex: 0 0 100%; height: 4px; }
+.sd-su > button, .sc-su > button, .bp-testa > button { order: 0; min-height: 44px; margin: 0 !important; }
+.sd-su > .anello, .sc-su > .anello, .bp-testa > .anello { order: 2; align-self: flex-start !important; }
+.sd-su > div:not(.anello), .sc-su > div:not(.anello), .bp-testa > div:not(.anello) { order: 2; flex: 1 1 0 !important; align-self: flex-start !important; min-height: 40px; align-content: center; }
+.sd-su b, .sc-su b, .bp-testa b { font: 700 17px var(--mono) !important; letter-spacing: 3px !important; color: #fff !important; }
+.sd-su small, .sc-su small, .bp-testa small { font: 600 9px var(--mono) !important; letter-spacing: 2px !important; color: var(--ciano) !important; opacity: 1 !important; }
+.sd-chiudi, .sc-chiudi { padding: 6px !important; }
 </style>
 
 <div class="vista-scelta build-scelta" role="group" aria-label="Build"><span>BUILD</span><button class="chip" type="button" data-build="22" aria-pressed="true">22</button><button class="chip" type="button" data-build="23" aria-pressed="false">23</button><button class="chip" type="button" data-build="32" aria-pressed="false">32</button></div>
@@ -5647,7 +5657,7 @@ function social(ok) {
   const DIDA = ["Uscito ora dal banco olografico di JARVIS: progettato in 3D, stampato in PLA. Dite la vostra 👇\n\n#3dprinting #kingrusto #design #madeinitaly",
     "Dal muro allo Studio: lo stencil diventa un pezzo vero. Chi lo vuole? Commentate LISTA.\n\n#kingrusto #graffiti #customdenim #3dprint",
     "Nuovo drop in arrivo. Questo è il prototipo: ditemi colore e misura.\n\n#kingrusto #streetart #drop"];
-  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>J.A.R.V.I.S.</b><small data-sc-sotto>${TC("Social").toUpperCase()}</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>SOCIAL</b><small data-sc-sotto>${TC("Social").toUpperCase()}</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
     <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["griglia", "GRIGLIA"], ["piano", "PIANO"], ["report", "REPORT"], ["orari", "ORARI"], ["rivali", "RIVALI"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
@@ -6187,7 +6197,7 @@ function studio(ok) {
   corpo.hidden = true; sezione.classList.add("pieno");
   const A = document.createElement("div"); A.className = "allen sd";
   const rail = (lista) => lista.map(([k, n]) => `<button type="button" data-sdt="${k}" aria-pressed="false" aria-label="${n}"><i>${SD_ICO[k]}</i>${n}</button>`).join("");
-  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>J.A.R.V.I.S.</b><small data-sd="prog">${TC("Studio").toUpperCase()}</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>STUDIO</b><small data-sd="prog">${TC("Studio").toUpperCase()}</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
     <div class="sd-vista"><div class="sd-modi">${[["solido", "SOLIDO"], ["reticolo", "WIREFRAME"], ["raggi", "RAGGI X"]].map(([k, n], i) => `<button type="button" data-sdv="${k}" aria-pressed="${!i}">${n}</button>`).join("")}<button type="button" data-sdg aria-pressed="true">SNAP 5</button></div>
       <div class="sd-storia"><button type="button" data-sda="annulla" aria-label="Annulla" class="spento">${SD_ICO.annulla}</button><button type="button" data-sda="ripeti" aria-label="Ripeti" class="spento">${SD_ICO.ripeti}</button></div></div>
     <div class="sd-banco"><div class="sd-angoli"></div>
