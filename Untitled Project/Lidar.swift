@@ -175,11 +175,23 @@ struct VistaLidar: View {
     /// Il modo vero: in Corpo, Postura (lo scheletro) o Texture (la «Statua»).
     private var vero: ModoLidar { modo == .corpo && corpo == .statua ? .statua : modo }
 
+    /// La testata nella riga della X (7 nov sera): nel menu il modo scelto, nei risultati la scansione; mentre scansiona niente.
+    private var testataLidar: DatiTestata? {
+        let sotto: String
+        switch fase {
+        case .menu: sotto = vero.sotto
+        case .risultato: sotto = risultato?.nome.lowercased() ?? "archivio"
+        case .risultatoModo: sotto = risultatoModo?.sotto ?? vero.sotto
+        case .scansione, .elaboro: return nil
+        }
+        return DatiTestata(titolo: "LiDAR", sottotitolo: sotto, icona: "cube.transparent")
+    }
+
     var body: some View {
         ZStack {
             SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 0) {
-                ChiudiLidar { chiudiChiedendo() }
+                ChiudiLidar(testata: testataLidar) { chiudiChiedendo() }   // 7 nov sera: la testata nella riga della X
                 switch fase {
                 case .menu:
                     ScrollView {
@@ -598,7 +610,6 @@ struct VistaLidar: View {
     private var schermoRisultato: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                TestataScheda(titolo: "LiDAR", sottotitolo: risultato?.nome.lowercased() ?? "archivio", icona: "cube.transparent", tinta: .ciano)
                 HStack(spacing: 6) {
                     ForEach(Vista.allCases, id: \.self) { v in ChipLidar(testo: v.rawValue, premuto: vista == v) { vista = v } }
                 }

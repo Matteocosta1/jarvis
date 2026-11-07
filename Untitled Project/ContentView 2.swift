@@ -2315,12 +2315,6 @@ struct ImpostazioniView: View {
             Form {
                 // 7 nov (il signore: «falle tutte uguali»): le righe come i pannelli delle altre sezioni (velo ciano), non il grigio di iOS
                 Group {
-                // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
-                Section {
-                    TestataScheda(titolo: "Impostazioni", sottotitolo: "configurazione nucleo", icona: "gearshape", tinta: Color.ciano)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                }
                 Section {
                     SecureField("Parola d'ordine", text: $parola)
                         .textInputAutocapitalization(.never)
@@ -2419,7 +2413,9 @@ struct ImpostazioniView: View {
             .contentMargins(.top, 16, for: .scrollContent)
             .contentMargins(.horizontal, 16, for: .scrollContent)
             // 5 nov (il signore: «se scorro si vede quella barra grigia»): «Fatto» in una riga sua sopra la pagina, come «Chiudi»
-            .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto") {
+            // 7 nov sera: la testata nella riga di «Fatto», come in tutte le sezioni
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto",
+                                     testata: DatiTestata(titolo: "Impostazioni", sottotitolo: "configurazione nucleo", icona: "gearshape")) {
                 Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))
                 chiudi()
             })

@@ -32,8 +32,11 @@ struct CorniceScheda<Contenuto: View>: View {
                 // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:
                 // la pagina scorre sotto la riga e la riga resta trasparente.
                 VStack(spacing: 0) {
-                    // 7 nov sera: anche col marchio (JARVIS Music) il caricamento è quello di tutte: «Chiudi» in alto e la testata sotto
-                    if fotocamera { tastoX } else if !marchio || !mostrato { BarraChiudi(tinta: tinta) { chiudi() } }
+                    // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi, così scorrendo la pagina
+                    // non spariscono»): la testata sta nella riga di «Chiudi» (o della X), ferma; sotto scorre solo il contenuto
+                    BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo),
+                                                      icona: icona, tinta: tinta, marchio: marchio),
+                                 tinta: tinta, conX: fotocamera, chiudi: { chiudi() })
                     pagina
                 }
                 if !mostrato {
@@ -43,7 +46,7 @@ struct CorniceScheda<Contenuto: View>: View {
                         .allowsHitTesting(false)
                 }
             }
-            // marchio: «Chiudi» è nella testata, come Studio e Social; fotocamera: la X nel cerchio; le altre: BarraChiudi
+            // la riga in alto è BarraSezione: la testata a sinistra, «Chiudi» (o la X nel cerchio con la fotocamera) a destra
             .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
@@ -63,15 +66,6 @@ struct CorniceScheda<Contenuto: View>: View {
     private var pagina: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if marchio && mostrato {
-                    // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
-                    HStack(alignment: .center) {
-                        TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
-                        Button("Chiudi") { chiudi() }.font(.system(size: 13, weight: .semibold)).tint(tinta)
-                    }
-                } else {
-                    TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
-                }
                 if mostrato {
                     contenuto()
                         .mask(alignment: .top) {
@@ -102,19 +96,6 @@ struct CorniceScheda<Contenuto: View>: View {
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollDismissesKeyboard(.interactively)
     }
-
-    /// 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio, nello stesso posto del
-    /// «Chiudi» delle altre (come nel mockup: lo stesso tasto, a cerchio). Fuori dalla barra di iOS, che la vestirebbe di vetro.
-    private var tastoX: some View {
-        HStack {
-            Spacer()
-            Button { Suoni.tocco(); chiudi() } label: { TondoX(tinta: tinta) }
-            .buttonStyle(StileStark())
-            .accessibilityLabel("Chiudi")
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 44)
-    }
 }
 
 /// La testata: icona dentro un anello che gira, nome della scheda in grande, una riga di stato.
@@ -127,11 +108,15 @@ struct TestataScheda: View {
     var marchio = false
     /// Sentinella: anche il titolo del colore della sezione (verde in visione notturna), non bianco.
     var titoloColorato = false
+    /// Una riga in più sotto il sottotitolo (vedi DatiTestata.riga).
+    var riga: AnyView? = nil
+    /// 7 nov sera: nella riga di «Chiudi» (BarraSezione): niente margine sotto, nome e sottotitolo su una riga sola.
+    var inBarra = false
     /// 4 nov: la sezione è dietro (MARK XI, invisibile o pagina olografica non davanti): l'arco si ferma, davanti riparte.
     @Environment(\.sezioneDietro) private var dietro
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: riga == nil ? .center : .top, spacing: 14) {
             ZStack {
                 Circle().stroke(tinta.opacity(0.25), lineWidth: 1)
                 // 26 ott sera (SATELLITE, foto del signore 22:07: un mezzo cerchio che gira per la pagina): l'arco girava con
@@ -172,45 +157,99 @@ struct TestataScheda: View {
                 TestoCodice(testo: sottotitolo.uppercased())
                     .font(.system(size: marchio ? 10.5 : 9, weight: marchio ? .bold : .semibold, design: .monospaced)).tracking(2)
                     .foregroundStyle(tinta)   // 27 ott: in Sound (come Studio e Social) la dicitura più marcata, senza bagliore
+                if let riga { riga }
             }
+            .padding(.top, riga == nil ? 0 : 2)
+            .lineLimit(1)
+            .truncationMode(.tail)
             Spacer(minLength: 0)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, inBarra ? 0 : 4)
     }
 }
 
-/// 5 nov · «Chiudi» delle sezioni senza fotocamera, in una riga sua sopra la pagina (al posto della barra di iOS, che scorrendo
-/// diventava grigia): stesso posto, stessa misura e stessa scritta di prima; la pagina scorre sotto e la riga resta trasparente.
-struct BarraChiudi: View {
+/// La testata di una sezione (icona animata, NOME, sottotitolo), per la riga in alto (BarraSezione).
+struct DatiTestata {
+    let titolo: String
+    let sottotitolo: String
+    let icona: String
+    var tinta: Color = .ciano
+    var marchio = false
+    var titoloColorato = false
+    /// Una riga in più sotto il sottotitolo (Sentinella: l'ora), come nel mockup: la riga in alto si allunga di quella.
+    var riga: AnyView? = nil
+}
+
+/// 7 nov sera (il signore: «perché non mettiamo le icone e il titolo e sottotitolo della sezione nel frame dove c'è Chiudi, almeno
+/// quando scorro la pagina non spariscono» · «deve essere tutto uguale a ora, solo che sposti quelle robe»): LA riga in alto di ogni
+/// sezione, uguale al mockup v275. A sinistra la testata (TestataScheda, misure di sempre), a destra «Chiudi» (o la X nel cerchio con
+/// la fotocamera, coi tasti accanto se la sezione ne ha). Alta 44, ferma: la pagina scorre sotto e la riga resta trasparente
+/// (5 nov: niente più barra di iOS, che scorrendo si vestiva di grigio). `chiudi` nil: solo disegnata (il caricamento, sopra la vera).
+struct BarraSezione<Tasti: View>: View {
+    let testata: DatiTestata?
     let tinta: Color
     /// «Chiudi»; nelle Impostazioni «Fatto», come prima.
     var testo = "Chiudi"
-    let chiudi: () -> Void
+    /// Le sezioni con la fotocamera: la X nel cerchio (TondoX) al posto di «Chiudi».
+    var conX = false
+    /// Quello che dice VoiceOver sulla X (Sentinella: «Disattiva la sentinella»).
+    var etichettaX = "Chiudi"
+    let chiudi: (() -> Void)?
+    @ViewBuilder let tasti: () -> Tasti
 
     var body: some View {
-        HStack {
-            Spacer()
-            Button(testo) { chiudi() }
-                .font(.system(size: 13, weight: .semibold))       // 7 nov: «le scritte Chiudi ancora più piccole» (prima 17, poi 15)
-                .tint(tinta)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+        // con una riga in più sotto il sottotitolo i tasti restano in alto, centrati sull'icona
+        HStack(alignment: testata?.riga == nil ? .center : .top, spacing: 0) {
+            if let t = testata {
+                TestataScheda(titolo: t.titolo, sottotitolo: t.sottotitolo, icona: t.icona, tinta: t.tinta, marchio: t.marchio,
+                              titoloColorato: t.titoloColorato, riga: t.riga, inBarra: true)
+                    .padding(.top, t.riga == nil ? 0 : 2)
+                    .padding(.trailing, 12)
+            } else {
+                Spacer(minLength: 0)
+            }
+            tasti()
+            if conX {
+                if let chiudi {
+                    Button { Suoni.tocco(); chiudi() } label: { TondoX(tinta: tinta) }
+                        .buttonStyle(StileStark())
+                        .accessibilityLabel(etichettaX)
+                } else {
+                    TondoX(tinta: tinta)
+                }
+            } else if let chiudi {
+                Button(testo) { chiudi() }
+                    .font(.system(size: 13, weight: .semibold))       // 7 nov: «le scritte Chiudi ancora più piccole» (prima 17, poi 15)
+                    .tint(tinta)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            } else {
+                Text(testo).font(.system(size: 13, weight: .semibold)).foregroundStyle(tinta)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
         }
         .padding(.horizontal, 16)
-        .frame(height: 44)
+        .frame(minHeight: 44)
     }
 }
 
-/// Le sezioni con una pagina che scorre propria (Vitals, Confidente, Ricordi, Bea, Diario…): la riga di «Chiudi» sopra la
-/// pagina e la barra di iOS nascosta (vedi BarraChiudi).
+extension BarraSezione where Tasti == EmptyView {
+    init(testata: DatiTestata?, tinta: Color, testo: String = "Chiudi", conX: Bool = false, etichettaX: String = "Chiudi", chiudi: (() -> Void)?) {
+        self.init(testata: testata, tinta: tinta, testo: testo, conX: conX, etichettaX: etichettaX, chiudi: chiudi) { EmptyView() }
+    }
+}
+
+/// Le sezioni con una pagina che scorre propria (Vitals, Confidente, Ricordi, Bea, Diario…): la riga in alto (BarraSezione, con la
+/// testata della sezione) sopra la pagina e la barra di iOS nascosta.
 struct ConBarraChiudi: ViewModifier {
     let tinta: Color
     var testo = "Chiudi"
+    var testata: DatiTestata? = nil
     let chiudi: () -> Void
 
     func body(content: Content) -> some View {
         VStack(spacing: 0) {
-            BarraChiudi(tinta: tinta, testo: testo, chiudi: chiudi)
+            BarraSezione(testata: testata, tinta: tinta, testo: testo, chiudi: chiudi)
             content
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -344,27 +383,9 @@ struct SchermoCaricamento: View {
         ZStack {
             SfondoSezione()
             VStack(alignment: .leading, spacing: 0) {
-                if marchio {
-                    HStack(alignment: .center) {
-                        TestataScheda(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
-                        Text("Chiudi").font(.system(size: 13, weight: .semibold)).foregroundStyle(tinta)
-                    }
-                    .padding(16)
-                } else {
-                    HStack {
-                        Spacer()
-                        if conX {
-                            TondoX(tinta: tinta)
-                        } else {
-                            Text("Chiudi").font(.system(size: 13, weight: .semibold)).foregroundStyle(tinta)
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-                    TestataScheda(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
-                        .padding(16)
-                }
+                // 7 nov sera: la testata nella riga di «Chiudi» (o della X), come in tutte le sezioni (BarraSezione)
+                BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: marchio),
+                             tinta: tinta, conX: conX, chiudi: nil)
                 Spacer(minLength: 0)
             }
             CaricamentoHUD(titolo: titolo, tinta: tinta)

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import WatchKit
 
@@ -23,7 +24,11 @@ private enum ColoriPolso {
     static let scuro = Color(red: 0.0, green: 0.094, blue: 0.125)       // #001820
 }
 
-/// La cornice delle schermate nuove: caricamento e suoni come le altre schede del polso, poi il titolo in ciano e il contenuto.
+/// La cornice delle schermate nuove: caricamento e suoni come le altre schede del polso, poi il contenuto.
+/// 7 nov sera (il signore: «il titolo nel frame di Chiudi, così scorrendo non sparisce» · «ottimizza tutto anche su Apple Watch»):
+/// il nome della schermata sta nella barra in alto dell'orologio, accanto a ‹ (come le altre schede del polso e come il mockup:
+/// «Radar», «Satellite», «Social»), ferma mentre la pagina scorre. Prima era una scritta nella pagina e scorrendo spariva.
+/// La parte dopo « · » (SOCIAL · @KINGRUSTO, PRIORITÀ · 3) resta in cima alla pagina, come nel mockup.
 struct SchermoPolso<Contenuto: View>: View {
     let titolo: String
     var pronto = true
@@ -31,23 +36,32 @@ struct SchermoPolso<Contenuto: View>: View {
     @State private var mostrato = false
     @State private var apertaDa = Date()
 
+    /// Il nome nella barra: la prima parola, con la maiuscola (RADAR → Radar, PRIORITÀ · 3 → Priorità).
+    private var nomeBarra: String {
+        (titolo.components(separatedBy: " · ").first ?? titolo).lowercased().capitalized
+    }
+
     var body: some View {
         ZStack {
             if mostrato {
                 ScrollView {
                     VStack(spacing: 5) {
-                        Text(titolo)
-                            .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.5)
-                            .foregroundStyle(ColoriPolso.ciano)
+                        if titolo.contains(" · ") {
+                            Text(titolo)
+                                .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.5)
+                                .foregroundStyle(ColoriPolso.ciano)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         contenuto()
                     }
                     .padding(.horizontal, 4)
                 }
                 .transition(.opacity)
             } else {
-                CaricamentoOrologio(titolo: titolo)
+                CaricamentoOrologio(titolo: nomeBarra)
             }
         }
+        .navigationTitle(nomeBarra)
         // già caricata (si torna indietro da una schermata aperta da qui): niente caricamento né suoni da capo
         .onAppear { guard !mostrato else { return }; apertaDa = Date(); WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }
         .task(id: pronto) {

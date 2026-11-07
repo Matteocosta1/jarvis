@@ -29,15 +29,13 @@ struct VistaRicordi: View {
             ZStack {
                 SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
                 VStack(spacing: 0) {
-                    // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e le schede con i tasti ciano del Satellite
-                    TestataScheda(titolo: scheda.rawValue, sottotitolo: "seconda memoria", icona: "brain.head.profile", tinta: Color.ciano)
-                        .padding(.horizontal, 16).padding(.top, 16)          // 7 nov: allo stesso posto delle altre sezioni
+                    // le schede con i tasti ciano del Satellite, 16 punti sotto la riga di «Chiudi» (7 nov sera: la testata è nella riga)
                     HStack(spacing: 6) {
                         ForEach(Scheda.allCases) { k in
                             ChipSat(testo: k.rawValue.uppercased(), acceso: scheda == k) { Suoni.tocco(); scheda = k }
                         }
                     }
-                    .padding(.horizontal, 16).padding(.top, 8)
+                    .padding(.horizontal, 16).padding(.top, 16)
 
                     if let d = dati, scheda == .traccia {
                         // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
@@ -67,7 +65,7 @@ struct VistaRicordi: View {
                         Spacer()
                     }
                 }
-                .modifier(ConBarraChiudi(tinta: Color.ciano) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
+                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: scheda.rawValue, sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)

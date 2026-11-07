@@ -246,12 +246,6 @@ struct VistaWiretap: View {
         ZStack {
             SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 14) {
-                // 7 nov sera (il signore: continuità in tutte le sezioni): «Chiudi» nella sua riga in alto e sotto la testata, come
-                // tutte le sezioni senza fotocamera (prima «Chiudi» stava sulla riga della testata)
-                TestataScheda(titolo: "Wiretap",
-                              sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
-                              icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)
-
                 // durata e onda
                 HStack(spacing: 10) {
                     if let i = w.inizio {
@@ -335,7 +329,11 @@ struct VistaWiretap: View {
                 }
             }
             .padding(16)
-            .modifier(ConBarraChiudi(tinta: Color.ciano) {
+            // 7 nov sera: la testata nella riga di «Chiudi», come in tutte le sezioni
+            .modifier(ConBarraChiudi(tinta: Color.ciano,
+                                     testata: DatiTestata(titolo: "Wiretap",
+                                                          sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
+                                                          icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)) {
                 // 4 nov (il signore): come «Jarvis, chiudi» a voce, niente si perde: con del testo parte il verbale
                 VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
             })

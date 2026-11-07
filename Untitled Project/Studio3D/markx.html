@@ -1254,6 +1254,14 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 /* Studio: l'Archivio più piccolo, sulla riga della testata a destra (il signore, 7 nov: «archivio più piccolo e spostato da lì») */
 .sd-su > .sd-arch { order: 3 !important; align-self: center !important; min-height: 0 !important; height: 24px; padding: 0 8px !important; font-size: 7px !important; letter-spacing: 1px !important; gap: 4px !important; border-radius: 7px !important; }
 .sd-su > .sd-arch svg { width: 10px !important; height: 10px !important; }
+/* v275 · la testata nella riga di «Chiudi» (Studio, Social, Browser) */
+.sd-su, .sc-su, .bp-testa { display: grid !important; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 14px !important; row-gap: 0 !important; align-items: start !important; justify-content: stretch !important; padding: 52px 16px 6px !important; }
+.sd-su::before, .sc-su::before, .bp-testa::before { content: none !important; display: none !important; }
+.sd-su > .anello, .sc-su > .anello, .bp-testa > .anello { grid-column: 1; grid-row: 1; align-self: start !important; }
+.sd-su > div:not(.anello), .sc-su > div:not(.anello), .bp-testa > div:not(.anello) { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: minmax(0, 1fr); min-width: 0; min-height: 0 !important; padding-top: 2px; align-content: start !important; }
+.sd-su > .sd-chiudi, .sc-su > .sc-chiudi, .bp-testa > .chiudi { grid-column: 3; grid-row: 1; height: 40px; min-height: 0 !important; align-self: start !important; justify-self: end; }
+.sd-su > .sd-arch { grid-column: 3; grid-row: 2; justify-self: end; align-self: start !important; margin-top: 4px !important; }
+.sd-su b, .sc-su b, .bp-testa b, .sd-su small, .sc-su small, .bp-testa small { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-chiudi, .sc-chiudi { font-size: 13px !important; }
 </style>
 

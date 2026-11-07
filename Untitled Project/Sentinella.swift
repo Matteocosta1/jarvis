@@ -393,25 +393,16 @@ struct VistaSentinella: View {
                 .allowsHitTesting(false)
 
             VStack {
-                // 7 nov sera (il signore: «o le fai tutte uguali»): i tre tasti nella riga in alto (la X a destra), la testata sotto,
-                // nello stesso punto di tutte le sezioni (prima stavano sulla stessa riga)
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Spacer()
-                        Button { Suoni.tocco(); s.ferma(); chiudi() } label: { tasto("xmark") }
-                            .accessibilityLabel("Disattiva la sentinella")
-                    }
-                    .frame(height: 44)
-                    VStack(alignment: .leading, spacing: 3) {
-                        TestataScheda(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "perimetro sotto controllo",
-                                      icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true)
-                        TimelineView(.periodic(from: .now, by: 1)) { t in
-                            Text(t.date.formatted(date: .omitted, time: .standard))
-                                .font(.system(size: 10, design: .monospaced)).opacity(0.7)
-                        }
-                        .foregroundStyle(colore)      // 27 ott: niente bagliore sulle scritte della testata
-                    }
-                }
+                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga
+                // della X, come tutte le sezioni (BarraSezione); l'ora sotto il sottotitolo, come nel mockup
+                BarraSezione(testata: DatiTestata(titolo: "Sentinella", sottotitolo: s.notte ? "visione notturna" : "perimetro sotto controllo",
+                                                  icona: "dot.radiowaves.left.and.right", tinta: colore, titoloColorato: true,
+                                                  riga: AnyView(TimelineView(.periodic(from: .now, by: 1)) { t in
+                                                      Text(t.date.formatted(date: .omitted, time: .standard))
+                                                          .font(.system(size: 10, design: .monospaced)).opacity(0.7)
+                                                  }
+                                                  .foregroundStyle(colore))),     // 27 ott: niente bagliore sulle scritte della testata
+                             tinta: .ciano, conX: true, etichettaX: "Disattiva la sentinella", chiudi: { s.ferma(); chiudi() })
                 .padding(.horizontal, -4)          // la riga e la testata a 16 punti dai bordi, come le altre sezioni
                 .padding(.top, -12)
                 Spacer()
@@ -530,9 +521,6 @@ struct VistaSentinella: View {
         .accessibilityLabel(titolo == "BUIO" ? "Schermo nero" : "Registro")
     }
 
-    private func tasto(_ icona: String) -> some View {
-        TondoX(simbolo: icona)                            // 7 nov sera: il tondo di tutte le sezioni (24 a vista, 44 al tocco)
-    }
 }
 
 /// 5 nov · l'immagine della Sentinella: un CALayer a cui la Sentinella dà ogni fotogramma (30 al secondo), senza passare da

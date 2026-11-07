@@ -42,9 +42,6 @@ struct VistaBea: View {
                 SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
                 List {
                     Section {
-                        TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "link", tinta: tinta)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                            .listRowBackground(Color.clear)
                         ologramma.listRowBackground(Color.clear)
                         contatto.listRowBackground(Color.clear)
                     }
@@ -69,15 +66,10 @@ struct VistaBea: View {
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: Apertura.dissolvenza), value: dati != nil)
-                .modifier(ConBarraChiudi(tinta: tinta) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
+                // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
+                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Bea", sottotitolo: dati == nil && !errore ? "acquisizione dati" : sottotitolo,
+                                                                            icona: "link", tinta: tinta)) { chiudi() })
                 if dati == nil && !errore {
-                    // il titolo resta in alto mentre carica, come nelle altre schede
-                    VStack {
-                        TestataScheda(titolo: "Bea", sottotitolo: "acquisizione dati", icona: "link", tinta: tinta)
-                            .padding(.horizontal, 16).padding(.top, 60)          // 7 nov: allo stesso posto di quando ha caricato
-                        Spacer()
-                    }
-                    .allowsHitTesting(false)
                     CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
                 }
             }

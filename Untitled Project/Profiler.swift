@@ -69,17 +69,15 @@ struct VistaProfiler: View {
 
     // MARK: Pezzi
 
-    /// 7 nov sera (il signore: «o le fai tutte uguali»): la X nella sua riga in alto, la testata sotto, come tutte le sezioni.
+    /// 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga della X,
+    /// come tutte le sezioni (BarraSezione).
     private var intestazione: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Spacer()
-                Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: ambra) }
-                .accessibilityLabel("Chiudi")
-            }
-            .frame(height: 44)
-            testata
+        HStack(spacing: 0) {
+            testata.padding(.trailing, 12)
+            Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: ambra) }
+            .accessibilityLabel("Chiudi")
         }
+        .frame(minHeight: 44)
     }
 
     private var testata: some View {

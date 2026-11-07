@@ -39,17 +39,9 @@ struct Allenatore: View {
             }
 
             VStack(spacing: 10) {
-                // 7 nov sera (il signore: «o le fai tutte uguali»): i tasti nella riga in alto (a sinistra della X), la testata sotto,
-                // nello stesso punto di tutte le sezioni
-                VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Spacer()
-                    Button { Suoni.tocco(); motore.cambiaCamera() } label: { TondoX(simbolo: "arrow.triangle.2.circlepath.camera") }
-                    .accessibilityLabel("Cambia fotocamera")
-                    Button { Suoni.tocco(); motore.ferma(); chiudi() } label: { TondoX() }
-                    .accessibilityLabel("Chiudi")
-                }
-                .frame(height: 44)
+                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga dei
+                // tasti, a sinistra; a destra cambia fotocamera e la X, come tutte le sezioni (BarraSezione)
+                HStack(spacing: 0) {
                 HStack {
                     AnelloOcchi(icona: "figure.pilates", tinta: Color.ciano)      // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
@@ -58,7 +50,15 @@ struct Allenatore: View {
                     .foregroundStyle(Color.ciano)
                     Spacer(minLength: 0)
                 }
+                .padding(.trailing, 12)
+                HStack(spacing: 10) {
+                    Button { Suoni.tocco(); motore.cambiaCamera() } label: { TondoX(simbolo: "arrow.triangle.2.circlepath.camera") }
+                    .accessibilityLabel("Cambia fotocamera")
+                    Button { Suoni.tocco(); motore.ferma(); chiudi() } label: { TondoX() }
+                    .accessibilityLabel("Chiudi")
                 }
+                }
+                .frame(minHeight: 44)
                 .padding(.horizontal, 16)
 
                 // telemetria in alto (nell'Ologramma i riquadri scendono in basso: il viso resta libero)

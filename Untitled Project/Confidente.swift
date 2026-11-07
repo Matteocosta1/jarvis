@@ -60,8 +60,6 @@ struct VistaConfidente: View {
                 SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
-                        TestataScheda(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2", tinta: Color.ciano)
                         Text("Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia: il mio è un parere, non una sentenza.")
                             .font(.system(size: 14))
                             .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
@@ -143,7 +141,7 @@ struct VistaConfidente: View {
                     .padding(16)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .modifier(ConBarraChiudi(tinta: Color.ciano) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
+                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
             }
             .task { stato = await SaluteOggi.leggi() }
             .tastiAVoce { a in

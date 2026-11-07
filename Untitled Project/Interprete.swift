@@ -56,15 +56,9 @@ struct Interprete: View {
         ZStack {
             SfondoSezione()                                       // 7 nov (il signore): lo sfondo di tutte le pagine
             VStack(spacing: 12) {
-                // 7 nov sera (il signore: tutte le sezioni uguali): «Chiudi» nella sua riga in alto, la testata sotto, come nel mockup
-                VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Spacer()
-                    Button("Chiudi") { Suoni.tocco(); motore.ferma(); chiudi() }
-                        .font(.system(size: 13, weight: .semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .frame(height: 44)
+                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga di
+                // «Chiudi», come tutte le sezioni (BarraSezione); il ponte 16 punti sotto
+                HStack(spacing: 0) {
                 HStack {
                     AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
@@ -76,8 +70,14 @@ struct Interprete: View {
                     .foregroundStyle(Color.ciano)
                     Spacer(minLength: 0)
                 }
+                .padding(.trailing, 12)
+                Button("Chiudi") { Suoni.tocco(); motore.ferma(); chiudi() }
+                    .font(.system(size: 13, weight: .semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
+                    .frame(minWidth: 44, minHeight: 44)
                 }
+                .frame(minHeight: 44)
                 .padding(.horizontal, 16)
+                .padding(.bottom, 4)
 
                 // v270 (il signore: «crea anche un ologramma per interprete»): il PONTE fra le due lingue, in testa come nel mockup
                 OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in

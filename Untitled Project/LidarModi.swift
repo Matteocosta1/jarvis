@@ -379,17 +379,13 @@ struct TavolaLidar<Contenuto: View>: View {
     }
 }
 
-/// La X nel cerchio in alto a destra: LiDAR è una sezione con la fotocamera.
+/// La riga in alto di LiDAR: la testata a sinistra e la X nel cerchio a destra (LiDAR è una sezione con la fotocamera), come tutte
+/// le sezioni (7 nov sera: BarraSezione, la testata nella riga della X). Durante la scansione solo la X, come prima.
 struct ChiudiLidar: View {
+    var testata: DatiTestata? = nil
     let azione: () -> Void
     var body: some View {
-        HStack {
-            Spacer()
-            Button { Suoni.tocco(); azione() } label: { TondoX() }
-            .accessibilityLabel("Chiudi")
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 44)                       // 7 nov: la X allo stesso posto di quella dello Scanner (e di «Chiudi» nelle altre)
+        BarraSezione(testata: testata, tinta: .ciano, conX: true, chiudi: azione)
     }
 }
 
@@ -472,7 +468,6 @@ struct MenuLidar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            TestataScheda(titolo: "LiDAR", sottotitolo: vero.sotto, icona: "cube.transparent", tinta: .ciano)
             VStack(spacing: 10) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(ModoLidar.ordine, id: \.self) { m in
@@ -522,7 +517,6 @@ struct RisultatoModoVista: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            TestataScheda(titolo: "LiDAR", sottotitolo: r.sotto, icona: "cube.transparent", tinta: .ciano)
             if conStile {
                 HStack(spacing: 6) {
                     ChipLidar(testo: "OLOGRAMMA", premuto: stile == .pieno) { stile = .pieno }

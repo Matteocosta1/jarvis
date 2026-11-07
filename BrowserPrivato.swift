@@ -386,12 +386,11 @@ struct PaginaBrowser: View {
         VStack(spacing: 0) {
             // 26 ott notte (il signore: «come le altre, stile olografico»): la testata di Studio, Sound e Social (icona animata,
             // J.A.R.V.I.S. · BROWSER, «Chiudi» sulla riga: niente fotocamera), poi la barra, la pagina nella cornice olografica
-            // 7 nov sera (il signore: «browser, studio e social sono ancora diverse dalle altre»): «Chiudi» nella sua riga in alto,
-            // la testata sotto, nello stesso punto di tutte le sezioni
-            BarraChiudi(tinta: accento) { chiudi() }
-                .accessibilityLabel("Chiudi il browser")
-            TestataScheda(titolo: "Browser", sottotitolo: incognito ? "incognito" : "web", icona: "globe", tinta: accento, titoloColorato: incognito)   // 27 ott: niente J.A.R.V.I.S.
-                .padding(.horizontal, 16).padding(.top, 16)
+            // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga di
+            // «Chiudi», come tutte le sezioni (BarraSezione); sotto, a 16 punti, la barra degli indirizzi
+            BarraSezione(testata: DatiTestata(titolo: "Browser", sottotitolo: incognito ? "incognito" : "web", icona: "globe", tinta: accento,
+                                              titoloColorato: incognito),   // 27 ott: niente J.A.R.V.I.S.
+                         tinta: accento, chiudi: { chiudi() })
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: incognito ? "eyeglasses" : "lock.shield").font(.footnote)
@@ -418,6 +417,7 @@ struct PaginaBrowser: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .padding(.top, 8)
 
             WebVista(web: nav.web)
                 // 5 nov pomeriggio (video del signore): nelle pagine olografiche la pagina web vuota (bianca) passava sopra il

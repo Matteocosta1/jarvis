@@ -208,16 +208,9 @@ struct Occhi: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 14) {
-                // 7 nov sera (il signore: «o le fai tutte uguali o non ci siamo»): come tutte le sezioni, la X nella sua riga in alto
-                // (alta 44, a 16 punti dal bordo) e sotto la testata, nello stesso punto delle altre (16 punti sotto la riga)
-                VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Spacer()
-                    Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: tinta) }
-                    .accessibilityLabel("Chiudi")
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["chiudi"] = $0 }
-                }
-                .frame(height: 44)
+                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): come tutte le sezioni
+                // (BarraSezione), la testata nella riga della X, a 16 punti dal bordo; le righe di quello che vede sotto il modo
+                HStack(alignment: .top, spacing: 0) {
                 HStack(alignment: manualeStark ? .top : .center) {
                     // 26 ott notte: l'icona con l'anello che gira, come nelle altre schede
                     AnelloOcchi(icona: cucina ? "fork.knife" : "eye", tinta: tinta)
@@ -254,6 +247,11 @@ struct Occhi: View {
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["testa"] = $0 }
                     Spacer(minLength: 0)
                 }
+                .padding(.top, 2)                  // l'icona centrata sulla X (alta 44), come nella riga di «Chiudi» delle altre
+                .padding(.trailing, 12)
+                Button { Suoni.tocco(); chiudi([]) } label: { TondoX(tinta: tinta) }
+                    .accessibilityLabel("Chiudi")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["chiudi"] = $0 }
                 }
                 .padding(.horizontal, -4)          // la riga e la testata a 16 punti dai bordi, come le altre sezioni (il resto a 20)
                 .padding(.top, -12)                // e attaccate al bordo sicuro in alto

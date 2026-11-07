@@ -525,7 +525,7 @@ struct LettoreMail: View {
         ZStack {
             SfondoSezione(tinta: tinta)
             VStack(spacing: 0) {
-                BarraChiudi(tinta: tinta) { chiudi() }
+                BarraSezione(testata: nil, tinta: tinta, chiudi: { chiudi() })
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(letta?.oggetto ?? oggetto)
@@ -629,9 +629,6 @@ struct VistaSpesa: View {
                 SfondoSezione(tinta: tinta)                 // 7 nov (il signore): anche la Spesa con la quadrettatura, come le altre
                 List {
                     Section {
-                        TestataScheda(titolo: "Spesa", sottotitolo: sottotitolo, icona: "cart", tinta: tinta)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
-                            .listRowBackground(Color.clear)
                         // 11.0 (6), come il mockup v264: l'ologramma della spesa con le sue tre prove (CASSA, SCAFFALE, ANELLO);
                         // toccata una cosa nell'ologramma è come toccarla nella lista: si spunta o torna da prendere
                         OlogrammaSpesaProve(dati: spesaOlo)
@@ -735,15 +732,10 @@ struct VistaSpesa: View {
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(caricata ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: Apertura.dissolvenza), value: caricata)
-                .modifier(ConBarraChiudi(tinta: tinta) { chiudi() })   // 5 nov: niente più barra grigia scorrendo
+                // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
+                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Spesa", sottotitolo: !caricata && !errore ? "acquisizione dati" : sottotitolo,
+                                                                            icona: "cart", tinta: tinta)) { chiudi() })
                 if !caricata && !errore {
-                    // il titolo resta in alto mentre carica, come nelle altre schede
-                    VStack {
-                        TestataScheda(titolo: "Spesa", sottotitolo: "acquisizione dati", icona: "cart", tinta: tinta)
-                            .padding(.horizontal, 16).padding(.top, 60)          // 7 nov: allo stesso posto di quando ha caricato
-                        Spacer()
-                    }
-                    .allowsHitTesting(false)
                     CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
                 }
                 if errore && !caricata {
