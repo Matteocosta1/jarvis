@@ -69,31 +69,47 @@ struct ArchiRuota: View {
     }
 }
 
-/// 5 nov · la GHIERA della click wheel (mockup v255–v259, il signore: «va bene solo la Ghiera», «ghiera singola», «la ghiera deve
-/// prendere la scena»). Un anello graduato appena dentro le icone (raggio 133: 27 punti dentro le icone), 120 tacche (lunghe ogni
-/// 5) e il numero di ogni icona, che gira col dito insieme alla corona; vicino all'icona in alto tacche e numeri si accendono.
-/// Sotto l'icona in alto il contatore «07 / 27 · 247°» (icona, quante sono, gradi della ruota). Solo mentre la ruota è viva.
-/// Disegnata una volta sola e girata (rotationEffect): a 120 Hz cambia solo la rotazione; la luce in alto è una maschera ferma.
+/// 7 nov sera (il signore, scelta finale: «ruota: MAGLIA»): la ghiera della click wheel fatta di NANOTECNOLOGIA, come il mockup
+/// v274 (JARVIS Fasce › RUOTA › MAGLIA). Un nido d'ape di tre file appena dentro le icone, che quando la ruota si accende cresce dal
+/// punto in alto verso il basso sui due lati come metallo liquido (0,5 s), con il fronte che brilla; spenta, si ritira verso l'alto
+/// (0,35 s). Gira col dito insieme alla corona; vicino all'icona in alto le celle si accendono e, mentre gira, un'onda di luce le
+/// percorre. Dentro, il numero di ogni icona; sotto l'icona in alto il contatore «07 / 27 · 247°».
+/// Disegnata una volta sola e girata (rotationEffect): a 120 Hz cambiano solo la rotazione e le maschere.
 struct GhieraRuota: View {
     @ObservedObject var ruota: RuotaCorona
     /// L'angolo di partenza di ogni icona (radianti), nell'ordine della corona.
     let angoli: [Double]
     /// Il raggio dell'anello delle icone (160).
     let raggio: CGFloat
+    @State private var fronte: Double = 0          // quanto è cresciuta la maglia dall'alto (0 → 1,06 π per lato)
 
     var body: some View {
         let vivo = ruota.vivo
+        let rg = raggio - 27
         ZStack {
-            GhieraDisegno(angoli: angoli, raggio: raggio - 27, forte: false)
+            MagliaDisegno(angoli: angoli, raggio: rg, forte: false)
                 .rotationEffect(.radians(ruota.giro))
-            GhieraDisegno(angoli: angoli, raggio: raggio - 27, forte: true)
+            MagliaDisegno(angoli: angoli, raggio: rg, forte: true)
                 .rotationEffect(.radians(ruota.giro))
-                .mask(GhieraCima())
+                .mask {
+                    ZStack {
+                        GhieraCima()
+                        // l'onda di luce che segue il giro (accesa solo mentre gira: la lente)
+                        OndaMaglia(angolo: -Double.pi / 2 + 1.4 * ruota.giro).opacity(ruota.lente)
+                    }
+                }
+            FronteMaglia(fronte: fronte, raggio: rg - 3)
+                .stroke(Color.ciano.opacity(0.35), style: StrokeStyle(lineWidth: 18, lineCap: .round))   // il tratto c'è solo mentre cresce o si ritira
+                .blur(radius: 3)
             contatore
-                .offset(y: -raggio + 47)
+                .offset(y: -raggio + 62)
+                .opacity(vivo ? 1 : 0)
         }
-        .opacity(vivo ? 1 : 0)
+        .mask(SettoreMaglia(fronte: fronte))
         .animation(.easeOut(duration: 0.15), value: vivo)
+        .onChange(of: vivo, initial: true) { _, v in
+            withAnimation(v ? .easeOut(duration: 0.5) : .easeIn(duration: 0.35)) { fronte = v ? 1.06 * .pi : 0 }
+        }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -111,10 +127,9 @@ struct GhieraRuota: View {
     }
 }
 
-/// Il disegno della ghiera a ruota ferma (giro 0), centrato nella tela. `forte`: la copia accesa (si vede solo in alto, GhieraCima).
-/// I valori sono quelli del mockup: anello ciano al 42% (1,2 punti), tacche #8ff0ff al 60% le lunghe (6 punti) e al 34% le corte
-/// (3 punti); vicino alla cima +45%. Numeri a 7 punti dentro l'anello, al 50% e pieni in cima. Alone ciano corto (4 px).
-struct GhieraDisegno: View {
+/// Il nido d'ape a ruota ferma (giro 0): tre file di 64 celle esagonali (raggi −10, −3, +4 attorno all'anello), sfalsate di mezza
+/// cella, e i numeri delle icone più dentro. `forte`: la copia accesa (si vede in cima e sull'onda). Valori del mockup MAGLIA.
+struct MagliaDisegno: View {
     let angoli: [Double]
     let raggio: CGFloat
     let forte: Bool
@@ -122,33 +137,89 @@ struct GhieraDisegno: View {
     var body: some View {
         Canvas { gc, size in
             let c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1), chiaro = Color(red: 143 / 255, green: 240 / 255, blue: 1)
+            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1), chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)
             var g = gc
-            g.addFilter(.shadow(color: ciano.opacity(0.7), radius: 2))
-            if !forte {
-                g.stroke(Path(ellipseIn: CGRect(x: c.x - raggio, y: c.y - raggio, width: raggio * 2, height: raggio * 2)),
-                         with: .color(ciano.opacity(0.42)), lineWidth: 1.2)
+            g.addFilter(.shadow(color: ciano.opacity(0.6), radius: 1.5))
+            var celle = Path()
+            let file: [CGFloat] = [raggio - 10, raggio - 3, raggio + 4]
+            for (j, rf) in file.enumerated() {
+                for k in 0..<64 {
+                    let th = (Double(k) + Double(j % 2) * 0.5) / 64 * 2 * .pi
+                    let cx = c.x + rf * CGFloat(cos(th)), cy = c.y + rf * CGFloat(sin(th))
+                    for v in 0..<6 {
+                        let a = th + Double(v) * .pi / 3
+                        let p = CGPoint(x: cx + 3.6 * CGFloat(cos(a)), y: cy + 3.6 * CGFloat(sin(a)))
+                        if v == 0 { celle.move(to: p) } else { celle.addLine(to: p) }
+                    }
+                    celle.closeSubpath()
+                }
             }
-            var lunghe = Path(), corte = Path()
-            for i in 0..<120 {
-                let a = Double(i) / 120 * 2 * .pi, lungo = i % 5 == 0
-                let r1 = raggio + (lungo ? 6 : 3)
-                let da = CGPoint(x: c.x + raggio * CGFloat(cos(a)), y: c.y + raggio * CGFloat(sin(a)))
-                let fino = CGPoint(x: c.x + r1 * CGFloat(cos(a)), y: c.y + r1 * CGFloat(sin(a)))
-                if lungo { lunghe.move(to: da); lunghe.addLine(to: fino) } else { corte.move(to: da); corte.addLine(to: fino) }
-            }
-            // la copia accesa aggiunge sopra quanto serve per arrivare ai valori della cima del mockup
-            g.stroke(lunghe, with: .color(chiaro.opacity(forte ? 1 : 0.6)), lineWidth: 1.3)
-            g.stroke(corte, with: .color(chiaro.opacity(forte ? 0.68 : 0.34)), lineWidth: 0.9)
+            let l: Double = forte ? 0.62 : 0.12                 // la luce della cella: in cima 0,12 + 0,5 (mockup)
+            g.fill(celle, with: .color(ciano.opacity(0.05 + 0.3 * l)))
+            g.stroke(celle, with: .color(ciano.opacity(0.25 + 0.6 * l)), lineWidth: 0.7)
             for (k, a) in angoli.enumerated() {
-                let rr = raggio - 7
+                let rr = raggio - 22
                 var t = g
                 t.translateBy(x: c.x + rr * CGFloat(cos(a)), y: c.y + rr * CGFloat(sin(a)))
                 t.rotate(by: .radians(a + .pi / 2))
                 t.draw(Text(String(format: "%02d", k + 1)).font(.system(size: 6, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(chiaro.opacity(forte ? 1 : 0.5)), at: .zero)
+                        .foregroundStyle(chiaro.opacity(forte ? 1 : 0.45)), at: .zero)
             }
         }
+    }
+}
+
+/// Dove la maglia è già cresciuta: lo spicchio attorno alla cima, largo `fronte` per lato (si anima).
+struct SettoreMaglia: Shape {
+    var fronte: Double
+    var animatableData: Double {
+        get { fronte }
+        set { fronte = newValue }
+    }
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        guard fronte > 0.001 else { return p }
+        let c = CGPoint(x: rect.midX, y: rect.midY), r = max(rect.width, rect.height)
+        p.move(to: c)
+        p.addArc(center: c, radius: r, startAngle: .radians(-Double.pi / 2 - fronte), endAngle: .radians(-Double.pi / 2 + fronte), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Il fronte che brilla mentre la maglia cresce o si ritira: due tratti corti ai due lati, sulla maglia.
+struct FronteMaglia: Shape {
+    var fronte: Double
+    let raggio: CGFloat
+    var animatableData: Double {
+        get { fronte }
+        set { fronte = newValue }
+    }
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        guard fronte > 0.001, fronte < 1.06 * .pi - 0.001 else { return p }
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        for lato in [-1.0, 1.0] {
+            let a = -Double.pi / 2 + lato * fronte
+            p.move(to: CGPoint(x: c.x + raggio * CGFloat(cos(a - 0.05)), y: c.y + raggio * CGFloat(sin(a - 0.05))))
+            p.addArc(center: c, radius: raggio, startAngle: .radians(a - 0.05), endAngle: .radians(a + 0.05), clockwise: false)
+        }
+        return p
+    }
+}
+
+/// L'onda di luce sulla maglia mentre gira: una campana stretta attorno ad `angolo` (fissa sullo schermo, si sposta col giro).
+struct OndaMaglia: View {
+    let angolo: Double
+    var body: some View {
+        let passi = 72
+        let fermate: [Gradient.Stop] = (0...passi).map { i in
+            let u = Double(i) / Double(passi), a = u * 2 * .pi
+            var d = abs(a - ((angolo.truncatingRemainder(dividingBy: 2 * .pi)) + 2 * .pi).truncatingRemainder(dividingBy: 2 * .pi))
+            d = min(d, 2 * .pi - d)
+            return Gradient.Stop(color: .black.opacity(exp(-pow(d / 0.35, 2))), location: u)
+        }
+        AngularGradient(stops: fermate, center: .center, startAngle: .zero, endAngle: .degrees(360))
     }
 }
 
