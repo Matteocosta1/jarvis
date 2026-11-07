@@ -91,7 +91,7 @@ struct VisoreVideo: View {
                     }
                     Spacer()
                     Button("Chiudi") { if aperto != nil { withAnimation { aperto = nil } } else { chiudi() } }
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                 }
                 .padding(.horizontal, 16).padding(.top, 8)
                 ZStack {

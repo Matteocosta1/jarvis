@@ -152,7 +152,7 @@ struct SchermoTravel: View {
                     }
                     Spacer()
                     Button { Suoni.tocco(); chiudi() } label: {
-                        Text("Chiudi").font(.system(size: 17, weight: .semibold)).foregroundStyle(ciano)
+                        Text("Chiudi").font(.system(size: 13, weight: .semibold)).foregroundStyle(ciano)
                             .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(StileStark())

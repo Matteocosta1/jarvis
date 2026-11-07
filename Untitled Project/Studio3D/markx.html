@@ -1251,6 +1251,10 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd-su b, .sc-su b, .bp-testa b { font: 700 17px var(--mono) !important; letter-spacing: 3px !important; color: #fff !important; }
 .sd-su small, .sc-su small, .bp-testa small { font: 600 9px var(--mono) !important; letter-spacing: 2px !important; color: var(--ciano) !important; opacity: 1 !important; }
 .sd-chiudi, .sc-chiudi { padding: 6px !important; }
+/* Studio: l'Archivio più piccolo, sulla riga della testata a destra (il signore, 7 nov: «archivio più piccolo e spostato da lì») */
+.sd-su > .sd-arch { order: 3 !important; align-self: center !important; min-height: 0 !important; height: 24px; padding: 0 8px !important; font-size: 7px !important; letter-spacing: 1px !important; gap: 4px !important; border-radius: 7px !important; }
+.sd-su > .sd-arch svg { width: 10px !important; height: 10px !important; }
+.sd-chiudi, .sc-chiudi { font-size: 13px !important; }
 </style>
 
 <div class="vista-scelta build-scelta" role="group" aria-label="Build"><span>BUILD</span><button class="chip" type="button" data-build="22" aria-pressed="true">22</button><button class="chip" type="button" data-build="23" aria-pressed="false">23</button><button class="chip" type="button" data-build="32" aria-pressed="false">32</button></div>

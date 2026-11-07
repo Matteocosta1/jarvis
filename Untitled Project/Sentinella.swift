@@ -531,7 +531,7 @@ struct VistaSentinella: View {
     }
 
     private func tasto(_ icona: String) -> some View {
-        TondoX(simbolo: icona)                            // 7 nov sera: il tondo di tutte le sezioni (28 a vista, 44 al tocco)
+        TondoX(simbolo: icona)                            // 7 nov sera: il tondo di tutte le sezioni (24 a vista, 44 al tocco)
     }
 }
 

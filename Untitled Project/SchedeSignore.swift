@@ -67,7 +67,7 @@ struct CorniceScheda<Contenuto: View>: View {
                     // come la testata di Studio e Social: icona, J.A.R.V.I.S., la sezione sotto e «Chiudi» sulla stessa riga
                     HStack(alignment: .center) {
                         TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
-                        Button("Chiudi") { chiudi() }.font(.system(size: 16, weight: .semibold)).tint(tinta)
+                        Button("Chiudi") { chiudi() }.font(.system(size: 13, weight: .semibold)).tint(tinta)
                     }
                 } else {
                     TestataScheda(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo), icona: icona, tinta: tinta)
@@ -191,7 +191,7 @@ struct BarraChiudi: View {
         HStack {
             Spacer()
             Button(testo) { chiudi() }
-                .font(.system(size: 15, weight: .semibold))       // 7 nov: «le scritte più piccole stanno meglio» (prima 17)
+                .font(.system(size: 13, weight: .semibold))       // 7 nov: «le scritte Chiudi ancora più piccole» (prima 17, poi 15)
                 .tint(tinta)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -309,16 +309,16 @@ enum Apertura {
 }
 
 /// 7 nov sera (il signore: «l'altezza sia la stessa del bottone con la X e della scritta Chiudi» · «tutte uguali nelle altezze»):
-/// il tondo delle sezioni con la fotocamera, uguale ovunque. A vista 28 punti (7 nov: «più piccole stanno meglio»), alto come la riga di «Chiudi»; al tocco 44, come
+/// il tondo delle sezioni con la fotocamera, uguale ovunque. A vista 24 punti (7 nov: «ancora più piccole»), alto come la riga di «Chiudi»; al tocco 44, come
 /// vuole iOS. Lo usano la X e i tasti accanto (cambia fotocamera, registro, schermo nero), come nel mockup (v274).
 struct TondoX: View {
     var simbolo = "xmark"
     var tinta: Color = .ciano
     var body: some View {
         Image(systemName: simbolo)
-            .font(.system(size: 12, weight: .semibold))   // 7 nov: «le X più piccole stanno meglio»: 28 a vista
+            .font(.system(size: 10, weight: .semibold))   // 7 nov: «le X ancora più piccole»: 24 a vista (prima 44, poi 32, 28)
             .foregroundStyle(tinta)
-            .frame(width: 28, height: 28)
+            .frame(width: 24, height: 24)
             .background(Color.black.opacity(0.4))
             .clipShape(Circle())
             .overlay(Circle().stroke(tinta.opacity(0.5), lineWidth: 1))
@@ -347,7 +347,7 @@ struct SchermoCaricamento: View {
                 if marchio {
                     HStack(alignment: .center) {
                         TestataScheda(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: true)
-                        Text("Chiudi").font(.system(size: 16, weight: .semibold)).foregroundStyle(tinta)
+                        Text("Chiudi").font(.system(size: 13, weight: .semibold)).foregroundStyle(tinta)
                     }
                     .padding(16)
                 } else {
@@ -356,7 +356,7 @@ struct SchermoCaricamento: View {
                         if conX {
                             TondoX(tinta: tinta)
                         } else {
-                            Text("Chiudi").font(.system(size: 15, weight: .semibold)).foregroundStyle(tinta)
+                            Text("Chiudi").font(.system(size: 13, weight: .semibold)).foregroundStyle(tinta)
                                 .frame(minWidth: 44, minHeight: 44)
                         }
                     }

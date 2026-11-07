@@ -274,9 +274,9 @@ struct SchermoDossier: View {
             .foregroundStyle(Color.ciano)
             Spacer(minLength: 4)
             // decisione 41: il DOSSIER non apre la fotocamera, quindi si chiude con la parola «Chiudi» (la regola di chiusura),
-            // nello stesso posto in alto a destra; scritta come il «Chiudi» delle altre schede (17 punti, semibold, ciano)
+            // nello stesso posto in alto a destra; scritta come il «Chiudi» delle altre schede (13 punti dal 7 nov, semibold, ciano)
             Button(action: chiudi) {
-                Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                Text("Chiudi").font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -334,7 +334,7 @@ struct VistaFotoSat: View {
                     Spacer()
                     // 5 nov sera (regola fissa): la foto di un luogo non apre la fotocamera: si chiude con «Chiudi», come il DOSSIER
                     Button { Suoni.tocco(); chiudi() } label: {
-                        Text("Chiudi").font(.system(size: 17, weight: .semibold))
+                        Text("Chiudi").font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
                     }
