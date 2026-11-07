@@ -31,7 +31,7 @@ struct VistaRicordi: View {
                 VStack(spacing: 0) {
                     // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e le schede con i tasti ciano del Satellite
                     TestataScheda(titolo: scheda.rawValue, sottotitolo: "seconda memoria", icona: "brain.head.profile", tinta: Color.ciano)
-                        .padding(.horizontal, 16).padding(.top, 4)
+                        .padding(.horizontal, 16).padding(.top, 16)          // 7 nov: allo stesso posto delle altre sezioni
                     HStack(spacing: 6) {
                         ForEach(Scheda.allCases) { k in
                             ChipSat(testo: k.rawValue.uppercased(), acceso: scheda == k) { Suoni.tocco(); scheda = k }

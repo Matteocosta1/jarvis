@@ -184,7 +184,7 @@ struct VistaLidar: View {
                 case .menu:
                     ScrollView {
                         MenuLidar(modo: $modo, corpo: $corpo, stile: $stile) { avviaScansione() }
-                            .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
+                            .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 24)   // 7 nov: la testata allo stesso posto delle altre sezioni
                     }
                 case .scansione, .elaboro:
                     schermoScansione.padding(.top, 8)
@@ -198,7 +198,7 @@ struct VistaLidar: View {
                                                altra: { chiediPrima(.menu) },
                                                chiedi: { chiedi(r.domanda) },
                                                studio: { alloStudio(r.modello, modo: r.modo) })
-                                .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
+                                .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 24)   // 7 nov: la testata allo stesso posto delle altre sezioni
                         }
                     }
                 }
@@ -605,7 +605,7 @@ struct VistaLidar: View {
                 TavolaLidar(proporzione: vista == .archivio ? nil : 720 / 560) { tavola }
                 if let s = risultato { pannelli(s) }
             }
-            .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
+            .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 24)   // 7 nov: la testata allo stesso posto delle altre sezioni
         }
     }
 

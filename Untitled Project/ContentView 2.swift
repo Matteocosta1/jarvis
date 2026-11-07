@@ -2291,6 +2291,8 @@ struct ImpostazioniView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // 7 nov (il signore: «falle tutte uguali»): le righe come i pannelli delle altre sezioni (velo ciano), non il grigio di iOS
+                Group {
                 // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
                 Section {
                     TestataScheda(titolo: "Impostazioni", sottotitolo: "configurazione nucleo", icona: "gearshape", tinta: Color.ciano)
@@ -2386,9 +2388,14 @@ struct ImpostazioniView: View {
                 } footer: {
                     Text("Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.")
                 }
+                }
+                .listRowBackground(Color.ciano.opacity(0.06))
             }
-            // 7 nov (il signore: «le pagine devono avere tutte lo stesso sfondo»): niente grigio di iOS dietro le righe
+            // 7 nov (il signore: «le pagine devono avere tutte lo stesso sfondo»): niente grigio di iOS dietro le righe; la testata
+            // allo stesso posto delle altre sezioni (16 punti sotto «Fatto» e dal bordo)
             .scrollContentBackground(.hidden)
+            .contentMargins(.top, 16, for: .scrollContent)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
             // 5 nov (il signore: «se scorro si vede quella barra grigia»): «Fatto» in una riga sua sopra la pagina, come «Chiudi»
             .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto") {
                 Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))

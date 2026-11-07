@@ -475,7 +475,7 @@ struct PaginaBrowser: View {
             .padding(.vertical, 8)
         }
         .foregroundStyle(accento)
-        .background(SfondoSezione(tinta: accento))       // 7 nov (il signore): la quadrettatura sfumata come le altre sezioni
+        .background(SfondoSezione())                    // 7 nov (il signore: «tutte uguali»): lo sfondo di tutte le sezioni, anche in incognito
         .animation(.easeInOut(duration: 0.25), value: nav.popup != nil)
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
         .onChange(of: attivo) {
@@ -667,7 +667,7 @@ struct VistaCronologiaBrowser: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(SfondoSezione(tinta: accento))            // 7 nov: lo sfondo di tutte le pagine
+            .background(SfondoSezione())                          // 7 nov: lo sfondo di tutte le pagine
             .searchable(text: $cerca, prompt: "Cerca nella cronologia")
             .navigationTitle("Cronologia")
             .navigationBarTitleDisplayMode(.inline)

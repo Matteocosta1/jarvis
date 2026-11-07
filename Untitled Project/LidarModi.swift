@@ -396,7 +396,8 @@ struct ChiudiLidar: View {
             }
             .accessibilityLabel("Chiudi")
         }
-        .padding(.horizontal, 16).padding(.top, 8)
+        .padding(.horizontal, 16)
+        .frame(height: 44)                       // 7 nov: la X allo stesso posto di quella dello Scanner (e di «Chiudi» nelle altre)
     }
 }
 
