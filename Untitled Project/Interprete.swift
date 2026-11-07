@@ -54,7 +54,7 @@ struct Interprete: View {
         let frasi = motore.scambi.map { PonteInterprete.Frase(altro: $0.chi == .altro, testo: $0.originale, trad: $0.tradotto) }
         let codice = lin.codice.uppercased()
         ZStack {
-            SfondoHUD(fase: motore.faseHUD)
+            SfondoSezione()                                       // 7 nov (il signore): lo sfondo di tutte le pagine
             VStack(spacing: 12) {
                 HStack {
                     AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni

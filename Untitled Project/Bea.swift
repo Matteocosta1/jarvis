@@ -637,7 +637,7 @@ struct TiPenso: View {
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color.fondo.ignoresSafeArea())
+        .background(SfondoSezione())                              // 7 nov: lo sfondo di tutte le pagine
         .preferredColorScheme(.dark)
     }
 

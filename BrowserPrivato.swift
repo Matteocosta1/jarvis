@@ -426,8 +426,10 @@ struct PaginaBrowser: View {
                 .overlay {
                     if nav.indirizzo.isEmpty && !nav.carica {          // niente pagina bianca: il visore spento, in attesa
                         // 27 ott (il signore): come il mockup, la pagina tutta nera con il globo olografico che gira
+                        // 7 nov (il signore: «le pagine devono avere tutte lo stesso sfondo, il Browser non ce l'ha»): il visore spento
+                        // lascia vedere lo sfondo della sezione (quadrettatura e chiarore) invece del nero pieno
                         ZStack {
-                            Color.fondo
+                            Color.clear
                             VStack(spacing: 14) {
                                 GloboOlo(tinta: accento).frame(width: 120, height: 120)
                                 Text(incognito ? "INCOGNITO" : "BROWSER PRIVATO").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(3)
@@ -665,7 +667,7 @@ struct VistaCronologiaBrowser: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(Color.fondo.ignoresSafeArea())
+            .background(SfondoSezione(tinta: accento))            // 7 nov: lo sfondo di tutte le pagine
             .searchable(text: $cerca, prompt: "Cerca nella cronologia")
             .navigationTitle("Cronologia")
             .navigationBarTitleDisplayMode(.inline)

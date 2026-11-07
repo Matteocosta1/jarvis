@@ -322,7 +322,7 @@ struct AperturaHUD: ViewModifier {
             .overlay {
                 if coperto {
                     ZStack {
-                        Color.fondo.ignoresSafeArea()
+                        SfondoSezione()                           // 7 nov: il caricamento sullo stesso sfondo della pagina
                         CaricamentoHUD(titolo: titolo, tinta: .ciano)
                     }
                     .transition(.opacity)

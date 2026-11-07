@@ -738,6 +738,10 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .tvp.su { transform: none; }
 /* ══ STUDIO (build 32, rifatto il 25 ott sera): il piano olografico fisso al centro, la creazione a voce lì sopra ══ */
 .sd { background: var(--fondo); }
+/* 7 nov (il signore: «le pagine devono avere tutte lo stesso sfondo»): anche lo Studio con il chiarore ciano e la quadrettatura sfumata */
+.sd::before, .sd::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.sd::before { background: radial-gradient(circle 420px at 50% 0, rgba(79,227,255,.16), rgba(79,227,255,0)); }
+.sd::after { background-image: linear-gradient(rgba(79,227,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(79,227,255,.03) 1px, transparent 1px); background-size: 22px 22px; mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); -webkit-mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); }
 .sd-su { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 6px; color: var(--ciano); z-index: 2; }
 .sd-su > div { flex: 1; display: grid; } .sd-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sd-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; }   /* 27 ott: diciture più marcate */
 .sd-arch { display: flex; align-items: center; gap: 5px; height: 28px; margin-top: 3px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(79,227,255,.4); background: rgba(2,6,10,.6); color: var(--ciano); font: 700 9px var(--mono); letter-spacing: 1.2px; cursor: pointer; white-space: nowrap; }

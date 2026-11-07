@@ -44,7 +44,7 @@ struct VistaStudio: View {
             .overlay {
                 if coperto {
                     ZStack {
-                        Color.fondo.ignoresSafeArea()
+                        SfondoSezione()                           // 7 nov: il caricamento sullo stesso sfondo della pagina
                         CaricamentoHUD(titolo: apertura.sezione, tinta: .ciano)
                     }
                     .transition(.opacity)

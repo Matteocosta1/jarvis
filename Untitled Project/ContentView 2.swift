@@ -2387,11 +2387,14 @@ struct ImpostazioniView: View {
                     Text("Cancella la cronologia sull'iPhone. Note e memoria di JARVIS restano nel cervello.")
                 }
             }
+            // 7 nov (il signore: «le pagine devono avere tutte lo stesso sfondo»): niente grigio di iOS dietro le righe
+            .scrollContentBackground(.hidden)
             // 5 nov (il signore: «se scorro si vede quella barra grigia»): «Fatto» in una riga sua sopra la pagina, come «Chiudi»
             .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto") {
                 Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))
                 chiudi()
             })
+            .background(SfondoSezione())                     // dietro anche alla riga di «Fatto», come nelle altre sezioni
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { voci = Jarvis.vociItaliane() }
         }
