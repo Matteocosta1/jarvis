@@ -76,7 +76,7 @@ final class ProveSpesa {
 
     /// In alto: quante ne mancano e quante sono prese.
     private func testata(_ gc: inout GraphicsContext, _ W: Double, _ n: Int, _ presi: Int) {
-        OP.scritta(&gc, n == 0 ? "LISTA VUOTA" : "DA PRENDERE \(n - presi)", 10, 14, 8, 700, OP.c(0.9), .leading)
+        if n > 0 { OP.scritta(&gc, "DA PRENDERE \(n - presi)", 10, 14, 8, 700, OP.c(0.9), .leading) }   // 7 nov: «lista vuota» solo sotto il titolo
         if n > 0 { OP.scritta(&gc, "PRESE \(presi) SU \(n)", W - 10, 14, 8, 700, presi == n ? OP.b(1) : OP.c(0.85), .trailing) }
     }
 
@@ -269,7 +269,7 @@ final class ProveSpesa {
         guard !piccolo else { return }
         OP.scritta(&gc, "\(presi)/\(V.count)", nc.x, nc.y + 5, 16, 700, OP.b(1))
         OP.scritta(&gc, presi == V.count && !V.isEmpty ? "TUTTO PRESO" : "PRESE", nc.x, nc.y + 15, 6.5, 600, OP.c(0.8))
-        OP.scritta(&gc, V.isEmpty ? "LISTA VUOTA" : "DA PRENDERE \(V.count - presi)", 10, 14, 8, 700, OP.c(0.9), .leading)
+        if !V.isEmpty { OP.scritta(&gc, "DA PRENDERE \(V.count - presi)", 10, 14, 8, 700, OP.c(0.9), .leading) }   // 7 nov: niente doppioni
     }
 }
 

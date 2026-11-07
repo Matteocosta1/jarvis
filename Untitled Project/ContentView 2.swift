@@ -816,9 +816,9 @@ struct ContentView: View {
         ]
     }
 
-    private func chiedi(_ frase: String) {
+    private func chiedi(_ frase: String, nascosto: String? = nil) {
         tastiera = false
-        Task { await jarvis.invia(frase) }
+        Task { await jarvis.invia(frase, nascosto: nascosto) }
     }
 
     /// Le icone in corona attorno al reattore, divise per gruppo con un arco e il nome del gruppo.
@@ -1504,7 +1504,7 @@ struct ContentView: View {
         case .ricordi:
             VistaRicordi(iniziale: v.ricordi ?? .ricordi, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }.paginaPiena()
         case .confidente:
-            VistaConfidente(invia: { testo in mostraConfidente = false; chiedi(testo) },
+            VistaConfidente(invia: { testo, nascosto in mostraConfidente = false; chiedi(testo, nascosto: nascosto) },
                             aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
         case .lingua:
             // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
@@ -1550,7 +1550,7 @@ struct ContentView: View {
             Task { try? await Task.sleep(for: .milliseconds(500)); scheda = altra }
         }
         case .meteo: VistaMeteo(chiedi: daScheda)
-        case .email: VistaPosta(chiedi: daScheda)
+        case .email: VistaPosta(chiedi: daScheda) { frase, testo in scheda = nil; chiedi(frase, nascosto: testo) }   // 7 nov: il lettore
         case .spesa: VistaSpesa(chiedi: daScheda)
         case .shazam: VistaShazam(chiedi: daScheda, apriMusica: { scheda = .musica })
         case .foto: VistaFotoScheda(chiedi: daScheda)
@@ -2122,10 +2122,17 @@ struct AnelliHUD: View {
                     }
                     gc.stroke(archi, with: .color(base.opacity(0.5)), style: StrokeStyle(lineWidth: fr > 0.85 ? 2.2 : 1.2, lineCap: .round))
                 }
-                // piccoli numeri «telemetrici» ai quattro punti cardinali: scritti una volta (i simboli della tela), poi solo spostati
+                // piccoli numeri «telemetrici» ai quattro punti cardinali: scritti una volta (i simboli della tela), poi solo spostati.
+                // 7 nov (il signore: «le linee curve che girano intorno al reattore vanno sopra ai numeri»): gli archi passano sullo
+                // stesso giro dei numeri; ora sotto ogni numero si apre un varco e gli archi ci passano dietro, i numeri restano puliti
+                let numeri = ["0", "90", "180", "270"]
+                var varchi = gc
+                varchi.blendMode = .destinationOut
                 for n in 0..<4 {
                     let th = Double(n) * .pi / 2 - .pi / 2 + t * 0.05 * fretta
                     let pt = CGPoint(x: c.x + R * 0.86 * cos(th), y: c.y + R * 0.86 * sin(th))
+                    let largo = 6 + 4.6 * Double(numeri[n].count)
+                    varchi.fill(Path(roundedRect: CGRect(x: pt.x - largo / 2, y: pt.y - 6, width: largo, height: 12), cornerRadius: 3), with: .color(.black))
                     if let s = gc.resolveSymbol(id: n) { gc.draw(s, at: pt) }
                 }
             } symbols: {

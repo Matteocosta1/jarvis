@@ -26,10 +26,7 @@ struct CorniceScheda<Contenuto: View>: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.fondo.ignoresSafeArea()
-                GrigliaSfumata()
-                RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
-                    .ignoresSafeArea()
+                SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
                 // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX).
                 // 5 nov (il signore: «se scorro in basso, in ogni sezione si vede quella barra grigia col Chiudi»): «Chiudi» non è
                 // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:

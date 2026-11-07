@@ -6,8 +6,8 @@ import UIKit
 /// e JARVIS gli dice cosa ne pensa, schietto in entrambe le direzioni. Oppure glielo racconta a voce.
 /// Quello che si dice qui non finisce nella memoria di JARVIS.
 struct VistaConfidente: View {
-    /// Manda il testo a JARVIS (chiude la pagina).
-    let invia: (String) -> Void
+    /// Manda il testo a JARVIS (chiude la pagina); il secondo testo va al cervello ma non si vede in chat (lo stato fisico).
+    let invia: (_ testo: String, _ nascosto: String) -> Void
     /// Apre l'ascolto a voce (chiude la pagina).
     let aVoce: () -> Void
     @State private var testo = ""
@@ -57,8 +57,7 @@ struct VistaConfidente: View {
     var body: some View {
         NavigationStack {
         ZStack {
-                Color.fondo.ignoresSafeArea()
-                GrigliaSfumata()
+                SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         // 26 ott notte: la testata delle altre sezioni (icona con l'anello che gira), niente titolo di iOS
@@ -126,7 +125,7 @@ struct VistaConfidente: View {
                             let d = domanda.trimmingCharacters(in: .whitespacesAndNewlines)
                             let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
                             svuota()                                  // mandata: la bozza non serve più
-                            invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
+                            invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
                         } label: {
                             Label("Chieda a JARVIS", systemImage: "person.2.wave.2")
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
@@ -169,7 +168,7 @@ struct VistaConfidente: View {
                     guard !t.isEmpty else { return false }
                     let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
                     svuota()                                      // mandata: la bozza non serve più
-                    invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\(rigaStato)\n\n\(t)")
+                    invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
                     return true
                 }
                 // riaprendo: la conversazione incollata e la domanda di prima

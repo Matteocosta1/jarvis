@@ -27,6 +27,8 @@ struct VistaScanner: View {
     @State private var codiceAMano = ""
     @State private var storico: [Passato] = []
     @State private var mostraIngredienti = false
+    @State private var chiediCancella = false         // 7 nov: «Cancella la cronologia», come in Shazam
+    @State private var inPausa = false                // 7 nov: dietro (MARK XI) la fotocamera si ferma e davanti riparte
     @State private var orecchio = OrecchioComandi()   // «Jarvis, un altro», «Jarvis, fa bene?», «Jarvis, cosa c'è dentro?»
     @Environment(\.chiudiOVia) private var chiudiScheda
 
@@ -47,6 +49,10 @@ struct VistaScanner: View {
             if !storico.isEmpty {
                 Pannello(titolo: "SCANSIONATI · \(storico.count)", tinta: tinta) {
                     ForEach(storico) { s in rigaStorico(s) }
+                    // 7 nov (il signore: «non si possono cancellare i prodotti scansionati»): come in Shazam, uno alla volta tenendo
+                    // premuto, o tutti da qui
+                    Button(role: .destructive) { chiediCancella = true } label: { Label("Cancella la cronologia", systemImage: "trash").font(.footnote) }
+                        .tint(.red).padding(.top, 4)
                 }
             }
         }
@@ -60,7 +66,12 @@ struct VistaScanner: View {
             orecchio.avvia()
         }
         .onDisappear { orecchio.ferma() }
-        .pausaDietro(ferma: { orecchio.ferma() }, riprendi: { orecchio.avvia() })        // MARK XI: dietro i comandi a voce in pausa
+        // MARK XI: dietro i comandi a voce in pausa; 7 nov (screenshot del signore: tornato davanti il lettore era nero) anche la
+        // fotocamera si ferma e davanti riparte da capo
+        .pausaDietro(ferma: { orecchio.ferma(); inPausa = true }, riprendi: { inPausa = false; orecchio.avvia() })
+        .confirmationDialog("Cancellare tutti i prodotti scansionati?", isPresented: $chiediCancella, titleVisibility: .visible) {
+            Button("Cancella", role: .destructive) { storico = []; VistaScanner.salva([]) }
+        }
     }
 
     /// Un comando detto a voce, come il tasto corrispondente.
@@ -89,7 +100,7 @@ struct VistaScanner: View {
     @ViewBuilder private var lettore: some View {
         if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
             ZStack {
-                LettoreCodici(attivo: leggo && !carico) { codice in trovato(codice) }
+                LettoreCodici(attivo: leggo && !carico && !inPausa) { codice in trovato(codice) }
                 RoundedRectangle(cornerRadius: 14).stroke(tinta.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [10, 6]))
                     .frame(width: 230, height: 120)
                     .shadow(color: tinta.opacity(0.6), radius: 8)
@@ -250,6 +261,12 @@ struct VistaScanner: View {
             }
         }
         .buttonStyle(StileStark())
+        .contextMenu {
+            Button(role: .destructive) {
+                storico.removeAll { $0.codice == s.codice }
+                VistaScanner.salva(storico)
+            } label: { Label("Elimina", systemImage: "trash") }
+        }
     }
 
     // MARK: azioni
@@ -308,12 +325,14 @@ struct LettoreCodici: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: DataScannerViewController, context: Context) {
-        context.coordinator.trovato = trovato
+        let c = context.coordinator
+        c.trovato = trovato
+        c.attivo = attivo
         if attivo {
-            // la fotocamera parte solo quando la vista è davvero sullo schermo
+            // la fotocamera parte solo quando la vista è davvero sullo schermo (e se nel frattempo non è andata dietro)
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
-                if !vc.isScanning { try? vc.startScanning() }
+                if c.attivo, !vc.isScanning { try? vc.startScanning() }
             }
         } else if vc.isScanning {
             vc.stopScanning()
@@ -328,6 +347,7 @@ struct LettoreCodici: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
         var trovato: (String) -> Void
+        var attivo = false                            // 7 nov: l'ultimo stato voluto (la partenza ritardata lo ricontrolla)
         init(trovato: @escaping (String) -> Void) { self.trovato = trovato }
 
         func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {

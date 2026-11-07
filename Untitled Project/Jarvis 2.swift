@@ -22,11 +22,15 @@ struct Messaggio: Identifiable, Codable, Equatable {
     /// Risposta interrotta: le frasi che JARVIS aveva detto per intero quando il signore l'ha fermato (vuoto: non aveva ancora
     /// cominciato). Nil: risposta detta tutta. Serve al cervello per riprendere dal punto giusto con «continua» (revisione del dialogo, 24 ott).
     var detto: String? = nil
+    /// 7 nov (il signore): quello che va al cervello ma non si vede in chat (il Confidente: lo stato fisico di oggi). Prima la riga
+    /// «[Stato fisico di oggi: …]» compariva nel messaggio del signore.
+    var nascosto: String? = nil
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
         if ruolo == "assistant", let detto { return Dialogo.rispostaInterrotta(testo, detto: detto) }
-        let base = conFoto ? "(il signore ha mandato una foto) \(testo)" : testo
+        let completo = nascosto.map { "\(testo)\n\($0)" } ?? testo
+        let base = conFoto ? "(il signore ha mandato una foto) \(completo)" : completo
         if aggiunta == true { return "(aggiunta alla mia richiesta precedente, considerala insieme a quella) \(base)" }
         if let q = interruzione {
             return "(ti ho interrotto mentre rispondevi a «\(q)». Se questa frase completa, corregge o aggiunge qualcosa a quella richiesta, rispondi tenendo conto di tutte e due insieme; se è una domanda nuova, rispondi solo a questa, senza riprendere la risposta interrotta) \(base)"
@@ -1153,7 +1157,8 @@ final class Jarvis: NSObject, ObservableObject {
         if fase != .ascolto { fase = .attesa }
     }
 
-    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false, interrottoSu: String? = nil) async {
+    func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false, interrottoSu: String? = nil,
+               nascosto: String? = nil) async {
         rispostaInterrotta = nil                      // una domanda è partita (anche scritta): l'interruzione di prima è chiusa
         quandoInterrotto = nil
         domandaInterrotta = nil
@@ -1186,6 +1191,7 @@ final class Jarvis: NSObject, ObservableObject {
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             if comeAggiunta { m.aggiunta = true } else if let q = interrottoSu { m.interruzione = q } else if comeSeguito { m.seguito = true }
+            if let n = nascosto?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty { m.nascosto = n }
             messaggi.append(m)
         }
         let recenti = messaggi.suffix(20).filter { !$0.testo.isEmpty }

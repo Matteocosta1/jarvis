@@ -17,7 +17,8 @@ import UIKit
 /// - Sonno = 100 × minuti dormiti stanotte ÷ media delle notti prima (fino a 30, almeno 3), massimo 100.
 /// - Battito = 100 × media a riposo di 7 giorni ÷ battito a riposo di oggi, massimo 100 (più basso del solito = recuperato).
 /// - Umore = voto dell'ultimo diario degli ultimi 7 giorni × 10.
-/// Se un punteggio manca si fa la media degli altri, e la riga sotto lo dice.
+/// Se un punteggio manca si fa la media degli altri, e la riga sotto lo dice. 7 nov (il signore: «consiglia tu»): con un dato solo
+/// la prontezza non si scrive («—»): un numero su un dato su tre diceva «pronto 100%» anche con la febbre.
 /// Sonno e battito sono gli stessi numeri del riquadro OGGI di Vitals (riepilogo di Benessere).
 struct DatiOrganismo: Equatable {
     var sonnoMin: Int?          // stanotte, in minuti
@@ -38,7 +39,7 @@ struct DatiOrganismo: Equatable {
     var punteggioUmore: Int? { umore.map { min(100, max(0, Int(($0 * 10).rounded()))) } }
     var prontezza: Int? {
         let p = [punteggioSonno, punteggioBattito, punteggioUmore].compactMap { $0 }
-        guard !p.isEmpty else { return nil }
+        guard p.count >= 2 else { return nil }                       // 7 nov: almeno 2 dati su 3
         return Int((Double(p.reduce(0, +)) / Double(p.count)).rounded())
     }
 
@@ -104,6 +105,7 @@ struct DatiOrganismo: Equatable {
         if let p = punteggioBattito { parti.append("Battito \(p)") } else { manca.append("il battito") }
         if let p = punteggioUmore { parti.append("Umore \(p)") } else { manca.append("l'umore") }
         if parti.isEmpty { return "Servono sonno, battito a riposo o il diario della sera." }
+        if parti.count == 1 { return "Servono almeno 2 dati su 3: c'è solo \(parti[0]). \(manca.count == 1 ? "Manca" : "Mancano") \(manca.joined(separator: " e "))." }
         var t = "Media dei punteggi su 100: " + parti.joined(separator: " · ") + "."
         if !manca.isEmpty { t += " \(manca.count == 1 ? "Manca" : "Mancano") \(manca.joined(separator: " e "))." }
         return t

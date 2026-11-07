@@ -91,18 +91,30 @@ final class RuotaCorona: NSObject, ObservableObject {
         avvia()
     }
 
-    /// Spegne l'ologramma (toccato, o una sezione si apre).
+    /// Spegne l'ologramma (toccato, una sezione si apre, 5 s senza scegliere niente). 7 nov (il signore: «se giro la ruota non
+    /// torna più alla posizione iniziale»): spenta, la corona torna da sola com'era prima di girarla, con la stessa molla dello
+    /// scatto (circa mezzo secondo, senza suoni né vibrazioni): a riposo le icone sono sempre al loro posto, coi gruppi di sempre.
     func spegni() {
         vivo = false
         creataDa = nil
         scelta = -1
         dito = nil
         molla = nil
+        torna()
+    }
+
+    /// La corona torna al suo posto (il giro intero più vicino: la strada più corta).
+    private func torna() {
+        let meta = (giro / RuotaCorona.due).rounded() * RuotaCorona.due
+        guard abs(giro - meta) > 0.0005 else { giro = meta; return }
+        molla = (meta: meta, x0: giro - meta, v0: 0, t0: CACurrentMediaTime())
+        avvia()
     }
 
     /// La corona torna com'era (all'avvio o dopo una nuova conversazione): nessun giro.
     func azzera() {
         spegni()
+        molla = nil
         giro = 0
         lente = 0
         ferma()

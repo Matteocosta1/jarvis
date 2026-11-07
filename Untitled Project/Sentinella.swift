@@ -578,7 +578,7 @@ struct RegistroSentinella: View {
 
     var body: some View {
         ZStack {
-            Color.fondo.ignoresSafeArea()
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 1) {

@@ -143,9 +143,7 @@ struct SchermoTravel: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.fondo.ignoresSafeArea()
-            RadialGradient(colors: [ciano.opacity(0.14), .clear], center: .top, startRadius: 0, endRadius: 300)
-                .frame(height: 300).frame(maxWidth: .infinity).ignoresSafeArea()
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {

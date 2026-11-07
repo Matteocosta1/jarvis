@@ -115,7 +115,7 @@ struct SchermoDossier: View {
 
     var body: some View {
         ZStack {
-            Color.fondo.ignoresSafeArea()
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 0) {
                 testa(titolo: "DOSSIER", sotto: "\(luogo.nome.uppercased()) · \(categoria.rawValue)") { Suoni.tocco(); apri(nil) }
                 ScrollView {

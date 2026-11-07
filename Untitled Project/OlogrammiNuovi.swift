@@ -698,7 +698,7 @@ enum DisegnoSpesa {
                 spessore: { (piccolo ? 0.8 : 0.9) + Double($0) * 0.12 })
         for (c, a) in lampi { Olo.alone(&gc, c, 16, a, Olo.bianco) }
         guard !piccolo else { return }
-        Olo.testo(&gc, tot > 0 ? "DA PRENDERE \(restano)" : "LISTA VUOTA", 10, 14, corpo: 8, peso: .bold, Olo.ciano.opacity(0.9), ancora: .leading)
+        if tot > 0 { Olo.testo(&gc, "DA PRENDERE \(restano)", 10, 14, corpo: 8, peso: .bold, Olo.ciano.opacity(0.9), ancora: .leading) }   // 7 nov: niente doppioni
         if tot > 0 {
             Olo.testo(&gc, "PRESE \(presi) SU \(tot)", w - 10, 14, corpo: 8, peso: .bold,
                       presi == tot ? Olo.bianco : Olo.ciano.opacity(0.85), ancora: .trailing)

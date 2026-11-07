@@ -244,8 +244,7 @@ struct VistaWiretap: View {
 
     var body: some View {
         ZStack {
-            Color.fondo.ignoresSafeArea()
-            GrigliaSfumata()
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 14) {
                 HStack(alignment: .top) {
                     // 26 ott notte: la testata delle altre schede (icona con l'anello che gira) e «Chiudi»: qui non c'è la fotocamera

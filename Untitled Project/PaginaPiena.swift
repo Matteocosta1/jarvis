@@ -225,4 +225,21 @@ struct GrigliaSfumata: View {
         .accessibilityHidden(true)
     }
 }
+
+/// 7 nov (il signore: «non hanno lo sfondo uguale alle altre, a quadretti con la sfumatura»): lo sfondo di ogni sezione, uno solo
+/// per tutte. Il fondo scuro, la quadrettatura sfumata e il chiarore ciano che scende dall'alto, come in CorniceScheda.
+struct SfondoSezione: View {
+    var tinta: Color = .ciano
+
+    var body: some View {
+        ZStack {
+            Color.fondo
+            GrigliaSfumata()
+            RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
 #endif

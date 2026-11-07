@@ -39,12 +39,11 @@ struct VistaBea: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.fondo.ignoresSafeArea()
-                GrigliaSfumata()
-                RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420).ignoresSafeArea()   // 26 ott notte: ciano come le altre
+                SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
                 List {
                     Section {
                         TestataScheda(titolo: "Bea", sottotitolo: sottotitolo, icona: "link", tinta: tinta)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
                             .listRowBackground(Color.clear)
                         ologramma.listRowBackground(Color.clear)
                         contatto.listRowBackground(Color.clear)
@@ -63,6 +62,10 @@ struct VistaBea: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                // 7 nov (il signore: «Bea inizia più in basso delle altre»): la lista di iOS lasciava uno spazio sopra la prima sezione;
+                // ora la testata sta dove sta nelle altre schede (16 punti sotto «Chiudi», 16 dal bordo)
+                .contentMargins(.top, 16, for: .scrollContent)
+                .contentMargins(.horizontal, 16, for: .scrollContent)
                 .scrollDismissesKeyboard(.interactively)
                 .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
                 .animation(.easeOut(duration: Apertura.dissolvenza), value: dati != nil)
@@ -71,7 +74,7 @@ struct VistaBea: View {
                     // il titolo resta in alto mentre carica, come nelle altre schede
                     VStack {
                         TestataScheda(titolo: "Bea", sottotitolo: "acquisizione dati", icona: "link", tinta: tinta)
-                            .padding(.horizontal, 20).padding(.top, 8)
+                            .padding(.horizontal, 16).padding(.top, 60)          // 7 nov: allo stesso posto di quando ha caricato
                         Spacer()
                     }
                     .allowsHitTesting(false)

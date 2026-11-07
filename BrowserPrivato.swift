@@ -273,7 +273,7 @@ struct BrowserPrivato: View {
 
     private var copertura: some View {
         ZStack {
-            Color.fondo.ignoresSafeArea()
+            SfondoSezione()
             VStack(spacing: 18) {
                 Image(systemName: "lock.shield.fill").font(.system(size: 54))
                 Text("BROWSER PRIVATO")
@@ -473,7 +473,7 @@ struct PaginaBrowser: View {
             .padding(.vertical, 8)
         }
         .foregroundStyle(accento)
-        .background(Color.fondo.ignoresSafeArea())
+        .background(SfondoSezione(tinta: accento))       // 7 nov (il signore): la quadrettatura sfumata come le altre sezioni
         .animation(.easeInOut(duration: 0.25), value: nav.popup != nil)
         .onChange(of: nav.indirizzo) { if !scrivendo { barra = nav.indirizzo } }
         .onChange(of: attivo) {

@@ -37,7 +37,7 @@ struct PannelliTraccia: View {
                 sentiero.disegna(&gc, W, H, t, M, nome: luogo?.testo ?? "LUOGO", metri: metri)
             }
             .corniceOlo(tinta)
-            Pannello(titolo: "TRACCIA", tinta: tinta) {
+            Pannello(titolo: "LUOGO", tinta: tinta) {          // 7 nov (il signore): niente TRACCIA ripetuto
                 if let avviso { AvvisoJarvis(testo: avviso) }
                 if let l = scelto, let lat = l.lat, let lon = l.lon {
                     let rotta = bussola.verso(lat: lat, lon: lon)
@@ -289,7 +289,6 @@ final class SentieroTraccia {
         let cima = P(lx, ly, 0.78), titolo = OP.taglia(nome.uppercased(), 18)
         OP.dentro(&gc, W, titolo, cima.x, cima.y - 6, 7, 700, OP.b(0.95))
         M.zona(f0.x, (f0.y + cima.y) / 2, 22, SentieroTraccia.luogoId)
-        OP.scritta(&gc, "TRACCIA", 10, 14, 8, 600, OP.c(0.85), .leading)
         let distanza = metri.map { Rotta.distanza($0).uppercased() }, piedi = metri.map { "A PIEDI \(Rotta.aPiedi($0))".uppercased() }
         if let distanza { OP.scritta(&gc, distanza, W - 10, 14, 8, 700, OP.b(0.95), .trailing) }
         if let piedi { OP.scritta(&gc, piedi, W - 10, 24, 6.5, 600, OP.c(0.8), .trailing) }

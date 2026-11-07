@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 import MapKit
 import AVFoundation
 
@@ -193,21 +194,60 @@ enum ScattoVeloce {
 // MARK: - Look Around
 
 /// La vista da strada di Apple (MKLookAroundViewController): si gira col dito e ci si muove nella via.
+/// 7 nov (screenshot del signore): la scritta di Apple «Guardati intorno» finiva sopra l'ora e la batteria, e il marchio «Mappe»
+/// sotto il tasto MAPPE. SwiftUI, a tutto schermo, azzera i margini sicuri della vista e i nostri si perdevano; ora la vista di Apple
+/// sta dentro un contenitore che le dà i suoi margini a ogni giro: sopra l'ora e l'intestazione (`sopra`), sotto i comandi (`sotto`).
+/// Così i segni di Apple (obbligatori) restano visibili, ma fuori dai nostri tasti.
 struct VistaLookAround: UIViewControllerRepresentable {
     let scena: MKLookAroundScene?
+    var sopra: CGFloat = 60
+    var sotto: CGFloat = 0
 
-    func makeUIViewController(context: Context) -> MKLookAroundViewController {
-        let c = MKLookAroundViewController(nibName: nil, bundle: nil)
-        c.isNavigationEnabled = true
-        c.showsRoadLabels = true
-        c.badgePosition = .topTrailing
-        c.additionalSafeAreaInsets = UIEdgeInsets(top: 56, left: 0, bottom: 0, right: 0)   // il marchio di Apple sotto l'intestazione
-        c.scene = scena
+    func makeUIViewController(context: Context) -> ContenitoreLookAround {
+        let c = ContenitoreLookAround()
+        c.vista.isNavigationEnabled = true
+        c.vista.showsRoadLabels = true
+        c.vista.badgePosition = .topTrailing
+        c.vista.scene = scena
+        c.sopra = sopra
+        c.sotto = sotto
         return c
     }
 
-    func updateUIViewController(_ c: MKLookAroundViewController, context: Context) {
-        if c.scene !== scena { c.scene = scena }
+    func updateUIViewController(_ c: ContenitoreLookAround, context: Context) {
+        if c.vista.scene !== scena { c.vista.scene = scena }
+        if c.sopra != sopra || c.sotto != sotto {
+            c.sopra = sopra
+            c.sotto = sotto
+            c.view.setNeedsLayout()
+        }
+    }
+}
+
+/// Il contenitore della vista da strada: tiene i margini sicuri giusti anche a tutto schermo.
+final class ContenitoreLookAround: UIViewController {
+    let vista = MKLookAroundViewController(nibName: nil, bundle: nil)
+    var sopra: CGFloat = 60
+    var sotto: CGFloat = 0
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        addChild(vista)
+        vista.view.frame = view.bounds
+        vista.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(vista.view)
+        vista.didMove(toParent: self)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // i margini veri dello schermo (l'isola, la barra in fondo) più l'intestazione e i comandi, tolto quello che c'è già
+        let schermo = view.window?.safeAreaInsets ?? .zero
+        let gia = view.safeAreaInsets
+        let voluti = UIEdgeInsets(top: max(0, schermo.top + sopra - gia.top), left: 0,
+                                  bottom: max(0, schermo.bottom + sotto - gia.bottom), right: 0)
+        if vista.additionalSafeAreaInsets != voluti { vista.additionalSafeAreaInsets = voluti }
     }
 }
 
@@ -378,13 +418,14 @@ struct SchermoNaviga: View {
     @State private var foto: [Int: UIImage] = [:]
     @State private var lampo = false
     @State private var visibile = false
+    @State private var altoGiu: CGFloat = 0           // 7 nov: quanto sono alti i comandi in fondo (il marchio di Apple sta sopra)
 
     private var tappa: TappaSat? { percorso.flatMap { $0.tappe.indices.contains(tappaVista) ? $0.tappe[tappaVista] : nil } }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VistaLookAround(scena: scene[tappaVista]).ignoresSafeArea()
+            VistaLookAround(scena: scene[tappaVista], sopra: 60, sotto: altoGiu).ignoresSafeArea()
             if percorso != nil, cercate.contains(tappaVista), scene[tappaVista] == nil {
                 Text("VISTA DA STRADA NON DISPONIBILE QUI")                  // Apple non ha Look Around in questo punto
                     .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
@@ -420,6 +461,7 @@ struct SchermoNaviga: View {
             }
             Spacer(minLength: 0)
             giu(stretta: stretta)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { altoGiu = $0 }
         }
     }
 
@@ -472,7 +514,13 @@ struct SchermoNaviga: View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack {
                 Color(red: 0.03, green: 0.07, blue: 0.08)
-                if let f = foto[t.id] { Image(uiImage: f).resizable().scaledToFill() }
+                if let f = foto[t.id] {
+                    Image(uiImage: f).resizable().scaledToFill()
+                } else if cercate.contains(t.id), scene[t.id] == nil {
+                    // 7 nov: lì Apple non ha la vista da strada (prima restava un riquadro nero), come nel DOSSIER
+                    Text("NON DISPONIBILE").font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1)
+                        .foregroundStyle(Color.tenue)
+                }
             }
             .frame(width: 112, height: 70).clipped()
             Text("\(t.id + 1) · \(t.svolta.freccia) \(t.via)")

@@ -878,7 +878,11 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .bp-cop-chiudi { background: none; border: 0; color: #9fb3b9; font: 15px var(--sans); cursor: pointer; }
 .bp .bw-vis { --c: var(--acc); }
 /* SOCIAL */
-.sc { background: radial-gradient(ellipse at 50% 0%, rgba(79,227,255,.1), transparent 55%), var(--fondo); color: var(--ciano); }
+.sc { background: var(--fondo); color: var(--ciano); }
+/* 7 nov (il signore: «Social non ha lo sfondo uguale alle altre, a quadretti con la sfumatura»): il chiarore ciano dall'alto e la quadrettatura sfumata delle sezioni, dietro a tutto */
+.sc::before, .sc::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.sc::before { background: radial-gradient(circle 420px at 50% 0, rgba(79,227,255,.16), rgba(79,227,255,0)); }
+.sc::after { background-image: linear-gradient(rgba(79,227,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(79,227,255,.03) 1px, transparent 1px); background-size: 22px 22px; mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); -webkit-mask-image: radial-gradient(circle at 50% 30%, #000 25%, transparent 80%); }
 .sc canvas { position: relative; inset: auto; }
 .sc-su { display: flex; align-items: flex-start; gap: 10px; padding: 52px 20px 4px; } .sc-su > div { flex: 1; display: grid; } .sc-su b { font: 700 16px var(--mono); letter-spacing: 4px; } .sc-su small { font: 700 10.5px var(--mono); letter-spacing: 2px; opacity: 1; }   /* 27 ott: diciture più marcate */
 .sc-chiudi { background: none; border: 0; color: var(--ciano); font: 600 16px var(--sans); cursor: pointer; padding: 6px 0 6px 10px; }

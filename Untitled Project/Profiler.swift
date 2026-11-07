@@ -32,9 +32,13 @@ struct VistaProfiler: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let foto, let img = UIImage(data: foto) {
-                Image(uiImage: img).resizable().scaledToFill()
+                // 7 nov (il signore: «dopo l'acquisizione sborda»): la foto riempita era più larga dello schermo e allargava tutta la
+                // pagina (testata, X e scheda uscivano ai lati). Ora riempie lo spazio che c'è e il resto si taglia.
+                Color.clear
+                    .overlay { Image(uiImage: img).resizable().scaledToFill() }
+                    .clipped()
+                    .overlay(Color.black.opacity(0.45))
                     .ignoresSafeArea()
-                    .overlay(Color.black.opacity(0.45).ignoresSafeArea())
                     .transition(.opacity)
             } else {
                 AnteprimaOcchi(sessione: motore.sessione)

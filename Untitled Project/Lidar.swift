@@ -177,8 +177,7 @@ struct VistaLidar: View {
 
     var body: some View {
         ZStack {
-            Color.fondo.ignoresSafeArea()
-            GrigliaSfumata()
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             VStack(spacing: 0) {
                 ChiudiLidar { chiudiChiedendo() }
                 switch fase {

@@ -289,10 +289,18 @@ enum OP {
         }
     }
 
-    /// aiutoOlo: il suggerimento in basso finché non si tocca.
+    /// aiutoOlo: il suggerimento in basso finché non si tocca. 7 nov (il signore, «fondo scuro dietro»): una pillola scura sotto
+    /// la scritta, che la stacca dall'anello del proiettore (prima le tacche le passavano sopra e si leggeva male).
     static func aiuto(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ testo: String, _ t: Double) {
-        let a = 0.55 * lis((t - 1.2) / 0.6) * (0.75 + 0.25 * sin(t * 2.4))
-        if a > 0.01 { scritta(&gc, testo, W / 2, H - 6, 7, 600, c(a)) }
+        let f = lis((t - 1.2) / 0.6) * (0.75 + 0.25 * sin(t * 2.4)), a = 0.55 * f
+        guard a > 0.01 else { return }
+        let w = larghezza(gc, testo, 7, 600) + 14, alta = 12.0, y = H - 6 - 7 * 0.36
+        let pillola = Path(roundedRect: CGRect(x: W / 2 - w / 2, y: y - alta / 2, width: w, height: alta), cornerRadius: alta / 2)
+        var g = gc
+        g.blendMode = .normal
+        g.fill(pillola, with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.85 * f)))
+        g.stroke(pillola, with: .color(s(0.25 * f)), lineWidth: 0.6)
+        scritta(&gc, testo, W / 2, H - 6, 7, 600, c(a))
     }
 }
 
