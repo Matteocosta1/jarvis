@@ -530,6 +530,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 11.0 (10) — 7 nov notte · controllo di compilazione: in corso
+Uguale alla 11.0 (9) + una correzione sola (il signore, 23:28: «lancio l'app, il volume è alto; se lo lancio dal tasto Azione il volume è basso»): il comando «Parla con Jarvis» del tasto Azione apriva il microfono subito, durante la musica d'avvio (col microfono aperto l'iPhone abbassa l'altoparlante). Ora durante l'avvio l'ascolto parte a musica finita, come aprendo dall'icona: volume alto e regolabile coi tasti anche dal tasto Azione. A JARVIS già acceso il tasto Azione resta immediato.
+
 ## 11.0 (9) — 7 nov sera · commit 466bd31 · controllo di compilazione VERDE (0 errori, 0 warning, run 42412540986)
 Sul telefono (23:25): «nuova build bellissima». Volume d'avvio sembrato più basso: era il volume media dell'iPhone (codice audio identico alla 8 e alla 8.0 (13)); alzato coi tasti durante l'avvio, «ok funziona».
 - Mockup v272–v274 (pulito e di lavoro) con le stesse cose: lettore della posta nel mockup; Messaggi con i ricevuti (v273); un solo caricamento per tutte le sezioni (SchermoCaricamento: sfondo, «Chiudi» o X in alto, testata al suo posto, caricamento al centro sotto, 0,28 s + 0,25 s) anche per Occhi, Cucina, Profiler, Trainer, Sentinella, LiDAR, Browser, Studio, Social, Musica; una sola disposizione per tutte (riga di chiusura alta 44, testata 16 punti sotto); X e «Chiudi» più piccoli e della stessa altezza (X 28 a vista, 44 al tocco, TondoX; «Chiudi» 15); Browser, Studio, Social e Musica col nome della sezione al posto di J.A.R.V.I.S.; Trainer di una parola; Sentinella con Registro e Buio sopra PERIMETRO SICURO come Occhi; Wiretap con «Chiudi» in alto (e nel mockup com'è nell'app).

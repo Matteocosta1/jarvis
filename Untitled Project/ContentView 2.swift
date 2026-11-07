@@ -551,7 +551,10 @@ struct ContentView: View {
         switch r {
         case .ascolta:
             jarvis.interrompi()
-            jarvis.ascoltaSubito()
+            // 7 nov notte (il signore: «se lo lancio dal tasto Azione il volume è basso»): durante l'avvio il microfono aspetta la fine
+            // della musica, come aprendo dall'icona (col microfono aperto l'iPhone abbassa l'altoparlante e i tasti del volume non
+            // regolano più la musica). A JARVIS già acceso il tasto Azione resta immediato.
+            if jarvis.avvioInCorso { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
         case .briefing:
             Task { await jarvis.invia("Buongiorno Jarvis, il briefing per favore.") }
         case .leggi(let testo):
