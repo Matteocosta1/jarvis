@@ -228,12 +228,15 @@ struct IconaSegueRuota: ViewModifier {
 }
 
 /// Il reattore si vela mentre l'ologramma è acceso (e lascia i tocchi all'ologramma).
+/// 7 nov sera (il signore: «l'orologio lasciarlo così, solo la trasparenza e la luminosità come su iPhone»): come VeloRuota
+/// dell'iPhone e il mockup v276: quasi sparito (0,015, prima 0,12) e più indietro (scala 0,78), con la stessa curva.
 struct VeloPolso: ViewModifier {
     @ObservedObject var ruota: RuotaPolso
     func body(content: Content) -> some View {
         content
-            .opacity(ruota.vivo ? 0.12 : 1)
-            .animation(.easeOut(duration: 0.2), value: ruota.vivo)
+            .opacity(ruota.vivo ? 0.015 : 1)
+            .scaleEffect(ruota.vivo ? 0.78 : 1)
+            .animation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.3), value: ruota.vivo)
             .allowsHitTesting(!ruota.vivo)
     }
 }

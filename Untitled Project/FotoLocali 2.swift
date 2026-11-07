@@ -370,6 +370,21 @@ actor IndiceFoto {
         await Task.yield()
     }
 
+    /// 7 nov sera (il signore, scelta A: «l'ologramma sempre visibile: a galleria finita fa girare le ultime foto lette con le cose
+    /// trovate»): la `k`-esima delle ultime 30 foto, riletta dall'AI di Apple con la fiducia (solo quelle già sul telefono, niente
+    /// iCloud: è un attimo). nil se non si apre: l'ologramma passa alla prossima.
+    func rileggi(_ k: Int) -> CampioneFoto? {
+        let o = PHFetchOptions()
+        o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        o.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        o.fetchLimit = 30
+        let r = PHAsset.fetchAssets(with: o)
+        guard r.count > 0 else { return nil }
+        let f = r.object(at: k % r.count)
+        guard let e = FotoLocali.classificaConFiducia(f, rete: false), !e.isEmpty else { return nil }
+        return CampioneFoto(id: f.localIdentifier, cose: CampioneFoto.cose(e))
+    }
+
     /// Le foto indicate (le più recenti di una ricerca), analizzate subito se mancano.
     func assicura(_ ids: [String]) async {
         carica()
@@ -477,6 +492,13 @@ final class AvanzamentoFoto: ObservableObject {
     @Published private(set) var passo = 0
     /// L'ultima foto letta (una ogni 1,4 s circa), con le sue cose.
     @Published private(set) var campione: CampioneFoto?
+    /// 7 nov sera: a galleria finita la sezione Foto aperta rilegge le ultime foto (l'ologramma gira invece di fermarsi).
+    @Published private(set) var rilettura = false
+
+    func rileggendo(_ si: Bool) { if rilettura != si { rilettura = si } }
+
+    /// La foto riletta a galleria finita (vedi IndiceFoto.rileggi).
+    func mostra(_ c: CampioneFoto) { if campione != c { campione = c } }
 
     func aggiorna(fatte: Int, totale: Int, attivo: Bool, campione: CampioneFoto? = nil) {
         if self.fatte != fatte { self.fatte = fatte }

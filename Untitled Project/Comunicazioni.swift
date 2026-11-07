@@ -142,8 +142,6 @@ struct MessaggioRicevuto: AppIntent {
     @Parameter(title: "Mittente") var mittente: String
     @Parameter(title: "Testo") var testo: String
 
-    init() {}
-
     func perform() async throws -> some IntentResult {
         let m = mittente, t = testo
         await RegistroMessaggi.ricevuto(da: m, testo: t)

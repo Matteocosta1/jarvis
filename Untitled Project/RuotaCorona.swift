@@ -90,7 +90,7 @@ final class RuotaCorona: NSObject, ObservableObject {
         }
         // 7 nov (il signore: «voglio poterla rimettere io in posizione corretta»): anche il suo posto di riposo è una tacca.
         // Lasciata più vicino al posto che a un'icona (lì in alto c'è lo spazio fra DAILY e SENSI), ci va con lo slancio,
-        // con lo scatto, e si spegne: il reattore torna com'era, come quando si spegne da sola dopo 5 s.
+        // con lo scatto, e si spegne: il reattore torna com'era, come quando si spegne da sola dopo 3 s.
         let casa = (proiezione / RuotaCorona.due).rounded() * RuotaCorona.due
         if abs(casa - proiezione) < minimo {
             vivo = false

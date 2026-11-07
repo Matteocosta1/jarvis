@@ -34,7 +34,7 @@ struct OlogrammaPolso<Icona: View>: View {
                         .frame(width: 200, height: 200)
                     icona(k)
                         .foregroundStyle(chiaro)
-                        .brightness(0.12 * luce)
+                        .brightness(0.25 * luce)                                       // 7 nov sera: come l'iPhone, scelta più luminosa (era 0,12)
                         .frame(width: 64, height: 64)
                         .mask {
                             VStack(spacing: 0) {
@@ -45,13 +45,14 @@ struct OlogrammaPolso<Icona: View>: View {
                         }
                         .mask { RigheIcona() }                                  // 5 nov sera: le righe come nel mockup
                         .shadow(color: ciano.opacity(0.45 + 0.55 * luce), radius: 3 + 5 * luce)
-                        .opacity(0.2 + 0.8 * luce)                                     // girando 20%, scelta piena
+                        .shadow(color: ciano.opacity(0.7 * luce), radius: 14 * luce)   // 7 nov sera: scelta, il secondo alone dell'iPhone
+                        .opacity(0.3 + 0.7 * luce)                                     // girando 30% come l'iPhone (era 20%), scelta piena
                         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)
                     Text(nome(nomi[k], T: T))
                         .font(.system(size: 15, weight: .bold, design: .monospaced)).tracking(3)
                         .foregroundStyle(bianco)
                         .shadow(color: ciano.opacity(0.8 * luce), radius: 4)
-                        .opacity(0.25 + 0.75 * luce)
+                        .opacity(0.35 + 0.65 * luce)                                   // girando 35% come l'iPhone (era 25%)
                         .lineLimit(1).fixedSize()
                         .position(x: 100, y: 130)
                     Text(gruppi.indices.contains(k) ? gruppi[k] : "")

@@ -354,6 +354,7 @@ struct VistaFotoScheda: View {
     @State private var quandoRisultati = Date.distantPast
     @State private var apertaIl = Date()
     @Environment(\.accessibilityReduceMotion) private var riduci
+    @Environment(\.sezioneDietro) private var dietro    // dietro (MARK XI) la rilettura delle foto si ferma
 
     var body: some View {
         CorniceScheda(titolo: "Foto", sottotitolo: foto.map { "\($0.count) foto · \(periodo.rawValue.lowercased())" } ?? "sfoglio la galleria", icona: "photo.on.rectangle", tinta: tinta, pronto: foto != nil) {
@@ -386,8 +387,8 @@ struct VistaFotoScheda: View {
             if !capite.isEmpty {
                 ParoleCapite(parole: capite, tinta: tinta).padding(.top, -6)
             }
-            // l'analisi di tutta la galleria (una volta sola, poi solo le foto nuove), in ologramma: c'è solo mentre va avanti e se
-            // restano almeno 50 foto (le poche foto nuove passano senza); finita lo dice, poi il pannello si chiude
+            // l'analisi di tutta la galleria (una volta sola, poi solo le foto nuove), in ologramma. 7 nov sera (il signore, scelta A):
+            // SEMPRE visibile: mentre va avanti il conto; finita «ANALISI COMPLETA · N FOTO» e l'ologramma che rilegge le ultime foto
             if pannello {
                 PannelloAnalisi(analisi: analisi, tinta: tinta, completa: completa)
                     .transition(.opacity)
@@ -441,6 +442,19 @@ struct VistaFotoScheda: View {
         .onAppear { apertaIl = Date(); aggiornaPannello() }
         .onChange(of: analisi.fatte) { _, _ in aggiornaPannello() }
         .onChange(of: analisi.attivo) { _, _ in aggiornaPannello() }
+        .onChange(of: analisi.totale) { _, _ in aggiornaPannello() }
+        // a galleria finita l'ologramma rilegge le ultime 30 foto, una ogni 1,5 s, solo con la sezione aperta e davanti
+        .task(id: pannello && completa && !dietro) {
+            guard pannello, completa, !dietro else { return }
+            analisi.rileggendo(true)
+            defer { analisi.rileggendo(false) }
+            var k = 0
+            while !Task.isCancelled {
+                if let c = await IndiceFoto.condiviso.rileggi(k), !Task.isCancelled { analisi.mostra(c) }
+                k = (k + 1) % 30
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
         // 4 nov: quando si comincia a scrivere si cerca in tutta la galleria (poi un periodo toccato restringe la ricerca)
         .onChange(of: cerca) { prima, adesso in
             let vuota = { (s: String) in s.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -475,20 +489,19 @@ struct VistaFotoScheda: View {
         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.34)) { capite = esito.capite }
     }
 
-    /// Il pannello dell'analisi: si apre se l'analisi va avanti e restano almeno 50 foto; quando finisce dice «ANALISI COMPLETA»
-    /// (col suono «pronto»), poi dopo 1,9 s si chiude.
+    /// Il pannello dell'analisi, sempre visibile (7 nov sera, il signore: scelta A): appena c'è la galleria si apre; mentre l'analisi va
+    /// avanti il conto, quando finisce davanti a lui dice «ANALISI COMPLETA» col suono «pronto» e resta, con la rilettura delle ultime
+    /// foto. Se arrivano foto nuove da leggere torna al conto.
     private func aggiornaPannello() {
-        if !pannello && analisi.attivo && analisi.totale > 0 && analisi.totale - analisi.fatte >= 50 {
-            completa = false
+        if !pannello {
+            guard analisi.totale > 0 else { return }
+            completa = !analisi.attivo
             withAnimation(.easeOut(duration: 0.3)) { pannello = true }
-        } else if pannello && !analisi.attivo && !completa {
+        } else if !analisi.attivo && !completa {
             completa = true
             Suoni.fatto()
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.9))
-                withAnimation(.timingCurve(0.3, 0.7, 0.3, 1, duration: 0.45)) { pannello = false }
-                completa = false
-            }
+        } else if analisi.attivo && completa {
+            completa = false
         }
     }
 

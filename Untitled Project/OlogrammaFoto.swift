@@ -118,7 +118,8 @@ struct OlogrammaAnalisi: View {
     @Environment(\.sezioneDietro) private var dietro  // 4 nov: la sezione dietro (MARK XI): l'ologramma si ferma
 
     var body: some View {
-        let finita = !analisi.attivo, avanti = analisi.totale > 0 ? min(1, Double(analisi.fatte) / Double(analisi.totale)) : 0
+        // 7 nov sera: a galleria finita, con la rilettura delle ultime foto, l'ologramma continua a girare (non si ferma sull'ultima)
+        let finita = !analisi.attivo && !analisi.rilettura, avanti = analisi.totale > 0 ? min(1, Double(analisi.fatte) / Double(analisi.totale)) : 0
         TimelineView(.animation(minimumInterval: nil, paused: riduci || dietro)) { ctx in
             let adesso = ctx.date, giro = foto
             Canvas { gc, size in
@@ -180,6 +181,7 @@ enum DisegnoAnalisi {
         let p = min(84, h * 0.56), cx = min(w * 0.23, 76), top = 24.0, cy = top + p / 2, base = h - 13, rx = p * 0.64, ry = rx * 0.17
         let t = adesso.timeIntervalSince(regia.zero)
         if fermo, regia.corrente == nil, let q = regia.prossimo { regia.corrente = q; regia.prossimo = nil }
+        if !finita, regia.fine != nil { regia.fine = nil; regia.inizio = adesso }   // riparte (la rilettura a galleria finita)
         if finita, regia.fine == nil, regia.corrente != nil { regia.fine = adesso }
         var u = regia.passo(adesso)
         if regia.fine != nil || fermo { u = a0 - 0.001 }          // finita (o ferma): l'ultima foto resta agganciata
