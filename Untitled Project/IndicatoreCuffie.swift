@@ -7,12 +7,12 @@ import AVFoundation
 // MARK: - CUFFIE (8 nov notte, il signore: «c'è un modo di riconoscere quando inserisco le cuffie? … io ho quelle col filo, magari
 // viene scritto EarPods… scritta piccola con logo cuffie, rimane per il tempo che sono collegate ma non deve essere invadente; quando
 // le scollego per 1/2 secondi dice scollegate e sparisce… accanto a MARK XI»). Come il mockup v285: sulla riga di MARK XI, dopo un
-// punto, stesso carattere (10, spaziatura 3) e stesso grigio. Lo dice iOS: a ogni cambio dell'uscita audio si guarda dove va il suono. Col filo (EarPods) «EARPODS», AirPods
+// punto, stesso carattere (10, spaziatura 3) e stesso grigio. Lo dice iOS: a ogni cambio dell'uscita audio si guarda dove va il suono. Col filo (EarPods) «HEADPHONES» col logo delle cuffie, AirPods
 // «AIRPODS», altre cuffie Bluetooth «CUFFIE». Tolte: «SCOLLEGATE» per 1,5 s, poi sparisce (dissolvenza 0,3 s).
 
 struct IndicatoreCuffie: View {
     @State private var nome: String?          // le cuffie collegate adesso (nil: nessuna)
-    @State private var simbolo = "earpods"
+    @State private var simbolo = "headphones"
     @State private var scollegate = false
     @State private var giro = 0
 
@@ -20,7 +20,9 @@ struct IndicatoreCuffie: View {
         let testo = scollegate ? "SCOLLEGATE" : nome
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text("·").font(.system(size: 10, weight: .medium, design: .monospaced)).padding(.leading, 3).padding(.trailing, 2)
-            Image(systemName: simbolo).font(.system(size: 9, weight: .medium))
+            // 04:56 «il logo sullo stesso livello della scritta»: i simboli di Apple, a pari carattere e sulla stessa linea, stanno
+            // centrati sulle maiuscole; .small li porta all'altezza delle maiuscole (come il mockup: logo 9, centrato)
+            Image(systemName: simbolo).font(.system(size: 10, weight: .medium)).imageScale(.small)
             Text(testo ?? "").font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(3).lineLimit(1)
         }
         .foregroundStyle(Color.tenue.opacity(scollegate ? 0.6 : 1))
@@ -46,7 +48,7 @@ struct IndicatoreCuffie: View {
             let n = u.portName.lowercased()
             let bluetooth = [AVAudioSession.Port.bluetoothA2DP, .bluetoothLE, .bluetoothHFP].contains(u.portType)
             if n.contains("airpods") { nome = "AIRPODS"; simbolo = "airpods" }
-            else if !bluetooth { nome = "EARPODS"; simbolo = "earpods" }               // col filo: le sue EarPods
+            else if !bluetooth { nome = "HEADPHONES"; simbolo = "headphones" }         // col filo (le sue EarPods): 04:56 «scriviamo headphones», 04:57 il logo delle cuffie
             else { nome = "CUFFIE"; simbolo = "headphones" }
             scollegate = false
             giro += 1
