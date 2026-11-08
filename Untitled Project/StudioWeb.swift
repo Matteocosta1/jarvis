@@ -38,31 +38,34 @@ struct VistaStudio: View {
     @Environment(\.tintaOlo) private var tintaOlo
     @Environment(\.materiaOlo) private var materiaOlo
     var body: some View {
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
-                     olo: tintaOlo, materia: materiaOlo)
-            .background(Color.fondo)
-            .ignoresSafeArea()
-            .overlay {
-                if coperto {
-                    // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
-                    // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
-                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio",
-                                       margineDallaFinestra: true)   // 8 nov: fermo sotto l'ora, alla stessa altezza della testata della pagina
-                        .transition(.opacity)
-                }
+        // 8 nov mattina (video del signore 06:34: Studio e Social «saltellano», «non si aprono come le altre»): come tutte le
+        // sezioni. La pagina web sta a tutto schermo (sotto l'ora e fino in fondo); il caricamento sta nel margine sicuro, come
+        // quello di ogni sezione: la riga di «Chiudi» sotto l'ora, il caricamento 120 punti più giù. Prima il caricamento stava
+        // sopra la pagina web, che allarga i suoi bordi ai margini di iOS solo a salita finita: a fine salita saltava di 59 punti.
+        ZStack {
+            PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
+                         olo: tintaOlo, materia: materiaOlo)
+                .background(Color.fondo)
+                .ignoresSafeArea()
+            if coperto {
+                // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
+                // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
+                SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
+                    .transition(.opacity)
             }
-            .statusBarHidden(false)
-            .interactiveDismissDisabled(presa)
-            .onAppear {
-                BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
-                apertaDa = Date()
-                Suoni.schedaApre()
-            }
-            .task {                                              // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
-                try? await Task.sleep(for: .seconds(4))
-                scopri()
-            }
-            .onDisappear { BattitoMani.paginaAperta(false) }
+        }
+        .statusBarHidden(false)
+        .interactiveDismissDisabled(presa)
+        .onAppear {
+            BattitoMani.paginaAperta(true)                       // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+            apertaDa = Date()
+            Suoni.schedaApre()
+        }
+        .task {                                                  // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
+            try? await Task.sleep(for: .seconds(4))
+            scopri()
+        }
+        .onDisappear { BattitoMani.paginaAperta(false) }
     }
 
     private func scopri() {
@@ -771,8 +774,13 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
           // 26 ott sera: l'apertura la fa l'app (caricamento e suoni come le altre schede): i suoni d'apertura della pagina tacciono
           var zitto = performance.now() + 2500;
           if (typeof window.suona === 'function') { var s0 = window.suona; window.suona = function(id){ if ((id === 'aPronta' || id === 'aScheda') && performance.now() < zitto) return; return s0.apply(this, arguments); }; }
-          var apri = function(){ if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; }
-            requestAnimationFrame(function(){ requestAnimationFrame(function(){ post({ tipo: 'pronta' }); }); }); };
+          // 8 nov mattina (video del signore 06:34): la sezione della pagina si apre già al suo posto. La salita la fa l'app (come
+          // per tutte le sezioni); quella del mockup (.foglio, 0,35 s) partiva sotto il caricamento e si vedeva finire mentre il
+          // caricamento sfumava: la testata entrava più in basso e saliva. La transizione torna dopo, per i passaggi dentro la pagina.
+          var apri = function(){ if (sez) sez.style.transition = 'none';
+            if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; }
+            if (sez) void sez.offsetWidth;
+            requestAnimationFrame(function(){ requestAnimationFrame(function(){ if (sez) sez.style.transition = ''; post({ tipo: 'pronta' }); }); }); };
           setTimeout(function(){ if (!via) radice.style.visibility = ''; }, 1500);   // per sicurezza: mai una pagina che resta nera
           \(arrivo)
           var foto = \(foto);

@@ -7,6 +7,14 @@ import SwiftUI
 // fuori dalla scheda) la scheda si richiude sulla sua riga (0,26 s) e la riga si riaccende. Tirata giù dalla barra segue il dito e si
 // chiude scivolando, come il foglio di prima; col «Riduci movimento» di iOS si apre e si chiude scivolando. Tutto a 120 Hz: le curve
 // sono quelle del mockup e l'effetto è un modificatore animabile, ricalcolato a ogni fotogramma.
+//
+// 8 nov mattina (video del signore 06:32: la scheda partiva troppo in basso, il titolo usciva sopra la scheda, «Chiudi» e
+// «Chiedi a JARVIS» sparivano): la scheda non si affida più ai margini di iOS. Tutto lo strato ignora i margini e la scheda ha
+// misure sue, scritte qui: larga quanto lo schermo, dal bordo dell'ora (come il «top: 58px» del mockup) fino in fondo; dentro,
+// il lettore non riceve margini (il suo fondo lo dà lui, sopra la barretta di iOS). La scheda si mette al suo posto spostandola
+// (offset), senza margini sopra che iOS poteva raddoppiare. La luce e il colore del mockup (brightness e saturate) sono strati
+// sopra la scheda (fusione «schiarisci colore» e «saturazione»), non filtri sul contenuto, che con le pagine che scorrono
+// facevano sparire scritte e tasti.
 
 /// Dove stanno le righe della posta sullo schermo (coordinate globali). Una scatola, non uno stato: scorrendo la lista le posizioni
 /// cambiano di continuo e non devono ridisegnare niente; servono solo nel momento in cui la scheda si apre o si chiude.
@@ -15,17 +23,16 @@ final class PosizioniRighe {
 }
 
 struct ProiezioneMail<Contenuto: View>: View {
-    /// Lo schermo intero (globale), dall'alto dell'ora al fondo.
+    /// Lo strato intero (globale): tutto lo schermo, dall'alto dell'ora al fondo.
     let schermo: CGRect
-    /// Dove parte la scheda (globale): sotto l'ora, come nel mockup (top 58 del telefono). Si prende dalla finestra (FasciaAlta),
-    /// perché nel contenitore della MARK XI il margine dell'ora a volte vale 0 (come SchermoCaricamento).
+    /// Dove parte la scheda (globale): sotto l'ora, come nel mockup (top 58 del telefono). Si prende dalla finestra (FasciaAlta).
     let alto: CGFloat
     let tinta: Color
     /// Dove sta adesso la riga toccata (nil se non c'è più: allora si chiude scivolando).
     let riga: () -> CGRect?
     /// La riga si accende: all'apertura subito (0,42 s), alla chiusura verso la fine (0,52 s).
     let accendiRiga: (_ dopo: Double, _ durata: Double) -> Void
-    /// La scheda è chiusa del tutto: via l'overlay.
+    /// La scheda è chiusa del tutto: via lo strato.
     let fine: () -> Void
     let contenuto: (_ chiudi: @escaping () -> Void) -> Contenuto
 
@@ -50,7 +57,7 @@ struct ProiezioneMail<Contenuto: View>: View {
     @State private var tiro: CGFloat = 0
     @State private var via = false
 
-    /// Il bordo alto della scheda dentro l'overlay.
+    /// Il bordo alto della scheda dentro lo strato.
     private var cima: CGFloat { max(0, alto - schermo.minY) }
     private var altezza: CGFloat { max(1, schermo.height - cima) }
     /// Il centro della riga, nelle coordinate della scheda.
@@ -60,27 +67,27 @@ struct ProiezioneMail<Contenuto: View>: View {
     }
 
     var body: some View {
-        let H = altezza
-        ZStack(alignment: .top) {
+        let larga = schermo.width
+        let alta = altezza
+        ZStack(alignment: .topLeading) {
             Color.black.opacity(velo ? 0.45 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { chiudi() }                      // un tocco fuori dalla scheda, come iOS
             contenuto(chiudi)
-                .ignoresSafeArea()                                  // i margini li dà la scheda (ora sopra, barra di iOS sotto)
-                .frame(width: schermo.width, height: H)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
+                .ignoresSafeArea()                              // i margini li dà la scheda (il fondo sopra la barretta di iOS)
+                .frame(width: larga, height: alta)
+                .modifier(EffettoProiezione(fase: fase, aprendo: aprendo, y: yRiga, altezza: alta, attivo: !scivola))
                 .overlay(alignment: .topLeading) {
                     // la barra in alto (fuori dal «Chiudi»): si tira giù
                     Color.clear
-                        .frame(width: max(0, schermo.width - 110), height: 44)
+                        .frame(width: max(0, larga - 110), height: 44)
                         .contentShape(Rectangle())
                         .gesture(trascina)
                 }
-                .modifier(EffettoProiezione(fase: fase, aprendo: aprendo, y: yRiga, altezza: H, attivo: !scivola))
-                .padding(.top, cima)
-                .offset(y: tiro + (scivola ? (1 - fase) * H : 0))
+                .offset(y: cima + tiro + (scivola ? (1 - fase) * alta : 0))
         }
-        .frame(width: schermo.width, height: schermo.height, alignment: .top)
+        .frame(width: larga, height: schermo.height, alignment: .topLeading)
+        .ignoresSafeArea()
         .onAppear(perform: apri)
     }
 
@@ -170,10 +177,10 @@ struct EffettoProiezione: ViewModifier, Animatable {
         return q < 0.15 ? 0.85 * q / 0.15 : 0.85 + 0.15 * corsa
     }
 
-    @ViewBuilder func body(content: Content) -> some View {
+    func body(content: Content) -> some View {
         let p = min(1, max(0, fase))
         let q = 1 - p                                                   // chiudendo: quanto è andata la chiusura
-        // la finestra: dalla linea della riga verso l'alto e il basso (aperta, o niente effetto)
+        // la finestra: dalla linea della riga verso l'alto e il basso (aperta, o niente effetto), con gli angoli alti di 32 punti
         let cima = attivo ? y * (1 - p) : 0
         let fondo = attivo ? y + (altezza - y) * p : altezza
         // tremolio, luce e colore (tappe del mockup)
@@ -187,21 +194,26 @@ struct EffettoProiezione: ViewModifier, Animatable {
         let giu = aprendo ? y + (altezza - y) * corsa : altezza - (altezza - y) * corsa
         let lineeOp: CGFloat = attivo ? Self.luceLinee(p: p, q: q, corsa: corsa, aprendo: aprendo) : 0
         content
-            .saturation(Double(colore))
             .overlay {
-                // la «luminosità» del mockup (brightness > 1): luce ciano-bianca sommata, che si spegne
-                Color(red: 0.75, green: 0.96, blue: 1)
-                    .opacity(Double(max(0, luce - 1)) * 0.32)
-                    .blendMode(.plusLighter)
-                    .allowsHitTesting(false)
+                // brightness(luce) del mockup: «schiarisci colore» con un grigio 1 − 1/luce moltiplica ogni colore per luce
+                // (il nero resta nero, il ciano si fa quasi bianco), come il filtro del mockup
+                if luce > 1.001 {
+                    Color(white: Double(1 - 1 / luce))
+                        .blendMode(.colorDodge)
+                        .allowsHitTesting(false)
+                }
             }
+            .overlay {
+                // saturate(colore) del mockup: il grigio in «saturazione» toglie colore per quanto manca all'1
+                if colore < 0.999 {
+                    Color.gray
+                        .blendMode(.saturation)
+                        .opacity(Double(1 - colore))
+                        .allowsHitTesting(false)
+                }
+            }
+            .clipShape(FinestraScheda(cima: cima, fondo: fondo, raggio: 32))
             .opacity(Double(opacita))
-            .mask(alignment: .top) {
-                Rectangle()
-                    .frame(height: max(0, fondo - cima))
-                    .padding(.top, cima)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
             .overlay(alignment: .top) {
                 ZStack(alignment: .top) {
                     LineaScansione().offset(y: su - 1)
@@ -210,6 +222,21 @@ struct EffettoProiezione: ViewModifier, Animatable {
                 .opacity(Double(max(0, lineeOp)))
                 .allowsHitTesting(false)
             }
+    }
+}
+
+/// La finestra della scheda (come il clip-path «inset(… round 32px 32px 0 0)» del mockup): dal bordo `cima` al bordo `fondo`,
+/// gli angoli in alto arrotondati (mai più della sua altezza). A scheda aperta è la scheda intera.
+struct FinestraScheda: Shape {
+    let cima: CGFloat
+    let fondo: CGFloat
+    let raggio: CGFloat
+
+    func path(in r: CGRect) -> Path {
+        let alta = max(0, fondo - cima)
+        let tondo = min(raggio, alta, r.width / 2)
+        return UnevenRoundedRectangle(topLeadingRadius: tondo, topTrailingRadius: tondo, style: .continuous)
+            .path(in: CGRect(x: r.minX, y: r.minY + cima, width: r.width, height: alta))
     }
 }
 

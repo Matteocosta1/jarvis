@@ -377,14 +377,11 @@ struct SchermoCaricamento: View {
     let icona: String
     var conX = false
     var marchio = false
-    /// 8 nov (video del signore: in Studio e Social il caricamento saliva sotto l'ora a metà): sopra una pagina che ignora i
-    /// margini (la pagina web) il margine dell'ora non arriva sempre giusto (nel contenitore della MARK XI a un certo punto vale 0):
-    /// lo si prende dalla finestra, fisso, come fa la pagina web per la sua testata.
-    var margineDallaFinestra = false
     private let tinta = Color.ciano
 
+    // 8 nov mattina: anche in Studio e Social sta nel margine sicuro della sezione, come in tutte le altre (prima lì prendeva il
+    // margine dell'ora dalla finestra sopra la pagina web: a fine salita saltava)
     var body: some View {
-        let alto: CGFloat = margineDallaFinestra ? FasciaAlta.altezza : 0
         ZStack {
             SfondoSezione()
             VStack(alignment: .leading, spacing: 0) {
@@ -393,11 +390,9 @@ struct SchermoCaricamento: View {
                              tinta: tinta, conX: conX, chiudi: nil)
                 Spacer(minLength: 0)
             }
-            .padding(.top, alto)
             CaricamentoHUD(titolo: titolo, tinta: tinta)
-                .padding(.top, 120 + alto)
+                .padding(.top, 120)
         }
-        .ignoresSafeArea(.container, edges: margineDallaFinestra ? .top : [])
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
