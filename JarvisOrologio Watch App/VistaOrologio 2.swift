@@ -558,22 +558,22 @@ struct VistaOrologio: View {
             ("SISTEMI", "gearshape", "#impostazioni"),
             ("SISTEMI", "server.rack", "#sistemi"),              // la pagina SISTEMI, come il menu dell'iPhone
 
-            ("GIORNATA", "sun.horizon", "#briefing"),
-            ("GIORNATA", "cloud.sun", "#meteo"),
-            ("GIORNATA", "envelope", "#email"),
-            ("GIORNATA", "cart", "#spesa"),
+            ("OPERATIONS", "sun.horizon", "#briefing"),
+            ("OPERATIONS", "cloud.sun", "#meteo"),
+            ("OPERATIONS", "envelope", "#email"),
+            ("OPERATIONS", "cart", "#spesa"),
 
-            ("SIGNORE", "book.closed", "#diario"),
-            ("SIGNORE", "person.2.wave.2", "Modalità confidente. Ho bisogno di parlarti di una cosa."),
-            ("SIGNORE", "waveform.path.ecg", "#vitals"),
-            ("SIGNORE", "bed.double", "#sonno"),
-            ("SIGNORE", "heart", "#cuore"),
+            ("BIOMETRICS", "book.closed", "#diario"),
+            ("BIOMETRICS", "person.2.wave.2", "Modalità confidente. Ho bisogno di parlarti di una cosa."),
+            ("BIOMETRICS", "waveform.path.ecg", "#vitals"),
+            ("BIOMETRICS", "bed.double", "#sonno"),
+            ("BIOMETRICS", "heart", "#cuore"),
 
-            ("SENSI", "shazam.logo", "#shazam"),
+            ("PERCEPTION", "shazam.logo", "#shazam"),
 
-            ("STRUMENTI", "brain.head.profile", "#ricordi"),
-            ("STRUMENTI", "globe.europe.africa", "Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce."),
-            ("STRUMENTI", "music.note.list", "#serata"),
+            ("ENGINEERING", "brain.head.profile", "#ricordi"),
+            ("ENGINEERING", "globe.europe.africa", "Fammi da interprete: ti dirò una frase e la lingua, tu traducila e dimmela ad alta voce."),
+            ("ENGINEERING", "music.note.list", "#serata"),
 
             ("INTELLIGENCE", "dot.radiowaves.left.and.right", "#sentinella"),   // la Sentinella: allarmi e «Guarda ora»
             ("INTELLIGENCE", "satellite", "#satellite"),                         // build 23: SATELLITE prima di Bea, come sull'iPhone

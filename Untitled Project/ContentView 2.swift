@@ -788,34 +788,35 @@ struct ContentView: View {
     /// In quattro gruppi, separati da una linea sottile:
     /// LA GIORNATA (cosa c'è oggi) · IL SIGNORE (come sta) · I SENSI (cosa vede e sente JARVIS) · STRUMENTI.
     /// In quattro gruppi lungo i tre quarti di cerchio attorno al reattore, da sinistra in basso verso destra in basso:
-    /// SIGNORE (come sta) · DAILY (la giornata) · SENSI (cosa vede e sente JARVIS) · STRUMENTI.
+    /// BIOMETRICS (come sta) · OPERATIONS (la giornata) · PERCEPTION (cosa vede e sente JARVIS) · ENGINEERING (8 nov: i nomi in
+    /// inglese, scelta del signore; prima SIGNORE · DAILY · SENSI · STRUMENTI).
     private var scorciatoie: [(gruppo: String, icona: String, nome: String, azione: () -> Void)] {
         [
-            ("SIGNORE", "book.closed", "Diario", { tastiera = false; scheda = .diario }),
-            ("SIGNORE", "person.2.wave.2", "Confidente", { tastiera = false; mostraConfidente = true }),
-            ("SIGNORE", "waveform.path.ecg", "Vitals", { tastiera = false; mostraVitals = true }),
-            ("SIGNORE", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
-            ("SIGNORE", "heart", "Cuore", { tastiera = false; scheda = .cuore }),
-            ("SIGNORE", "figure.pilates", "Trainer", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
+            ("BIOMETRICS", "book.closed", "Diario", { tastiera = false; scheda = .diario }),
+            ("BIOMETRICS", "person.2.wave.2", "Confidente", { tastiera = false; mostraConfidente = true }),
+            ("BIOMETRICS", "waveform.path.ecg", "Vitals", { tastiera = false; mostraVitals = true }),
+            ("BIOMETRICS", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
+            ("BIOMETRICS", "heart", "Cuore", { tastiera = false; scheda = .cuore }),
+            ("BIOMETRICS", "figure.pilates", "Trainer", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
 
-            ("DAILY", "sun.horizon", "Briefing", { tastiera = false; scheda = .briefing }),
-            ("DAILY", "cloud.sun", "Meteo", { tastiera = false; scheda = .meteo }),
-            ("DAILY", "envelope.badge", "Email", { tastiera = false; scheda = .email }),
-            ("DAILY", "envelope", "Messaggi", { tastiera = false; scheda = .messaggi }),
-            ("DAILY", "cart", "Spesa", { tastiera = false; scheda = .spesa }),
+            ("OPERATIONS", "sun.horizon", "Briefing", { tastiera = false; scheda = .briefing }),
+            ("OPERATIONS", "cloud.sun", "Meteo", { tastiera = false; scheda = .meteo }),
+            ("OPERATIONS", "envelope.badge", "Email", { tastiera = false; scheda = .email }),
+            ("OPERATIONS", "envelope", "Messaggi", { tastiera = false; scheda = .messaggi }),
+            ("OPERATIONS", "cart", "Spesa", { tastiera = false; scheda = .spesa }),
 
-            ("SENSI", "eye", "Occhi", { tastiera = false; jarvis.guardaManuale() }),
-            ("SENSI", "fork.knife", "Cucina", { tastiera = false; jarvis.guardaCucina() }),
-            ("SENSI", "barcode.viewfinder", "Scanner", { tastiera = false; scheda = .scanner }),
-            ("SENSI", "shazam.logo", "Shazam", { tastiera = false; jarvis.interrompi(); scheda = .shazam }),
-            ("SENSI", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
+            ("PERCEPTION", "eye", "Occhi", { tastiera = false; jarvis.guardaManuale() }),
+            ("PERCEPTION", "fork.knife", "Cucina", { tastiera = false; jarvis.guardaCucina() }),
+            ("PERCEPTION", "barcode.viewfinder", "Scanner", { tastiera = false; scheda = .scanner }),
+            ("PERCEPTION", "shazam.logo", "Shazam", { tastiera = false; jarvis.interrompi(); scheda = .shazam }),
+            ("PERCEPTION", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
 
-            ("STRUMENTI", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
-            ("STRUMENTI", "globe.europe.africa", "Interprete", { tastiera = false; scegliLingua = true }),
-            ("STRUMENTI", "globe", "Browser", { mostraBrowser = true }),
-            ("STRUMENTI", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
-            ("STRUMENTI", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
-            ("STRUMENTI", "cube.transparent", "LiDAR", { tastiera = false; jarvis.interrompi(); mostraLidar = true }),
+            ("ENGINEERING", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
+            ("ENGINEERING", "globe.europe.africa", "Interprete", { tastiera = false; scegliLingua = true }),
+            ("ENGINEERING", "globe", "Browser", { mostraBrowser = true }),
+            ("ENGINEERING", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
+            ("ENGINEERING", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
+            ("ENGINEERING", "cube.transparent", "LiDAR", { tastiera = false; jarvis.interrompi(); mostraLidar = true }),
         ]
     }
 

@@ -530,6 +530,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Verso la 11.0 (12) — 8 nov notte (numero da confermare)
+- Ruota (il signore 03:52–03:55: «mettiamoli tutti in inglese… INTELLIGENCE l'unico che mi piace… bravissimo»): i gruppi diventano OPERATIONS (era DAILY) · PERCEPTION (SENSI) · BIOMETRICS (SIGNORE) · ENGINEERING (STRUMENTI) · INTELLIGENCE. Sulla ruota, nell'ologramma sotto il nome della sezione e sul polso (dove DAILY si chiamava GIORNATA). Mockup v283 uguale. Provati e scartati: «nomi dritti» (03:51: «bruttissimo»).
+
 ## 11.0 (11) — 8 nov notte · numero confermato dal signore (03:23: «metti tutto nella build 11») · commit c798aaf · controllo di compilazione VERDE (0 errori, 0 warning, run 42439597149)
 - Shazam (02:44: «un player per ascoltarla o su Apple Music o YouTube, come Vinyl Hustler»): AscoltoShazam.swift (nuovo) come Ascolto.swift di Vinyl Hustler — Apple Music intero col permesso e l'abbonamento, se no l'anteprima di 30 s di Apple (ricerca iTunes), se no il video di YouTube (cervello «browser-video»). Il player rifatto uguale al mockup (.sz-player): fonte e ora in alto con «Chiudi», copertina 230 con l'anello che gira mentre suona, −15 · PLAY · +15, LIBRERIA · YOUTUBE (APPLE) · MUSICA; YOUTUBE mette il video al posto della copertina. Chiuso il player, anteprima e video si fermano (Apple Music continua). Mockup v280 uguale (video d'esempio).
 - Ruota (foto del signore 03:33: «quella selezionata non deve rimanere un pochino sotto l'altra, si deve vedere tutta»): più la lente ingrandisce un'icona più sta sopra, la scelta sopra a tutte (PostoRuota.zIndex; prima tutte le ingrandite allo stesso livello e vinceva la successiva). Mockup v281 uguale, più il reattore piccolo intero a 26 come l'app (prima ritagliato).
