@@ -367,7 +367,8 @@ Deno.serve(async (req) => {
       u.searchParams.set("client_id", id); u.searchParams.set("redirect_uri", `${URL_DB}/functions/v1/social-facebook`);
       u.searchParams.set("state", attesa); u.searchParams.set("response_type", "code");
       // Facebook Login for Business: i permessi stanno nella «configurazione» dell'app (config_id); senza, si chiedono uno per uno
-      if (env("FACEBOOK_CONFIG_ID")) u.searchParams.set("config_id", env("FACEBOOK_CONFIG_ID")); else u.searchParams.set("scope", PERMESSI_FB);
+      // «JARVIS Rivali» (8 nov): token utente, i sei permessi di PERMESSI_FB. L'ID non è segreto; un segreto FACEBOOK_CONFIG_ID lo sostituisce
+      u.searchParams.set("config_id", env("FACEBOOK_CONFIG_ID") || "3814041238743533");
       return json({ url: u.toString() });
     }
     if (c.azione === "rivali") return json(await rivali(c));
