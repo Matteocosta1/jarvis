@@ -1,10 +1,12 @@
 #!/bin/bash
 # Banco di prova: crea e accende un iPhone nel simulatore (come quello del signore: 393 x 852, Dynamic Island, se c'è).
 set -euo pipefail
+# il runtime iOS generico più recente (non quelli legati a un modello, tipo «iOS-27-2-iPhone19-4»)
 RT=$(xcrun simctl list runtimes -j | python3 -c "
-import json,sys
+import json,sys,re
 r=[x for x in json.load(sys.stdin)['runtimes'] if x.get('platform')=='iOS' and x.get('isAvailable')]
-print(r[-1]['identifier'] if r else '')")
+g=[x for x in r if re.search(r'iOS-[0-9]+-[0-9]+$', x['identifier'])]
+print((g or r)[-1]['identifier'] if r else '')")
 echo "runtime: $RT"
 [ -n "$RT" ] || { xcrun simctl list runtimes; exit 1; }
 UDID=""
