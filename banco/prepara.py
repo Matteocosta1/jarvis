@@ -7,11 +7,13 @@ A = R / "Untitled Project"
 shutil.copy(R / "banco" / "BancoProva.swift", A / "BancoProva.swift")
 
 
-def cambia(nome, vecchio, nuovo, conta=1):
+def cambia(nome, vecchio, nuovo, conta=1, facoltativa=False):
     p = A / nome
     s = p.read_text(encoding="utf-8")
     n = s.count(vecchio)
     if n != conta:
+        if facoltativa:
+            print("salto (sonda non più al suo posto)", nome, vecchio[:50].replace("\n", " ")); return
         sys.exit(f"ERRORE banco: in {nome} '{vecchio[:60]}' compare {n} volte (attese {conta})")
     p.write_text(s.replace(vecchio, nuovo), encoding="utf-8")
     print("ok", nome)
@@ -46,9 +48,9 @@ print("ok ProiezioneMail.swift")
 
 # 6. le sonde dei margini (si vedono solo nelle scene «…sonde»)
 cambia("StudioWeb.swift", "            .statusBarHidden(false)\n            .interactiveDismissDisabled(presa)",
-       "            .overlay { SondaSA(nome: \"VS\", riga: 0) }\n            .statusBarHidden(false)\n            .interactiveDismissDisabled(presa)")
+       "            .overlay { SondaSA(nome: \"VS\", riga: 0) }\n            .statusBarHidden(false)\n            .interactiveDismissDisabled(presa)", facoltativa=True)
 cambia("StudioWeb.swift", "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay {\n                if coperto {",
-       "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            .overlay {\n                if coperto {")
+       "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            .overlay {\n                if coperto {", facoltativa=True)
 cambia("SchedeSignore.swift", "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .allowsHitTesting(false)",
        "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)")
 cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)",

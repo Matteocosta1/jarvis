@@ -155,6 +155,12 @@ struct RadiceBanco: View {
             apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social"))
             await aspetta(13.0)                                                 // 29,0
             chiudiDavanti()
+        case "tutte":                                                           // 8 nov: le aperture a confronto (Posta e Cuore come riferimento)
+            apri(.scheda(.email)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.cuore)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(13.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social")); await aspetta(10.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.musica)); await aspetta(5.0); chiudiDavanti()
         default:
             break
         }
