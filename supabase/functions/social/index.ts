@@ -365,7 +365,9 @@ Deno.serve(async (req) => {
       await db.from("social_facebook").upsert({ id: 1, attesa, attesa_fino: new Date(Date.now() + 10 * 6e4).toISOString() });
       const u = new URL("https://www.facebook.com/v23.0/dialog/oauth");
       u.searchParams.set("client_id", id); u.searchParams.set("redirect_uri", `${URL_DB}/functions/v1/social-facebook`);
-      u.searchParams.set("state", attesa); u.searchParams.set("scope", PERMESSI_FB); u.searchParams.set("response_type", "code");
+      u.searchParams.set("state", attesa); u.searchParams.set("response_type", "code");
+      // Facebook Login for Business: i permessi stanno nella «configurazione» dell'app (config_id); senza, si chiedono uno per uno
+      if (env("FACEBOOK_CONFIG_ID")) u.searchParams.set("config_id", env("FACEBOOK_CONFIG_ID")); else u.searchParams.set("scope", PERMESSI_FB);
       return json({ url: u.toString() });
     }
     if (c.azione === "rivali") return json(await rivali(c));
