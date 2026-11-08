@@ -635,14 +635,7 @@ struct VistaMusica: View {
 
     private func caricaOggi() async {
         guard await CatalogoMusica.autorizzato() else { avviso = CatalogoMusica.senzaPermesso; attesaOggi = false; pronto = true; return }
-        // 8 nov pomeriggio (il signore: «clicchi, caricamento e carica TUTTA LA PAGINA»): il caricamento resta finché arrivano le
-        // liste di OGGI, poi la pagina compare tutta insieme. Se Apple Music tarda più di 4 s la pagina compare comunque, con
-        // l'anello al posto delle liste.
-        let riserva = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(4))
-            if !Task.isCancelled { pronto = true }
-        }
-        defer { riserva.cancel(); pronto = true }
+        pronto = true
         if let abbonamento = try? await MusicSubscription.current, !abbonamento.canPlayCatalogContent {
             avviso = "Per far suonare Apple Music serve l'abbonamento attivo su questo iPhone, Sir."
         }
