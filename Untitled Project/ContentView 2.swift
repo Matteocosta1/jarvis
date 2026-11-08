@@ -1534,10 +1534,9 @@ struct ContentView: View {
             if let a = v.pagina {
                 // MARK X: Studio e Social (la pagina del mockup), ora una sezione come le altre: si chiudono col loro «Chiudi»
                 // o trascinando giù dalla fascia dell'ora
+                // 8 nov mattina: nel margine sicuro come ogni sezione (la pagina web va a tutto schermo da sé, VistaStudio)
                 VistaStudio(apertura: a, parla: { [jarvis] frase in jarvis.annuncia(frase) }, chiudi: { aperturaPagina = nil })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.fondo)
-                    .ignoresSafeArea()
                     .paginaPiena()
             }
         }
