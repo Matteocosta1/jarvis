@@ -403,7 +403,9 @@ struct VistaSentinella: View {
                                                   }
                                                   .foregroundStyle(colore))),     // 27 ott: niente bagliore sulle scritte della testata
                              tinta: .ciano, conX: true, etichettaX: "Disattiva la sentinella", chiudi: { s.ferma(); chiudi() })
-                .padding(.horizontal, -4)          // la riga e la testata a 16 punti dai bordi, come le altre sezioni
+                // 8 nov (video del signore: «la scritta non è allineata dopo il caricamento»): BarraSezione ha già i suoi 16 punti
+                // dai bordi: si toglie tutto il margine della pagina (20), non solo 4 (prima testata e X stavano a 32 punti dai bordi)
+                .padding(.horizontal, -20)
                 .padding(.top, -12)
                 Spacer()
                 // 7 nov sera (il signore: «la luna e il registro sopra PERIMETRO SICURO, così sono simili ad Occhi»): tondi col nome
