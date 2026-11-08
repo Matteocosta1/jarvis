@@ -9,6 +9,7 @@ import SafariServices
 import PhotosUI             // 3 nov · RITRATTO: la galleria con i byte originali delle foto (la profondità dentro l'HEIC)
 import QuickLook            // 3 nov · AR: AR Quick Look
 import ARKit                // ARQuickLookPreviewItem
+import AuthenticationServices // 8 nov · RIVALI: il login di Facebook (ASWebAuthenticationSession)
 
 // MARK: - STUDIO e SOCIAL (MARK X): il banco olografico per modellare in 3D e stampare, e Instagram, IDENTICI al mockup approvato.
 // La pagina è il mockup stesso («Studio3D/markx.html», generata da tools/studio_app.py) con three.js 0.160 nel pacchetto
@@ -108,6 +109,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private var sceltaRitratto: SceltaRitratto?      // 3 nov · RITRATTO: il delegato della galleria (il picker lo tiene debole)
     private var fonteAR: FonteAR?                    // 3 nov · AR: la fonte di AR Quick Look (anche lei tenuta debole)
     private let velo = VeloWeb()                     // 5 nov: il velo olografico dentro la pagina (pagine olografiche)
+    private var loginFacebook: ASWebAuthenticationSession?   // 8 nov · RIVALI: il login in corso (va tenuto vivo finché finisce)
+    private let ancoraLogin = AncoraLogin()
 
     init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {},
          presa: @escaping (Bool) -> Void = { _ in }) {
@@ -283,6 +286,13 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         case "socialCommenti":                                           // GRIGLIA: commenti sì/no su un post pubblicato
             let corpo: [String: Any] = ["azione": "commenti", "id": o["idMedia"] as? String ?? "", "on": o["on"] as? Bool ?? true]
             Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "socialRivali":                                             // 8 nov · RIVALI: gli account seguiti coi numeri, AGGIUNGI e TOGLI
+            var corpo: [String: Any] = ["azione": "rivali"]
+            if let op = o["op"] as? String { corpo["op"] = op }
+            if let u = o["username"] as? String { corpo["username"] = u }
+            Task { let r = await RegiaStudio.social(corpo); self.rispondi(id, (r, nil)) }
+        case "socialFacebook":                                           // 8 nov · RIVALI › COLLEGA: il login di Facebook, una volta sola
+            Task { await self.collegaFacebook() }
         case "apriInstagram":                                            // GRIGLIA › MODIFICA: il post nell'app di Instagram
             guard let t = o["url"] as? String, let u = URL(string: t), u.scheme == "https",
                   u.host == "www.instagram.com" || u.host == "instagram.com" else { return }
@@ -354,6 +364,45 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return (nil, "il cervello non risponde") }
         if let t = o["testo"] as? String, !t.isEmpty { return (t, nil) }
         return (nil, o["errore"] as? String ?? "risposta vuota")
+    }
+
+    // MARK: SOCIAL › RIVALI: COLLEGA (8 nov)
+    /// Il cervello prepara l'indirizzo del login (configurazione «JARVIS Rivali», codice monouso di 10 minuti); il login si apre nel
+    /// foglio sicuro di iOS (con l'accesso a Facebook di Safari, se c'è); Facebook torna al cervello, che si tiene la chiave e rimanda
+    /// a jarvis://rivali?ok=1 (o ?errore=…). La pagina riceve l'esito in window.__socFb e rilegge i rivali.
+    private func collegaFacebook() async {
+        guard loginFacebook == nil else { return }
+        let r = await RegiaStudio.social(["azione": "fbLink"], attesa: 20)
+        let o = r.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+        guard let t = o?["url"] as? String, let u = URL(string: t), u.scheme == "https" else {
+            finitoFacebook(["errore": o?["errore"] as? String ?? "il cervello non risponde"])
+            return
+        }
+        let s = ASWebAuthenticationSession(url: u, callback: .customScheme("jarvis")) { @Sendable url, errore in
+            var esito: [String: String] = [:]
+            if let url, let c = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                for q in c.queryItems ?? [] { esito[q.name] = q.value ?? "" }
+            } else if let e = errore as? ASWebAuthenticationSessionError, e.code == .canceledLogin {
+                esito["errore"] = "annullato"
+            } else {
+                esito["errore"] = "il login non è riuscito"
+            }
+            let fatto = esito
+            Task { @MainActor in self.finitoFacebook(fatto) }
+        }
+        s.presentationContextProvider = ancoraLogin
+        s.prefersEphemeralWebBrowserSession = false
+        loginFacebook = s
+        if !s.start() { finitoFacebook(["errore": "il login non parte"]) }
+    }
+
+    private func finitoFacebook(_ esito: [String: String]) {
+        loginFacebook = nil
+        var o: [String: Any] = ["ok": esito["ok"] == "1"]
+        if let e = esito["errore"] { o["errore"] = e }
+        if let p = esito["pagina"] { o["pagina"] = p }
+        let json = (try? JSONSerialization.data(withJSONObject: o)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        esegui("window.__socFb && window.__socFb(\(json))")
     }
 
     // MARK: SOCIAL (Instagram dal cervello)
@@ -734,6 +783,13 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
 }
 
 /// Il gestore dei messaggi tiene la regia senza trattenerla (niente cicli che non si chiudono mai).
+/// 8 nov · RIVALI: la finestra su cui iOS mostra il login di Facebook. iOS la chiede sul thread principale.
+private final class AncoraLogin: NSObject, ASWebAuthenticationPresentationContextProviding {
+    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        MainActor.assumeIsolated { FasciaAlta.finestra ?? ASPresentationAnchor() }
+    }
+}
+
 private final class PonteDebole: NSObject, WKScriptMessageHandler {
     weak var regia: RegiaStudio?
     init(_ r: RegiaStudio) { regia = r }

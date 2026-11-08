@@ -1263,6 +1263,19 @@ button.voce.fatta { color: var(--tenue); text-decoration: line-through; }
 .sd-su > .sd-arch { grid-column: 3; grid-row: 2; justify-self: end; align-self: start !important; margin-top: 4px !important; }
 .sd-su b, .sc-su b, .bp-testa b, .sd-su small, .sc-su small, .bp-testa small { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-chiudi, .sc-chiudi { font-size: 13px !important; }
+
+/* v279 · RIVALI: TOGLI › CONFERMA sulle righe, AGGIUNGI */
+.sc-riv.con-togli { grid-template-columns: minmax(0, 1fr) repeat(3, auto) auto; }
+.sc-riv > div:first-child { min-width: 0; } .sc-riv b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-riv { transition: opacity .2s, transform .28s cubic-bezier(.32,.72,0,1); }
+.sc-riv.via { opacity: 0; transform: scale(.96); }
+.sc-togli { width: 70px; box-sizing: border-box; text-align: center; padding: 6px 0; font: 600 9px var(--mono); letter-spacing: 1px; color: var(--ciano); background: none; border: 1px solid rgba(79,227,255,.3); border-radius: 8px; cursor: pointer; }
+.sc-togli.rosso { color: #ff6b6b; border-color: rgba(255,107,107,.6); }
+.sc-agg { display: flex; gap: 8px; align-items: center; }
+.sc-agg input { flex: 1; min-width: 0; height: 40px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(79,227,255,.3); background: rgba(255,255,255,.05); color: #fff; font: 14px var(--sans); outline: none; }
+.sc-agg input:focus { border-color: var(--ciano); }
+.sc-agg .sc-mini { height: 40px; padding: 0 12px; }
+@media (prefers-reduced-motion: reduce) { .sc-riv { transition: none; } }
 </style>
 
 <div class="vista-scelta build-scelta" role="group" aria-label="Build"><span>BUILD</span><button class="chip" type="button" data-build="22" aria-pressed="true">22</button><button class="chip" type="button" data-build="23" aria-pressed="false">23</button><button class="chip" type="button" data-build="32" aria-pressed="false">32</button></div>
@@ -5653,7 +5666,7 @@ SOC.ore = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"].map((g, d) => [0, 3,
 SOC.rivali = [["kingrusto", 12400, 3.1, 1060, 8.6, true], ["rivale_esempio_1", 18900, 5.4, 1240, 6.6], ["rivale_esempio_2", 9700, 2.2, 990, 10.2], ["rivale_esempio_3", 31200, 6.8, 1610, 5.2]];
 SOC.fbCollegato = false;
 if (window.JARVIS_APP) { SOC.posta = []; SOC.coda = []; SOC.pubblicati = []; SOC.media = []; SOC.ore = null; SOC.rivali = []; SOC.auto = { on: false, parola: "LISTA", testo: "" }; }
-window.__socStato = (r) => { if (!r || r.errore) { SOC.vero = { errore: (r && r.errore) || "non risponde" }; } else { SOC.vero = r; let ign = []; try { ign = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} SOC.posta = (r.posta || []).filter((m) => !ign.includes(m.id)); SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; SOC.media = r.media || []; SOC.ore = r.ore || null; if (r.auto) SOC.auto = r.auto; } window.__socRidisegna && window.__socRidisegna(); if (window.__socRiassunto) { window.__socRiassunto = false; if (SOC.vero.report) parlaMock(SOC.vero.report.riassunto, 6000); else parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); } };
+window.__socStato = (r) => { if (!r || r.errore) { SOC.vero = { errore: (r && r.errore) || "non risponde" }; } else { SOC.vero = r; let ign = []; try { ign = JSON.parse(localStorage.getItem("jarvisSocialIgnorati") || "[]"); } catch {} SOC.posta = (r.posta || []).filter((m) => !ign.includes(m.id)); SOC.coda = r.coda || []; SOC.pubblicati = r.pubblicati || []; SOC.media = r.media || []; SOC.ore = r.ore || null; if (r.auto) SOC.auto = r.auto; if (r.fb) { const era = SOC.fbCollegato; SOC.fbCollegato = !!r.fb.collegato; SOC.fbGiorni = r.fb.collegato ? r.fb.giorni : null; if (!era && SOC.fbCollegato) SOC.rivaliLetti = false; } } window.__socRidisegna && window.__socRidisegna(); if (window.__socRiassunto) { window.__socRiassunto = false; if (SOC.vero.report) parlaMock(SOC.vero.report.riassunto, 6000); else parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); } };
 CONTENUTI.Social = `<div id="social"></div>`;
 const SC_SPUNTA = '<svg class="sc-spunta" viewBox="0 0 24 24" aria-label="Verificato" role="img"><path fill="#0098fd" stroke="#0098fd" stroke-width="1.1" stroke-linejoin="round" d="M12.00 1.40L13.74 3.27L16.06 2.21L16.94 4.60L19.50 4.50L19.40 7.06L21.79 7.94L20.73 10.26L22.60 12.00L20.73 13.74L21.79 16.06L19.40 16.94L19.50 19.50L16.94 19.40L16.06 21.79L13.74 20.73L12.00 22.60L10.26 20.73L7.94 21.79L7.06 19.40L4.50 19.50L4.60 16.94L2.21 16.06L3.27 13.74L1.40 12.00L3.27 10.26L2.21 7.94L4.60 7.06L4.50 4.50L7.06 4.60L7.94 2.21L10.26 3.27z"/><path d="M7.7 12.2l2.9 2.9 5.7-5.9" fill="none" stroke="#04090c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // l'ultimo pezzo dello Studio con la sua miniatura (archivio: il progetto attivo, se no l'ultimo salvato)
@@ -5727,11 +5740,16 @@ function social(ok) {
         <div class="sc-cal"><div class="sc-cal-d"><b>${G[sel.d]}</b><small>${String(O[sel.o]).padStart(2, "0")}:00</small></div><div><b>${String(v).replace(".", ",")}K follower online</b><small>${eTop(sel.d, sel.o) ? "TRA I 3 ORARI MIGLIORI" : `${Math.round(v / top[0].v * 100)}% DEL MIGLIORE`}</small></div></div>
         <button type="button" class="sc-vai" data-az="programmaOra">PROGRAMMA ${G[sel.d]} ALLE ${String(O[sel.o]).padStart(2, "0")}</button>
         <p class="sc-nota">Dalle statistiche ufficiali di Instagram (follower online, ora per ora). Tocchi una casella per vedere quell'ora.${window.JARVIS_APP ? "" : " Numeri d'esempio."}</p>`; return; }
-    if (scheda === "rivali") { const R = SOC.rivali, mx = Math.max(...R.map((r) => r[4]));
-      P.innerHTML = `${SOC.fbCollegato ? "" : `<div class="sc-chiuso"><b>DA COLLEGARE</b><p>Per guardare altri account Instagram vuole la pagina Facebook collegata a @kingrusto. È gratis e si fa una volta sola, in circa 5 minuti.</p><button type="button" class="sc-mini" data-az="comeRivali">COME SI COLLEGA</button></div>`}
-        <div class="sc-rivali${SOC.fbCollegato ? "" : " sfocato"}">${R.map(([n, f, ps, lk, er, io]) => `<div class="sc-riv${io ? " io" : ""}"><div><b>@${n}</b><div style="height:4px;margin-top:6px;border-radius:2px;background:rgba(79,227,255,.15)"><div style="height:100%;width:${(er / mx * 100).toFixed(0)}%;border-radius:2px;background:var(--ciano)"></div></div></div><span>${scNum(f)}<small>FOLLOWER</small></span><span>${String(ps).replace(".", ",")}<small>POST/SETT</small></span><span>${String(er).replace(".", ",")}%<small>COINVOLG.</small></span></div>`).join("")}</div>
-        ${SOC.fbCollegato ? `<button type="button" class="sc-vai" data-az="riassuntoRivali">COME SONO MESSO?</button>` : ""}
-        <p class="sc-nota">Si vedono solo account professionali pubblici: follower, post, like e commenti dei loro ultimi post. Le storie e i messaggi degli altri non si vedono.${window.JARVIS_APP ? "" : " Dati d'esempio."}</p>`; return; }
+    if (scheda === "rivali") { const R = SOC.rivali, mx = Math.max(1, ...R.map((r) => r[4])), altri = R.filter((r) => !r[5]).length, fb = SOC.fbCollegato;
+      if (window.JARVIS_APP && fb && !SOC.rivaliLetti && !SOC.rivaliCarico) setTimeout(() => rivaliApp(), 0);          // v279: i numeri veri
+      const gg = SOC.fbGiorni, scade = fb && gg != null && gg < 7;
+      P.innerHTML = `${fb ? "" : `<div class="sc-chiuso"><b>DA COLLEGARE</b><p>Per guardare altri account Instagram vuole la pagina Facebook collegata a @kingrusto. È gratis e si fa una volta sola, in circa 5 minuti.</p><button type="button" class="sc-mini" data-az="comeRivali">COME SI COLLEGA</button></div>`}
+        ${scade ? `<div class="sc-chiuso"><b>FACEBOOK · ${gg <= 0 ? "SCADE OGGI" : gg === 1 ? "1 GIORNO" : gg + " GIORNI"}</b><p>La chiave di Facebook sta per scadere: tocchi COLLEGA e vale altri 60 giorni.</p><button type="button" class="sc-mini" data-az="collegaFb">COLLEGA</button></div>` : ""}
+        <div class="sc-rivali${fb ? "" : " sfocato"}">${R.map(([n, f, ps, lk, er, io]) => `<div class="sc-riv${io ? " io" : ""}${fb ? " con-togli" : ""}"><div><b>@${n}</b><div style="height:4px;margin-top:6px;border-radius:2px;background:rgba(79,227,255,.15)"><div style="height:100%;width:${(er / mx * 100).toFixed(0)}%;border-radius:2px;background:var(--ciano)"></div></div></div><span>${scNum(f)}<small>FOLLOWER</small></span><span>${String(ps).replace(".", ",")}<small>POST/SETT</small></span><span>${String(er).replace(".", ",")}%<small>COINVOLG.</small></span>${fb && !io ? `<button type="button" class="sc-togli${SOC.togli === n ? " rosso" : ""}" data-togli="${escSd(n)}" aria-label="${SOC.togli === n ? "Conferma: togli" : "Togli"} @${escSd(n)}">${SOC.togli === n ? "CONFERMA" : "TOGLI"}</button>` : fb ? `<span class="sc-togli" aria-hidden="true" style="visibility:hidden"></span>` : ""}</div>`).join("")}</div>
+        ${fb && SOC.rivaliCarico ? `<p class="sc-nota">Leggo i numeri degli account…</p>` : ""}
+        ${fb && altri < 10 ? `<form class="sc-agg" autocomplete="off"><input type="text" name="rivale" placeholder="@account da seguire" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="31" enterkeyhint="done" aria-label="Account da seguire"><button type="submit" class="sc-mini">AGGIUNGI</button></form>` : ""}
+        ${fb && altri ? `<button type="button" class="sc-vai" data-az="riassuntoRivali">COME SONO MESSO?</button>` : ""}
+        <p class="sc-nota">Si vedono solo account professionali pubblici: follower, post, like e commenti dei loro ultimi post. Le storie e i messaggi degli altri non si vedono.${fb ? ` Account seguiti: ${altri} su 10.` : ""}${window.JARVIS_APP ? "" : " Dati d'esempio."}</p>`; return; }
     if (scheda === "report") { P.innerHTML = `<div class="sc-numeri">${(SOC.vero?.report?.numeri || (window.JARVIS_APP ? [["FOLLOWER", "—", SOC.vero?.errore ? "Instagram non risponde" : "carico…"], ["COPERTURA", "—", "account raggiunti · 7 giorni"], ["INTERAZIONI", "—", "like, commenti, salvataggi"], ["POST", "—", "pubblicati in tutto"]] : [["FOLLOWER", "12,4K", "+184 in 7 giorni"], ["COPERTURA", "38,2K", "account raggiunti · 7 giorni"], ["INTERAZIONI", "4,1K", "like, commenti, salvataggi"], ["ORARIO MIGLIORE", "LUN 12", "quando i suoi follower sono online"]])).map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><span>${c}</span></div>`).join("")}</div>
         <div class="sc-blocco"><small class="sc-et">COPERTURA · ULTIMI 7 GIORNI</small><canvas id="scGraf" width="640" height="220"></canvas></div>
         <div class="sc-blocco"><small class="sc-et">IL PIÙ VISTO</small>${SOC.vero?.report || window.JARVIS_APP ? (SOC.vero?.report?.top ? `<div class="sc-cal"><div class="sc-cal-d"><b>${SOC.vero.report.top.tipo}</b></div><div><b>${escSd(SOC.vero.report.top.titolo)}</b><small>${SOC.vero.report.top.dettaglio}</small></div></div>` : `<p class="sc-nota">Ancora niente da mostrare.</p>`) : `<div class="sc-cal"><div class="sc-cal-d"><b>REEL</b></div><div><b>Giacca custom · stencil KR</b><small>14,8K visualizzazioni · 1,2K like · 86 commenti</small></div></div>`}</div>
@@ -5756,8 +5774,16 @@ function social(ok) {
       suona("aTick"); quando = `${G[s.d]} ${String([0, 3, 6, 9, 12, 15, 18, 21][s.o]).padStart(2, "0")}:00`; scheda = "pubblica"; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.sc === "pubblica"));
       parlaMock(`Bene, Sir: il prossimo post esce ${quando.toLowerCase().replace(" ", " alle ")}. Scelga cosa pubblicare.`, 2800); pagina(); return; }
     if (b.dataset.az === "comeRivali") { suona("aTick"); foglio(`<div class="sc-f-su"><b>COLLEGARE FACEBOOK</b><button type="button" class="sc-chiudi" data-f="chiudi">Chiudi</button></div>
-        <ol class="sc-passi"><li>Nell'app di Instagram: <b>Profilo › Modifica profilo › Pagina</b>.</li><li>Tocchi <b>Crea</b> (o scelga una pagina che ha già). Il nome può essere KING RUSTO.</li><li>${window.JARVIS_APP ? "Me lo dica: JARVIS le chiede un solo permesso a Facebook." : "Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook."}</li><li>Da lì RIVALI si accende: scelga fino a 10 account da seguire.</li></ol>
-        <button type="button" class="sc-vai" data-f="collega">${window.JARVIS_APP ? "HO CAPITO" : "COLLEGA (PROVA)"}</button><p class="sc-nota">La pagina Facebook non deve pubblicare niente: serve solo come chiave per vedere gli altri account.</p>`); return; }
+        <ol class="sc-passi"><li>Nell'app di Instagram: <b>Profilo › Modifica profilo › Pagina</b>.</li><li>Tocchi <b>Crea</b> (o scelga una pagina che ha già). Il nome può essere KING RUSTO.</li><li>Torni qui e tocchi <b>COLLEGA</b>: JARVIS le chiede un solo permesso a Facebook.</li><li>Da lì RIVALI si accende: scelga fino a 10 account da seguire.</li></ol>
+        <button type="button" class="sc-vai" data-f="collega">${window.JARVIS_APP ? "COLLEGA" : "COLLEGA (PROVA)"}</button><p class="sc-nota">La pagina Facebook non deve pubblicare niente: serve solo come chiave per vedere gli altri account.</p>`); return; }
+    if (b.dataset.az === "riassuntoRivali" && window.JARVIS_APP) { suona("aTick"); parlaMock(SOC.rivaliRiassunto || "Aggiunga almeno un account da seguire, Sir.", 6500); return; }
+    if (b.dataset.az === "collegaFb") { collegaFb(); return; }
+    if (b.dataset.togli) { const n = b.dataset.togli;                                     // v279: TOGLI › CONFERMA (3 s)
+      if (SOC.togli !== n) { suona("aTick"); SOC.togli = n; clearTimeout(SOC.togliT); SOC.togliT = setTimeout(() => { SOC.togli = null; if (scheda === "rivali" && A.isConnected) pagina(); }, 3000); pagina(); return; }
+      SOC.togli = null; clearTimeout(SOC.togliT); suona("aPronto"); try { navigator.vibrate && navigator.vibrate(12); } catch {}
+      b.closest(".sc-riv")?.classList.add("via");
+      setTimeout(() => { if (window.JARVIS_APP) { SOC.rivali = SOC.rivali.filter((r) => r[0] !== n); pagina(); rivaliApp({ op: "togli", username: n }); return; }
+        SOC.rivali = SOC.rivali.filter((r) => r[0] !== n); if (scheda === "rivali") pagina(); }, 280); return; }
     if (b.dataset.az === "riassuntoRivali") { suona("aTick"); parlaMock("Lei ha il coinvolgimento più alto dopo rivale_esempio_2, Sir: 8,6 per cento. Chi pubblica di più è rivale_esempio_3, quasi 7 post a settimana: lei ne fa 3. Un Reel in più a settimana la porterebbe davanti.", 6500); return; }
     if (b.dataset.sc) { suona("aTick"); scheda = b.dataset.sc; A.querySelectorAll("[data-sc]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pagina(); return; }
     if (b.dataset.fonte) { suona("aTick"); const k = b.dataset.fonte;
@@ -5800,12 +5826,36 @@ function social(ok) {
     if (b.dataset.az === "riassunto" && window.JARVIS_APP) { suona("aTick"); if (SOC.vero?.errore) parlaMock("Instagram non risponde, Sir: " + SOC.vero.errore, 3600); else { window.__socRiassunto = true; parlaMock("Leggo le statistiche, Sir: un attimo.", 2000); } return; }
     if (b.dataset.az === "riassunto") { suona("aTick"); parlaMock("Settimana buona, Sir: 38 mila account raggiunti e 184 follower in più. Il Reel della giacca custom ha fatto quasi 15 mila visualizzazioni: giovedì è il giorno forte. Lunedì a mezzogiorno pubblico il prossimo?", 6000); return; }
     if (b.dataset.az === "auto") { suona("aTick"); SOC.auto.on = !SOC.auto.on; if (window.JARVIS_APP) window.__socAuto(); b.classList.toggle("on", SOC.auto.on); b.setAttribute("aria-pressed", SOC.auto.on); parlaMock(SOC.auto.on ? `Attiva, Sir: chi commenta «${SOC.auto.parola}» riceve il link in DM.` : "Automazione spenta, Sir.", 2400); } });
+  // v279 · RIVALI: COLLEGA (nell'app il login di Facebook, una volta sola), i numeri dal cervello, AGGIUNGI
+  function collegaFb() { suona("aTick");
+    if (window.JARVIS_APP) { try { window.webkit.messageHandlers.jarvis.postMessage({ tipo: "socialFacebook" }); } catch {} return; }
+    SOC.fbCollegato = true; SOC.fbGiorni = 60; suona("aPronto"); parlaMock("Collegato, Sir: ecco i rivali.", 2200); pagina(); }
+  window.__socFb = (r) => {                                                         // l'app: com'è andato il login di Facebook
+    if (r && r.ok) { SOC.fbCollegato = true; SOC.fbGiorni = 59; SOC.rivaliLetti = false; suona("aPronto"); parlaMock("Collegato, Sir: ecco i rivali.", 2600); }
+    else if (r && r.errore && r.errore !== "annullato") parlaMock("Facebook non ha collegato, Sir: " + r.errore, 4200);
+    if (scheda === "rivali" && A.isConnected) pagina(); };
+  async function rivaliApp(corpo) {
+    SOC.rivaliCarico = true; if (scheda === "rivali" && A.isConnected) pagina();
+    const r = await window.__jarvisChiedi("socialRivali", corpo || {}).then((t) => JSON.parse(t)).catch((e) => ({ errore: e.message || String(e) }));
+    SOC.rivaliCarico = false; SOC.rivaliLetti = true;
+    if (r.errore) parlaMock("Non è andata, Sir: " + r.errore, 3600);
+    else { if (r.collegato === false) SOC.fbCollegato = false; else { SOC.rivali = r.rivali || []; SOC.rivaliRiassunto = r.riassunto || ""; if (r.giorni != null) SOC.fbGiorni = r.giorni; }
+      if (corpo && corpo.op === "aggiungi") parlaMock(`Aggiunto, Sir: @${corpo.username}.`, 2200); }
+    if (scheda === "rivali" && A.isConnected) pagina(); return r; }
+  A.addEventListener("submit", (e) => { const f = e.target.closest(".sc-agg"); if (!f) return; e.preventDefault();
+    const n = String(f.rivale.value || "").trim().replace(/^@/, "").toLowerCase();
+    if (!/^[a-z0-9._]{1,30}$/.test(n)) { suona("aTick"); parlaMock("Mi scriva il nome dell'account, Sir: lettere, numeri, punto e trattino basso.", 3600); return; }
+    if (SOC.rivali.some((r) => r[0] === n)) { suona("aTick"); parlaMock(`@${n} è già fra i rivali, Sir.`, 2400); return; }
+    f.rivale.blur(); suona("aPronto");
+    if (window.JARVIS_APP) { rivaliApp({ op: "aggiungi", username: n }); return; }
+    let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) >>> 0;              // numeri d'esempio, sempre gli stessi per lo stesso nome
+    const fo = 4000 + h % 30000; SOC.rivali.push([n, fo, Math.round((15 + h % 55)) / 10, Math.round(fo * .06), Math.round((20 + (h >>> 4) % 80)) / 10]);
+    parlaMock(`Aggiunto, Sir: @${n}.`, 2200); pagina(); });
   // il foglio che sale dal basso: la scheda di un post (GRIGLIA), un post in programma (PIANO), i passi per Facebook (RIVALI)
   function foglio(html, dopo) { A.querySelector(".sc-foglio")?.remove(); const F = document.createElement("div"); F.className = "sc-foglio"; F.innerHTML = html; A.appendChild(F); requestAnimationFrame(() => F.classList.add("su"));
     const via = () => { F.classList.remove("su"); setTimeout(() => F.remove(), 300); };
     F.addEventListener("click", (ev) => { const el = ev.target.closest("[data-f]"), k = el?.dataset.f; if (!k) return; ev.stopPropagation(); if (k === "chiudi") { suona("aTick"); via(); return; }
-      if (k === "collega" && window.JARVIS_APP) { suona("aTick"); via(); parlaMock("Prima crei la pagina Facebook e la colleghi a Instagram, Sir: poi me lo dica e accendo RIVALI.", 4200); return; }
-      if (k === "collega") { suona("aPronto"); SOC.fbCollegato = true; via(); parlaMock("Collegato, Sir: ecco i rivali.", 2200); pagina(); return; } dopo?.(k, F, via, el); });
+      if (k === "collega") { via(); collegaFb(); return; } dopo?.(k, F, via, el); });
     F.querySelectorAll("canvas[data-seme]").forEach(scTela); return F; }
   function foglioMedia(m) { if (!m) return; const med = (k) => SOC.media.reduce((s, x) => s + x[k], 0) / SOC.media.length, r = m.salv / med("salv");
     foglio(`<div class="sc-f-su"><b>${m.tipo} · ${m.quando}</b><button type="button" class="sc-chiudi" data-f="chiudi">Chiudi</button></div>
