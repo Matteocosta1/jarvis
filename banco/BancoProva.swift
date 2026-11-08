@@ -105,6 +105,12 @@ struct RadiceBanco: View {
             VistaCuoreTelefono(chiedi: { _ in }).paginaPiena()
         case .scheda(.musica):
             VistaMusica().paginaPiena()
+        case .scheda(.edith):
+            VistaEdith(chiedi: { _ in }).paginaPiena()
+        case .scheda(.meteo):
+            VistaMeteo(chiedi: { _ in }).paginaPiena()
+        case .lingua:
+            SceltaLingua { _ in }.paginaPiena()
         case .pagina:
             if let a = v.pagina {
                 VistaStudio(apertura: a, parla: { _ in }, chiudi: { chiudi(v.id) })
@@ -165,6 +171,14 @@ struct RadiceBanco: View {
             apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(13.0); chiudiDavanti(); await aspetta(1.5)
             apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social")); await aspetta(10.0); chiudiDavanti(); await aspetta(1.5)
             apri(.scheda(.musica)); await aspetta(5.0); chiudiDavanti()
+        case "pagine":                                                          // 8 nov pomeriggio: ogni sezione come una pagina sola
+            apri(.scheda(.edith)); await aspetta(3.5); chiudiDavanti(); await aspetta(1.5)
+            apri(.lingua); await aspetta(3.5); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.meteo)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.email)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.cuore)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.musica)); await aspetta(6.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(11.0); chiudiDavanti()
         default:
             break
         }

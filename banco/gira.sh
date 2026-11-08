@@ -13,7 +13,7 @@ xcrun simctl privacy "$UDID" grant all "$BID" || true
 xcrun simctl spawn "$UDID" log stream --style compact --predicate "process == \"$(basename "$APP" .app)\"" > "$OUT/console.log" 2>&1 &
 LOGP=$!
 for S in "$@"; do
-  case "$S" in mail*) DUR=16 ;; studio*) DUR=33 ;; tutte*) DUR=50 ;; *) DUR=15 ;; esac
+  case "$S" in mail*) DUR=16 ;; studio*) DUR=33 ;; tutte*) DUR=50 ;; pagine*) DUR=52 ;; *) DUR=15 ;; esac
   # un primo avvio a vuoto (la prima volta il simulatore è lento a caricare l'app)
   if [ ! -f "$OUT/.caldo" ]; then
     xcrun simctl launch "$UDID" "$BID" -banco nulla; sleep 6; xcrun simctl terminate "$UDID" "$BID" || true; sleep 1; touch "$OUT/.caldo"
