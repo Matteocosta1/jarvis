@@ -20,7 +20,6 @@ struct CorniceScheda<Contenuto: View>: View {
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
-    @State private var stampa: CGFloat = 0           // quanto della scheda è già «stampato» (0 → 1)
     @State private var apertaDa = Date()
 
     var body: some View {
@@ -57,34 +56,22 @@ struct CorniceScheda<Contenuto: View>: View {
             let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
-            mostrato = true
-            withAnimation(.easeOut(duration: Apertura.stampa)) { stampa = 1 }
+            // 8 nov pomeriggio (il signore, video 14:12: «carica la parte in alto e poi quella sotto… tutte e 30 e più fanno schifo…
+            // caricare insieme come una pagina sola, deve essere uniforme»): niente più stampa dall'alto, che stampava un riquadro
+            // alla volta (la maschera finiva su ogni riquadro); il caricamento sfuma e la sezione compare tutta insieme (0,25 s),
+            // la scritta sotto il nome compresa (TestoCodice), in tutte le sezioni
+            withAnimation(.easeOut(duration: Apertura.dissolvenza)) { mostrato = true }
         }
     }
 
-    /// La pagina che scorre: la testata e il contenuto, che si «stampa» dall'alto.
+    /// La pagina che scorre: il contenuto, che compare tutto insieme a fine caricamento (come una pagina sola).
     private var pagina: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if mostrato {
-                    contenuto()
-                        .mask(alignment: .top) {
-                            // la scheda si «stampa» dall'alto, riga per riga
-                            GeometryReader { g in
-                                VStack(spacing: 0) {
-                                    Rectangle().frame(height: g.size.height * stampa)
-                                    Spacer(minLength: 0)
-                                }
-                            }
-                        }
-                        .overlay(alignment: .top) {
-                            GeometryReader { g in
-                                Rectangle().fill(tinta).frame(height: 2)
-                                    .shadow(color: tinta, radius: 6)
-                                    .offset(y: g.size.height * stampa)
-                                    .opacity(stampa < 1 ? 1 : 0)
-                            }
-                        }
+                    // UNA vista sola (non i riquadri uno per uno): compare tutta insieme, nello stesso istante
+                    VStack(alignment: .leading, spacing: 16) { contenuto() }
+                        .transition(.opacity)
                 }
             }
             .padding(16)
@@ -1201,7 +1188,8 @@ nonisolated enum Salute {
 }
 /// 27 ott (il signore): la scritta sotto il nome della sezione scorre veloce da sinistra, da trasparente al colore pieno (0,35 s);
 /// quella di prima resta leggibile almeno 0,7 s, poi continua a scorrere a destra tornando trasparente, e arriva la nuova allo
-/// stesso modo. Poi si ferma.
+/// stesso modo. Poi si ferma. 8 nov: all'apertura della sezione (prima scritta e fine caricamento) niente attesa né scorrimento,
+/// la scritta compare insieme alla pagina.
 struct TestoCodice: View {
     let testo: String
     @State private var mostrato = ""                 // la scritta che si vede (la nuova arriva solo dopo che la vecchia si è letta)
@@ -1214,8 +1202,23 @@ struct TestoCodice: View {
         Text(mostrato)
             .opacity(dentro ? 1 : 0)
             .offset(x: dentro ? 0 : (daSinistra ? 60 : -40))      // entra da sinistra, poi scorre via a destra
-            .onAppear { mostra(testo, attesa: 0) }
-            .onChange(of: testo) { _, nuovo in mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
+            .onAppear { subito(testo, animata: false) }
+            .onChange(of: testo) { vecchio, nuovo in
+                // 8 nov pomeriggio (il signore: «deve essere una pagina unica, un caricamento unico senza gap»): la prima scritta c'è già
+                // quando la sezione sale, e a fine caricamento quella vera prende il posto di quella del caricamento nello stesso
+                // istante in cui compare la pagina (la stessa dissolvenza), senza aspettare né scorrere. Scorre dal lato solo quando
+                // cambia dentro la sezione già aperta.
+                if TestiCaricamento.diCaricamento(vecchio) { subito(nuovo, animata: true) }
+                else { mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
+            }
+    }
+
+    private func subito(_ nuovo: String, animata: Bool) {
+        voluta = nuovo
+        var t = Transaction(animation: animata ? .easeOut(duration: Apertura.dissolvenza) : nil)
+        t.disablesAnimations = !animata
+        withTransaction(t) { mostrato = nuovo; daSinistra = false; dentro = true }
+        lettaDa = Date()
     }
 
     private func mostra(_ nuovo: String, attesa: Double) {
@@ -1255,5 +1258,10 @@ enum TestiCaricamento {
         "studio": "laboratorio 3d in linea", "social": "social network",
     ]
     static func di(_ sezione: String) -> String { testi[sezione.lowercased()] ?? "acquisizione dati" }
+    /// È una scritta del caricamento (anche in maiuscolo, come la mostra TestoCodice)?
+    static func diCaricamento(_ scritta: String) -> Bool {
+        let s = scritta.lowercased()
+        return s == "acquisizione dati" || testi.values.contains(s)
+    }
 }
 #endif

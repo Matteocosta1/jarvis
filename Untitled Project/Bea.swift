@@ -71,6 +71,7 @@ struct VistaBea: View {
                                                                             icona: "link", tinta: tinta)) { chiudi() })
                 if dati == nil && !errore {
                     CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
+                        .transition(.opacity)   // 8 nov: sfuma insieme alla pagina che compare (una pagina sola)
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)

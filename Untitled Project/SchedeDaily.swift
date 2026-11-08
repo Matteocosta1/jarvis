@@ -806,6 +806,7 @@ struct VistaSpesa: View {
                                                                             icona: "cart", tinta: tinta)) { chiudi() })
                 if !caricata && !errore {
                     CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
+                        .transition(.opacity)   // 8 nov: sfuma insieme alla pagina che compare (una pagina sola)
                 }
                 if errore && !caricata {
                     Text("Non raggiungo la lista, Sir.").foregroundStyle(.orange)
