@@ -18,55 +18,53 @@ struct VistaVitals: View {
     @State private var confermaTutto = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
-                        PannelloOrganismo(oggi: oggi, diario: dati)
-                        PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
-                        sezioneOggi
+        ZStack {
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
+                    PannelloOrganismo(oggi: oggi, diario: dati)
+                    PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
+                    sezioneOggi
 
-                        Picker("Periodo", selection: $giorni) {
-                            Text("7 giorni").tag(7)
-                            Text("30 giorni").tag(30)
-                            Text("90 giorni").tag(90)
-                        }
-                        .pickerStyle(.segmented)
-
-                        if let d = dati {
-                            riquadri(d)
-                            grafico(d)
-                            if !d.battiti.isEmpty { graficoBattito(d) }
-                            if !d.passiGiorni.isEmpty { graficoPassi(d) }
-                            lettura(d)
-                            Button { chiedi("Jarvis, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") } label: {
-                                Label("Chieda a JARVIS come sta", systemImage: "waveform")
-                                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                    .frame(maxWidth: .infinity).frame(height: 48)
-                                    .foregroundStyle(Color.fondo).background(Color.ciano2)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(StileStark())
-                            diario(d)
-                        } else if let errore {
-                            Text(errore).foregroundStyle(.orange).font(.footnote)
-                        } else {
-                            AttesaAnello().frame(maxWidth: .infinity).padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
-                        }
+                    Picker("Periodo", selection: $giorni) {
+                        Text("7 giorni").tag(7)
+                        Text("30 giorni").tag(30)
+                        Text("90 giorni").tag(90)
                     }
-                    .padding(16)
+                    .pickerStyle(.segmented)
+
+                    if let d = dati {
+                        riquadri(d)
+                        grafico(d)
+                        if !d.battiti.isEmpty { graficoBattito(d) }
+                        if !d.passiGiorni.isEmpty { graficoPassi(d) }
+                        lettura(d)
+                        Button { chiedi("Jarvis, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") } label: {
+                            Label("Chieda a JARVIS come sta", systemImage: "waveform")
+                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                .frame(maxWidth: .infinity).frame(height: 48)
+                                .foregroundStyle(Color.fondo).background(Color.ciano2)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(StileStark())
+                        diario(d)
+                    } else if let errore {
+                        Text(errore).foregroundStyle(.orange).font(.footnote)
+                    } else {
+                        AttesaAnello().frame(maxWidth: .infinity).padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
+                    }
                 }
-                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Vitals", sottotitolo: "parametri vitali", icona: "waveform.path.ecg")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+                .padding(16)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .task(id: giorni) { await carica() }
-            .confirmationDialog("Cancellare tutto il diario? Non si può tornare indietro.", isPresented: $confermaTutto, titleVisibility: .visible) {
-                Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
-                Button("Annulla", role: .cancel) {}
-            }
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Vitals", sottotitolo: "parametri vitali", icona: "waveform.path.ecg")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .task(id: giorni) { await carica() }
+        .confirmationDialog("Cancellare tutto il diario? Non si può tornare indietro.", isPresented: $confermaTutto, titleVisibility: .visible) {
+            Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
+            Button("Annulla", role: .cancel) {}
         }
         .preferredColorScheme(.dark)
         .aperturaHUD("Vitals", icona: "waveform.path.ecg")

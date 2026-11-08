@@ -25,77 +25,75 @@ struct VistaRicordi: View {
     @State private var salvaDaFare = false        // «ricorda questo luogo»: una volta sola, anche cambiando scheda
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
-                VStack(spacing: 0) {
-                    // le schede con i tasti ciano del Satellite, 16 punti sotto la riga di «Chiudi» (7 nov sera: la testata è nella riga)
-                    HStack(spacing: 6) {
-                        ForEach(Scheda.allCases) { k in
-                            ChipSat(testo: k.rawValue.uppercased(), acceso: scheda == k) { Suoni.tocco(); scheda = k }
-                        }
+        ZStack {
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
+            VStack(spacing: 0) {
+                // le schede con i tasti ciano del Satellite, 16 punti sotto la riga di «Chiudi» (7 nov sera: la testata è nella riga)
+                HStack(spacing: 6) {
+                    ForEach(Scheda.allCases) { k in
+                        ChipSat(testo: k.rawValue.uppercased(), acceso: scheda == k) { Suoni.tocco(); scheda = k }
                     }
-                    .padding(.horizontal, 16).padding(.top, 16)
+                }
+                .padding(.horizontal, 16).padding(.top, 16)
 
-                    if let d = dati, scheda == .traccia {
-                        // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
-                        ScrollView {
-                            // solo i luoghi con le coordinate: la freccia punta il più recente che si può raggiungere
-                            PannelliTraccia(luoghi: d.posti.filter { ($0.tipo == "posto" || $0.tipo == "parcheggio") && $0.lat != nil && $0.lon != nil },
-                                            ultimi: Array(d.ricordi.prefix(3)),
-                                            guida: $guidaAccesa, salvaSubito: $salvaDaFare, ricarica: { await carica() })
-                                .padding(16)
-                                .padding(.bottom, 30)
-                        }
-                    } else if let d = dati {
-                        List {
-                            switch scheda {
-                            case .posti: posti(d)
-                            case .ricordi, .traccia: ricordi(d)
-                            }
-                        }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .scrollDismissesKeyboard(.interactively)
-                    } else if errore {
-                        Text("Non raggiungo la memoria, Sir.").foregroundStyle(.orange).padding(.top, 40)
-                        Spacer()
-                    } else {
-                        AttesaAnello().padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
-                        Spacer()
+                if let d = dati, scheda == .traccia {
+                    // build 22: TRACCIA, la strada verso un luogo salvato (come nel mockup): i posti e i vecchi parcheggi
+                    ScrollView {
+                        // solo i luoghi con le coordinate: la freccia punta il più recente che si può raggiungere
+                        PannelliTraccia(luoghi: d.posti.filter { ($0.tipo == "posto" || $0.tipo == "parcheggio") && $0.lat != nil && $0.lon != nil },
+                                        ultimi: Array(d.ricordi.prefix(3)),
+                                        guida: $guidaAccesa, salvaSubito: $salvaDaFare, ricarica: { await carica() })
+                            .padding(16)
+                            .padding(.bottom, 30)
                     }
-                }
-                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Ricordi", sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»; 8 nov (il signore): il titolo resta RICORDI su ogni scheda
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear { scheda = iniziale; guidaAccesa = guida; salvaDaFare = salva }
-            // 4 nov (il signore, strada B): Ricordi già aperto (davanti o dietro) e TRACCIA chiesta a voce («traccia il luogo»,
-            // «portami al luogo», «ricorda questo luogo»): la fa qui, sul posto (prima tornava com'era e la guida non partiva)
-            .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
-                guard (n.userInfo?["reparto"] as? String) == Reparto.ricordi.rawValue else { return }
-                fotoAperta = nil                                 // una foto aperta sopra non copre TRACCIA
-                scheda = .traccia
-                if (n.userInfo?["guida"] as? Bool) == true { guidaAccesa = true }
-                if (n.userInfo?["salva"] as? Bool) == true { salvaDaFare = true }
-            }
-            // TRACCIA mostra tutti i luoghi: una ricerca lasciata nella scheda Ricordi non li deve filtrare
-            .onChange(of: scheda) { _, nuova in if nuova == .traccia && !cerca.isEmpty { cerca = "" } }
-            .task { await carica() }
-            .task(id: cerca) {
-                try? await Task.sleep(for: .milliseconds(350))
-                if !Task.isCancelled { await carica() }
-            }
-            .sheet(isPresented: Binding(get: { fotoAperta != nil }, set: { if !$0 { fotoAperta = nil } })) {
-                if let d = fotoAperta, let img = UIImage(data: d) {
-                    ZStack {
-                        Color.black.ignoresSafeArea()
-                        Image(uiImage: img).resizable().scaledToFit()
+                } else if let d = dati {
+                    List {
+                        switch scheda {
+                        case .posti: posti(d)
+                        case .ricordi, .traccia: ricordi(d)
+                        }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDismissesKeyboard(.interactively)
+                } else if errore {
+                    Text("Non raggiungo la memoria, Sir.").foregroundStyle(.orange).padding(.top, 40)
+                    Spacer()
+                } else {
+                    AttesaAnello().padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
+                    Spacer()
                 }
             }
-            .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Ricordi", sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»; 8 nov (il signore): il titolo resta RICORDI su ogni scheda
         }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { scheda = iniziale; guidaAccesa = guida; salvaDaFare = salva }
+        // 4 nov (il signore, strada B): Ricordi già aperto (davanti o dietro) e TRACCIA chiesta a voce («traccia il luogo»,
+        // «portami al luogo», «ricorda questo luogo»): la fa qui, sul posto (prima tornava com'era e la guida non partiva)
+        .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
+            guard (n.userInfo?["reparto"] as? String) == Reparto.ricordi.rawValue else { return }
+            fotoAperta = nil                                 // una foto aperta sopra non copre TRACCIA
+            scheda = .traccia
+            if (n.userInfo?["guida"] as? Bool) == true { guidaAccesa = true }
+            if (n.userInfo?["salva"] as? Bool) == true { salvaDaFare = true }
+        }
+        // TRACCIA mostra tutti i luoghi: una ricerca lasciata nella scheda Ricordi non li deve filtrare
+        .onChange(of: scheda) { _, nuova in if nuova == .traccia && !cerca.isEmpty { cerca = "" } }
+        .task { await carica() }
+        .task(id: cerca) {
+            try? await Task.sleep(for: .milliseconds(350))
+            if !Task.isCancelled { await carica() }
+        }
+        .sheet(isPresented: Binding(get: { fotoAperta != nil }, set: { if !$0 { fotoAperta = nil } })) {
+            if let d = fotoAperta, let img = UIImage(data: d) {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    Image(uiImage: img).resizable().scaledToFit()
+                }
+            }
+        }
+        .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
         .preferredColorScheme(.dark)
         .aperturaHUD("Ricordi", icona: "brain.head.profile")
     }

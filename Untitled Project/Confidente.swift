@@ -55,132 +55,130 @@ struct VistaConfidente: View {
     }
 
     var body: some View {
-        NavigationStack {
         ZStack {
-                SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia: il mio è un parere, non una sentenza.")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+            SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia: il mio è un parere, non una sentenza.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
 
-                        // v267: la BILANCIA, sotto le parole di JARVIS: la conversazione sui piatti, il cuore di oggi nel perno
-                        OlogrammaConfidente(dati: ConfidenteOlo(testo: testo, battito: stato?.battito)).corniceOlo(Color.ciano)
+                    // v267: la BILANCIA, sotto le parole di JARVIS: la conversazione sui piatti, il cuore di oggi nel perno
+                    OlogrammaConfidente(dati: ConfidenteOlo(testo: testo, battito: stato?.battito)).corniceOlo(Color.ciano)
 
-                        statoFisico
+                    statoFisico
 
-                        Button { Suoni.tocco(); aVoce() } label: {
-                            Label("Preferisco raccontarlo a voce", systemImage: "waveform")
-                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                .frame(maxWidth: .infinity).frame(height: 50)
-                                .foregroundStyle(Color.fondo).background(Color.ciano2)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Button { Suoni.tocco(); aVoce() } label: {
+                        Label("Preferisco raccontarlo a voce", systemImage: "waveform")
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .frame(maxWidth: .infinity).frame(height: 50)
+                            .foregroundStyle(Color.fondo).background(Color.ciano2)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(StileStark())
+
+                    Text("OPPURE INCOLLI LA CONVERSAZIONE")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        .foregroundStyle(Color.ciano)
+
+                    ZStack(alignment: .topLeading) {
+                        if testo.isEmpty {
+                            Text("Su WhatsApp: tenga premuto un messaggio › Inoltra o Copia, poi incolli qui. Oppure scriva cosa è successo.")
+                                .font(.system(size: 14)).foregroundStyle(Color.tenue)
+                                .padding(.horizontal, 5).padding(.vertical, 8)
                         }
-                        .buttonStyle(StileStark())
+                        TextEditor(text: $testo)
+                            .focused($scrivendo)
+                            .scrollContentBackground(.hidden)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 200)
+                    }
+                    .padding(8)
+                    .background(Color.ciano.opacity(0.05))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))   // 27 ott: la cornice olografica
 
-                        Text("OPPURE INCOLLI LA CONVERSAZIONE")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
-                            .foregroundStyle(Color.ciano)
-
-                        ZStack(alignment: .topLeading) {
-                            if testo.isEmpty {
-                                Text("Su WhatsApp: tenga premuto un messaggio › Inoltra o Copia, poi incolli qui. Oppure scriva cosa è successo.")
-                                    .font(.system(size: 14)).foregroundStyle(Color.tenue)
-                                    .padding(.horizontal, 5).padding(.vertical, 8)
-                            }
-                            TextEditor(text: $testo)
-                                .focused($scrivendo)
-                                .scrollContentBackground(.hidden)
-                                .font(.system(size: 15))
-                                .foregroundStyle(.white)
-                                .frame(minHeight: 200)
+                    // 4 nov (il signore): la bozza resta riaprendo; «Cancella», come in Messaggi, la svuota
+                    if !testo.isEmpty || !domanda.isEmpty {
+                        HStack {
+                            Spacer()
+                            Button { Suoni.tocco(); svuota() } label: { Text("Cancella").font(.system(size: 12)) }.tint(Color.ciano)
                         }
-                        .padding(8)
+                        .padding(.top, -8)
+                    }
+
+                    TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
+                        .lineLimit(1...3)
+                        .padding(12)
+                        .foregroundStyle(.white)
                         .background(Color.ciano.opacity(0.05))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 0.8))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))   // 27 ott: la cornice olografica
 
-                        // 4 nov (il signore): la bozza resta riaprendo; «Cancella», come in Messaggi, la svuota
-                        if !testo.isEmpty || !domanda.isEmpty {
-                            HStack {
-                                Spacer()
-                                Button { Suoni.tocco(); svuota() } label: { Text("Cancella").font(.system(size: 12)) }.tint(Color.ciano)
-                            }
-                            .padding(.top, -8)
-                        }
-
-                        TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
-                            .lineLimit(1...3)
-                            .padding(12)
-                            .foregroundStyle(.white)
-                            .background(Color.ciano.opacity(0.05))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 0.8))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                        Button {
-                            Suoni.tocco()
-                            let d = domanda.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
-                            svuota()                                  // mandata: la bozza non serve più
-                            invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
-                        } label: {
-                            Label("Chieda a JARVIS", systemImage: "person.2.wave.2")
-                                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                .frame(maxWidth: .infinity).frame(height: 50)
-                                .foregroundStyle(Color.ciano)
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.7), lineWidth: 1))
-                        }
-                        .buttonStyle(StileStark())
-                        .disabled(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .opacity(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
-
-                        Text("Resta tra voi: JARVIS non lo salva nella memoria, a meno che non glielo chieda lei.")
-                            .font(.footnote).foregroundStyle(Color.tenue)
+                    Button {
+                        Suoni.tocco()
+                        let d = domanda.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                        svuota()                                  // mandata: la bozza non serve più
+                        invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
+                    } label: {
+                        Label("Chieda a JARVIS", systemImage: "person.2.wave.2")
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .frame(maxWidth: .infinity).frame(height: 50)
+                            .foregroundStyle(Color.ciano)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.7), lineWidth: 1))
                     }
-                    .padding(16)
+                    .buttonStyle(StileStark())
+                    .disabled(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
+
+                    Text("Resta tra voi: JARVIS non lo salva nella memoria, a meno che non glielo chieda lei.")
+                        .font(.footnote).foregroundStyle(Color.tenue)
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+                .padding(16)
             }
-            .task { stato = await SaluteOggi.leggi() }
-            .tastiAVoce { a in
-                switch a {
-                case .confidenteIncolla:
-                    if let c = UIPasteboard.general.string, !c.isEmpty { testo = testo.isEmpty ? c : testo + "\n" + c; Suoni.tocco() }
-                case .confidenteAVoce: Suoni.tocco(); aVoce()
-                default: break
-                }
-            }
-            .onAppear {
-                // con la conversazione incollata, quello che dice a voce è la sua domanda («Jarvis, ho esagerato io?»)
-                ConfidenteAperto.domanda = { frase in
-                    var t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // niente incollato, ma parla di «questo messaggio», «questa chat»…: prende quello che ha copiato
-                    let basso = frase.lowercased()
-                    if t.isEmpty, ["messaggio", "questo", "questa", "conversazione", "chat", "whatsapp", "ha scritto", "mi ha detto", "copiato"].contains(where: { basso.contains($0) }),
-                       let copiato = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !copiato.isEmpty {
-                        testo = copiato
-                        t = copiato
-                    }
-                    guard !t.isEmpty else { return false }
-                    let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
-                    svuota()                                      // mandata: la bozza non serve più
-                    invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
-                    return true
-                }
-                // riaprendo: la conversazione incollata e la domanda di prima
-                if testo.isEmpty, domanda.isEmpty, let b = Bozze.leggi("confidente", come: Bozze.Confidente.self) {
-                    testo = b.testo
-                    domanda = b.domanda
-                }
-            }
-            .onDisappear { ConfidenteAperto.domanda = nil }
-            .onChange(of: testo) { salvaBozza() }
-            .onChange(of: domanda) { salvaBozza() }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .scrollDismissesKeyboard(.interactively)
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
         }
+        .task { stato = await SaluteOggi.leggi() }
+        .tastiAVoce { a in
+            switch a {
+            case .confidenteIncolla:
+                if let c = UIPasteboard.general.string, !c.isEmpty { testo = testo.isEmpty ? c : testo + "\n" + c; Suoni.tocco() }
+            case .confidenteAVoce: Suoni.tocco(); aVoce()
+            default: break
+            }
+        }
+        .onAppear {
+            // con la conversazione incollata, quello che dice a voce è la sua domanda («Jarvis, ho esagerato io?»)
+            ConfidenteAperto.domanda = { frase in
+                var t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+                // niente incollato, ma parla di «questo messaggio», «questa chat»…: prende quello che ha copiato
+                let basso = frase.lowercased()
+                if t.isEmpty, ["messaggio", "questo", "questa", "conversazione", "chat", "whatsapp", "ha scritto", "mi ha detto", "copiato"].contains(where: { basso.contains($0) }),
+                   let copiato = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !copiato.isEmpty {
+                    testo = copiato
+                    t = copiato
+                }
+                guard !t.isEmpty else { return false }
+                let d = frase.trimmingCharacters(in: .whitespacesAndNewlines)
+                svuota()                                      // mandata: la bozza non serve più
+                invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
+                return true
+            }
+            // riaprendo: la conversazione incollata e la domanda di prima
+            if testo.isEmpty, domanda.isEmpty, let b = Bozze.leggi("confidente", come: Bozze.Confidente.self) {
+                testo = b.testo
+                domanda = b.domanda
+            }
+        }
+        .onDisappear { ConfidenteAperto.domanda = nil }
+        .onChange(of: testo) { salvaBozza() }
+        .onChange(of: domanda) { salvaBozza() }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .preferredColorScheme(.dark)
         .aperturaHUD("Confidente", icona: "person.2.wave.2")
     }
