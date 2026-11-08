@@ -403,6 +403,11 @@ struct StratoSezioniVista<Vista: View>: View {
         let p = posa(v)
         let web = v.sezione.paginaWeb
         vista(v)
+                // 8 nov sera (il signore, video 19:31: «la parte superiore carica sfalsata, quasi un secondo dopo… così sono due
+                // settori, la voglio come un foglio unico»): la pagina saliva col bordo in alto sotto l'ora (lo sfondo della sezione non
+                // arrivava nella fascia dell'ora), così sopra si vedeva ancora JARVIS finché la pagina non era arrivata. Ora sale col
+                // suo sfondo fino al bordo dello schermo, un foglio solo, come il .foglio del mockup.
+                .background(alignment: .top) { SfondoSezione().padding(.top, -FasciaAlta.altezza) }
                 .environment(\.sezioneAperta, v.id)
                 .environment(\.sezioneDietro, pila.davanti != v.id)        // dietro: fotocamera e microfono in pausa
                 .environment(\.jarvisCoperto, false)
