@@ -37,49 +37,183 @@ struct VistaStudio: View {
     /// Nelle pagine olografiche: quanto è olografica la pagina e se si sta materializzando (il velo ciano dentro la pagina, OloWeb).
     @Environment(\.tintaOlo) private var tintaOlo
     @Environment(\.materiaOlo) private var materiaOlo
+    /// 8 nov (video del signore 09:00 e 09:02: «la parte alta va a salti, si stacca e carica dopo», «uguali alle altre sezioni»):
+    /// la riga in alto è quella dell'app (BarraSezione), come in tutte le sezioni, ferma dal primo istante. Prima c'era quella del
+    /// caricamento e poi quella della pagina web, diversa (icona, «Chiudi», spaziature): nel cambio si vedevano doppie e saltavano;
+    /// in Studio sparivano per 0,2 s. La pagina dice quale sezione mostra e il suo sottotitolo; «Chiudi» e ARCHIVIO comandano la pagina.
+    @State private var sezioneMostrata: String?
+    @State private var sottotitolo: String?
+    @State private var telecomando = TelecomandoStudio()
+    private var nome: String { sezioneMostrata ?? apertura.sezione }
+
+    /// 8 nov (il signore: «Studio, Social e Musica si devono aprire come tutte le altre, fluidità, precisione, continuità grafica,
+    /// nessun nero»): l'apertura di CorniceScheda, pezzo per pezzo. Lo sfondo è quello di tutte le sezioni (SfondoSezione: la pagina
+    /// web è trasparente sopra), la riga in alto è BarraSezione ferma dal primo istante, il caricamento è lo stesso (al centro, 120
+    /// punti sotto); quando la pagina è sullo schermo il caricamento sparisce e il contenuto si «stampa» dall'alto con la riga di luce
+    /// (0,32 s), come in ogni sezione.
+    @State private var stampa: CGFloat = 0
+    @State private var stampata = false
+
     var body: some View {
-        // 8 nov mattina (video del signore 06:34: Studio e Social «saltellano», «non si aprono come le altre»): come tutte le
-        // sezioni. La sezione sta nel margine sicuro (ContentView) e la pagina web va a tutto schermo da sé (sotto l'ora e fino in
-        // fondo); il caricamento sta sopra, nel margine sicuro, come quello di ogni sezione: la riga di «Chiudi» sotto l'ora, il
-        // caricamento 120 punti più giù. Prima la sezione intera ignorava i margini: durante la salita iOS non li dà (la pagina è
-        // ancora sotto lo schermo) e a salita finita sì, e il caricamento saltava di 59 punti (provato nel simulatore).
-        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
-                     olo: tintaOlo, materia: materiaOlo)
-            .background(Color.fondo)
-            .ignoresSafeArea()
-            .overlay {
-                if coperto {
-                    // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
-                    // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
-                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
-                        .transition(.opacity)
+        // la riga in alto è alta 44 sotto il margine dell'ora: lì comincia il contenuto, e lì comincia la stampa
+        let daQui = (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 44
+        ZStack {
+            SfondoSezione()
+            // 8 nov mattina (video del signore 06:34): la pagina web va a tutto schermo da sé (sotto l'ora e fino in fondo); la
+            // sezione resta nel margine sicuro come tutte le altre (prima ignorava i margini e a fine salita saltava di 59 punti)
+            PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
+                         testata: { s, t in
+                             if !s.isEmpty { sezioneMostrata = s }
+                             sottotitolo = t.isEmpty ? nil : t
+                         },
+                         passaggio: { riapri() },
+                         telecomando: telecomando, olo: tintaOlo, materia: materiaOlo)
+                .ignoresSafeArea()
+            StampaSezione(da: daQui, stampa: stampa, riga: !coperto && !stampata)
+                .opacity(stampata ? 0 : 1)
+                .allowsHitTesting(false)
+            if coperto {
+                // lo stesso caricamento di tutte le sezioni (7 nov sera: «o le fai tutte uguali»); la riga in alto è quella sotto
+                SchermoCaricamento(titolo: nome, icona: nome == "Social" ? "social" : "studio", conTestata: false)
+            }
+            VStack(spacing: 0) {
+                BarraSezione(testata: DatiTestata(titolo: nome, sottotitolo: coperto ? TestiCaricamento.di(nome) : (sottotitolo ?? TestiCaricamento.di(nome)),
+                                                  icona: nome == "Social" ? "social" : "studio", tinta: .ciano),
+                             tinta: .ciano, chiudi: { telecomando.chiudi() }) {
+                    if nome == "Studio" {
+                        TastoArchivioStudio { telecomando.archivio() }
+                    }
                 }
+                Spacer(minLength: 0)
             }
-            .statusBarHidden(false)
-            .interactiveDismissDisabled(presa)
-            .onAppear {
-                BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
-                apertaDa = Date()
-                Suoni.schedaApre()
-            }
-            .task {                                              // per sicurezza: se la pagina non dice mai «pronta» (bloccata), dopo 10 s si scopre lo stesso
-                // 8 nov: prima 4 s, e una pagina lenta finiva scoperta nel nero; ora il caricamento resta fermo al 92 % come in tutte
-                // le sezioni che aspettano i dati, finché la pagina non è sullo schermo
-                try? await Task.sleep(for: .seconds(10))
-                scopri()
-            }
-            .onDisappear { BattitoMani.paginaAperta(false) }
+        }
+        .statusBarHidden(false)
+        .interactiveDismissDisabled(presa)
+        .onAppear {
+            BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+            apertaDa = Date()
+            Suoni.schedaApre()
+        }
+        .task {                                              // per sicurezza: se la pagina non dice mai «pronta» (bloccata), dopo 10 s si scopre lo stesso
+            // 8 nov: prima 4 s, e una pagina lenta finiva scoperta nel nero; ora il caricamento resta fermo al 92 % come in tutte
+            // le sezioni che aspettano i dati, finché la pagina non è sullo schermo
+            try? await Task.sleep(for: .seconds(10))
+            scopri()
+        }
+        .onDisappear { BattitoMani.paginaAperta(false) }
     }
 
+    /// La pagina è sullo schermo: dopo il caricamento minimo di tutte le sezioni, il suono di «pronta», il caricamento sparisce
+    /// e il contenuto si stampa dall'alto (come CorniceScheda: `mostrato`, poi `stampa` 0 → 1 in Apertura.stampa).
     private func scopri() {
         guard coperto else { return }
         Task { @MainActor in
-            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)        // come AperturaHUD delle altre schede
+            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard coperto else { return }
             Suoni.schedaPronta()
-            withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
+            coperto = false
+            withAnimation(.easeOut(duration: Apertura.stampa)) { stampa = 1 } completion: { stampata = true }
         }
+    }
+
+    /// 8 nov: dentro la pagina si passa da una sezione all'altra (Studio → Social, LiDAR → Studio): si riapre come un'apertura,
+    /// col caricamento e poi la stampa, come quando si apre una sezione.
+    private func riapri() {
+        guard !coperto else { return }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            coperto = true
+            stampa = 0
+            stampata = false
+        }
+        apertaDa = Date()
+        Suoni.schedaApre()
+    }
+}
+
+/// 8 nov: la «stampa» del contenuto come in tutte le sezioni (CorniceScheda): sopra la pagina lo sfondo della sezione, che dall'alto
+/// in giù lascia il posto alla pagina; sul bordo la riga di luce (2 punti, ciano, bagliore 6, larga quanto il contenuto).
+private struct StampaSezione: View {
+    let da: CGFloat
+    let stampa: CGFloat
+    let riga: Bool
+
+    var body: some View {
+        GeometryReader { g in
+            let y = da + max(0, g.size.height - da) * stampa
+            ZStack(alignment: .top) {
+                SfondoSezione()
+                    .mask(alignment: .top) {
+                        VStack(spacing: 0) {
+                            Color.clear.frame(height: y)
+                            Color.black
+                        }
+                    }
+                Rectangle().fill(Color.ciano).frame(height: 2)
+                    .shadow(color: .ciano, radius: 6)
+                    .padding(.horizontal, 16)
+                    .offset(y: y)
+                    .opacity(riga ? 1 : 0)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+/// 8 nov: i tasti della riga in alto dell'app (BarraSezione) che comandano la pagina di Studio e Social: «Chiudi» e ARCHIVIO.
+final class TelecomandoStudio {
+    var chiudi: () -> Void = {}
+    var archivio: () -> Void = {}
+}
+
+/// 8 nov: ARCHIVIO di Studio nella riga in alto, uguale a quello della pagina (.sd-arch: alto 28, 8 punti, icona 12, bordo 0,4).
+/// Il suono lo fa la pagina, come prima.
+private struct TastoArchivioStudio: View {
+    let azione: () -> Void
+    var body: some View {
+        Button(action: azione) {
+            HStack(spacing: 4) {
+                IconaArchivioStudio()
+                    .stroke(Color.ciano, style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
+                    .frame(width: 12, height: 12)
+                Text("ARCHIVIO").font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1)
+            }
+            .foregroundStyle(Color.ciano)
+            .padding(.horizontal, 7)
+            .frame(height: 28)
+            .background(Color(red: 2 / 255, green: 6 / 255, blue: 10 / 255).opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.4), lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(StileStark())
+        .accessibilityLabel("Archivio")
+    }
+}
+
+/// L'icona dell'archivio della pagina (SD_ICO.archivio): la cartella con la nuvola, nel quadrato 24 × 24.
+private struct IconaArchivioStudio: Shape {
+    func path(in r: CGRect) -> Path {
+        let k = min(r.width, r.height) / 24
+        let p0 = CGPoint(x: r.minX, y: r.minY)
+        func q(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: p0.x + x * k, y: p0.y + y * k) }
+        var p = Path()
+        p.move(to: q(3, 6)); p.addLine(to: q(9, 6)); p.addLine(to: q(11, 8)); p.addLine(to: q(21, 8))
+        p.addLine(to: q(21, 19)); p.addLine(to: q(3, 19)); p.closeSubpath()
+        // la nuvola: tre archi (raggi 2,5 · 3,5 · 2) come nel disegno della pagina
+        func arco(_ cx: CGFloat, _ cy: CGFloat, _ raggio: CGFloat, _ da: Double, _ a: Double) {
+            for i in 0...14 {
+                let t = (da + (a - da) * Double(i) / 14) * .pi / 180
+                p.addLine(to: q(cx + raggio * CGFloat(cos(t)), cy + raggio * CGFloat(sin(t))))
+            }
+        }
+        p.move(to: q(9, 15.5))
+        arco(9.25, 13.05, 2.5, 95.8, 275.8)
+        arco(12.8, 11.76, 3.5, 199.4, 357.4)
+        arco(16.15, 13.55, 2, 274.4, 454.4)
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -89,9 +223,15 @@ private struct PaginaStudio: UIViewRepresentable {
     let chiudi: () -> Void
     let pronta: () -> Void
     let presa: (Bool) -> Void
+    let testata: (_ sezione: String, _ sottotitolo: String) -> Void
+    let passaggio: () -> Void
+    let telecomando: TelecomandoStudio
     let olo: Double
     let materia: Bool
-    func makeCoordinator() -> RegiaStudio { RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta, presa: presa) }
+    func makeCoordinator() -> RegiaStudio {
+        RegiaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: pronta, presa: presa, testata: testata, passaggio: passaggio,
+                    telecomando: telecomando)
+    }
     func makeUIView(context: Context) -> WKWebView { context.coordinator.costruisci() }
     func updateUIView(_ uiView: WKWebView, context: Context) { context.coordinator.olo(forza: olo, materia: materia) }
     static func dismantleUIView(_ uiView: WKWebView, coordinator: RegiaStudio) { coordinator.smonta() }
@@ -104,6 +244,9 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private let chiudi: () -> Void
     private let pronta: () -> Void
     private let presa: (Bool) -> Void
+    private let testata: (_ sezione: String, _ sottotitolo: String) -> Void
+    private let passaggio: () -> Void
+    private var paginaAperta = false                 // 8 nov: la pagina ha aperto la sezione (ha detto «pronta»)
     private weak var web: WKWebView?
     private var archivio: [String: String] = RegiaStudio.leggiArchivio()
     private var salvataggio: Task<Void, Never>?
@@ -119,14 +262,27 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private let ancoraLogin = AncoraLogin()
 
     init(apertura: AperturaPagina, parla: @escaping (String) -> Void, chiudi: @escaping () -> Void, pronta: @escaping () -> Void = {},
-         presa: @escaping (Bool) -> Void = { _ in }) {
+         presa: @escaping (Bool) -> Void = { _ in }, testata: @escaping (_ sezione: String, _ sottotitolo: String) -> Void = { _, _ in },
+         passaggio: @escaping () -> Void = {}, telecomando: TelecomandoStudio? = nil) {
         self.apertura = apertura
         self.parla = parla
         self.chiudi = chiudi
         self.pronta = pronta
         self.presa = presa
+        self.testata = testata
+        self.passaggio = passaggio
         self.videoScelto = apertura.video                // 26 ott sera: il video degli Occhi (lo carica l'app, alla pagina va la copertina)
         super.init()
+        // 8 nov: «Chiudi» e ARCHIVIO della riga in alto (dell'app) premono quelli della pagina, che resta padrona della chiusura
+        // (Studio: «Salvare in archivio?»). Prima che la pagina sia aperta «Chiudi» chiude e basta.
+        telecomando?.chiudi = { [weak self] in self?.premiChiudi() }
+        telecomando?.archivio = { [weak self] in self?.web?.evaluateJavaScript("window.__jarvisArchivio && window.__jarvisArchivio()", completionHandler: nil) }
+    }
+
+    private func premiChiudi() {
+        guard paginaAperta, let web else { salvaOra(); chiudi(); return }
+        web.evaluateJavaScript("window.__jarvisChiudi ? window.__jarvisChiudi() : window.webkit.messageHandlers.jarvis.postMessage({ tipo: 'chiudi' })",
+                               completionHandler: nil)
     }
 
     func costruisci() -> WKWebView {
@@ -140,7 +296,9 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
         conf.userContentController = ponte
         let w = WKWebView(frame: .zero, configuration: conf)
         w.isOpaque = false
-        w.backgroundColor = UIColor(red: 0.008, green: 0.012, blue: 0.016, alpha: 1)
+        // 8 nov: trasparente: lo sfondo è SfondoSezione, lo stesso di tutte le sezioni (la pagina disegna solo il contenuto)
+        w.backgroundColor = .clear
+        w.scrollView.backgroundColor = .clear
         w.scrollView.isScrollEnabled = false
         w.scrollView.bounces = false
         w.scrollView.contentInsetAdjustmentBehavior = .never
@@ -214,6 +372,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             // 8 nov (il signore: «non voglio problemi di nero»): «pronta» della pagina vuol dire che la pagina ha finito il suo lavoro,
             // non che l'immagine sia già sullo schermo (nel simulatore arrivava secondi dopo: nero). L'istantanea di iOS «dopo
             // l'aggiornamento dello schermo» torna solo quando la pagina è davvero presentata: allora sfuma il caricamento.
+            paginaAperta = true
             guard let web else { pronta(); return }
             let c = WKSnapshotConfiguration()
             c.rect = CGRect(x: 0, y: 0, width: 4, height: 4)
@@ -223,6 +382,10 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
                 _ = try? await web?.takeSnapshot(configuration: c)
                 self?.pronta()
             }
+        case "testata":                                                  // 8 nov: la sezione che la pagina mostra e il suo sottotitolo
+            testata(o["sezione"] as? String ?? "", o["sotto"] as? String ?? "")
+        case "passaggio":                                                // 8 nov: la pagina passa a un'altra sezione: si ricopre col caricamento
+            passaggio()
         case "presa":                                                    // il dito lavora nella pagina: niente chiusura trascinando
             presa(o["on"] as? Bool ?? false)
         case "ls":                                                       // l'archivio dei progetti (localStorage del mockup)
@@ -635,7 +798,10 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
           // 26 ott: la pagina (4 MB) si disegnava a pezzi mentre si caricava: per un attimo la casa del mockup su fondo bianco
           // (menu delle build, link). Resta nascosta, sul nero, finché non è aperta la sezione (la mostra copioneFine).
           document.documentElement.style.visibility = 'hidden';
-          document.documentElement.style.background = '#020304';
+          // 8 nov: la pagina è trasparente: sotto c'è lo sfondo di tutte le sezioni, quello dell'app (SfondoSezione). Nelle pagine
+          // olografiche (OloWeb) torna il suo fondo, come prima
+          document.documentElement.style.background = 'transparent';
+          document.documentElement.classList.add('jarvis-trasparente');
           // 26 ott: i suoni del banco (tag <audio>) aprivano il lettore di iOS nella Dynamic Island. Si suonano con Web Audio,
           // che non passa da «In riproduzione»; i video (Reel, 360°) restano come sono.
           (function(){
@@ -725,15 +891,35 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             + '.isola{opacity:0!important}html .sd-su,html .sc-su{padding-top:\(alto + 2)px!important}'   // 8 nov: la riga della testata alla stessa altezza di quella del caricamento (e di tutte le sezioni: icona 2 punti sotto il margine dell'ora)
             + '.sd-banco{min-height:min(240px,26vh)!important}'
             + '#tendina{display:none!important}'
-            + '.voce-mock{display:none!important}';   // 8 nov notte (foto del signore, Social): nell'app JARVIS parla davvero, la sua frase scritta non si vede mai   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
+            + '.voce-mock{display:none!important}'
+            // 8 nov (video del signore 09:00/09:02: «la parte alta va a salti»): la riga in alto è quella dell'app, come in tutte le
+            // sezioni; della testata della pagina restano solo le righe di stato di Studio (.oc-info), al loro posto
+            + '#sezione .sd-su>.anello,#sezione .sd-su>div>b,#sezione .sd-su>div>small,#sezione .sd-su>button,#sezione .sc-su>.anello,#sezione .sc-su>div>b,#sezione .sc-su>div>small,#sezione .sc-su>button{visibility:hidden!important}'
+            // 8 nov: lo sfondo è quello dell'app (SfondoSezione, uguale in tutte le sezioni): la pagina disegna solo il contenuto
+            + 'html.jarvis-trasparente,html.jarvis-trasparente body,html.jarvis-trasparente #cornice,html.jarvis-trasparente #cornice>.telefono,html.jarvis-trasparente #sezione,html.jarvis-trasparente .allen.sd,html.jarvis-trasparente .allen.sc{background:transparent!important}'
+            + 'html.jarvis-trasparente #cornice>.telefono::before,html.jarvis-trasparente #sezione::before,html.jarvis-trasparente #sezione::after,html.jarvis-trasparente .allen.sd::before,html.jarvis-trasparente .allen.sd::after,html.jarvis-trasparente .allen.sc::before,html.jarvis-trasparente .allen.sc::after{display:none!important}'
+            + 'html.jarvis-trasparente #cornice>.telefono>:not(#sezione):not(#notifica):not(#conferma){opacity:0!important;pointer-events:none!important}';   // 8 nov notte (foto del signore, Social): nell'app JARVIS parla davvero, la sua frase scritta non si vede mai   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
           document.head.appendChild(st);
           // 8 nov notte (il signore: «toglile, queste trascrizioni orribili delle parole di JARVIS»): nell'app la frase la dice la voce
           // vera; la scritta del mockup (che non parla) qui non si crea più
           if (typeof window.parlaMock === 'function') { window.parlaMock = function(t){ post({ tipo: 'parla', testo: String(t) }); }; }
           var sez = document.getElementById('sezione'), aperta = false, via = null, radice = document.documentElement;
+          // 8 nov: all'app la sezione mostrata e il suo sottotitolo (per la riga in alto dell'app); «Chiudi» e ARCHIVIO dell'app
+          // premono quelli della pagina (Studio: «Salvare in archivio?» come prima)
+          var ultimaTestata = '';
+          var testata = function(){ var su = sez && sez.querySelector('.sd-su, .sc-su'); if (!su) return;
+            var n = su.classList.contains('sc-su') ? 'Social' : 'Studio', s = su.querySelector(':scope > div > small'), t = s ? s.textContent.trim() : '';
+            if (n + '|' + t === ultimaTestata) return; ultimaTestata = n + '|' + t; post({ tipo: 'testata', sezione: n, sotto: t }); };
+          if (sez) new MutationObserver(testata).observe(sez, { childList: true, subtree: true, characterData: true });
+          window.__jarvisChiudi = function(){ var b = sez && sez.querySelector('.sd-su .sd-chiudi, .sc-su .sc-chiudi');
+            if (aperta && b) { chiedeChiusura = performance.now(); b.click(); } else { aperta = false; post({ tipo: 'chiudi' }); } };
+          window.__jarvisArchivio = function(){ var b = sez && sez.querySelector('.sd-su [data-sdarch]'); if (b) b.click(); };
           if (sez) new MutationObserver(function(){
-            if (sez.classList.contains('su')) { aperta = true; clearTimeout(via); via = null; radice.style.visibility = ''; }
+            if (sez.classList.contains('su')) { var ripresa = !!via; aperta = true; clearTimeout(via); via = null; radice.style.visibility = '';
+              // 8 nov: dopo un passaggio (Studio → Social…) la sezione nuova è aperta: di nuovo «pronta», come all'apertura
+              if (ripresa) requestAnimationFrame(function(){ requestAnimationFrame(function(){ testata(); post({ tipo: 'pronta' }); }); }); }
             else if (aperta && !via) {
+              post({ tipo: 'passaggio' });                             // 8 nov: l'app ricopre col caricamento, come un'apertura
               radice.style.visibility = 'hidden';                      // la casa del telefono del mockup non si vede mai
               via = setTimeout(function(){ via = null; if (sez.classList.contains('su')) { radice.style.visibility = ''; return; } aperta = false; post({ tipo: 'chiudi' }); }, 750);
             }
@@ -793,6 +979,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
           // caricamento sfumava: la testata entrava più in basso e saliva. La transizione torna dopo, per i passaggi dentro la pagina.
           var apri = function(){ if (sez) sez.style.transition = 'none';
             if (typeof window.apriSezione === 'function') window.apriSezione(\(js(a.sezione))); if (sez && sez.classList.contains('su')) { aperta = true; radice.style.visibility = ''; }
+            testata();
             if (sez) void sez.offsetWidth;
             requestAnimationFrame(function(){ requestAnimationFrame(function(){ if (sez) sez.style.transition = ''; post({ tipo: 'pronta' }); }); }); };
           setTimeout(function(){ if (!via) radice.style.visibility = ''; }, 1500);   // per sicurezza: mai una pagina che resta nera
@@ -844,7 +1031,9 @@ enum OloWeb {
       var metti = function (e, p) { for (var k in p) { e.style.setProperty(k, p[k], 'important'); } };
       var via = function () { if (C) { C.remove(); } if (S) { S.remove(); } C = null; S = null; };
       var giro = ++G.giro;
-      if (!m && f <= 0 && (!C || !S || G.mat)) { G.mat = false; via(); return 0; }
+      // 8 nov: la pagina è trasparente sopra lo sfondo dell'app; olografica torna col suo fondo (il ciano «color» vuole un fondo)
+      if (f > 0 || m) { R.classList.remove('jarvis-trasparente'); }
+      if (!m && f <= 0 && (!C || !S || G.mat)) { G.mat = false; via(); R.classList.add('jarvis-trasparente'); return 0; }
       if (!C || !S) {
         via();
         var crea = function (id, fondo, fusione) {
@@ -890,7 +1079,7 @@ enum OloWeb {
         metti(e, { transition: 'opacity ' + tempo + 'ms ' + curva, '-webkit-mask-image': 'none', 'mask-image': 'none',
           opacity: String(f) });
       });
-      if (f <= 0) { setTimeout(function () { if (G.giro === giro) { via(); } }, tempo + 50); }
+      if (f <= 0) { setTimeout(function () { if (G.giro === giro) { via(); R.classList.add('jarvis-trasparente'); } }, tempo + 50); }
       return 0;
     }
     """

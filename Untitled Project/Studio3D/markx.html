@@ -5682,7 +5682,7 @@ function social(ok) {
   const DIDA = ["Uscito ora dal banco olografico di JARVIS: progettato in 3D, stampato in PLA. Dite la vostra 👇\n\n#3dprinting #kingrusto #design #madeinitaly",
     "Dal muro allo Studio: lo stencil diventa un pezzo vero. Chi lo vuole? Commentate LISTA.\n\n#kingrusto #graffiti #customdenim #3dprint",
     "Nuovo drop in arrivo. Questo è il prototipo: ditemi colore e misura.\n\n#kingrusto #streetart #drop"];
-  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>SOCIAL</b><small data-sc-sotto>${TC("Social").toUpperCase()}</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sc-su"><div class="anello">${ICONE.Social}</div><div><b>SOCIAL</b><small data-sc-sotto>SOCIAL · @KINGRUSTO</small></div><button type="button" class="sc-chiudi">Chiudi</button></div>
     <div class="sc-conto"><div class="sc-avatar"><i></i><b>KR</b></div><div><b class="sc-nome">@kingrusto${SOC.verificato ? SC_SPUNTA : ""}</b><small data-soc="sotto">${window.JARVIS_APP ? "INSTAGRAM · ACCOUNT&nbsp;CREATOR · CARICO…" : "INSTAGRAM · ACCOUNT&nbsp;CREATOR · DATI&nbsp;D'ESEMPIO"}</small></div><div class="sc-num"><b data-soc="follower">${window.JARVIS_APP ? "…" : "12,4K"}</b><small>FOLLOWER</small></div></div>
     <div class="sc-schede" role="tablist">${[["pubblica", "PUBBLICA"], ["posta", "POSTA"], ["griglia", "GRIGLIA"], ["piano", "PIANO"], ["report", "REPORT"], ["orari", "ORARI"], ["rivali", "RIVALI"], ["automazioni", "AUTOMAZIONI"]].map(([k, n]) => `<button type="button" class="chip" data-sc="${k}" aria-pressed="${k === "pubblica"}">${n}${k === "posta" ? `<em data-n="posta"></em>` : ""}</button>`).join("")}</div>
     <div class="sc-pagina" id="scPagina"></div>`;
@@ -6259,7 +6259,7 @@ function studio(ok) {
   corpo.hidden = true; sezione.classList.add("pieno");
   const A = document.createElement("div"); A.className = "allen sd";
   const rail = (lista) => lista.map(([k, n]) => `<button type="button" data-sdt="${k}" aria-pressed="false" aria-label="${n}"><i>${SD_ICO[k]}</i>${n}</button>`).join("");
-  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>STUDIO</b><small data-sd="prog">${TC("Studio").toUpperCase()}</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
+  A.innerHTML = `<div class="sd-su"><div class="anello">${ICONE.Studio}</div><div><b>STUDIO</b><small data-sd="prog">${progAtt()?.nome ? `STUDIO · ${progAtt().nome.toUpperCase()}` : "CREATIVE STUDIO"}</small><div class="oc-info" data-sd="info"></div></div><button type="button" class="sd-arch" data-sdarch>${SD_ICO.archivio}ARCHIVIO</button><button type="button" class="sd-chiudi">Chiudi</button></div>
     <div class="sd-vista"><div class="sd-modi">${[["solido", "SOLIDO"], ["reticolo", "WIREFRAME"], ["raggi", "RAGGI X"]].map(([k, n], i) => `<button type="button" data-sdv="${k}" aria-pressed="${!i}">${n}</button>`).join("")}<button type="button" data-sdg aria-pressed="true">SNAP 5</button></div>
       <div class="sd-storia"><button type="button" data-sda="annulla" aria-label="Annulla" class="spento">${SD_ICO.annulla}</button><button type="button" data-sda="ripeti" aria-label="Ripeti" class="spento">${SD_ICO.ripeti}</button></div></div>
     <div class="sd-banco"><div class="sd-angoli"></div>
@@ -6275,8 +6275,8 @@ function studio(ok) {
     <div class="sd-dock"><div class="sd-fonti">${[["disegna", "SCHIZZO"], ["foto", "FOTO"], ["carica", "IMPORTA"], ["lidar", "LIDAR"], ["occhi", "OCCHI"]].map(([k, n]) => `<button type="button" data-sdf="${k}">${SD_ICO[k]}${n}</button>`).join("")}</div>
       <div class="sd-azioni"><button type="button" class="pieno spento" data-sdx="stampa">${SD_ICO.stampa}STAMPA 3D</button><button type="button" class="vuoto spento" data-sdx="condividi">${SD_ICO.condividi}CONDIVIDI</button></div></div>
     <input type="file" accept="image/*,.stl" hidden data-sd="file"><input type="file" accept="image/*" capture="environment" hidden data-sd="cam">`;
-  const sdDopo = Date.now() + 1300;   // 27 ott: prima la parola di caricamento, poi il progetto
-  A.style.opacity = 0; sezione.appendChild(A);
+  const sdDopo = Date.now();   // v291 (il signore: «tutte uguali»): il nome del progetto arriva con la sezione, come i sottotitoli di tutte
+  sezione.appendChild(A);   // v291: il banco c'è già quando finisce il caricamento (prima compariva 0,25 s dopo: un attimo di buio)
   const $sd = (k) => A.querySelector(`[data-sd="${k}"]`);
   const vivo = () => ok() && A.isConnected;
   A.querySelector(".sd-chiudi").addEventListener("click", () => { suona("aTick"); if (!B) { $("chiudiSez").click(); return; } chiediSalva(() => $("chiudiSez").click(), "Chiudo Studio"); });
@@ -6297,7 +6297,6 @@ function studio(ok) {
   // ── l'accensione del banco: la griglia si accende dal centro, gli anelli si allargano, le righe entrano ──
   (async () => {
     await attesa(250); if (!vivo()) return;
-    A.style.transition = "opacity .35s"; A.style.opacity = 1;
     B = await bancoOlografico3D(A.querySelector(".sd-banco"), vivo, {
       tocca: (id) => { const o = oggetti.find((x) => x.id === id); seleziona(o || null); },
       trascina: (dx, dy) => trascina(dx, dy), fine: () => fineTrascina(),

@@ -343,6 +343,10 @@ struct VistaMusica: View {
     @State private var aperta: RaccoltaMusica?
     @State private var braniAperta: [Track]?
     @State private var pronto = false
+    /// 8 nov (il signore: Musica «carica dopo», «uguale alle altre sezioni»): la sezione si apre col caricamento di sempre; le liste
+    /// di Apple Music arrivano dopo, con l'anello del mockup al loro posto (come la Posta e il Diario). Prima il caricamento
+    /// aspettava tutte e tre le risposte di Apple Music.
+    @State private var attesaOggi = true
     @State private var avviso: String?
     @State private var recenti: [Song] = []
     @State private var perLeiPlaylist: [Playlist] = []
@@ -417,6 +421,9 @@ struct VistaMusica: View {
     // MARK: OGGI
 
     @ViewBuilder private var oggi: some View {
+        if attesaOggi && recenti.isEmpty && perLeiPlaylist.isEmpty && perLeiAlbum.isEmpty && momento.isEmpty {
+            AttesaAnello(tinta: .ciano).frame(maxWidth: .infinity).padding(.top, 24)
+        }
         if !recenti.isEmpty {
             sezione("ASCOLTATI DI RECENTE") {
                 fila(recenti.map { s in
@@ -627,7 +634,8 @@ struct VistaMusica: View {
     // MARK: il caricamento
 
     private func caricaOggi() async {
-        guard await CatalogoMusica.autorizzato() else { avviso = CatalogoMusica.senzaPermesso; pronto = true; return }
+        guard await CatalogoMusica.autorizzato() else { avviso = CatalogoMusica.senzaPermesso; attesaOggi = false; pronto = true; return }
+        pronto = true
         if let abbonamento = try? await MusicSubscription.current, !abbonamento.canPlayCatalogContent {
             avviso = "Per far suonare Apple Music serve l'abbonamento attivo su questo iPhone, Sir."
         }
@@ -635,17 +643,19 @@ struct VistaMusica: View {
         async let p = CatalogoMusica.perLei()
         async let m = CatalogoMusica.momento()
         let (rr, pp, mm) = await (r, p, m)
-        recenti = rr
-        perLeiPlaylist = pp.playlist
-        perLeiAlbum = pp.album
-        radioSuggerite = pp.radio
-        momento = mm
+        withAnimation(.easeOut(duration: 0.25)) {
+            recenti = rr
+            perLeiPlaylist = pp.playlist
+            perLeiAlbum = pp.album
+            radioSuggerite = pp.radio
+            momento = mm
+            attesaOggi = false
+        }
         // decisione 34: niente di niente, nemmeno la classifica del suo Paese (che c'è sempre quando Apple Music risponde):
         // Apple Music non ha risposto. Lo dice il riquadro arancione, come il permesso e l'abbonamento mancanti
         if avviso == nil, rr.isEmpty, pp.playlist.isEmpty, pp.album.isEmpty, pp.radio.isEmpty, mm.isEmpty {
             avviso = CatalogoMusica.nonRisponde
         }
-        pronto = true
     }
 
     private func carica(_ s: Scheda) async {
