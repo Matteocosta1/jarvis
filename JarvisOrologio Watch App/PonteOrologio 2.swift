@@ -185,6 +185,8 @@ final class PonteOrologio: NSObject {
         let tempo: Double
         let suona: Bool
         let errore: String?
+        /// 8 nov · Shazam al polso: da dove suona sull'iPhone («APPLE MUSIC» o «APPLE · ANTEPRIMA 30 S»); nil per la MUSICA.
+        let fonte: String?
     }
 
     /// Comanda la musica dell'iPhone: «stato», «play», «pausa», «avanti», «indietro». Nil se l'iPhone non risponde.
@@ -197,7 +199,7 @@ final class PonteOrologio: NSObject {
             s.sendMessage(["musica": comando], replyHandler: { @Sendable r in
                 c.resume(returning: StatoMusica(titolo: r["titolo"] as? String ?? "—", artista: r["artista"] as? String ?? "—",
                                                 durata: (r["durata"] as? NSNumber)?.doubleValue, tempo: (r["tempo"] as? NSNumber)?.doubleValue ?? 0,
-                                                suona: r["suona"] as? Bool ?? false, errore: r["errore"] as? String))
+                                                suona: r["suona"] as? Bool ?? false, errore: r["errore"] as? String, fonte: r["fonte"] as? String))
             }, errorHandler: { @Sendable _ in
                 c.resume(returning: nil)
             })

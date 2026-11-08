@@ -627,6 +627,7 @@ struct VistaShazamOrologio: View {
     @State private var brano: Musica.Brano?
     @State private var suona = false                 // MARK X: la canzone suona sull'iPhone; dal polso pausa e play
     @State private var avviso: String?
+    @State private var fonte = "APPLE MUSIC"          // 8 nov: o «APPLE · ANTEPRIMA 30 S» (senza Apple Music, come lo Shazam dell'iPhone)
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
@@ -648,7 +649,7 @@ struct VistaShazamOrologio: View {
                                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                         }
                         .tint(ciano)
-                        Text(avviso ?? "SUONA SULL'IPHONE · APPLE MUSIC").font(.system(size: 8, design: .monospaced))
+                        Text(avviso ?? "SUONA SULL'IPHONE · \(fonte)").font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(avviso == nil ? .secondary : Color.orange).multilineTextAlignment(.center)
                         TastoJarvisOrologio(testo: "Chieda a JARVIS", frase: "Raccontami qualcosa di «\(b.titolo)» di \(b.artista).")
                     }
@@ -687,10 +688,11 @@ struct VistaShazamOrologio: View {
         switch await Musica.riconosci(secondi: 12) {
         case .trovato(let b):
             brano = b; stato = .trovata; WKInterfaceDevice.current().play(.success); SuoniOrologio.pronto()
-            // la canzone parte subito sull'iPhone (Apple Music), come il player del telefono
-            let d: [String: String] = ["id": b.appleMusicID ?? "", "cerca": "\(b.titolo) \(b.artista)"]
+            // la canzone parte subito sull'iPhone, come il player del telefono: Apple Music intero se può, se no l'anteprima di 30 s
+            // (8 nov, il signore: «Shazam al polso senza Apple Music»)
+            let d: [String: String] = ["id": b.appleMusicID ?? "", "cerca": "\(b.titolo) \(b.artista)", "titolo": b.titolo, "artista": b.artista]
             let j = String(decoding: (try? JSONSerialization.data(withJSONObject: d)) ?? Data("{}".utf8), as: UTF8.self)
-            if let r = await PonteOrologio.condiviso.musica("brano:" + j) { suona = r.suona; avviso = r.errore }
+            if let r = await PonteOrologio.condiviso.musica("brano:" + j) { suona = r.suona; avviso = r.errore; fonte = r.fonte ?? "APPLE MUSIC" }
             else { avviso = "L'IPHONE NON RISPONDE" }
         case .nessuno: stato = .niente("Non la riconosco, Sir. Avvicini il polso alla musica.")
         case .errore(let e): stato = .niente("Shazam non risponde: \(e)")
@@ -699,7 +701,8 @@ struct VistaShazamOrologio: View {
 
     private func playPausa() async {
         WKInterfaceDevice.current().play(.click)
-        if let r = await PonteOrologio.condiviso.musica(suona ? "pausa" : "play") { suona = r.suona; avviso = r.errore }
+        // 8 nov: «shazam:…», così comanda la fonte di Shazam (anche l'anteprima), non la coda di MUSICA
+        if let r = await PonteOrologio.condiviso.musica(suona ? "shazam:pausa" : "shazam:play") { suona = r.suona; avviso = r.errore }
         else { avviso = "L'IPHONE NON RISPONDE" }
     }
 }

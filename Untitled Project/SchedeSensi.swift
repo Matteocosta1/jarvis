@@ -35,6 +35,8 @@ struct VistaShazam: View {
     @State private var stato: Stato = .fermo
     @State private var storico: [Trovata] = []
     @State private var chiediCancella = false
+    @State private var daEliminare: UUID?               // 8 nov (scelta del signore): la canzone che aspetta CONFERMA, 3 s
+    @State private var giroElimina = 0
     @State private var lampo = false                    // il lampo del logo quando la trova
     @State private var aperta: Trovata?                 // il player
     @ObservedObject private var ascolto = AscoltoShazam.condiviso   // 8 nov: da dove si ascolta (Apple Music, anteprima, YouTube)
@@ -53,8 +55,10 @@ struct VistaShazam: View {
             if !storico.isEmpty {
                 Pannello(titolo: "RICONOSCIUTE · \(storico.count)", tinta: tinta) {
                     ForEach(storico) { t in rigaStorico(t) }
-                    Button(role: .destructive) { chiediCancella = true } label: { Label("Cancella la cronologia", systemImage: "trash").font(.footnote) }
-                        .tint(.red).padding(.top, 4)
+                    Button(role: .destructive) { Suoni.schedaApre(); withAnimation(.salitaFoglio) { chiediCancella = true } } label: {
+                        Label("Cancella la cronologia", systemImage: "trash").font(.footnote)
+                    }
+                    .tint(.red).padding(.top, 4)
                 }
             }
             // 8 nov (controllo): col mini-player in fondo le ultime canzoni restavano sotto e non si toccavano: lo spazio del mini
@@ -77,8 +81,12 @@ struct VistaShazam: View {
             Task { await ascolta() }
         }
         .task { await lettore.segui() }
-        .confirmationDialog("Cancellare tutte le canzoni riconosciute?", isPresented: $chiediCancella, titleVisibility: .visible) {
-            Button("Cancella", role: .destructive) { storico = []; VistaShazam.salva([]) }
+        // 8 nov (scelta del signore): «CANCELLARE TUTTO?» olografico come lo Scanner del mockup (prima la domanda di iOS)
+        .domandaCancella($chiediCancella, sotto: "\(storico.count) canzoni riconosciute",
+                         nota: "Si cancella solo la cronologia di Shazam sull'iPhone. Per una sola: ELIMINA sulla sua riga.") {
+            Suoni.pronto()
+            withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico = [] }
+            VistaShazam.salva([])
         }
     }
 
@@ -341,25 +349,59 @@ struct VistaShazam: View {
     }
 
     private func rigaStorico(_ t: Trovata) -> some View {
-        Button { Task { await suona(t) } } label: {
-            HStack(spacing: 12) {
-                AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                    .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(t.titolo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text(t.artista).font(.system(size: 12)).foregroundStyle(tinta).lineLimit(1)
+        HStack(spacing: 10) {
+            Button { Task { await suona(t) } } label: {
+                HStack(spacing: 12) {
+                    AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
+                        .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(t.titolo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                        Text(t.artista).font(.system(size: 12)).foregroundStyle(tinta).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Text(t.quando.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
+                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
+                    Image(systemName: "play.circle.fill").font(.system(size: 22)).foregroundStyle(tinta)
                 }
-                Spacer()
-                Text(t.quando.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
-                    .font(.system(size: 9, design: .monospaced)).foregroundStyle(Color.tenue)
-                Image(systemName: "play.circle.fill").font(.system(size: 22)).foregroundStyle(tinta)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            // 8 nov (scelta del signore, «Shazam: ELIMINA › CONFERMA»): come lo Scanner e l'archivio di LiDAR, CONFERMA per 3 s
+            let sicuro = daEliminare == t.id
+            let rosso = Color(red: 1, green: 107 / 255, blue: 107 / 255)                                    // #ff6b6b
+            Button { elimina(t) } label: {
+                Text(sicuro ? "CONFERMA" : "ELIMINA")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1)
+                    .foregroundStyle(sicuro ? rosso : Color.ciano)
+                    .padding(.vertical, 6).padding(.horizontal, 8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(sicuro ? rosso.opacity(0.6) : Color.ciano.opacity(0.3), lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(StileStark())
+            .accessibilityLabel(sicuro ? "Conferma: elimina \(t.titolo)" : "Elimina \(t.titolo)")
         }
-        .buttonStyle(.plain)
+        .transition(.opacity.combined(with: .move(edge: .leading)))
         .contextMenu {
             Button { chiedi("Raccontami qualcosa di «\(t.titolo)» di \(t.artista): l'anno, la storia, e se c'è un vinile da cercare su Discogs.") } label: { Label("Chieda a JARVIS", systemImage: "waveform") }
             Button(role: .destructive) { storico.removeAll { $0.id == t.id }; VistaShazam.salva(storico) } label: { Label("Elimina", systemImage: "trash") }
         }
+    }
+
+    /// Il primo tocco su ELIMINA chiede CONFERMA per 3 secondi (come lo Scanner), il secondo elimina la canzone, solo quella.
+    private func elimina(_ t: Trovata) {
+        guard daEliminare == t.id else {
+            Suoni.tocco()
+            daEliminare = t.id
+            giroElimina += 1
+            let mio = giroElimina
+            Task { try? await Task.sleep(for: .seconds(3)); if giroElimina == mio { daEliminare = nil } }
+            return
+        }
+        Suoni.pronto()
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6)
+        daEliminare = nil
+        withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico.removeAll { $0.id == t.id } }
+        VistaShazam.salva(storico)
     }
 
     // MARK: ascolto, riproduzione, libreria

@@ -54,8 +54,10 @@ struct VistaScanner: View {
                     ForEach(storico) { s in rigaStorico(s) }
                     // 8 nov (il signore: «cancellare i singoli prodotti, non tutti»): ogni riga ha ELIMINA › CONFERMA, come
                     // l'archivio di LiDAR, Studio e Satellite (resta anche tenendo premuto); tutti insieme da qui
-                    Button(role: .destructive) { chiediCancella = true } label: { Label("Cancella la cronologia", systemImage: "trash").font(.footnote) }
-                        .tint(.red).padding(.top, 4)
+                    Button(role: .destructive) { Suoni.schedaApre(); withAnimation(.salitaFoglio) { chiediCancella = true } } label: {
+                        Label("Cancella la cronologia", systemImage: "trash").font(.footnote)
+                    }
+                    .tint(.red).padding(.top, 4)
                 }
             }
         }
@@ -72,8 +74,12 @@ struct VistaScanner: View {
         // MARK XI: dietro i comandi a voce in pausa; 7 nov (screenshot del signore: tornato davanti il lettore era nero) anche la
         // fotocamera si ferma e davanti riparte da capo
         .pausaDietro(ferma: { orecchio.ferma(); inPausa = true }, riprendi: { inPausa = false; orecchio.avvia() })
-        .confirmationDialog("Cancellare tutti i prodotti scansionati?", isPresented: $chiediCancella, titleVisibility: .visible) {
-            Button("Cancella", role: .destructive) { storico = []; VistaScanner.salva([]) }
+        // 8 nov (controllo): «CANCELLARE TUTTO?» olografico come il mockup v277 (prima la domanda di iOS)
+        .domandaCancella($chiediCancella, sotto: "\(storico.count) prodotti scansionati",
+                         nota: "Si cancella solo la cronologia di Scanner sull'iPhone. Per uno solo: ELIMINA sulla sua riga.") {
+            Suoni.pronto()
+            withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico = [] }
+            VistaScanner.salva([])
         }
     }
 

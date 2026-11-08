@@ -51,7 +51,10 @@ final class AscoltoShazam: ObservableObject {
 
     // MARK: si parte dalla fonte migliore
 
-    func suona(titolo: String, artista: String, appleID: String?) async {
+    /// `dalPolso` (8 nov, il signore: «Shazam al polso senza Apple Music»): la canzone riconosciuta sull'orologio suona qui allo
+    /// stesso modo, ma senza chiedere il permesso (l'iPhone può essere in tasca: il foglio di iOS non si vedrebbe) e senza YouTube
+    /// (il video si guarda sul telefono).
+    func suona(titolo: String, artista: String, appleID: String?, dalPolso: Bool = false) async {
         ferma()
         giro += 1
         let mio = giro
@@ -62,7 +65,9 @@ final class AscoltoShazam: ObservableObject {
         anteprima = nil
         defer { if mio == giro { cercando = false } }
         // 1 · Apple Music intero
-        if await CatalogoMusica.autorizzato(), (try? await MusicSubscription.current)?.canPlayCatalogContent == true,
+        var permesso = MusicAuthorization.currentStatus == .authorized
+        if !permesso && !dalPolso { permesso = await CatalogoMusica.autorizzato() }
+        if permesso, (try? await MusicSubscription.current)?.canPlayCatalogContent == true,
            let s = await Self.trova(titolo: titolo, artista: artista, appleID: appleID) {
             guard mio == giro else { return }
             brano = s
@@ -79,8 +84,15 @@ final class AscoltoShazam: ObservableObject {
             return
         }
         guard mio == giro else { return }
-        // 3 · YouTube
+        // 3 · YouTube (non dal polso)
+        guard !dalPolso else { errore = "Non la trovo né su Apple Music né fra le anteprime, Sir."; return }
         await video(titolo: titolo, artista: artista)
+    }
+
+    /// Dal polso (8 nov): l'anteprima riparte o si ferma come chiede l'orologio (non è un interruttore: il polso dice cosa vuole).
+    func anteprimaDalPolso(suona si: Bool) async {
+        guard fonte == .anteprima, si != suonaAnteprima else { return }
+        await playPausa()
     }
 
     /// Il tasto YOUTUBE: il video della canzone (l'audio di Apple si ferma, YouTube vuole che il video si veda).
@@ -198,6 +210,14 @@ final class AscoltoShazam: ObservableObject {
 
     private func avviaAnteprima(_ u: URL) {
         fermaAudio()
+        // 8 nov (controllo): finito l'avvio l'audio dell'app resta «ambient» (Suoni.fineAvvioAudio): l'anteprima taceva col tasto
+        // silenzioso e, partita dal polso con l'iPhone in tasca, si fermava. Se nessuno usa l'audio, l'anteprima lo prende come musica;
+        // se l'ascolto di JARVIS ha già l'audio (registrazione e riproduzione), non si tocca.
+        let sessione = AVAudioSession.sharedInstance()
+        if sessione.category == .ambient || sessione.category == .soloAmbient {
+            try? sessione.setCategory(.playback, mode: .default, options: [])
+        }
+        try? sessione.setActive(true)
         let p = AVPlayer(url: u)
         lettore30 = p
         p.play()

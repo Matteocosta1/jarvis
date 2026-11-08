@@ -542,21 +542,22 @@ struct VistaOrologio: View {
     }
 
     /// Scorciatoie: un tocco e JARVIS fa la domanda. Per aggiungerne una basta una riga.
-    /// Build 30 (deciso dal signore, 25 ott): in testa, cioè quelle che restano sullo schermo dopo l'avvio, SISTEMI:
+    /// Build 30 (deciso dal signore, 25 ott): in testa, cioè quelle che restano sullo schermo dopo l'avvio, SYSTEMS:
     /// Supabase · GitHub · Archivio · Cestino · Musica · Impostazioni · Sistemi. Poi per tipo come sull'iPhone:
-    /// GIORNATA · SIGNORE · SENSI · STRUMENTI · INTELLIGENCE, separati da una linea sottile.
+    /// OPERATIONS · BIOMETRICS · PERCEPTION · ENGINEERING · INTELLIGENCE, separati da una linea sottile.
+    /// 8 nov (il signore): i nomi in inglese; 05:2x «Polso: SISTEMI → SYSTEMS» anche il gruppo in testa.
     /// Occhi, Cucina e Allenatore restano solo sull'iPhone (servono la fotocamera); la Foto e il Browser pure.
     /// frase "#vitals" apre la pagina Vitals, "#sentinella" la Sentinella; frase nil pulisce la conversazione.
     private var scorciatoie: [(gruppo: String, icona: String, frase: String?)] {
         [
-            ("SISTEMI", "logo:supabase-logo", "#supabase"),      // i loghi veri, come sull'iPhone
-            ("SISTEMI", "logo:github-logo", "#github"),
-            ("SISTEMI", "archivio", "#archivio"),                // la cartella con la nuvola
-            ("SISTEMI", "trash", nil),                           // pulisce la conversazione
-            ("SISTEMI", "logo:GlifoInstagram", "@social"),       // MARK X: SOCIAL, il glifo Instagram dell'iPhone, prima di MUSICA come lì
-            ("SISTEMI", "vinile", "#musica"),                    // MUSICA: il vinile olografico dell'iPhone
-            ("SISTEMI", "gearshape", "#impostazioni"),
-            ("SISTEMI", "server.rack", "#sistemi"),              // la pagina SISTEMI, come il menu dell'iPhone
+            ("SYSTEMS", "logo:supabase-logo", "#supabase"),      // i loghi veri, come sull'iPhone
+            ("SYSTEMS", "logo:github-logo", "#github"),
+            ("SYSTEMS", "archivio", "#archivio"),                // la cartella con la nuvola
+            ("SYSTEMS", "trash", nil),                           // pulisce la conversazione
+            ("SYSTEMS", "logo:GlifoInstagram", "@social"),       // MARK X: SOCIAL, il glifo Instagram dell'iPhone, prima di MUSICA come lì
+            ("SYSTEMS", "vinile", "#musica"),                    // MUSICA: il vinile olografico dell'iPhone
+            ("SYSTEMS", "gearshape", "#impostazioni"),
+            ("SYSTEMS", "server.rack", "#sistemi"),              // la pagina SISTEMI, come il menu dell'iPhone
 
             ("OPERATIONS", "sun.horizon", "#briefing"),
             ("OPERATIONS", "cloud.sun", "#meteo"),

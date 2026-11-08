@@ -991,20 +991,12 @@ struct IconaTastoMusica: View {
 enum PonteMusica {
     static func esegui(_ comando: String) async -> [String: Any] {
         let l = LettoreMusica.condiviso
+        // MARK X: Shazam al polso → la canzone suona sull'iPhone. 8 nov (il signore: «Shazam al polso senza Apple Music»): come lo
+        // Shazam del telefono (AscoltoShazam), Apple Music intero se può, se no l'anteprima di 30 s; il PLAY/PAUSA di quella scheda
+        // arriva come «shazam:play» / «shazam:pausa» (la MUSICA del polso resta sul lettore di Apple Music, qui sotto).
+        if comando.hasPrefix("brano:") || comando.hasPrefix("shazam:") { return await shazamDalPolso(comando) }
         guard MusicAuthorization.currentStatus == .authorized else {
             return ["errore": "Apra MUSICA sull'iPhone e dia il permesso ad Apple Music, Sir."]
-        }
-        if comando.hasPrefix("brano:") {                    // MARK X: Shazam al polso → la canzone suona sull'iPhone
-            let d = (try? JSONSerialization.jsonObject(with: Data(comando.dropFirst(6).utf8))) as? [String: String] ?? [:]
-            var s: Song?
-            if let id = d["id"], !id.isEmpty {
-                s = try? await MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(id)).response().items.first
-            }
-            if s == nil, let q = d["cerca"], !q.isEmpty {
-                var r = MusicCatalogSearchRequest(term: q, types: [Song.self]); r.limit = 1
-                s = try? await r.response().songs.first
-            }
-            if let s { await l.metti(s) } else { l.errore = "Non la trovo su Apple Music, Sir." }
         }
         switch comando {
         case "play": await l.play()
@@ -1018,6 +1010,29 @@ enum PonteMusica {
         var r: [String: Any] = ["titolo": l.titolo, "artista": l.artista, "tempo": l.tempo, "suona": l.suona]
         if let d = l.durata { r["durata"] = d }
         if let e = l.errore { r["errore"] = e }
+        return r
+    }
+
+    /// Shazam al polso: «brano:{id, titolo, artista, cerca}» la fa suonare; «shazam:play» e «shazam:pausa» la comandano.
+    /// Risponde se suona, da dove («APPLE MUSIC» o «APPLE · ANTEPRIMA 30 S») e l'eventuale errore.
+    private static func shazamDalPolso(_ comando: String) async -> [String: Any] {
+        let a = AscoltoShazam.condiviso, l = LettoreMusica.condiviso
+        if comando.hasPrefix("brano:") {
+            let d = (try? JSONSerialization.jsonObject(with: Data(comando.dropFirst(6).utf8))) as? [String: String] ?? [:]
+            let cerca = d["cerca"] ?? "", id = d["id"] ?? ""
+            await a.suona(titolo: d["titolo"] ?? cerca, artista: d["artista"] ?? "", appleID: id.isEmpty ? nil : id, dalPolso: true)
+        } else {
+            let si = comando == "shazam:play"
+            switch a.fonte {
+            case .anteprima: await a.anteprimaDalPolso(suona: si)
+            case .intero: if si { await l.play() } else { l.pausa() }
+            case .video, .nessuna: break
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(250))     // il lettore ha appena cambiato: si legge com'è adesso
+        l.aggiorna()
+        var r: [String: Any] = ["suona": a.suonaOra, "fonte": AscoltoShazam.scritta(a.fonte)]
+        if let e = a.errore ?? (a.fonte == .intero ? l.errore : nil) { r["errore"] = e }
         return r
     }
 }
