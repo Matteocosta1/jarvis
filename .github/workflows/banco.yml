@@ -1,0 +1,44 @@
+name: Banco
+
+# Banco di prova (ramo claude/banco-prova, mai quello di Xcode): l'app vera nel simulatore iOS, una radice di prova che apre
+# Email (con una mail aperta e chiusa), Studio e Social nel contenitore della MARK XI, e il video registrato dal simulatore.
+
+on:
+  push:
+    branches: [claude/banco-prova]
+  workflow_dispatch:
+
+concurrency:
+  group: banco
+  cancel-in-progress: true
+
+jobs:
+  banco:
+    runs-on: xcode-27
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepara il banco
+        run: python3 banco/prepara.py
+
+      - name: Accendi il simulatore
+        run: bash banco/simulatore.sh
+
+      - name: Compila per il simulatore
+        run: |
+          set -o pipefail
+          xcodebuild -project "Untitled Project.xcodeproj" -scheme "Untitled Project" -configuration Debug -destination "id=$UDID" -derivedDataPath dd CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build 2>&1 | tee build.log | grep -E "error: |BUILD (SUCCEEDED|FAILED)"
+
+      - name: Gira le scene
+        run: bash banco/gira.sh mail studio
+
+      - name: Salva i video
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banco
+          path: |
+            banco/out
+            build.log
+          retention-days: 5
