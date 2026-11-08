@@ -35,6 +35,11 @@ struct VistaBea: View {
     @State private var preparaFoto = false
     @State private var erroreFoto: String?
     @FocusState private var scrivendo: Bool
+    // 8 nov sera (il signore: «come il mockup di adesso»): l'apertura di tutte le schede (CorniceScheda), come Bea nel mockup
+    @State private var mostrato = false
+    @State private var stampa: CGFloat = 0
+    @State private var caricamentoVia = false
+    @State private var apertaDa = Date()
 
     var body: some View {
         NavigationStack {
@@ -64,21 +69,32 @@ struct VistaBea: View {
                 .contentMargins(.top, 16, for: .scrollContent)
                 .contentMargins(.horizontal, 16, for: .scrollContent)
                 .scrollDismissesKeyboard(.interactively)
-                .opacity(dati != nil || errore ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
-                .animation(.easeOut(duration: Apertura.dissolvenza), value: dati != nil)
+                // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
+                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+                .allowsHitTesting(mostrato)
                 // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
-                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Bea", sottotitolo: dati == nil && !errore ? "acquisizione dati" : sottotitolo,
+                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Bea", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Bea"),
                                                                             icona: "link", tinta: tinta)) { chiudi() })
-                if dati == nil && !errore {
+                if !caricamentoVia {
                     CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
-                        .transition(.opacity)   // 8 nov: sfuma insieme alla pagina che compare (una pagina sola)
+                        .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear { Suoni.schedaApre() }
+            .onAppear { apertaDa = Date(); Suoni.schedaApre() }
             .task {
                 if let d = FotoBea.salvata() { fotoOlo = UIImage(data: d) }
-                await carica(); if dati != nil { Suoni.schedaPronta() }   // come tutte le altre schede
+                await carica()
+                // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
+                // pagina si stampa dall'alto
+                let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
+                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+                guard !Task.isCancelled else { return }
+                if dati != nil { Suoni.schedaPronta() }
+                withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
+                withAnimation(Apertura.curvaStampa) { stampa = 1 }
+                try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
+                caricamentoVia = true
             }
             .onChange(of: sceltaFoto) { _, scelta in
                 guard let scelta else { return }

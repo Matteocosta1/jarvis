@@ -691,6 +691,11 @@ struct VistaSpesa: View {
     @State private var caricata = false
     @State private var errore = false
     @FocusState private var scrivendo: Bool
+    // 8 nov sera (il signore: «come il mockup di adesso»): l'apertura di tutte le schede (CorniceScheda), come Spesa nel mockup
+    @State private var mostrato = false
+    @State private var stampa: CGFloat = 0
+    @State private var caricamentoVia = false
+    @State private var apertaDa = Date()
 
     var body: some View {
         NavigationStack {
@@ -799,22 +804,35 @@ struct VistaSpesa: View {
                 .contentMargins(.top, 16, for: .scrollContent)
                 .contentMargins(.horizontal, 16, for: .scrollContent)
                 .scrollDismissesKeyboard(.interactively)
-                .opacity(caricata ? 1 : 0)        // 26 ott: mentre carica non si vede in trasparenza sotto il caricamento (come le altre schede)
-                .animation(.easeOut(duration: Apertura.dissolvenza), value: caricata)
+                // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
+                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+                .allowsHitTesting(mostrato)
                 // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
-                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Spesa", sottotitolo: !caricata && !errore ? "acquisizione dati" : sottotitolo,
+                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Spesa", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Spesa"),
                                                                             icona: "cart", tinta: tinta)) { chiudi() })
-                if !caricata && !errore {
+                if !caricamentoVia {
                     CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
-                        .transition(.opacity)   // 8 nov: sfuma insieme alla pagina che compare (una pagina sola)
+                        .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
                 }
-                if errore && !caricata {
+                if errore && !caricata && mostrato {
                     Text("Non raggiungo la lista, Sir.").foregroundStyle(.orange)
                 }
             }
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear { Suoni.schedaApre() }
-            .task { await carica(); if caricata { Suoni.schedaPronta() } }
+            .onAppear { apertaDa = Date(); Suoni.schedaApre() }
+            .task {
+                await carica()
+                // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
+                // pagina si stampa dall'alto
+                let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
+                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+                guard !Task.isCancelled else { return }
+                if caricata { Suoni.schedaPronta() }
+                withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
+                withAnimation(Apertura.curvaStampa) { stampa = 1 }
+                try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
+                caricamentoVia = true
+            }
             .tastiAVoce { a in
                 switch a {
                 case .spesaLeggi: chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.")

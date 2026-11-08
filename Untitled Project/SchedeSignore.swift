@@ -20,6 +20,7 @@ struct CorniceScheda<Contenuto: View>: View {
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
+    @State private var stampa: CGFloat = 0           // quanto del contenuto è già «stampato» (0 → 1), come .stampa2 del mockup
     @State private var caricamentoVia = false
     @State private var apertaDa = Date()
 
@@ -39,7 +40,7 @@ struct CorniceScheda<Contenuto: View>: View {
                                  tinta: tinta, conX: fotocamera, chiudi: { chiudi() })
                     pagina
                 }
-                // il caricamento sfuma nella stessa dissolvenza in cui compare la pagina; tolto solo a dissolvenza finita
+                // il caricamento sfuma (0,25 s) mentre la pagina si stampa, come nel mockup; tolto a stampa finita
                 if !caricamentoVia {
                     CaricamentoHUD(titolo: titolo, tinta: tinta)
                         .padding(.top, 120)
@@ -58,24 +59,26 @@ struct CorniceScheda<Contenuto: View>: View {
             let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
-            // 8 nov pomeriggio (il signore, video 14:12: «carica la parte in alto e poi quella sotto… tutte e 30 e più fanno schifo…
-            // caricare insieme come una pagina sola, deve essere uniforme»): niente più stampa dall'alto, che stampava un riquadro
-            // alla volta (la maschera finiva su ogni riquadro); il caricamento sfuma e la sezione compare tutta insieme (0,25 s),
-            // la scritta sotto il nome compresa (TestoCodice), in tutte le sezioni
-            withAnimation(.easeOut(duration: Apertura.dissolvenza)) { mostrato = true }
-            try? await Task.sleep(for: .seconds(Apertura.dissolvenza + 0.05))
+            // 8 nov sera (il signore: «il comportamento della pagina deve essere come nel mock up», scelta «come il mockup di
+            // adesso»): come apriSezione del mockup, nello stesso istante il caricamento sfuma (0,25 s), la scritta sotto il nome
+            // arriva (TestoCodice) e il contenuto, UN blocco solo, si stampa dall'alto dietro una sola riga di luce (0,32 s, la
+            // curva del mockup). Prima (fino alla 11.0 (12)) la stampa finiva su ogni riquadro: la pagina arrivava a pezzi.
+            // Con la fotocamera (Scanner) il mirino compare e basta, come nel mockup.
+            withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
+            if fotocamera { stampa = 1 } else { withAnimation(Apertura.curvaStampa) { stampa = 1 } }
+            try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
             caricamentoVia = true
         }
     }
 
-    /// La pagina che scorre: il contenuto, che compare tutto insieme a fine caricamento (come una pagina sola).
+    /// La pagina che scorre: il contenuto, che a fine caricamento si stampa dall'alto tutto insieme (un blocco solo).
     private var pagina: some View {
         ScrollView {
-            // UNA vista sola (non i riquadri uno per uno), già pronta sotto il caricamento: a fine caricamento cambia solo la
-            // trasparenza, quindi compare tutta nello stesso istante, senza un fotogramma vuoto (prima la pagina si costruiva
-            // proprio lì: per un attimo il caricamento spariva e sotto non c'era ancora niente)
+            // UNA vista sola (non i riquadri uno per uno: su una lista di viste la stampa finirebbe su ognuna), già pronta sotto il
+            // caricamento (come `resto` nel mockup, nascosto finché non si stampa): a fine caricamento si scopre e basta, senza
+            // fotogrammi vuoti
             VStack(alignment: .leading, spacing: 16) { contenuto() }
-                .opacity(mostrato ? 1 : 0)
+                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
                 .allowsHitTesting(mostrato)
                 .accessibilityHidden(!mostrato)
             .padding(16)
@@ -238,13 +241,23 @@ struct ConBarraChiudi: ViewModifier {
     var testo = "Chiudi"
     var testata: DatiTestata? = nil
     let chiudi: () -> Void
+    @Environment(\.inCaricamento) private var inCaricamento
 
     func body(content: Content) -> some View {
         VStack(spacing: 0) {
-            BarraSezione(testata: testata, tinta: tinta, testo: testo, chiudi: chiudi)
+            BarraSezione(testata: testataMostrata, tinta: tinta, testo: testo, chiudi: chiudi)
             content
+                .modifier(StampaDaAmbiente(tinta: tinta))        // 8 nov sera: sotto AperturaHUD si stampa come nel mockup
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// 8 nov sera: sotto il caricamento (AperturaHUD) la scritta sotto il nome è quella del caricamento, come nel mockup; quella
+    /// vera arriva quando il caricamento sfuma, insieme alla pagina (TestoCodice).
+    private var testataMostrata: DatiTestata? {
+        guard inCaricamento, let t = testata else { return testata }
+        return DatiTestata(titolo: t.titolo, sottotitolo: TestiCaricamento.di(t.titolo), icona: t.icona, tinta: t.tinta,
+                           marchio: t.marchio, titoloColorato: t.titoloColorato, riga: t.riga)
     }
 }
 
@@ -328,6 +341,10 @@ struct CaricamentoHUD: View {
 /// possibile»): caricamento 0,28 s, stampa 0,32 s, la copertura del caricamento sfuma in 0,25 s. Il caricamento è un minimo: se i
 /// dati del cervello arrivano dopo, la scheda li aspetta (non si mostrano mai dati vecchi).
 enum Apertura {
+    /// 8 nov sera: la stampa del mockup, e = 1 − (1 − p)^2,2 (la curva di .stampa2 e .scan), come Bézier (scarto sotto lo 0,02 %).
+    static let curvaStampa = Animation.timingCurve(0.42, 0.924, 0.776, 1, duration: stampa)
+    /// 8 nov sera: la dissolvenza del caricamento del mockup («opacity .25s», la curva «ease» del browser).
+    static let curvaDissolvenza = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: dissolvenza)
     /// Il caricamento HUD (prima 0,45 s; ancora prima 1,1 s nelle sezioni dal vivo, 0,9 s nelle schede).
     static let caricamento = 0.28
     /// La pagina che si «stampa» dall'alto (prima 0,5 s; ancora prima 0,9 s).
@@ -337,6 +354,93 @@ enum Apertura {
     /// L'ascolto dei comandi a voce dentro le sezioni: cambia la sessione audio, quindi parte a suoni d'apertura finiti
     /// (il caricamento più il clic di fine caricamento, 0,7 s; prima 1,8 s).
     static let orecchio = caricamento + 0.7
+}
+
+/// 8 nov sera (il signore: «il comportamento della pagina deve essere come nel mock up», scelta «come il mockup di adesso»): la
+/// «stampa» del mockup (.stampa2 e .scan in apriSezione). Il contenuto della sezione, UN blocco solo, si scopre dall'alto in basso
+/// dietro una riga di luce (2 punti, alone ciano, larga quanto il contenuto: 16 punti dai bordi come la riga del mockup), che
+/// sparisce a stampa finita. `progresso` va da 0 (niente) a 1 (tutto) con Apertura.curvaStampa. Si taglia con una forma (non con
+/// una maschera): a stampa finita il taglio è largo 1.000 punti per lato e non costa niente, nemmeno scorrendo.
+struct StampaDallAlto: ViewModifier, Animatable {
+    var progresso: CGFloat
+    var tinta: Color = .ciano
+
+    // nonisolated: SwiftUI la legge e la scrive dall'animazione (come EffettoProiezione e Rivela)
+    nonisolated var animatableData: CGFloat {
+        get { progresso }
+        set { progresso = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .clipShape(TaglioStampa(progresso: progresso))
+            .overlay(alignment: .top) {
+                // la riga c'è solo mentre si stampa (calcolata a ogni fotogramma dall'animazione, come EffettoProiezione)
+                GeometryReader { g in
+                    RigaDiStampa(tinta: tinta)
+                        .offset(y: g.size.height * min(max(progresso, 0), 1))
+                        .opacity(progresso > 0 && progresso < 1 ? 1 : 0)
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+    }
+}
+
+/// Il taglio della stampa: dall'alto (con 1.000 punti di margine sopra e ai lati, per gli aloni) fino a dove è arrivata la riga;
+/// a stampa finita anche sotto.
+struct TaglioStampa: Shape {
+    var progresso: CGFloat
+
+    var animatableData: CGFloat {                        // come Ritaglio (NavigaSezioni)
+        get { progresso }
+        set { progresso = newValue }
+    }
+
+    func path(in r: CGRect) -> Path {
+        let giu = progresso >= 1 ? r.height + 1000 : r.height * max(0, progresso)
+        return Path(CGRect(x: r.minX - 1000, y: r.minY - 1000, width: r.width + 2000, height: giu + 1000))
+    }
+}
+
+/// La riga di luce della stampa, come .scan del mockup: alta 2, ciano, con l'alone (box-shadow 0 0 8px e 0 0 18px).
+struct RigaDiStampa: View {
+    var tinta: Color = .ciano
+    var body: some View {
+        Rectangle().fill(tinta).frame(height: 2)
+            .shadow(color: tinta, radius: 4)
+            .shadow(color: tinta, radius: 9)
+    }
+}
+
+/// La stampa decisa da fuori (AperturaHUD): le sezioni con la loro pagina (Vitals, Ricordi, Confidente, Wiretap, Interprete) la
+/// leggono dall'ambiente e si stampano sotto la riga in alto, come nel mockup. Senza AperturaHUD sopra, niente.
+struct StampaDaAmbiente: ViewModifier {
+    var tinta: Color = .ciano
+    @Environment(\.stampaSezione) private var stampa
+
+    func body(content: Content) -> some View {
+        if let stampa {
+            content.modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+        } else {
+            content
+        }
+    }
+}
+
+/// 8 nov sera: AperturaHUD dice alla sezione sotto quanto del contenuto è stampato e se il caricamento è ancora davanti (la scritta
+/// sotto il nome è quella del caricamento finché il caricamento non sfuma, come nel mockup).
+private struct ChiaveStampaSezione: EnvironmentKey { static let defaultValue: CGFloat? = nil }
+private struct ChiaveInCaricamento: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var stampaSezione: CGFloat? {
+        get { self[ChiaveStampaSezione.self] }
+        set { self[ChiaveStampaSezione.self] = newValue }
+    }
+    var inCaricamento: Bool {
+        get { self[ChiaveInCaricamento.self] }
+        set { self[ChiaveInCaricamento.self] = newValue }
+    }
 }
 
 /// 7 nov sera (il signore: «l'altezza sia la stessa del bottone con la X e della scritta Chiudi» · «tutte uguali nelle altezze»):
@@ -371,6 +475,9 @@ struct SchermoCaricamento: View {
     var marchio = false
     /// 8 nov: Studio e Social hanno la loro riga in alto sempre ferma sopra (VistaStudio): qui solo lo sfondo e il caricamento.
     var conTestata = true
+    /// 8 nov sera (come il mockup v293): mentre il caricamento sfuma la sua scritta sotto il nome sparisce subito, così quella vera
+    /// della sezione arriva da sola, insieme alla pagina (senza la vecchia in trasparenza sopra per 0,25 s).
+    var senzaScritta = false
     private let tinta = Color.ciano
 
     // 8 nov mattina: anche in Studio e Social sta nel margine sicuro della sezione, come in tutte le altre (prima lì prendeva il
@@ -381,7 +488,8 @@ struct SchermoCaricamento: View {
             if conTestata {
                 VStack(alignment: .leading, spacing: 0) {
                     // 7 nov sera: la testata nella riga di «Chiudi» (o della X), come in tutte le sezioni (BarraSezione)
-                    BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: marchio),
+                    BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: senzaScritta ? "" : TestiCaricamento.di(titolo), icona: icona,
+                                                      tinta: tinta, marchio: marchio),
                                  tinta: tinta, conX: conX, chiudi: nil)
                     Spacer(minLength: 0)
                 }
@@ -406,13 +514,20 @@ struct AperturaHUD: ViewModifier {
     var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
     @State private var coperto = true
     @State private var via = false
+    @State private var stampa: CGFloat = 0
+    /// 8 nov sera (il signore: «come il mockup di adesso»): le sezioni senza fotocamera (Vitals, Ricordi, Confidente, Wiretap,
+    /// Interprete) si stampano dall'alto come tutte le schede del mockup; con la fotocamera (e il Browser, che non ha la riga) la
+    /// sezione compare e basta, come nel mockup.
+    private var stampaContenuto: Bool { !conX && !fotocamera && !soloSfuma }
 
     func body(content: Content) -> some View {
         content
+            .environment(\.stampaSezione, stampaContenuto ? stampa : nil)
+            .environment(\.inCaricamento, coperto)
             .overlay {
-                // 8 nov pomeriggio: sfuma con la stessa dissolvenza di tutte le sezioni e si toglie a dissolvenza finita
+                // come nel mockup: sfuma in 0,25 s mentre la pagina si stampa, e si toglie a stampa finita
                 if !via {
-                    SchermoCaricamento(titolo: titolo, icona: icona, conX: conX)
+                    SchermoCaricamento(titolo: titolo, icona: icona, conX: conX, senzaScritta: !coperto)
                         .opacity(coperto ? 1 : 0)
                 }
             }
@@ -421,8 +536,9 @@ struct AperturaHUD: ViewModifier {
                 try? await Task.sleep(for: .seconds(durata))
                 if soloSfuma { Suoni.schedaPronta(soloSfuma: true) }
                 else if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
-                withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
-                try? await Task.sleep(for: .seconds(Apertura.dissolvenza + 0.05))
+                withAnimation(Apertura.curvaDissolvenza) { coperto = false }
+                if stampaContenuto { withAnimation(Apertura.curvaStampa) { stampa = 1 } } else { stampa = 1 }
+                try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
                 via = true
             }
     }
@@ -1197,8 +1313,7 @@ nonisolated enum Salute {
 }
 /// 27 ott (il signore): la scritta sotto il nome della sezione scorre veloce da sinistra, da trasparente al colore pieno (0,35 s);
 /// quella di prima resta leggibile almeno 0,7 s, poi continua a scorrere a destra tornando trasparente, e arriva la nuova allo
-/// stesso modo. Poi si ferma. 8 nov: all'apertura della sezione (prima scritta e fine caricamento) niente attesa né scorrimento,
-/// la scritta compare insieme alla pagina.
+/// stesso modo. Poi si ferma. 8 nov sera: a fine caricamento quella vera arriva subito, insieme alla pagina che si stampa.
 struct TestoCodice: View {
     let testo: String
     @State private var mostrato = ""                 // la scritta che si vede (la nuova arriva solo dopo che la vecchia si è letta)
@@ -1211,31 +1326,22 @@ struct TestoCodice: View {
         Text(mostrato)
             .opacity(dentro ? 1 : 0)
             .offset(x: dentro ? 0 : (daSinistra ? 60 : -40))      // entra da sinistra, poi scorre via a destra
-            .onAppear { subito(testo, animata: false) }
+            .onAppear { mostra(testo, attesa: 0) }
             .onChange(of: testo) { vecchio, nuovo in
-                // 8 nov pomeriggio (il signore: «deve essere una pagina unica, un caricamento unico senza gap»): la prima scritta c'è già
-                // quando la sezione sale, e a fine caricamento quella vera prende il posto di quella del caricamento nello stesso
-                // istante in cui compare la pagina (la stessa dissolvenza), senza aspettare né scorrere. Scorre dal lato solo quando
-                // cambia dentro la sezione già aperta.
-                if TestiCaricamento.diCaricamento(vecchio) { subito(nuovo, animata: true) }
+                // 8 nov sera (il signore: la scritta «insieme alla pagina», in app e mockup): a fine caricamento quella vera arriva
+                // subito, nello stesso istante in cui la pagina si stampa: senza aspettare che si legga quella del caricamento e
+                // senza farla uscire prima. Dentro una sezione già aperta resta come sempre (si legge 0,7 s, esce, arriva la nuova).
+                if TestiCaricamento.diCaricamento(vecchio) { mostra(nuovo, attesa: 0, conUscita: false) }
                 else { mostra(nuovo, attesa: max(0, 0.7 - Date().timeIntervalSince(lettaDa))) }
             }
     }
 
-    private func subito(_ nuovo: String, animata: Bool) {
-        voluta = nuovo
-        var t = Transaction(animation: animata ? .easeOut(duration: Apertura.dissolvenza) : nil)
-        t.disablesAnimations = !animata
-        withTransaction(t) { mostrato = nuovo; daSinistra = false; dentro = true }
-        lettaDa = Date()
-    }
-
-    private func mostra(_ nuovo: String, attesa: Double) {
+    private func mostra(_ nuovo: String, attesa: Double, conUscita: Bool = true) {
         voluta = nuovo
         Task { @MainActor in
             if attesa > 0 { try? await Task.sleep(for: .seconds(attesa)) }
             guard nuovo == voluta else { return }                      // nel frattempo è cambiata ancora: vale l'ultima
-            if !mostrato.isEmpty {                                     // la vecchia continua a scorrere a destra, sfumando
+            if conUscita && !mostrato.isEmpty {                        // la vecchia continua a scorrere a destra, sfumando
                 daSinistra = true
                 withAnimation(.easeIn(duration: 0.3)) { dentro = false }
                 try? await Task.sleep(for: .milliseconds(300))

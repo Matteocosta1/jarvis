@@ -79,6 +79,8 @@ struct Interprete: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
 
+                // 8 nov sera: sotto la riga in alto la pagina si stampa all'apertura come nel mockup (StampaDaAmbiente, un blocco solo)
+                VStack(spacing: 12) {
                 // v270 (il signore: «crea anche un ologramma per interprete»): il PONTE fra le due lingue, in testa come nel mockup
                 OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
                     PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: codice, frasi: frasi)
@@ -145,6 +147,8 @@ struct Interprete: View {
                     tasto("Ascolta \(lin.bandiera)", icona: "ear", colore: Color.orange) { orecchio.ferma(); motore.ascolta(.altro, lingua: lin) }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 16)
+                }
+                .modifier(StampaDaAmbiente())
             }
         }
         .onAppear {
