@@ -150,7 +150,7 @@ struct TestataScheda: View {
                         .foregroundStyle(tinta)
                 } else {
                     Text(titolo.uppercased())
-                        .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)   // 27 ott: nome della sezione più piccolo (prima 24)
+                        .font(.system(size: 17, weight: .bold, design: .monospaced)).tracking(3)   // 8 nov: 17 come il mockup e la testata di Studio e Social (27 ott: 18, prima 24)
                         .foregroundStyle(titoloColorato ? tinta : .white)
                 }
                 // 27 ott (il signore): la scritta sotto il nome arriva dal lato in trasparenza (TestoCodice)

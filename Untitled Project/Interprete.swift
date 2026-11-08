@@ -63,7 +63,7 @@ struct Interprete: View {
                     AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
                         Text("INTERPRETE")
-                            .font(.system(size: 18, weight: .bold, design: .monospaced)).tracking(3)
+                            .font(.system(size: 17, weight: .bold, design: .monospaced)).tracking(3)   // 8 nov: 17 come il mockup
                         Text(lin.nome.uppercased())
                             .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
                     }
