@@ -55,8 +55,8 @@ cambia("SchedeSignore.swift", "            CaricamentoHUD(titolo: titolo, tinta:
        "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)")
 cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)",
        "            .overlay { SondaSA(nome: \"CORN\", riga: 0) }\n            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)")
-cambia("ProiezioneMail.swift", "                .frame(width: larga, height: alta)\n",
-       "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n")
+cambia("ProiezioneMail.swift", "                .frame(width: larga, height: alta)\n                .modifier(EffettoProiezione",
+       "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n                .modifier(EffettoProiezione")
 cambia("SchedeDaily.swift", "        .background(SfondoSezione(tinta: tinta))\n        .task { await carica() }",
        "        .background(SfondoSezione(tinta: tinta))\n        .overlay { SondaSA(nome: \"LET\", riga: 4) }\n        .task { await carica() }")
 # 7. la PROIEZIONE senza luce e colore (scene «…B»)
