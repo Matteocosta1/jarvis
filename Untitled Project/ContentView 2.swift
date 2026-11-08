@@ -113,7 +113,6 @@ struct ContentView: View {
     /// Il reattore grande al centro (falso: è in piccolo in alto). Segue la tastiera: quando scende rientra insieme a lei,
     /// con la sua stessa durata e curva (keyboardWillHide), in un movimento solo.
     @State private var reattoreGrande = true
-    @State private var reattorePremuto = false        // 8 nov: il tocco (sopra) preme il reattore che si vede (sotto)
     /// La curva della tastiera di iOS (parte veloce e si posa piano, circa 0,25 s): reattore, riga di stato e chat si muovono con lei.
     static let curvaTastiera: Animation = .timingCurve(0.38, 0.7, 0.125, 1, duration: 0.25)
     @State private var durataRientro: Double = 0.25      // la durata vera dell'ultima discesa della tastiera (per far scorrere la chat insieme)
@@ -286,12 +285,8 @@ struct ContentView: View {
                     // il posto un attimo dopo: per quell'attimo il contenuto è più alto dello spazio e iOS lo centrava, spingendo su la
                     // testata. Ancorato in alto, la testata resta ferma (l'eccedenza va in basso, dietro la tastiera che sale).
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    // build 23: il reattore nel suo posto grande o in quello piccolo (vola dall'uno all'altro).
-                    // 8 nov (foto del signore 03:28: «la linea della ghiera trasparente non mi piace che passi sopra le icone, meglio che
-                    // siano le icone sopra»): il reattore si DISEGNA sotto la schermata (le icone della corona gli passano sopra), il suo
-                    // TOCCO resta sopra (un cerchio invisibile nello stesso posto), così toccarlo funziona come prima.
-                    .backgroundPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti, tocco: false) }
-                    .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti, tocco: true) }
+                    // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
+                    .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
                     .onChange(of: tastiera) { _, aperta in
                         guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
                         if aperta {
@@ -1009,40 +1004,25 @@ struct ContentView: View {
     /// Build 23, come nel mockup («vola»): un reattore solo, che con la tastiera vola dal suo posto al centro al posto piccolo nella
     /// barra in alto (tra «J.A.R.V.I.S.» e le icone) rimpicciolendo, e ritorno, nello stesso tempo e con la stessa curva della
     /// tastiera di iOS (keyboardWillShow / keyboardWillHide). Solo posizione e scala: non sparisce al centro per ricomparire in alto.
-    /// `tocco: false` è il reattore che si vede (sotto le icone), `tocco: true` il cerchio invisibile che si tocca (sopra a tutto)
-    /// con l'ologramma della ruota. Stessa misura, stessa scala, stesso posto: si muovono insieme.
-    @ViewBuilder private func reattoreVolante(_ posti: [String: Anchor<CGRect>], tocco: Bool) -> some View {
+    @ViewBuilder private func reattoreVolante(_ posti: [String: Anchor<CGRect>]) -> some View {
         let piccolo = !reattoreGrande
         GeometryReader { g in
             if telefono, let posto = posti[piccolo ? "piccolo" : "grande"] {     // iPad e Mac: il reattore resta nella corona
                 let r = g[posto]
-                if tocco {
-                    Button {
-                        tastiera = false                                   // piccolo: chiude la tastiera e basta
-                        if !piccolo { jarvis.toccaReattore() }
-                    } label: { Color.clear.frame(width: 240, height: 240).contentShape(Circle()) }
-                    .buttonStyle(StileTocco(premuto: $reattorePremuto))
-                    .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
-                    .position(x: r.midX, y: r.midY)
-                    .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima
-                    .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con Jarvis")
-                    .allowsHitTesting(acceso)
-                    .modifier(VeloRuota(ruota: ruota))                      // mentre gira la ruota il reattore non si tocca, come prima
-                    if !piccolo {
-                        ologramma.position(x: r.midX, y: r.midY)            // MARK XI: l'ologramma dell'icona in alto, al posto del reattore
-                    }
-                } else {
-                    reattore
-                        .scaleEffect(reattorePremuto ? 0.88 : 1)                 // come StileStark, sul reattore che si vede
-                        .brightness(reattorePremuto ? 0.25 : 0)
-                        .animation(.spring(duration: 0.25, bounce: 0.5), value: reattorePremuto)
-                        .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
-                        .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
-                        .opacity(acceso ? 1 : 0)
-                        .position(x: r.midX, y: r.midY)
-                        .modifier(VeloRuota(ruota: ruota))
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+                Button {
+                    tastiera = false                                   // piccolo: chiude la tastiera e basta
+                    if !piccolo { jarvis.toccaReattore() }
+                } label: { reattore }
+                .buttonStyle(StileStark())
+                .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
+                .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
+                .opacity(acceso ? 1 : 0)
+                .position(x: r.midX, y: r.midY)
+                .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima
+                .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con Jarvis")
+                .modifier(VeloRuota(ruota: ruota))
+                if !piccolo {
+                    ologramma.position(x: r.midX, y: r.midY)            // MARK XI: l'ologramma dell'icona in alto, al posto del reattore
                 }
             }
         }
@@ -2258,16 +2238,6 @@ struct StileStark: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.88 : 1)
             .brightness(configuration.isPressed ? 0.25 : 0)
             .animation(.spring(duration: 0.25, bounce: 0.5), value: configuration.isPressed)
-    }
-}
-
-/// 8 nov · il tocco del reattore (un cerchio invisibile sopra a tutto) dice quando è premuto: il reattore che si vede, sotto le
-/// icone, si preme come con StileStark.
-struct StileTocco: ButtonStyle {
-    @Binding var premuto: Bool
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .onChange(of: configuration.isPressed) { _, p in premuto = p }
     }
 }
 
