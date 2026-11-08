@@ -101,6 +101,10 @@ struct RadiceBanco: View {
         case .scheda(.email):
             VistaPosta(chiedi: { _ in }) { _, _ in }.paginaPiena()
                 .overlay { SondaSA(nome: "PAG", riga: 5) }
+        case .scheda(.cuore):
+            VistaCuoreTelefono(chiedi: { _ in }).paginaPiena()
+        case .scheda(.musica):
+            VistaMusica().paginaPiena()
         case .pagina:
             if let a = v.pagina {
                 VistaStudio(apertura: a, parla: { _ in }, chiudi: { chiudi(v.id) })
