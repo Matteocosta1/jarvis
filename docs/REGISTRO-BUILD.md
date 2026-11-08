@@ -537,6 +537,7 @@ La 11.0 (17) + JARVIS vede quello che vede il signore (il signore, 23:49: in EDI
 - Sezioni: EDITH (tutti i campi e gli esiti; la password MAI: solo «scritta» e l'esito del controllo fatto sul telefono), Email (cartella e righe a schermo) e la mail aperta nel lettore (da, a, data, oggetto, testo), Spesa, Meteo, Messaggi (destinatario, canale, bozza), Telefono (numero sulla tastiera e di chi è), Satellite (luogo scelto, meteo lì, indirizzo), Ricordi, Serata (conti a schermo), Musica (brano di adesso, raccolta aperta, ricerca), Bea (quello che scrive, il «Ti penso» pronto), GitHub, Archivio. Le altre mandano almeno il nome della sezione aperta.
 - Non serve in Shazam e Scanner (lì il microfono di JARVIS è spento) né sull'orologio (le sezioni si chiudono quando si chiede a JARVIS).
 - Da verificare sul telefono: EDITH con un link scritto → «Jarvis, controlla il link» / «è sicuro?»; una mail aperta → «leggimela»; Messaggi con una bozza → «com'è questo messaggio?».
+- 9 nov 00:36, provata dal signore sul telefono: «funziona tutto da dio». Build BUONA.
 
 ## 11.0 (17) — 8 nov notte · numero scelto dal signore (17) · commit 11a63f9 · controllo di compilazione VERDE (0 errori, 0 warning, run 42531549642)
 La 11.0 (16) + la scheda come un foglio unico, senza stacchi né colori diversi (il signore, video 21:57: «ancora stacco e discrepanza sui colori… deve sembrare un'unica pagina»; 22:19: «la perfetta corrispondenza del colore… i quadrati precisi, allineati… come fosse un'unica scheda»).
