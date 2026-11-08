@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 11.0 (16) — 8 nov sera · numero proposto (la 15 è su TestFlight) · commit e controllo: vedi l'ultima riga
+## 11.0 (16) — 8 nov sera · numero proposto (la 15 è su TestFlight) · commit 03117e2 · controllo di compilazione VERDE (0 errori, 0 warning, run 42513197170)
 La 11.0 (15) + l'apertura come un foglio unico (il signore, video 19:31: «la parte superiore carica sfalsata, quasi un secondo dopo… così sono due settori»; 19:39: «nella 10.0 (24) le sezioni caricavano tutte insieme fluide, senza stacchi»).
 - Causa: fino alla 10.0 (24) ogni sezione era un foglio di iOS a tutto schermo; dalla 11.0 sta nel contenitore delle sezioni (MARK XI), dove il suo sfondo si fermava sotto la fascia dell'ora. Salendo, il bordo in alto della pagina era sotto l'ora e lì sopra si vedeva ancora JARVIS finché la pagina non arrivava (misurato sul video: ~0,17 s di fascia scoperta, poi il salto).
 - Ora ogni sezione sale con il suo sfondo fino al bordo dello schermo (NavigaSezioni: SfondoSezione anche nella fascia dell'ora), un foglio solo come il .foglio del mockup. Provato nel simulatore: la fascia sale insieme alla pagina.
