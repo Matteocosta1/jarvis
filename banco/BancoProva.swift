@@ -111,6 +111,10 @@ struct RadiceBanco: View {
             VistaMeteo(chiedi: { _ in }).paginaPiena()
         case .lingua:
             SceltaLingua { _ in }.paginaPiena()
+        case .ricordi:
+            VistaRicordi(iniziale: .ricordi, guida: false, salva: false) { _ in }.paginaPiena()
+        case .scheda(.bea):
+            VistaBea(chiedi: { _ in }).paginaPiena()
         case .pagina:
             if let a = v.pagina {
                 VistaStudio(apertura: a, parla: { _ in }, chiudi: { chiudi(v.id) })
@@ -177,8 +181,10 @@ struct RadiceBanco: View {
             apri(.scheda(.meteo)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
             apri(.scheda(.email)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
             apri(.scheda(.cuore)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
-            apri(.scheda(.musica)); await aspetta(6.0); chiudiDavanti(); await aspetta(1.5)
-            apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(11.0); chiudiDavanti()
+            apri(.ricordi); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.bea)); await aspetta(4.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(11.0); chiudiDavanti(); await aspetta(1.5)
+            apri(.scheda(.musica)); await aspetta(5.0); chiudiDavanti()
         default:
             break
         }
