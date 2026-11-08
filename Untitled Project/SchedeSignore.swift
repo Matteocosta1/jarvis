@@ -20,6 +20,7 @@ struct CorniceScheda<Contenuto: View>: View {
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
+    @State private var caricamentoVia = false
     @State private var apertaDa = Date()
 
     var body: some View {
@@ -38,10 +39,11 @@ struct CorniceScheda<Contenuto: View>: View {
                                  tinta: tinta, conX: fotocamera, chiudi: { chiudi() })
                     pagina
                 }
-                if !mostrato {
+                // il caricamento sfuma nella stessa dissolvenza in cui compare la pagina; tolto solo a dissolvenza finita
+                if !caricamentoVia {
                     CaricamentoHUD(titolo: titolo, tinta: tinta)
                         .padding(.top, 120)
-                        .transition(.opacity)
+                        .opacity(mostrato ? 0 : 1)
                         .allowsHitTesting(false)
                 }
             }
@@ -61,19 +63,21 @@ struct CorniceScheda<Contenuto: View>: View {
             // alla volta (la maschera finiva su ogni riquadro); il caricamento sfuma e la sezione compare tutta insieme (0,25 s),
             // la scritta sotto il nome compresa (TestoCodice), in tutte le sezioni
             withAnimation(.easeOut(duration: Apertura.dissolvenza)) { mostrato = true }
+            try? await Task.sleep(for: .seconds(Apertura.dissolvenza + 0.05))
+            caricamentoVia = true
         }
     }
 
     /// La pagina che scorre: il contenuto, che compare tutto insieme a fine caricamento (come una pagina sola).
     private var pagina: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if mostrato {
-                    // UNA vista sola (non i riquadri uno per uno): compare tutta insieme, nello stesso istante
-                    VStack(alignment: .leading, spacing: 16) { contenuto() }
-                        .transition(.opacity)
-                }
-            }
+            // UNA vista sola (non i riquadri uno per uno), già pronta sotto il caricamento: a fine caricamento cambia solo la
+            // trasparenza, quindi compare tutta nello stesso istante, senza un fotogramma vuoto (prima la pagina si costruiva
+            // proprio lì: per un attimo il caricamento spariva e sotto non c'era ancora niente)
+            VStack(alignment: .leading, spacing: 16) { contenuto() }
+                .opacity(mostrato ? 1 : 0)
+                .allowsHitTesting(mostrato)
+                .accessibilityHidden(!mostrato)
             .padding(16)
             .padding(.bottom, 30)
             // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
@@ -82,6 +86,7 @@ struct CorniceScheda<Contenuto: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollDismissesKeyboard(.interactively)
+        .scrollDisabled(!mostrato)
     }
 }
 
@@ -400,13 +405,15 @@ struct AperturaHUD: ViewModifier {
     var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
     var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
     @State private var coperto = true
+    @State private var via = false
 
     func body(content: Content) -> some View {
         content
             .overlay {
-                if coperto {
+                // 8 nov pomeriggio: sfuma con la stessa dissolvenza di tutte le sezioni e si toglie a dissolvenza finita
+                if !via {
                     SchermoCaricamento(titolo: titolo, icona: icona, conX: conX)
-                        .transition(.opacity)
+                        .opacity(coperto ? 1 : 0)
                 }
             }
             .onAppear { Suoni.schedaApre() }
@@ -415,6 +422,8 @@ struct AperturaHUD: ViewModifier {
                 if soloSfuma { Suoni.schedaPronta(soloSfuma: true) }
                 else if fotocamera { Suoni.schedaPronta(soloSfuma: true); Suoni.aperturaCamera() } else { Suoni.schedaPronta() }
                 withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
+                try? await Task.sleep(for: .seconds(Apertura.dissolvenza + 0.05))
+                via = true
             }
     }
 }
