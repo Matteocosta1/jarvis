@@ -68,6 +68,8 @@ enum FasciaAlta {
         return finestre.first { $0.isKeyWindow } ?? finestre.first
     }
     static var altezza: CGFloat { max(finestra?.safeAreaInsets.top ?? 44, 24) }
+    /// 8 nov: il margine in fondo (la barra di iOS), per la scheda della mail che arriva fino in fondo allo schermo.
+    static var fondo: CGFloat { finestra?.safeAreaInsets.bottom ?? 34 }
 }
 
 // MARK: - 26 ott sera (video del signore 21:58: Studio e Social sparivano di colpo e restava il nero per quasi un secondo)

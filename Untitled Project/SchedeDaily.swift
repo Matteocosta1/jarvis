@@ -366,6 +366,9 @@ struct VistaPosta: View {
     @State private var priorita: PostaPriorita?       // build 22: la posta che conta, dal cervello
     @State private var erroreP: String?
     @State private var aperta: Mail?                  // 7 nov: la mail aperta nel lettore
+    @State private var posizioni = PosizioniRighe()   // 8 nov: dove sono le righe (la PROIEZIONE parte dalla riga toccata)
+    @State private var lampo: String?                 // 8 nov: la riga che si accende quando la mail si apre o si richiude
+    @State private var lampoLuce = 0.0
 
     var body: some View {
         CorniceScheda(titolo: "Email", sottotitolo: posta.map { p in
@@ -443,6 +446,16 @@ struct VistaPosta: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(StileStark())
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { posizioni.righe[m.chiave] = $0 }
+                    .overlay {
+                        // 8 nov · PROIEZIONE: la riga si accende (bordo ciano e alone) quando la sua mail si apre o si richiude
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(tinta.opacity(0.95), lineWidth: 1)
+                            .shadow(color: tinta.opacity(0.55), radius: 11)
+                            .padding(.horizontal, -6)
+                            .opacity(lampo == m.chiave ? lampoLuce : 0)
+                            .allowsHitTesting(false)
+                    }
                     .contextMenu {
                         Button { chiedi("Di cosa parla l'email di \(m.nome) con oggetto «\(m.oggetto)»? È importante?") } label: { Label("Chiedi a JARVIS", systemImage: "waveform") }
                     }
@@ -463,14 +476,35 @@ struct VistaPosta: View {
         .tastiAVoce { a in
             if a == .postaRiassumi { chiedi("Riassumimi la posta delle ultime \(ore) ore: cosa conta davvero e cosa posso ignorare?") }
         }
-        .sheet(item: $aperta) { m in
-            LettoreMail(chiave: m.chiave, nome: m.nome, oggetto: m.oggetto, tinta: tinta) { frase, testo in
-                aperta = nil
-                if let chiediCon { chiediCon(frase, testo) } else { chiedi(frase) }
+        // 8 nov (scelta del signore, 02:56): la mail si apre con la PROIEZIONE dalla sua riga, come il mockup v278 (prima un foglio di iOS)
+        .overlay {
+            if let m = aperta {
+                GeometryReader { g in
+                    ProiezioneMail(schermo: g.frame(in: .global), alto: FasciaAlta.altezza, tinta: tinta,
+                                   riga: { posizioni.righe[m.chiave] },
+                                   accendiRiga: { dopo, durata in accendi(m.chiave, dopo: dopo, durata: durata) },
+                                   fine: { aperta = nil }) { chiudiLettore in
+                        LettoreMail(chiave: m.chiave, nome: m.nome, oggetto: m.oggetto, tinta: tinta, margineBasso: FasciaAlta.fondo,
+                                    chiudi: chiudiLettore) { frase, testo in
+                            aperta = nil
+                            if let chiediCon { chiediCon(frase, testo) } else { chiedi(frase) }
+                        }
+                    }
+                }
+                .ignoresSafeArea()
             }
-            .presentationBackground(Color.fondo)
         }
-        .chiudiFoglioDietro { aperta = nil }                 // MARK XI: il foglio non resta sopra la sezione che va dietro
+        .chiudiFoglioDietro { aperta = nil }                 // MARK XI: la mail aperta non resta sopra la sezione che va dietro
+    }
+
+    /// 8 nov · PROIEZIONE: la riga della mail si accende e si spegne (all'apertura subito, alla chiusura verso la fine).
+    private func accendi(_ chiave: String, dopo: Double, durata: Double) {
+        Task {
+            if dopo > 0 { try? await Task.sleep(for: .seconds(dopo)) }
+            lampo = chiave
+            lampoLuce = 1
+            withAnimation(.easeOut(duration: durata)) { lampoLuce = 0 }
+        }
     }
 
     /// v267: la casella per l'ologramma SMISTA (la lista a schermo, nil mentre apre la casella; le PRIORITÀ del cervello).
@@ -505,8 +539,11 @@ struct LettoreMail: View {
     let nome: String
     let oggetto: String
     let tinta: Color
+    /// 8 nov: il margine del fondo dello schermo (la scheda della PROIEZIONE arriva in fondo, i tasti restano sopra la barra di iOS).
+    var margineBasso: CGFloat = 0
+    /// 8 nov: «Chiudi» richiude la PROIEZIONE sulla riga (prima chiudeva il foglio di iOS).
+    let chiudi: () -> Void
     let chiedi: (_ frase: String, _ testo: String) -> Void
-    @Environment(\.dismiss) private var chiudi
     @Environment(\.openURL) private var apriLink
 
     private struct Letta {
@@ -568,10 +605,9 @@ struct LettoreMail: View {
                     }
                     .buttonStyle(StileStark())
                 }
-                .padding(.horizontal, 16).padding(.bottom, 12)
+                .padding(.horizontal, 16).padding(.bottom, 12 + margineBasso)
             }
         }
-        .preferredColorScheme(.dark)
         .task { await carica() }
     }
 
