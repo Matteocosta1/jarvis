@@ -181,7 +181,7 @@ struct RadiceBanco: View {
             apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(13.0); chiudiDavanti(); await aspetta(1.5)
             apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social")); await aspetta(10.0); chiudiDavanti(); await aspetta(1.5)
             apri(.scheda(.musica)); await aspetta(5.0); chiudiDavanti()
-        case "diag", "diag_L_T":                                                // 8 nov notte: la diagnosi del foglio (strati per fotogramma)
+        case "diag", "diag_L_T", "diag_L":                                                // 8 nov notte: la diagnosi del foglio (strati per fotogramma)
             let lento = BancoProva.lento
             let resta = lento > 1 ? 7.0 : 4.0
             SondaStrati.condivisa.avvia("CUORE", durata: lento > 1 ? 4.5 : 1.6)

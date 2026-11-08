@@ -34,7 +34,7 @@ jobs:
           xcodebuild -project "Untitled Project.xcodeproj" -scheme "Untitled Project" -configuration Debug -destination "id=$UDID" -derivedDataPath dd CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build 2>&1 | tee build.log | grep -E "error: |BUILD (SUCCEEDED|FAILED)"
 
       - name: Gira le scene
-        run: bash banco/gira.sh diag diag_L_T
+        run: bash banco/gira.sh diag_L
 
       - name: Pubblica le uscite (ramo claude/banco-uscite, solo per scaricarle)
         if: always()
