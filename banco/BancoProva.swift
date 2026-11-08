@@ -13,6 +13,10 @@ enum BancoProva {
         return nil
     }()
     static var attivo: Bool { scena != nil }
+    /// Le sonde dei margini (scene «…sonde»).
+    static var sonde: Bool { scena?.hasSuffix("sonde") ?? false }
+    /// La PROIEZIONE senza luce e colore (scene «…B»).
+    static var senzaColori: Bool { scena?.hasSuffix("B") ?? false }
 
     /// Le risposte del cervello, finte (come le darebbe lui).
     static func risposta(_ corpo: [String: Any]) async -> [String: Any]? {
@@ -96,13 +100,13 @@ struct RadiceBanco: View {
         switch v.sezione {
         case .scheda(.email):
             VistaPosta(chiedi: { _ in }) { _, _ in }.paginaPiena()
+                .overlay { SondaSA(nome: "PAG", riga: 5) }
         case .pagina:
             if let a = v.pagina {
                 VistaStudio(apertura: a, parla: { _ in }, chiudi: { chiudi(v.id) })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.fondo)
-                    .ignoresSafeArea()
                     .paginaPiena()
+                    .overlay { SondaSA(nome: "PAG", riga: 5) }
             }
         default:
             EmptyView()
@@ -127,7 +131,10 @@ struct RadiceBanco: View {
     private func copione() async {
         inizio = Date()
         await aspetta(1.5)
-        switch BancoProva.scena ?? "" {
+        var nome = BancoProva.scena ?? ""
+        if nome.hasSuffix("sonde") { nome.removeLast(5) }
+        if nome.hasSuffix("B") { nome.removeLast() }
+        switch nome {
         case "mail":
             apri(.scheda(.email))
             await aspetta(3.0)                                                  // 4,5
@@ -151,6 +158,25 @@ struct RadiceBanco: View {
         default:
             break
         }
+    }
+}
+
+/// Una sonda: dove sta la vista (y globale, altezza) e quali margini di iOS riceve (alto/basso), scritta in giallo a 300 + 26·riga
+/// punti dal suo bordo alto. Si aggiorna a ogni impaginazione (non a ogni fotogramma di un'animazione).
+struct SondaSA: View {
+    let nome: String
+    let riga: Int
+    var body: some View {
+        if BancoProva.sonde { GeometryReader { g in
+            let f = g.frame(in: .global)
+            Text("\(nome) y\(Int(f.minY.rounded())) h\(Int(f.height.rounded())) sa\(Int(g.safeAreaInsets.top.rounded()))/\(Int(g.safeAreaInsets.bottom.rounded()))")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.yellow)
+                .padding(.horizontal, 4)
+                .background(Color.black.opacity(0.75))
+                .offset(x: 4 + CGFloat(riga % 2) * 150, y: 300 + CGFloat(riga) * 26)
+        }
+        .allowsHitTesting(false) }
     }
 }
 

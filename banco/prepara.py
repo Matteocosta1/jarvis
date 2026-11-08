@@ -43,3 +43,20 @@ gancio = f"\n{m.group(1)}.onReceive(NotificationCenter.default.publisher(for: .b
 s = s[:m.start()] + gancio + s[m.start():]
 p.write_text(s, encoding="utf-8")
 print("ok ProiezioneMail.swift")
+
+# 6. le sonde dei margini (si vedono solo nelle scene «…sonde»)
+cambia("StudioWeb.swift", "        .statusBarHidden(false)\n        .interactiveDismissDisabled(presa)",
+       "        .overlay { SondaSA(nome: \"VS\", riga: 0) }\n        .statusBarHidden(false)\n        .interactiveDismissDisabled(presa)")
+cambia("StudioWeb.swift", "                .background(Color.fondo)\n                .ignoresSafeArea()\n            if coperto {",
+       "                .background(Color.fondo)\n                .ignoresSafeArea()\n                .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            if coperto {")
+cambia("SchedeSignore.swift", "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .allowsHitTesting(false)",
+       "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)")
+cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)",
+       "            .overlay { SondaSA(nome: \"CORN\", riga: 0) }\n            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)")
+cambia("ProiezioneMail.swift", "                .frame(width: larga, height: alta)\n",
+       "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n")
+cambia("SchedeDaily.swift", "        .background(SfondoSezione(tinta: tinta))\n        .task { await carica() }",
+       "        .background(SfondoSezione(tinta: tinta))\n        .overlay { SondaSA(nome: \"LET\", riga: 4) }\n        .task { await carica() }")
+# 7. la PROIEZIONE senza luce e colore (scene «…B»)
+cambia("ProiezioneMail.swift", "                if luce > 1.001 {", "                if luce > 1.001 && !BancoProva.senzaColori {")
+cambia("ProiezioneMail.swift", "                if colore < 0.999 {", "                if colore < 0.999 && !BancoProva.senzaColori {")

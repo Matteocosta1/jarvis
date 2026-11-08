@@ -12,6 +12,9 @@ concurrency:
   group: banco
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   banco:
     runs-on: xcode-27
@@ -31,7 +34,20 @@ jobs:
           xcodebuild -project "Untitled Project.xcodeproj" -scheme "Untitled Project" -configuration Debug -destination "id=$UDID" -derivedDataPath dd CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build 2>&1 | tee build.log | grep -E "error: |BUILD (SUCCEEDED|FAILED)"
 
       - name: Gira le scene
-        run: bash banco/gira.sh mail studio
+        run: bash banco/gira.sh mail mailB mailsonde studio studiosonde
+
+      - name: Pubblica le uscite (ramo claude/banco-uscite, solo per scaricarle)
+        if: always()
+        run: |
+          cp build.log banco/out/ 2>/dev/null || true
+          cd banco/out
+          rm -f .caldo
+          git init -q -b uscite
+          git config user.name "banco"
+          git config user.email "banco@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Uscite del banco: ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" uscite:claude/banco-uscite
 
       - name: Salva i video
         if: always()
