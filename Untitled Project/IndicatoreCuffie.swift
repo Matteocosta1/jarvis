@@ -6,8 +6,8 @@ import AVFoundation
 
 // MARK: - CUFFIE (8 nov notte, il signore: «c'è un modo di riconoscere quando inserisco le cuffie? … io ho quelle col filo, magari
 // viene scritto EarPods… scritta piccola con logo cuffie, rimane per il tempo che sono collegate ma non deve essere invadente; quando
-// le scollego per 1/2 secondi dice scollegate e sparisce»). Come il mockup v285: sotto le 6 icone della testata, a destra, 8 punti,
-// ciano tenue. Lo dice iOS: a ogni cambio dell'uscita audio si guarda dove va il suono. Col filo (EarPods) «EARPODS», AirPods
+// le scollego per 1/2 secondi dice scollegate e sparisce… accanto a MARK XI»). Come il mockup v285: sulla riga di MARK XI, dopo un
+// punto, stesso carattere (10, spaziatura 3) e stesso grigio. Lo dice iOS: a ogni cambio dell'uscita audio si guarda dove va il suono. Col filo (EarPods) «EARPODS», AirPods
 // «AIRPODS», altre cuffie Bluetooth «CUFFIE». Tolte: «SCOLLEGATE» per 1,5 s, poi sparisce (dissolvenza 0,3 s).
 
 struct IndicatoreCuffie: View {
@@ -18,13 +18,15 @@ struct IndicatoreCuffie: View {
 
     var body: some View {
         let testo = scollegate ? "SCOLLEGATE" : nome
-        HStack(spacing: 4) {
-            Image(systemName: simbolo).font(.system(size: 10, weight: .medium))
-            Text(testo ?? " ").font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5)
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text("·").font(.system(size: 10, weight: .medium, design: .monospaced)).padding(.leading, 3).padding(.trailing, 2)
+            Image(systemName: simbolo).font(.system(size: 9, weight: .medium))
+            Text(testo ?? "").font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(3).lineLimit(1)
         }
-        .foregroundStyle(Color.ciano.opacity(scollegate ? 0.5 : 0.75))
+        .foregroundStyle(Color.tenue.opacity(scollegate ? 0.6 : 1))
         .opacity(testo == nil ? 0 : 1)
-        .offset(y: testo == nil ? -3 : 0)
+        .frame(width: testo == nil ? 0 : nil, alignment: .leading)
+        .clipped()
         .animation(.easeOut(duration: 0.3), value: testo)
         .fixedSize()
         .allowsHitTesting(false)

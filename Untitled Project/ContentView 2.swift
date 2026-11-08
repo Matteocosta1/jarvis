@@ -661,14 +661,19 @@ struct ContentView: View {
                     .shadow(color: .ciano.opacity(0.5), radius: 10)
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
                     .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
-                Text(sottotitolo)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .tracking(3)
-                    .foregroundStyle(sottotitolo == ContentView.marca ? Color.tenue : Color.ciano)
-                    .contentTransition(.numericText())
-                    .id(sottotitolo)
-                    .transition(.opacity)
-                    .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(sottotitolo)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .tracking(3)
+                        .foregroundStyle(sottotitolo == ContentView.marca ? Color.tenue : Color.ciano)
+                        .contentTransition(.numericText())
+                        .id(sottotitolo)
+                        .transition(.opacity)
+                    // 8 nov · CUFFIE (il signore: «scritta piccola con logo cuffie, finché sono collegate, non invadente… accanto a
+                    // MARK XI»): «· EARPODS» sulla stessa riga, stesso carattere e grigio, come il mockup v285; con la tastiera no
+                    if !mini && sottotitolo == ContentView.marca { IndicatoreCuffie() }
+                }
+                .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             }
             .frame(maxWidth: .infinity, alignment: .leading)          // tutto il posto libero accanto alle icone (prima: lo Spacer)
             .opacity(acceso ? 1 : 0)
@@ -776,15 +781,6 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        // 8 nov · CUFFIE (il signore: «scritta piccola con logo cuffie, rimane finché sono collegate, non invadente»): sotto le 6 icone,
-        // a destra, come il mockup v285; con la tastiera aperta no (lì la testata è stretta)
-        .overlay(alignment: .bottomTrailing) {
-            if !mini {
-                IndicatoreCuffie()
-                    .padding(.trailing, 20)
-                    .alignmentGuide(.bottom) { d in d[.top] - 4 }
-            }
-        }
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
         // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
         // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
