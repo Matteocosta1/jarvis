@@ -49,15 +49,10 @@ struct VistaStudio: View {
     /// 8 nov (il signore: «Studio, Social e Musica si devono aprire come tutte le altre, fluidità, precisione, continuità grafica,
     /// nessun nero»): l'apertura di CorniceScheda, pezzo per pezzo. Lo sfondo è quello di tutte le sezioni (SfondoSezione: la pagina
     /// web è trasparente sopra), la riga in alto è BarraSezione ferma dal primo istante, il caricamento è lo stesso (al centro, 120
-    /// punti sotto); quando la pagina è sullo schermo il caricamento sparisce e il contenuto si «stampa» dall'alto con la riga di luce
-    /// (0,32 s), come in ogni sezione.
-    @State private var stampa: CGFloat = 0
-    @State private var stampata = false
+    /// punti sotto); quando la pagina è sullo schermo il caricamento sfuma sulla pagina, come LiDAR (8 nov sera).
     @State private var caricamentoVia = false
 
     var body: some View {
-        // la riga in alto è alta 44 sotto il margine dell'ora: lì comincia il contenuto, e lì comincia la stampa
-        let daQui = (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 44
         ZStack {
             SfondoSezione()
             // 8 nov mattina (video del signore 06:34): la pagina web va a tutto schermo da sé (sotto l'ora e fino in fondo); la
@@ -70,12 +65,9 @@ struct VistaStudio: View {
                          passaggio: { riapri() },
                          telecomando: telecomando, olo: tintaOlo, materia: materiaOlo)
                 .ignoresSafeArea()
-            StampaSezione(da: daQui, stampa: stampa, riga: !coperto && !stampata)
-                .opacity(stampata ? 0 : 1)
-                .allowsHitTesting(false)
             if !caricamentoVia {
                 // lo stesso caricamento di tutte le sezioni (7 nov sera: «o le fai tutte uguali»); la riga in alto è quella sotto.
-                // 8 nov sera (come il mockup, rigaFissa): sfuma in 0,25 s mentre la pagina si stampa
+                // 8 nov sera: sfuma in 0,25 s sulla pagina, come LiDAR
                 SchermoCaricamento(titolo: nome, icona: nome == "Social" ? "social" : "studio", conTestata: false)
                     .opacity(coperto ? 1 : 0)
             }
@@ -107,7 +99,7 @@ struct VistaStudio: View {
     }
 
     /// La pagina è sullo schermo: dopo il caricamento minimo di tutte le sezioni, il suono di «pronta», il caricamento sparisce
-    /// e il contenuto si stampa dall'alto (come CorniceScheda: `mostrato`, poi `stampa` 0 → 1 in Apertura.stampa).
+    /// sulla pagina, come LiDAR.
     private func scopri() {
         guard coperto else { return }
         Task { @MainActor in
@@ -115,15 +107,14 @@ struct VistaStudio: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard coperto else { return }
             Suoni.schedaPronta()
-            // 8 nov sera (il signore: «come il mockup di adesso»): come stampaPagina del mockup v291, il caricamento sfuma (0,25 s)
-            // mentre la pagina si stampa dalla riga in alto in giù, un blocco solo, con la curva del mockup
-            withAnimation(Apertura.curvaDissolvenza) { coperto = false }
-            withAnimation(Apertura.curvaStampa) { stampa = 1 } completion: { stampata = true; caricamentoVia = true }
+            // 8 nov sera (il signore, 18:51: «fallo come LiDAR, anche quella è una pagina che gira dentro una pagina… uguali alle
+            // altre sezioni»): come LiDAR, il caricamento sfuma (0,25 s) sulla pagina già pronta; niente stampa (faceva il lampo)
+            withAnimation(Apertura.curvaDissolvenza) { coperto = false } completion: { caricamentoVia = true }
         }
     }
 
     /// 8 nov: dentro la pagina si passa da una sezione all'altra (Studio → Social, LiDAR → Studio): si riapre come un'apertura,
-    /// col caricamento e poi la stampa, come quando si apre una sezione.
+    /// col caricamento, come quando si apre una sezione.
     private func riapri() {
         guard !coperto else { return }
         var t = Transaction()
@@ -131,40 +122,9 @@ struct VistaStudio: View {
         withTransaction(t) {
             coperto = true
             caricamentoVia = false
-            stampa = 0
-            stampata = false
         }
         apertaDa = Date()
         Suoni.schedaApre()
-    }
-}
-
-/// 8 nov: la «stampa» del contenuto come in tutte le sezioni (CorniceScheda): sopra la pagina lo sfondo della sezione, che dall'alto
-/// in giù lascia il posto alla pagina; sul bordo la riga di luce del mockup (RigaDiStampa: 2 punti, alone, 16 punti dai bordi).
-private struct StampaSezione: View {
-    let da: CGFloat
-    let stampa: CGFloat
-    let riga: Bool
-
-    var body: some View {
-        GeometryReader { g in
-            let y = da + max(0, g.size.height - da) * stampa
-            ZStack(alignment: .top) {
-                SfondoSezione()
-                    .mask(alignment: .top) {
-                        VStack(spacing: 0) {
-                            Color.clear.frame(height: y)
-                            Color.black
-                        }
-                    }
-                RigaDiStampa()
-                    .opacity(riga ? 1 : 0)
-                    .animation(nil, value: riga)          // come la riga del mockup: c'è subito, senza dissolvenza
-                    .padding(.horizontal, 16)
-                    .offset(y: y)
-            }
-        }
-        .ignoresSafeArea()
     }
 }
 
