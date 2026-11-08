@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 11.0 (?) — 8 nov notte · numero da confermare dal signore · controllo di compilazione in corso
+## 11.0 (17) — 8 nov notte · numero scelto dal signore (17) · commit 11a63f9 · controllo di compilazione VERDE (0 errori, 0 warning, run 42531549642)
 La 11.0 (16) + la scheda come un foglio unico, senza stacchi né colori diversi (il signore, video 21:57: «ancora stacco e discrepanza sui colori… deve sembrare un'unica pagina»; 22:19: «la perfetta corrispondenza del colore… i quadrati precisi, allineati… come fosse un'unica scheda»).
 - Misurato sul video del signore (60 fotogrammi al secondo, Cuore e Studio): (1) due sfondi, quello della fascia dell'ora (il «cappello» della 16) e quello della sezione, con i quadretti sfasati di 15 punti e il chiarore che ripartiva sotto l'ora; (2) a 0,12 s dall'apertura la fascia in alto compariva già ferma al suo posto mentre il resto saliva ancora per 0,18 s; (3) in Cuore la salita ferma 4 fotogrammi e poi un salto, proprio quando suonava «pronta»; (4) durante il caricamento una riga con le punte luminose sotto la testata.
 - Dimostrato sul banco (sfondi colorati, salita rallentata 6 volte, strati misurati a ogni fotogramma): iOS calcola i margini dell'ora sulla posizione animata, e gli sfondi che «ignorano i margini» si allargano di colpo fino in cima quando la pagina arriva sotto l'ora (il «cappello» si fermava lì). In più il NavigationStack di iOS dentro le sezioni (serviva solo a nascondere la sua barra) mostrava la barra nei primi fotogrammi e la pagina dentro si spostava da sola mentre il foglio saliva (Ricordi: fino a 45 punti).
