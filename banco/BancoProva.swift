@@ -2,6 +2,8 @@
 import Foundation
 import SwiftUI
 import Combine
+import UIKit
+import QuartzCore
 
 // BANCO DI PROVA (solo sul ramo claude/banco-prova, mai nell'app del signore): l'app vera nel simulatore, con una radice che apre
 // le sezioni nel contenitore della MARK XI come fa ContentView, e un copione a tempo. Il video lo registra il simulatore.
@@ -17,6 +19,10 @@ enum BancoProva {
     static var sonde: Bool { scena?.hasSuffix("sonde") ?? false }
     /// La PROIEZIONE senza luce e colore (scene «…B»).
     static var senzaColori: Bool { scena?.hasSuffix("B") ?? false }
+    /// 8 nov notte (diagnosi): le aperture rallentate (scene con «_L»): salita, caricamento, stampa e dissolvenza × 6.
+    static var lento: Double { (scena?.contains("_L") ?? false) ? 6 : 1 }
+    /// 8 nov notte (diagnosi): gli sfondi colorati (scene con «_T»): il «cappello» in rosso, lo sfondo della sezione in verde.
+    static var tinte: Bool { scena?.contains("_T") ?? false }
 
     /// Le risposte del cervello, finte (come le darebbe lui).
     static func risposta(_ corpo: [String: Any]) async -> [String: Any]? {
@@ -175,6 +181,15 @@ struct RadiceBanco: View {
             apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(13.0); chiudiDavanti(); await aspetta(1.5)
             apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social")); await aspetta(10.0); chiudiDavanti(); await aspetta(1.5)
             apri(.scheda(.musica)); await aspetta(5.0); chiudiDavanti()
+        case "diag", "diag_L_T":                                                // 8 nov notte: la diagnosi del foglio (strati per fotogramma)
+            let lento = BancoProva.lento
+            let resta = lento > 1 ? 7.0 : 4.0
+            SondaStrati.condivisa.avvia("CUORE", durata: lento > 1 ? 4.5 : 1.6)
+            apri(.scheda(.cuore)); await aspetta(resta); chiudiDavanti(); await aspetta(1.5)
+            SondaStrati.condivisa.avvia("STUDIO", durata: lento > 1 ? 4.5 : 1.6)
+            apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio")); await aspetta(lento > 1 ? 12.0 : 9.0); chiudiDavanti(); await aspetta(1.5)
+            SondaStrati.condivisa.avvia("RICORDI", durata: lento > 1 ? 4.5 : 1.6)
+            apri(.ricordi); await aspetta(resta); chiudiDavanti()
         case "pagine":                                                          // 8 nov pomeriggio: ogni sezione come una pagina sola
             apri(.scheda(.edith)); await aspetta(3.5); chiudiDavanti(); await aspetta(1.5)
             apri(.lingua); await aspetta(3.5); chiudiDavanti(); await aspetta(1.5)
@@ -207,6 +222,79 @@ struct SondaSA: View {
                 .offset(x: 4 + CGFloat(riga % 2) * 150, y: 300 + CGFloat(riga) * 26)
         }
         .allowsHitTesting(false) }
+    }
+}
+
+/// 8 nov notte (diagnosi del «foglio unico»): a ogni fotogramma, per `durata` secondi, ogni strato largo quanto lo schermo
+/// (CALayer della finestra, anche quelli disegnati da SwiftUI): dove sta (y e altezza in punti della finestra, dal layer di
+/// presentazione), opacità, se è nascosto, la classe e (se è di una UIView) i margini sicuri. Scritto nel registro («STRATI»).
+@MainActor
+final class SondaStrati: NSObject {
+    static let condivisa = SondaStrati()
+    private var link: CADisplayLink?
+    private var inizio: CFTimeInterval = 0
+    private var durata: CFTimeInterval = 1.6
+    private var nome = ""
+    private var ultimo: [ObjectIdentifier: String] = [:]
+    private var giro = 0
+
+    func avvia(_ nome: String, durata: Double) {
+        link?.invalidate()
+        self.nome = nome
+        self.durata = durata
+        inizio = CACurrentMediaTime()
+        ultimo = [:]
+        giro = 0
+        let l = CADisplayLink(target: self, selector: #selector(tick(_:)))
+        l.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+        l.add(to: .main, forMode: .common)
+        link = l
+        NSLog("STRATI %@ INIZIO", nome)
+    }
+
+    @objc private func tick(_ l: CADisplayLink) {
+        let t = CACurrentMediaTime() - inizio
+        if t > durata { l.invalidate(); link = nil; NSLog("STRATI %@ FINE", nome); return }
+        guard let w = FasciaAlta.finestra else { return }
+        giro += 1
+        let radice = w.layer.presentation() ?? w.layer
+        var visti: Set<ObjectIdentifier> = []
+        var righe: [String] = []
+        visita(w.layer, radice: radice, profondita: 0, percorso: "", visti: &visti, righe: &righe)
+        for (k, _) in ultimo where !visti.contains(k) { righe.append("VIA \(k.hashValue % 1_000_000)") }
+        ultimo = ultimo.filter { visti.contains($0.key) }
+        NSLog("STRATI %@ t=%.3f g=%d n=%d", nome, t, giro, righe.count)
+        for r in righe { NSLog("STRATI %@ %@", nome, r) }
+    }
+
+    private func visita(_ layer: CALayer, radice: CALayer, profondita: Int, percorso: String, visti: inout Set<ObjectIdentifier>,
+                        righe: inout [String]) {
+        guard profondita < 60 else { return }
+        let p = layer.presentation() ?? layer
+        let r = p.convert(p.bounds, to: radice)
+        let id = ObjectIdentifier(layer)
+        if r.width >= 300 && r.height >= 30 {
+            visti.insert(id)
+            var classe = String(describing: type(of: layer))
+            var sa = ""
+            if let v = layer.delegate as? UIView {
+                classe = String(describing: type(of: v))
+                sa = String(format: " sa=%.0f/%.0f", v.safeAreaInsets.top, v.safeAreaInsets.bottom)
+            }
+            let colore: String = {
+                guard let c = p.backgroundColor, let k = c.components, k.count >= 3 else { return "" }
+                return String(format: " bg=%.2f,%.2f,%.2f,%.2f", k[0], k[1], k[2], c.alpha)
+            }()
+            let riga = String(format: "y=%.1f h=%.1f x=%.1f w=%.1f a=%.2f%@%@%@%@", r.minY, r.height, r.minX, r.width, p.opacity,
+                              p.isHidden ? " NASC" : "", p.masksToBounds ? " CLIP" : "", sa, colore)
+            if ultimo[id] != riga {
+                righe.append("L\(id.hashValue % 1_000_000) d\(profondita) \(classe) \(riga)")
+                ultimo[id] = riga
+            }
+        }
+        for s in layer.sublayers ?? [] {
+            visita(s, radice: radice, profondita: profondita + 1, percorso: percorso, visti: &visti, righe: &righe)
+        }
     }
 }
 

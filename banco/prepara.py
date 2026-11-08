@@ -62,3 +62,20 @@ cambia("SchedeDaily.swift", "        .background(SfondoSezione(tinta: tinta))\n 
 # 7. la PROIEZIONE senza luce e colore (scene «…B»)
 cambia("ProiezioneMail.swift", "                if luce > 1.001 {", "                if luce > 1.001 && !BancoProva.senzaColori {")
 cambia("ProiezioneMail.swift", "                if colore < 0.999 {", "                if colore < 0.999 && !BancoProva.senzaColori {")
+
+# 8. 8 nov notte, diagnosi del foglio: aperture rallentate (scene «_L») e sfondi colorati (scene «_T»: cappello rosso, sezione verde)
+cambia("PaginaPiena.swift", "    static let salita: Animation = .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)",
+       "    static var salita: Animation { .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35 * BancoProva.lento) }")
+cambia("SchedeSignore.swift", "    static let curvaStampa = Animation.timingCurve(0.42, 0.924, 0.776, 1, duration: stampa)",
+       "    static var curvaStampa: Animation { Animation.timingCurve(0.42, 0.924, 0.776, 1, duration: stampa) }")
+cambia("SchedeSignore.swift", "    static let curvaDissolvenza = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: dissolvenza)",
+       "    static var curvaDissolvenza: Animation { Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: dissolvenza) }")
+cambia("SchedeSignore.swift", "    static let caricamento = 0.28", "    static var caricamento: Double { 0.28 * BancoProva.lento }")
+cambia("SchedeSignore.swift", "    static let stampa = 0.32", "    static var stampa: Double { 0.32 * BancoProva.lento }")
+cambia("SchedeSignore.swift", "    static let dissolvenza = 0.25", "    static var dissolvenza: Double { 0.25 * BancoProva.lento }")
+cambia("SchedeSignore.swift", "    static let orecchio = caricamento + 0.7", "    static var orecchio: Double { caricamento + 0.7 }")
+cambia("PaginaPiena.swift", "struct SfondoSezione: View {\n    var tinta: Color = .ciano\n",
+       "struct SfondoSezione: View {\n    var tinta: Color = .ciano\n    var banco = 0\n", facoltativa=True)
+cambia("PaginaPiena.swift", "            RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)\n        }\n        .ignoresSafeArea()",
+       "            RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)\n            if BancoProva.tinte { (banco == 1 ? Color.red : Color.green).opacity(0.3) }\n        }\n        .ignoresSafeArea()", facoltativa=True)
+cambia("NavigaSezioni.swift", "SfondoSezione().padding(.top, -FasciaAlta.altezza)", "SfondoSezione(banco: 1).padding(.top, -FasciaAlta.altezza)", facoltativa=True)
