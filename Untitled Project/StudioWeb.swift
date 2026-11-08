@@ -62,8 +62,10 @@ struct VistaStudio: View {
                 apertaDa = Date()
                 Suoni.schedaApre()
             }
-            .task {                                              // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
-                try? await Task.sleep(for: .seconds(4))
+            .task {                                              // per sicurezza: se la pagina non dice mai «pronta» (bloccata), dopo 10 s si scopre lo stesso
+                // 8 nov: prima 4 s, e una pagina lenta finiva scoperta nel nero; ora il caricamento resta fermo al 92 % come in tutte
+                // le sezioni che aspettano i dati, finché la pagina non è sullo schermo
+                try? await Task.sleep(for: .seconds(10))
                 scopri()
             }
             .onDisappear { BattitoMani.paginaAperta(false) }
@@ -208,8 +210,19 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if let t = o["testo"] as? String, !t.isEmpty { parla(t) }
         case "chiudi":
             salvaOra(); chiudi()
-        case "pronta":                                                   // la sezione è aperta e disegnata: via il caricamento
-            pronta()
+        case "pronta":                                                   // la sezione è aperta: via il caricamento, ma solo a pagina sullo schermo
+            // 8 nov (il signore: «non voglio problemi di nero»): «pronta» della pagina vuol dire che la pagina ha finito il suo lavoro,
+            // non che l'immagine sia già sullo schermo (nel simulatore arrivava secondi dopo: nero). L'istantanea di iOS «dopo
+            // l'aggiornamento dello schermo» torna solo quando la pagina è davvero presentata: allora sfuma il caricamento.
+            guard let web else { pronta(); return }
+            let c = WKSnapshotConfiguration()
+            c.rect = CGRect(x: 0, y: 0, width: 4, height: 4)
+            c.snapshotWidth = 4
+            c.afterScreenUpdates = true
+            Task { [weak self, weak web] in
+                _ = try? await web?.takeSnapshot(configuration: c)
+                self?.pronta()
+            }
         case "presa":                                                    // il dito lavora nella pagina: niente chiusura trascinando
             presa(o["on"] as? Bool ?? false)
         case "ls":                                                       // l'archivio dei progetti (localStorage del mockup)
