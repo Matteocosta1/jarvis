@@ -96,6 +96,23 @@ struct VistaRicordi: View {
         .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
         .preferredColorScheme(.dark)
         .aperturaHUD("Ricordi", icona: "brain.head.profile")
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di Ricordi (la scheda, la ricerca, le prime righe a schermo nell'ordine).
+    private var testoSchermo: String {
+        guard let d = dati else { return Schermo.unisci("Ricordi", ["scheda \(scheda.rawValue)", errore ? "non raggiungo la memoria" : "la memoria si sta caricando"]) }
+        let righe: [DatiRicordi.Riga] = scheda == .posti ? d.posti : d.ricordi
+        let prime: [String] = righe.prefix(10).enumerated().map { i, r in
+            var riga = "\(i + 1). \(r.testo.prefix(160))"
+            if let p = r.persona { riga += " (\(p))" }
+            if let l = r.luogo { riga += " @ \(l)" }
+            if !r.quando.isEmpty { riga += " – \(r.quando)" }
+            return riga
+        }
+        let ricerca: String? = scheda == .ricordi ? Schermo.campo("cerca", cerca) : nil
+        let elenco: String = prime.isEmpty ? "nessuna riga a schermo" : "a schermo: " + prime.joined(separator: "; ")
+        return Schermo.unisci("Ricordi", ["scheda \(scheda.rawValue)", ricerca, elenco])
     }
 
     // MARK: Ricordi

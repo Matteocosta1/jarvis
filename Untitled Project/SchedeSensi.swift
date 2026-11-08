@@ -709,6 +709,17 @@ struct VistaSerata: View {
         }
         .task { await caricaElenco() }
         .task(id: scelta?.id) { if let s = scelta { await carica(s) } }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS della Serata (la serata scelta e i suoi conti come sono a schermo).
+    private var testoSchermo: String {
+        guard let s = scelta else { return Schermo.unisci("Serata", [errore.map { "errore: \($0)" } ?? "i conti si stanno aprendo"]) }
+        let quale = "serata scelta: \(s.nome) del \(s.data)" + (s.chiusa ? " (chiusa)" : " (aperta)")
+        let numeri: String
+        if let conti { numeri = "conti a schermo: " + Schermo.esito(conti, massimo: 1500) }
+        else { numeri = errore.map { "errore: \($0)" } ?? "conti in caricamento" }
+        return Schermo.unisci("Serata", [quale, numeri])
     }
 
     private func n(_ x: Any?) -> Double { (x as? NSNumber)?.doubleValue ?? 0 }

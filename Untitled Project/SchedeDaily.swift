@@ -41,6 +41,23 @@ struct VistaMeteo: View {
             radar = await Radar.chiedi()
             radarFinito = true
         }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS del meteo (il luogo a schermo, adesso e i prossimi giorni, come li vede il signore).
+    private var testoSchermo: String {
+        guard let m = meteo else {
+            let attesa: String = errore.map { "errore: \($0)" } ?? "il meteo si sta caricando"
+            return Schermo.unisci("Meteo", [attesa])
+        }
+        let c = m.currentWeather
+        let pioggia = m.hourlyForecast.forecast.first?.precipitationChance
+        let giorni: [String] = m.dailyForecast.forecast.prefix(7).map { d in
+            "\(d.date.formatted(.dateTime.weekday(.abbreviated))) \(gradi(d.lowTemperature))/\(gradi(d.highTemperature)) \(d.condition.description)"
+        }
+        var adesso = "adesso \(gradi(c.temperature)), \(c.condition.description)"
+        if let p = pioggia { adesso += ", pioggia nella prossima ora \(Int((p * 100).rounded()))%" }
+        return Schermo.unisci("Meteo", ["luogo: \(luogo)", adesso, "prossimi giorni: " + giorni.joined(separator: "; ")])
     }
 
     /// 11.0 (3), come il mockup approvato: al posto dell'icona il cielo di adesso in ologramma, con la rosa dei venti
@@ -495,6 +512,22 @@ struct VistaPosta: View {
             }
         }
         .chiudiFoglioDietro { aperta = nil }                 // MARK XI: la mail aperta non resta sopra la sezione che va dietro
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS della posta (la cartella e le righe a schermo, nell'ordine). La mail aperta la dice il lettore.
+    private var testoSchermo: String {
+        var dove = "cartella \(nomeCartella)"
+        if inArrivo { dove += ", ultime \(ore) ore" + (soloNonLette ? ", solo non lette" : "") } else { dove += ", ultimi 30 giorni" }
+        var pezzi: [String?] = [dove]
+        if let posta {
+            pezzi.append(posta.isEmpty ? "nessuna mail a schermo" : "\(posta.count) mail a schermo (dall'alto)")
+            for (i, m) in posta.prefix(15).enumerated() {
+                pezzi.append("\(i + 1). \(m.nome) – «\(m.oggetto)» – \(m.data)\(m.letta ? "" : " – NON LETTA")")
+            }
+        } else if let errore { pezzi.append("errore: \(errore)") }
+        else { pezzi.append("la casella si sta aprendo") }
+        return Schermo.unisci("Email", pezzi)
     }
 
     /// 8 nov · PROIEZIONE: la riga della mail si accende e si spegne (all'apertura subito, alla chiusura verso la fine).
@@ -622,6 +655,14 @@ struct LettoreMail: View {
         }
         .background(PelleLuce(tinta: tinta))          // 8 nov (scelta del signore, 09:49): LUCE, la scheda olografica trasparente
         .task { await carica() }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: la mail aperta, come la vede il signore («leggimela», «cosa devo rispondere?», «è una truffa?»).
+    private var testoSchermo: String {
+        guard let l = letta else { return Schermo.unisci("Email", ["mail aperta: \(nome) – «\(oggetto)» (il testo si sta caricando)"]) }
+        return Schermo.unisci("Email", ["mail aperta", Schermo.campo("da", l.da), Schermo.campo("a", l.a), Schermo.campo("cc", l.cc),
+                                        Schermo.campo("data", l.data), Schermo.campo("oggetto", l.oggetto), Schermo.campo("testo", l.testo, massimo: 2500)])
     }
 
     private func riga(_ etichetta: String, _ valore: String) -> some View {
@@ -844,6 +885,15 @@ struct VistaSpesa: View {
             }
         }
         .preferredColorScheme(.dark)
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS della spesa (la lista, il carrello di questa visita, quello che sta scrivendo).
+    private var testoSchermo: String {
+        guard caricata else { return Schermo.unisci("Spesa", ["la lista si sta aprendo", Schermo.campo("sta scrivendo", nuovo)]) }
+        let lista: String = daComprare.isEmpty ? "niente da comprare" : "da comprare: " + daComprare.map(\.testo).joined(separator: ", ")
+        let carrello: String? = nelCarrello.isEmpty ? nil : "già nel carrello: " + nelCarrello.map(\.testo).joined(separator: ", ")
+        return Schermo.unisci("Spesa", [lista, carrello, Schermo.campo("sta scrivendo (non ancora aggiunto)", nuovo)])
     }
 
     private var sottotitolo: String {

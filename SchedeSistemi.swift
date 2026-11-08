@@ -75,6 +75,15 @@ struct VistaGitHub: View {
         .task { await carica() }
         .onDisappear { dettatura.ferma() }
         .onChange(of: dettatura.testo) { _, nuovo in if dettatura.attivo { titoloIssue = (baseIssue + " " + nuovo).trimmingCharacters(in: .whitespaces) } }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di GitHub (il repository aperto e il suo dettaglio, la issue che sta scrivendo).
+    private var testoSchermo: String {
+        Schermo.unisci("GitHub", [repoScelto.map { "repository aperto: \($0)" } ?? "nessun repository aperto",
+                                 dettaglio.map { "dettaglio a schermo: " + Schermo.esito($0.d, massimo: 1200) },
+                                 Schermo.campo("titolo della issue che sta scrivendo (non ancora aperta)", titoloIssue),
+                                 errore.map { "errore: \($0)" }])
     }
 
     private var sottotitolo: String {
@@ -621,6 +630,17 @@ struct VistaArchivio: View {
         } message: { Text(daEliminare?.s("nome") ?? "") }
         // 4 nov: la fotocamera, il foglio del link, la scelta dei file e la domanda (iOS) non restano sopra la sezione che sale
         .chiudiFoglioDietro { scatta = false; daCondividere = nil; scegliFile = false; daEliminare = nil }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS dell'Archivio (la cartella, la ricerca, i file a schermo nell'ordine).
+    private var testoSchermo: String {
+        let nomi: [String] = (file ?? []).prefix(20).enumerated().map { i, f in "\(i + 1). \(f.s("nome"))" }
+        let elenco: String
+        if file == nil { elenco = errore.map { "errore: \($0)" } ?? "file in caricamento" }
+        else { elenco = nomi.isEmpty ? "nessun file a schermo" : "file a schermo: " + nomi.joined(separator: "; ") }
+        let dove: String = cartella.map { "cartella \($0)" } ?? "tutte le cartelle"
+        return Schermo.unisci("Archivio", [dove, Schermo.campo("cerca", cerca), elenco, caricamento.map { "caricamento in corso: \($0)" }])
     }
 
     private func chip(_ testo: String, attiva: Bool, azione: @escaping () -> Void) -> some View {

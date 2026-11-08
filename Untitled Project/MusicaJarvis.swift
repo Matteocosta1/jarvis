@@ -375,6 +375,27 @@ struct VistaMusica: View {
         }
         .task { await lettore.segui() }
         .task { await caricaOggi() }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di MUSICA (il brano di adesso, la scheda, la raccolta aperta, la ricerca e i risultati).
+    private var testoSchermo: String {
+        var ora = "niente in riproduzione"
+        if let v = lettore.voce {
+            ora = "in riproduzione: \(v.title)"
+            if let a = v.subtitle { ora += " – \(a)" }
+            if !lettore.suona { ora += " (in pausa)" }
+        }
+        var pezzi: [String?] = [ora, "scheda \(scheda.rawValue)"]
+        if let r = aperta {
+            let brani: [String] = (braniAperta ?? []).prefix(15).enumerated().map { i, t in "\(i + 1). \(t.title) – \(t.artistName)" }
+            pezzi.append("aperta: \(r.nome)" + (brani.isEmpty ? "" : ", brani: " + brani.joined(separator: "; ")))
+        } else if scheda == .cerca {
+            pezzi.append(Schermo.campo("cerca", testo))
+            let trovati: [String] = risultati.prefix(10).enumerated().map { i, b in "\(i + 1). \(b.title) – \(b.artistName)" }
+            if !trovati.isEmpty { pezzi.append("risultati per «\(cercato)»: " + trovati.joined(separator: "; ")) }
+        }
+        return Schermo.unisci("Musica", pezzi)
     }
 
     // MARK: le schede

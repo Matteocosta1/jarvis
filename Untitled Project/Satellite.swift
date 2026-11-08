@@ -216,6 +216,24 @@ struct VistaSatellite: View {
             guard (n.userInfo?["reparto"] as? String) == Reparto.satellite.rawValue, caricato, richiesta.azione != nil else { return }
             Task { await eseguiVoce(sulPosto: true) }
         }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di SATELLITE («portami qui», «che posto è questo?», «che tempo fa lì?» parlano del luogo scelto).
+    private var testoSchermo: String {
+        guard caricato else { return Schermo.unisci("Satellite", [errore ? "non raggiungo i luoghi" : "i luoghi si stanno caricando"]) }
+        var luogo: String?
+        if let l = scelto {
+            var d = "luogo scelto sulla mappa: \(l.nome) (\(l.tipo))"
+            if !l.via.isEmpty { d += ", \(l.via)" }
+            if let p = l.persona { d += ", con \(p)" }
+            d += ", coordinate " + String(format: "%.5f,%.5f", l.lat, l.lon)
+            if !l.quando.isEmpty { d += ", \(l.quando)" }
+            luogo = d
+        }
+        let cielo: String? = meteo.map { m in "meteo lì: \(m.gradi)°, \(m.cielo), \(m.pioggia)" }
+        return Schermo.unisci("Satellite", ["filtro \(filtro.rawValue), \(visibili.count) luoghi in elenco", luogo, cielo,
+                                           Schermo.campo("indirizzo scritto", indirizzo), avviso.map { "avviso a schermo: \($0)" }])
     }
 
     // MARK: SATELLITE

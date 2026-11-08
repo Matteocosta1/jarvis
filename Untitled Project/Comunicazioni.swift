@@ -273,6 +273,22 @@ struct VistaMessaggi: View {
         .onChange(of: testo) { salvaBozza() }
         .onChange(of: numeroScelto) { salvaBozza() }
         .onChange(of: scelto) { salvaBozza() }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS dei Messaggi (a chi scrive, il canale, la bozza; senza nessuno scelto, la ricerca e gli ultimi).
+    private var testoSchermo: String {
+        if let s = scelto {
+            var chi = "destinatario scelto: \(s.nome)"
+            if let n = numeroScelto { chi += " (\(n))" }
+            let bozza: String = Schermo.campo("bozza scritta (non ancora inviata)", testo, massimo: 1500) ?? "bozza vuota"
+            return Schermo.unisci("Messaggi", [chi, "canale: \(canale.rawValue)", bozza, esito.map { "esito: \($0)" }])
+        }
+        let ultimi: [String] = registro.prefix(5).map { "a \($0.nome): «\(($0.testo ?? "").prefix(120))»" }
+        let arrivati: [String] = ricevuti.prefix(5).map { "da \($0.nome): «\(($0.testo ?? "").prefix(120))»" }
+        let mandati: String? = ultimi.isEmpty ? nil : "ultimi mandati da JARVIS: " + ultimi.joined(separator: "; ")
+        let arrivo: String? = arrivati.isEmpty ? nil : "ultimi arrivati: " + arrivati.joined(separator: "; ")
+        return Schermo.unisci("Messaggi", ["nessun destinatario scelto", Schermo.campo("cerca", cerca), mandati, arrivo])
     }
 
     /// v267: i messaggi per l'ologramma BOLLE (i più nuovi, la persona scelta, il canale). 7 nov: mandati da JARVIS e ricevuti,
@@ -487,6 +503,17 @@ struct VistaTelefono: View {
             Button("Chiama") { if let d = daChiamare { chiama(nome: d.0, numero: d.1) } }
             Button("Annulla", role: .cancel) {}
         }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS del Telefono (la pagina, il numero sulla tastiera e di chi è, la ricerca, le ultime chiamate).
+    private var testoSchermo: String {
+        let ultime: [String] = registro.prefix(5).map { "\($0.nome) (\($0.numero)) \($0.quando.formatted(date: .numeric, time: .shortened))" }
+        var composto = Schermo.campo("numero sulla tastiera", numero)
+        if let n = composto, let c = contattoDelNumero { composto = n + " (è \(c.nome) in rubrica)" }
+        let ricerca: String? = pagina == .rubrica ? Schermo.campo("cerca", cerca) : nil
+        let chiamate: String? = pagina == .recenti && !ultime.isEmpty ? "ultime chiamate: " + ultime.joined(separator: "; ") : nil
+        return Schermo.unisci("Telefono", ["pagina \(pagina.rawValue)", composto, ricerca, chiamate])
     }
 
     private var contattoDelNumero: Contatto? {

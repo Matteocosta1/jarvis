@@ -1307,6 +1307,8 @@ final class Jarvis: NSObject, ObservableObject {
         if let foto { corpo["immagine"] = foto.base64EncodedString() }
         if !giro.isEmpty { corpo["immagini"] = giro.map { $0.base64EncodedString() } }   // i fotogrammi del giro, in ordine
         if let allegato { corpo["allegato"] = allegato }                                  // la trascrizione del Wiretap
+        // 8 nov notte: la sezione aperta e cosa mostra (campi scritti, voce aperta, risultati): JARVIS vede quello che vede lui
+        if let schermo = Schermo.perCervello(sezione: sezioneAperta) { corpo["schermo"] = schermo }
         let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
         if let posizione { corpo["posizione"] = posizione }
         // iOS ci lascia finire la risposta anche se lo schermo si spegne o il signore cambia app per un momento

@@ -129,6 +129,14 @@ struct VistaBea: View {
         }
         .chiudiFoglioDietro { sceltaContatto = false; pensiero = nil }   // 4 nov: i fogli (iOS) non restano sopra la sezione che sale
         .preferredColorScheme(.dark)
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di Bea (quello che sta scrivendo nella scheda, il «Ti penso» pronto a schermo).
+    private var testoSchermo: String {
+        Schermo.unisci("Bea", [Schermo.campo("sta scrivendo (\(tipoNuovo.nome), non ancora salvato)", nuovo),
+                              pensiero.map { "messaggio «Ti penso» proposto a schermo (non ancora mandato): «\($0)»" },
+                              errorePensiero.map { "errore: \($0)" }])
     }
 
     private var sottotitolo: String {

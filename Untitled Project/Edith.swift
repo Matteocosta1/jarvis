@@ -108,6 +108,24 @@ struct VistaEdith: View {
             }
             Text("Solo difesa: le sue cose, e dati pubblici prima di fidarsi di qualcuno.").font(.system(size: 9)).foregroundStyle(Color.tenue)
         }
+        .sulloSchermo(testoSchermo)
+    }
+
+    /// 8 nov notte: cosa vede JARVIS di EDITH (i campi scritti e i risultati già mostrati). La password non esce mai dal telefono:
+    /// JARVIS sa solo se è scritta e l'esito del controllo fatto qui.
+    private var testoSchermo: String {
+        let campi: [(String, String)] = [("PORTE · IP", ip), ("FUGHE · mail", email), ("LINK · testo o link", link), ("DOMINI · dominio", dominio),
+                                         ("AZIENDA · partita IVA", piva), ("IBAN", iban), ("NUMERO", numero), ("REPUTAZIONE · nome", reputazione)]
+        var pezzi: [String?] = campi.map { Schermo.campo($0.0, $0.1) }
+        if !password.isEmpty { pezzi.append("PASSWORD: scritta (il valore resta sul telefono)") }
+        let chiavi: [(String, String)] = [("porte", "PORTE"), ("fughe", "FUGHE"), ("link", "LINK"), ("dominio", "DOMINI"), ("azienda", "AZIENDA"),
+                                          ("iban", "IBAN"), ("numero", "NUMERO"), ("reputazione", "REPUTAZIONE")]
+        for (chiave, nome) in chiavi {
+            if inCorso.contains(chiave) { pezzi.append("Esito \(nome): controllo in corso") }
+            else if let e = esiti[chiave] { pezzi.append("Esito \(nome) già mostrato: \(Schermo.esito(e.d))") }
+        }
+        if let esitoPassword { pezzi.append("Esito PASSWORD: \(esitoPassword)") }
+        return Schermo.unisci("EDITH (difesa)", pezzi)
     }
 
     // MARK: Pezzi
