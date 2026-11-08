@@ -61,7 +61,7 @@ struct VistaRicordi: View {
                         Text("Non raggiungo la memoria, Sir.").foregroundStyle(.orange).padding(.top, 40)
                         Spacer()
                     } else {
-                        ProgressView().tint(Color.ciano).padding(.top, 60)
+                        AttesaAnello().padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
                         Spacer()
                     }
                 }
