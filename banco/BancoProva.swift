@@ -149,11 +149,11 @@ struct RadiceBanco: View {
             chiudiDavanti()
         case "studio":
             apri(.pagina("Studio"), pagina: AperturaPagina(sezione: "Studio"))
-            await aspetta(7.0)                                                  // 8,5
+            await aspetta(13.0)                                                 // 14,5 (nel simulatore la pagina web è lenta)
             chiudiDavanti()
-            await aspetta(1.5)                                                  // 10,0
+            await aspetta(1.5)                                                  // 16,0
             apri(.pagina("Social"), pagina: AperturaPagina(sezione: "Social"))
-            await aspetta(7.0)                                                  // 17,0
+            await aspetta(13.0)                                                 // 29,0
             chiudiDavanti()
         default:
             break
