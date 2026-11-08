@@ -47,16 +47,12 @@ struct VistaStudio: View {
     private var nome: String { sezioneMostrata ?? apertura.sezione }
 
     /// 8 nov (il signore: «Studio, Social e Musica si devono aprire come tutte le altre, fluidità, precisione, continuità grafica,
-    /// nessun nero»): l'apertura di CorniceScheda, pezzo per pezzo. Lo sfondo è quello di tutte le sezioni (SfondoSezione: la pagina
-    /// web è trasparente sopra), la riga in alto è BarraSezione ferma dal primo istante, il caricamento è lo stesso (al centro, 120
-    /// punti sotto); quando la pagina è sullo schermo il caricamento sparisce e il contenuto si «stampa» dall'alto con la riga di luce
-    /// (0,32 s), come in ogni sezione.
-    @State private var stampa: CGFloat = 0
-    @State private var stampata = false
+    /// nessun nero»; pomeriggio: «caricare insieme come una pagina sola, deve essere uniforme»): l'apertura di CorniceScheda. Lo
+    /// sfondo è quello di tutte le sezioni (SfondoSezione: la pagina web è trasparente sopra), la riga in alto è BarraSezione ferma
+    /// dal primo istante, il caricamento è lo stesso; quando la pagina è sullo schermo il caricamento sfuma e la pagina compare
+    /// tutta insieme (0,25 s), come ogni sezione.
 
     var body: some View {
-        // la riga in alto è alta 44 sotto il margine dell'ora: lì comincia il contenuto, e lì comincia la stampa
-        let daQui = (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 44
         ZStack {
             SfondoSezione()
             // 8 nov mattina (video del signore 06:34): la pagina web va a tutto schermo da sé (sotto l'ora e fino in fondo); la
@@ -69,12 +65,10 @@ struct VistaStudio: View {
                          passaggio: { riapri() },
                          telecomando: telecomando, olo: tintaOlo, materia: materiaOlo)
                 .ignoresSafeArea()
-            StampaSezione(da: daQui, stampa: stampa, riga: !coperto && !stampata)
-                .opacity(stampata ? 0 : 1)
-                .allowsHitTesting(false)
             if coperto {
                 // lo stesso caricamento di tutte le sezioni (7 nov sera: «o le fai tutte uguali»); la riga in alto è quella sotto
                 SchermoCaricamento(titolo: nome, icona: nome == "Social" ? "social" : "studio", conTestata: false)
+                    .transition(.opacity)
             }
             VStack(spacing: 0) {
                 BarraSezione(testata: DatiTestata(titolo: nome, sottotitolo: coperto ? TestiCaricamento.di(nome) : (sottotitolo ?? TestiCaricamento.di(nome)),
@@ -103,8 +97,8 @@ struct VistaStudio: View {
         .onDisappear { BattitoMani.paginaAperta(false) }
     }
 
-    /// La pagina è sullo schermo: dopo il caricamento minimo di tutte le sezioni, il suono di «pronta», il caricamento sparisce
-    /// e il contenuto si stampa dall'alto (come CorniceScheda: `mostrato`, poi `stampa` 0 → 1 in Apertura.stampa).
+    /// La pagina è sullo schermo: dopo il caricamento minimo di tutte le sezioni, il suono di «pronta», il caricamento sfuma e
+    /// la pagina compare tutta insieme (come CorniceScheda: `mostrato` in Apertura.dissolvenza).
     private func scopri() {
         guard coperto else { return }
         Task { @MainActor in
@@ -112,8 +106,7 @@ struct VistaStudio: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard coperto else { return }
             Suoni.schedaPronta()
-            coperto = false
-            withAnimation(.easeOut(duration: Apertura.stampa)) { stampa = 1 } completion: { stampata = true }
+            withAnimation(.easeOut(duration: Apertura.dissolvenza)) { coperto = false }
         }
     }
 
@@ -123,42 +116,9 @@ struct VistaStudio: View {
         guard !coperto else { return }
         var t = Transaction()
         t.disablesAnimations = true
-        withTransaction(t) {
-            coperto = true
-            stampa = 0
-            stampata = false
-        }
+        withTransaction(t) { coperto = true }
         apertaDa = Date()
         Suoni.schedaApre()
-    }
-}
-
-/// 8 nov: la «stampa» del contenuto come in tutte le sezioni (CorniceScheda): sopra la pagina lo sfondo della sezione, che dall'alto
-/// in giù lascia il posto alla pagina; sul bordo la riga di luce (2 punti, ciano, bagliore 6, larga quanto il contenuto).
-private struct StampaSezione: View {
-    let da: CGFloat
-    let stampa: CGFloat
-    let riga: Bool
-
-    var body: some View {
-        GeometryReader { g in
-            let y = da + max(0, g.size.height - da) * stampa
-            ZStack(alignment: .top) {
-                SfondoSezione()
-                    .mask(alignment: .top) {
-                        VStack(spacing: 0) {
-                            Color.clear.frame(height: y)
-                            Color.black
-                        }
-                    }
-                Rectangle().fill(Color.ciano).frame(height: 2)
-                    .shadow(color: .ciano, radius: 6)
-                    .padding(.horizontal, 16)
-                    .offset(y: y)
-                    .opacity(riga ? 1 : 0)
-            }
-        }
-        .ignoresSafeArea()
     }
 }
 
