@@ -71,9 +71,21 @@ struct ProiezioneMail<Contenuto: View>: View {
         let larga = schermo.width
         let alta = altezza
         ZStack(alignment: .topLeading) {
-            Color.black.opacity(velo ? 0.45 : 0)
+            // 8 nov (LUCE, scelta del signore 09:49): dietro la scheda trasparente si vede la Posta, velata al 28 %
+            Color.black.opacity(velo ? 0.28 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { chiudi() }                      // un tocco fuori dalla scheda, come iOS
+            // LUCE: il bagliore ciano sopra la scheda (box-shadow 0 -10px 50px del mockup). Nella PROIEZIONE il mockup lo taglia
+            // col clip-path finché la scheda non è aperta del tutto: qui c'è solo a fase 1 (letta fotogramma per fotogramma)
+            let su = cima + tiro + (scivola ? (1 - fase) * alta : 0)
+            UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+                .fill(tinta.opacity(0.30))
+                .frame(width: larga, height: alta)
+                .blur(radius: 25)
+                .offset(y: su - 10)
+                .mask(alignment: .topLeading) { Rectangle().frame(width: larga, height: max(0, su)) }
+                .modifier(SoloAperta(fase: fase, sempre: scivola))
+                .allowsHitTesting(false)
             SenzaMargini(contenuto: contenuto(chiudi))          // dentro la scheda niente margini di iOS (li scrive il lettore)
                 .frame(width: larga, height: alta)
                 .modifier(EffettoProiezione(fase: fase, aprendo: aprendo, y: yRiga, altezza: alta, attivo: !scivola))
@@ -271,6 +283,126 @@ private struct LineaScansione: View {
             .frame(height: 2)
             .shadow(color: Color.ciano.opacity(0.75), radius: 6)
             .shadow(color: Color.ciano.opacity(0.25), radius: 17)
+    }
+}
+/// Il bagliore di LUCE si vede solo a scheda aperta del tutto (la fase vera di ogni fotogramma, non quella d'arrivo); scivolando sempre.
+private struct SoloAperta: ViewModifier, Animatable {
+    var fase: CGFloat
+    let sempre: Bool
+    nonisolated var animatableData: CGFloat {
+        get { fase }
+        set { fase = newValue }
+    }
+    func body(content: Content) -> some View {
+        content.opacity(sempre || fase > 0.999 ? 1 : 0)
+    }
+}
+
+/// 8 nov (il signore, 09:49: «per MAIL la mia scelta è LUCE»): la scheda della mail olografica, come la prova LUCE del mockup v290.
+/// Vetro trasparente (dietro si vede la Posta), la luce del proiettore che scende dall'alto, le righe di scansione fini, gli angoli
+/// da mirino, il filo di luce sul bordo e una fascia di luce che attraversa la scheda dall'alto in basso ogni 4 s.
+struct PelleLuce: View {
+    let tinta: Color
+    @Environment(\.sezioneDietro) private var dietro
+
+    var body: some View {
+        GeometryReader { g in
+            let W = g.size.width, H = g.size.height
+            ZStack(alignment: .topLeading) {
+                // il vetro: il più leggero di iOS (nel mockup blur 5 e saturazione 1,4) e il fondo al 34 %
+                Rectangle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark)
+                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.34)
+                // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
+                EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
+                    .frame(width: W * 2.6, height: 760)
+                    .position(x: W / 2, y: 0)
+                GrigliaSfumata()
+                RigheLuce(tinta: tinta)
+                AngoliLuce()
+                if !dietro { ScansioneLuce(tinta: tinta, alta: H) }
+                BordoLuce(tinta: tinta)
+            }
+            .frame(width: W, height: H, alignment: .topLeading)
+            .clipped()
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Le righe di scansione della scheda: 1 punto ogni 3, ciano al 6 % (dal basso, come il gradiente del mockup).
+private struct RigheLuce: View {
+    let tinta: Color
+    var body: some View {
+        Canvas { gc, size in
+            var p = Path()
+            var y = size.height - 1
+            while y > -1 { p.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)); y -= 3 }
+            gc.fill(p, with: .color(tinta.opacity(0.06)))
+        }
+    }
+}
+
+/// Gli angoli da mirino: L di 16 punti, spesse 1,5, a 12 dai lati; in alto a 52 (sotto la riga di «Chiudi»), in basso sopra i tasti.
+private struct AngoliLuce: View {
+    var body: some View {
+        Canvas { gc, size in
+            let W = size.width, H = size.height, l: CGFloat = 16, s: CGFloat = 1.5
+            var p = Path()
+            p.addRect(CGRect(x: 12, y: 52, width: l, height: s)); p.addRect(CGRect(x: 12, y: 52, width: s, height: l))
+            p.addRect(CGRect(x: W - 12 - l, y: 52, width: l, height: s)); p.addRect(CGRect(x: W - 12 - s, y: 52, width: s, height: l))
+            p.addRect(CGRect(x: 12, y: H - 96 - s, width: l, height: s)); p.addRect(CGRect(x: 12, y: H - 96 - l, width: s, height: l))
+            p.addRect(CGRect(x: W - 12 - l, y: H - 96 - s, width: l, height: s)); p.addRect(CGRect(x: W - 12 - s, y: H - 96 - l, width: s, height: l))
+            gc.fill(p, with: .color(Color(red: 120 / 255, green: 236 / 255, blue: 1).opacity(0.9)))
+        }
+    }
+}
+
+/// La scansione lenta: una fascia di luce (110 punti, più chiara sul bordo basso) che attraversa la scheda dall'alto in basso in
+/// 2,2 s con la curva del mockup (0,45 0 0,55 1), poi una pausa; un giro ogni 4 s, a 120 Hz. Dietro si ferma.
+private struct ScansioneLuce: View {
+    let tinta: Color
+    let alta: CGFloat
+    private static let curva = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.45, y: 0), endControlPoint: UnitPoint(x: 0.55, y: 1))
+    var body: some View {
+        TimelineView(.animation) { t in
+            let c = t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4) / 4
+            let p = c < 0.55 ? Self.curva.value(at: c / 0.55) : 1
+            let bordo = 2 * alta * CGFloat(p)
+            LinearGradient(stops: [.init(color: tinta.opacity(0), location: 0),
+                                   .init(color: tinta.opacity(0.10), location: 80 / 110),
+                                   .init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.40), location: 109 / 110),
+                                   .init(color: tinta.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 110)
+                .offset(y: bordo - 110)
+                .opacity(bordo > 0 && bordo < alta + 110 ? 1 : 0)
+        }
+    }
+}
+
+/// Il filo di luce sul bordo (lati e angoli alti di 32, come la scheda): in alto più chiaro, sui lati ciano al 50 %; dentro, un alone.
+private struct BordoLuce: View {
+    let tinta: Color
+    private struct Bordo: Shape {
+        func path(in r: CGRect) -> Path {
+            var p = Path()
+            p.move(to: CGPoint(x: r.minX, y: r.maxY))
+            p.addLine(to: CGPoint(x: r.minX, y: r.minY + 32))
+            p.addArc(center: CGPoint(x: r.minX + 32, y: r.minY + 32), radius: 32, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+            p.addLine(to: CGPoint(x: r.maxX - 32, y: r.minY))
+            p.addArc(center: CGPoint(x: r.maxX - 32, y: r.minY + 32), radius: 32, startAngle: .degrees(270), endAngle: .degrees(360), clockwise: false)
+            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            return p
+        }
+    }
+    var body: some View {
+        ZStack {
+            Bordo().stroke(tinta.opacity(0.14), lineWidth: 60).blur(radius: 30)
+            Bordo().stroke(LinearGradient(stops: [.init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.95), location: 0),
+                                                  .init(color: tinta.opacity(0.5), location: 0.06)],
+                                          startPoint: .top, endPoint: .bottom), lineWidth: 2.5)
+        }
     }
 }
 #endif
