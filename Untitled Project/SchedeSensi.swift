@@ -39,6 +39,7 @@ struct VistaShazam: View {
     @ObservedObject private var ascolto = AscoltoShazam.condiviso   // 8 nov: da dove si ascolta (Apple Music, anteprima, YouTube)
     @State private var inLibreria = Set<String>()
     @State private var giu: CGFloat = 0                 // lo swipe giù del player
+    @State private var mini = false                     // 8 nov: il player tirato giù diventa il mini-player in fondo
     @ObservedObject private var lettore = LettoreMusica.condiviso
     @Environment(\.sezioneDietro) private var dietro    // 4 nov: dietro (MARK XI) il logo olografico si ferma
 
@@ -144,9 +145,29 @@ struct VistaShazam: View {
     // (col video di YouTube al suo posto); −15 · PLAY · +15; LIBRERIA · YOUTUBE (o APPLE) · MUSICA.
 
     private func player(_ t: Trovata) -> some View {
+        Group {
+            if mini { miniPlayer(t) } else { playerPieno(t) }
+        }
+        .frame(maxWidth: 560)
+        .offset(y: max(0, giu))
+        .gesture(DragGesture()
+            .onChanged { giu = $0.translation.height }
+            .onEnded { v in
+                if v.translation.height > 90 || v.predictedEndTranslation.height > 260 {
+                    Suoni.tocco()
+                    if mini { chiudiPlayer() }                                            // giù dal mini: si chiude
+                    else { withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.28)) { mini = true; giu = 0 } }   // giù dal pieno: il mini
+                } else { withAnimation(.spring(duration: 0.3)) { giu = 0 } }
+            })
+        .transition(.move(edge: .bottom))
+    }
+
+    // 8 nov (il signore, 04:07: «il player non deve andare così sopra l'ologramma col logo di Shazam… e posso tirarlo giù»): come il
+    // mockup v284 — compatto, sotto l'anello del logo (copertina 96 accanto al titolo, con l'anello di luce che gira mentre suona);
+    // YOUTUBE: il video a tutta larghezza sopra il titolo; tirato giù diventa il mini-player, toccato si riapre.
+    private func playerPieno(_ t: Trovata) -> some View {
         let video = ascolto.fonte == .video
-        let lato: CGFloat = 230                                       // come il mockup: min(62% dello schermo, 230) → 230 su ogni iPhone
-        return VStack(spacing: 14) {
+        return VStack(spacing: 12) {
             Capsule().fill(Color.white.opacity(0.25)).frame(width: 40, height: 5)
             HStack {
                 Text("\(AscoltoShazam.scritta(ascolto.fonte)) · RICONOSCIUTA ALLE \(t.quando.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)))")
@@ -156,25 +177,22 @@ struct VistaShazam: View {
                 Button("Chiudi") { Suoni.tocco(); chiudiPlayer() }
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(tinta)
             }
-            ZStack {
-                if video, let id = ascolto.videoID {
-                    LettoreYouTube(id: id)
-                        .frame(width: lato, height: lato * 9 / 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: tinta.opacity(0.25), radius: 15)
-                        .id(id)
-                } else {
-                    copertina(t, lato: lato)
-                }
-                if ascolto.cercando {
-                    ProgressView().tint(tinta)
-                }
+            if video, let id = ascolto.videoID {
+                LettoreYouTube(id: id)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: tinta.opacity(0.25), radius: 15)
+                    .id(id)
             }
-            .frame(height: video ? lato * 9 / 16 : lato)
-            VStack(spacing: 4) {
-                Text(t.titolo).font(.system(size: 20, weight: .bold)).foregroundStyle(.white).lineLimit(2).multilineTextAlignment(.center)
-                Text([t.artista, t.album, ascolto.brano?.releaseDate.map { String(Calendar.current.component(.year, from: $0)) }].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 13)).foregroundStyle(Color(red: 0.62, green: 0.70, blue: 0.73)).lineLimit(1)
+            HStack(spacing: 14) {
+                if !video { copertina(t, lato: 96, raggio: 12) }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(t.titolo).font(.system(size: 19, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                    Text(sottoTitolo(t)).font(.system(size: 13)).foregroundStyle(Color(red: 0.62, green: 0.70, blue: 0.73)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if ascolto.cercando { ProgressView().tint(tinta) }
             }
             if !video {
                 barraTempo
@@ -211,8 +229,7 @@ struct VistaShazam: View {
             }
         }
         .buttonStyle(StileStark())
-        .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 30)
-        .frame(maxWidth: 560)
+        .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 26)
         .background(
             UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24)
                 .fill(LinearGradient(colors: [Color(red: 6 / 255, green: 20 / 255, blue: 26 / 255).opacity(0.98),
@@ -222,32 +239,63 @@ struct VistaShazam: View {
                 .shadow(color: tinta.opacity(0.12), radius: 20, y: -10)
                 .ignoresSafeArea(edges: .bottom)
         )
-        .offset(y: max(0, giu))
-        .gesture(DragGesture()
-            .onChanged { giu = $0.translation.height }
-            .onEnded { v in
-                if v.translation.height > 90 || v.predictedEndTranslation.height > 260 { Suoni.tocco(); chiudiPlayer() }
-                else { withAnimation(.spring(duration: 0.3)) { giu = 0 } }
-            })
-        .transition(.move(edge: .bottom))
+    }
+
+    /// Il mini-player (come .sz-player.mini del mockup): copertina, titolo, PLAY/PAUSA. Toccato si riapre; tirato giù si chiude.
+    private func miniPlayer(_ t: Trovata) -> some View {
+        HStack(spacing: 12) {
+            copertina(t, lato: 44, raggio: 8)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t.titolo).font(.system(size: 14, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                Text(sottoTitolo(t)).font(.system(size: 11)).foregroundStyle(Color(red: 0.62, green: 0.70, blue: 0.73)).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if ascolto.fonte != .video {
+                Button { Suoni.tocco(); Task { await ascolto.playPausa() } } label: {
+                    Image(systemName: ascolto.suonaOra ? "pause.fill" : "play.fill")
+                        .font(.system(size: 17)).foregroundStyle(Color(red: 0, green: 0.094, blue: 0.125))
+                        .frame(width: 40, height: 40).background(Circle().fill(tinta))
+                        .shadow(color: tinta.opacity(0.45), radius: 7)
+                }
+                .buttonStyle(StileStark())
+                .accessibilityLabel(ascolto.suonaOra ? "Pausa" : "Riproduci")
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(LinearGradient(colors: [Color(red: 6 / 255, green: 20 / 255, blue: 26 / 255).opacity(0.98),
+                                              Color(red: 2 / 255, green: 6 / 255, blue: 10 / 255).opacity(0.99)], startPoint: .top, endPoint: .bottom))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(tinta.opacity(0.45), lineWidth: 1))
+                .shadow(color: tinta.opacity(0.12), radius: 14)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        .onTapGesture { Suoni.tocco(); withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { mini = false } }
+        .padding(.horizontal, 10).padding(.bottom, 12)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Riapre il player")
+    }
+
+    private func sottoTitolo(_ t: Trovata) -> String {
+        [t.artista, t.album, ascolto.brano?.releaseDate.map { String(Calendar.current.component(.year, from: $0)) }].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// La copertina grande (come .sz-p-cop): leggermente più piccola da ferma, l'anello di luce che gira mentre suona.
-    private func copertina(_ t: Trovata, lato: CGFloat) -> some View {
+    private func copertina(_ t: Trovata, lato: CGFloat, raggio: CGFloat) -> some View {
         let suona = ascolto.suonaOra
         return TimelineView(.animation(paused: !suona || UIAccessibility.isReduceMotionEnabled || dietro)) { tl in
             let giro = tl.date.timeIntervalSinceReferenceDate * 9          // 1 giro in 40 s, come il mockup (ts / 40)
             ZStack {
-                RoundedRectangle(cornerRadius: 22)
+                // 8 nov: gira la LUCE lungo il bordo, non il bordo (girando il quadrato gli angoli uscivano storti)
+                RoundedRectangle(cornerRadius: raggio + 4)
                     .strokeBorder(AngularGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.7),
                                                           .init(color: tinta.opacity(0.7), location: 0.85), .init(color: .clear, location: 1)],
-                                                  center: .center), lineWidth: 1.5)
-                    .frame(width: lato + 20, height: lato + 20)
-                    .rotationEffect(.degrees(giro.truncatingRemainder(dividingBy: 360)))
+                                                  center: .center, angle: .degrees(giro.truncatingRemainder(dividingBy: 360))), lineWidth: 1.5)
+                    .frame(width: lato + (lato > 60 ? 12 : 8), height: lato + (lato > 60 ? 12 : 8))
                     .opacity(suona ? 1 : 0)
                 AsyncImage(url: t.copertina) { img in img.resizable().scaledToFill() } placeholder: { Color.white.opacity(0.06) }
-                    .frame(width: lato, height: lato).clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: tinta.opacity(0.25), radius: 15)
+                    .frame(width: lato, height: lato).clipShape(RoundedRectangle(cornerRadius: raggio))
+                    .shadow(color: tinta.opacity(0.22), radius: lato > 60 ? 11 : 4)
                     .scaleEffect(suona ? 1 : 0.94)
                     .animation(.easeOut(duration: 0.5), value: suona)
             }
@@ -281,7 +329,7 @@ struct VistaShazam: View {
 
     private func chiudiPlayer() {
         ascolto.chiudi()                                                          // anteprima e video si fermano; Apple Music continua
-        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { aperta = nil; giu = 0 }
+        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { aperta = nil; giu = 0; mini = false }
     }
 
     private func rigaStorico(_ t: Trovata) -> some View {
@@ -332,7 +380,7 @@ struct VistaShazam: View {
     /// Sale il player e la canzone parte dalla fonte migliore: Apple Music intero (permesso e abbonamento), se no l'anteprima di
     /// 30 secondi, se no il video di YouTube (AscoltoShazam).
     private func suona(_ t: Trovata) async {
-        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { aperta = t; giu = 0 }
+        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { aperta = t; giu = 0; mini = false }
         await ascolto.suona(titolo: t.titolo, artista: t.artista, appleID: t.appleMusicID)
     }
 

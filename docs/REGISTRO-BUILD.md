@@ -531,6 +531,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 
 ## Verso la 11.0 (12) — 8 nov notte (numero da confermare)
+- Shazam (04:07: «il player non deve andare così sopra l'ologramma col logo… e posso tirarlo giù»; 04:08 «crealo con massima competenza»): il player compatto si ferma sotto l'anello del logo (copertina 96 accanto al titolo; ASCOLTA e l'ologramma restano visibili); YOUTUBE col video a tutta larghezza sopra il titolo; tirato giù diventa il MINI-PLAYER in fondo (copertina 44, titolo, PLAY/PAUSA; la musica continua), toccato si riapre, tirato giù ancora si chiude; la luce attorno alla copertina gira lungo il bordo (prima girava il riquadro e gli angoli uscivano storti). Mockup v284 uguale, più la riga di stato di Shazam che finiva sopra l'elenco (classe «cambia» condivisa con lo strato della ruota).
 - Ruota (il signore 03:52–03:55: «mettiamoli tutti in inglese… INTELLIGENCE l'unico che mi piace… bravissimo»): i gruppi diventano OPERATIONS (era DAILY) · PERCEPTION (SENSI) · BIOMETRICS (SIGNORE) · ENGINEERING (STRUMENTI) · INTELLIGENCE. Sulla ruota, nell'ologramma sotto il nome della sezione e sul polso (dove DAILY si chiamava GIORNATA). Mockup v283 uguale. Provati e scartati: «nomi dritti» (03:51: «bruttissimo»).
 
 ## 11.0 (11) — 8 nov notte · numero confermato dal signore (03:23: «metti tutto nella build 11») · commit c798aaf · controllo di compilazione VERDE (0 errori, 0 warning, run 42439597149)
