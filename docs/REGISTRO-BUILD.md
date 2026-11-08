@@ -530,6 +530,15 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 11.0 (15) — 8 nov sera · numero scelto dal signore (19:02: «15») · commit bc4592e (+ numero) · controllo di compilazione VERDE (0 errori, 0 warning, run 42507811886)
+La 11.0 (14) rifatta come il mockup (scelta del signore 18:0x: «come il mockup di adesso»; 19:10: «il mock up adesso è perfetto»). Mockup v293 pubblicato.
+- Tutte le sezioni: tocco → suono di caricamento → caricamento → il caricamento sfuma (0,25 s) mentre il contenuto, UN blocco solo, si stampa dall'alto dietro una sola riga di luce (0,32 s, la curva del mockup) → suono di conferma. Prima la stampa finiva su ogni riquadro (pagina a pezzi). Vale per CorniceScheda, Vitals, Ricordi, Confidente, Wiretap, Interprete, Bea e Spesa; le sezioni con fotocamera compaiono senza stampa, come nel mockup.
+- La scritta sotto il nome arriva insieme alla pagina (scelta del signore: «insieme alla pagina»), anche nel mockup; la scritta del caricamento che sfuma sparisce subito.
+- Studio e Social come LiDAR (il signore, 18:51): il caricamento sfuma sulla pagina, suona la conferma, niente stampa né lampo; nel mockup anche la luce in alto uguale alle altre sezioni.
+- Musica come le altre: il caricamento aspetta le liste di OGGI (al massimo 4 s), la pagina compare intera; nel mockup tolto l'anello che arrivava dopo.
+- Polso: la scheda si stampa dall'alto come il polso del mockup (senza riga).
+- Simulatore (banco «pagine»): stampa in un blocco solo, nessun vuoto; Studio nel simulatore resta sul caricamento (pagina web lenta, come sempre lì), Musica dietro il permesso di Apple Music: da verificare sul telefono.
+
 ## 11.0 (14) — 8 nov pomeriggio · numero scelto dal signore (14:3x: «11.14») · commit e controllo finale: vedi l'ultima riga
 Uguale alla 11.0 (12) + l'apertura di TUTTE le sezioni come una pagina sola (il signore, video 14:12: «carica la parte in alto e poi quella sotto… tutte e 30 e più fanno schifo… clicchi, caricamento e carica TUTTA LA PAGINA… un caricamento unico senza gap»). Solo app (iPhone e polso), il mockup no (il signore, 14:21).
 - Causa 1: la «stampa» dall'alto era applicata al contenuto della sezione, che è una lista di riquadri: iOS la metteva su OGNI riquadro, quindi ogni riquadro si stampava per conto suo con la sua riga di luce (la pagina compariva a pezzi). Tolta: niente più stampa.
