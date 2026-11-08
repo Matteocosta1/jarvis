@@ -195,6 +195,8 @@ private struct Cornici: Shape {
 /// Il lettore ufficiale di YouTube (embed), nella pagina: niente download, solo riproduzione.
 struct LettoreYouTube: UIViewRepresentable {
     let id: String
+    /// 8 nov · Shazam: chi comanda il video da fuori (il PLAY/PAUSA del mini-player) riceve il lettore appena creato.
+    var pronto: ((WKWebView) -> Void)? = nil
     func makeUIView(context: Context) -> WKWebView {
         let c = WKWebViewConfiguration()
         c.allowsInlineMediaPlayback = true
@@ -205,9 +207,10 @@ struct LettoreYouTube: UIViewRepresentable {
         w.scrollView.isScrollEnabled = false
         let html = """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{border:0;width:100%;height:100%}</style></head>
-        <body><iframe src="https://www.youtube.com/embed/\(id)?playsinline=1&autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>
+        <body><iframe src="https://www.youtube.com/embed/\(id)?playsinline=1&autoplay=1&rel=0&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>
         """
         w.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
+        pronto?(w)
         return w
     }
     func updateUIView(_ uiView: WKWebView, context: Context) {}

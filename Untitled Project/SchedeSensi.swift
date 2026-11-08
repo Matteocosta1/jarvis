@@ -5,6 +5,7 @@ import Combine
 import Charts
 import MusicKit
 import UIKit
+import WebKit          // 8 nov: il lettore di YouTube del player passa il suo WKWebView ad AscoltoShazam
 
 // MARK: - SHAZAM (MARK X): logo olografico in ascolto, poi sale il player che la suona subito su Apple Music
 
@@ -56,6 +57,8 @@ struct VistaShazam: View {
                         .tint(.red).padding(.top, 4)
                 }
             }
+            // 8 nov (controllo): col mini-player in fondo le ultime canzoni restavano sotto e non si toccavano: lo spazio del mini
+            if aperta != nil && mini { Color.clear.frame(height: 84).accessibilityHidden(true) }
         }
         .overlay(alignment: .bottom) { if let t = aperta { player(t) } }
         .onAppear { storico = VistaShazam.leggi() }
@@ -145,8 +148,14 @@ struct VistaShazam: View {
     // (col video di YouTube al suo posto); −15 · PLAY · +15; LIBRERIA · YOUTUBE (o APPLE) · MUSICA.
 
     private func player(_ t: Trovata) -> some View {
-        Group {
-            if mini { miniPlayer(t) } else { playerPieno(t) }
+        // 8 nov (controllo): tirato giù, il video di YouTube si chiudeva (la musica si fermava) e riaprendolo ripartiva da capo.
+        // Ora il player pieno resta vivo sotto il mini, nascosto e senza tocchi: il video continua e si riapre dov'era.
+        ZStack(alignment: .bottom) {
+            playerPieno(t)
+                .opacity(mini ? 0 : 1)
+                .allowsHitTesting(!mini)
+                .accessibilityHidden(mini)
+            if mini { miniPlayer(t) }
         }
         .frame(maxWidth: 560)
         .offset(y: max(0, giu))
@@ -178,7 +187,7 @@ struct VistaShazam: View {
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(tinta)
             }
             if video, let id = ascolto.videoID {
-                LettoreYouTube(id: id)
+                LettoreYouTube(id: id, pronto: { ascolto.agganciaVideo($0) })
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -186,7 +195,7 @@ struct VistaShazam: View {
                     .id(id)
             }
             HStack(spacing: 14) {
-                if !video { copertina(t, lato: 96, raggio: 12) }
+                if !video { copertina(t, lato: 96, raggio: 12, ferma: mini) }
                 VStack(alignment: .leading, spacing: 4) {
                     Text(t.titolo).font(.system(size: 19, weight: .bold)).foregroundStyle(.white).lineLimit(1)
                     Text(sottoTitolo(t)).font(.system(size: 13)).foregroundStyle(Color(red: 0.62, green: 0.70, blue: 0.73)).lineLimit(1)
@@ -250,16 +259,15 @@ struct VistaShazam: View {
                 Text(sottoTitolo(t)).font(.system(size: 11)).foregroundStyle(Color(red: 0.62, green: 0.70, blue: 0.73)).lineLimit(1)
             }
             Spacer(minLength: 0)
-            if ascolto.fonte != .video {
-                Button { Suoni.tocco(); Task { await ascolto.playPausa() } } label: {
-                    Image(systemName: ascolto.suonaOra ? "pause.fill" : "play.fill")
-                        .font(.system(size: 17)).foregroundStyle(Color(red: 0, green: 0.094, blue: 0.125))
-                        .frame(width: 40, height: 40).background(Circle().fill(tinta))
-                        .shadow(color: tinta.opacity(0.45), radius: 7)
-                }
-                .buttonStyle(StileStark())
-                .accessibilityLabel(ascolto.suonaOra ? "Pausa" : "Riproduci")
+            // 8 nov (controllo): anche col video di YouTube, come il mockup (prima il mini del video non aveva il tasto)
+            Button { Suoni.tocco(); Task { await ascolto.playPausa() } } label: {
+                Image(systemName: ascolto.suonaOra ? "pause.fill" : "play.fill")
+                    .font(.system(size: 17)).foregroundStyle(Color(red: 0, green: 0.094, blue: 0.125))
+                    .frame(width: 40, height: 40).background(Circle().fill(tinta))
+                    .shadow(color: tinta.opacity(0.45), radius: 7)
             }
+            .buttonStyle(StileStark())
+            .accessibilityLabel(ascolto.suonaOra ? "Pausa" : "Riproduci")
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
         .background(
@@ -281,9 +289,9 @@ struct VistaShazam: View {
     }
 
     /// La copertina grande (come .sz-p-cop): leggermente più piccola da ferma, l'anello di luce che gira mentre suona.
-    private func copertina(_ t: Trovata, lato: CGFloat, raggio: CGFloat) -> some View {
+    private func copertina(_ t: Trovata, lato: CGFloat, raggio: CGFloat, ferma: Bool = false) -> some View {
         let suona = ascolto.suonaOra
-        return TimelineView(.animation(paused: !suona || UIAccessibility.isReduceMotionEnabled || dietro)) { tl in
+        return TimelineView(.animation(paused: !suona || ferma || UIAccessibility.isReduceMotionEnabled || dietro)) { tl in
             let giro = tl.date.timeIntervalSinceReferenceDate * 9          // 1 giro in 40 s, come il mockup (ts / 40)
             ZStack {
                 // 8 nov: gira la LUCE lungo il bordo, non il bordo (girando il quadrato gli angoli uscivano storti)
@@ -358,15 +366,20 @@ struct VistaShazam: View {
 
     private func ascolta() async {
         guard stato != .ascolto else { return }
-        withAnimation { stato = .ascolto; aperta = nil }
+        // 8 nov (controllo): col player aperto spariva solo il player e l'anteprima continuava senza comandi (e Shazam la sentiva).
+        // Ora si chiude come con «Chiudi» (anteprima e video si fermano), come ASCOLTA nel mockup.
+        if aperta != nil { chiudiPlayer() }
+        withAnimation { stato = .ascolto }
         switch await Musica.riconosci(secondi: 12) {
         case .trovato(let b):
             let t = Trovata(titolo: b.titolo, artista: b.artista, album: b.album, copertina: b.copertina, link: b.appleMusic ?? b.web,
                             generi: b.generi, quando: Date(), appleMusicID: b.appleMusicID)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             Suoni.pronto()
-            withAnimation(.easeOut(duration: 0.15)) { stato = .trovata; lampo = true }
-            withAnimation(.easeOut(duration: 0.6).delay(0.15)) { lampo = false }
+            // 8 nov (controllo): acceso e spento nello stesso istante SwiftUI non lo disegnava mai: si spegne quando è acceso
+            withAnimation(.easeOut(duration: 0.15)) { stato = .trovata; lampo = true } completion: {
+                withAnimation(.easeOut(duration: 0.6)) { lampo = false }
+            }
             storico.insert(t, at: 0)
             VistaShazam.salva(storico)
             await suona(t)

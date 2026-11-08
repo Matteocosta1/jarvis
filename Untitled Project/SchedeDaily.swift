@@ -501,9 +501,10 @@ struct VistaPosta: View {
     private func accendi(_ chiave: String, dopo: Double, durata: Double) {
         Task {
             if dopo > 0 { try? await Task.sleep(for: .seconds(dopo)) }
-            lampo = chiave
-            lampoLuce = 1
-            withAnimation(.easeOut(duration: durata)) { lampoLuce = 0 }
+            // 8 nov (controllo): accesa e spenta nello stesso istante SwiftUI non disegnava la riga accesa: si spegne quando è accesa
+            withAnimation(.easeOut(duration: 0.05)) { lampo = chiave; lampoLuce = 1 } completion: {
+                withAnimation(.easeOut(duration: durata)) { lampoLuce = 0 }
+            }
         }
     }
 

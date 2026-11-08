@@ -5,6 +5,7 @@ import Combine
 import AVFoundation
 import CoreMedia
 import MusicKit
+import WebKit
 
 // MARK: - SHAZAM › da dove si ascolta la canzone trovata (8 nov notte, il signore: «Shazam quando riconosce la canzone deve aprire
 // un player per ascoltarla o su Apple Music o YouTube, come abbiamo fatto con Vinyl Hustler»). Come Ascolto.swift di Vinyl Hustler:
@@ -27,8 +28,12 @@ final class AscoltoShazam: ObservableObject {
     @Published private(set) var tempoAnteprima: Double = 0
     @Published private(set) var durataAnteprima: Double = 30
     @Published var errore: String?
+    /// 8 nov · il video di YouTube suona adesso (lo dice WebKit): serve al PLAY/PAUSA del mini-player e alla luce della copertina.
+    @Published private(set) var suonaVideo = false
 
     private var anteprima: URL?
+    private weak var webVideo: WKWebView?      // il lettore di YouTube nel player (LettoreYouTube), finché si vede
+    private var orologioVideo: Task<Void, Never>?
     private var lettore30: AVPlayer?
     private var orologio: Task<Void, Never>?
     private var giro = 0                       // la canzone in corso: una risposta vecchia non tocca quella nuova
@@ -103,7 +108,8 @@ final class AscoltoShazam: ObservableObject {
         switch fonte {
         case .intero: LettoreMusica.condiviso.suona
         case .anteprima: suonaAnteprima
-        case .video, .nessuna: false
+        case .video: suonaVideo
+        case .nessuna: false
         }
     }
     var tempo: Double { fonte == .anteprima ? tempoAnteprima : LettoreMusica.condiviso.tempo }
@@ -119,9 +125,41 @@ final class AscoltoShazam: ObservableObject {
                 p.play()
             }
             leggi()
-        case .video, .nessuna: break
+        case .video:
+            // 8 nov · dal mini-player: col video che suona lo mette in pausa; fermo, lo fa ripartire dov'era
+            guard let w = webVideo else { return }
+            if await w.requestMediaPlaybackState() == .playing {
+                await w.pauseAllMediaPlayback()
+            } else {
+                await w.setAllMediaPlaybackSuspended(false)                 // sospeso da iOS (una telefonata): riprende
+                _ = try? await w.evaluateJavaScript(Self.ripartiVideo)
+            }
+            suonaVideo = await w.requestMediaPlaybackState() == .playing
+        case .nessuna: break
         }
     }
+
+    /// Il lettore di YouTube appena creato (LettoreYouTube nel player): da qui il PLAY/PAUSA del mini-player e lo stato vero del
+    /// video (anche quando il signore lo ferma o lo fa ripartire coi tasti di YouTube). Finisce da solo quando il lettore sparisce.
+    func agganciaVideo(_ w: WKWebView) {
+        webVideo = w
+        orologioVideo?.cancel()
+        orologioVideo = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let w = self?.webVideo else { break }
+                let stato = await w.requestMediaPlaybackState()
+                if !Task.isCancelled { self?.suonaVideo = stato == .playing }
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+        }
+    }
+
+    /// Il video riparte: è nella pagina di youtube.com (la cornice è della stessa origine), se no col comando ufficiale del lettore.
+    private static let ripartiVideo = """
+    (function(){var f=document.querySelector('iframe');if(!f)return 0;\
+    try{var v=f.contentDocument&&f.contentDocument.querySelector('video');if(v){v.play();return 1}}catch(e){}\
+    if(f.contentWindow)f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}','*');return 2})()
+    """
 
     func salta(_ secondi: Double) {
         switch fonte {
@@ -153,6 +191,7 @@ final class AscoltoShazam: ObservableObject {
         cercando = false
         if fonte != .intero { ferma() }
         videoID = nil
+        fermaVideo()
     }
 
     // MARK: dentro
@@ -194,7 +233,15 @@ final class AscoltoShazam: ObservableObject {
 
     private func ferma() {
         fermaAudio()
+        fermaVideo()
         fonte = .nessuna
+    }
+
+    private func fermaVideo() {
+        orologioVideo?.cancel()
+        orologioVideo = nil
+        webVideo = nil
+        suonaVideo = false
     }
 
     // MARK: le ricerche

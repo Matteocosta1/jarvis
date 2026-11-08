@@ -272,8 +272,10 @@ struct VistaProfiler: View {
         stato = "ACQUISIZIONE"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         Suoni.tocco()
-        withAnimation(.easeOut(duration: 0.06)) { lampo = true }
-        withAnimation(.easeIn(duration: 0.45).delay(0.06)) { lampo = false }
+        // 8 nov (controllo): acceso e spento nello stesso istante SwiftUI non disegnava il lampo: si spegne quando è acceso
+        withAnimation(.easeOut(duration: 0.06)) { lampo = true } completion: {
+            withAnimation(.easeIn(duration: 0.45)) { lampo = false }
+        }
         motore.scatta(veloce: false) { dati in
             let jpeg = dati.flatMap { Occhi.riduci($0) }
             Task { @MainActor in
