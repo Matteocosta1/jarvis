@@ -59,24 +59,25 @@ struct PannelloAVoce: View {
 }
 
 /// Il tasto da HUD del mockup: contorno ciano, scritta in maiuscolo da terminale. `corto`: largo quanto la scritta.
-/// 8 nov mattina: alto come .comando del mockup (38; corto 30); `altezza` per i tasti più alti (i due del lettore della posta, 48).
+/// 8 nov mattina: alto come .comando del mockup (38; corto 30); `compatto` per quattro tasti in fila (SATELLITE: Guida, Naviga,
+/// Travel, Dossier), 11 punti e alti 37 come nel mockup.
 struct TastoComando: View {
     let testo: String
     var corto = false
+    var compatto = false
     var attivo = true
-    var altezza: CGFloat? = nil
     let azione: () -> Void
 
     var body: some View {
         Button(action: azione) {
             Text(testo)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced)).tracking(1.5)
+                .font(.system(size: compatto ? 11 : 12, weight: .semibold, design: .monospaced)).tracking(compatto ? 0.5 : 1.5)
                 .textCase(.uppercase)
                 .lineLimit(1)
                 .foregroundStyle(Color.ciano)
                 .padding(.horizontal, corto ? 14 : 8)
                 .frame(maxWidth: corto ? nil : .infinity)
-                .frame(height: altezza ?? (corto ? 30 : 38))
+                .frame(height: corto ? 30 : (compatto ? 37 : 38))
                 .contentShape(Rectangle())
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
         }

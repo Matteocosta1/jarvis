@@ -675,7 +675,7 @@ struct VistaDiario: View {
             } else if let errore {
                 Text(errore).font(.footnote).foregroundStyle(.orange)
             } else {
-                ProgressView().tint(tinta).frame(maxWidth: .infinity).padding(.top, 40)
+                AttesaAnello(tinta: tinta).frame(maxWidth: .infinity).padding(.top, 40)   // 8 nov: l'anello del mockup (.attesa-l)
             }
         }
         .task { await carica() }

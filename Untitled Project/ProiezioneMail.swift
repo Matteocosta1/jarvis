@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 
 // MARK: - POSTA › la PROIEZIONE della mail (8 nov notte, scelta del signore alle 02:56: «PROIEZIONE va bene per mail»)
 // Come il mockup v278 (MAIL_OLO «proiezione»): la riga toccata si accende; dalla sua linea due scansioni corrono in su e in giù e
@@ -11,8 +12,8 @@ import SwiftUI
 // 8 nov mattina (video del signore 06:32: la scheda partiva troppo in basso, il titolo usciva sopra la scheda, «Chiudi» e
 // «Chiedi a JARVIS» sparivano): la scheda non si affida più ai margini di iOS. Tutto lo strato ignora i margini e la scheda ha
 // misure sue, scritte qui: larga quanto lo schermo, dal bordo dell'ora (come il «top: 58px» del mockup) fino in fondo; dentro,
-// il lettore non riceve margini (il suo fondo lo dà lui, sopra la barretta di iOS). La scheda si mette al suo posto spostandola
-// (offset), senza margini sopra che iOS poteva raddoppiare. La luce e il colore del mockup (brightness e saturate) sono strati
+// il lettore non riceve margini (SenzaMargini: il suo fondo lo dà lui, sopra la barretta di iOS). La scheda si mette al suo posto
+// spostandola (offset), senza margini sopra che iOS poteva raddoppiare. La luce e il colore del mockup (brightness e saturate) sono strati
 // sopra la scheda (fusione «schiarisci colore» e «saturazione»), non filtri sul contenuto, che con le pagine che scorrono
 // facevano sparire scritte e tasti.
 
@@ -73,8 +74,7 @@ struct ProiezioneMail<Contenuto: View>: View {
             Color.black.opacity(velo ? 0.45 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { chiudi() }                      // un tocco fuori dalla scheda, come iOS
-            contenuto(chiudi)
-                .ignoresSafeArea()                              // i margini li dà la scheda (il fondo sopra la barretta di iOS)
+            SenzaMargini(contenuto: contenuto(chiudi))          // dentro la scheda niente margini di iOS (li scrive il lettore)
                 .frame(width: larga, height: alta)
                 .modifier(EffettoProiezione(fase: fase, aprendo: aprendo, y: yRiga, altezza: alta, attivo: !scivola))
                 .overlay(alignment: .topLeading) {
@@ -237,6 +237,26 @@ struct FinestraScheda: Shape {
         let tondo = min(raggio, alta, r.width / 2)
         return UnevenRoundedRectangle(topLeadingRadius: tondo, topTrailingRadius: tondo, style: .continuous)
             .path(in: CGRect(x: r.minX, y: r.minY + cima, width: r.width, height: alta))
+    }
+}
+
+/// 8 nov mattina (provato nel simulatore iPhone del banco di prova): il lettore senza i margini di iOS. Per SwiftUI la scheda tocca
+/// la cima dello schermo e quindi ha il margine dell'ora: chiedendo di ignorarlo, il lettore si allargava di 59 punti verso l'alto
+/// (la riga di «Chiudi» finiva sotto l'ora e il titolo sopra la scheda); senza chiederlo, il margine si sarebbe aggiunto (la scheda
+/// partiva 59 punti più giù, il video delle 06:32). Qui il lettore sta in un ospite senza margini (safeAreaRegions vuote): occupa
+/// esattamente la scheda, e il fondo sopra la barretta di iOS se lo dà lui.
+private struct SenzaMargini<Contenuto: View>: UIViewControllerRepresentable {
+    let contenuto: Contenuto
+
+    func makeUIViewController(context: Context) -> UIHostingController<Contenuto> {
+        let ospite = UIHostingController(rootView: contenuto)
+        ospite.safeAreaRegions = []
+        ospite.view.backgroundColor = .clear
+        return ospite
+    }
+
+    func updateUIViewController(_ ospite: UIHostingController<Contenuto>, context: Context) {
+        ospite.rootView = contenuto
     }
 }
 

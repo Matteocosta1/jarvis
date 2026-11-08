@@ -53,7 +53,7 @@ struct VistaVitals: View {
                         } else if let errore {
                             Text(errore).foregroundStyle(.orange).font(.footnote)
                         } else {
-                            ProgressView().tint(Color.ciano).frame(maxWidth: .infinity).padding(.top, 60)
+                            AttesaAnello().frame(maxWidth: .infinity).padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
                         }
                     }
                     .padding(16)

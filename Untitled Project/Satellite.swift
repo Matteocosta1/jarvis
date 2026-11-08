@@ -256,10 +256,10 @@ struct VistaSatellite: View {
             // decisione 19: il meteo (qui e sulla mappa) è di Apple Meteo, che chiede il suo marchio e il link alle fonti
             if meteo != nil { AttribuzioneMeteo() }
             HStack(spacing: 8) {
-                TastoComando(testo: "Guida", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.guida(l)) } }
-                TastoComando(testo: "Naviga", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.naviga(l)) } }
-                TastoComando(testo: "Travel", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.travel(l, .mezzi)) } }   // MARK X
-                TastoComando(testo: "Dossier", attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.dossier(l)) } }
+                TastoComando(testo: "Guida", compatto: true, attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.guida(l)) } }
+                TastoComando(testo: "Naviga", compatto: true, attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.naviga(l)) } }
+                TastoComando(testo: "Travel", compatto: true, attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.travel(l, .mezzi)) } }   // MARK X
+                TastoComando(testo: "Dossier", compatto: true, attivo: scelto != nil) { Suoni.tocco(); if let l = scelto { apri(.dossier(l)) } }
             }
         }
     }

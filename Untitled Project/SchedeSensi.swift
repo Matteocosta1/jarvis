@@ -577,7 +577,7 @@ struct VistaFotoScheda: View {
                     }
                 }
             } else {
-                ProgressView().tint(tinta).frame(maxWidth: .infinity).padding(.top, 40)
+                AttesaAnello(tinta: tinta).frame(maxWidth: .infinity).padding(.top, 40)   // 8 nov: l'anello del mockup (.attesa-l)
             }
         }
         // la ricerca si ripete mentre l'analisi della galleria va avanti (ogni 400 foto): escono anche le foto appena analizzate
@@ -705,7 +705,7 @@ struct VistaSerata: View {
             }
             if let c = conti { riepilogo(c) }
             else if let errore { Text(errore).font(.footnote).foregroundStyle(.orange) }
-            else { ProgressView().tint(tinta).frame(maxWidth: .infinity).padding(.top, 40) }
+            else { AttesaAnello(tinta: tinta).frame(maxWidth: .infinity).padding(.top, 40) }   // 8 nov: l'anello del mockup (.attesa-l)
         }
         .task { await caricaElenco() }
         .task(id: scelta?.id) { if let s = scelta { await carica(s) } }
