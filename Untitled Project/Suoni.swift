@@ -50,15 +50,15 @@ enum Suoni {
     /// Sistemi in linea, all'apertura.
     static func avvio() { suona(.avvio) }
 
+    // 8 nov notte (video del signore 21:57, misurato fotogramma per fotogramma: in Cuore la salita si fermava per 4 fotogrammi
+    // proprio quando suonava «pronta», e poi saltava avanti): i suoni dell'apertura delle sezioni hanno i loro lettori già pronti
+    // (`pronti`, preparati all'avvio con quelli delle pagine). Nel momento dell'apertura non si apre più nessun file: si suona e basta.
+
     /// Una sezione si apre (parte il caricamento HUD). File: «scheda». Se manca, il suono dell'ascolto.
     static func schedaApre() {
         guard attivi else { return }
-        guard let url = file("scheda"), let p = try? AVAudioPlayer(contentsOf: url) else { suona(.ascolto); return }
-        p.volume = 1.0                                               // schede: 100%
-        lettoreScheda?.stop()
-        lettoreScheda = p
-        p.play()
-        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))          // un «tick» dell'app non è un battito di mani
+        guard let p = pronti("scheda") else { suona(.ascolto); return }
+        suonaApertura(p)
     }
     /// La sezione ha i dati e si stampa sullo schermo. File: «schedapronta». Se manca, il suono di «pronto».
     /// Il suono del caricamento sfuma in quel momento, così i due non si accavallano.
@@ -66,27 +66,32 @@ enum Suoni {
         guard attivi else { return }
         if let p = lettoreScheda, p.isPlaying { p.setVolume(0, fadeDuration: 0.18) }
         if soloSfuma { return }                                      // Bea e Spesa: il suono d'apertura sfuma, nessun altro suono
-        if let url = file("schedapronta") { riproduci(url, volume: 1.0); return }
-        return                                                       // niente bip «pronto» di riserva
+        _ = suonaPronto("schedapronta", volume: 1.0)                 // niente bip «pronto» di riserva se il file manca
     }
     private static var lettoreScheda: AVAudioPlayer?
     /// L'apertura delle sezioni dal vivo e personali: Bea, Spesa, Occhi, Allenatore, Profiler. File: «apertura»;
     /// se manca, il suono delle schede. Usa lo stesso lettore delle schede, così «schedaPronta» lo sfuma.
     static func apertura() {
         guard attivi else { return }
-        guard let url = file("apertura"), let p = try? AVAudioPlayer(contentsOf: url) else { schedaApre(); return }
-        p.volume = 1.0                                               // come le schede: 100%
-        lettoreScheda?.stop()
+        guard let p = pronti("apertura") else { schedaApre(); return }
+        suonaApertura(p)
+    }
+    /// Il suono d'apertura (schede e sezioni dal vivo) dal suo lettore già pronto, a volume pieno: quello di prima si ferma.
+    private static func suonaApertura(_ p: AVAudioPlayer) {
+        if let prima = lettoreScheda, prima !== p { prima.stop() }
+        p.stop()
+        p.currentTime = 0
+        p.volume = 1.0                                               // schede: 100%
         lettoreScheda = p
         p.play()
-        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))
+        BattitoMani.ignora(per: max(0.5, p.duration + 0.2))          // un «tick» dell'app non è un battito di mani
     }
     /// L'apertura delle sezioni con fotocamera (Occhi, Cucina, Allenatore, Profiler, Scanner), quando la fotocamera è pronta.
     /// File: «aperturacamera»; finché non c'è, lo stesso suono di «apertura».
     static func aperturaCamera() {
         Aptica.fotocamera()
         guard attivi else { return }
-        if let url = file("aperturacamera") { riproduci(url, volume: 1.0); return }
+        if suonaPronto("aperturacamera", volume: 1.0).1 != nil { return }
         apertura()
     }
     private static var lettoreChat: AVAudioPlayer?
@@ -167,7 +172,8 @@ enum Suoni {
 
     /// Prepara i lettori (all'apertura del contenitore delle sezioni), così il primo gesto non aspetta.
     static func preparaPagine() {
-        for n in ["sparisce", "caricaolo", "scelta"] { _ = pronti(n) }
+        // 8 nov notte: anche i suoni dell'apertura delle sezioni (vedi schedaApre)
+        for n in ["sparisce", "caricaolo", "scelta", "scheda", "schedapronta", "apertura", "aperturacamera"] { _ = pronti(n) }
     }
 
     /// Le pagine olografiche delle sezioni aperte compaiono. File: «caricaolo» (vadim «holographic interface menu opening»).

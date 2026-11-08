@@ -102,7 +102,9 @@ struct TaglioPolso: Shape {
     }
 
     func path(in r: CGRect) -> Path {
-        let giu = progresso >= 1 ? r.height + 500 : r.height * max(0, progresso)
+        // 8 nov notte (come sull'iPhone, TaglioStampa): prima della stampa non si vede niente, nemmeno l'orlo del primo riquadro
+        guard progresso > 0 else { return Path() }
+        let giu = progresso >= 1 ? r.height + 500 : r.height * progresso
         return Path(CGRect(x: r.minX - 500, y: r.minY - 500, width: r.width + 1000, height: giu + 500))
     }
 }
