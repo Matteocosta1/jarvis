@@ -776,6 +776,15 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
+        // 8 nov · CUFFIE (il signore: «scritta piccola con logo cuffie, rimane finché sono collegate, non invadente»): sotto le 6 icone,
+        // a destra, come il mockup v285; con la tastiera aperta no (lì la testata è stretta)
+        .overlay(alignment: .bottomTrailing) {
+            if !mini {
+                IndicatoreCuffie()
+                    .padding(.trailing, 20)
+                    .alignmentGuide(.bottom) { d in d[.top] - 4 }
+            }
+        }
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
         // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
         // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
