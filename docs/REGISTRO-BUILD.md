@@ -530,6 +530,12 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 11.0 (16) — 8 nov sera · numero proposto (la 15 è su TestFlight) · commit e controllo: vedi l'ultima riga
+La 11.0 (15) + l'apertura come un foglio unico (il signore, video 19:31: «la parte superiore carica sfalsata, quasi un secondo dopo… così sono due settori»; 19:39: «nella 10.0 (24) le sezioni caricavano tutte insieme fluide, senza stacchi»).
+- Causa: fino alla 10.0 (24) ogni sezione era un foglio di iOS a tutto schermo; dalla 11.0 sta nel contenitore delle sezioni (MARK XI), dove il suo sfondo si fermava sotto la fascia dell'ora. Salendo, il bordo in alto della pagina era sotto l'ora e lì sopra si vedeva ancora JARVIS finché la pagina non arrivava (misurato sul video: ~0,17 s di fascia scoperta, poi il salto).
+- Ora ogni sezione sale con il suo sfondo fino al bordo dello schermo (NavigaSezioni: SfondoSezione anche nella fascia dell'ora), un foglio solo come il .foglio del mockup. Provato nel simulatore: la fascia sale insieme alla pagina.
+- La salita come il mockup: 0,35 s con la curva del .foglio (cubic-bezier .2,.8,.2,1), al posto della molla di iOS che si posava piano in fondo.
+
 ## 11.0 (15) — 8 nov sera · numero scelto dal signore (19:02: «15») · commit bc4592e (+ numero) · controllo di compilazione VERDE (0 errori, 0 warning, run 42507811886)
 La 11.0 (14) rifatta come il mockup (scelta del signore 18:0x: «come il mockup di adesso»; 19:10: «il mock up adesso è perfetto»). Mockup v293 pubblicato.
 - Tutte le sezioni: tocco → suono di caricamento → caricamento → il caricamento sfuma (0,25 s) mentre il contenuto, UN blocco solo, si stampa dall'alto dietro una sola riga di luce (0,32 s, la curva del mockup) → suono di conferma. Prima la stampa finiva su ogni riquadro (pagina a pezzi). Vale per CorniceScheda, Vitals, Ricordi, Confidente, Wiretap, Interprete, Bea e Spesa; le sezioni con fotocamera compaiono senza stampa, come nel mockup.
