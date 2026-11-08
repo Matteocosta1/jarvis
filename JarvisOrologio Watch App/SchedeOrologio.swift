@@ -51,21 +51,26 @@ struct CorniceOrologio<Contenuto: View>: View {
     var apertura = false            // Bea e Spesa: il suono «apertura» invece di quello delle schede
     @ViewBuilder let contenuto: () -> Contenuto
     @State private var mostrato = false
+    @State private var caricamentoVia = false
     @State private var apertaDa = Date()
 
     var body: some View {
         ZStack {
             GrigliaPolso()                  // 27 ott (il signore): le sezioni come sull'iPhone (GrigliaSfumata)
-            if mostrato {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) { contenuto() }
-                        .padding(.horizontal, 4)
-                }
-                .avvisaRighe()                       // MARK XI: toccando fuori da una riga di lato, la corona torna alla pagina
-                .transition(.opacity)
-            } else {
+            // 8 nov pomeriggio: la scheda è già pronta sotto il caricamento; a fine caricamento cambia solo la trasparenza
+            // (tutta insieme, nessun fotogramma vuoto), e il caricamento si toglie a dissolvenza finita
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) { contenuto() }
+                    .padding(.horizontal, 4)
+            }
+            .avvisaRighe()                       // MARK XI: toccando fuori da una riga di lato, la corona torna alla pagina
+            .opacity(mostrato ? 1 : 0)
+            .allowsHitTesting(mostrato)
+            .accessibilityHidden(!mostrato)
+            if !caricamentoVia {
                 CaricamentoOrologio(titolo: titolo)
-                    .transition(.opacity)
+                    .opacity(mostrato ? 0 : 1)
+                    .allowsHitTesting(false)
             }
         }
         .navigationTitle(titolo)
@@ -84,6 +89,8 @@ struct CorniceOrologio<Contenuto: View>: View {
             // 8 nov pomeriggio (il signore: «clicchi, caricamento e carica TUTTA LA PAGINA… una pagina unica»), come l'iPhone:
             // niente più stampa dall'alto, il caricamento sfuma e la scheda compare tutta insieme
             withAnimation(.easeOut(duration: AperturaPolso.dissolvenza)) { mostrato = true }
+            try? await Task.sleep(for: .seconds(AperturaPolso.dissolvenza + 0.05))
+            caricamentoVia = true
         }
     }
 }
