@@ -58,7 +58,7 @@ cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar
 cambia("ProiezioneMail.swift", "                .frame(width: larga, height: alta)\n                .modifier(EffettoProiezione",
        "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n                .modifier(EffettoProiezione", facoltativa=True)
 cambia("SchedeDaily.swift", "        .background(SfondoSezione(tinta: tinta))\n        .task { await carica() }",
-       "        .background(SfondoSezione(tinta: tinta))\n        .overlay { SondaSA(nome: \"LET\", riga: 4) }\n        .task { await carica() }")
-# 7. la PROIEZIONE senza luce e colore (scene «…B», facoltativa=True)
+       "        .background(SfondoSezione(tinta: tinta))\n        .overlay { SondaSA(nome: \"LET\", riga: 4) }\n        .task { await carica() }", facoltativa=True)
+# 7. la PROIEZIONE senza luce e colore (scene «…B»)
 cambia("ProiezioneMail.swift", "                if luce > 1.001 {", "                if luce > 1.001 && !BancoProva.senzaColori {")
 cambia("ProiezioneMail.swift", "                if colore < 0.999 {", "                if colore < 0.999 && !BancoProva.senzaColori {")
