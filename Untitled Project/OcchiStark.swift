@@ -852,18 +852,19 @@ struct TastoOcchi: View {
     var body: some View {
         Button(action: azione) {
             VStack(spacing: 4) {
-                IconaOcchi.percorso(tipo, lato: 18)
-                    .stroke(style: StrokeStyle(lineWidth: tipo == .aereo ? 1.7 : 1.8, lineCap: tipo == .cerca ? .round : .butt, lineJoin: .round))
-                    .frame(width: 18, height: 18)
+                // 8 nov (il signore: «ridurre la dimensione delle icone»): cerchio 34 (era 40), simbolo 15 (era 18), larghezza 46
+                IconaOcchi.percorso(tipo, lato: 15)
+                    .stroke(style: StrokeStyle(lineWidth: tipo == .aereo ? 1.5 : 1.6, lineCap: tipo == .cerca ? .round : .butt, lineJoin: .round))
+                    .frame(width: 15, height: 15)
                     .foregroundStyle(acceso ? Color.fondo : Color.ciano.opacity(0.7))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(acceso ? Color.ciano : Color.black.opacity(0.5)))
                     .overlay(Circle().stroke(Color.ciano.opacity(0.55), lineWidth: 1))
                     .shadow(color: Color.ciano.opacity(acceso ? 0.65 : 0), radius: 7)
                 Text(titolo).font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(0.5)
                     .foregroundStyle(acceso ? Color.ciano : Color.ciano.opacity(0.7))
             }
-            .frame(width: 50)
+            .frame(width: 46)
             .animation(.easeOut(duration: 0.2), value: acceso)
         }
         .buttonStyle(StileStark())

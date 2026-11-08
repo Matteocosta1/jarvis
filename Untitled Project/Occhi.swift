@@ -286,7 +286,8 @@ struct Occhi: View {
                 }
                 if manualeStark {
                     // le tre icone sopra lo zoom: ETICHETTE, OLOGRAMMA (si accendono e si spengono), CERCA (il solo bersaglio)
-                    HStack(alignment: .top, spacing: 18) {
+                    // 8 nov (il signore): cinque icone più piccole, 14 fra l'una e l'altra; AEREO sempre, l'ultima a destra
+                    HStack(alignment: .top, spacing: 14) {
                         TastoOcchi(tipo: .etichette, titolo: "ETICHETTE", acceso: stark.eti) {
                             guard !occupato else { return }
                             Suoni.tocco(); mettiEtichette(!stark.eti)
@@ -299,18 +300,16 @@ struct Occhi: View {
                             guard !occupato else { return }
                             Suoni.tocco(); cerca()
                         }
-                        if tastoAereo {                     // MARK X · AEREO: compare quando lo chiede a voce, poi si accende e si spegne
-                            TastoOcchi(tipo: .aereo, titolo: "AEREO", acceso: cielo.acceso) {
-                                guard !occupato else { return }
-                                Suoni.tocco()
-                                if cielo.acceso { spegniAereo() } else { Task { _ = await accendiAereo("che aereo è quello?") } }
-                            }
-                            .transition(.scale(scale: 0.4).combined(with: .opacity))
-                        }
                         TastoOcchiStudio(acceso: modoStudio) {   // MARK X: STUDIO si accende; poi lo scatto va sul banco dello Studio
                             guard !occupato else { return }
                             Suoni.tocco(); modoStudio.toggle(); modoSocial = false
                             if modoStudio { avvisa("SCATTI: LA FOTO VA ALLO STUDIO") }
+                        }
+                        // MARK X · AEREO: si accende e si spegne; 8 nov (il signore) sempre presente, dopo STUDIO (prima solo chiesto a voce)
+                        TastoOcchi(tipo: .aereo, titolo: "AEREO", acceso: cielo.acceso) {
+                            guard !occupato else { return }
+                            Suoni.tocco()
+                            if cielo.acceso { spegniAereo() } else { Task { _ = await accendiAereo("che aereo è quello?") } }
                         }
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["icone"] = $0 }

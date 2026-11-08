@@ -431,7 +431,7 @@ struct PaginaBrowser: View {
                         ZStack {
                             Color.clear
                             VStack(spacing: 14) {
-                                GloboOlo(tinta: accento).frame(width: 120, height: 120)
+                                GloboOlo(tinta: accento).frame(width: 162, height: 162)   // 8 nov (il signore: «ingrandisci un po' il globo»): 160 di globo, come il mockup
                                 Text(incognito ? "INCOGNITO" : "BROWSER PRIVATO").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(3)
                                     .foregroundStyle(accento)
                                 Text(incognito ? "Niente cronologia, cookie o accessi salvati: sparisce tutto alla chiusura." : "Cerchi o scriva un indirizzo. VIDEO cerca direttamente su YouTube.")

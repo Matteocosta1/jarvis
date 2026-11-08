@@ -658,9 +658,12 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             + 'body>*:not(#cornice){display:none!important}#cornice,#cornice>.telefono{width:100vw!important;height:100vh!important;transform:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}'
             + '.isola{opacity:0!important}html .sd-su,html .sc-su{padding-top:\(alto + 2)px!important}'   // 8 nov: la riga della testata alla stessa altezza di quella del caricamento (e di tutte le sezioni: icona 2 punti sotto il margine dell'ora)
             + '.sd-banco{min-height:min(240px,26vh)!important}'
-            + '#tendina{display:none!important}';   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
+            + '#tendina{display:none!important}'
+            + '.voce-mock{display:none!important}';   // 8 nov notte (foto del signore, Social): nell'app JARVIS parla davvero, la sua frase scritta non si vede mai   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
           document.head.appendChild(st);
-          if (typeof window.parlaMock === 'function') { var o = window.parlaMock; window.parlaMock = function(t){ post({ tipo: 'parla', testo: String(t) }); return o.apply(this, arguments); }; }
+          // 8 nov notte (il signore: «toglile, queste trascrizioni orribili delle parole di JARVIS»): nell'app la frase la dice la voce
+          // vera; la scritta del mockup (che non parla) qui non si crea più
+          if (typeof window.parlaMock === 'function') { window.parlaMock = function(t){ post({ tipo: 'parla', testo: String(t) }); }; }
           var sez = document.getElementById('sezione'), aperta = false, via = null, radice = document.documentElement;
           if (sez) new MutationObserver(function(){
             if (sez.classList.contains('su')) { aperta = true; clearTimeout(via); via = null; radice.style.visibility = ''; }

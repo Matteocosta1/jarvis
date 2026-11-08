@@ -101,17 +101,17 @@ struct TastoOcchiStudio: View {
     var body: some View {
         Button(action: azione) {
             VStack(spacing: 4) {
-                IconaStudio()
-                    .frame(width: 18, height: 18)
+                IconaStudio()                              // 8 nov: come le altre icone degli Occhi, 15 in un cerchio da 34
+                    .frame(width: 15, height: 15)
                     .foregroundStyle(acceso ? Color.fondo : Color.ciano.opacity(0.7))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 34, height: 34)
                     .background(Circle().fill(acceso ? Color.ciano : Color.black.opacity(0.5)))
                     .overlay(Circle().stroke(Color.ciano.opacity(0.55), lineWidth: 1))
                     .shadow(color: Color.ciano.opacity(acceso ? 0.65 : 0), radius: 7)
                 Text("STUDIO").font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(0.5)
                     .foregroundStyle(acceso ? Color.ciano : Color.ciano.opacity(0.7))
             }
-            .frame(width: 50)
+            .frame(width: 46)
             .animation(.easeOut(duration: 0.2), value: acceso)
         }
         .buttonStyle(StileStark())

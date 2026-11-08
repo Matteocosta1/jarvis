@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import UIKit
 import Vision
 import VisionKit
 
@@ -28,6 +29,8 @@ struct VistaScanner: View {
     @State private var storico: [Passato] = []
     @State private var mostraIngredienti = false
     @State private var chiediCancella = false         // 7 nov: «Cancella la cronologia», come in Shazam
+    @State private var daEliminare: String?           // 8 nov: il prodotto (codice) che aspetta CONFERMA, 3 s
+    @State private var giroElimina = 0
     @State private var inPausa = false                // 7 nov: dietro (MARK XI) la fotocamera si ferma e davanti riparte
     @State private var orecchio = OrecchioComandi()   // «Jarvis, un altro», «Jarvis, fa bene?», «Jarvis, cosa c'è dentro?»
     @Environment(\.chiudiOVia) private var chiudiScheda
@@ -49,8 +52,8 @@ struct VistaScanner: View {
             if !storico.isEmpty {
                 Pannello(titolo: "SCANSIONATI · \(storico.count)", tinta: tinta) {
                     ForEach(storico) { s in rigaStorico(s) }
-                    // 7 nov (il signore: «non si possono cancellare i prodotti scansionati»): come in Shazam, uno alla volta tenendo
-                    // premuto, o tutti da qui
+                    // 8 nov (il signore: «cancellare i singoli prodotti, non tutti»): ogni riga ha ELIMINA › CONFERMA, come
+                    // l'archivio di LiDAR, Studio e Satellite (resta anche tenendo premuto); tutti insieme da qui
                     Button(role: .destructive) { chiediCancella = true } label: { Label("Cancella la cronologia", systemImage: "trash").font(.footnote) }
                         .tint(.red).padding(.top, 4)
                 }
@@ -248,25 +251,59 @@ struct VistaScanner: View {
     }
 
     private func rigaStorico(_ s: Passato) -> some View {
-        Button { trovato(s.codice) } label: {
-            HStack(spacing: 12) {
-                AsyncImage(url: URL(string: s.immagine)) { img in img.resizable().scaledToFit() } placeholder: { Color.white.opacity(0.06) }
-                    .frame(width: 40, height: 40).clipShape(RoundedRectangle(cornerRadius: 8))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(s.nome).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Text(s.marca).font(.system(size: 11)).foregroundStyle(Color.tenue).lineLimit(1)
+        HStack(spacing: 12) {
+            Button { trovato(s.codice) } label: {
+                HStack(spacing: 12) {
+                    AsyncImage(url: URL(string: s.immagine)) { img in img.resizable().scaledToFit() } placeholder: { Color.white.opacity(0.06) }
+                        .frame(width: 40, height: 40).clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(s.nome).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                        Text(s.marca).font(.system(size: 11)).foregroundStyle(Color.tenue).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Text("\(s.voto)").font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(coloreVoto(s.voto))
                 }
-                Spacer()
-                Text("\(s.voto)").font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(coloreVoto(s.voto))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(StileStark())
+            // 8 nov: ELIMINA › CONFERMA (3 s), lo stesso tasto dell'archivio di LiDAR
+            let sicuro = daEliminare == s.codice
+            let rosso = Color(red: 1, green: 107 / 255, blue: 107 / 255)                                    // #ff6b6b
+            Button { elimina(s) } label: {
+                Text(sicuro ? "CONFERMA" : "ELIMINA")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1)
+                    .foregroundStyle(sicuro ? rosso : Color.ciano)
+                    .padding(.vertical, 6).padding(.horizontal, 8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(sicuro ? rosso.opacity(0.6) : Color.ciano.opacity(0.3), lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(StileStark())
+            .accessibilityLabel(sicuro ? "Conferma: elimina \(s.nome)" : "Elimina \(s.nome)")
         }
-        .buttonStyle(StileStark())
+        .transition(.opacity.combined(with: .move(edge: .leading)))
         .contextMenu {
             Button(role: .destructive) {
                 storico.removeAll { $0.codice == s.codice }
                 VistaScanner.salva(storico)
             } label: { Label("Elimina", systemImage: "trash") }
         }
+    }
+
+    /// Il primo tocco su ELIMINA chiede CONFERMA per 3 secondi (come LiDAR), il secondo elimina il prodotto, solo quello.
+    private func elimina(_ s: Passato) {
+        guard daEliminare == s.codice else {
+            Suoni.tocco()
+            daEliminare = s.codice
+            giroElimina += 1
+            let mio = giroElimina
+            Task { try? await Task.sleep(for: .seconds(3)); if giroElimina == mio { daEliminare = nil } }
+            return
+        }
+        Suoni.pronto()
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6)
+        daEliminare = nil
+        withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico.removeAll { $0.codice == s.codice } }
+        VistaScanner.salva(storico)
     }
 
     // MARK: azioni

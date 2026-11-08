@@ -11,6 +11,9 @@
 //  · commenti  → { id, on } accende o spegne i commenti di un post pubblicato
 //  · auto      → { on, parola, testo } l'automazione «commenta PAROLA → link in DM»
 //  · giro      → (pg_cron ogni 10 minuti) pubblica i programmati scaduti e fa girare l'automazione
+//  · fbLink    → l'indirizzo del login di Facebook per RIVALI (codice monouso di 10 minuti; il ritorno lo gestisce «social-facebook»)
+//  · rivali    → { op?: "aggiungi"|"togli", username? } gli account seguiti (fino a 10) coi numeri di Business Discovery
+//                (chiave di Facebook, non di Instagram Login: graph.facebook.com), riletti dopo 6 ore, più @kingrusto per il confronto
 // Il token sta nella tabella social_token (rinnovato ogni lunedì da «social-token»); non esce mai da qui.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -47,6 +50,63 @@ const quandoTesto = (d: Date) => {
   const oggi = new Date(), ieri = new Date(Date.now() - 864e5), f = (x: Date) => x.toLocaleDateString("it-IT", { timeZone: "Europe/Rome" });
   return (f(d) === f(oggi) ? "OGGI" : f(d) === f(ieri) ? "IERI" : giornoRoma(d)) + " " + oraRoma(d);
 };
+// RIVALI (8 nov): Business Discovery esiste solo con il login di Facebook (graph.facebook.com), con la chiave in social_facebook
+const FB = "https://graph.facebook.com/v23.0";
+const PERMESSI_FB = "instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement,business_management";
+async function fbRiga() {
+  const { data } = await db.from("social_facebook").select("token,scade,ig_id,pagina").eq("id", 1).maybeSingle();
+  const giorni = data?.scade ? Math.floor((new Date(data.scade).getTime() - Date.now()) / 864e5) : -1;
+  return { ...(data ?? {}), giorni, collegato: !!data?.token && !!data?.ig_id && giorni >= 0 };
+}
+/** I numeri pubblici di un account professionale: follower, post a settimana (ultimi 28 giorni), like medi, coinvolgimento %. */
+async function scopri(f: { token: string; ig_id: string }, nome: string) {
+  const u = new URL(`${FB}/${f.ig_id}`);
+  u.searchParams.set("fields", `business_discovery.username(${nome}){username,followers_count,media_count,media.limit(12){like_count,comments_count,timestamp}}`);
+  u.searchParams.set("access_token", f.token);
+  const r = await fetch(u), d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error(d?.error?.message ?? `Facebook ${r.status}`);
+  const b = d.business_discovery ?? {}, m: any[] = b.media?.data ?? [], fol = b.followers_count ?? 0;
+  const recenti = m.filter((x) => new Date(x.timestamp).getTime() > Date.now() - 28 * 864e5);
+  const lk = m.length ? m.reduce((a, x) => a + (x.like_count ?? 0), 0) / m.length : 0;
+  const inter = m.length ? m.reduce((a, x) => a + (x.like_count ?? 0) + (x.comments_count ?? 0), 0) / m.length : 0;
+  return { username: b.username ?? nome, follower: fol, postSett: Math.round(recenti.length / 4 * 10) / 10, like: Math.round(lk), er: fol ? Math.round(inter / fol * 1000) / 10 : 0 };
+}
+async function rivali(c: any) {
+  const f = await fbRiga();
+  if (!f.collegato) return { collegato: false, scaduto: !!f.token, rivali: [] };
+  const nome = String(c.username ?? "").trim().replace(/^@/, "").toLowerCase();
+  if (c.op === "aggiungi") {
+    if (!/^[a-z0-9._]{1,30}$/.test(nome)) return { errore: "nome utente non valido" };
+    const { count } = await db.from("social_rivali").select("username", { count: "exact", head: true });
+    if ((count ?? 0) >= 10) return { errore: "sono già 10: ne tolga uno" };
+    let dati;
+    try { dati = await scopri(f as any, nome); } catch { return { errore: `@${nome} non si vede: deve essere un account professionale (Business o Creator)` }; }
+    await db.from("social_rivali").upsert({ username: nome, dati, letto: new Date().toISOString() });
+  }
+  if (c.op === "togli") await db.from("social_rivali").delete().eq("username", nome);
+  const { data: righe } = await db.from("social_rivali").select("username,dati,letto").order("aggiunto");
+  const io = await scopri(f as any, (await ig(await token(), "/me", { fields: "username" })).username).catch(() => null);
+  const lista: any[] = [];
+  for (const r of righe ?? []) {
+    let d = r.dati;
+    if (!d || !r.letto || Date.now() - new Date(r.letto).getTime() > 6 * 36e5) {
+      try { d = await scopri(f as any, r.username); await db.from("social_rivali").update({ dati: d, letto: new Date().toISOString() }).eq("username", r.username); } catch { /* resta l'ultimo letto */ }
+    }
+    if (d) lista.push(d);
+  }
+  const tutti = [...(io ? [{ ...io, io: true }] : []), ...lista];
+  const tab = tutti.map((x) => [x.username, x.follower, x.postSett, x.like, x.er, !!x.io]);
+  // il riassunto di «COME SONO MESSO?»: la posizione per coinvolgimento e chi pubblica di più
+  let riassunto = "";
+  if (io && lista.length) {
+    const perEr = [...tutti].sort((a, b) => b.er - a.er), pos = perEr.findIndex((x) => x.io) + 1;
+    const piu = [...lista].sort((a, b) => b.postSett - a.postSett)[0], v = (n: number) => String(n).replace(".", ",");
+    riassunto = `${pos === 1 ? "Lei ha il coinvolgimento più alto" : `Lei è ${pos}° su ${tutti.length} per coinvolgimento, dietro a ${perEr[0].username}`}, Sir: ${v(io.er)} per cento. `
+      + (piu.postSett > io.postSett ? `Chi pubblica di più è ${piu.username}, ${v(piu.postSett)} post a settimana: lei ne fa ${v(io.postSett)}.` : `Pubblica più di tutti: ${v(io.postSett)} post a settimana.`);
+  }
+  return { collegato: true, giorni: f.giorni, pagina: f.pagina ?? "", rivali: tab, riassunto };
+}
+
 const GIORNI = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"], GIORNI_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** «GIO 21:00» → il prossimo giovedì alle 21 a Roma, in UTC (se non si capisce: lunedì alle 12, l'orario del mockup). */
 function prossimo(testo = "LUN 12:00"): Date {
@@ -190,6 +250,7 @@ async function stato(t: string, leggero = false) {
     media: grigliaVera, ore: oreVere,
     pubblicati: media.slice(0, 6).map((m: any) => ({ quando: quandoTesto(new Date(m.timestamp)), titolo: titolo(m), tipo: tipo(m) })),
     auto: { on: imp?.auto_on ?? false, parola: imp?.parola ?? "LISTA", testo: imp?.testo ?? "Ecco il link 👉" },
+    fb: await fbRiga().then((f) => ({ collegato: f.collegato, scaduto: !!f.token && !f.collegato, giorni: f.giorni, pagina: f.pagina ?? "" })).catch(() => ({ collegato: false })),
   };
 }
 
@@ -297,6 +358,17 @@ Deno.serve(async (req) => {
       await ig(t, `/${String(c.id).replace(/\D/g, "")}`, { comment_enabled: String(!!c.on) }, "POST");
       return json({ ok: true });
     }
+    if (c.azione === "fbLink") {
+      const id = env("FACEBOOK_APP_ID");
+      if (!id) return json({ errore: "mancano le chiavi dell'app Facebook nel cervello" }, 500);
+      const attesa = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+      await db.from("social_facebook").upsert({ id: 1, attesa, attesa_fino: new Date(Date.now() + 10 * 6e4).toISOString() });
+      const u = new URL("https://www.facebook.com/v23.0/dialog/oauth");
+      u.searchParams.set("client_id", id); u.searchParams.set("redirect_uri", `${URL_DB}/functions/v1/social-facebook`);
+      u.searchParams.set("state", attesa); u.searchParams.set("scope", PERMESSI_FB); u.searchParams.set("response_type", "code");
+      return json({ url: u.toString() });
+    }
+    if (c.azione === "rivali") return json(await rivali(c));
     if (c.azione === "annulla") { await db.from("social_coda").update({ stato: "annullato" }).eq("id", c.id); return json({ ok: true }); }
     if (c.azione === "auto") {
       await db.from("social_impostazioni").upsert({ id: 1, auto_on: !!c.on, parola: String(c.parola ?? "LISTA").toUpperCase().slice(0, 20), testo: String(c.testo ?? "").slice(0, 900) });

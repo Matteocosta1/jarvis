@@ -352,6 +352,7 @@ enum PonteInterprete {
         }
         OP.scritta(&gc, "INTERPRETE", 10, 14, 8, 600, OP.c(0.85), .leading)
         OP.scritta(&gc, "\(la) ⇄ \(lb)", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
+        if frasi.isEmpty && lb == "?" { OP.scritta(&gc, "SCELGA LA LINGUA", W / 2, 34, 7, 700, OP.c(0.85)) }   // 8 nov: come il mockup
         if let k = M.scelta, k >= latoId, k - latoId < lati.count {
             let i = k - latoId, p = P(lati[i], 0, 0.55)
             OP.riquadro(&gc, W, H, p.x, p.y, [i == 1 ? lb : la, i == 1 ? "LA LINGUA DELL'ALTRO" : "LA SUA LINGUA", parla == i ? "STA PARLANDO" : "ASCOLTA"],
@@ -367,6 +368,12 @@ struct SceltaLingua: View {
 
     var body: some View {
         CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
+            // 8 nov (il signore: «nella build in Interprete non c'è l'ologramma»): il PONTE anche qui, sopra la scelta della lingua,
+            // come nel mockup: l'italiano di qua, «?» di là finché non sceglie
+            OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
+                PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: "?", frasi: [])
+            }
+            .corniceOlo(Color.ciano)
             Pannello(titolo: "LINGUA", tinta: Color.ciano) {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(Lingua.tutte) { l in
