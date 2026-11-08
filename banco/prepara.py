@@ -52,13 +52,13 @@ cambia("StudioWeb.swift", "            .statusBarHidden(false)\n            .int
 cambia("StudioWeb.swift", "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay {\n                if coperto {",
        "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            .overlay {\n                if coperto {", facoltativa=True)
 cambia("SchedeSignore.swift", "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .allowsHitTesting(false)",
-       "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)")
+       "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)", facoltativa=True)
 cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)",
-       "            .overlay { SondaSA(nome: \"CORN\", riga: 0) }\n            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)")
+       "            .overlay { SondaSA(nome: \"CORN\", riga: 0) }\n            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)", facoltativa=True)
 cambia("ProiezioneMail.swift", "                .frame(width: larga, height: alta)\n                .modifier(EffettoProiezione",
-       "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n                .modifier(EffettoProiezione")
+       "                .frame(width: larga, height: alta)\n                .overlay { SondaSA(nome: \"CARD\", riga: 3) }\n                .modifier(EffettoProiezione", facoltativa=True)
 cambia("SchedeDaily.swift", "        .background(SfondoSezione(tinta: tinta))\n        .task { await carica() }",
        "        .background(SfondoSezione(tinta: tinta))\n        .overlay { SondaSA(nome: \"LET\", riga: 4) }\n        .task { await carica() }")
-# 7. la PROIEZIONE senza luce e colore (scene «…B»)
+# 7. la PROIEZIONE senza luce e colore (scene «…B», facoltativa=True)
 cambia("ProiezioneMail.swift", "                if luce > 1.001 {", "                if luce > 1.001 && !BancoProva.senzaColori {")
 cambia("ProiezioneMail.swift", "                if colore < 0.999 {", "                if colore < 0.999 && !BancoProva.senzaColori {")
