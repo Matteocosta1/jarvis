@@ -398,7 +398,11 @@ struct TaglioStampa: Shape {
     }
 
     func path(in r: CGRect) -> Path {
-        let giu = progresso >= 1 ? r.height + 1000 : r.height * max(0, progresso)
+        // 8 nov notte (video del signore 21:57: durante il caricamento, sotto la testata, una riga con le punte luminose): era
+        // l'orlo del primo riquadro (il bordo e gli angoli col loro alone), che sta proprio sul bordo alto del contenuto e passava
+        // dal margine sopra. Prima della stampa non si vede niente, come `resto` nel mockup.
+        guard progresso > 0 else { return Path() }
+        let giu = progresso >= 1 ? r.height + 1000 : r.height * progresso
         return Path(CGRect(x: r.minX - 1000, y: r.minY - 1000, width: r.width + 2000, height: giu + 1000))
     }
 }

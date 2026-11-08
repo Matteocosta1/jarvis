@@ -8,6 +8,8 @@ import UIKit
 
 struct PaginaPiena: ViewModifier {
     @Environment(\.chiudiOVia) private var chiudi
+    @Environment(\.foglioPagina) private var nelFoglio
+    @Environment(\.isPresented) private var presentata
     @State private var scesa: CGFloat = 0
 
     /// L'altezza della fascia in alto (ora, Dynamic Island) dove parte il trascinamento: lì non ci sono tasti delle schede.
@@ -17,7 +19,12 @@ struct PaginaPiena: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.fondo.ignoresSafeArea())
+            // 8 nov notte (il signore, video 21:57: «stacco e discrepanza sui colori, deve sembrare un'unica scheda»): nel contenitore
+            // delle sezioni lo sfondo del foglio sta qui, sotto la sezione e dentro il suo trascinamento: sale, si ferma e scende
+            // insieme a lei, dal bordo alto dello schermo al bordo basso (SfondoAncorato). Prima era un colore pieno che «ignorava i
+            // margini»: iOS lo allargava fino in cima solo quando la pagina arrivava sotto l'ora, e la fascia in alto si vedeva arrivare
+            // prima del resto.
+            .background { if nelFoglio && !presentata { SfondoAncorato() } else { Color.fondo.ignoresSafeArea() } }
             .overlay(alignment: .top) {
                 Color.clear
                     .frame(height: fascia + 8)
@@ -70,6 +77,10 @@ enum FasciaAlta {
     static var altezza: CGFloat { max(finestra?.safeAreaInsets.top ?? 44, 24) }
     /// 8 nov: il margine in fondo (la barra di iOS), per la scheda della mail che arriva fino in fondo allo schermo.
     static var fondo: CGFloat { finestra?.safeAreaInsets.bottom ?? 34 }
+    /// 8 nov notte: il margine sicuro in alto, esatto (dove comincia il contenitore delle sezioni e quindi ogni pagina).
+    static var margineAlto: CGFloat { finestra?.safeAreaInsets.top ?? 0 }
+    /// 8 nov notte: lo schermo (la finestra): il foglio di ogni sezione è grande così.
+    static var schermo: CGSize { finestra?.bounds.size ?? CGSize(width: 393, height: 852) }
 }
 
 // MARK: - 26 ott sera (video del signore 21:58: Studio e Social sparivano di colpo e restava il nero per quasi un secondo)
@@ -90,6 +101,9 @@ private struct ChiaveJarvisCoperto: EnvironmentKey { static let defaultValue = f
 private struct ChiaveSezioneAperta: EnvironmentKey { static let defaultValue: UUID? = nil }
 /// La sezione è dietro (o è una pagina olografica non davanti): fotocamera, microfono e comandi a voce in pausa.
 private struct ChiaveSezioneDietro: EnvironmentKey { static let defaultValue = false }
+/// 8 nov notte: la vista sta in una pagina del contenitore delle sezioni (StratoSezioniVista): lo sfondo del foglio si disegna
+/// dal bordo alto dello schermo, fermo sulla pagina (SfondoAncorato).
+private struct ChiaveFoglioPagina: EnvironmentKey { static let defaultValue = false }
 extension Notification.Name {
     /// Una sezione del contenitore chiede di chiudersi (userInfo «id»: UUID).
     static let jarvisChiudiSezione = Notification.Name("JarvisChiudiSezione")
@@ -139,6 +153,10 @@ extension EnvironmentValues {
     var sezioneDietro: Bool {
         get { self[ChiaveSezioneDietro.self] }
         set { self[ChiaveSezioneDietro.self] = newValue }
+    }
+    var foglioPagina: Bool {
+        get { self[ChiaveFoglioPagina.self] }
+        set { self[ChiaveFoglioPagina.self] = newValue }
     }
     /// Al posto di `dismiss`: dentro il contenitore chiude la sezione; in un foglio presentato, il foglio.
     var chiudiOVia: ChiudiOVia { ChiudiOVia(sezione: isPresented ? nil : sezioneAperta, dismiss: dismiss) }
@@ -233,16 +251,94 @@ struct GrigliaSfumata: View {
 
 /// 7 nov (il signore: «non hanno lo sfondo uguale alle altre, a quadretti con la sfumatura»): lo sfondo di ogni sezione, uno solo
 /// per tutte. Il fondo scuro, la quadrettatura sfumata e il chiarore ciano che scende dall'alto, come in CorniceScheda.
+/// 8 nov notte (il signore: «stacco e discrepanza sui colori… i quadrati precisi, allineati e composti bene, come fosse un'unica
+/// scheda»): nel contenitore delle sezioni è il foglio intero, ancorato alla pagina (SfondoAncorato): ogni sfondo della pagina
+/// (quello sotto la sezione, quello della sezione, quello del caricamento) è lo stesso disegno nello stesso punto, pixel per
+/// pixel, quindi non c'è più nessuna giuntura. Nei fogli di iOS (presentati) resta com'era: grande quanto il foglio.
 struct SfondoSezione: View {
+    var tinta: Color = .ciano
+    @Environment(\.foglioPagina) private var nelFoglio
+    @Environment(\.isPresented) private var presentata
+
+    var body: some View {
+        if nelFoglio && !presentata {
+            SfondoAncorato(tinta: tinta)
+        } else {
+            SfondoFoglio(tinta: tinta)
+                .ignoresSafeArea()
+        }
+    }
+}
+
+/// 8 nov notte: lo sfondo del foglio in una pagina del contenitore delle sezioni. Il foglio è grande quanto lo schermo e parte dal
+/// bordo alto dello schermo (la pagina parte dal margine sicuro: il foglio comincia `margineAlto` più su), con misure esplicite e
+/// senza «ignorare i margini»: iOS i margini li calcola sulla posizione animata, e mentre la pagina saliva allargava gli sfondi fino
+/// in cima solo quando la pagina arrivava sotto l'ora (la fascia in alto arrivava ferma prima del resto, con i quadretti sfasati e il
+/// chiarore che ripartiva). Così sale, si ferma e scende tutto insieme, un foglio solo. Non cambia l'impaginazione di chi lo usa
+/// (prende lo spazio che gli danno) e non prende i tocchi.
+struct SfondoAncorato: View {
     var tinta: Color = .ciano
 
     var body: some View {
-        ZStack {
-            Color.fondo
-            GrigliaSfumata()
-            RadialGradient(colors: [tinta.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 420)
+        // la GeometryReader rifà il disegno se cambia la finestra (iPad, Mac, rotazione)
+        GeometryReader { _ in
+            let schermo = FasciaAlta.schermo
+            SfondoFoglio(tinta: tinta)
+                .frame(width: schermo.width, height: schermo.height)
+                .offset(y: -FasciaAlta.margineAlto)
         }
-        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// 8 nov notte (il signore: «la perfetta corrispondenza del colore, uniforme alla perfezione… i quadrati precisi, allineati e composti
+/// bene»): lo sfondo del foglio disegnato come il .foglio.scheda del mockup approvato, misura per misura, a partire dal suo bordo alto:
+///  · il fondo #050809 (--fondo);
+///  · la quadrettatura (.foglio::after): una riga di 1 punto ogni 22 dal bordo alto e dal bordo sinistro, ciano al 3%, orizzontali e
+///    verticali (dove si incrociano si sommano, come nel browser), sfumata da un cerchio al 50% / 30% del foglio: piena fino al 25% del
+///    raggio, sparita all'80% (il raggio arriva all'angolo più lontano, come «farthest-corner»);
+///  · il chiarore in alto (.foglio.scheda::before): una fascia alta 380 con un'ellisse centrata in alto, ciano al 16% che sparisce al
+///    70% (l'ellisse passa per l'angolo più lontano della fascia con le proporzioni metà larghezza × 380, come nel browser).
+/// Un Canvas solo, fermo: si ridisegna solo se cambia la grandezza del foglio.
+struct SfondoFoglio: View {
+    var tinta: Color = .ciano
+
+    var body: some View {
+        let luce = tinta
+        Canvas { gc, size in
+            let tutto = CGRect(origin: .zero, size: size)
+            gc.fill(Path(tutto), with: .color(Color(red: 5 / 255, green: 8 / 255, blue: 9 / 255)))
+            // la quadrettatura, sfumata dal cerchio
+            gc.drawLayer { strato in
+                var orizzontali = Path()
+                var y: CGFloat = 0
+                while y < size.height { orizzontali.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)); y += 22 }
+                var verticali = Path()
+                var x: CGFloat = 0
+                while x < size.width { verticali.addRect(CGRect(x: x, y: 0, width: 1, height: size.height)); x += 22 }
+                strato.fill(orizzontali, with: .color(luce.opacity(0.03)))
+                strato.fill(verticali, with: .color(luce.opacity(0.03)))
+                let centro = CGPoint(x: size.width * 0.5, y: size.height * 0.3)
+                let dx = max(centro.x, size.width - centro.x), dy = max(centro.y, size.height - centro.y)
+                let raggio = (dx * dx + dy * dy).squareRoot()
+                strato.blendMode = .destinationIn
+                strato.fill(Path(tutto), with: .radialGradient(Gradient(stops: [.init(color: .black, location: 0.25),
+                                                                                 .init(color: .black.opacity(0), location: 0.8)]),
+                                                               center: centro, startRadius: 0, endRadius: raggio))
+            }
+            // il chiarore in alto: un cerchio di raggio √2 × 380 stretto in larghezza fino a √2 × metà foglio (l'ellisse del browser)
+            let alta: CGFloat = 380
+            let raggio = alta * CGFloat(2).squareRoot()
+            var chiarore = gc
+            chiarore.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: alta)))
+            chiarore.translateBy(x: size.width / 2, y: 0)
+            chiarore.scaleBy(x: size.width / 2 / alta, y: 1)
+            chiarore.fill(Path(CGRect(x: -raggio, y: 0, width: 2 * raggio, height: alta)),
+                          with: .radialGradient(Gradient(stops: [.init(color: luce.opacity(0.16), location: 0),
+                                                                 .init(color: luce.opacity(0), location: 0.7)]),
+                                                center: .zero, startRadius: 0, endRadius: raggio))
+        }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
