@@ -45,7 +45,8 @@ struct VistaStudio: View {
                 if coperto {
                     // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
                     // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
-                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
+                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio",
+                                       margineDallaFinestra: true)   // 8 nov: fermo sotto l'ora, alla stessa altezza della testata della pagina
                         .transition(.opacity)
                 }
             }
@@ -655,7 +656,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
           var st = document.createElement('style');
           st.textContent = 'html,:root{padding:0!important}body{padding:0!important;margin:0!important;display:block!important;background:#020304!important;overflow:hidden!important}'
             + 'body>*:not(#cornice){display:none!important}#cornice,#cornice>.telefono{width:100vw!important;height:100vh!important;transform:none!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}'
-            + '.isola{opacity:0!important}.sd-su,.sc-su{padding-top:calc(max(env(safe-area-inset-top,0px), \(alto)px) + 6px)!important}'
+            + '.isola{opacity:0!important}html .sd-su,html .sc-su{padding-top:\(alto + 2)px!important}'   // 8 nov: la riga della testata alla stessa altezza di quella del caricamento (e di tutte le sezioni: icona 2 punti sotto il margine dell'ora)
             + '.sd-banco{min-height:min(240px,26vh)!important}'
             + '#tendina{display:none!important}';   // 26 ott sera (foto del signore): la tendina PROTOCOLLI del mockup spuntava sopra l'ora   // iPhone piccoli (SE): il banco cede spazio, STAMPA e CONDIVIDI restano dentro
           document.head.appendChild(st);
