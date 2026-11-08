@@ -4,7 +4,7 @@
 // Facebook torna QUI (GET ?code&state) → si controlla il codice monouso, si cambia il code in una chiave da 60 giorni, si trova
 // l'account Instagram legato alla pagina, si salva tutto in social_facebook → si torna all'app (jarvis://rivali?ok=1).
 // Pubblica senza JWT (ci arriva il browser del login): la protezione è il codice monouso «state», valido 10 minuti.
-// Segreti: FACEBOOK_APP_ID, FACEBOOK_APP_SECRET (li mette il signore in Supabase). La chiave non esce mai da qui.
+// Segreto: FACEBOOK_APP_SECRET (lo mette il signore in Supabase); l'ID dell'app JARVIS KR (1670395291165844) non è segreto. La chiave non esce mai da qui.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   if (!riga?.attesa || !uguali(state, riga.attesa) || new Date(riga.attesa_fino ?? 0).getTime() < Date.now() || !code)
     return app({ errore: "il login è scaduto: ritocchi COLLEGA" });
   await db.from("social_facebook").update({ attesa: null, attesa_fino: null }).eq("id", 1);   // monouso
-  const id = env("FACEBOOK_APP_ID"), seg = env("FACEBOOK_APP_SECRET");
+  const id = (env("FACEBOOK_APP_ID") || "1670395291165844"), seg = env("FACEBOOK_APP_SECRET");
   if (!id || !seg) return app({ errore: "mancano le chiavi dell'app Facebook nel cervello" });
   try {
     const corta = await fb("/oauth/access_token", { client_id: id, client_secret: seg, redirect_uri: RITORNO, code });

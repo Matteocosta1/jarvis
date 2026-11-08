@@ -359,7 +359,7 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
     if (c.azione === "fbLink") {
-      const id = env("FACEBOOK_APP_ID");
+      const id = (env("FACEBOOK_APP_ID") || "1670395291165844");
       if (!id) return json({ errore: "mancano le chiavi dell'app Facebook nel cervello" }, 500);
       const attesa = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
       await db.from("social_facebook").upsert({ id: 1, attesa, attesa_fino: new Date(Date.now() + 10 * 6e4).toISOString() });
