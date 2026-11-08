@@ -39,33 +39,34 @@ struct VistaStudio: View {
     @Environment(\.materiaOlo) private var materiaOlo
     var body: some View {
         // 8 nov mattina (video del signore 06:34: Studio e Social «saltellano», «non si aprono come le altre»): come tutte le
-        // sezioni. La pagina web sta a tutto schermo (sotto l'ora e fino in fondo); il caricamento sta nel margine sicuro, come
-        // quello di ogni sezione: la riga di «Chiudi» sotto l'ora, il caricamento 120 punti più giù. Prima il caricamento stava
-        // sopra la pagina web, che allarga i suoi bordi ai margini di iOS solo a salita finita: a fine salita saltava di 59 punti.
-        ZStack {
-            PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
-                         olo: tintaOlo, materia: materiaOlo)
-                .background(Color.fondo)
-                .ignoresSafeArea()
-            if coperto {
-                // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
-                // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
-                SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
-                    .transition(.opacity)
+        // sezioni. La sezione sta nel margine sicuro (ContentView) e la pagina web va a tutto schermo da sé (sotto l'ora e fino in
+        // fondo); il caricamento sta sopra, nel margine sicuro, come quello di ogni sezione: la riga di «Chiudi» sotto l'ora, il
+        // caricamento 120 punti più giù. Prima la sezione intera ignorava i margini: durante la salita iOS non li dà (la pagina è
+        // ancora sotto lo schermo) e a salita finita sì, e il caricamento saltava di 59 punti (provato nel simulatore).
+        PaginaStudio(apertura: apertura, parla: parla, chiudi: chiudi, pronta: { scopri() }, presa: { presa = $0 },
+                     olo: tintaOlo, materia: materiaOlo)
+            .background(Color.fondo)
+            .ignoresSafeArea()
+            .overlay {
+                if coperto {
+                    // 7 nov sera (il signore: «anche Studio e Social sono diverse… o le fai tutte uguali»): lo stesso caricamento
+                    // di tutte le sezioni, senza eccezioni: «Chiudi» in alto, la testata sotto, il caricamento al centro
+                    SchermoCaricamento(titolo: apertura.sezione, icona: apertura.sezione == "Social" ? "social" : "studio")
+                        .transition(.opacity)
+                }
             }
-        }
-        .statusBarHidden(false)
-        .interactiveDismissDisabled(presa)
-        .onAppear {
-            BattitoMani.paginaAperta(true)                       // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
-            apertaDa = Date()
-            Suoni.schedaApre()
-        }
-        .task {                                                  // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
-            try? await Task.sleep(for: .seconds(4))
-            scopri()
-        }
-        .onDisappear { BattitoMani.paginaAperta(false) }
+            .statusBarHidden(false)
+            .interactiveDismissDisabled(presa)
+            .onAppear {
+                BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
+                apertaDa = Date()
+                Suoni.schedaApre()
+            }
+            .task {                                              // per sicurezza: se la pagina non dice «pronta», dopo 4 s si scopre lo stesso
+                try? await Task.sleep(for: .seconds(4))
+                scopri()
+            }
+            .onDisappear { BattitoMani.paginaAperta(false) }
     }
 
     private func scopri() {
