@@ -45,10 +45,10 @@ p.write_text(s, encoding="utf-8")
 print("ok ProiezioneMail.swift")
 
 # 6. le sonde dei margini (si vedono solo nelle scene «…sonde»)
-cambia("StudioWeb.swift", "        .statusBarHidden(false)\n        .interactiveDismissDisabled(presa)",
-       "        .overlay { SondaSA(nome: \"VS\", riga: 0) }\n        .statusBarHidden(false)\n        .interactiveDismissDisabled(presa)")
-cambia("StudioWeb.swift", "                .background(Color.fondo)\n                .ignoresSafeArea()\n            if coperto {",
-       "                .background(Color.fondo)\n                .ignoresSafeArea()\n                .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            if coperto {")
+cambia("StudioWeb.swift", "            .statusBarHidden(false)\n            .interactiveDismissDisabled(presa)",
+       "            .overlay { SondaSA(nome: \"VS\", riga: 0) }\n            .statusBarHidden(false)\n            .interactiveDismissDisabled(presa)")
+cambia("StudioWeb.swift", "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay {\n                if coperto {",
+       "            .background(Color.fondo)\n            .ignoresSafeArea()\n            .overlay { SondaSA(nome: \"WEB\", riga: 1) }\n            .overlay {\n                if coperto {")
 cambia("SchedeSignore.swift", "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .allowsHitTesting(false)",
        "            CaricamentoHUD(titolo: titolo, tinta: tinta)\n                .padding(.top, 120)\n        }\n        .overlay { SondaSA(nome: \"LOAD\", riga: 2) }\n        .allowsHitTesting(false)")
 cambia("SchedeSignore.swift", "            .toolbar(.hidden, for: .navigationBar)\n        }\n        .preferredColorScheme(.dark)",
