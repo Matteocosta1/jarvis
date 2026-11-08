@@ -698,151 +698,149 @@ struct VistaSpesa: View {
     @State private var apertaDa = Date()
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SfondoSezione(tinta: tinta)                 // 7 nov (il signore): anche la Spesa con la quadrettatura, come le altre
-                List {
-                    Section {
-                        // 11.0 (6), come il mockup v264: l'ologramma della spesa con le sue tre prove (CASSA, SCAFFALE, ANELLO);
-                        // toccata una cosa nell'ologramma è come toccarla nella lista: si spunta o torna da prendere
-                        OlogrammaSpesaProve(dati: spesaOlo)
-                            .corniceOlo(tinta)
-                            .listRowBackground(Color.clear)
-                        progresso.listRowBackground(Color.clear)
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus").foregroundStyle(tinta)
-                            TextField("Aggiunga: latte, pane, detersivo…", text: $nuovo)
-                                .focused($scrivendo)
-                                .foregroundStyle(.white)
-                                .submitLabel(.done)
-                                .onSubmit { Task { await aggiungi(nuovo) } }
-                            if !nuovo.trimmingCharacters(in: .whitespaces).isEmpty {
-                                Button { Task { await aggiungi(nuovo) } } label: {
-                                    Image(systemName: "arrow.up.circle.fill").font(.system(size: 24)).foregroundStyle(tinta)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .listRowBackground(tinta.opacity(0.08))
-                    }
-
-                    if caricata && daComprare.isEmpty && nelCarrello.isEmpty {
-                        Section {
-                            Text("Scriva qui sopra, oppure dica a JARVIS «manca il latte».")   // 7 nov: «lista vuota» è già sotto il titolo
-                                .font(.footnote).foregroundStyle(Color.tenue)
-                        }
+        ZStack {
+            SfondoSezione(tinta: tinta)                 // 7 nov (il signore): anche la Spesa con la quadrettatura, come le altre
+            List {
+                Section {
+                    // 11.0 (6), come il mockup v264: l'ologramma della spesa con le sue tre prove (CASSA, SCAFFALE, ANELLO);
+                    // toccata una cosa nell'ologramma è come toccarla nella lista: si spunta o torna da prendere
+                    OlogrammaSpesaProve(dati: spesaOlo)
+                        .corniceOlo(tinta)
                         .listRowBackground(Color.clear)
-                    }
-
-                    ForEach(reparti, id: \.nome) { r in
-                        Section {
-                            ForEach(r.voci) { v in rigaDaComprare(v) }
-                        } header: {
-                            Label(r.nome.uppercased(), systemImage: r.icona)
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta)
-                        }
-                    }
-
-                    if !nelCarrello.isEmpty {
-                        Section {
-                            ForEach(nelCarrello) { v in
-                                Button { Task { await rimetti(v) } } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "checkmark.circle.fill").font(.system(size: 22)).foregroundStyle(tinta)
-                                        Text(v.testo).strikethrough().foregroundStyle(Color.tenue)
-                                        Spacer()
-                                    }
-                                }
-                                .listRowBackground(Color.clear)
+                    progresso.listRowBackground(Color.clear)
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus").foregroundStyle(tinta)
+                        TextField("Aggiunga: latte, pane, detersivo…", text: $nuovo)
+                            .focused($scrivendo)
+                            .foregroundStyle(.white)
+                            .submitLabel(.done)
+                            .onSubmit { Task { await aggiungi(nuovo) } }
+                        if !nuovo.trimmingCharacters(in: .whitespaces).isEmpty {
+                            Button { Task { await aggiungi(nuovo) } } label: {
+                                Image(systemName: "arrow.up.circle.fill").font(.system(size: 24)).foregroundStyle(tinta)
                             }
-                        } header: {
-                            Label("NEL CARRELLO · TOCCHI PER RIMETTERE", systemImage: "cart.fill")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta.opacity(0.7))
+                            .buttonStyle(.plain)
                         }
                     }
+                    .listRowBackground(tinta.opacity(0.08))
+                }
 
-                    if !abitualiDaMostrare.isEmpty {
-                        Section {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(abitualiDaMostrare) { v in
-                                        Button { Task { await aggiungi(v.testo) } } label: {
-                                            Label(v.testo, systemImage: "arrow.uturn.left")
-                                                .font(.system(size: 12, weight: .medium))
-                                                .padding(.horizontal, 10).padding(.vertical, 7)
-                                                .foregroundStyle(tinta)
-                                                .overlay(Capsule().stroke(tinta.opacity(0.5), lineWidth: 1))
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.vertical, 2)
-                            }
-                            .listRowBackground(Color.clear)
-                        } header: {
-                            Text("COMPRATI DI RECENTE · UN TOCCO E TORNANO IN LISTA")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta.opacity(0.7))
-                        }
-                    }
-
+                if caricata && daComprare.isEmpty && nelCarrello.isEmpty {
                     Section {
-                        if !daComprare.isEmpty {
-                            ShareLink(item: testoDaCondividere) {
-                                Label("Manda la lista (WhatsApp, Messaggi…)", systemImage: "square.and.arrow.up").foregroundStyle(tinta)
-                            }
-                        }
-                        Button { chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.") } label: {
-                            Label("Me la legga JARVIS", systemImage: "waveform").foregroundStyle(tinta)
-                        }
+                        Text("Scriva qui sopra, oppure dica a JARVIS «manca il latte».")   // 7 nov: «lista vuota» è già sotto il titolo
+                            .font(.footnote).foregroundStyle(Color.tenue)
                     }
                     .listRowBackground(Color.clear)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                // 7 nov (il signore: «Bea inizia più in basso delle altre»): la lista di iOS lasciava uno spazio sopra la prima sezione;
-                // ora la testata sta dove sta nelle altre schede (16 punti sotto «Chiudi», 16 dal bordo)
-                .contentMargins(.top, 16, for: .scrollContent)
-                .contentMargins(.horizontal, 16, for: .scrollContent)
-                .scrollDismissesKeyboard(.interactively)
-                // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
-                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
-                .allowsHitTesting(mostrato)
-                // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
-                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Spesa", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Spesa"),
-                                                                            icona: "cart", tinta: tinta)) { chiudi() })
-                if !caricamentoVia {
-                    CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
-                        .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
+
+                ForEach(reparti, id: \.nome) { r in
+                    Section {
+                        ForEach(r.voci) { v in rigaDaComprare(v) }
+                    } header: {
+                        Label(r.nome.uppercased(), systemImage: r.icona)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta)
+                    }
                 }
-                if errore && !caricata && mostrato {
-                    Text("Non raggiungo la lista, Sir.").foregroundStyle(.orange)
+
+                if !nelCarrello.isEmpty {
+                    Section {
+                        ForEach(nelCarrello) { v in
+                            Button { Task { await rimetti(v) } } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "checkmark.circle.fill").font(.system(size: 22)).foregroundStyle(tinta)
+                                    Text(v.testo).strikethrough().foregroundStyle(Color.tenue)
+                                    Spacer()
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    } header: {
+                        Label("NEL CARRELLO · TOCCHI PER RIMETTERE", systemImage: "cart.fill")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta.opacity(0.7))
+                    }
                 }
+
+                if !abitualiDaMostrare.isEmpty {
+                    Section {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(abitualiDaMostrare) { v in
+                                    Button { Task { await aggiungi(v.testo) } } label: {
+                                        Label(v.testo, systemImage: "arrow.uturn.left")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .padding(.horizontal, 10).padding(.vertical, 7)
+                                            .foregroundStyle(tinta)
+                                            .overlay(Capsule().stroke(tinta.opacity(0.5), lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .listRowBackground(Color.clear)
+                    } header: {
+                        Text("COMPRATI DI RECENTE · UN TOCCO E TORNANO IN LISTA")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(tinta.opacity(0.7))
+                    }
+                }
+
+                Section {
+                    if !daComprare.isEmpty {
+                        ShareLink(item: testoDaCondividere) {
+                            Label("Manda la lista (WhatsApp, Messaggi…)", systemImage: "square.and.arrow.up").foregroundStyle(tinta)
+                        }
+                    }
+                    Button { chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.") } label: {
+                        Label("Me la legga JARVIS", systemImage: "waveform").foregroundStyle(tinta)
+                    }
+                }
+                .listRowBackground(Color.clear)
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear { apertaDa = Date(); Suoni.schedaApre() }
-            .task {
-                await carica()
-                // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
-                // pagina si stampa dall'alto
-                let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
-                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
-                guard !Task.isCancelled else { return }
-                if caricata { Suoni.schedaPronta() }
-                withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
-                withAnimation(Apertura.curvaStampa) { stampa = 1 }
-                try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
-                caricamentoVia = true
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            // 7 nov (il signore: «Bea inizia più in basso delle altre»): la lista di iOS lasciava uno spazio sopra la prima sezione;
+            // ora la testata sta dove sta nelle altre schede (16 punti sotto «Chiudi», 16 dal bordo)
+            .contentMargins(.top, 16, for: .scrollContent)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .scrollDismissesKeyboard(.interactively)
+            // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
+            .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+            .allowsHitTesting(mostrato)
+            // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
+            .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Spesa", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Spesa"),
+                                                                        icona: "cart", tinta: tinta)) { chiudi() })
+            if !caricamentoVia {
+                CaricamentoHUD(titolo: "Spesa", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
+                    .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
             }
-            .tastiAVoce { a in
-                switch a {
-                case .spesaLeggi: chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.")
-                case .spesaWhatsApp:                    // WhatsApp con la lista già scritta: sceglie lui a chi mandarla
-                    guard !daComprare.isEmpty,
-                          let t = testoDaCondividere.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))),
-                          let u = URL(string: "https://wa.me/?text=\(t)") else { return }
-                    apriLink(u)
-                default: break
-                }
+            if errore && !caricata && mostrato {
+                Text("Non raggiungo la lista, Sir.").foregroundStyle(.orange)
+            }
+        }
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { apertaDa = Date(); Suoni.schedaApre() }
+        .task {
+            await carica()
+            // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
+            // pagina si stampa dall'alto
+            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard !Task.isCancelled else { return }
+            if caricata { Suoni.schedaPronta() }
+            withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
+            withAnimation(Apertura.curvaStampa) { stampa = 1 }
+            try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
+            caricamentoVia = true
+        }
+        .tastiAVoce { a in
+            switch a {
+            case .spesaLeggi: chiudi(); chiedi("Leggimi la lista della spesa, un reparto alla volta.")
+            case .spesaWhatsApp:                    // WhatsApp con la lista già scritta: sceglie lui a chi mandarla
+                guard !daComprare.isEmpty,
+                      let t = testoDaCondividere.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))),
+                      let u = URL(string: "https://wa.me/?text=\(t)") else { return }
+                apriLink(u)
+            default: break
             }
         }
         .preferredColorScheme(.dark)

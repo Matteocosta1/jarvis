@@ -42,94 +42,92 @@ struct VistaBea: View {
     @State private var apertaDa = Date()
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
-                List {
-                    Section {
-                        ologramma.listRowBackground(Color.clear)
-                        contatto.listRowBackground(Color.clear)
-                    }
-                    pensieri
-                    if let d = dati {
-                        date(d)
-                        promesse(d)
-                        gusti(d)
-                        idee(d)
-                        if !d.note.isEmpty { elenco(d.note, titolo: "DA NON DIMENTICARE", icona: "note.text") }
-                        lavoro(d)
-                    }
-                    aggiungi
-                    sicurezza
+        ZStack {
+            SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
+            List {
+                Section {
+                    ologramma.listRowBackground(Color.clear)
+                    contatto.listRowBackground(Color.clear)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                // 7 nov (il signore: «Bea inizia più in basso delle altre»): la lista di iOS lasciava uno spazio sopra la prima sezione;
-                // ora la testata sta dove sta nelle altre schede (16 punti sotto «Chiudi», 16 dal bordo)
-                .contentMargins(.top, 16, for: .scrollContent)
-                .contentMargins(.horizontal, 16, for: .scrollContent)
-                .scrollDismissesKeyboard(.interactively)
-                // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
-                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
-                .allowsHitTesting(mostrato)
-                // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
-                .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Bea", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Bea"),
-                                                                            icona: "link", tinta: tinta)) { chiudi() })
-                if !caricamentoVia {
-                    CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
-                        .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
+                pensieri
+                if let d = dati {
+                    date(d)
+                    promesse(d)
+                    gusti(d)
+                    idee(d)
+                    if !d.note.isEmpty { elenco(d.note, titolo: "DA NON DIMENTICARE", icona: "note.text") }
+                    lavoro(d)
                 }
+                aggiungi
+                sicurezza
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .onAppear { apertaDa = Date(); Suoni.schedaApre() }
-            .task {
-                if let d = FotoBea.salvata() { fotoOlo = UIImage(data: d) }
-                await carica()
-                // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
-                // pagina si stampa dall'alto
-                let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
-                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
-                guard !Task.isCancelled else { return }
-                if dati != nil { Suoni.schedaPronta() }
-                withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
-                withAnimation(Apertura.curvaStampa) { stampa = 1 }
-                try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
-                caricamentoVia = true
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            // 7 nov (il signore: «Bea inizia più in basso delle altre»): la lista di iOS lasciava uno spazio sopra la prima sezione;
+            // ora la testata sta dove sta nelle altre schede (16 punti sotto «Chiudi», 16 dal bordo)
+            .contentMargins(.top, 16, for: .scrollContent)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .scrollDismissesKeyboard(.interactively)
+            // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
+            .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+            .allowsHitTesting(mostrato)
+            // 7 nov sera: la testata nella riga di «Chiudi», ferma anche mentre carica e mentre la lista scorre
+            .modifier(ConBarraChiudi(tinta: tinta, testata: DatiTestata(titolo: "Bea", sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di("Bea"),
+                                                                        icona: "link", tinta: tinta)) { chiudi() })
+            if !caricamentoVia {
+                CaricamentoHUD(titolo: "Bea", tinta: tinta).padding(.top, 120).allowsHitTesting(false)
+                    .opacity(mostrato ? 0 : 1)    // sfuma in 0,25 s mentre la pagina si stampa, come nel mockup
             }
-            .onChange(of: sceltaFoto) { _, scelta in
-                guard let scelta else { return }
-                Task { await nuovaFoto(scelta) }
-            }
-            .tastiAVoce { a in
-                let n = Rubrica.pulisci(numero)
-                switch a {
-                case .beaTiPenso: if !numero.isEmpty, !scrivePensiero { Task { await nuovoPensiero() } }
-                case .beaChiama: if !numero.isEmpty { apri("tel:\(n)") }
-                case .beaMessaggio: if !numero.isEmpty { apri("sms:\(n)") }
-                case .beaWhatsApp: if !numero.isEmpty { apri("https://wa.me/\(Rubrica.internazionale(numero))") }
-                case .bea112: chiama112AVoce = true
-                default: break
-                }
-            }
-            .confirmationDialog("Chiamare il 112?", isPresented: $chiama112AVoce, titleVisibility: .visible) {
-                Button("Chiama il 112", role: .destructive) { apri("tel:112") }
-                Button("Annulla", role: .cancel) {}
-            } message: { Text("Il numero unico di emergenza.") }
-            .sheet(isPresented: $sceltaContatto) {
-                SceltaContattoBea { c, n in
-                    nomeContatto = c.nome
-                    numero = n
-                    sceltaContatto = false
-                    PonteTelefono.condiviso.invia()          // anche l'orologio conosce il numero, per il «Ti penso»
-                }
-            }
-            .sheet(isPresented: Binding(get: { pensiero != nil }, set: { if !$0 { pensiero = nil } })) {
-                TiPenso(testo: pensiero ?? "", numero: numero) { pensiero = nil } altro: { Task { await nuovoPensiero() } }
-                    .id(pensiero)                                   // «Scrivine un altro»: il testo nuovo rimpiazza il vecchio
-                    .presentationDetents([.medium])
-            }
-            .chiudiFoglioDietro { sceltaContatto = false; pensiero = nil }   // 4 nov: i fogli (iOS) non restano sopra la sezione che sale
         }
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { apertaDa = Date(); Suoni.schedaApre() }
+        .task {
+            if let d = FotoBea.salvata() { fotoOlo = UIImage(data: d) }
+            await carica()
+            // come tutte le altre schede (CorniceScheda): il caricamento almeno 0,28 s, poi «pronta», il caricamento sfuma e la
+            // pagina si stampa dall'alto
+            let resta = Apertura.caricamento - Date().timeIntervalSince(apertaDa)
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            guard !Task.isCancelled else { return }
+            if dati != nil { Suoni.schedaPronta() }
+            withAnimation(Apertura.curvaDissolvenza) { mostrato = true }
+            withAnimation(Apertura.curvaStampa) { stampa = 1 }
+            try? await Task.sleep(for: .seconds(max(Apertura.dissolvenza, Apertura.stampa) + 0.05))
+            caricamentoVia = true
+        }
+        .onChange(of: sceltaFoto) { _, scelta in
+            guard let scelta else { return }
+            Task { await nuovaFoto(scelta) }
+        }
+        .tastiAVoce { a in
+            let n = Rubrica.pulisci(numero)
+            switch a {
+            case .beaTiPenso: if !numero.isEmpty, !scrivePensiero { Task { await nuovoPensiero() } }
+            case .beaChiama: if !numero.isEmpty { apri("tel:\(n)") }
+            case .beaMessaggio: if !numero.isEmpty { apri("sms:\(n)") }
+            case .beaWhatsApp: if !numero.isEmpty { apri("https://wa.me/\(Rubrica.internazionale(numero))") }
+            case .bea112: chiama112AVoce = true
+            default: break
+            }
+        }
+        .confirmationDialog("Chiamare il 112?", isPresented: $chiama112AVoce, titleVisibility: .visible) {
+            Button("Chiama il 112", role: .destructive) { apri("tel:112") }
+            Button("Annulla", role: .cancel) {}
+        } message: { Text("Il numero unico di emergenza.") }
+        .sheet(isPresented: $sceltaContatto) {
+            SceltaContattoBea { c, n in
+                nomeContatto = c.nome
+                numero = n
+                sceltaContatto = false
+                PonteTelefono.condiviso.invia()          // anche l'orologio conosce il numero, per il «Ti penso»
+            }
+        }
+        .sheet(isPresented: Binding(get: { pensiero != nil }, set: { if !$0 { pensiero = nil } })) {
+            TiPenso(testo: pensiero ?? "", numero: numero) { pensiero = nil } altro: { Task { await nuovoPensiero() } }
+                .id(pensiero)                                   // «Scrivine un altro»: il testo nuovo rimpiazza il vecchio
+                .presentationDetents([.medium])
+        }
+        .chiudiFoglioDietro { sceltaContatto = false; pensiero = nil }   // 4 nov: i fogli (iOS) non restano sopra la sezione che sale
         .preferredColorScheme(.dark)
     }
 

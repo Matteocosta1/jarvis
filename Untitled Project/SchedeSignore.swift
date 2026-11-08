@@ -25,32 +25,33 @@ struct CorniceScheda<Contenuto: View>: View {
     @State private var apertaDa = Date()
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
-                // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX).
-                // 5 nov (il signore: «se scorro in basso, in ogni sezione si vede quella barra grigia col Chiudi»): «Chiudi» non è
-                // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:
-                // la pagina scorre sotto la riga e la riga resta trasparente.
-                VStack(spacing: 0) {
-                    // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi, così scorrendo la pagina
-                    // non spariscono»): la testata sta nella riga di «Chiudi» (o della X), ferma; sotto scorre solo il contenuto
-                    BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo),
-                                                      icona: icona, tinta: tinta, marchio: marchio),
-                                 tinta: tinta, conX: fotocamera, chiudi: { chiudi() })
-                    pagina
-                }
-                // il caricamento sfuma (0,25 s) mentre la pagina si stampa, come nel mockup; tolto a stampa finita
-                if !caricamentoVia {
-                    CaricamentoHUD(titolo: titolo, tinta: tinta)
-                        .padding(.top, 120)
-                        .opacity(mostrato ? 0 : 1)
-                        .allowsHitTesting(false)
-                }
+        ZStack {
+            SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
+            // 4 nov (regola fissa): la scheda con la fotocamera (Scanner) si chiude con la X nel cerchio (vedi tastoX).
+            // 5 nov (il signore: «se scorro in basso, in ogni sezione si vede quella barra grigia col Chiudi»): «Chiudi» non è
+            // più nella barra di iOS, che scorrendo si vestiva di grigio, ma in una riga sua sopra la pagina, come nel mockup:
+            // la pagina scorre sotto la riga e la riga resta trasparente.
+            VStack(spacing: 0) {
+                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi, così scorrendo la pagina
+                // non spariscono»): la testata sta nella riga di «Chiudi» (o della X), ferma; sotto scorre solo il contenuto
+                BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: mostrato ? sottotitolo : TestiCaricamento.di(titolo),
+                                                  icona: icona, tinta: tinta, marchio: marchio),
+                             tinta: tinta, conX: fotocamera, chiudi: { chiudi() })
+                pagina
             }
-            // la riga in alto è BarraSezione: la testata a sinistra, «Chiudi» (o la X nel cerchio con la fotocamera) a destra
-            .toolbar(.hidden, for: .navigationBar)
+            // il caricamento sfuma (0,25 s) mentre la pagina si stampa, come nel mockup; tolto a stampa finita
+            if !caricamentoVia {
+                CaricamentoHUD(titolo: titolo, tinta: tinta)
+                    .padding(.top, 120)
+                    .opacity(mostrato ? 0 : 1)
+                    .allowsHitTesting(false)
+            }
         }
+        // la riga in alto è BarraSezione: la testata a sinistra, «Chiudi» (o la X nel cerchio con la fotocamera) a destra.
+        // 8 nov notte (banco, aperture rallentate e strati misurati fotogramma per fotogramma): tolto il NavigationStack di iOS
+        // che c'era qui solo per nascondere la sua barra. Nei primi fotogrammi della salita iOS la mostrava e poi la toglieva, e la
+        // pagina dentro si spostava da sola mentre il foglio saliva; in più il suo contenitore taglia i bordi e calcola i margini a
+        // modo suo. Senza, la sezione è un foglio solo che sale tutto insieme. Nessuna sezione ci navigava dentro.
         .preferredColorScheme(.dark)
         .onAppear { apertaDa = Date(); Suoni.schedaApre() }
         .task(id: pronto) {
