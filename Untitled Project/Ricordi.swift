@@ -65,7 +65,7 @@ struct VistaRicordi: View {
                         Spacer()
                     }
                 }
-                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: scheda.rawValue, sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+                .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Ricordi", sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»; 8 nov (il signore): il titolo resta RICORDI su ogni scheda
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)

@@ -532,6 +532,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 ## Verso la 11.0 (11) — 8 nov notte (numero da confermare)
 - Studio e Social (video del signore, 02:19: «unica piccolezza»): a metà caricamento la testata del caricamento saliva sotto l'ora e la Dynamic Island (sopra la pagina web, che ignora i margini, nel contenitore della MARK XI il margine dell'ora a un certo punto vale 0), poi la pagina arrivava ~12 punti più in alto del caricamento (la testata web a 52 px fissi del mockup, il margine vero dell'app non passava più). Ora il caricamento prende il margine dalla finestra (SchermoCaricamento margineDallaFinestra) e la testata della pagina sta a margine + 2, come l'icona di tutte le sezioni: niente salti.
+- Ricordi (video del signore, 02:22: «nel titolo diventa Traccia»): il titolo resta RICORDI su tutte le schede (TRACCIA, RICORDI, POSTI), sotto «seconda memoria». Mockup v276 uguale.
 
 ## 11.0 (10) — 7 nov notte · commit 1ef44cc · controllo di compilazione VERDE (0 errori, 0 warning, run 42421222533)
 Uguale alla 11.0 (9) + una correzione sola (il signore, 23:28: «lancio l'app, il volume è alto; se lo lancio dal tasto Azione il volume è basso»): il comando «Parla con Jarvis» del tasto Azione apriva il microfono subito, durante la musica d'avvio (col microfono aperto l'iPhone abbassa l'altoparlante). Ora durante l'avvio l'ascolto parte a musica finita, come aprendo dall'icona: volume alto e regolabile coi tasti anche dal tasto Azione. A JARVIS già acceso il tasto Azione resta immediato.
