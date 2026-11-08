@@ -377,6 +377,8 @@ struct SchermoCaricamento: View {
     let icona: String
     var conX = false
     var marchio = false
+    /// 8 nov: Studio e Social hanno la loro riga in alto sempre ferma sopra (VistaStudio): qui solo lo sfondo e il caricamento.
+    var conTestata = true
     private let tinta = Color.ciano
 
     // 8 nov mattina: anche in Studio e Social sta nel margine sicuro della sezione, come in tutte le altre (prima lì prendeva il
@@ -384,11 +386,13 @@ struct SchermoCaricamento: View {
     var body: some View {
         ZStack {
             SfondoSezione()
-            VStack(alignment: .leading, spacing: 0) {
-                // 7 nov sera: la testata nella riga di «Chiudi» (o della X), come in tutte le sezioni (BarraSezione)
-                BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: marchio),
-                             tinta: tinta, conX: conX, chiudi: nil)
-                Spacer(minLength: 0)
+            if conTestata {
+                VStack(alignment: .leading, spacing: 0) {
+                    // 7 nov sera: la testata nella riga di «Chiudi» (o della X), come in tutte le sezioni (BarraSezione)
+                    BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: TestiCaricamento.di(titolo), icona: icona, tinta: tinta, marchio: marchio),
+                                 tinta: tinta, conX: conX, chiudi: nil)
+                    Spacer(minLength: 0)
+                }
             }
             CaricamentoHUD(titolo: titolo, tinta: tinta)
                 .padding(.top, 120)
