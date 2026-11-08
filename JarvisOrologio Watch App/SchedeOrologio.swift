@@ -12,6 +12,7 @@ enum TintaOrologio { static let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 /// 5 nov (il signore: «apertura delle sezioni da circa 1 s a 0,4-0,5 s, uguale ovunque»): i tempi di apertura di tutte le
 /// schede e schermate del polso, come sull'iPhone.
 /// 5 nov pomeriggio (punti 1 e 2 approvati, come l'iPhone): caricamento 0,28 s, stampa 0,32 s, copertura che sfuma in 0,25 s.
+/// 8 nov pomeriggio: la stampa non si usa più (la scheda compare tutta insieme, come sull'iPhone).
 enum AperturaPolso {
     /// Il caricamento HUD (prima 0,45 s; ancora prima 0,9 s nelle schede, 1,1 s nelle pagine).
     static let caricamento = 0.28
@@ -22,7 +23,7 @@ enum AperturaPolso {
 }
 
 /// Una scheda sull'orologio: il nome in alto, il caricamento HUD (anelli, barra, sistemi) e poi il contenuto
-/// che si stampa dall'alto. Stesso ciano di JARVIS, stesso ritmo dell'iPhone, in piccolo.
+/// che compare tutto insieme (8 nov; prima si stampava dall'alto). Stesso ciano di JARVIS, stesso ritmo dell'iPhone, in piccolo.
 /// 27 ott: la GrigliaSfumata delle sezioni dell'iPhone, in scala col polso (schermo largo la metà): passo 28 → 14, sfumatura 520 → 260,
 /// stesso centro, stesso colore; linea un filo più carica perché lo schermo del polso ha meno pixel per punto (2x invece di 3x).
 struct GrigliaPolso: View {
@@ -50,7 +51,6 @@ struct CorniceOrologio<Contenuto: View>: View {
     var apertura = false            // Bea e Spesa: il suono «apertura» invece di quello delle schede
     @ViewBuilder let contenuto: () -> Contenuto
     @State private var mostrato = false
-    @State private var stampa: CGFloat = 0
     @State private var apertaDa = Date()
 
     var body: some View {
@@ -62,16 +62,10 @@ struct CorniceOrologio<Contenuto: View>: View {
                         .padding(.horizontal, 4)
                 }
                 .avvisaRighe()                       // MARK XI: toccando fuori da una riga di lato, la corona torna alla pagina
-                .mask(alignment: .top) {
-                    GeometryReader { g in
-                        VStack(spacing: 0) {
-                            Rectangle().frame(height: g.size.height * stampa)
-                            Spacer(minLength: 0)
-                        }
-                    }
-                }
+                .transition(.opacity)
             } else {
                 CaricamentoOrologio(titolo: titolo)
+                    .transition(.opacity)
             }
         }
         .navigationTitle(titolo)
@@ -87,8 +81,9 @@ struct CorniceOrologio<Contenuto: View>: View {
             guard !Task.isCancelled else { return }       // uscito prima della fine: niente «pronta» a scheda chiusa
             WKInterfaceDevice.current().play(.success)
             SuoniOrologio.schedaPronta()
-            mostrato = true
-            withAnimation(.easeOut(duration: AperturaPolso.stampa)) { stampa = 1 }
+            // 8 nov pomeriggio (il signore: «clicchi, caricamento e carica TUTTA LA PAGINA… una pagina unica»), come l'iPhone:
+            // niente più stampa dall'alto, il caricamento sfuma e la scheda compare tutta insieme
+            withAnimation(.easeOut(duration: AperturaPolso.dissolvenza)) { mostrato = true }
         }
     }
 }
