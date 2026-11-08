@@ -160,7 +160,10 @@ struct StratoPagina: View {
     /// fondo, discesa ~0,35 s che parte piano e si posa piano. Sono le molle di iOS che le ricalcano (scarto sotto l'1%).
     // 27 ott notte (10.0 16): lo strato scende di tutta l'altezza dello schermo, come le altre schede di iOS: stessi tempi delle
     // altre schede (misurati sul video di SATELLITE), quindi stessa durata e stessa velocità.
-    static let salita: Animation = .spring(response: 0.34, dampingFraction: 0.9)
+    // 8 nov sera (il signore: «il mockup adesso è perfetto… timing perfetto, deve sembrare un'unica pagina»): la salita del .foglio
+    // del mockup (transform .35s cubic-bezier(.2,.8,.2,1)), invece della molla di iOS che si posava piano in fondo (la parte alta
+    // arrivava per ultima)
+    static let salita: Animation = .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)
     /// Dopo il trascinamento col dito: 0,22 s e frena, come le altre schede (PaginaPiena), il dito l'ha già portata giù.
     static func discesa(_ durata: Double = 0.35) -> Animation {
         durata > 0.3 ? .spring(response: 0.33, dampingFraction: 1) : .easeOut(duration: durata)
