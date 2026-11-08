@@ -538,6 +538,7 @@ Uguale alla 11.0 (12) + l'apertura di TUTTE le sezioni come una pagina sola (il 
 - Musica: il caricamento resta finché arrivano le liste di OGGI (al massimo 4 s, poi la pagina compare con l'anello), così la pagina compare intera.
 - Polso: le schede (CorniceOrologio) uguali, senza stampa, pagina pronta sotto il caricamento e un'unica dissolvenza.
 - Provata nel simulatore (banco, scena «pagine»: EDITH, Interprete, Meteo, Email, Cuore, Musica, Studio): fotogramma per fotogramma, caricamento → un'unica dissolvenza → pagina intera, nessun fotogramma vuoto né riquadri a pezzi. Musica nel simulatore resta dietro la richiesta del permesso di Apple Music (sul telefono il permesso c'è già).
+- **Commit d4a3346 · controllo di compilazione VERDE** (0 errori, 0 warning, run 42488046501: iPhone, polso, complicazione, isola). Da caricare: Pull + Archive + TestFlight sul ramo claude/build-23.
 
 ## 11.0 (12) — 8 nov mattina · numero confermato dal signore (07:4x: «11.0 (12)»; la 11 è già su TestFlight) · la prima compilazione (db2279a, run 42458339721) era verde ma NON consegnata: il signore ha chiesto di sistemare prima Studio, Social e Musica e la scheda della mail · commit e controllo finale: vedi l'ultima riga
 Tutta la 11.0 (11) più le correzioni dei due video del signore (06:32 e 06:34: «risolvi con massima competenza e fallo identico al mock up»; «Studio e Social non vanno bene così… saltellano»; «deve essere tutto perfetto ed equilibrato in tutte le pagine… stesse grandezze di font, di bottoni e scritte Chiudi»).
