@@ -8,7 +8,7 @@ import AVFoundation
 // viene scritto EarPods… scritta piccola con logo cuffie, rimane per il tempo che sono collegate ma non deve essere invadente; quando
 // le scollego per 1/2 secondi dice scollegate e sparisce… accanto a MARK XI»). Come il mockup v285: sulla riga di MARK XI, dopo un
 // punto, stesso carattere (10, spaziatura 3) e stesso grigio. Lo dice iOS: a ogni cambio dell'uscita audio si guarda dove va il suono. Col filo (EarPods) «HEADPHONES» col logo delle cuffie, AirPods
-// «AIRPODS», altre cuffie Bluetooth «CUFFIE». Tolte: «SCOLLEGATE» per 1,5 s, poi sparisce (dissolvenza 0,3 s).
+// «AIRPODS», altre cuffie Bluetooth «HEADPHONES». Tolte: «SCOLLEGATE» per 1,5 s, poi sparisce (dissolvenza 0,3 s).
 
 struct IndicatoreCuffie: View {
     @State private var nome: String?          // le cuffie collegate adesso (nil: nessuna)
@@ -49,7 +49,7 @@ struct IndicatoreCuffie: View {
             let bluetooth = [AVAudioSession.Port.bluetoothA2DP, .bluetoothLE, .bluetoothHFP].contains(u.portType)
             if n.contains("airpods") { nome = "AIRPODS"; simbolo = "airpods" }
             else if !bluetooth { nome = "HEADPHONES"; simbolo = "headphones" }         // col filo (le sue EarPods): 04:56 «scriviamo headphones», 04:57 il logo delle cuffie
-            else { nome = "CUFFIE"; simbolo = "headphones" }
+            else { nome = "HEADPHONES"; simbolo = "headphones" }                       // altre cuffie Bluetooth (05:00: HEADPHONES anche qui)
             scollegate = false
             giro += 1
             return
