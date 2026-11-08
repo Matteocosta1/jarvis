@@ -28,7 +28,9 @@ struct PostoRuota: ViewModifier {
             }
             .scaleEffect(s)
             .offset(x: raggio * CGFloat(cos(a)), y: raggio * CGFloat(sin(a)))
-            .zIndex(s > 1.02 ? 3 : 0)
+            // 8 nov (foto del signore 03:33: «quella selezionata non deve rimanere un pochino sotto l'altra, si deve vedere tutta»):
+            // più è ingrandita dalla lente, più sta sopra; la scelta sopra a tutte
+            .zIndex(scelta ? 100 : s > 1.001 ? 10 * s : 0)
     }
 }
 
