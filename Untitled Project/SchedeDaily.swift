@@ -570,6 +570,7 @@ struct LettoreMail: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(letta?.oggetto ?? oggetto)
                         .font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
+                        .shadow(color: tinta.opacity(0.45), radius: 7)          // LUCE: l'alone ciano del titolo (text-shadow 0 0 14px)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                     VStack(alignment: .leading, spacing: 5) {
@@ -578,11 +579,13 @@ struct LettoreMail: View {
                         if let l = letta, !l.cc.isEmpty { riga("CC", l.cc) }
                         if let l = letta, !l.data.isEmpty { riga("DATA", l.data) }
                     }
-                    Rectangle().fill(tinta.opacity(0.25)).frame(height: 1)
+                    Rectangle().fill(tinta.opacity(0.5)).frame(height: 1)
+                        .shadow(color: tinta.opacity(0.6), radius: 4)               // LUCE: la linea accesa
                     if let l = letta {
                         Text(l.testo)
                             .font(.system(size: 15)).lineSpacing(3)            // come il mockup: 15 punti, righe a 1,4
                             .foregroundStyle(.white.opacity(0.92))
+                            .shadow(color: tinta.opacity(0.2), radius: 4)       // LUCE: l'alone leggero del testo
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else if let errore {
@@ -617,7 +620,7 @@ struct LettoreMail: View {
             .padding(.horizontal, 16)
             .padding(.bottom, max(16, margineBasso))                     // il mockup: 34, la barretta di iOS del suo iPhone
         }
-        .background(SfondoSezione(tinta: tinta))
+        .background(PelleLuce(tinta: tinta))          // 8 nov (scelta del signore, 09:49): LUCE, la scheda olografica trasparente
         .task { await carica() }
     }
 
@@ -626,6 +629,7 @@ struct LettoreMail: View {
             Text(etichetta).font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
                 .foregroundStyle(tinta).frame(width: 40, alignment: .leading)
             Text(valore).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).textSelection(.enabled)
+                .shadow(color: tinta.opacity(0.2), radius: 4)
         }
     }
 
