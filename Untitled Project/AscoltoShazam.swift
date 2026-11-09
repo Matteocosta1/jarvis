@@ -37,6 +37,8 @@ final class AscoltoShazam: ObservableObject {
     private var lettore30: AVPlayer?
     private var orologio: Task<Void, Never>?
     private var giro = 0                       // la canzone in corso: una risposta vecchia non tocca quella nuova
+    /// 9 nov · i video trovati per la canzone, in ordine: se uno non si può guardare qui, parte il successivo (riserva).
+    private var videoRiserva: [String] = []
 
     private init() {}
 
@@ -56,6 +58,7 @@ final class AscoltoShazam: ObservableObject {
     /// (il video si guarda sul telefono).
     func suona(titolo: String, artista: String, appleID: String?, dalPolso: Bool = false) async {
         ferma()
+        audioARiposo()             // 9 nov: dal video o dall'anteprima ad Apple Music intero, l'audio di JARVIS non le sta davanti
         giro += 1
         let mio = giro
         cercando = true
@@ -104,9 +107,53 @@ final class AscoltoShazam: ObservableObject {
         guard mio == giro else { return }
         guard let v = lista.first else { errore = e ?? "Nessun video per questa canzone, Sir."; return }
         fermaAudio()
+        audioDaMusica()
+        videoRiserva = lista.dropFirst().map(\.id)
         videoID = v.id
         fonte = .video
         errore = nil
+    }
+
+    /// 9 nov (il signore: il video di riserva): il lettore di YouTube dice che questo video qui non si può guardare (chi l'ha
+    /// caricato non lo permette, rimosso, privato…): parte da solo il prossimo trovato per la stessa canzone. Finiti, lo dice.
+    func videoNonDisponibile(_ id: String, codice: Int) {
+        guard fonte == .video, videoID == id else { return }          // una risposta di un video vecchio non tocca quello nuovo
+        fermaVideo()
+        if !videoRiserva.isEmpty {
+            videoID = videoRiserva.removeFirst()
+        } else {
+            videoID = nil
+            errore = "Nessun video di questa canzone si può guardare qui, Sir (YouTube \(codice)). Provi APPLE."
+        }
+    }
+
+    /// 9 nov notte (il signore: «dal player integrato in Shazam si sente bassissima»): per riconoscere la canzone l'audio di JARVIS
+    /// va in «registrazione» (microfono aperto) e ci restava: con il microfono aperto iOS suona tutto a volume da telefonata
+    /// (il pallino arancione restava acceso), e appena si usciva dall'app la canzone tornava al volume pieno. Finito l'ascolto il
+    /// microfono si chiude e l'audio torna come a riposo («ambient», la musica del lettore di sistema suona piena); l'anteprima e il
+    /// video, che suonano dentro JARVIS, lo prendono come musica («playback», come Vinyl Hustler).
+    static func chiudiMicrofono() {
+        let s = AVAudioSession.sharedInstance()
+        guard s.category == .playAndRecord || s.category == .record else { return }
+        try? s.setActive(false, options: .notifyOthersOnDeactivation)
+        try? s.setCategory(.ambient, mode: .default, options: [])
+    }
+
+    /// L'audio di JARVIS come musica (anteprima e video). Se l'ascolto di JARVIS ha l'audio (registrazione), non si tocca.
+    private func audioDaMusica() {
+        let sessione = AVAudioSession.sharedInstance()
+        if sessione.category == .ambient || sessione.category == .soloAmbient {
+            try? sessione.setCategory(.playback, mode: .default, options: [])
+        }
+        try? sessione.setActive(true)
+    }
+
+    /// Chiuso il player, l'audio torna a riposo (la musica delle altre app risale); se lo usa l'ascolto di JARVIS, non si tocca.
+    private func audioARiposo() {
+        let sessione = AVAudioSession.sharedInstance()
+        guard sessione.category == .playback else { return }
+        try? sessione.setActive(false, options: .notifyOthersOnDeactivation)
+        try? sessione.setCategory(.ambient, mode: .default, options: [])
     }
 
     /// Il tasto APPLE: dal video torna all'audio di Apple (intero o anteprima).
@@ -166,12 +213,8 @@ final class AscoltoShazam: ObservableObject {
         }
     }
 
-    /// Il video riparte: è nella pagina di youtube.com (la cornice è della stessa origine), se no col comando ufficiale del lettore.
-    private static let ripartiVideo = """
-    (function(){var f=document.querySelector('iframe');if(!f)return 0;\
-    try{var v=f.contentDocument&&f.contentDocument.querySelector('video');if(v){v.play();return 1}}catch(e){}\
-    if(f.contentWindow)f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}','*');return 2})()
-    """
+    /// Il video riparte col comando ufficiale del lettore di YouTube (LettoreYouTube, IFrame API: `cmd`).
+    private static let ripartiVideo = "cmd('play')"
 
     func salta(_ secondi: Double) {
         switch fonte {
@@ -201,9 +244,12 @@ final class AscoltoShazam: ObservableObject {
     func chiudi() {
         giro += 1
         cercando = false
+        let dentro = fonte == .anteprima || fonte == .video
         if fonte != .intero { ferma() }
         videoID = nil
+        videoRiserva = []
         fermaVideo()
+        if dentro { audioARiposo() }
     }
 
     // MARK: dentro
@@ -213,11 +259,7 @@ final class AscoltoShazam: ObservableObject {
         // 8 nov (controllo): finito l'avvio l'audio dell'app resta «ambient» (Suoni.fineAvvioAudio): l'anteprima taceva col tasto
         // silenzioso e, partita dal polso con l'iPhone in tasca, si fermava. Se nessuno usa l'audio, l'anteprima lo prende come musica;
         // se l'ascolto di JARVIS ha già l'audio (registrazione e riproduzione), non si tocca.
-        let sessione = AVAudioSession.sharedInstance()
-        if sessione.category == .ambient || sessione.category == .soloAmbient {
-            try? sessione.setCategory(.playback, mode: .default, options: [])
-        }
-        try? sessione.setActive(true)
+        audioDaMusica()
         let p = AVPlayer(url: u)
         lettore30 = p
         p.play()

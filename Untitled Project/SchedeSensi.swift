@@ -195,7 +195,7 @@ struct VistaShazam: View {
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(tinta)
             }
             if video, let id = ascolto.videoID {
-                LettoreYouTube(id: id, pronto: { ascolto.agganciaVideo($0) })
+                LettoreYouTube(id: id, pronto: { ascolto.agganciaVideo($0) }, errore: { ascolto.videoNonDisponibile(id, codice: $0) })
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -412,7 +412,9 @@ struct VistaShazam: View {
         // Ora si chiude come con «Chiudi» (anteprima e video si fermano), come ASCOLTA nel mockup.
         if aperta != nil { chiudiPlayer() }
         withAnimation { stato = .ascolto }
-        switch await Musica.riconosci(secondi: 12) {
+        let esito = await Musica.riconosci(secondi: 12)
+        AscoltoShazam.chiudiMicrofono()        // 9 nov notte: il microfono si chiude, la canzone suona a volume pieno
+        switch esito {
         case .trovato(let b):
             let t = Trovata(titolo: b.titolo, artista: b.artista, album: b.album, copertina: b.copertina, link: b.appleMusic ?? b.web,
                             generi: b.generi, quando: Date(), appleMusicID: b.appleMusicID)
@@ -441,6 +443,12 @@ struct VistaShazam: View {
 
     private func aggiungiLibreria() async {
         guard let s = ascolto.brano else { return }
+        // 9 nov notte (il signore: «non avevo spuntato»): senza «Sincronizza libreria» iOS rifiuta con un messaggio tecnico
+        // («L'operazione richiesta non è abilitata per questo dispositivo»): JARVIS dice prima cosa accendere.
+        if let abbonamento = try? await MusicSubscription.current, !abbonamento.hasCloudLibraryEnabled {
+            ascolto.errore = "Per aggiungerla alla libreria accenda «Sincronizza libreria» in Impostazioni › App › Musica, Sir."
+            return
+        }
         do {
             try await MusicLibrary.shared.add(s)
             inLibreria.insert(s.id.rawValue)

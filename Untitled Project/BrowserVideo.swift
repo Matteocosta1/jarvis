@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import WebKit
 
@@ -193,26 +194,74 @@ private struct Cornici: Shape {
 }
 
 /// Il lettore ufficiale di YouTube (embed), nella pagina: niente download, solo riproduzione.
+/// 9 nov notte (il signore, Shazam: «Questo video non è disponibile · codice di errore 152-4»): la pagina si presentava a YouTube
+/// come youtube.com stesso (baseURL), e YouTube ora rifiuta i lettori che lo fanno (errore 152). Come Vinyl Hustler, che funziona:
+/// la pagina ha l'indirizzo di JARVIS e il video passa dal lettore ufficiale (IFrame API) con la stessa origine dichiarata.
+/// Il lettore si comanda con `cmd('play')` / `cmd('pausa')`; gli errori del video (non incorporabile, rimosso…) arrivano a `errore`.
 struct LettoreYouTube: UIViewRepresentable {
     let id: String
     /// 8 nov · Shazam: chi comanda il video da fuori (il PLAY/PAUSA del mini-player) riceve il lettore appena creato.
     var pronto: ((WKWebView) -> Void)? = nil
+    /// 9 nov · Shazam: il video non si può guardare qui (codice di YouTube: 2, 5, 100, 101, 150, 152, 153…).
+    var errore: ((Int) -> Void)? = nil
+
+    /// L'indirizzo con cui la pagina si presenta a YouTube (l'identificativo dell'app, come chiede YouTube ai lettori nelle app).
+    static let origine = "https://it.discosizer.jarvis"
+
+    func makeCoordinator() -> Ponte { Ponte() }
+
     func makeUIView(context: Context) -> WKWebView {
         let c = WKWebViewConfiguration()
         c.allowsInlineMediaPlayback = true
         c.mediaTypesRequiringUserActionForPlayback = []
+        c.userContentController.add(context.coordinator, name: "yt")
+        context.coordinator.errore = errore
         let w = WKWebView(frame: .zero, configuration: c)
         w.isOpaque = false
         w.backgroundColor = .black
         w.scrollView.isScrollEnabled = false
-        let html = """
-        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#000;height:100%}iframe{border:0;width:100%;height:100%}</style></head>
-        <body><iframe src="https://www.youtube.com/embed/\(id)?playsinline=1&autoplay=1&rel=0&enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>
-        """
-        w.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
+        let sicuro = id.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        w.loadHTMLString(Self.pagina(sicuro), baseURL: URL(string: Self.origine))
         pronto?(w)
         return w
     }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    func updateUIView(_ uiView: WKWebView, context: Context) { context.coordinator.errore = errore }
+
+    static func dismantleUIView(_ w: WKWebView, coordinator: Ponte) {
+        w.configuration.userContentController.removeScriptMessageHandler(forName: "yt")
+        w.stopLoading()
+    }
+
+    /// Riceve dalla pagina gli errori del lettore (una volta sola per video).
+    final class Ponte: NSObject, WKScriptMessageHandler {
+        var errore: ((Int) -> Void)?
+        private var detto = false
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard !detto, let d = message.body as? [String: Any], let codice = (d["errore"] as? NSNumber)?.intValue else { return }
+            detto = true
+            errore?(codice)
+        }
+    }
+
+    static func pagina(_ id: String) -> String {
+        """
+        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta name="referrer" content="strict-origin-when-cross-origin">
+        <style>html,body{margin:0;height:100%;background:#000}#p{position:absolute;left:0;top:0;width:100%;height:100%}</style>
+        </head><body><div id="p"></div>
+        <script src="https://www.youtube.com/iframe_api"></script>
+        <script>
+        var player;
+        function onYouTubeIframeAPIReady(){
+          player=new YT.Player('p',{width:'100%',height:'100%',videoId:'\(id)',
+            playerVars:{playsinline:1,autoplay:1,rel:0,modestbranding:1,origin:'\(origine)',widget_referrer:'\(origine)'},
+            events:{onReady:function(e){e.target.playVideo();},
+                    onError:function(e){try{window.webkit.messageHandlers.yt.postMessage({errore:e.data});}catch(x){}}}});
+        }
+        function cmd(c){ if(!player||!player.playVideo)return 0; if(c=='play')player.playVideo(); else if(c=='pausa')player.pauseVideo(); return 1; }
+        </script></body></html>
+        """
+    }
 }
 #endif
