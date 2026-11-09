@@ -169,7 +169,10 @@ struct VistaShazam: View {
         }
         .frame(maxWidth: 560)
         .offset(y: max(0, giu))
-        .gesture(DragGesture()
+        // 9 nov (il signore: «resta attaccato al puntatore… scende soltanto, non si trasforma»): il gesto stava sul player spostato
+        // (offset) e misurava il dito nel suo spazio, che scendeva insieme a lui: lo spostamento letto restava piccolo e tremolava,
+        // e lasciato non arrivava mai alla soglia del mini. Ora misura sullo schermo (globale): tirato giù diventa il mini, come prima.
+        .gesture(DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { giu = $0.translation.height }
             .onEnded { v in
                 if v.translation.height > 90 || v.predictedEndTranslation.height > 260 {
