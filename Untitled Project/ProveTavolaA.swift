@@ -310,7 +310,7 @@ final class ProveCuore {
             var h = ceil(m0 / 180) * 180
             while h <= m1 { let p = nastro((h - m0) / (m1 - m0) * 0.7, 0); OP.scritta(&gc, "\(Int(h / 60))", p.x, p.y + 10, 6.5, 600, OP.c(0.6)); h += 180 }
         }
-        Tav.testate(&gc, W, "ECG · OGGI", "\(Int(D.adesso)) BPM", ok ? "MIN \(D.minimo) · MAX \(D.massimo)" : "NESSUN BATTITO OGGI")
+        Tav.testate(&gc, W, "ECG · OGGI", "\(Int(D.adesso)) BPM", ok ? "MIN \(D.minimo) · MAX \(D.massimo)" : O.count == 1 ? "UNA MISURA OGGI" : "NESSUN BATTITO OGGI")   // 9 nov: una misura non è «nessun battito»
         if let s = M.scelta, ok, s >= 0, s < O.count {
             let c = O[s], p = posto(c.m, c.v), mm = Int(c.m)
             let stato = c.v > Double(D.riposo + 30) ? "SOTTO SFORZO" : c.v < Double(D.riposo + 6) ? "A RIPOSO" : "NORMALE"

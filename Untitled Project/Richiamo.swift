@@ -34,6 +34,9 @@ final class Richiamo {
     private var voluto = false
     private var acceso = false
     private(set) var sveglio = false     // ha sentito «Jarvis»: sta raccogliendo la frase
+    /// 9 nov (il signore: «mentre suona la canzone dico Jarvis, la musica si abbassa, ci parlo»): con la musica conta solo «Jarvis»
+    /// (niente frasi senza nome, niente seguito, niente nome in fondo alla frase): la canzone non lo sveglia da sola.
+    var soloNome = false
     private var resto = ""
     /// Fino a quando basta parlare, senza «Jarvis»: subito dopo una richiesta il signore può aggiungere ancora qualcosa.
     var liberoFinoA = Date.distantPast
@@ -300,10 +303,10 @@ final class Richiamo {
                 let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 var trovato = Richiamo.dopoRichiamo(segmento)
                 soloDopoNome = true
-                vocativo = trovato?.isEmpty == true && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+                vocativo = trovato?.isEmpty == true && !soloNome && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
                 // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)
-                if trovato == nil, !OrologioInUso.attivo {
+                if trovato == nil, !OrologioInUso.attivo, !soloNome {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
                     let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
                     let breve = parole.count == 1 && Richiamo.risposteBrevi.contains(String(parole[0]).lowercased())

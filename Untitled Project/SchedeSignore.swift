@@ -1229,6 +1229,8 @@ struct VistaCuoreTelefono: View {
                 AreaMark(x: .value("Ora", d), yStart: .value("base", (valori.min() ?? 40) - 5), yEnd: .value("bpm", v))
                     .foregroundStyle(LinearGradient(colors: [tinta.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.catmullRom)
+                // 9 nov (dal video del signore): con una sola misura la linea non si vede; il punto sì
+                if battiti.count == 1 { PointMark(x: .value("Ora", d), y: .value("bpm", v)).foregroundStyle(tinta).symbolSize(60) }
             }
             .chartYScale(domain: .automatic(includesZero: false))
             .chartXAxis { AxisMarks(values: .stride(by: .hour, count: 3)) { _ in AxisValueLabel(format: .dateTime.hour()) } }

@@ -74,7 +74,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .confidente: return ["↔ GIRA · TOCCA UN PIATTO", "↔ GIRA · TOCCA UNA ZONA", "↔ GIRA · TOCCA UNA RIGA"]
         case .interprete: return ["↔ GIRA · TOCCA UNA FRASE", "↔ GIRA · TOCCA UN PAESE", "TOCCA UNA VOCE"]
         case .traccia: return ["↔ GIRA · TOCCA IL LUOGO", "↔ SCORRI · TOCCA IL RICORDO", "↔ GIRA · TOCCA UN POSTO"]
-        case .vitals: return ["↔ GIRA · TOCCA UN PUNTO", "↔ GIRA · TOCCA UN ANELLO", "↔ GIRA · TOCCA UN GIORNO"]
+        case .vitals: return ["↔ GIRA · TOCCA UNA ZONA", "↔ GIRA · TOCCA UN ANELLO", "↔ GIRA · TOCCA UN GIORNO"]
         case .github: return ["↔ GIRA · TOCCA UN PADIGLIONE", "↔ GIRA · TOCCA UN ELETTRONE", "↔ GIRA · TOCCA UN GIORNO"]
         case .supabase: return ["↔ GIRA · TOCCA UNA CAMERA", "↔ GIRA · TOCCA UNA FUNZIONE", "↔ GIRA · TOCCA UN MINUTO"]
         case .archivio: return ["↔ SFOGLIA · TOCCA LA TAVOLA", "↔ GIRA · TOCCA UNA CARTELLA", "↔ GIRA · TOCCA UN FILE"]

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import simd
 
 // MARK: - VITALS, GITHUB, SUPABASE, ARCHIVIO, COSTI (build 11.0 (19), 9 nov, come il mockup)
 // VITALS    SCANSIONE (la figura a fette, il piano che scende, testa · cuore · gambe), ANELLI (sonno, passi, umore attorno
@@ -92,17 +93,69 @@ final class ProveVitals {
         return r
     }
 
-    // SCANSIONE: la figura a fette di luce, il piano che scende, i punti agganciati
+    // SCANSIONE (9 nov, il signore: «ridisegnalo più cool e interattivo, come i lavori di Tony Stark»): la diagnostica di FRIDAY
+    // sull'armatura, come il mockup. Il corpo a fette con il volume di luce; il cuore batte al ritmo vero e a ogni battito l'impulso
+    // corre nei vasi fino a mani, testa e piedi; il piano di scansione scorre, e toccando una zona si ferma lì (la fetta si accende,
+    // il nome della quota di lato). Le zone hanno la targhetta col valore, colorata come lo stato (verde bene, oro così così, rosa
+    // basso, grigio senza dato); a sinistra l'asta delle quote, sul pavimento l'arco della prontezza.
+    private static let cuoreP: P3 = P3(0.06, -0.05, 1.38)
+    private static let vasi: [[P3]] = [
+        [cuoreP, P3(0.02, -0.03, 1.5), P3(-0.2, 0, 1.49), P3(-0.265, 0, 1.46), P3(-0.29, 0, 1.18), P3(-0.305, 0, 0.9), P3(-0.31, 0, 0.76)],
+        [cuoreP, P3(0.1, -0.03, 1.5), P3(0.2, 0, 1.49), P3(0.265, 0, 1.46), P3(0.29, 0, 1.18), P3(0.305, 0, 0.9), P3(0.31, 0, 0.76)],
+        [cuoreP, P3(0.03, -0.03, 1.15), P3(0, -0.03, 0.96), P3(-0.09, 0, 0.86), P3(-0.085, 0, 0.5), P3(-0.08, 0, 0.2), P3(-0.08, -0.04, 0.05)],
+        [cuoreP, P3(0.05, -0.03, 1.15), P3(0.02, -0.03, 0.96), P3(0.09, 0, 0.86), P3(0.085, 0, 0.5), P3(0.08, 0, 0.2), P3(0.08, -0.04, 0.05)],
+        [cuoreP, P3(0.02, -0.02, 1.56), P3(0, -0.01, 1.66), P3(0, 0, 1.82)],
+    ]
+    private static func lungo(_ V: [P3]) -> Double {
+        var L = 0.0
+        for i in 1..<V.count { L += simd_length(V[i] - V[i - 1]) }
+        return L
+    }
+    private static let lunghi: [Double] = vasi.map { lungo($0) }
+    private static let lMax: Double = lunghi.max() ?? 1
+    private static func lungoVaso(_ V: [P3], _ d0: Double) -> P3 {
+        var d = d0
+        for i in 1..<V.count {
+            let a = V[i - 1], b = V[i], l = simd_length(b - a)
+            if d <= l { return a + (b - a) * (d / max(1e-6, l)) }
+            d -= l
+        }
+        return V[V.count - 1]
+    }
+    private static func stato(_ p: Int?) -> Color {
+        guard let p else { return Color(red: 150 / 255, green: 170 / 255, blue: 180 / 255) }
+        return p >= 75 ? Tav.verde : p >= 50 ? Tav.oro : Tav.rosa
+    }
+    private static func quota(_ z: Double) -> String { z > 1.62 ? "TESTA" : z > 1.2 ? "TORACE" : z > 0.88 ? "ADDOME" : z > 0.5 ? "COSCE" : "GAMBE" }
+    private var ferma = 1.95
+    private var ultimo: Double?
+
     private func scansione(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ D: DatiVitalsOlo, _ piccolo: Bool) {
         let s = Tav.scena(&gc, W, H, t, M, piccolo, OpzioniOlo(al: 0.12, sz: 0.92, su: 0.02, oscilla: 0.55, mano: 0.8, conoSu: -0.6, conoW: 0.5))
+        let dt: Double = ultimo.map { min(0.05, max(0, t - $0)) } ?? 1 / 60
+        ultimo = t
+        let bpm: Double = Double(D.battito.testo.prefix(while: { $0.isNumber })) ?? 60
+        let colpo = colpoCuore(t, bpm)
+        let umore = D.umore.testo.replacingOccurrences(of: " SU ", with: "/")
+        let zone: [(nome: String, p: P3, z: Double, punti: Int?, valore: String, righe: [String])] = [
+            ("TESTA", P3(0, 0, 1.8), 1.8, D.umore.punti, "UMORE \(umore)", ["UMORE \(D.umore.testo)", "SONNO \(D.sonno.testo)", D.sonno.nota]),
+            ("CUORE", ProveVitals.cuoreP, 1.38, D.battito.punti, D.battito.testo, ["BATTITO \(D.battito.testo)", D.battito.nota, "PUNTEGGIO \(D.battito.punti.map(String.init) ?? "—")"]),
+            ("GAMBE", P3(0.085, 0, 0.45), 0.45, D.passi.punti, "\(D.passi.testo) PASSI", ["PASSI \(D.passi.testo)", D.passi.nota, "\(D.passi.punti.map(String.init) ?? "—")% DELL'OBIETTIVO"]),
+        ]
+        let sc: Int? = piccolo ? nil : M.scelta.flatMap { $0 >= 0 && $0 < zone.count ? $0 : nil }
+        let libero: Double = 1.95 - (t * 0.32).truncatingRemainder(dividingBy: 1.2) / 1.0 * 1.95
+        if let sc { ferma += (zone[sc].z - ferma) * (1 - exp(-dt / 0.12)) } else { ferma = libero }
+        let scan = ferma, bloccata = sc != nil
         var F = FasciOlo(6)
-        let scan = 1.95 - (t * 0.32).truncatingRemainder(dividingBy: 1.2) / 1.0 * 1.95, passo = piccolo ? 0.11 : 0.055
+        // il corpo: le fette (più chiare vicino al piano, accese nella zona toccata) e il volume velato di luce
+        let passo = piccolo ? 0.11 : 0.055
         var z = 0.04
         while z <= 1.94 && z <= 1.95 * s.nasce {
-            let g = abs(z - scan) < 0.06 ? 4 : z > scan ? 2 : 1
+            let vicino = abs(z - scan) < 0.06
+            let g: Int = vicino ? 4 : bloccata ? (abs(z - scan) < 0.2 ? 2 : 1) : z > scan ? 2 : 1
             for (cx, rx, ry, dy) in ProveVitals.largh(z) {
                 var q: P3?
-                var velo = Path()                                  // 9 nov: il volume del corpo, ogni fetta velata di luce
+                var velo = Path()
                 for k in 0...24 {
                     let a = Double(k) / 24 * OP.due, p = s.P(cx + cos(a) * rx, dy + sin(a) * ry, z)
                     if let q { F.metti(g, q, p) }
@@ -125,26 +178,67 @@ final class ProveVitals {
                 }
                 z2 += 0.0375
             }
+            // l'asta delle quote a sinistra
+            F.metti(1, s.P(-0.55, 0, 0), s.P(-0.55, 0, 1.95 * s.nasce))
+            for k in 0...10 {
+                let zq = Double(k) * 0.195
+                if zq > 1.95 * s.nasce { break }
+                F.metti(k % 5 == 0 ? 2 : 1, s.P(-0.55, 0, zq), s.P(k % 5 == 0 ? -0.5 : -0.52, 0, zq))
+            }
         }
         Tav.traccia(&gc, F, piccolo)
-        gc.stroke(Tav.spezzata((0...40).map { k in let a = Double(k) / 40 * OP.due; return s.P(cos(a) * 0.5, sin(a) * 0.3, scan) }), with: .color(OP.b(0.6)), lineWidth: 1.2)
-        let pc = s.P(0.06, -0.05, 1.38)
-        Tav.alone(&gc, pc, 8 + 4 * max(0, sin(t * 6.1)), 0.8, Tav.rosa)
+        // i vasi e l'impulso che parte dal cuore a ogni battito
+        if s.nasce > 0.6 {
+            for V in ProveVitals.vasi {
+                gc.stroke(Tav.spezzata(V.map { s.Pv($0) }), with: .color(Tav.rosa.opacity(0.16)), lineWidth: piccolo ? 0.6 : 0.9)
+            }
+            let corsa: Double = colpo.fase * 1.6
+            for (i, V) in ProveVitals.vasi.enumerated() {
+                let d: Double = corsa * ProveVitals.lMax
+                if d > ProveVitals.lunghi[i] { continue }
+                let p = s.Pv(ProveVitals.lungoVaso(V, d))
+                Tav.alone(&gc, p, piccolo ? 3 : 5, 0.9 * (1 - d / ProveVitals.lMax * 0.6), Tav.rosa)
+            }
+        }
+        // il piano di scansione: l'anello e il velo
+        let anello = Tav.spezzata((0...40).map { k in let a = Double(k) / 40 * OP.due; return s.P(cos(a) * 0.5, sin(a) * 0.3, scan) })
+        gc.fill(anello, with: .color(OP.s(bloccata ? 0.08 : 0.04)))
+        gc.stroke(anello, with: .color(OP.b(bloccata ? 0.85 : 0.6)), lineWidth: bloccata ? 1.5 : 1.2)
+        let pc = s.Pv(ProveVitals.cuoreP)
+        Tav.alone(&gc, pc, (piccolo ? 6 : 9) + (piccolo ? 4 : 7) * colpo.batte, 0.85, Tav.rosa)
+        // la prontezza sul pavimento: l'arco che si riempie
+        if !piccolo, let pr = D.prontezza {
+            let rx: Double = min(W * 0.22, 90) * 1.14, ry: Double = rx * 0.17, fino: Double = Double(pr) / 100 * OP.lis(t / 1.4)
+            let n = max(2, Int(fino * 96))
+            let arco = Tav.spezzata((0...n).map { k in let a = Double.pi / 2 + Double(k) / Double(n) * fino * OP.due; return P3(s.cx + cos(a) * rx, s.base + sin(a) * ry, 0) })
+            gc.stroke(arco, with: .color(OP.b(0.75)), lineWidth: 2)
+        }
         guard !piccolo else { return }
-        let punti: [(String, P3, [String])] = [
-            ("TESTA", s.P(0, 0, 1.8), ["UMORE \(D.umore.testo)", "SONNO \(D.sonno.testo)", D.sonno.nota]),
-            ("CUORE", pc, ["BATTITO \(D.battito.testo)", D.battito.nota, "PUNTEGGIO \(D.battito.punti.map(String.init) ?? "—")"]),
-            ("GAMBE", s.P(0.085, 0, 0.45), ["PASSI \(D.passi.testo)", D.passi.nota, "\(D.passi.punti.map(String.init) ?? "—")% DELL'OBIETTIVO"]),
-        ]
-        for (i, (nome, p, _)) in punti.enumerated() {
-            let lx = i == 1 ? p.x + 46 : p.x - 46
-            var l = Path(); l.move(to: CGPoint(x: p.x, y: p.y)); l.addLine(to: CGPoint(x: lx, y: p.y - 8))
-            gc.stroke(l, with: .color(OP.c(0.6)), lineWidth: 1)
-            OP.scritta(&gc, nome, lx, p.y - 11, 6.5, 800, OP.b(0.9), i == 1 ? .leading : .trailing)
+        // il segno del piano sull'asta e il nome della quota
+        let sp = s.P(-0.55, 0, scan)
+        var tri = Path()
+        tri.move(to: CGPoint(x: sp.x - 2, y: sp.y)); tri.addLine(to: CGPoint(x: sp.x - 8, y: sp.y - 4)); tri.addLine(to: CGPoint(x: sp.x - 8, y: sp.y + 4)); tri.closeSubpath()
+        gc.fill(tri, with: .color(OP.b(0.95)))
+        OP.scritta(&gc, "\(ProveVitals.quota(scan)) · \(Int((scan / 1.95 * 100).rounded()))%", sp.x - 11, sp.y + 3, 6.5, 700, OP.b(bloccata ? 0.95 : 0.7), .trailing)
+        // le targhette delle zone: la linea, il riquadrino col colore dello stato, il valore
+        for (i, zz) in zone.enumerated() {
+            let p = s.Pv(zz.p), dx: Double = i == 1 ? 1 : -1, lx = p.x + dx * 44, ly = p.y - 10, c = ProveVitals.stato(zz.punti)
+            var l = Path()
+            l.move(to: CGPoint(x: p.x, y: p.y)); l.addLine(to: CGPoint(x: p.x + dx * 12, y: ly)); l.addLine(to: CGPoint(x: lx, y: ly))
+            gc.stroke(l, with: .color(c.opacity(0.7)), lineWidth: 1)
+            let tw: Double = max(OP.larghezza(gc, zz.nome, 6.5, 700), OP.larghezza(gc, zz.valore, 7, 600)) + 10
+            let bx: Double = dx > 0 ? lx : lx - tw, by: Double = ly - 9
+            let box = CGRect(x: bx, y: by, width: tw, height: 21)
+            gc.fill(Path(box), with: .color(Color(red: 4 / 255, green: 16 / 255, blue: 22 / 255).opacity(0.82)))
+            gc.stroke(Path(box.insetBy(dx: 0.5, dy: 0.5)), with: .color(c.opacity(0.85)), lineWidth: 1)
+            OP.scritta(&gc, zz.nome, bx + 5, by + 8, 6.5, 800, c.opacity(0.95), .leading)
+            OP.scritta(&gc, zz.valore, bx + 5, by + 17, 7, 600, OP.b(0.92), .leading)
+            Tav.alone(&gc, p, 4, 0.8, c)
             M.zona(p.x, p.y, 16, i)
+            M.zona(bx + tw / 2, by + 10, 16, i)
         }
         Tav.testate(&gc, W, "SCANSIONE · CORPO", "PRONTEZZA \(D.prontezza.map { "\($0)%" } ?? "—")", D.conto)
-        if let i = M.scelta, i >= 0, i < punti.count { OP.riquadro(&gc, W, H, punti[i].1.x, punti[i].1.y, [punti[i].0] + punti[i].2, t - M.sceltaT, codice: "SCAN") }
+        if let sc { let p = s.Pv(zone[sc].p); OP.riquadro(&gc, W, H, p.x, p.y, [zone[sc].nome] + zone[sc].righe, t - M.sceltaT, codice: "SCAN") }
     }
 
     // ANELLI: sonno fuori, passi in mezzo, umore dentro; al centro la prontezza

@@ -150,17 +150,13 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var micSpento = false {
         didSet { if micSpento != oldValue { aggiornaRichiamo() } }
     }
-    /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO»; con la musica, «MICROFONO IN PAUSA».
-    var etichettaFase: String {
-        guard fase == .attesa else { return fase.rawValue }
-        if micSpento { return "MICROFONO SPENTO" }
-        return musicaSuona ? "MICROFONO IN PAUSA" : fase.rawValue
-    }
-    /// 9 nov (il signore, scelta 3: «somiglia alla soluzione di Apple»): mentre suona la musica (Apple Music, Spotify… o il player
-    /// di Shazam) l'orecchio dell'attesa è in pausa: niente «Jarvis», niente battiti di mani, niente frasi, e niente orecchio mentre
-    /// parla. Prima sentiva la canzone (la voce del cantante, i colpi di batteria come battiti) e rispondeva da solo. Si tocca il
-    /// reattore: la musica si abbassa (l'ascolto ha già .duckOthers), JARVIS ascolta e risponde, poi la musica torna su. In pausa o
-    /// a canzone finita l'orecchio si riaccende da solo.
+    /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO».
+    var etichettaFase: String { fase == .attesa && micSpento ? "MICROFONO SPENTO" : fase.rawValue }
+    /// 9 nov (il signore: «mentre suona la canzone dico Jarvis, la musica si abbassa, ci parlo, risponde, e dopo uno o due secondi
+    /// la musica risfuma verso l'alto»): mentre suona la musica (Apple Music, Spotify… o il player di Shazam) l'orecchio dell'attesa
+    /// sente solo «Jarvis» (niente frasi senza nome, niente battiti di mani, niente orecchio mentre parla): prima sentiva la canzone
+    /// (la voce del cantante, i colpi di batteria come battiti) e rispondeva da solo. Detto «Jarvis»: la musica si abbassa (l'ascolto
+    /// ha .duckOthers), JARVIS ascolta e risponde; un secondo e mezzo dopo la risposta la musica risale. Anche il tocco sul reattore.
     @Published private(set) var musicaSuona = false {
         didSet { if musicaSuona != oldValue { aggiornaRichiamo() } }
     }
@@ -614,7 +610,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        !inBenvenuto && !avvioInCorso && !micSpento && !musicaSuona && Impostazioni.richiamo && richiamoConsentito
+        !inBenvenuto && !avvioInCorso && !micSpento && Impostazioni.richiamo && richiamoConsentito
             && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
             && !(occhi != nil && fase == .elaboro)      // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
     }
@@ -635,13 +631,16 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
+        richiamo.soloNome = musicaSuona                  // 9 nov: con la musica solo «Jarvis»
         avvioRichiamo?.cancel()
         guard richiamoServe else { richiamo.ferma(); restituisciMusica(); return }
         guard !richiamo.attivo else { return }
         // in attesa un attimo di respiro (il microfono di quando parlava si libera); mentre pensa, subito.
         // M6: prima erano 450 ms, per lasciar finire il segnale «pronto», che col richiamo acceso non suona mai: intanto
         // un «Perché?» detto appena JARVIS aveva finito cadeva nel vuoto
-        let ritardo = fase == .attesa ? 150 : 100
+        restituisciMusica()                              // 9 nov: tornato in attesa con la musica, fra 1,5 s la musica risale
+        // 9 nov: con la musica, finita la risposta l'orecchio riparte dopo che la musica è risalita (1,5 s, come vuole il signore)
+        let ritardo = fase == .attesa ? (musicaSuona ? 1700 : 150) : 100
         avvioRichiamo = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.richiamoServe else { return }
@@ -654,7 +653,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func restituisciMusica() {
         guard musicaSuona, fase == .attesa, !Jarvis.usaAscoltoCloud else { return }
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(600))
+            try? await Task.sleep(for: .milliseconds(1500))
             guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
@@ -663,6 +662,14 @@ final class Jarvis: NSObject, ObservableObject {
     /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
     private func richiamato() {
         Posizione.scalda()                               // difetto 5: il GPS si sveglia mentre il signore dice la frase
+        // 9 nov: con la musica il microfono dell'attesa non abbassa la canzone: detto «Jarvis», si passa all'ascolto vero, che la
+        // abbassa (.duckOthers); il bip dice di parlare. Sul Mac l'attesa con la musica è spenta come prima.
+        if musicaSuona, !Jarvis.usaAscoltoCloud {
+            if fase == .elaboro { segnaInterruzione(); interrompi() }
+            richiamo.ferma()
+            Task { await avviaAscolto(bip: true) }
+            return
+        }
         if fase == .elaboro {                            // stava pensando: lo fermo, come un'interruzione
             segnaInterruzione()
             interrompi()
@@ -696,7 +703,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Due battiti di mani.
     private func applaudito() {
-        guard fase == .attesa, !inBenvenuto else { return }
+        guard fase == .attesa, !inBenvenuto, !musicaSuona else { return }   // 9 nov: con la musica i colpi di batteria non sono battiti
         if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
         ultimiBattiti = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -1894,6 +1901,7 @@ final class Jarvis: NSObject, ObservableObject {
             // il segnale di fine deve finire prima di restituire l'audio alle altre app; senza segnale (M6) si restituisce
             // subito, prima che il «Jarvis» in attesa riparta (150 ms): così la musica torna al suo volume e il microfono è pronto
             if pronto { try? await Task.sleep(for: .milliseconds(400)) }
+            if self?.musicaSuona == true { try? await Task.sleep(for: .milliseconds(1500)) }   // 9 nov: la musica risale dopo 1,5 s
             // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso;
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
