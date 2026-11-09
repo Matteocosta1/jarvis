@@ -63,8 +63,14 @@ struct Interprete: View {
         CorniceScheda(titolo: "Interprete", sottotitolo: lin.map { $0.nome.lowercased() } ?? "scelga la lingua",
                       icona: "globe.europe.africa", tinta: Color.ciano, fondo: motore.scambi.count) {
             // v270: il PONTE fra le due lingue, in testa come nel mockup (prima della scelta: IT e il punto di domanda)
-            OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
-                PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: lin.map { $0.codice.uppercased() } ?? "?", frasi: frasi)
+            // 9 nov (build 19): tre prove come il mockup, PONTE (quello di prima), GLOBO e VOCI
+            let codice = lin.map { $0.codice.uppercased() } ?? "?"
+            ProveOloVista(sezione: .interprete, altezza: 250, crea: { _ in }) { k, gc, W, H, t, M in
+                switch k {
+                case 1: ProveInterpreteTavola.globo(&gc, W, H, t, M, codice: codice, frasi: frasi, piccolo: false)
+                case 2: ProveInterpreteTavola.voci(&gc, W, H, t, M, codice: codice, frasi: frasi, piccolo: false)
+                default: PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: codice, frasi: frasi)
+                }
             }
             .corniceOlo(Color.ciano)
             if let l = lin, !scegliendo {

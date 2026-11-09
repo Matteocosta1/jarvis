@@ -486,10 +486,15 @@ struct VistaTelefono: View {
     @State private var registro: [VoceRegistro] = Registro.leggi("registroChiamate")
     @State private var caricato = false
     @State private var daChiamare: (String, String)?
+    @State private var premuto: (k: String, quando: Date)?        // 9 nov: per l'ologramma (il tasto appena premuto)
+    @State private var chiamata: Date?                               // e quando è partita l'ultima chiamata
 
     var body: some View {
         CorniceScheda(titolo: "Telefono", sottotitolo: pagina.rawValue.lowercased(), icona: "phone", tinta: tinta, pronto: caricato) {
-            Picker("Pagina", selection: $pagina) { ForEach(Pagina.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
+            // 9 nov (build 19, il signore: «un ologramma per la sezione telefono e farla un po' più carina»): in testa l'ologramma con
+            // le prove (ANTENNA, STARKPHONE, SATELLITI) e sotto le schede a chip come Musica, al posto del selettore di iOS
+            OlogrammaTelefono(dati: datiOlo).corniceOlo(tinta)
+            schede
             switch pagina {
             case .tastiera: tastiera
             case .rubrica: rubrica
@@ -514,6 +519,41 @@ struct VistaTelefono: View {
         let ricerca: String? = pagina == .rubrica ? Schermo.campo("cerca", cerca) : nil
         let chiamate: String? = pagina == .recenti && !ultime.isEmpty ? "ultime chiamate: " + ultime.joined(separator: "; ") : nil
         return Schermo.unisci("Telefono", ["pagina \(pagina.rawValue)", composto, ricerca, chiamate])
+    }
+
+    /// Le schede TASTIERA · RUBRICA · RECENTI, a chip come Musica (.mu-schede del mockup).
+    private var schede: some View {
+        HStack(spacing: 6) {
+            ForEach(Pagina.allCases) { p in
+                let attiva = p == pagina
+                Button { Suoni.tocco(); pagina = p } label: {
+                    Text(p.rawValue.uppercased())
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .foregroundStyle(attiva ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                        .padding(.vertical, 8).padding(.horizontal, 6)
+                        .frame(maxWidth: .infinity)
+                        .background(attiva ? Color.ciano : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(attiva ? Color.ciano : Color.ciano.opacity(0.3), lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(StileStark())
+                .accessibilityAddTraits(attiva ? .isSelected : [])
+            }
+        }
+    }
+
+    /// I dati per l'ologramma: il numero, di chi è, la rubrica, le chiamate di JARVIS, il tasto appena premuto, la chiamata.
+    private var datiOlo: DatiTelefonoOlo {
+        var d = DatiTelefonoOlo()
+        d.numero = numero
+        d.chi = contattoDelNumero?.nome
+        d.contatti = contatti.prefix(60).map { (nome: $0.nome, numero: $0.primoNumero ?? "") }
+        d.recenti = registro.prefix(20).map { (nome: $0.nome, numero: $0.numero, quando: $0.quando.formatted(date: .numeric, time: .shortened)) }
+        d.premuto = premuto
+        d.chiamata = chiamata
+        d.premi = { t in premi(t) }
+        return d
     }
 
     private var contattoDelNumero: Contatto? {
@@ -577,6 +617,7 @@ struct VistaTelefono: View {
         Suoni.tocco()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         numero += t
+        premuto = (k: t, quando: Date())
     }
 
     private var filtrati: [Contatto] {
@@ -639,6 +680,7 @@ struct VistaTelefono: View {
         let pulito = Rubrica.pulisci(n)
         guard !pulito.isEmpty, let url = URL(string: "tel://\(pulito)") else { return }
         Suoni.pronto()
+        chiamata = Date()
         Registro.aggiungi(VoceRegistro(nome: nome, numero: n, quando: Date(), tipo: "chiamata"), a: "registroChiamate")
         registro = Registro.leggi("registroChiamate")
         UIApplication.shared.open(url)

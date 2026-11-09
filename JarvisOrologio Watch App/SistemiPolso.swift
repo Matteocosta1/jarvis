@@ -81,7 +81,11 @@ struct VistaCostiOrologio: View {
     var body: some View {
         CorniceOrologio(titolo: "Costi", pronto: dati != nil || errore != nil) {
             if let c = dati {
-                ValoreOrologio(titolo: "MESE", valore: "\(Self.soldi(c["dollari_mese"])) $", sotto: "\(Self.intero(c["chiamate_mese"])) risposte")
+                // 9 nov (build 19): la prova scelta sull'iPhone (PALLADIO, TORRI, CLESSIDRA), in piccolo accanto al mese, come il mockup
+                HStack(spacing: 8) {
+                    OlogrammaCostiProve(dati: DatiCostiOlo.da(c), piccolo: true).frame(width: 46, height: 46)
+                    ValoreOrologio(titolo: "MESE", valore: "\(Self.soldi(c["dollari_mese"])) $", sotto: "\(Self.intero(c["chiamate_mese"])) risposte")
+                }
                 HStack(spacing: 6) {
                     ValoreOrologio(titolo: "OGGI", valore: Self.soldi(c["dollari_oggi"]))
                     ValoreOrologio(titolo: "IERI", valore: Self.soldi(c["dollari_ieri"]))

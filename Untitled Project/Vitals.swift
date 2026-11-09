@@ -16,12 +16,16 @@ struct VistaVitals: View {
     @State private var carico = false
     @State private var errore: String?
     @State private var confermaTutto = false
+    @State private var storia: [Date: SaluteStorica.Valori] = [:]      // 9 nov: per l'ologramma (sonno medio, battito, passi di ieri)
 
     var body: some View {
         ZStack {
             SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    // 9 nov (build 19, il signore: «falli tutti J»): in testa l'ologramma con le prove SCANSIONE, ANELLI, RADAR, come il mockup
+                    OlogrammaVitalsProve(dati: DatiVitalsOlo.da(DatiOrganismo.calcola(oggi: oggi, storia: storia, diario: dati), giorni: dati?.giorni ?? []))
+                        .corniceOlo(Color.ciano)
                     // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
                     PannelloOrganismo(oggi: oggi, diario: dati)
                     PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
@@ -62,6 +66,7 @@ struct VistaVitals: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task(id: giorni) { await carica() }
+        .task { storia = await SaluteStorica.giorni(30) }
         .confirmationDialog("Cancellare tutto il diario? Non si può tornare indietro.", isPresented: $confermaTutto, titleVisibility: .visible) {
             Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
             Button("Annulla", role: .cancel) {}

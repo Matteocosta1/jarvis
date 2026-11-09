@@ -790,6 +790,7 @@ struct VistaVitalsOrologio: View {
     @State private var dati: DatiVitals?
     @State private var giorni = 7
     @State private var confermaTutto = false
+    @State private var storia: [Date: SaluteStorica.Valori] = [:]      // 9 nov: per la prontezza dell'ologramma
     private let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
 
     var body: some View {
@@ -798,6 +799,15 @@ struct VistaVitalsOrologio: View {
             Section {
                 NavigationLink { VistaOrganismoOrologio() } label: {
                     Label("Organismo", systemImage: "figure.stand").foregroundStyle(ciano)
+                }
+                // 9 nov (build 19): la prova scelta sull'iPhone (SCANSIONE, ANELLI, RADAR), in piccolo, con la prontezza, come il mockup
+                let organismo = DatiOrganismo.calcola(oggi: oggi, storia: storia, diario: dati)
+                HStack(spacing: 8) {
+                    OlogrammaVitalsProve(dati: DatiVitalsOlo.da(organismo, giorni: dati?.giorni ?? []), piccolo: true).frame(width: 46, height: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("PRONTEZZA").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                        Text(organismo.prontezza.map { "\($0)%" } ?? "—").font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
                 }
             }
             Section {
@@ -920,6 +930,7 @@ struct VistaVitalsOrologio: View {
             oggi = await SaluteOggi.leggi()
         }
         .task(id: giorni) { await carica() }
+        .task { storia = await SaluteStorica.giorni(30) }
         .confirmationDialog("Cancellare tutto il diario?", isPresented: $confermaTutto) {
             Button("Cancella tutto", role: .destructive) { Task { await cancella(nil) } }
             Button("Annulla", role: .cancel) {}
@@ -1092,8 +1103,8 @@ struct VistaCuore: View {
         List {
             Section {
                 HStack {
-                    // 11.0 (3), come il mockup approvato: il cuore in ologramma che batte al ritmo di adesso
-                    OlogrammaCuore(dati: DatiCuore(adesso: cuore.ultimo ?? 0), piccolo: true)
+                    // 9 nov (build 19): la prova del cuore scelta sull'iPhone (BATTITO, PETTO, ECG, ANELLI), in piccolo, al ritmo di adesso
+                    OlogrammaCuorePiccolo(dati: DatiCuoreOlo(adesso: cuore.ultimo ?? 0))
                         .frame(width: 42, height: 42)
                     Text(cuore.ultimo.map { "\(Int($0.rounded())) bpm" } ?? "—")
                         .font(.title2.bold())

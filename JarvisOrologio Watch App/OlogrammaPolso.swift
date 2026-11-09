@@ -49,14 +49,14 @@ struct OlogrammaPolso<Icona: View>: View {
                         .opacity(0.3 + 0.7 * luce)                                     // girando 30% come l'iPhone (era 20%), scelta piena
                         .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)
                     Text(nome(nomi[k], T: T))
-                        .font(.system(size: 15, weight: .bold, design: .monospaced)).tracking(3)
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced)).tracking(1.9)   // 9 nov: a 0,95 resta 9 punti come prima
                         .foregroundStyle(bianco)
                         .shadow(color: ciano.opacity(0.8 * luce), radius: 4)
                         .opacity(0.35 + 0.65 * luce)                                   // girando 35% come l'iPhone (era 25%)
                         .lineLimit(1).fixedSize()
                         .position(x: 100, y: 130)
                     Text(gruppi.indices.contains(k) ? gruppi[k] : "")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2)
+                        .font(.system(size: 6.3, weight: .semibold, design: .monospaced)).tracking(2)
                         .foregroundStyle(Color(red: 0.30, green: 0.40, blue: 0.44))
                         .opacity(luce)
                         .position(x: 100, y: 148)
@@ -65,8 +65,10 @@ struct OlogrammaPolso<Icona: View>: View {
             .frame(width: 200, height: 200)
             .opacity(vivo ? guizzo(ctx.date) : 0)
         }
-        .scaleEffect(0.6)
-        .frame(width: 120, height: 120)
+        // 9 nov (il signore: «ingrandire la misura dell'animazione ologramma delle icone… un po' di più», al polso): da 0,6 a 0,95,
+        // come il mockup; le scritte restano della misura di prima, la trasparenza e tutto il resto uguali
+        .scaleEffect(0.95)
+        .frame(width: 190, height: 190)
         .contentShape(Circle())
         .onTapGesture { if vivo { apri(k) } }
         .allowsHitTesting(vivo)

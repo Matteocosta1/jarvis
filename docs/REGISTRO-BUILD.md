@@ -542,6 +542,12 @@ La 11.0 (18) + le correzioni della notte (screenshot e video del signore, 01:34�
 - Satellite NAVIGA e GUIDA: il tasto «Guardati intorno» di Apple in basso a destra (prima sopra l'ora); veli scuri dietro testata e comandi; «DIETRO» nella capsula.
 - Il vinile di MUSICA nel Dock gira (33 giri) mentre la musica suona; fermata resta dov'è.
 - Da verificare sul telefono: volume di Shazam, video YouTube in Shazam e Browser, Interprete, Wiretap «Salvare?», Naviga.
+- Aggiunti nella stessa 19 (9 nov mattina, il signore: «falli tutti J», «nella build inseriamo anche le modifiche di prima», «19, non l'ho caricata»):
+  - Gli ologrammi della tavola, uguali al mockup, con le chip delle prove: CUORE (BATTITO, PETTO col cuore anatomico, ECG, ANELLI), TELEFONO (ANTENNA, STARKPHONE coi tasti di vetro che scrivono, SATELLITI; schede a chip come Musica), METEO (CELLA, GLOBO, VENTO), EDITH (OCCHIALI, DRONI, SCUDO: toccato due volte un controllo col campo scritto parte), EMAIL (SMISTA, FIREWALL, FASCICOLI), MESSAGGI (BOLLE, RETE, ORBITE), CONFIDENTE (BILANCIA, MENTE, ONDA), INTERPRETE (PONTE, GLOBO, VOCI), RICORDI › TRACCIA (SENTIERO, B.A.R.F., MAPPA), VITALS (SCANSIONE, ANELLI, RADAR), GITHUB (EXPO, ATOMO, PULSAR), SUPABASE (REATTORE, RETE, BATTITO: le richieste minuto per minuto), ARCHIVIO (OFFICINA, NUVOLA, SPIRALE), COSTI (PALLADIO, TORRI, CLESSIDRA). File nuovi: ProveTavola.swift, ProveTavolaA/B/C.swift, ProveTavolaViste.swift.
+  - Al polso: Cuore, Meteo, Email, Vitals, Costi, GitHub, Supabase e Archivio mostrano in piccolo la prova scelta sull'iPhone.
+  - Al polso l'ologramma dell'icona scelta più grande: da 0,6 a 0,95 (le scritte della misura di prima).
+  - Cervello v123 (col via del signore): la spesa giorno per giorno del mese, per TORRI (prova generale superata).
+  - Versione di prova (Debug, mai su TestFlight): il banco degli ologrammi coi dati del mockup (-provaBanco) e l'apertura di una sezione (-provaSezione), per le foto nel simulatore su GitHub (workflow «Prova»).
 
 ## 11.0 (18) — 9 nov notte · numero scelto dal signore (18) · commit 16661f5 · controllo di compilazione VERDE (0 errori, 0 warning, run 42533019280) · cervello v122 pubblicato (prova generale superata)
 La 11.0 (17) + JARVIS vede quello che vede il signore (il signore, 23:49: in EDITH il link scritto e il risultato «SEMBRA A POSTO» a schermo, e JARVIS a voce diceva che il link era vuoto; 23:52: «mettilo ora… guarda se ci sono altre situazioni analoghe nelle varie sezioni»).

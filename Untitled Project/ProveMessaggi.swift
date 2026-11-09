@@ -172,8 +172,13 @@ struct OlogrammaMessaggi: View {
     @State private var prove = ProveMessaggi()
 
     var body: some View {
-        OloSingolaVista(altezza: 260, aiuto: "↔ GIRA · TOCCA UN MESSAGGIO", etichetta: "Ologramma dei messaggi mandati da JARVIS") { gc, W, H, t, M in
-            prove.disegna(&gc, W, H, t, M, dati, piccolo: false)
+        // 9 nov (build 19): tre prove come il mockup, BOLLE (quella di prima), RETE e ORBITE
+        ProveOloVista(sezione: .messaggi, altezza: 260, crea: { _ in }) { k, gc, W, H, t, M in
+            switch k {
+            case 1: ProveMessaggiTavola.rete(&gc, W, H, t, M, dati, piccolo: false)
+            case 2: ProveMessaggiTavola.orbite(&gc, W, H, t, M, dati, piccolo: false)
+            default: prove.disegna(&gc, W, H, t, M, dati, piccolo: false)
+            }
         }
     }
 }

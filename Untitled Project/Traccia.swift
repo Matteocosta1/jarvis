@@ -11,6 +11,8 @@ struct PannelliTraccia: View {
     /// I luoghi salvati, dal più recente (i «posti» della seconda memoria con le coordinate).
     let luoghi: [DatiRicordi.Riga]
     let ultimi: [DatiRicordi.Riga]
+    /// 9 nov: tutti i ricordi, per B.A.R.F.
+    var ricordi: [DatiRicordi.Riga] = []
     /// La Guida (fotocamera e frecce): spenta quando si apre Ricordi, accesa subito da «Jarvis, portami al luogo».
     @Binding var guida: Bool
     /// «Jarvis, ricorda questo luogo»: appena c'è la posizione, si salva da solo. Il segno sta in VistaRicordi e si spegne
@@ -33,8 +35,19 @@ struct PannelliTraccia: View {
         VStack(alignment: .leading, spacing: 16) {
             // v270 (il signore: «crea anche un ologramma per Traccia»): SENTIERO, in testa come nel mockup
             let luogo = scelto, metri = luogo.flatMap { l in l.lat.flatMap { la in l.lon.flatMap { lo in bussola.verso(lat: la, lon: lo)?.metri } } }
-            OloSingolaVista(altezza: 260, aiuto: "↔ GIRA · TOCCA IL LUOGO", etichetta: "Ologramma della strada fino al luogo") { gc, W, H, t, M in
-                sentiero.disegna(&gc, W, H, t, M, nome: luogo?.testo ?? "LUOGO", metri: metri)
+            // 9 nov (build 19): tre prove come il mockup, SENTIERO (quello di prima), B.A.R.F. (i ricordi) e MAPPA (i posti)
+            let ricordiOlo = ricordi.map { RicordoOlo(tipo: $0.tipo, testo: $0.testo, chi: $0.persona, dove: $0.luogo, quando: $0.quando) }
+            let luoghiOlo = luoghi.map { l in
+                LuogoOlo(nome: PannelliTraccia.nome(l), via: l.luogo ?? l.testo, quando: l.quando,
+                         metri: l.lat.flatMap { la in l.lon.flatMap { lo in bussola.verso(lat: la, lon: lo)?.metri } })
+            }
+            let indice = luoghi.firstIndex { $0.id == luogo?.id } ?? 0
+            ProveOloVista(sezione: .traccia, altezza: 260, crea: { _ in }) { k, gc, W, H, t, M in
+                switch k {
+                case 1: ProveRicordiTavola.barf(&gc, W, H, t, M, ricordiOlo, piccolo: false)
+                case 2: ProveRicordiTavola.mappa(&gc, W, H, t, M, luoghiOlo, scelto: indice, piccolo: false)
+                default: sentiero.disegna(&gc, W, H, t, M, nome: luogo?.testo ?? "LUOGO", metri: metri)
+                }
             }
             .corniceOlo(tinta)
             Pannello(titolo: "LUOGO", tinta: tinta) {          // 7 nov (il signore): niente TRACCIA ripetuto

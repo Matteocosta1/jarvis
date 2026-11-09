@@ -435,8 +435,9 @@ struct VistaMeteoOrologio: View {
             if let m = meteo {
                 let c = m.currentWeather
                 HStack(spacing: 10) {
-                    // 11.0 (3), come il mockup approvato: il cielo di adesso in ologramma, piccolo
-                    OlogrammaCielo(stato: StatoCielo(c, probabilita: m.hourlyForecast.forecast.first?.precipitationChance), piccolo: true)
+                    // 9 nov (build 19): la prova del meteo scelta sull'iPhone (CELLA, GLOBO, VENTO), in piccolo, come il mockup
+                    OlogrammaMeteoProve(dati: DatiMeteoOlo(stato: StatoCielo(c, probabilita: m.hourlyForecast.forecast.first?.precipitationChance),
+                                                          gradi: Int(c.temperature.converted(to: .celsius).value.rounded()), nome: c.condition.description), piccolo: true)
                         .frame(width: 46, height: 46)
                         .padding(-4)
                     VStack(alignment: .leading, spacing: 0) {
@@ -792,7 +793,19 @@ struct VistaGitHubOrologio: View {
     var body: some View {
         CorniceOrologio(titolo: "GitHub", pronto: repository != nil || errore != nil) {
             if let repository {
-                Text("\(repository.count) repository").font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
+                // 9 nov (build 19): la prova scelta sull'iPhone (EXPO, ATOMO, PULSAR), in piccolo, come il mockup
+                HStack(spacing: 8) {
+                    OlogrammaGithubProve(dati: DatiGithubOlo(repo: repository.map { r in
+                        let m = (r["ultimo_commit"] as? [String: Any])?["messaggio"] as? String
+                        return RepoOlo(nome: r["nome"] as? String ?? "", da: r["da"] as? String ?? "", lingua: r["linguaggio"] as? String ?? "",
+                                       commit: m.map { [$0] } ?? [], giorni: Array(repeating: 0, count: 14))
+                    }), piccolo: true)
+                    .frame(width: 46, height: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("REPOSITORY").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                        Text("\(repository.count)").font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                }
                 TastoJarvisOrologio(testo: "A che punto siamo?", frase: "A che punto sono i miei progetti su GitHub? In due frasi.")
                 ForEach(Array(repository.prefix(12).enumerated()), id: \.offset) { _, r in
                     let ultimo = r["ultimo_commit"] as? [String: Any]
@@ -829,6 +842,9 @@ struct VistaSupabaseOrologio: View {
             if let stato {
                 let log = stato["log"] as? [String: Any]
                 let errori = ((log?["richieste"] as? [[String: Any]]) ?? []) + ((log?["console"] as? [[String: Any]]) ?? [])
+                // 9 nov (build 19): la prova scelta sull'iPhone (REATTORE, RETE, BATTITO), in piccolo, come il mockup
+                OlogrammaSupabaseProve(dati: VistaSupabaseOrologio.datiOlo(stato, errori: errori.count), piccolo: true)
+                    .frame(width: 46, height: 46).frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 6) {
                     ValoreOrologio(titolo: "DB", valore: "\(stato["database_mb"] ?? 0) MB")
                     ValoreOrologio(titolo: "ERRORI 24H", valore: "\(errori.count)", colore: errori.isEmpty ? .green : .red)
@@ -868,6 +884,17 @@ struct VistaSupabaseOrologio: View {
             stato = o
         }
     }
+
+    /// I dati per l'ologramma piccolo: tabelle, funzioni, database ed errori (il battito minuto per minuto resta sull'iPhone).
+    static func datiOlo(_ s: [String: Any], errori: Int) -> DatiSupabaseOlo {
+        func n(_ v: Any?) -> Int { (v as? NSNumber)?.intValue ?? Int(v as? String ?? "") ?? 0 }
+        var d = DatiSupabaseOlo()
+        d.tabelle = (s["tabelle"] as? [[String: Any]] ?? []).map { (nome: $0["tabella"] as? String ?? "", righe: n($0["righe"])) }
+        d.funzioni = (s["funzioni"] as? [[String: Any]] ?? []).map { (nome: $0["nome"] as? String ?? "", versione: n($0["versione"]), attiva: ($0["stato"] as? String ?? "").uppercased() == "ACTIVE") }
+        d.righe = n(s["righe_totali"])
+        d.errori = errori
+        return d
+    }
 }
 
 struct VistaArchivioOrologio: View {
@@ -879,7 +906,19 @@ struct VistaArchivioOrologio: View {
     var body: some View {
         CorniceOrologio(titolo: "Archivio", pronto: file != nil || errore != nil) {
             if let file {
-                Text("\(file.count) file · \(cartelle.count) cartelle").font(.system(size: 10, design: .monospaced)).foregroundStyle(ciano)
+                // 9 nov (build 19): la prova scelta sull'iPhone (OFFICINA, NUVOLA, SPIRALE), in piccolo, come il mockup
+                HStack(spacing: 8) {
+                    OlogrammaArchivioProve(dati: DatiArchivioOlo(file: file.map { f in
+                        FileOlo(nome: f["nome"] as? String ?? "", cartella: f["cartella"] as? String ?? "", kb: (f["kb"] as? NSNumber)?.intValue ?? 0,
+                                quando: f["quando"] as? String ?? "", tipo: f["tipo"] as? String ?? "")
+                    }, cartelle: cartelle.map { (nome: $0["nome"] as? String ?? "", n: ($0["file"] as? NSNumber)?.intValue ?? 0) }), piccolo: true)
+                    .frame(width: 46, height: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("FILE").font(.system(size: 8, weight: .semibold, design: .monospaced)).foregroundStyle(ciano)
+                        Text("\(file.count)").font(.system(size: 16, weight: .semibold, design: .rounded))
+                        Text("\(cartelle.count) cartelle").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                    }
+                }
                 TastoJarvisOrologio(testo: "Cosa c'è?", frase: "Cosa c'è nel mio archivio? Le cartelle e le cose più recenti, in due frasi.")
                 if file.isEmpty { Text("Archivio vuoto, Sir.").font(.footnote).foregroundStyle(.secondary) }
                 ForEach(Array(file.prefix(20).enumerated()), id: \.offset) { _, f in

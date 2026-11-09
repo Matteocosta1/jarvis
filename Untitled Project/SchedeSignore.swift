@@ -1088,14 +1088,8 @@ struct VistaCuoreTelefono: View {
                       icona: "heart", tinta: tinta, pronto: caricato) {
             // 11.0 (3), come il mockup approvato: il cuore in ologramma batte al ritmo di adesso; l'anello va da 40 a 180 battiti,
             // con l'arco di oggi (dal minimo al massimo), adesso e a riposo
-            OlogrammaCuore(dati: DatiCuore(adesso: ultimo?.1 ?? 0, riposo: Double(oggi?.battito ?? 0),
-                                           minimo: battiti.map(\.1).min() ?? 0, massimo: battiti.map(\.1).max() ?? 0))
-                .frame(height: 250)
-                .frame(maxWidth: .infinity)
-                .background(tinta.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(tinta.opacity(0.22), lineWidth: 1))
-                .overlay { AngoliOlo(tinta: tinta).padding(-1).allowsHitTesting(false) }
+            // 9 nov (build 19, il signore: «un cuore vero alla Tony Stark»): le prove del cuore come il mockup, BATTITO è quello di prima
+            OlogrammaCuoreProve(dati: datiOlo).corniceOlo(tinta)
             HStack(spacing: 10) {
                 Valore(titolo: "ADESSO", valore: ultimo.map { "\(Int($0.1))" } ?? "—", sotto: "bpm", tinta: tinta)
                 Valore(titolo: "A RIPOSO", valore: oggi?.battito.map { "\($0)" } ?? "—", sotto: oggi?.battitoMedia.map { "media 7 gg \($0)" }, tinta: tinta)
@@ -1174,6 +1168,21 @@ struct VistaCuoreTelefono: View {
     }
 
     private var ultimo: (Date, Double)? { battiti.last }
+
+    /// I dati delle prove: i battiti di oggi in minuti dalla mezzanotte, riposo e HRV dei 30 giorni.
+    private var datiOlo: DatiCuoreOlo {
+        let cal = Calendar.current, mezzanotte = cal.startOfDay(for: Date())
+        var d = DatiCuoreOlo()
+        d.adesso = ultimo?.1 ?? 0
+        d.riposo = oggi?.battito ?? Int(riposo.last?.1 ?? 0)
+        d.minimo = Int(battiti.map(\.1).min() ?? 0)
+        d.massimo = Int(battiti.map(\.1).max() ?? 0)
+        d.hrv = Int(hrv.last?.1 ?? 0)
+        d.oggi = battiti.filter { $0.0 >= mezzanotte }.map { (m: $0.0.timeIntervalSince(mezzanotte) / 60, v: $0.1) }
+        d.riposo30 = riposo.suffix(30).map(\.1)
+        d.hrv30 = hrv.suffix(30).map(\.1)
+        return d
+    }
 
     /// Il tasto SOS: posizione dell'iPhone e chiamata alla funzione jarvis-allarme, la stessa dell'orologio.
     private func sos() async {

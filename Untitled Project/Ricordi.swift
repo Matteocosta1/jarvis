@@ -41,7 +41,7 @@ struct VistaRicordi: View {
                     ScrollView {
                         // solo i luoghi con le coordinate: la freccia punta il più recente che si può raggiungere
                         PannelliTraccia(luoghi: d.posti.filter { ($0.tipo == "posto" || $0.tipo == "parcheggio") && $0.lat != nil && $0.lon != nil },
-                                        ultimi: Array(d.ricordi.prefix(3)),
+                                        ultimi: Array(d.ricordi.prefix(3)), ricordi: d.ricordi,
                                         guida: $guidaAccesa, salvaSubito: $salvaDaFare, ricarica: { await carica() })
                             .padding(16)
                             .padding(.bottom, 30)

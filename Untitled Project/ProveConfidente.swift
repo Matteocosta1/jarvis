@@ -14,8 +14,10 @@ struct ConfidenteOlo {
     struct Voce { let nome: String; let n: Int }
     let voci: [Voce]
     let battito: Int?
+    let testo: String                                    // 9 nov: per MENTE e ONDA
 
     init(testo: String, battito: Int?) {
+        self.testo = testo
         voci = ConfidenteOlo.voci(testo)
         self.battito = battito
     }
@@ -193,8 +195,13 @@ struct OlogrammaConfidente: View {
     @State private var prove = ProveConfidente()
 
     var body: some View {
-        OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UN PIATTO", etichetta: "Ologramma della bilancia: la conversazione sui due piatti") { gc, W, H, t, M in
-            prove.disegna(&gc, W, H, t, M, dati, piccolo: false)
+        // 9 nov (build 19): tre prove come il mockup, BILANCIA (quella di prima), MENTE e ONDA
+        ProveOloVista(sezione: .confidente, altezza: 250, crea: { _ in }) { k, gc, W, H, t, M in
+            switch k {
+            case 1: ProveConfidenteTavola.mente(&gc, W, H, t, M, testo: dati.testo, piccolo: false)
+            case 2: ProveConfidenteTavola.onda(&gc, W, H, t, M, testo: dati.testo, piccolo: false)
+            default: prove.disegna(&gc, W, H, t, M, dati, piccolo: false)
+            }
         }
     }
 }

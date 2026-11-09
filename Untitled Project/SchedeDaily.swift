@@ -21,6 +21,13 @@ struct VistaMeteo: View {
 
     var body: some View {
         CorniceScheda(titolo: "Meteo", sottotitolo: luogo, icona: "cloud.sun", tinta: tinta, pronto: meteo != nil || errore != nil) {
+            // 9 nov (build 19, il signore: «falli tutti J»): in testa l'ologramma con le prove CELLA, GLOBO, VENTO, come il mockup
+            if let m = meteo {
+                OlogrammaMeteoProve(dati: DatiMeteoOlo(stato: StatoCielo(m.currentWeather, probabilita: m.hourlyForecast.forecast.first?.precipitationChance),
+                                                      gradi: Int(m.currentWeather.temperature.converted(to: .celsius).value.rounded()),
+                                                      nome: m.currentWeather.condition.description))
+                    .corniceOlo(tinta)
+            }
             PannelloRadar(radar: radar, finito: radarFinito)       // in testa, come nel mockup
             if let m = meteo {
                 adesso(m.currentWeather, pioggia: m.hourlyForecast.forecast.first?.precipitationChance)

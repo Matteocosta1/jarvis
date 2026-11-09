@@ -26,6 +26,9 @@ struct VistaEdith: View {
 
     var body: some View {
         CorniceScheda(titolo: "EDITH", sottotitolo: "Sistema di Difesa e Riconoscimento", icona: "eyeglasses", tinta: tinta) {
+            // 9 nov (build 19, il signore: «falli tutti J»): in testa l'ologramma con le prove OCCHIALI, DRONI, SCUDO (i nove controlli;
+            // toccato due volte, un controllo col campo scritto parte, come il suo tasto)
+            OlogrammaEdithProve(dati: DatiEdithOlo(controlli: controlliOlo, avvia: { esegui($0) })).corniceOlo(tinta)
             // PORTE
             Pannello(titolo: "PORTE", tinta: tinta) {
                 Text("Cosa si vede da internet della sua rete: router, DVR, NAS, PC.").font(.footnote).foregroundStyle(Color.tenue)
@@ -149,15 +152,90 @@ struct VistaEdith: View {
     private func tasto(_ testo: String, chiave: String, corpo: @escaping () -> [String: Any]) -> some View {
         Button {
             Suoni.tocco()
-            Task {
-                inCorso.insert(chiave)
-                let r = await VistaVitals.chiama(corpo())
-                esiti[chiave] = Voce(r ?? ["errore": "non raggiungo il cervello"])
-                inCorso.remove(chiave)
-            }
+            Task { await controlla(chiave, corpo()) }
         } label: { etichetta(testo, attivo: inCorso.contains(chiave)) }
         .buttonStyle(StileStark())
         .disabled(inCorso.contains(chiave))
+    }
+
+    private func controlla(_ chiave: String, _ corpo: [String: Any]) async {
+        inCorso.insert(chiave)
+        let r = await VistaVitals.chiama(corpo)
+        esiti[chiave] = Voce(r ?? ["errore": "non raggiungo il cervello"])
+        inCorso.remove(chiave)
+    }
+
+    // MARK: L'ologramma (9 nov)
+
+    /// Il corpo della domanda di un controllo, solo se il suo campo è scritto (PORTE va anche vuoto: la rete di adesso).
+    private func corpo(_ chiave: String) -> [String: Any]? {
+        let pieno = { (s: String) -> Bool in !s.trimmingCharacters(in: .whitespaces).isEmpty }
+        switch chiave {
+        case "porte": return ["edith": "porte", "ip": ip]
+        case "fughe": return pieno(email) ? ["edith": "fughe", "email": email] : nil
+        case "link": return pieno(link) ? ["edith": "link", "testo": link] : nil
+        case "dominio": return pieno(dominio) ? ["edith": "dominio", "dominio": dominio] : nil
+        case "azienda": return pieno(piva) ? ["edith": "azienda", "piva": piva] : nil
+        case "iban": return pieno(iban) ? ["edith": "iban", "iban": iban] : nil
+        case "numero": return pieno(numero) ? ["edith": "numero", "numero": numero] : nil
+        case "reputazione": return pieno(reputazione) ? ["edith": "reputazione", "nome": reputazione] : nil
+        default: return nil
+        }
+    }
+
+    /// Il tocco nell'ologramma: fa partire il controllo, come il suo tasto.
+    private func esegui(_ chiave: String) {
+        guard !inCorso.contains(chiave) else { return }
+        if chiave == "password" {
+            guard !password.isEmpty else { return }
+            Suoni.tocco()
+            Task { await controllaPassword() }
+            return
+        }
+        guard let c = corpo(chiave) else { return }
+        Suoni.tocco()
+        Task { await controlla(chiave, c) }
+    }
+
+    /// I nove controlli per l'ologramma: fatto (c'è un esito a schermo), a posto o no, e se si può far partire dal tocco.
+    private var controlliOlo: [ControlloEdith] {
+        let buoni: Set<String> = ["pulito", "pulita", "sembra a posto", "valida", "corretto"]
+        let nomi: [(String, String)] = [("porte", "PORTE"), ("fughe", "FUGHE"), ("link", "LINK"), ("dominio", "DOMINI"), ("azienda", "AZIENDA"),
+                                        ("iban", "IBAN"), ("numero", "NUMERO"), ("reputazione", "REPUTAZIONE")]
+        var out: [ControlloEdith] = nomi.map { (chiave: String, nome: String) -> ControlloEdith in
+            let pronto = corpo(chiave) != nil
+            guard let e = esiti[chiave] else { return ControlloEdith(id: chiave, nome: nome, esito: "", fatto: false, ok: false, pronto: pronto) }
+            if !e.s("errore").isEmpty { return ControlloEdith(id: chiave, nome: nome, esito: e.s("errore"), fatto: true, ok: false, pronto: pronto) }
+            var esito = e.s("esito")
+            var ok = buoni.contains(esito)
+            switch chiave {
+            case "link":
+                let l = e.lista("link"), male = l.first { !buoni.contains($0.s("esito")) }
+                ok = !l.isEmpty && male == nil
+                esito = male.map { "\($0.s("dominio")): \($0.s("esito"))" } ?? "tutti i link sembrano a posto"
+            case "dominio":
+                let giorni = e.voce("certificato")?.n("giorni_rimasti") ?? 99, simili = e.stringhe("simili_registrati")
+                ok = simili.isEmpty && giorni >= 15
+                esito = "certificato \(giorni) giorni · \(simili.count) simili registrati"
+            case "azienda":
+                ok = esito == "valida"
+                if !e.s("nome").isEmpty { esito = e.s("nome") }
+            case "iban":
+                ok = esito.hasPrefix("cifra di controllo corretta")
+                if ok, !e.s("banca").isEmpty { esito = "corretto · \(e.s("banca"))" }
+            case "numero":
+                ok = true
+                esito = [e.s("paese"), e.s("tipo")].filter { !$0.isEmpty }.joined(separator: " · ")
+            case "reputazione":
+                ok = true
+                esito = e.voce("scheda")?.s("nome") ?? "\(e.lista("risultati").count) risultati"
+            default: break
+            }
+            return ControlloEdith(id: chiave, nome: nome, esito: esito, fatto: true, ok: ok, pronto: pronto)
+        }
+        let p = esitoPassword.map { $0.replacingOccurrences(of: "⚠️ ", with: "").replacingOccurrences(of: "✓ ", with: "") } ?? ""
+        out.append(ControlloEdith(id: "password", nome: "PASSWORD", esito: p, fatto: esitoPassword != nil, ok: esitoPassword?.hasPrefix("✓") ?? false, pronto: !password.isEmpty))
+        return out
     }
 
     private func stato(_ esito: String) -> some View {

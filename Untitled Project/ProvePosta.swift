@@ -136,15 +136,24 @@ struct OlogrammaPosta: View {
     var piccolo = false
     @State private var prove = ProvePosta()
 
+    @State private var altre = ProvePostaTavola()
+
     var body: some View {
+        // 9 nov (build 19): tre prove come il mockup, SMISTA (quella di prima), FIREWALL e FASCICOLI; il polso segue la scelta
         if piccolo {
-            OloPiccolaVista { gc, W, H, t, M in prove.disegna(&gc, W, H, t, M, dati, piccolo: true) }
+            ProvaOloPiccola(sezione: .posta) { k, gc, W, H, t, M in disegna(k, &gc, W, H, t, M, piccolo: true) }
         } else {
             #if os(iOS)
-            OloSingolaVista(altezza: 260, aiuto: "↔ GIRA · TOCCA UNA MAIL", etichetta: "Ologramma della casella: una lastra per mail, le importanti in alto") { gc, W, H, t, M in
-                prove.disegna(&gc, W, H, t, M, dati, piccolo: false)
-            }
+            ProveOloVista(sezione: .posta, altezza: 260, crea: { _ in }) { k, gc, W, H, t, M in disegna(k, &gc, W, H, t, M, piccolo: false) }
             #endif
+        }
+    }
+
+    private func disegna(_ k: Int, _ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, piccolo: Bool) {
+        switch k {
+        case 1: altre.firewall(&gc, W, H, t, M, dati, piccolo: piccolo)
+        case 2: altre.fascicoli(&gc, W, H, t, M, dati, piccolo: piccolo)
+        default: prove.disegna(&gc, W, H, t, M, dati, piccolo: piccolo)
         }
     }
 }

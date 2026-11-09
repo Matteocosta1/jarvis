@@ -153,6 +153,18 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(8))
                 await caricaStatoSistemi()
             }
+            #if DEBUG
+            // 9 nov: solo nella versione di prova (mai su TestFlight, che è Release): il controllo su GitHub apre da solo la sezione
+            // passata all'avvio (-provaSezione telefono) per fotografare gli ologrammi nel simulatore
+            .task {
+                guard let nome = UserDefaults.standard.string(forKey: "provaSezione"), let r = Reparto(rawValue: nome) else { return }
+                try? await Task.sleep(for: .seconds(6))
+                jarvis.repartoRichiesto = r
+            }
+            .overlay {                                          // -provaBanco costi: il banco degli ologrammi coi dati del mockup
+                if let b = UserDefaults.standard.string(forKey: "provaBanco") { BancoProveOlo(sezione: b) }
+            }
+            #endif
             .onChange(of: jarvis.chiudiChiesto) { _, si in       // «Jarvis, chiudi» / «torna»: si torna alla schermata principale
                 guard si else { return }
                 jarvis.chiudiChiesto = false

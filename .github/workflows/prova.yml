@@ -1,0 +1,77 @@
+name: Prova
+
+# La prova nel simulatore (9 nov): compila la versione di prova (Debug) per un iPhone del simulatore, la avvia col banco degli
+# ologrammi (-provaBanco <sezione> -oloProva.<sezione> <prova>, i dati d'esempio del mockup) e con alcune sezioni vere
+# (-provaSezione <reparto>), e fotografa lo schermo. Le foto sono nell'artefatto «foto-simulatore».
+# Parte SOLO quando il messaggio del commit contiene [prova] (o a mano dalla scheda Actions).
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: prova-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prova:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[prova]')
+    runs-on: xcode-27
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Accende il simulatore
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          tutti = [x for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          pro = [x for x in tutti if x['name'].endswith(' Pro')]
+          scelto = (pro or tutti)[-1]
+          print(scelto['udid']); print(scelto['name'], file=sys.stderr)")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
+
+      - name: Compila la versione di prova
+        run: |
+          set -o pipefail
+          xcodebuild -project "Untitled Project.xcodeproj" -scheme "Untitled Project" -configuration Debug -destination "id=$UDID" \
+            -derivedDataPath dd CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build 2>&1 | tee build-prova.log | grep -E "error: |BUILD (SUCCEEDED|FAILED)"
+
+      - name: Fotografa gli ologrammi
+        run: |
+          APP=$(ls -d dd/Build/Products/Debug-iphonesimulator/*.app | grep -v -i watch | head -1)
+          ID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl privacy "$UDID" grant all "$ID" || true
+          mkdir -p foto
+          banco() {   # sezione, numero di prove
+            for k in $(seq 0 $(($2 - 1))); do
+              xcrun simctl terminate "$UDID" "$ID" 2>/dev/null || true
+              xcrun simctl launch "$UDID" "$ID" -provaBanco "$1" "-oloProva.$1" "$k" > /dev/null
+              sleep 8
+              xcrun simctl io "$UDID" screenshot "foto/banco_$1_$k.png" > /dev/null
+            done
+          }
+          banco cuore 4; banco telefono 3; banco meteo 3; banco edith 3; banco posta 3; banco messaggi 3; banco confidente 3
+          banco interprete 3; banco traccia 3; banco vitals 3; banco github 3; banco supabase 3; banco archivio 3; banco costi 3
+          for r in telefono cuore edith vitals messaggi confidente interprete costi; do
+            xcrun simctl terminate "$UDID" "$ID" 2>/dev/null || true
+            xcrun simctl launch "$UDID" "$ID" -provaSezione "$r" > /dev/null
+            sleep 16
+            xcrun simctl io "$UDID" screenshot "foto/sezione_$r.png" > /dev/null
+          done
+          ls foto
+
+      - name: Salva le foto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foto-simulatore
+          path: |
+            foto
+            build-prova.log
+          retention-days: 7

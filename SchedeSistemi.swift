@@ -42,12 +42,15 @@ struct VistaGitHub: View {
     @State private var titoloIssue = ""
     @StateObject private var dettatura = Wiretap()
     @State private var baseIssue = ""
+    @State private var dettagliOlo: [String: Voce] = [:]          // 9 nov: i primi repository per l'ologramma (commit e 14 giorni)
 
     var body: some View {
         CorniceScheda(titolo: "GitHub", sottotitolo: sottotitolo, icona: "chevron.left.forwardslash.chevron.right", tinta: tinta, pronto: pagina != nil || errore != nil) {
             if let errore {
                 Pannello(tinta: tinta) { Text(errore).font(.footnote).foregroundStyle(.orange) }
             } else if let pagina {
+                // 9 nov (build 19, il signore: «falli tutti J»): in testa l'ologramma con le prove EXPO, ATOMO, PULSAR, come il mockup
+                OlogrammaGithubProve(dati: datiOlo(pagina)).corniceOlo(tinta)
                 if let repoScelto {
                     tastoIndietro(repoScelto)
                     if let dettaglio { vistaDettaglio(dettaglio) }
@@ -254,6 +257,23 @@ struct VistaGitHub: View {
         guard let o = await VistaVitals.chiama(["github": true]) else { errore = "Non raggiungo il cervello, Sir."; return }
         if let e = o["errore"] as? String { errore = e; return }
         pagina = Voce(o)
+        // poi, senza fretta, i dettagli dei primi tre repository per l'ologramma (gli ultimi commit e l'attività)
+        for r in Voce(o).lista("repository").prefix(3) {
+            let nome = r.s("nome")
+            if let d = await VistaVitals.chiama(["github": true, "repo": nome]), d["errore"] == nil { dettagliOlo[nome] = Voce(d) }
+        }
+    }
+
+    /// I repository per l'ologramma: nome, da quando, linguaggio, gli ultimi commit e i commit degli ultimi 14 giorni.
+    private func datiOlo(_ p: Voce) -> DatiGithubOlo {
+        DatiGithubOlo(repo: p.lista("repository").map { r in
+            let d = dettagliOlo[r.s("nome")]
+            var commit: [String] = d?.lista("commit").map { $0.s("messaggio") } ?? []
+            if commit.isEmpty, let u = r.voce("ultimo_commit"), !u.s("messaggio").isEmpty { commit = [u.s("messaggio")] }
+            let att = d?.lista("attivita").map { $0.n("commit") } ?? []
+            let giorni: [Int] = att.count >= 14 ? Array(att.suffix(14)) : Array(repeating: 0, count: 14 - att.count) + att
+            return RepoOlo(nome: r.s("nome"), da: r.s("da"), lingua: r.s("linguaggio"), commit: commit.map { String($0.split(separator: "\n").first ?? "") }, giorni: giorni)
+        })
     }
 
     private func caricaDettaglio(_ nome: String) async {
@@ -284,6 +304,8 @@ struct VistaSupabase: View {
             if let errore {
                 Pannello(tinta: tinta) { Text(errore).font(.footnote).foregroundStyle(.orange) }
             } else if let stato {
+                // 9 nov (build 19): in testa l'ologramma con le prove REATTORE, RETE, BATTITO, come il mockup
+                OlogrammaSupabaseProve(dati: datiOlo(stato)).corniceOlo(tinta)
                 let log = stato.voce("log")
                 let richieste = log?.lista("richieste") ?? [], console = log?.lista("console") ?? []
                 let problemi = richieste.count + console.count
@@ -362,6 +384,21 @@ struct VistaSupabase: View {
                 try? await Task.sleep(for: .seconds(30))
             }
         }
+    }
+
+    /// I dati per l'ologramma: tabelle, funzioni, database, storage, errori e il battito dell'ultima ora.
+    private func datiOlo(_ s: Voce) -> DatiSupabaseOlo {
+        var d = DatiSupabaseOlo()
+        d.tabelle = s.lista("tabelle").map { (nome: $0.s("tabella"), righe: $0.n("righe")) }
+        d.funzioni = s.lista("funzioni").map { (nome: $0.s("nome"), versione: $0.n("versione"), attiva: $0.s("stato").uppercased() == "ACTIVE") }
+        d.db = "\(s.s("database_mb")) MB"
+        d.righe = s.n("righe_totali")
+        let mb = s.lista("storage").reduce(0.0) { $0 + (Double($1.s("mb")) ?? 0) }, nf = s.lista("storage").reduce(0) { $0 + $1.n("file") }
+        d.storage = String(format: "%.0f MB · %d FILE", mb, nf)
+        let log = s.voce("log")
+        d.errori = (log?.lista("richieste").count ?? 0) + (log?.lista("console").count ?? 0)
+        d.minuti = battito?.lista("minuti").map { (r: $0.n("richieste"), e: $0.n("errori")) } ?? []
+        return d
     }
 
     /// Il battito del cervello: le richieste minuto per minuto dell'ultima ora, gli errori in rosso.
@@ -536,6 +573,10 @@ struct VistaArchivio: View {
             if let errore {
                 Pannello(tinta: tinta) { Text(errore).font(.footnote).foregroundStyle(.orange) }
             } else if let file {
+                // 9 nov (build 19): in testa l'ologramma con le prove OFFICINA, NUVOLA, SPIRALE, come il mockup
+                OlogrammaArchivioProve(dati: DatiArchivioOlo(file: file.map { FileOlo(nome: $0.s("nome"), cartella: $0.s("cartella"), kb: $0.n("kb"), quando: $0.s("quando"), tipo: $0.s("tipo")) },
+                                                             cartelle: cartelle.map { (nome: $0.s("nome"), n: $0.n("file")) }))
+                    .corniceOlo(tinta)
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
                     TextField("Cerca nell'archivio", text: $cerca)
@@ -764,6 +805,8 @@ struct VistaCosti: View {
             if let errore {
                 Pannello(tinta: tinta) { Text(errore).font(.footnote).foregroundStyle(.orange) }
             } else if let c = dati {
+                // 9 nov (build 19): in testa l'ologramma con le prove PALLADIO, TORRI, CLESSIDRA, come il mockup
+                OlogrammaCostiProve(dati: DatiCostiOlo.da(c.d)).corniceOlo(tinta)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(Self.soldi(c.s("dollari_mese"))).font(.system(size: 46, weight: .thin, design: .rounded)).foregroundStyle(.white)

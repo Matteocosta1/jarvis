@@ -14,6 +14,8 @@ typealias P3 = SIMD3<Double>
 /// Le sezioni con le prove: i nomi delle chip, i suggerimenti e la chiave della scelta (la stessa sull'iPhone e sul polso).
 nonisolated enum SezioneOlo: String, CaseIterable {
     case diario, sonno, briefing, spesa, serata, bea
+    // 9 nov (build 19, il signore: «falli tutti J»): gli ologrammi della tavola, come il mockup
+    case cuore, telefono, meteo, edith, posta, messaggi, confidente, interprete, traccia, vitals, github, supabase, archivio, costi
 
     /// v270: Bea ha una chiave nuova (le prove sono cambiate: VETRO, SCUDO, RITRATTO); la scelta di prima si ritrova (SCUDO resta SCUDO).
     var chiave: String {
@@ -37,6 +39,20 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .spesa: return ["CASSA", "SCAFFALE", "ANELLO"]
         case .serata: return ["FLUSSO", "TORRI", "REATTORE"]
         case .bea: return ["VETRO", "SCUDO", "RITRATTO"]                 // v270: tolte PUNTI e LINEE, il RITRATTO come l'Armadio
+        case .cuore: return ["BATTITO", "PETTO", "ECG", "ANELLI"]
+        case .telefono: return ["ANTENNA", "STARKPHONE", "SATELLITI"]
+        case .meteo: return ["CELLA", "GLOBO", "VENTO"]
+        case .edith: return ["OCCHIALI", "DRONI", "SCUDO"]
+        case .posta: return ["SMISTA", "FIREWALL", "FASCICOLI"]
+        case .messaggi: return ["BOLLE", "RETE", "ORBITE"]
+        case .confidente: return ["BILANCIA", "MENTE", "ONDA"]
+        case .interprete: return ["PONTE", "GLOBO", "VOCI"]
+        case .traccia: return ["SENTIERO", "B.A.R.F.", "MAPPA"]
+        case .vitals: return ["SCANSIONE", "ANELLI", "RADAR"]
+        case .github: return ["EXPO", "ATOMO", "PULSAR"]
+        case .supabase: return ["REATTORE", "RETE", "BATTITO"]
+        case .archivio: return ["OFFICINA", "NUVOLA", "SPIRALE"]
+        case .costi: return ["PALLADIO", "TORRI", "CLESSIDRA"]
         }
     }
 
@@ -49,6 +65,20 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .spesa: return ["TOCCA UNA COSA: PASSA IN CASSA", "↔ GIRA · TOCCA UNA COSA: PRESA", "↔ GIRA · TOCCA UN SETTORE: PRESA"]
         case .serata: return ["TOCCA UNA VOCE", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA UN SETTORE"]
         case .bea: return ["↔ GIRA · TOCCA UNA DATA", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA LEI O UNA DATA"]
+        case .cuore: return ["", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA UN TRATTO", "↔ GIRA · TOCCA UN GIORNO"]
+        case .telefono: return ["↔ GIRA · TOCCA LA CIMA", "TOCCA UN TASTO SUL VETRO", "↔ GIRA · TOCCA UN CONTATTO"]
+        case .meteo: return ["↔ GIRA · TOCCA LA NUVOLA", "↔ GIRA · TOCCA MILANO", "↔ GIRA · TOCCA LA ROSA"]
+        case .edith: return ["↔ GIRA · TOCCA UNA LENTE", "↔ GIRA · TOCCA UN DRONE", "↔ GIRA · TOCCA UNO SPICCHIO"]
+        case .posta: return ["↔ GIRA · TOCCA UNA MAIL", "↔ GIRA · TOCCA UNA MAIL", "↔ SFOGLIA · TOCCA QUELLO DAVANTI"]
+        case .messaggi: return ["↔ GIRA · TOCCA UN MESSAGGIO", "↔ GIRA · TOCCA UNA PERSONA", "↔ GIRA · TOCCA UN MESSAGGIO"]
+        case .confidente: return ["↔ GIRA · TOCCA UN PIATTO", "↔ GIRA · TOCCA UNA ZONA", "↔ GIRA · TOCCA UNA RIGA"]
+        case .interprete: return ["↔ GIRA · TOCCA UNA FRASE", "↔ GIRA · TOCCA UN PAESE", "TOCCA UNA VOCE"]
+        case .traccia: return ["↔ GIRA · TOCCA IL LUOGO", "↔ SCORRI · TOCCA IL RICORDO", "↔ GIRA · TOCCA UN POSTO"]
+        case .vitals: return ["↔ GIRA · TOCCA UN PUNTO", "↔ GIRA · TOCCA UN ANELLO", "↔ GIRA · TOCCA UN GIORNO"]
+        case .github: return ["↔ GIRA · TOCCA UN PADIGLIONE", "↔ GIRA · TOCCA UN ELETTRONE", "↔ GIRA · TOCCA UN GIORNO"]
+        case .supabase: return ["↔ GIRA · TOCCA UNA CAMERA", "↔ GIRA · TOCCA UNA FUNZIONE", "↔ GIRA · TOCCA UN MINUTO"]
+        case .archivio: return ["↔ SFOGLIA · TOCCA LA TAVOLA", "↔ GIRA · TOCCA UNA CARTELLA", "↔ GIRA · TOCCA UN FILE"]
+        case .costi: return ["↔ GIRA · TOCCA UNA BOBINA", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA LA CLESSIDRA"]
         }
     }
 
@@ -427,11 +457,12 @@ final class ManoOlo {
             let d = hypot(z.x - Double(p.x), z.y - Double(p.y))
             if d < max(z.r, 16) && d < d0 { d0 = d; meglio = z.id }
         }
+        // 9 nov: l'azione del tocco viene prima (EDITH: toccato di nuovo, il controllo parte; prima il secondo tocco chiudeva e basta)
+        if let m = meglio, let f = suTocco, f(m) { return .fatto }
         guard let m = meglio, m != scelta else {
             if scelta != nil { scelta = nil; return .chiuso }
             return .niente
         }
-        if let f = suTocco, f(m) { return .fatto }
         scelta = m
         sceltaT = t
         return .scelto
@@ -463,7 +494,7 @@ enum MotoreOlo {
         } else {
             disegna(&gc, W, H)
         }
-        if !M.usata, let a = aiuto { OP.aiuto(&gc, W, H, a, t) }
+        if !M.usata, let a = aiuto, !a.isEmpty { OP.aiuto(&gc, W, H, a, t) }
     }
 }
 
