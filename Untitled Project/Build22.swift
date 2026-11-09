@@ -328,12 +328,15 @@ nonisolated enum Dialogo {
         // «piano» seguito da queste parole è un nome o un avverbio, non l'ordine: «piano terra», «piano piano», «piano B»
         let nonOrdine: Set<String> = ["piano", "terra", "terreno", "primo", "secondo", "terzo", "superiore", "inferiore", "di", "del", "della",
                                       "dei", "delle", "per", "b", "a", "è", "e", "era", "sarà", "sara", "bar", "forte", "regolatore"]
-        for k in 0..<min(p.count, 5) where p[k] == "piano" || p[k] == "sottovoce" {
+        // 9 nov (il signore: «aggiungi un comando vocale: Jarvis sussurra»): anche «sussurra», «sussurrami», «parla sussurrando»
+        let sussurro: Set<String> = ["sussurra", "sussurrami", "sussurrando", "sussurrare"]
+        for k in 0..<min(p.count, 5) where p[k] == "piano" || p[k] == "sottovoce" || sussurro.contains(p[k]) {
             var togli: Set<Int> = [k]
             var j = k - 1
             if j >= 0, ["più", "piu"].contains(p[j]) { togli.insert(j); j -= 1 }          // «parla più piano»
             let dopoVerbo = j >= 0 && verbiVoce.contains(p[j])
             if dopoVerbo { togli.insert(j) }                                                 // «parla piano»: via anche «parla»
+            if sussurro.contains(p[k]) && !dopoVerbo && k != inizio { continue }             // «perché sussurra?»: una domanda, non l'ordine
             if p[k] == "piano" && !dopoVerbo && !togli.contains(k - 1) {
                 guard k == inizio else { continue }                                          // «qual è il piano per stasera?»
                 let chiuso = k + 1 == p.count || [",", ":", ";", "!", "."].contains(where: { parole[k].hasSuffix($0) })

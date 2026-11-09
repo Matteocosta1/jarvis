@@ -22,7 +22,7 @@ enum Vocabolario {
         "Jarvis", "EDITH", "apri EDITH", "EDITH controllo completo", "controllo completo", "mi ricevi", "mi ricevi Jarvis", "ricevi", "ricevuto",
         "LiDAR", "Wiretap", "Sentinella", "Profiler", "Vitals", "Briefing", "Shazam", "Scanner", "Supabase", "GitHub", "Discosizer", "Discogs",
         "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Trainer", "Personal Trainer", "apri il Trainer", "Confidente", "Diario", "Occhi", "Cucina",
-        "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "voce normale",
+        "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "sussurra", "voce normale",
         "wake up daddy's home", "daddy's home", "chiudi", "pulisci", "scansiona la stanza", "quanto è grande", "fine scansione",
         // i nomi inglesi delle sezioni dentro le frasi di tutti i giorni: così il riconoscimento li aspetta scritti giusti
         "apri LiDAR", "apri EDITH", "apri Vitals", "apri il Briefing", "apri Shazam", "apri lo Scanner", "apri il Profiler", "apri il Wiretap",

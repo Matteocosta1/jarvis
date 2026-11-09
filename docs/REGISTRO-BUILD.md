@@ -532,6 +532,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 ## Prossima build (numero da chiedere al signore) — in preparazione
 - Musica (9 nov, scelta 3 del signore): mentre suona la musica (Apple Music, Spotify, il player di Shazam) l'orecchio dell'attesa è in pausa: niente «Jarvis», battiti di mani, frasi né orecchio mentre parla; sotto il reattore «MICROFONO IN PAUSA». Tocco sul reattore: la musica si abbassa, ascolta, risponde, la musica torna su. Ferma la musica, l'orecchio si riaccende da solo. Mockup uguale.
+- Cuore: tolto ANELLI (il signore: «togliamolo così almeno sono 3»): BATTITO, PETTO, ECG, anche al polso.
+- Sussurro: anche «Jarvis, sussurra» / «sussurrami …» / «parla sussurrando» (oltre a «piano» e «sottovoce»), iPhone e polso.
+- Vitals · SCANSIONE: il corpo vero (testa, collo, spalle, petto, vita, fianchi, braccia con gomito e mano, gambe con ginocchio, polpaccio e piede), fette più fitte e il volume velato di luce; scritta «SCANSIONE · CORPO» (prima «FRIDAY», si leggeva come venerdì); in alto i valori veri come Organismo (SONNO 6 H 40 · BATTITO 67 BPM · UMORE 7/10), non più i punteggi su 100.
 
 ## 12.0 (1) — MARK XII · 9 nov mattina · il signore: «passiamo alla Mark 12… 12 (1)». Contiene tutto quello della 11.0 (19) qui sotto, più MARK XII a schermo (iPhone e polso).
 

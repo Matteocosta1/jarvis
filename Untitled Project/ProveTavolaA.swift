@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - CUORE e TELEFONO (build 11.0 (19), 9 nov, come il mockup)
 // CUORE (il signore: «un cuore vero alla Tony Stark… si vede il petto con un cuore che batte»): BATTITO (il cuore di sempre),
 // PETTO (il torace in scansione con il cuore anatomico che batte e il reattore sullo sterno), ECG (il nastro dei battiti di oggi
-// con il tracciato vivo), ANELLI (riposo e HRV dei 30 giorni attorno al cuore). TELEFONO: ANTENNA (il traliccio con le cifre
+// con il tracciato vivo); ANELLI tolto il 9 nov (il signore: «togliamolo così almeno sono 3»). TELEFONO: ANTENNA (il traliccio con le cifre
 // in orbita), STARKPHONE (il telefono di vetro di Iron Man 2: i tasti sul vetro scrivono), SATELLITI (la Terra coi satelliti Stark
 // e il fascio verso il contatto). Il cuore anche sul polso (la prova scelta sull'iPhone); il telefono solo sull'iPhone.
 
@@ -163,7 +163,6 @@ final class ProveCuore {
         switch k {
         case 1: petto(&gc, W, H, t, M, D, piccolo)
         case 2: ecg(&gc, W, H, t, M, D, piccolo)
-        case 3: anelli(&gc, W, H, t, M, D, piccolo)
         default: DisegnoCuore.disegna(&gc, CGSize(width: W, height: H), t: t, d: D.base, piccolo: piccolo)
         }
     }
@@ -319,46 +318,6 @@ final class ProveCuore {
         }
     }
 
-    // ANELLI: riposo (dentro) e HRV (fuori) dei 30 giorni come colonne attorno al cuore che batte
-    private func anelli(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ D: DatiCuoreOlo, _ piccolo: Bool) {
-        let colpo = colpoCuore(t, D.adesso), cx = W / 2, base = piccolo ? H - 3 : H - 12, rx = piccolo ? W * 0.3 : min(W * 0.26, 100)
-        Olo.pavimento(&gc, cx, base, rx, t, n: piccolo ? 20 : 48)
-        let al = 0.36, sz = piccolo ? W * 0.4 : min(W * 0.34, H * 0.6), cy = base - (piccolo ? 4 : 16)
-        let ang = t * 0.12 + M.giro, nasce = OP.lis(t / 1.0)
-        let P = { (x: Double, y: Double, z: Double) -> P3 in Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
-        var F = FasciOlo(6)
-        let R1 = 0.62, R2 = 0.95, n = min(30, min(D.riposo30.count, D.hrv30.count))
-        let r30 = Array(D.riposo30.suffix(n)), h30 = Array(D.hrv30.suffix(n))
-        let rMin = r30.min() ?? 0, rMax = r30.max() ?? 1, hMin = h30.min() ?? 0, hMax = h30.max() ?? 1
-        var colonne: [(a: Double, i: Int, h1: Double, h2: Double)] = []
-        for i in 0..<n {
-            if Double(i) / Double(n) > nasce { break }
-            let a = Double(i) / Double(n) * OP.due - 1.5708, oggi = i == n - 1
-            let h1 = 0.12 + (r30[i] - rMin) / max(1, rMax - rMin) * 0.42, h2 = 0.12 + (h30[i] - hMin) / max(1, hMax - hMin) * 0.55
-            let due: [(Double, Double, Int)] = [(R1, h1, oggi ? 4 : 2), (R2, h2, oggi ? 4 : 1)]
-            for (r, h, g) in due { F.metti(g, P(cos(a) * r, sin(a) * r, 0.02), P(cos(a) * r, sin(a) * r, 0.02 + h)) }
-            colonne.append((a, i, h1, h2))
-        }
-        for r in [R1, R2] { var q: P3?; for s in 0...60 { let a = Double(s) / 60 * OP.due, p = P(cos(a) * r, sin(a) * r, 0.02); if let q { F.metti(0, q, p) }; q = p } }
-        _ = CuoreAnat.disegna(&F, { P($0.x, $0.y, $0.z) }, P3(0, 0, 0.55), 0.24 * nasce, t, D.adesso, piccolo)
-        F.linee(&gc, colore: { $0 >= 4 ? OP.b(0.9) : OP.c(0.1 + 0.17 * Double($0)) }, spessore: { piccolo ? 0.6 + Double($0) * 0.1 : 1 + Double($0) * 0.35 },
-                alone: { $0 >= 3 && !piccolo ? OP.s(0.09) : nil })
-        let pc = P(0, 0, 0.55)
-        Tav.alone(&gc, pc, sz * (0.35 + 0.12 * colpo.batte), 0.15 + 0.3 * colpo.batte, Tav.rosa)
-        guard !piccolo else { return }
-        let mezzo = (R1 + R2) / 2
-        for c in colonne { let p = P(cos(c.a) * mezzo, sin(c.a) * mezzo, 0.02 + max(c.h1, c.h2) * 0.6); M.zona(p.x, p.y, 10, c.i) }
-        let lab1 = P(-R1, 0, 0), lab2 = P(-R2, 0, 0)
-        OP.scritta(&gc, "RIPOSO", lab1.x, lab1.y + 12, 6, 700, OP.c(0.75))
-        OP.scritta(&gc, "HRV", lab2.x, lab2.y + 12, 6, 700, OP.b(0.8))
-        OP.scritta(&gc, "30 GIORNI", 10, 14, 8, 600, OP.c(0.85), .leading)
-        OP.scritta(&gc, n > 0 ? "RIPOSO \(D.riposo) · HRV \(D.hrv)" : "SERVONO I DATI DI SALUTE", W - 10, 14, 8, 700, OP.b(0.95), .trailing)
-        if let s = M.scelta, let c = colonne.first(where: { $0.i == s }) {
-            let p = P(cos(c.a) * mezzo, sin(c.a) * mezzo, 0.02 + max(c.h1, c.h2) * 0.6), fa = n - 1 - c.i
-            OP.riquadro(&gc, W, H, p.x, p.y, [fa > 0 ? "\(fa) GIORN\(fa == 1 ? "O" : "I") FA" : "OGGI", "A RIPOSO \(Int(r30[c.i])) BPM", "HRV \(Int(h30[c.i])) ms"],
-                        t - M.sceltaT, codice: "GIORNO")
-        }
-    }
 }
 
 #if os(iOS)

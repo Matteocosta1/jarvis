@@ -1103,7 +1103,7 @@ struct VistaCuore: View {
         List {
             Section {
                 HStack {
-                    // 9 nov (build 19): la prova del cuore scelta sull'iPhone (BATTITO, PETTO, ECG, ANELLI), in piccolo, al ritmo di adesso
+                    // 9 nov (build 19): la prova del cuore scelta sull'iPhone (BATTITO, PETTO, ECG), in piccolo, al ritmo di adesso
                     OlogrammaCuorePiccolo(dati: DatiCuoreOlo(adesso: cuore.ultimo ?? 0))
                         .frame(width: 42, height: 42)
                     Text(cuore.ultimo.map { "\(Int($0.rounded())) bpm" } ?? "—")

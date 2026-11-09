@@ -39,7 +39,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .spesa: return ["CASSA", "SCAFFALE", "ANELLO"]
         case .serata: return ["FLUSSO", "TORRI", "REATTORE"]
         case .bea: return ["VETRO", "SCUDO", "RITRATTO"]                 // v270: tolte PUNTI e LINEE, il RITRATTO come l'Armadio
-        case .cuore: return ["BATTITO", "PETTO", "ECG", "ANELLI"]
+        case .cuore: return ["BATTITO", "PETTO", "ECG"]                    // 9 nov (il signore): tolto ANELLI
         case .telefono: return ["ANTENNA", "STARKPHONE", "SATELLITI"]
         case .meteo: return ["CELLA", "GLOBO", "VENTO"]
         case .edith: return ["OCCHIALI", "DRONI", "SCUDO"]
@@ -65,7 +65,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .spesa: return ["TOCCA UNA COSA: PASSA IN CASSA", "↔ GIRA · TOCCA UNA COSA: PRESA", "↔ GIRA · TOCCA UN SETTORE: PRESA"]
         case .serata: return ["TOCCA UNA VOCE", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA UN SETTORE"]
         case .bea: return ["↔ GIRA · TOCCA UNA DATA", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA LEI O UNA DATA"]
-        case .cuore: return ["", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA UN TRATTO", "↔ GIRA · TOCCA UN GIORNO"]
+        case .cuore: return ["", "↔ GIRA · TOCCA IL CUORE", "↔ GIRA · TOCCA UN TRATTO"]
         case .telefono: return ["↔ GIRA · TOCCA LA CIMA", "TOCCA UN TASTO SUL VETRO", "↔ GIRA · TOCCA UN CONTATTO"]
         case .meteo: return ["↔ GIRA · TOCCA LA NUVOLA", "↔ GIRA · TOCCA MILANO", "↔ GIRA · TOCCA LA ROSA"]
         case .edith: return ["↔ GIRA · TOCCA UNA LENTE", "↔ GIRA · TOCCA UN DRONE", "↔ GIRA · TOCCA UNO SPICCHIO"]

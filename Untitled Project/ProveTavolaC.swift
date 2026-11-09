@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - VITALS, GITHUB, SUPABASE, ARCHIVIO, COSTI (build 11.0 (19), 9 nov, come il mockup)
-// VITALS    SCANSIONE (la figura di FRIDAY a fette, il piano che scende, testa · cuore · gambe), ANELLI (sonno, passi, umore attorno
+// VITALS    SCANSIONE (la figura a fette, il piano che scende, testa · cuore · gambe), ANELLI (sonno, passi, umore attorno
 //           alla prontezza), RADAR (i 30 giorni: umore e sonno, il fascio che gira).
 // GITHUB    EXPO (i repository come padiglioni della Stark Expo), ATOMO (i commit come elettroni dell'elemento nuovo), PULSAR (14 giorni).
 // SUPABASE  REATTORE (la Stark Tower: le tabelle come camere), RETE (le funzioni attorno al database), BATTITO (le richieste dell'ultima
@@ -23,7 +23,8 @@ struct DatiVitalsOlo {
     var passi: (punti: Int?, testo: String, nota: String) = (nil, "—", "IERI · OBIETTIVO 10.000")
     var giorni: [GiornoVitalsOlo] = []
 
-    var conto: String { "SONNO \(sonno.punti.map(String.init) ?? "—") · BATTITO \(battito.punti.map(String.init) ?? "—") · UMORE \(umore.punti.map(String.init) ?? "—")" }
+    /// 9 nov: i valori veri (come il pannello Organismo sotto), non i punteggi su 100 (prima «BATTITO 91» sopra e «BATTITO 67» sotto)
+    var conto: String { "SONNO \(sonno.testo) · BATTITO \(battito.testo) · UMORE \(umore.testo.replacingOccurrences(of: " SU ", with: "/"))" }
 
     /// Dai dati che Vitals ha già: l'organismo (prontezza e punteggi) e i giorni (umore dal diario, sonno, battito, passi).
     static func da(_ o: DatiOrganismo, giorni: [DatiVitals.Giorno]) -> DatiVitalsOlo {
@@ -52,31 +53,63 @@ final class ProveVitals {
         }
     }
 
-    /// Le sezioni del corpo a quota z (0 piedi, 1,95 testa): centro, raggio largo e raggio profondo.
-    private static func largh(_ z: Double) -> [(Double, Double, Double)] {
-        if z > 1.66 { let u = (z - 1.8) / 0.15, k = max(0, 1 - u * u).squareRoot(); return [(0, 0.1 * k, 0.11 * k)] }
-        if z > 1.55 { return [(0, 0.055, 0.055)] }
-        if z > 0.92 {
-            let sp = z > 1.4 ? 0.26 : 0.2 + (z - 0.92) * 0.12
-            var r: [(Double, Double, Double)] = [(0, sp, 0.13)]
-            if z > 0.95 && z < 1.5 { r.append((-0.33 - (1.5 - z) * 0.08, 0.045, 0.045)); r.append((0.33 + (1.5 - z) * 0.08, 0.045, 0.045)) }
-            return r
+    /// 9 nov (il signore: «corpo troppo semplice»): la figura vera, come l'ologramma di Organismo sotto: testa, collo, spalle tonde,
+    /// petto, vita, fianchi, braccia lungo il corpo (gomito, polso, mano) e gambe (coscia, ginocchio, polpaccio, caviglia, piede).
+    /// Le misure sono chiavi lungo l'altezza (0 piedi, 1,95 testa), unite in linea retta: le fette e la sagoma restano morbide.
+    private static func chiave(_ k: [(Double, Double)], _ z: Double) -> Double {
+        guard let primo = k.first, let ultimo = k.last else { return 0 }
+        if z <= primo.0 { return primo.1 }
+        if z >= ultimo.0 { return ultimo.1 }
+        for n in 1..<k.count where z <= k[n].0 {
+            let a = k[n - 1], b = k[n], u: Double = (z - a.0) / (b.0 - a.0)
+            return a.1 + (b.1 - a.1) * u
         }
-        let r = 0.06 + z * 0.045
-        return [(-0.12, r, r * 0.9), (0.12, r, r * 0.9)]
+        return ultimo.1
+    }
+    private static let tronco: [(Double, Double)] = [(0.90, 0.175), (0.97, 0.19), (1.05, 0.17), (1.15, 0.142), (1.26, 0.168), (1.36, 0.198),
+                                                     (1.44, 0.222), (1.50, 0.235), (1.545, 0.185), (1.57, 0.085)]
+    private static let troncoP: [(Double, Double)] = [(0.90, 0.10), (1.00, 0.105), (1.14, 0.095), (1.26, 0.11), (1.38, 0.12), (1.50, 0.10), (1.57, 0.06)]
+    private static let braccioX: [(Double, Double)] = [(0.74, 0.31), (0.90, 0.305), (1.20, 0.29), (1.48, 0.265)]
+    private static let braccioR: [(Double, Double)] = [(0.74, 0.024), (0.88, 0.037), (0.94, 0.031), (1.16, 0.04), (1.30, 0.048), (1.48, 0.054)]
+    private static let gambaX: [(Double, Double)] = [(0.04, 0.08), (0.50, 0.085), (0.90, 0.095)]
+    private static let gambaR: [(Double, Double)] = [(0.04, 0.034), (0.10, 0.03), (0.20, 0.04), (0.36, 0.058), (0.50, 0.048), (0.70, 0.075), (0.90, 0.095)]
+
+    /// Le sezioni del corpo a quota z: centro di lato, raggio largo, raggio profondo e spostamento in avanti (il piede).
+    private static func largh(_ z: Double) -> [(Double, Double, Double, Double)] {
+        if z > 1.66 { let u: Double = (z - 1.805) / 0.145, k: Double = max(0, 1 - u * u).squareRoot(); return [(0, 0.09 * k, 0.105 * k, -0.01)] }
+        if z > 1.57 { return [(0, 0.048, 0.052, 0)] }
+        var r: [(Double, Double, Double, Double)] = []
+        if z >= 0.90 { r.append((0, chiave(tronco, z), chiave(troncoP, z), 0)) }
+        if z < 0.90 {
+            let gx = chiave(gambaX, z), gr = chiave(gambaR, z)
+            let piede: Double = z < 0.09 ? (0.09 - z) / 0.05 : 0
+            r.append((-gx, gr, gr * 0.95 + piede * 0.04, -piede * 0.04)); r.append((gx, gr, gr * 0.95 + piede * 0.04, -piede * 0.04))
+        }
+        if z >= 0.74 && z <= 1.48 {
+            let bx = chiave(braccioX, z), br = chiave(braccioR, z)
+            r.append((-bx, br, br, 0)); r.append((bx, br, br, 0))
+        }
+        return r
     }
 
-    // SCANSIONE: la figura di FRIDAY a fette di luce, il piano che scende, i punti agganciati
+    // SCANSIONE: la figura a fette di luce, il piano che scende, i punti agganciati
     private func scansione(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ D: DatiVitalsOlo, _ piccolo: Bool) {
-        let s = Tav.scena(&gc, W, H, t, M, piccolo, OpzioniOlo(al: 0.12, sz: 0.85, su: 0.02, oscilla: 0.55, mano: 0.8, conoSu: -0.6, conoW: 0.5))
+        let s = Tav.scena(&gc, W, H, t, M, piccolo, OpzioniOlo(al: 0.12, sz: 0.92, su: 0.02, oscilla: 0.55, mano: 0.8, conoSu: -0.6, conoW: 0.5))
         var F = FasciOlo(6)
-        let scan = 1.95 - (t * 0.32).truncatingRemainder(dividingBy: 1.2) / 1.0 * 1.95, passo = piccolo ? 0.15 : 0.075
+        let scan = 1.95 - (t * 0.32).truncatingRemainder(dividingBy: 1.2) / 1.0 * 1.95, passo = piccolo ? 0.11 : 0.055
         var z = 0.04
         while z <= 1.94 && z <= 1.95 * s.nasce {
-            let g = abs(z - scan) < 0.08 ? 4 : z > scan ? 2 : 1
-            for (cx, rx, ry) in ProveVitals.largh(z) {
+            let g = abs(z - scan) < 0.06 ? 4 : z > scan ? 2 : 1
+            for (cx, rx, ry, dy) in ProveVitals.largh(z) {
                 var q: P3?
-                for k in 0...20 { let a = Double(k) / 20 * OP.due, p = s.P(cx + cos(a) * rx, sin(a) * ry, z); if let q { F.metti(g, q, p) }; q = p }
+                var velo = Path()                                  // 9 nov: il volume del corpo, ogni fetta velata di luce
+                for k in 0...24 {
+                    let a = Double(k) / 24 * OP.due, p = s.P(cx + cos(a) * rx, dy + sin(a) * ry, z)
+                    if let q { F.metti(g, q, p) }
+                    if k == 0 { velo.move(to: CGPoint(x: p.x, y: p.y)) } else { velo.addLine(to: CGPoint(x: p.x, y: p.y)) }
+                    q = p
+                }
+                gc.fill(velo, with: .color(OP.c(piccolo ? 0.05 : 0.035)))
             }
             z += passo
         }
@@ -87,7 +120,7 @@ final class ProveVitals {
                 if A.count == B.count {
                     for (j, a) in A.enumerated() {
                         let b = B[j]
-                        for k in 0..<6 { let an = Double(k) / 6 * OP.due + 0.26; F.metti(k == 0 || k == 3 ? 2 : 0, s.P(a.0 + cos(an) * a.1, sin(an) * a.2, z2), s.P(b.0 + cos(an) * b.1, sin(an) * b.2, z2 + 0.0375)) }
+                        for k in 0..<10 { let an = Double(k) / 10 * OP.due + 0.26; F.metti(k == 0 || k == 5 ? 2 : 0, s.P(a.0 + cos(an) * a.1, a.3 + sin(an) * a.2, z2), s.P(b.0 + cos(an) * b.1, b.3 + sin(an) * b.2, z2 + 0.0375)) }
                     }
                 }
                 z2 += 0.0375
@@ -101,7 +134,7 @@ final class ProveVitals {
         let punti: [(String, P3, [String])] = [
             ("TESTA", s.P(0, 0, 1.8), ["UMORE \(D.umore.testo)", "SONNO \(D.sonno.testo)", D.sonno.nota]),
             ("CUORE", pc, ["BATTITO \(D.battito.testo)", D.battito.nota, "PUNTEGGIO \(D.battito.punti.map(String.init) ?? "—")"]),
-            ("GAMBE", s.P(0.12, 0, 0.45), ["PASSI \(D.passi.testo)", D.passi.nota, "\(D.passi.punti.map(String.init) ?? "—")% DELL'OBIETTIVO"]),
+            ("GAMBE", s.P(0.085, 0, 0.45), ["PASSI \(D.passi.testo)", D.passi.nota, "\(D.passi.punti.map(String.init) ?? "—")% DELL'OBIETTIVO"]),
         ]
         for (i, (nome, p, _)) in punti.enumerated() {
             let lx = i == 1 ? p.x + 46 : p.x - 46
@@ -110,7 +143,7 @@ final class ProveVitals {
             OP.scritta(&gc, nome, lx, p.y - 11, 6.5, 800, OP.b(0.9), i == 1 ? .leading : .trailing)
             M.zona(p.x, p.y, 16, i)
         }
-        Tav.testate(&gc, W, "SCANSIONE · FRIDAY", "PRONTEZZA \(D.prontezza.map { "\($0)%" } ?? "—")", D.conto)
+        Tav.testate(&gc, W, "SCANSIONE · CORPO", "PRONTEZZA \(D.prontezza.map { "\($0)%" } ?? "—")", D.conto)
         if let i = M.scelta, i >= 0, i < punti.count { OP.riquadro(&gc, W, H, punti[i].1.x, punti[i].1.y, [punti[i].0] + punti[i].2, t - M.sceltaT, codice: "SCAN") }
     }
 
