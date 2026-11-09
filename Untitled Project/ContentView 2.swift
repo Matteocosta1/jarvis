@@ -705,7 +705,7 @@ struct ContentView: View {
             .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
             Button { toccaDock(ContentView.postoTesta.musica) } label: {
-                IconaVinile()
+                VinileDock()                                        // 9 nov notte: gira mentre la musica suona
                     .frame(width: 18, height: 18)
                     .foregroundStyle(Color.ciano)
                     // 27 ott notte (il signore): il disco un poco più a destra, verso Studio

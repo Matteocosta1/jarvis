@@ -965,6 +965,32 @@ struct IconaVinile: View {
     }
 }
 
+/// 9 nov notte (il signore, provato nel mockup: «bellissimo, lo voglio anche nell'app»): il vinile di MUSICA nel Dock gira come
+/// un disco a 33 giri (1,8 s a giro) mentre la musica suona; fermata, resta dov'era (riparte da lì). A 120 Hz con l'orologio dello
+/// schermo, e solo mentre suona. Con «Riduci movimento» resta fermo.
+struct VinileDock: View {
+    @ObservedObject private var lettore = LettoreMusica.condiviso
+    @Environment(\.accessibilityReduceMotion) private var ridotto
+    @State private var base: Double = 0                // dove si è fermato (gradi)
+    @State private var da: Date?                       // da quando gira
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: nil, paused: da == nil)) { t in
+            IconaVinile().rotationEffect(.degrees(angolo(t.date)))
+        }
+        .onChange(of: lettore.suona && !ridotto, initial: true) { _, gira in
+            if gira {
+                if da == nil { da = Date() }
+            } else if da != nil {
+                base = angolo(Date()).truncatingRemainder(dividingBy: 360)
+                da = nil
+            }
+        }
+    }
+
+    private func angolo(_ ora: Date) -> Double { base + (da.map { ora.timeIntervalSince($0) } ?? 0) * 360 / 1.8 }
+}
+
 /// I cinque tasti della sezione, disegnati come gli SVG del mockup.
 struct IconaTastoMusica: View {
     enum Tipo { case casuale, precedente, play, pausa, successivo, ripeti }
