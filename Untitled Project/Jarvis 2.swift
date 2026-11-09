@@ -168,6 +168,7 @@ final class Jarvis: NSObject, ObservableObject {
         guard !micSpento else { return }
         spentoLungo = Date()
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        Suoni.microfonoSpento()
         riservato = false
         micSpento = true
     }
@@ -193,6 +194,19 @@ final class Jarvis: NSObject, ObservableObject {
                 self?.leggiMusica()
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    /// 9 nov: quando è stato bloccato lo schermo l'ultima volta (l'avviso del sistema «lockcomplete», lo stesso che usano molte app).
+    private var bloccatoAlle = Date.distantPast
+    private static let schermoBloccato = Notification.Name("JarvisSchermoBloccato")
+
+    private func seguiBlocco() {
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), nil, { _, _, _, _, _ in
+            NotificationCenter.default.post(name: Notification.Name("JarvisSchermoBloccato"), object: nil)
+        }, "com.apple.springboard.lockcomplete" as CFString, nil, .deliverImmediately)
+        NotificationCenter.default.addObserver(forName: Jarvis.schermoBloccato, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.bloccatoAlle = Date() }
         }
     }
 
@@ -354,6 +368,7 @@ final class Jarvis: NSObject, ObservableObject {
         AmbienteSonoro.condiviso.jarvisSuona(true)   // si apre con la musica d'avvio: non è «confusione»
         sintesi.delegate = self
         seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa sente solo «Jarvis»
+        seguiBlocco()                                // 9 nov: lo schermo bloccato non è «uscire da JARVIS» (la musica continua)
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica]) }   // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
@@ -2365,10 +2380,17 @@ final class Jarvis: NSObject, ObservableObject {
     /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
-        // 9 nov (il signore: «se chiudo l'app la musica deve spegnersi, non continuare su Apple Music»): uscendo da JARVIS (anche
-        // bloccando lo schermo) si ferma la musica dell'app Musica e il player di Shazam. Spotify Apple non lo lascia fermare.
-        if LettoreMusica.sistemaSuona { LettoreMusica.condiviso.pausa() }
-        AscoltoShazam.condiviso.chiudi()
+        // 9 nov (il signore: «se chiudo l'app la musica deve spegnersi, non continuare su Apple Music… quando blocco lo schermo
+        // deve continuare e va nella Dynamic Island»): uscendo da JARVIS (Home o un'altra app) si fermano la musica dell'app Musica e
+        // il player di Shazam; bloccando lo schermo no. iOS dà la stessa uscita nei due casi: il blocco si riconosce dall'avviso del
+        // sistema che arriva insieme (Jarvis.seguiBlocco). Senza avviso (se iOS smettesse di mandarlo) la musica si ferma: la scelta
+        // sicura. Spotify Apple non lo lascia fermare.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard let self, Date().timeIntervalSince(self.bloccatoAlle) > 3 else { return }   // schermo bloccato: la musica continua
+            if LettoreMusica.sistemaSuona { LettoreMusica.condiviso.pausa() }
+            AscoltoShazam.condiviso.chiudi()
+        }
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello

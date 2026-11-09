@@ -140,6 +140,12 @@ enum Suoni {
     }
     private static var ultimoDockSopra: CFTimeInterval = 0
 
+    /// 9 nov: la pressione lunga sul reattore, microfono SPENTO. File: «spento» (il suono scelto dal signore, «ui sound off»).
+    static func microfonoSpento() {
+        guard attivi, let url = file("spento") else { return }
+        riproduci(url, volume: 1.0)
+    }
+
     /// Lo scatto della click wheel: un'icona passa in alto. File: «ruota» (mixkit «mouse hard clicking», un colpo solo).
     /// Arriva a raffica (fino a uno ogni 35 ms): quattro lettori già pronti, a turno, così parte senza ritardo.
     static func scattoRuota() {
