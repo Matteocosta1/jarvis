@@ -173,6 +173,8 @@ final class AscoltoShazam: ObservableObject {
         case .nessuna: false
         }
     }
+    /// 9 nov: suona dentro JARVIS (anteprima o video, non l'app Musica): l'audio di JARVIS non va spento, fermerebbe la canzone.
+    var suonaDentro: Bool { (fonte == .anteprima && suonaAnteprima) || (fonte == .video && suonaVideo) }
     var tempo: Double { fonte == .anteprima ? tempoAnteprima : LettoreMusica.condiviso.tempo }
     var durata: Double? { fonte == .anteprima ? durataAnteprima : LettoreMusica.condiviso.durata }
 

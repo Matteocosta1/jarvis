@@ -530,7 +530,8 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## Prossima build (numero da chiedere) — in preparazione
+## 12.0 (4) — MARK XII · 9 nov pomeriggio · numero confermato dal signore («12.4» = 12.0 (4))
+- Ricontrollo della logica musica/microfono: l'audio di JARVIS non si spegne più mentre la canzone di Shazam (anteprima o video) suona dentro JARVIS (prima, a fine risposta o al cambio di stato, poteva fermarla); «Jarvis» con la musica: se l'ascolto non parte, il «Jarvis» in attesa si riaccende da solo.
 - Musica che si fermava pochi secondi dopo la partenza (12.0 (3), il signore: «parte, pochi secondi, si riblocca»): era la cancellazione dell'eco accesa sul microfono dell'attesa quando parte la musica (la modalità «chiamata» di iOS ferma la musica delle altre app). Tolta: con la musica resta RISERVATO (solo «Jarvis») senza cancellazione dell'eco.
 
 ## 12.0 (3) — MARK XII · 9 nov · numero confermato dal signore («perfetto facciamolo») · controllo di compilazione VERDE (run 42615234041)

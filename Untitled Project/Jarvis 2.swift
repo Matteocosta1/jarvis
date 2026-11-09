@@ -697,7 +697,8 @@ final class Jarvis: NSObject, ObservableObject {
         guard musicaSuona, fase == .attesa, !Jarvis.usaAscoltoCloud else { return }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
-            guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo else { return }
+            guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo,
+                  !AscoltoShazam.condiviso.suonaDentro else { return }   // la canzone di Shazam suona dentro JARVIS: l'audio resta acceso
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
@@ -710,7 +711,10 @@ final class Jarvis: NSObject, ObservableObject {
         if musicaSuona, !Jarvis.usaAscoltoCloud {
             if fase == .elaboro { segnaInterruzione(); interrompi() }
             richiamo.ferma()
-            Task { await avviaAscolto(bip: true) }
+            Task {
+                await avviaAscolto(bip: true)
+                if fase == .attesa { aggiornaRichiamo() }   // l'ascolto non è partito: il «Jarvis» in attesa torna acceso
+            }
             return
         }
         if fase == .elaboro {                            // stava pensando: lo fermo, come un'interruzione
@@ -1955,7 +1959,7 @@ final class Jarvis: NSObject, ObservableObject {
             // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso;
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
-                  !self.richiamo.attivo else { return }
+                  !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }   // 9 nov: né la canzone di Shazam
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»
