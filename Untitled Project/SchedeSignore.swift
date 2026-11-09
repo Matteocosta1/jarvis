@@ -489,6 +489,7 @@ struct SchermoCaricamento: View {
     var marchio = false
     /// 8 nov: Studio e Social hanno la loro riga in alto sempre ferma sopra (VistaStudio): qui solo lo sfondo e il caricamento.
     var conTestata = true
+    var testo = "Chiudi"            // 9 nov: Impostazioni ha «Fatto», anche nel caricamento
     /// 8 nov sera (come il mockup v293): mentre il caricamento sfuma la sua scritta sotto il nome sparisce subito, così quella vera
     /// della sezione arriva da sola, insieme alla pagina (senza la vecchia in trasparenza sopra per 0,25 s).
     var senzaScritta = false
@@ -504,7 +505,7 @@ struct SchermoCaricamento: View {
                     // 7 nov sera: la testata nella riga di «Chiudi» (o della X), come in tutte le sezioni (BarraSezione)
                     BarraSezione(testata: DatiTestata(titolo: titolo, sottotitolo: senzaScritta ? "" : TestiCaricamento.di(titolo), icona: icona,
                                                       tinta: tinta, marchio: marchio),
-                                 tinta: tinta, conX: conX, chiudi: nil)
+                                 tinta: tinta, testo: testo, conX: conX, chiudi: nil)
                     Spacer(minLength: 0)
                 }
             }
@@ -526,6 +527,7 @@ struct AperturaHUD: ViewModifier {
     var durata = Apertura.caricamento
     var fotocamera = false          // sezioni con fotocamera: a fine caricamento il clic «aperturacamera» al posto di «pronta»
     var soloSfuma = false           // 26 ott notte (Occhi, Cucina): a fine caricamento sfuma e basta, il suono lo fa la sezione
+    var testo = "Chiudi"            // 9 nov: la scritta in alto a destra nel caricamento (Impostazioni: «Fatto»)
     @State private var coperto = true
     @State private var via = false
     @State private var stampa: CGFloat = 0
@@ -541,7 +543,7 @@ struct AperturaHUD: ViewModifier {
             .overlay {
                 // come nel mockup: sfuma in 0,25 s mentre la pagina si stampa, e si toglie a stampa finita
                 if !via {
-                    SchermoCaricamento(titolo: titolo, icona: icona, conX: conX, senzaScritta: !coperto)
+                    SchermoCaricamento(titolo: titolo, icona: icona, conX: conX, testo: testo, senzaScritta: !coperto)
                         .opacity(coperto ? 1 : 0)
                 }
             }
@@ -560,8 +562,9 @@ struct AperturaHUD: ViewModifier {
 
 extension View {
     /// Apre la sezione con il caricamento HUD di JARVIS.
-    func aperturaHUD(_ titolo: String, icona: String, conX: Bool = false, fotocamera: Bool = false, soloSfuma: Bool = false) -> some View {
-        modifier(AperturaHUD(titolo: titolo, icona: icona, conX: conX, fotocamera: fotocamera, soloSfuma: soloSfuma))
+    func aperturaHUD(_ titolo: String, icona: String, conX: Bool = false, fotocamera: Bool = false, soloSfuma: Bool = false,
+                     testo: String = "Chiudi") -> some View {
+        modifier(AperturaHUD(titolo: titolo, icona: icona, conX: conX, fotocamera: fotocamera, soloSfuma: soloSfuma, testo: testo))
     }
 }
 

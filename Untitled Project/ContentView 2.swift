@@ -1258,9 +1258,6 @@ struct ContentView: View {
                 pila.togli(s)
             }
             if riprendo == s { riprendo = nil }
-            // 9 nov notte (il signore: «la rotella di impostazioni non ha il suono di apertura scheda»): Impostazioni sale senza
-            // caricamento e non aveva suono; ora quello d'apertura delle schede, solo quando si apre davvero (non da dietro)
-            if s == .impostazioni, pila.voce(s) == nil { Suoni.schedaApre() }
             let occhiata: Occhiata? = s == .occhi ? jarvis.occhi : nil
             let lingua: Lingua? = s == .interprete ? jarvis.interprete : nil
             let pagina: AperturaPagina? = aperturaPagina.flatMap { s == .pagina($0.sezione) ? $0 : nil }
@@ -1495,7 +1492,11 @@ struct ContentView: View {
     @ViewBuilder private func vistaSezione(_ v: PilaSezioni.Voce) -> some View {
         switch v.sezione {
         case .impostazioni:
-            ImpostazioniView().environmentObject(jarvis).paginaPiena()                 // 27 ott: senza caricamento, sale come le altre
+            // 9 nov (il signore: «facciamola come le altre: click, caricamento, apertura»): il caricamento HUD con i suoni di tutte le
+            // sezioni, poi la pagina si stampa dall'alto (ConBarraChiudi legge la stampa); «Fatto» anche nel caricamento, come nella pagina
+            ImpostazioniView().environmentObject(jarvis)
+                .aperturaHUD("Impostazioni", icona: "gearshape", testo: "Fatto")
+                .paginaPiena()
         case .browser:
             BrowserPrivato()
         case .occhi:
