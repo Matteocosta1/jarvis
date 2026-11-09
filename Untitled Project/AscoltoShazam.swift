@@ -58,7 +58,9 @@ final class AscoltoShazam: ObservableObject {
     /// (il video si guarda sul telefono).
     func suona(titolo: String, artista: String, appleID: String?, dalPolso: Bool = false) async {
         ferma()
-        audioARiposo()             // 9 nov: dal video o dall'anteprima ad Apple Music intero, l'audio di JARVIS non le sta davanti
+        // 9 nov: dal video o dall'anteprima ad Apple Music intero, l'audio di JARVIS non le sta davanti. Non dal polso: lì
+        // l'iPhone può essere sulla schermata principale con JARVIS che parla (la sua voce non si tocca)
+        if !dalPolso { audioARiposo() }
         giro += 1
         let mio = giro
         cercando = true
