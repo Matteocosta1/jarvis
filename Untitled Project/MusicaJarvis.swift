@@ -1,18 +1,20 @@
 #if os(iOS)
 import SwiftUI
 import MusicKit
-import MediaPlayer
+import AVFoundation
 import Combine
 
 // MARK: - MUSICA (build 23, MARK IX): il suo Apple Music dentro JARVIS, come nel mockup approvato (#23)
 
-/// Il lettore della sezione MUSICA. È il lettore di sistema (`SystemMusicPlayer`, cioè l'app Musica): lo stesso dei comandi a voce
-/// di sempre («metti i Clash», «salta», «pausa», MusicaApple.swift). Così quello che mette a voce si vede qui, quello che mette qui
-/// si comanda anche a voce e dal polso, e la musica continua anche con JARVIS chiuso. Tutto passa dal suo abbonamento Apple Music.
+/// Il lettore della sezione MUSICA. 9 nov sera (il signore: «fai un lettore nostro interno», «come Apple Music»): è il lettore
+/// DENTRO JARVIS (`ApplicationMusicPlayer`), non più l'app Musica. Chiudendo JARVIS la musica finisce; «Chiudi» sulla sezione la
+/// ferma; in background (Home, altra app, schermo bloccato) continua, con JARVIS nella Dynamic Island; l'app Musica non viene mai
+/// toccata. Lo stesso lettore per i comandi a voce («metti i Clash», MusicaApple.swift), Shazam e il polso. Il volume coi tasti
+/// dell'iPhone; JARVIS non può abbassarlo (Apple non lo permette): con «Jarvis» va in pausa e riparte dopo la risposta.
 final class LettoreMusica: ObservableObject {
     static let condiviso = LettoreMusica()
 
-    private let lettore = SystemMusicPlayer.shared
+    private let lettore = ApplicationMusicPlayer.shared
     @Published private(set) var voce: MusicKit.MusicPlayer.Queue.Entry?     // il brano in coda adesso
     @Published private(set) var suona = false
     @Published private(set) var casuale = false
@@ -27,8 +29,35 @@ final class LettoreMusica: ObservableObject {
 
     private init() { aggiorna() }
 
-    /// 9 nov: l'app Musica sta suonando adesso? Letto al momento (anche a sezione chiusa), per l'orecchio di JARVIS con la musica.
-    static var sistemaSuona: Bool { SystemMusicPlayer.shared.state.playbackStatus == .playing }
+    /// 9 nov sera: messa in pausa da JARVIS perché il signore gli parla («Jarvis» o tocco): riparte da sola dopo la risposta.
+    private(set) var fermataDaJarvis = false
+
+    /// L'audio di JARVIS pronto per la musica: se era sul «solo effetti» (che col silenzioso tace e in background si ferma) passa
+    /// alla riproduzione vera, come un'app musicale. Se il «Jarvis» in attesa ha già il microfono (registra e riproduce), resta così.
+    static func preparaAudio() {
+        let s = AVAudioSession.sharedInstance()
+        if s.category == .ambient || s.category == .soloAmbient { try? s.setCategory(.playback, mode: .default, options: []) }
+        try? s.setActive(true)
+    }
+
+    /// «Jarvis» con la musica: pausa (il lettore dell'app non si può abbassare), poi `riprendiDopoJarvis`.
+    func fermaPerJarvis() {
+        guard suona else { return }
+        lettore.pause()
+        fermataDaJarvis = true
+        aggiorna()
+    }
+    func riprendiDopoJarvis() async {
+        guard fermataDaJarvis else { return }
+        fermataDaJarvis = false
+        await play()
+    }
+    /// «Chiudi» sulla sezione: la musica finisce (come chiudere Apple Music).
+    func ferma() {
+        fermataDaJarvis = false
+        lettore.stop()
+        aggiorna()
+    }
 
     /// Mentre la sezione (o il polso) guarda: legge il lettore quattro volte al secondo (brano, play, casuale, ripeti).
     func segui() async {
@@ -88,16 +117,12 @@ final class LettoreMusica: ObservableObject {
         if case .song(let s)? = voce?.item { return s }
         return nil
     }
-    /// L'app Musica, per quello che MusicKit a volte non dà (la durata dei brani della libreria).
-    private var inRiproduzione: MPMediaItem? { MPMusicPlayerController.systemMusicPlayer.nowPlayingItem }
-
-    var titolo: String { voce?.title ?? inRiproduzione?.title ?? "—" }
-    var artista: String { brano?.artistName ?? voce?.subtitle ?? inRiproduzione?.artist ?? "—" }
-    var album: String { brano?.albumTitle ?? inRiproduzione?.albumTitle ?? "—" }
+    var titolo: String { voce?.title ?? "—" }
+    var artista: String { brano?.artistName ?? voce?.subtitle ?? "—" }
+    var album: String { brano?.albumTitle ?? "—" }
     var copertina: Artwork? { voce?.artwork }
     var durata: TimeInterval? {
         if let d = brano?.duration, d > 0 { return d }
-        if let d = inRiproduzione?.playbackDuration, d > 0 { return d }
         return nil
     }
     var tempo: TimeInterval { lettore.playbackTime }
@@ -115,11 +140,12 @@ final class LettoreMusica: ObservableObject {
     func playPausa() async { if suona { pausa() } else { await play() } }
 
     func play() async {
+        LettoreMusica.preparaAudio()
         do { try await lettore.play(); errore = nil } catch { errore = "Apple Music: \(error.localizedDescription)" }
         aggiorna()
     }
 
-    func pausa() { lettore.pause(); aggiorna() }
+    func pausa() { fermataDaJarvis = false; lettore.pause(); aggiorna() }
 
     func avanti() async {
         do { try await lettore.skipToNextEntry() } catch { errore = "Apple Music: \(error.localizedDescription)" }
@@ -161,7 +187,7 @@ final class LettoreMusica: ObservableObject {
     func metti<T: PlayableMusicItem>(_ lista: [T], da: T?) async {
         guard !lista.isEmpty else { return }
         guard await CatalogoMusica.autorizzato() else { errore = CatalogoMusica.senzaPermesso; return }
-        lettore.queue = SystemMusicPlayer.Queue(for: lista, startingAt: da)
+        lettore.queue = ApplicationMusicPlayer.Queue(for: lista, startingAt: da)
         await play()
     }
 
@@ -377,6 +403,9 @@ struct VistaMusica: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task { await lettore.segui() }
+        // 9 nov sera (il signore: «se chiudo la scheda la musica finisce, come Apple Music»): «Chiudi» ferma la musica; mandata
+        // dietro la sezione resta viva (niente onDisappear) e la musica continua, col disco del Dock che gira
+        .onDisappear { lettore.ferma() }
         .task { await caricaOggi() }
         .sulloSchermo(testoSchermo)
     }

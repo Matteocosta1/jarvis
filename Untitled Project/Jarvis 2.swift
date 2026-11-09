@@ -197,19 +197,6 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    /// 9 nov: quando è stato bloccato lo schermo l'ultima volta (l'avviso del sistema «lockcomplete», lo stesso che usano molte app).
-    private var bloccatoAlle = Date.distantPast
-    private static let schermoBloccato = Notification.Name("JarvisSchermoBloccato")
-
-    private func seguiBlocco() {
-        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), nil, { _, _, _, _, _ in
-            NotificationCenter.default.post(name: Notification.Name("JarvisSchermoBloccato"), object: nil)
-        }, "com.apple.springboard.lockcomplete" as CFString, nil, .deliverImmediately)
-        NotificationCenter.default.addObserver(forName: Jarvis.schermoBloccato, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.bloccatoAlle = Date() }
-        }
-    }
-
     private func leggiMusica() {
         // 9 nov: quattro letture insieme (una sola non bastava sul telefono): l'app Musica (anche dalla sezione Musica e da Shazam),
         // il player di Shazam dentro JARVIS (anteprima e video), e l'audio delle altre app (Spotify, un video)
@@ -219,7 +206,7 @@ final class Jarvis: NSObject, ObservableObject {
         // aperta; ora anche qui, una volta al secondo, così il disco nel Dock si ferma quando la musica si ferma (anche dall'isola)
         let lettore = LettoreMusica.condiviso
         lettore.aggiorna()
-        let suona: Bool = altre || lettore.suona || AscoltoShazam.condiviso.suonaOra
+        let suona: Bool = altre || lettore.suona || lettore.fermataDaJarvis || AscoltoShazam.condiviso.suonaOra
         if suona { silenzioMusica = 0; musicaSuona = true; return }
         silenzioMusica += 1
         if silenzioMusica >= 2 { musicaSuona = false }
@@ -372,7 +359,6 @@ final class Jarvis: NSObject, ObservableObject {
         AmbienteSonoro.condiviso.jarvisSuona(true)   // si apre con la musica d'avvio: non è «confusione»
         sintesi.delegate = self
         seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa sente solo «Jarvis»
-        seguiBlocco()                                // 9 nov: lo schermo bloccato non è «uscire da JARVIS» (la musica continua)
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica]) }   // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
@@ -434,7 +420,7 @@ final class Jarvis: NSObject, ObservableObject {
             // 9 nov (logica approvata dal signore): SPENTO → il tocco lo riaccende e ascolta subito; con la musica il tocco ascolta
             // subito (la musica si abbassa); altrimenti il tocco passa fra IN ATTESA e RISERVATO (solo «Jarvis»)
             if micSpento { micSpento = false; Task { await avviaAscolto(bip: true) } }
-            else if musicaSuona { Task { await avviaAscolto(bip: true) } }
+            else if musicaSuona { LettoreMusica.condiviso.fermaPerJarvis(); Task { await avviaAscolto(bip: true) } }   // 9 nov sera: pausa, non sfuma
             else { riservato.toggle() }
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
@@ -704,6 +690,11 @@ final class Jarvis: NSObject, ObservableObject {
         guard musicaSuona, fase == .attesa, !Jarvis.usaAscoltoCloud else { return }
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
+            // 9 nov sera: la musica del lettore dentro JARVIS, messa in pausa per ascoltare, riparte da dove era
+            if let self, self.fase == .attesa, self.inCoda.isEmpty, LettoreMusica.condiviso.fermataDaJarvis {
+                await LettoreMusica.condiviso.riprendiDopoJarvis()
+                return
+            }
             guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo,
                   !AscoltoShazam.condiviso.suonaDentro else { return }   // la canzone di Shazam suona dentro JARVIS: l'audio resta acceso
             await self.rilasciaMusica()
@@ -716,7 +707,8 @@ final class Jarvis: NSObject, ObservableObject {
     func rilasciaMusica() async {
         let sessione = AVAudioSession.sharedInstance()
         for _ in 0..<6 {
-            guard fase == .attesa, inCoda.isEmpty, !richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }
+            guard fase == .attesa, inCoda.isEmpty, !richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,
+                  !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis else { return }   // la musica è nostra: l'audio resta
             try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
             do { try sessione.setActive(false, options: .notifyOthersOnDeactivation); return } catch {
                 try? await Task.sleep(for: .milliseconds(330))
@@ -732,6 +724,7 @@ final class Jarvis: NSObject, ObservableObject {
         if musicaSuona, !Jarvis.usaAscoltoCloud {
             if fase == .elaboro { segnaInterruzione(); interrompi() }
             richiamo.ferma()
+            LettoreMusica.condiviso.fermaPerJarvis()     // 9 nov sera: il lettore dentro JARVIS non si abbassa: pausa, riparte dopo
             Task {
                 await avviaAscolto(bip: true)
                 if fase == .attesa { aggiornaRichiamo() }   // l'ascolto non è partito: il «Jarvis» in attesa torna acceso
@@ -1981,7 +1974,7 @@ final class Jarvis: NSObject, ObservableObject {
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
                   !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }   // 9 nov: né la canzone di Shazam
-            if self.musicaSuona { await self.rilasciaMusica() } else {
+            if self.musicaSuona { await self.rilasciaMusica() } else if !LettoreMusica.condiviso.suona {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
         }
@@ -2415,17 +2408,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
-        // 9 nov (il signore: «se chiudo l'app la musica deve spegnersi, non continuare su Apple Music… quando blocco lo schermo
-        // deve continuare e va nella Dynamic Island»): uscendo da JARVIS (Home o un'altra app) si fermano la musica dell'app Musica e
-        // il player di Shazam; bloccando lo schermo no. iOS dà la stessa uscita nei due casi: il blocco si riconosce dall'avviso del
-        // sistema che arriva insieme (Jarvis.seguiBlocco). Senza avviso (se iOS smettesse di mandarlo) la musica si ferma: la scelta
-        // sicura. Spotify Apple non lo lascia fermare.
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(700))
-            guard let self, Date().timeIntervalSince(self.bloccatoAlle) > 3 else { return }   // schermo bloccato: la musica continua
-            if LettoreMusica.sistemaSuona { LettoreMusica.condiviso.pausa() }
-            AscoltoShazam.condiviso.chiudi()
-        }
+        // 9 nov sera (il signore: «come Apple Music»): in background (Home, altra app, schermo bloccato) la musica continua; la
+        // musica è del lettore dentro JARVIS, quindi chiudendo JARVIS finisce da sola. «Chiudi» sulla sezione la ferma.
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello

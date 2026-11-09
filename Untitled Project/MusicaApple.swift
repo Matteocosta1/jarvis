@@ -2,7 +2,7 @@ import Foundation
 import MusicKit
 
 /// «Jarvis, metti …»: fa suonare brani, album, artisti e playlist di Apple Music (serve l'abbonamento).
-/// Usa il lettore di sistema: la musica continua nell'app Musica anche se JARVIS si chiude.
+/// 9 nov sera: usa il lettore DENTRO JARVIS (come la sezione Musica): chiudendo JARVIS la musica finisce, l'app Musica non si tocca.
 /// Serve il servizio MusicKit attivo sull'identificativo dell'app e la frase NSAppleMusicUsageDescription.
 enum MusicaApple {
 
@@ -17,7 +17,7 @@ enum MusicaApple {
             guard abbonamento.canPlayCatalogContent else {
                 return (json(["errore": "per far partire i brani serve un abbonamento Apple Music attivo"]), true)
             }
-            let lettore = SystemMusicPlayer.shared
+            let lettore = ApplicationMusicPlayer.shared
             var suona = ""
             switch tipo {
             case "album":
@@ -35,7 +35,7 @@ enum MusicaApple {
                 guard let artista = try await r.response().artists.first else { return nessuno(testo) }
                 let dettagli = try await artista.with([.topSongs])
                 guard let brani = dettagli.topSongs, !brani.isEmpty else { return nessuno(testo) }
-                lettore.queue = SystemMusicPlayer.Queue(for: brani)
+                lettore.queue = ApplicationMusicPlayer.Queue(for: brani)
                 suona = "i brani più ascoltati di \(artista.name)"
             default:
                 var r = MusicCatalogSearchRequest(term: testo, types: [Song.self]); r.limit = 1
@@ -43,7 +43,8 @@ enum MusicaApple {
                 lettore.queue = [b]
                 suona = "\(b.title) di \(b.artistName)"
             }
-            try await lettore.play()
+            await LettoreMusica.condiviso.play()
+            if let e = LettoreMusica.condiviso.errore { return (json(["errore": e]), true) }
             return (json(["ok": true, "in_riproduzione": suona]), false)
         } catch {
             return (json(["errore": "Apple Music: \(error.localizedDescription)"]), true)
@@ -51,19 +52,17 @@ enum MusicaApple {
     }
 
     static func controllo(azione: String) async -> (String, Bool) {
-        let lettore = SystemMusicPlayer.shared
-        do {
-            switch azione {
-            case "pausa": lettore.pause()
-            case "play": try await lettore.play()
-            case "avanti": try await lettore.skipToNextEntry()
-            case "indietro": try await lettore.skipToPreviousEntry()
-            default: return (json(["errore": "azione sconosciuta: \(azione)"]), true)
-            }
-            return (json(["ok": true]), false)
-        } catch {
-            return (json(["errore": "Apple Music: \(error.localizedDescription)"]), true)
+        let l = LettoreMusica.condiviso
+        l.errore = nil
+        switch azione {
+        case "pausa": l.pausa()
+        case "play": await l.play()
+        case "avanti": await l.avanti()
+        case "indietro": await l.indietro()
+        default: return (json(["errore": "azione sconosciuta: \(azione)"]), true)
         }
+        if let e = l.errore { return (json(["errore": e]), true) }
+        return (json(["ok": true]), false)
     }
 
     private static func nessuno(_ testo: String) -> (String, Bool) {
