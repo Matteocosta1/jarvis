@@ -2338,6 +2338,12 @@ async function consumi() {
     db.from("jarvis_consumi").select("creato").gte("creato", inizioMese.toISOString()).order("creato").limit(1),
     statoCredito().catch(() => ({ impostato: false })),
   ]);
+  // 9 nov (il signore, ologramma TORRI dei Costi: «ok dai fallo»): la spesa giorno per giorno del mese, dal primo a oggi
+  const nGiorni = Number(oggiRoma().slice(8, 10)) || 1;
+  const giorni = await Promise.all(Array.from({ length: nGiorni }, (_, i) => nGiorni - 1 - i).map(async (k) => {
+    const da = mezzanotteRoma(k), a = k === 0 ? new Date() : mezzanotteRoma(k - 1);
+    return { giorno: new Date(da.getTime() + 12 * 3600e3).toISOString().slice(0, 10), dollari: r2(sommaDollari(await costiFra(da, a))) };
+  })).catch(() => []);
   const modelli = mese.map((m) => ({ ...m, dollari: r2(m.dollari) })).sort((a, b) => b.dollari - a.dollari);
   const righe = primo.data ?? [];
   // la voce: il piano ElevenLabs e quanto ne resta
@@ -2347,7 +2353,7 @@ async function consumi() {
     fissi: [{ nome: "Supabase Pro", costo: "25 $/mese" }, { nome: "Apple Developer", costo: "99 €/anno" }],
     chiamate_mese: modelli.reduce((a, m) => a + m.chiamate, 0), chiamate_oggi: oggi.reduce((a, m) => a + m.chiamate, 0), modelli,
     caratteri_voce_mese: voceMese.caratteri, caratteri_voce_oggi: voceOggi.caratteri, voce,
-    dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr };
+    dal: righe.length ? quando(righe[0].creato) : "", credito: statoCr, giorni };
 }
 
 // ───────── Scanner alimentare (stile Yuka) con Open Food Facts: gratuito, aperto, senza chiave ─────────
