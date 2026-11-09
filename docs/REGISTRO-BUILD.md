@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## Prossima build (numero da chiedere) — in preparazione
+## 12.0 (3) — MARK XII · 9 nov · numero confermato dal signore («perfetto facciamolo») · controllo di compilazione VERDE (run 42615234041)
 - Microfono, logica nuova approvata dal signore (9 nov, «bellissima logica, facciamola»): tre stati sotto il reattore. IN ATTESA (ascolta tutto), RISERVATO (solo «Jarvis»: tocco sul reattore, o da solo mentre suona la musica, con la cancellazione dell'eco), SPENTO (sordo: pressione lunga sul reattore o «Jarvis, spegni il microfono»; un tocco lo riaccende e ascolta). Con la musica: «Jarvis» o tocco → la musica sfuma, ascolta, risponde, risale dopo 1,5 s; se era SPENTO resta spento (la privacy vince). La riga sotto dice cosa sente. Mockup uguale.
 - Uscendo da JARVIS (Home o un'altra app) si fermano la musica dell'app Musica e il player di Shazam (prima continuava su Apple Music); bloccando lo schermo invece continua (Dynamic Island), riconosciuto dall'avviso di sistema «lockcomplete» (senza avviso si ferma). Spotify non si può fermare da fuori.
 - Suono della pressione lunga (SPENTO): «spento.m4a», scelto dal signore (ui sound off, tagliato a 0,75 s: dopo era silenzio).
