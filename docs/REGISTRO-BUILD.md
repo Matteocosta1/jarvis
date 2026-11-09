@@ -530,6 +530,19 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 11.0 (19) — 9 nov notte · numero scelto dal signore (19) · commit 96e0e08 · controllo di compilazione VERDE (0 errori, 0 warning, run 42545348244)
+La 11.0 (18) + le correzioni della notte (screenshot e video del signore, 01:34–02:24). Mockup Mark XI aggiornato con le stesse cose.
+- YouTube (Shazam e Browser): «Questo video non è disponibile · 152-4». La pagina del player si presentava come youtube.com; ora come Vinyl Hustler: lettore ufficiale (IFrame API) con l'origine dell'app (it.discosizer.jarvis). In Shazam, se un video non si può guardare, parte il successivo (video di riserva).
+- Shazam a volume pieno: dopo il riconoscimento il microfono si chiude e l'audio torna a riposo (prima restava «registrazione»: volume da telefonata, pallino arancione). Anteprima e video suonano come musica. Dal polso l'audio non si tocca.
+- Shazam «Chiudi» ferma tutto (anche Apple Music intero); solo MUSICA lascia suonare e passa a Musica. Chiudere la sezione col player aperto lo ferma.
+- LIBRERIA: senza «Sincronizza libreria» dice di accenderla (Impostazioni › App › Musica).
+- Impostazioni: suono d'apertura delle schede; la rotella gira aprendo e chiudendo (anche nel mockup).
+- Interprete: una sola apertura come il mockup (pannello LINGUA dentro la sezione; «cambia lingua» lì dentro; «traduci in…» dritto alla conversazione); testata, tasti e riquadri come le altre sezioni; «A turni automatici» tenuto (anche nel mockup).
+- Wiretap: il tempo si ferma allo stop; «Chiudi» con del testo chiede «SALVARE LA REGISTRAZIONE?» (Archivio, cartella Wiretap); niente verbale automatico (solo col suo tasto); chiuso da fuori salva da solo in Archivio.
+- Satellite NAVIGA e GUIDA: il tasto «Guardati intorno» di Apple in basso a destra (prima sopra l'ora); veli scuri dietro testata e comandi; «DIETRO» nella capsula.
+- Il vinile di MUSICA nel Dock gira (33 giri) mentre la musica suona; fermata resta dov'è.
+- Da verificare sul telefono: volume di Shazam, video YouTube in Shazam e Browser, Interprete, Wiretap «Salvare?», Naviga.
+
 ## 11.0 (18) — 9 nov notte · numero scelto dal signore (18) · commit 16661f5 · controllo di compilazione VERDE (0 errori, 0 warning, run 42533019280) · cervello v122 pubblicato (prova generale superata)
 La 11.0 (17) + JARVIS vede quello che vede il signore (il signore, 23:49: in EDITH il link scritto e il risultato «SEMBRA A POSTO» a schermo, e JARVIS a voce diceva che il link era vuoto; 23:52: «mettilo ora… guarda se ci sono altre situazioni analoghe nelle varie sezioni»).
 - Causa: il cervello riceveva solo la conversazione, non i campi né i risultati della sezione aperta. A «controlla il link» chiamava edith_link con il testo vuoto.
