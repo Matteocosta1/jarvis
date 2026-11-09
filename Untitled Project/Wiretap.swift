@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import AVFoundation
 import Speech
@@ -21,6 +22,8 @@ final class Wiretap: ObservableObject {
     @Published private(set) var inPausa = false
     private var pausaDa: Date?
     private var pause: TimeInterval = 0
+    /// 9 nov notte (il signore, video 02:07: fermata la registrazione «lui continua a scorrere il tempo»): quando si è fermata.
+    private var fine: Date?
     /// Un comando detto durante la registrazione («Jarvis, torna», «Jarvis, apri la Sentinella»): non finisce nel verbale.
     var comando: ((ComandoVocale) -> Void)?
     /// MARK XI (4 nov, il signore): il Wiretap sta dietro un'altra sezione e registra ancora: «Jarvis, chiudi» vale per la sezione
@@ -41,6 +44,7 @@ final class Wiretap: ObservableObject {
     /// I secondi registrati fino a `adesso`, senza le pause.
     func secondi(_ adesso: Date = Date()) -> Int {
         guard let inizio else { return 0 }
+        let adesso = fine.map { min($0, adesso) } ?? adesso          // fermata: il tempo resta quello registrato
         let fermo = pause + (pausaDa.map { adesso.timeIntervalSince($0) } ?? 0)
         return max(0, Int(adesso.timeIntervalSince(inizio) - fermo))
     }
@@ -100,6 +104,7 @@ final class Wiretap: ObservableObject {
         confermato = []
         parziale = ""
         inizio = Date()
+        fine = nil
         inPausa = false
         pausaDa = nil
         pause = 0
@@ -152,6 +157,7 @@ final class Wiretap: ObservableObject {
         pausaDa = nil
         inPausa = false
         attivo = false
+        fine = Date()
         turno += 1
         presa.metti(nil)?.endAudio()
         compito?.finish()
@@ -224,10 +230,10 @@ nonisolated final class PresaRichiesta: @unchecked Sendable {
 // MARK: - La schermata
 
 struct VistaWiretap: View {
-    /// Manda la trascrizione a JARVIS per il verbale (chiude la pagina).
+    /// Il tasto «Il verbale, JARVIS»: la trascrizione a JARVIS per il verbale (chiude la pagina). Solo se lo si preme.
     let verbale: (String, Int) -> Void
     let chiudi: () -> Void
-    /// Comandi a voce durante l'intercettazione: «Jarvis, torna» chiude (e se c'è testo, prepara il verbale).
+    /// Comandi a voce durante l'intercettazione: «Jarvis, torna» fa come «Chiudi» (con del testo chiede se salvarlo).
     var comando: (ComandoVocale) -> Void = { _ in }
     /// MARK XI: i comandi che valgono per JARVIS e la sezione davanti (li esegue la schermata principale): le sezioni aperte a
     /// voce, «Jarvis, apri…» (4 nov, il signore: davanti, il Wiretap va dietro) e, col Wiretap dietro, «Jarvis, chiudi».
@@ -236,6 +242,12 @@ struct VistaWiretap: View {
     /// «Registra la riunione»: parte già registrando, come toccare REC (dopo il suono d'apertura).
     var avviaSubito = false
     @State private var chiusa = false              // chiusa prima che partisse: non registra più
+    /// 9 nov notte (il signore: «quando chiudo chiede di salvare… niente testo automatico, se ho chiuso ci sarà stato un motivo»):
+    /// «Chiudi» con del testo non manda più il verbale a JARVIS: chiede se salvare la registrazione nell'Archivio (cartella Wiretap),
+    /// con la domanda «Salvare?» di Studio e LiDAR. Il verbale parte solo col suo tasto (o «Jarvis, fai il verbale»).
+    @State private var chiediSalva = false
+    @State private var nomeSalva = ""
+    @State private var salvando = false
 
     @StateObject private var w = Wiretap()
     @State private var copiato = false
@@ -334,9 +346,9 @@ struct VistaWiretap: View {
                                      testata: DatiTestata(titolo: "Wiretap",
                                                           sottotitolo: w.attivo ? "intercettazione in corso" : (w.confermato.isEmpty ? "pronto" : "registrazione chiusa"),
                                                           icona: "waveform.and.mic", tinta: w.attivo ? Color.red : Color.ciano)) {
-                // 4 nov (il signore): come «Jarvis, chiudi» a voce, niente si perde: con del testo parte il verbale
-                VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
+                chiediChiusura()
             })
+            if chiediSalva { foglioSalva }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -351,21 +363,21 @@ struct VistaWiretap: View {
                 }
                 isolaRec(w)
             }
-            // MARK XI (4 nov): chiuso da fuori (pagine olografiche, «chiudi tutto», «chiudi il Wiretap») fa come il suo «Chiudi»
-            let verbale = self.verbale, chiudi = self.chiudi
+            // MARK XI (4 nov): chiuso da fuori (pagine olografiche, «chiudi tutto», «chiudi il Wiretap»): lì non si può chiedere,
+            // quindi il testo si salva da solo nell'Archivio (niente si perde, niente verbale)
+            let chiudi = self.chiudi
             WiretapAperto.registra(ObjectIdentifier(registratore)) { [weak registratore] in
                 guard let w = registratore else { return }
-                VistaWiretap.chiudiConVerbale(w, verbale: verbale, chiudi: chiudi)
+                VistaWiretap.salvaEChiudi(w, chiudi: chiudi)
             }
             w.comando = { c in
                 // le sezioni aperte a voce («quella di prima», «mettila da parte», «chiudi il meteo», «fai il verbale»), «Jarvis,
                 // apri…» (4 nov, il signore: il Wiretap va dietro e continua a registrare, come mandato dietro col dito) e, col
                 // Wiretap dietro, «Jarvis, chiudi» per la sezione davanti: li esegue la schermata principale, la registrazione continua
                 if c.navigaSezioni || VistaWiretap.apre(c) || (w.dietro && c == .torna) { aJarvis(c); return }
+                if c == .torna { chiediChiusura(); return }                      // «Jarvis, chiudi»: come il tasto «Chiudi»
                 w.ferma()
-                let testo = w.testo
-                if c == .torna, !testo.isEmpty { verbale(testo, w.minuti) }    // niente si perde: parte il verbale
-                else { comando(c) }
+                comando(c)
             }
             if avviaSubito {
                 Task {
@@ -386,6 +398,91 @@ struct VistaWiretap: View {
 }
 
 extension VistaWiretap {
+    /// «Chiudi» (il tasto o «Jarvis, chiudi»): senza testo chiude; con del testo chiede se salvarlo (sale «SALVARE LA REGISTRAZIONE?»).
+    fileprivate func chiediChiusura() {
+        guard !salvando else { return }
+        w.ferma()
+        guard !w.testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { w.cancella(); chiudi(); return }
+        nomeSalva = VistaWiretap.nomePredefinito(w)
+        Suoni.schedaApre()
+        withAnimation(.salitaFoglio) { chiediSalva = true }
+    }
+
+    /// La domanda prima di chiudere, come LiDAR e lo Studio: SALVA · NON SALVARE · ANNULLA.
+    private var foglioSalva: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.001).ignoresSafeArea()               // sotto il foglio non si tocca niente
+            FoglioSalva(titolo: "SALVARE LA REGISTRAZIONE?",
+                        sotto: salvando ? "Salvo nell'Archivio…" : "Chiudo il Wiretap · \(w.minuti) min, non salvata",
+                        nome: $nomeSalva,
+                        nota: "SALVA la mette nell'Archivio, cartella Wiretap. NON SALVARE butta il testo.",
+                        salva: { salva() },
+                        nonSalvare: {
+                            guard !salvando else { return }
+                            withAnimation(.salitaFoglio) { chiediSalva = false }
+                            w.cancella()
+                            chiudi()
+                        },
+                        annulla: { guard !salvando else { return }; withAnimation(.salitaFoglio) { chiediSalva = false } })
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
+        .transition(.move(edge: .bottom))
+        .zIndex(10)
+    }
+
+    /// SALVA: il testo va nell'Archivio; salvato, il Wiretap si chiude. Se non riesce resta aperto e lo dice.
+    private func salva() {
+        guard !salvando else { return }
+        salvando = true
+        let testo = VistaWiretap.documento(w), nome = nomeSalva
+        Task {
+            let errore = await VistaWiretap.salvaInArchivio(testo, nome: nome)
+            salvando = false
+            withAnimation(.salitaFoglio) { chiediSalva = false }
+            if let errore {
+                w.problema = "Non salvata: \(errore)"
+            } else {
+                Suoni.schedaPronta()
+                w.cancella()
+                chiudi()
+            }
+        }
+    }
+
+    /// Chiuso da fuori: il testo si salva da solo nell'Archivio, poi chiude.
+    static func salvaEChiudi(_ w: Wiretap, chiudi: () -> Void) {
+        w.ferma()
+        if !w.testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let testo = documento(w), nome = nomePredefinito(w)
+            Task { _ = await salvaInArchivio(testo, nome: nome) }
+        }
+        chiudi()
+    }
+
+    /// «Wiretap 9 nov 02.07» (senza i due punti, che nei nomi dei file non vanno).
+    static func nomePredefinito(_ w: Wiretap) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "it_IT")
+        f.dateFormat = "d MMM HH.mm"
+        return "Wiretap \(f.string(from: w.inizio ?? Date()))"
+    }
+
+    /// Il file: quando, quanto è durata, poi la trascrizione.
+    static func documento(_ w: Wiretap) -> String {
+        let quando = (w.inizio ?? Date()).formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute())
+        return "WIRETAP · \(quando) · \(w.minuti) min\n\n\(w.testo)\n"
+    }
+
+    /// Il testo nell'Archivio (cartella Wiretap). Nil: salvato; altrimenti il perché no.
+    static func salvaInArchivio(_ testo: String, nome: String) async -> String? {
+        let pulito = nome.trimmingCharacters(in: .whitespacesAndNewlines)
+        let corpo: [String: Any] = ["archivio_carica": ["nome": pulito.isEmpty ? "Wiretap" : pulito, "cartella": "Wiretap",
+                                                        "tipo": "text/plain", "testo": testo]]
+        guard let o = await VistaVitals.chiama(corpo, attesa: 30) else { return "il cervello non risponde." }
+        if let e = o["errore"] as? String { return e }
+        return nil
+    }
+
     /// «Jarvis, apri…» (anche Studio e Social), 4 nov, il signore: il Wiretap va dietro (o ci resta) e continua a registrare.
     /// «Traduci in…» no: il microfono serve all'Interprete e la registrazione si ferma (il testo resta).
     static func apre(_ c: ComandoVocale) -> Bool {
@@ -395,12 +492,6 @@ extension VistaWiretap {
         }
     }
 
-    /// «Chiudi» (il tasto, o da fuori: pagine olografiche, «chiudi tutto»): con del testo parte il verbale, altrimenti chiude.
-    static func chiudiConVerbale(_ w: Wiretap, verbale: (String, Int) -> Void, chiudi: () -> Void) {
-        w.ferma()
-        let testo = w.testo
-        if !testo.isEmpty { verbale(testo, w.minuti) } else { w.cancella(); chiudi() }
-    }
 
     /// L'isola REC: da quando conta (spostato delle pause) o, in pausa, i secondi registrati.
     fileprivate func isolaRec(_ r: Wiretap? = nil) {

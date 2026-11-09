@@ -88,6 +88,8 @@ struct VistaShazam: View {
             withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico = [] }
             VistaShazam.salva([])
         }
+        // 9 nov notte: chiusa la sezione col player aperto, l'assaggio si ferma come con «Chiudi» del player
+        .onDisappear { if aperta != nil { ascolto.chiudi() } }
     }
 
     private var sottotitolo: String {
@@ -239,7 +241,7 @@ struct VistaShazam: View {
                         else { await ascolto.video(titolo: t.titolo, artista: t.artista) }
                     }
                 }
-                ChipOlo(testo: "MUSICA", acceso: false) { Suoni.tocco(); chiudiPlayer(); apriMusica() }
+                ChipOlo(testo: "MUSICA", acceso: false) { Suoni.tocco(); chiudiPlayer(tieniMusica: true); apriMusica() }
             }
             if let e = ascolto.errore ?? (ascolto.fonte == .intero ? lettore.errore : nil) {
                 Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center)
@@ -343,8 +345,10 @@ struct VistaShazam: View {
 
     nonisolated static func mmss(_ s: Double) -> String { let x = Int(max(0, s)); return String(format: "%d:%02d", x / 60, x % 60) }
 
-    private func chiudiPlayer() {
-        ascolto.chiudi()                                                          // anteprima e video si fermano; Apple Music continua
+    /// 9 nov notte (scelta del signore): il player di Shazam è un assaggio: «Chiudi» ferma tutto, anche Apple Music intero.
+    /// Solo MUSICA (`tieniMusica`) lascia suonare la canzone, che passa nella sezione Musica.
+    private func chiudiPlayer(tieniMusica: Bool = false) {
+        ascolto.chiudi(tieniMusica: tieniMusica)
         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)) { aperta = nil; giu = 0; mini = false }
     }
 

@@ -43,7 +43,9 @@ enum WiretapAperto {
 
 /// Una sezione del contenitore.
 enum Sezione: Hashable {
-    case impostazioni, browser, occhi, interprete, sentinella, wiretap, profiler, allenatore, lidar, vitals, ricordi, confidente, lingua
+    // 9 nov notte (il signore: «si apre due volte ed è orribile così»): niente più la sezione a parte per scegliere la lingua
+    // dell'Interprete: la lingua si sceglie dentro l'Interprete, come nel mockup
+    case impostazioni, browser, occhi, interprete, sentinella, wiretap, profiler, allenatore, lidar, vitals, ricordi, confidente
     case scheda(SchedaApp)
     case pagina(String)                 // MARK X: Studio e Social
 
@@ -62,7 +64,6 @@ enum Sezione: Hashable {
         case .vitals: return "Vitals"
         case .ricordi: return "Ricordi"
         case .confidente: return "Confidente"
-        case .lingua: return "Interprete"
         case .pagina(let n): return n
         case .scheda(let s):
             switch s {
@@ -152,6 +153,12 @@ final class PilaSezioni: ObservableObject {
             return vecchia.sezione
         }
         return nil
+    }
+
+    /// 9 nov: la lingua dell'Interprete scelta o cambiata dentro la sezione (tornando davanti da dietro riparte con questa).
+    func linguaInterprete(_ l: Lingua) {
+        guard let i = voci.firstIndex(where: { $0.sezione == .interprete }) else { return }
+        voci[i].lingua = l
     }
 
     /// Lo stato della sezione si è spento: se stava andando dietro resta (spenta se ha la fotocamera), altrimenti è chiusa ed esce.

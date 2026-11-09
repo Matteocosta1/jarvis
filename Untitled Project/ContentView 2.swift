@@ -188,6 +188,8 @@ struct ContentView: View {
             // sezione davanti va dietro da sola; si chiude solo quello che starebbe sopra di loro (la pagina web, il menu SISTEMI…)
             .onChange(of: jarvis.occhi != nil) { _, aperti in if aperti { liberaSopra() } }
             .onChange(of: jarvis.interprete != nil) { _, aperto in if aperto { liberaSopra() } }
+            // 9 nov: la lingua c'è (scelta nel pannello, a voce o cambiata dentro): la sezione la ricorda, la scelta è finita
+            .onChange(of: jarvis.interprete) { _, l in if let l { scegliLingua = false; pila.linguaInterprete(l) } }
             .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
                 Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
                     jarvis.impostaFoto(immagine)
@@ -762,8 +764,10 @@ struct ContentView: View {
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.35).padding(.trailing, mini ? 1 : ContentView.margineDock)   // foto 02:49: spazio 7
-                    // 9 nov notte (il signore: «l'icona si anima quando chiudo la sezione»): ferma come le altre icone del Dock e come
-                    // nel mockup (prima girava di 90° all'apertura, coperta dalla sezione, e si vedeva tornare indietro alla chiusura)
+                    // 9 nov notte (il signore: «l'icona di impostazioni mi piace che si animi all'avvio e alla chiusura… aggiungiamola»):
+                    // la rotella gira di un quarto aprendo Impostazioni e torna chiudendo, ora anche nel mockup
+                    .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
+                    .animation(.spring(duration: 0.5), value: mostraImpostazioni)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
@@ -817,7 +821,7 @@ struct ContentView: View {
             ("PERCEPTION", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
 
             ("ENGINEERING", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
-            ("ENGINEERING", "globe.europe.africa", "Interprete", { tastiera = false; scegliLingua = true }),
+            ("ENGINEERING", "globe.europe.africa", "Interprete", { tastiera = false; apriInterprete() }),
             ("ENGINEERING", "globe", "Browser", { mostraBrowser = true }),
             ("ENGINEERING", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
             ("ENGINEERING", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
@@ -1205,7 +1209,7 @@ struct ContentView: View {
         if mostraImpostazioni { a.append(.impostazioni) }
         if mostraBrowser { a.append(.browser) }
         if jarvis.occhi != nil { a.append(.occhi) }
-        if jarvis.interprete != nil { a.append(.interprete) }
+        if jarvis.interprete != nil || scegliLingua { a.append(.interprete) }      // 9 nov: senza lingua, la sceglie lì dentro
         if mostraSentinella { a.append(.sentinella) }
         if mostraWiretap { a.append(.wiretap) }
         if mostraProfiler { a.append(.profiler) }
@@ -1214,7 +1218,6 @@ struct ContentView: View {
         if mostraVitals { a.append(.vitals) }
         if mostraRicordi != nil { a.append(.ricordi) }
         if mostraConfidente { a.append(.confidente) }
-        if scegliLingua { a.append(.lingua) }
         if let sc = scheda { a.append(.scheda(sc)) }
         if let p = aperturaPagina { a.append(.pagina(p.sezione)) }
         return a
@@ -1291,7 +1294,7 @@ struct ContentView: View {
         case .impostazioni: mostraImpostazioni = false
         case .browser: mostraBrowser = false
         case .occhi: jarvis.occhiChiusi([])               // dietro: JARVIS non resta ad aspettare la foto (davanti la riaspetta)
-        case .interprete: jarvis.interprete = nil
+        case .interprete: jarvis.interprete = nil; scegliLingua = false
         case .sentinella: mostraSentinella = false
         case .wiretap: mostraWiretap = false
         case .profiler: mostraProfiler = false
@@ -1300,7 +1303,6 @@ struct ContentView: View {
         case .vitals: mostraVitals = false
         case .ricordi: mostraRicordi = nil
         case .confidente: mostraConfidente = false
-        case .lingua: scegliLingua = false
         case .scheda(let sc): if scheda == sc { scheda = nil }
         case .pagina: aperturaPagina = nil
         }
@@ -1313,7 +1315,7 @@ struct ContentView: View {
         case .impostazioni: mostraImpostazioni = true
         case .browser: mostraBrowser = true
         case .occhi: if let o = v.occhiata { jarvis.riprendiOcchi(o) }       // la stessa inquadratura, e JARVIS riaspetta la foto
-        case .interprete: jarvis.interprete = v.lingua
+        case .interprete: if let l = v.lingua { jarvis.interprete = l } else { scegliLingua = true }   // 9 nov: senza lingua, la scelta
         case .wiretap: mostraWiretap = true
         case .sentinella: mostraSentinella = true
         case .profiler: profiler()
@@ -1322,7 +1324,6 @@ struct ContentView: View {
         case .vitals: mostraVitals = true
         case .ricordi: mostraRicordi = v.ricordi ?? .ricordi
         case .confidente: mostraConfidente = true
-        case .lingua: scegliLingua = true
         case .scheda(let sc): scheda = sc
         case .pagina: aperturaPagina = v.pagina
         }
@@ -1357,14 +1358,14 @@ struct ContentView: View {
     /// Dalle pagine olografiche (o a voce, «chiudi il meteo»): la sezione si chiude, davanti o dietro che sia.
     private func chiudiDietro(_ id: UUID) {
         guard let v = pila.voci.first(where: { $0.id == id }) else { return }
-        if v.sezione == .wiretap { chiudiWiretap(); return }       // 4 nov (il signore): con del testo parte il verbale
+        if v.sezione == .wiretap { chiudiWiretap(); return }       // 9 nov: con del testo si salva da solo nell'Archivio
         if pila.davanti == id { spegniStato(v.sezione); return }
         pila.togli(v.sezione)
         sezioneChiusa(v.sezione)
     }
 
-    /// 4 nov (il signore): il Wiretap chiuso da fuori (pagine olografiche, «chiudi tutto», «chiudi il Wiretap») fa come il suo
-    /// «Chiudi»: con del testo parte il verbale, niente si perde. Dietro, poi esce anche dall'elenco.
+    /// 4 nov (il signore): il Wiretap chiuso da fuori (pagine olografiche, «chiudi tutto», «chiudi il Wiretap»). 9 nov notte: niente
+    /// più verbale automatico; con del testo si salva da solo nell'Archivio (cartella Wiretap). Dietro, poi esce anche dall'elenco.
     private func chiudiWiretap() {
         guard let v = pila.voce(.wiretap) else { return }
         let dietro = pila.davanti != v.id
@@ -1373,7 +1374,7 @@ struct ContentView: View {
     }
 
     /// «Jarvis, chiudi tutto» (4 nov, il signore): si chiudono tutte le sezioni aperte, anche quelle dietro, e quello che sta
-    /// sopra (come «Jarvis, chiudi»). Il Wiretap con del testo prepara il verbale.
+    /// sopra (come «Jarvis, chiudi»). Il Wiretap con del testo lo salva nell'Archivio (9 nov).
     private func chiudiTutteLeSezioni() {
         if tendinaAperta || tendinaTrascina != 0 { chiudiTendina() }
         for v in pila.voci where v.id != pila.davanti && v.sezione != .wiretap {
@@ -1492,7 +1493,12 @@ struct ContentView: View {
                     .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "fork.knife" : "eye", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
-            if let l = v.lingua { Interprete(lingua: l) { jarvis.interprete = nil } }
+            // 9 nov notte (il signore: «si apre due volte ed è orribile così»): una sezione sola, come il mockup. Dall'icona si apre
+            // senza lingua e la si sceglie nel pannello LINGUA, lì dentro; «Jarvis, traduci in tedesco» la apre già con la lingua
+            Interprete(lingua: v.lingua ?? jarvis.interprete, scelta: { l in jarvis.interrompi(); jarvis.interprete = l }) {
+                jarvis.interprete = nil; scegliLingua = false
+            }
+            .paginaPiena()
         case .sentinella:
             VistaSentinella(chiudi: { mostraSentinella = false }, comando: comandoDaReparto)
         case .wiretap:
@@ -1519,18 +1525,6 @@ struct ContentView: View {
         case .confidente:
             VistaConfidente(invia: { testo, nascosto in mostraConfidente = false; chiedi(testo, nascosto: nascosto) },
                             aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
-        case .lingua:
-            // 26 ott notte (il signore): la lingua dell'Interprete si sceglie in una scheda di JARVIS (caricamento, icona animata, tasti
-            // ciano), non più nel menu di iOS con le bandierine. 4 nov: la stessa scheda (SceltaLingua) di «Jarvis, cambia lingua».
-            SceltaLingua { l in
-                jarvis.interrompi()
-                scegliLingua = false
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(450))     // l'Interprete sale a scheda chiusa
-                    jarvis.interprete = l
-                }
-            }
-            .paginaPiena()
         case .scheda(let sc):
             vistaScheda(sc).paginaPiena()
         case .pagina:
@@ -1708,7 +1702,7 @@ struct ContentView: View {
         case .confidente: return .confidente
         case .allenatore: return .allenatore
         case .ricordi: return .ricordi
-        case .interprete: return .lingua
+        case .interprete: return .interprete
         case .browser: return .browser
         case .lidar: return .lidar
         case .impostazioni: return .impostazioni
@@ -1818,7 +1812,7 @@ struct ContentView: View {
                 jarvis.salvaTraccia = false
                 jarvis.richiestaTraccia = false
                 mostraRicordi = .traccia
-            case .interprete: scegliLingua = true
+            case .interprete: apriInterprete()
             case .browser: mostraBrowser = true
             case .lidar: mostraLidar = true
             case .costi: scheda = .costi
@@ -1853,6 +1847,12 @@ struct ContentView: View {
         default:
             break                                   // gli altri li gestisce il reparto stesso
         }
+    }
+
+    /// 9 nov notte: l'icona (o «Jarvis, apri l'interprete»). Se l'Interprete è già aperto, anche dietro, torna con la sua lingua e
+    /// la sua conversazione; se no sale senza lingua e la si sceglie lì dentro (una sola apertura, come il mockup).
+    private func apriInterprete() {
+        if let l = pila.voce(.interprete)?.lingua ?? jarvis.interprete { jarvis.interprete = l } else { scegliLingua = true }
     }
 
     /// Profiler: la sua schermata, con la scheda da compilare dopo lo scatto.

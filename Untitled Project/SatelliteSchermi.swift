@@ -103,10 +103,12 @@ struct ScattoSat: View {
     var body: some View {
         HStack(spacing: 10) {
             Spacer(minLength: 0)
+            // 9 nov notte: sopra la vista da strada la scritta si perdeva: nella capsula scura, come la bussola in alto
             Text(davanti ? "DAVANTI" : "DIETRO")
                 .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1)
                 .foregroundStyle(Color.ciano)
-                .frame(width: 46, alignment: .trailing)
+                .padding(.vertical, 5).padding(.horizontal, 8)
+                .background(Capsule().fill(Color.black.opacity(0.45)))
             Button {
                 Suoni.tocco()
                 davanti.toggle()
@@ -204,7 +206,10 @@ struct VistaLookAround: UIViewControllerRepresentable {
         let c = ContenitoreLookAround()
         c.vista.isNavigationEnabled = true
         c.vista.showsRoadLabels = true
-        c.vista.badgePosition = .topTrailing
+        // 9 nov notte (il signore, screenshot 02:13: «Guardati intorno» di Apple sopra l'ora, il Wi-Fi e la batteria): la vista di Apple
+        // mette il suo tasto in alto senza tener conto dei margini; in basso a destra invece li rispetta (il marchio «Mappe» sta già
+        // giusto, sopra i comandi). Il tasto va lì, accanto al marchio: i segni di Apple restano visibili, la testata è libera
+        c.vista.badgePosition = .bottomTrailing
         c.vista.scene = scena
         c.sopra = sopra
         c.sotto = sotto
@@ -401,6 +406,29 @@ private func disegnaCartellino(_ gc: GraphicsContext, testo: String, x: Double, 
     gc.draw(scritta, at: CGPoint(x: cx, y: basso - h / 2), anchor: .center)
 }
 
+/// 9 nov notte (il signore: «risolvi il casino grafico… le sovrapposizioni in alto e riordina»): la vista da strada vera e la
+/// fotocamera sono chiare (cielo, facciate), non scure come le viste del mockup, e l'ora, la testata, la bussola e «Chiudi» ci si
+/// perdevano sopra; in fondo le frecce passavano sotto i comandi e il totale «A piedi» non si leggeva. Due veli scuri, come le app di
+/// foto e mappe di iOS: in alto dietro la barra di iOS e la testata, in basso dietro i comandi (`sotto`: quanto sono alti).
+struct VeliSat: View {
+    let sotto: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            LinearGradient(stops: [.init(color: .black.opacity(0.72), location: 0), .init(color: .black.opacity(0.45), location: 0.55),
+                                   .init(color: .black.opacity(0), location: 1)], startPoint: .top, endPoint: .bottom)
+                .frame(height: FasciaAlta.margineAlto + 120)
+            Spacer(minLength: 0)
+            LinearGradient(stops: [.init(color: .black.opacity(0), location: 0), .init(color: .black.opacity(0.6), location: 0.3),
+                                   .init(color: .black.opacity(0.82), location: 1)], startPoint: .top, endPoint: .bottom)
+                .frame(height: sotto + FasciaAlta.fondo + 70)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - NAVIGA
 
 struct SchermoNaviga: View {
@@ -433,6 +461,8 @@ struct SchermoNaviga: View {
                              : "\(t.svolta.freccia) \(t.via.uppercased()) · \(Rotta.distanza(t.metri))")
                     .ignoresSafeArea()
             }
+            VeliSat(sotto: altoGiu)
+
             // decisione 16: sugli iPhone da 375 punti girati in orizzontale (12/13 mini: 354 punti d'altezza utile) la colonna
             // (circa 368 punti) non ci stava e la testata si tagliava. Solo quando non ci sta si stringono gli spazi tra i pezzi
             // (10 → 6) e il margine in fondo (22 → 14): niente tolto. Dove ci sta (il 15 Pro, 372 punti) resta identica
@@ -579,12 +609,14 @@ struct SchermoGuida: View {
     @State private var cameraAccesa = false
     @State private var lampo = false
     @State private var visibile = false
+    @State private var altoGiu: CGFloat = 0           // 9 nov: quanto sono alti i comandi in fondo (il velo scuro ci sta dietro)
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             if cameraAccesa, let m = camera { AnteprimaOcchi(sessione: m.sessione).ignoresSafeArea() }
             FrecceGuida(relativa: relativa, testo: cartellino, arrivato: motore.arrivato).ignoresSafeArea()
+            VeliSat(sotto: altoGiu)
             VStack(spacing: 0) {
                 TestaSat(sotto: "GUIDA · \(luogo.nome.uppercased())", bussola: motore.direzione.map { Rotta.bussola($0) } ?? "N · 0°", conFotocamera: true) {
                     Suoni.tocco(); apri(nil)                       // la guida resta attiva: negli Occhi e al polso
@@ -592,6 +624,7 @@ struct SchermoGuida: View {
                 su
                 Spacer(minLength: 0)
                 giu
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { altoGiu = $0 }
             }
             LampoSat(acceso: $lampo)
         }

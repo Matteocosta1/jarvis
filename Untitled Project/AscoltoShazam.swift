@@ -242,12 +242,13 @@ final class AscoltoShazam: ObservableObject {
         }
     }
 
-    /// Il player si chiude: l'anteprima e il video si fermano (Apple Music intero continua, come prima: è la musica del signore).
-    func chiudi() {
+    /// Il player si chiude: si ferma tutto (9 nov notte, scelta del signore: il player di Shazam è un assaggio), anche Apple Music
+    /// intero; con MUSICA (`tieniMusica`) la canzone intera continua e passa nella sezione Musica.
+    func chiudi(tieniMusica: Bool = false) {
         giro += 1
         cercando = false
         let dentro = fonte == .anteprima || fonte == .video
-        if fonte != .intero { ferma() }
+        if fonte != .intero || !tieniMusica { ferma() }
         videoID = nil
         videoRiserva = []
         fermaVideo()

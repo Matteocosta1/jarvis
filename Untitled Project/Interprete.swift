@@ -40,147 +40,145 @@ struct Lingua: Identifiable, Hashable {
 }
 
 struct Interprete: View {
-    let lingua: Lingua
+    /// La lingua con cui si apre: nil dall'icona (la sceglie qui dentro, nel pannello LINGUA), già scelta con «traduci in tedesco».
+    let lingua: Lingua?
+    /// 9 nov: la lingua scelta o cambiata qui dentro, per il contenitore (JARVIS e la pila la ricordano).
+    var scelta: (Lingua) -> Void = { _ in }
     let chiudi: () -> Void
     @StateObject private var motore = MotoreInterprete()
     @AppStorage("interpreteAuto") private var automatico = true
-    @State private var scelta: Lingua?                  // «Jarvis, passa al francese»: la lingua cambiata a voce
-    @State private var scegliLingua = false             // «Jarvis, cambia lingua»
+    @State private var cambiata: Lingua?                // la lingua scelta qui dentro (nel pannello o a voce: «passa al francese»)
+    @State private var scegliendo = false               // «Jarvis, cambia lingua»: il pannello LINGUA torna al posto della conversazione
     @State private var orecchio = OrecchioComandi()     // i comandi a voce tra un turno e l'altro, sempre con «Jarvis» davanti
     @State private var chiuso = false                   // a schermata chiusa l'orecchio non si riaccende più
-    private var lin: Lingua { scelta ?? lingua }
+    private var lin: Lingua? { cambiata ?? lingua }
 
+    // 9 nov notte (il signore: «la sezione interprete va rifatta… si apre due volte ed è orribile così»): identica al mockup
+    // (sezione Interprete del mockup Mark XI). Una sola apertura, col caricamento e la testata di tutte le sezioni (CorniceScheda):
+    // in testa l'ologramma PONTE; sotto, senza lingua, il pannello LINGUA; scelta la lingua, al suo posto i due lati (LEI ⇄ L'ALTRO),
+    // lo stato, la conversazione in un riquadro olografico, i turni automatici e i due tasti ASCOLTA. Prima la lingua si sceglieva in
+    // una scheda a parte (SceltaLingua) che si chiudeva, e poi saliva l'Interprete col suo caricamento: due aperture.
     var body: some View {
         let frasi = motore.scambi.map { PonteInterprete.Frase(altro: $0.chi == .altro, testo: $0.originale, trad: $0.tradotto) }
-        let codice = lin.codice.uppercased()
-        ZStack {
-            SfondoSezione()                                       // 7 nov (il signore): lo sfondo di tutte le pagine
-            VStack(spacing: 12) {
-                // 7 nov sera (il signore: «metti icona, titolo e sottotitolo nel frame dove c'è Chiudi»): la testata nella riga di
-                // «Chiudi», come tutte le sezioni (BarraSezione); il ponte 16 punti sotto
-                HStack(spacing: 0) {
-                HStack {
-                    AnelloOcchi(icona: "globe.europe.africa", tinta: Color.ciano)   // 26 ott notte: l'icona animata come le altre sezioni
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("INTERPRETE")
-                            .font(.system(size: 17, weight: .bold, design: .monospaced)).tracking(3)   // 8 nov: 17 come il mockup
-                        Text(lin.nome.uppercased())
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2)
-                    }
-                    .foregroundStyle(Color.ciano)
-                    Spacer(minLength: 0)
-                }
-                .padding(.trailing, 12)
-                Button("Chiudi") { Suoni.tocco(); motore.ferma(); chiudi() }
-                    .font(.system(size: 13, weight: .semibold)).tint(Color.ciano).foregroundStyle(Color.ciano)
-                    .frame(minWidth: 44, minHeight: 44)
-                }
-                .frame(minHeight: 44)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
-
-                // 8 nov sera: sotto la riga in alto la pagina si stampa all'apertura come nel mockup (StampaDaAmbiente, un blocco solo)
-                VStack(spacing: 12) {
-                // v270 (il signore: «crea anche un ologramma per interprete»): il PONTE fra le due lingue, in testa come nel mockup
-                OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
-                    PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: codice, frasi: frasi)
-                }
-                .corniceOlo(Color.ciano)
-                .padding(.horizontal, 12)
-
-                // le due lingue, con il lato attivo che si illumina
-                HStack(spacing: 10) {
-                    lato(Lingua.italiano, attivo: motore.lato == .io, titolo: "LEI")
-                    Image(systemName: "arrow.left.arrow.right").foregroundStyle(Color.tenue)
-                    lato(lin, attivo: motore.lato == .altro, titolo: "L'ALTRO")
-                }
-                .padding(.horizontal, 20)
-
-                Text(motore.stato)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(3)
-                    .foregroundStyle(motore.fase == .ascolto ? Color.ciano : Color.orange)
-                    .frame(minHeight: 18)
-
-                // la conversazione
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(motore.scambi) { s in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("\(s.chi == .io ? "LEI" : lin.nome.uppercased()) · \(s.ora)")
-                                        .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2)
-                                        .foregroundStyle(s.chi == .io ? Color.ciano : Color.orange)
-                                    Text(s.originale).font(.system(size: 15)).foregroundStyle(.white)
-                                    Text(s.tradotto.isEmpty ? "…" : s.tradotto).font(.system(size: 15)).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95)).italic()
-                                }
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.ciano.opacity(0.05))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke((s.chi == .io ? Color.ciano : Color.orange).opacity(0.35), lineWidth: 0.8))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .id(s.id)
-                            }
-                            if !motore.parziale.isEmpty {
-                                Text(motore.parziale).font(.system(size: 15)).foregroundStyle(Color.tenue).padding(.horizontal, 10)
-                            }
-                        }
-                        .padding(.horizontal, 20).padding(.vertical, 8)
-                    }
-                    .onChange(of: motore.scambi.count) { if let u = motore.scambi.last { withAnimation { proxy.scrollTo(u.id, anchor: .bottom) } } }
-                }
-                // 27 ott: la conversazione nel visore olografico, come Browser e Confidente
-                .background(Color.ciano.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ciano.opacity(0.25), lineWidth: 1))
-                .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))
-                .padding(.horizontal, 12)
-
-                Toggle(isOn: $automatico) {
-                    Text("A turni automatici").font(.footnote).foregroundStyle(Color.tenue)
-                }
-                .tint(Color.ciano2)
-                .padding(.horizontal, 20)
-
-                // i due tasti: ascolta me / ascolta l'altro
-                HStack(spacing: 14) {
-                    tasto("Ascolta me", icona: "person.wave.2", colore: Color.ciano) { orecchio.ferma(); motore.ascolta(.io, lingua: lin) }
-                    tasto("Ascolta \(lin.bandiera)", icona: "ear", colore: Color.orange) { orecchio.ferma(); motore.ascolta(.altro, lingua: lin) }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 16)
-                }
-                .modifier(StampaDaAmbiente())
+        CorniceScheda(titolo: "Interprete", sottotitolo: lin.map { $0.nome.lowercased() } ?? "scelga la lingua",
+                      icona: "globe.europe.africa", tinta: Color.ciano, fondo: motore.scambi.count) {
+            // v270: il PONTE fra le due lingue, in testa come nel mockup (prima della scelta: IT e il punto di domanda)
+            OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
+                PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: lin.map { $0.codice.uppercased() } ?? "?", frasi: frasi)
+            }
+            .corniceOlo(Color.ciano)
+            if let l = lin, !scegliendo {
+                conversazione(l)
+            } else {
+                pannelloLingue
             }
         }
         .onAppear {
             motore.automatico = automatico
-            motore.prepara(lingua: lin)
             orecchio.dentro = .interprete
             orecchio.comando = { c in comando(c) }
             motore.suComando = { c in comando(c) }          // «Jarvis, …» detto durante il suo turno: è un comando, non si traduce
+            if let l = lin { motore.prepara(lingua: l) }
         }
         .task {
             try? await Task.sleep(for: .seconds(Apertura.orecchio))      // dopo il suono d'apertura, come nella Sentinella
-            if !Task.isCancelled, !chiuso, motore.fase == .attesa { orecchio.avvia() }
+            // senza lingua il microfono resta a JARVIS («Jarvis, inglese»): quello dell'Interprete parte con la lingua
+            if !Task.isCancelled, !chiuso, lin != nil, motore.fase == .attesa { orecchio.avvia() }
         }
         // il microfono dei comandi resta acceso solo tra un turno e l'altro: nei turni il microfono è dell'Interprete
         .onChange(of: motore.fase) { _, f in
             if f != .attesa { orecchio.ferma(); return }
-            Task {
-                try? await Task.sleep(for: .milliseconds(400))
-                if !chiuso, motore.fase == .attesa { orecchio.avvia() }
-            }
+            riaccendiOrecchio()
+        }
+        // la lingua arrivata da fuori mentre il pannello è aperto («Jarvis, inglese» detto a JARVIS): si parte con quella
+        .onChange(of: lingua) { _, l in
+            guard let l, l != cambiata else { return }
+            cambiata = l
+            scegliendo = false
+            motore.prepara(lingua: l)
+            riaccendiOrecchio()
         }
         .onChange(of: automatico) { _, v in motore.automatico = v }
         .onDisappear { chiuso = true; orecchio.ferma(); motore.ferma() }
-        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma(); scegliLingua = false },   // MARK XI: dietro in pausa
-                     riprendi: { if !chiuso, motore.fase == .attesa { orecchio.avvia() } })
-        // 4 nov (il signore): «Jarvis, cambia lingua» apre la scheda di JARVIS con le lingue, come all'apertura (SceltaLingua),
-        // non più il menu di iOS con le bandierine. La conversazione resta.
-        .fullScreenCover(isPresented: $scegliLingua) {
-            SceltaLingua { l in cambia(l) }
-                .paginaPiena()
+        .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },          // MARK XI: dietro in pausa
+                     riprendi: { if !chiuso, lin != nil, motore.fase == .attesa { orecchio.avvia() } })
+    }
+
+    /// La scelta della lingua, come il mockup: il pannello LINGUA con i tasti delle lingue su due colonne.
+    private var pannelloLingue: some View {
+        Pannello(titolo: "LINGUA", tinta: Color.ciano, olografico: true) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(Lingua.tutte) { l in
+                    TastoComando(testo: "\(l.bandiera) \(l.nome)") { scegli(l) }
+                }
+            }
         }
-        .aperturaHUD("Interprete", icona: "globe.europe.africa")
+    }
+
+    /// Scelta la lingua: i due lati, lo stato, la conversazione, i turni automatici e i due tasti, come il mockup.
+    @ViewBuilder private func conversazione(_ l: Lingua) -> some View {
+        HStack(spacing: 10) {
+            lato(Lingua.italiano, attivo: motore.lato == .io, titolo: "LEI")
+            Text("⇄").foregroundStyle(Color.tenue)
+            lato(l, attivo: motore.lato == .altro, titolo: "L'ALTRO")
+        }
+        Text(motore.stato)
+            .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(3)
+            .foregroundStyle(motore.fase == .ascolto ? Color.ciano : Color.orange)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, minHeight: 18)
+        if !motore.scambi.isEmpty || !motore.parziale.isEmpty {
+            Pannello(tinta: Color.ciano, olografico: true) {
+                ForEach(motore.scambi) { s in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(s.originale).font(.system(size: 14)).foregroundStyle(.white)
+                        Text(s.tradotto.isEmpty ? "…" : s.tradotto).font(.system(size: 12)).foregroundStyle(Color.tenue)
+                    }
+                    .padding(.vertical, 8).padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(s.chi == .io ? Color.ciano.opacity(0.35) : Color.orange.opacity(0.4), lineWidth: 1))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(s.chi == .io ? "Lei" : l.nome): \(s.originale). Tradotto: \(s.tradotto)")
+                }
+                if !motore.parziale.isEmpty {
+                    Text(motore.parziale).font(.system(size: 14)).foregroundStyle(Color.tenue).padding(.horizontal, 10)
+                }
+            }
+        }
+        Toggle(isOn: $automatico) {                                   // come «Solo non lette» della Posta (.interr del mockup)
+            Text("A turni automatici").font(.system(size: 14)).foregroundStyle(.white)
+        }
+        .tint(Color.ciano)
+        HStack(spacing: 8) {
+            TastoComando(testo: "Ascolta me", attivo: libero) { Suoni.tocco(); orecchio.ferma(); motore.ascolta(.io, lingua: l) }
+            TastoComando(testo: "Ascolta \(l.bandiera)", attivo: libero) { Suoni.tocco(); orecchio.ferma(); motore.ascolta(.altro, lingua: l) }
+        }
+    }
+
+    /// I tasti ASCOLTA valgono quando l'Interprete non sta traducendo o parlando.
+    private var libero: Bool { motore.fase != .traduco && motore.fase != .parlo }
+
+    /// Una lingua toccata nel pannello: la prima volta si parte, dopo è un cambio (con l'annuncio, come a voce).
+    private func scegli(_ l: Lingua) {
+        Suoni.tocco()
+        guard lin != nil else {
+            cambiata = l
+            scegliendo = false
+            scelta(l)
+            motore.prepara(lingua: l)
+            riaccendiOrecchio()
+            return
+        }
+        cambia(l)
+    }
+
+    /// L'orecchio dei comandi si riaccende un attimo dopo (finito il turno o scelta la lingua).
+    private func riaccendiOrecchio() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if !chiuso, lin != nil, motore.fase == .attesa { orecchio.avvia() }
+        }
     }
 
     /// I comandi a voce dentro l'Interprete.
@@ -193,26 +191,31 @@ struct Interprete: View {
         case .dentroInterprete(let a):
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             switch a {
-            case .ascoltaMe: orecchio.ferma(); motore.ascolta(.io, lingua: lin)
-            case .ascoltaAltro: orecchio.ferma(); motore.ascolta(.altro, lingua: lin)
-            case .ripeti:                                   // niente da ripetere: l'ascolto dei comandi resta acceso
-                orecchio.ferma(); motore.ripeti(lin)
-                if motore.fase == .attesa { orecchio.avvia() }
+            case .lingua(let codice): if let l = Lingua.trova(codice) { scegli(l) }
+            case .sceltaLingua: withAnimation(.easeOut(duration: 0.25)) { scegliendo = true }   // 9 nov: il pannello LINGUA, qui dentro
             case .turniAutomatici(let si):
                 automatico = si
                 orecchio.ferma(); motore.annuncia(si ? "Turni automatici, Sir." : "Turni manuali, Sir.")
-            case .lingua(let codice): if let l = Lingua.trova(codice) { cambia(l) }
-            case .sceltaLingua: scegliLingua = true
+            case .ascoltaMe, .ascoltaAltro, .ripeti:
+                guard let l = lin, !scegliendo else { return }       // senza lingua non c'è niente da ascoltare né da ripetere
+                switch a {
+                case .ascoltaMe: orecchio.ferma(); motore.ascolta(.io, lingua: l)
+                case .ascoltaAltro: orecchio.ferma(); motore.ascolta(.altro, lingua: l)
+                default:                                    // niente da ripetere: l'ascolto dei comandi resta acceso
+                    orecchio.ferma(); motore.ripeti(l)
+                    if motore.fase == .attesa { orecchio.avvia() }
+                }
             }
         case .interprete(let codice):                         // «Jarvis, traduci in tedesco» anche da qui
-            if let l = Lingua.trova(codice) { cambia(l) }
+            if let l = Lingua.trova(codice) { scegli(l) }
         default: break
         }
     }
 
     private func cambia(_ l: Lingua) {
-        scegliLingua = false                                // anche a voce («passa al francese») con la scheda delle lingue aperta
-        scelta = l
+        cambiata = l
+        withAnimation(.easeOut(duration: 0.25)) { scegliendo = false }   // anche a voce («passa al francese») col pannello aperto
+        scelta(l)
         motore.prepara(lingua: l)
         orecchio.ferma()
         motore.annuncia("\(l.nome), Sir.")
@@ -223,29 +226,13 @@ struct Interprete: View {
             Text(l.bandiera).font(.system(size: 28))
             Text(titolo).font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(Color.tenue)
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 8)
+        .frame(maxWidth: .infinity).padding(.vertical, 10)                 // come .in-lato del mockup
         .overlay { if attivo { AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false) } }   // 27 ott: chi parla, nel visore
         .background(Color.ciano.opacity(attivo ? 0.18 : 0.05))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(attivo ? 0.9 : 0.3), lineWidth: attivo ? 1.4 : 0.8))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(attivo ? 0.9 : 0.25), lineWidth: attivo ? 1.4 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .ciano.opacity(attivo ? 0.5 : 0), radius: 8)
         .animation(.easeInOut(duration: 0.3), value: attivo)
-    }
-
-    private func tasto(_ titolo: String, icona: String, colore: Color, azione: @escaping () -> Void) -> some View {
-        Button { Suoni.tocco(); azione() } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icona).font(.system(size: 22, weight: .semibold))
-                Text(titolo).font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1)
-            }
-            .foregroundStyle(colore)
-            .frame(maxWidth: .infinity).frame(height: 64)
-            .background(colore.opacity(0.1))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(colore.opacity(0.6), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(StileStark())
-        .disabled(motore.fase == .traduco || motore.fase == .parlo)
     }
 }
 
@@ -361,33 +348,6 @@ enum PonteInterprete {
             let i = k - latoId, p = P(lati[i], 0, 0.55)
             OP.riquadro(&gc, W, H, p.x, p.y, [i == 1 ? lb : la, i == 1 ? "LA LINGUA DELL'ALTRO" : "LA SUA LINGUA", parla == i ? "STA PARLANDO" : "ASCOLTA"],
                         t - M.sceltaT, codice: i == 1 ? "L'ALTRO" : "LEI")
-        }
-    }
-}
-
-/// La scelta della lingua dell'Interprete: la scheda di JARVIS (caricamento, icona animata, tasti ciano con le bandierine), non
-/// il menu di iOS. 26 ott notte (il signore) per l'apertura; 4 nov anche per «Jarvis, cambia lingua» dentro l'Interprete.
-struct SceltaLingua: View {
-    let scegli: (Lingua) -> Void
-
-    var body: some View {
-        CorniceScheda(titolo: "Interprete", sottotitolo: "scelga la lingua", icona: "globe.europe.africa", tinta: Color.ciano) {
-            // 8 nov (il signore: «nella build in Interprete non c'è l'ologramma»): il PONTE anche qui, sopra la scelta della lingua,
-            // come nel mockup: l'italiano di qua, «?» di là finché non sceglie
-            OloSingolaVista(altezza: 250, aiuto: "↔ GIRA · TOCCA UNA FRASE", etichetta: "Ologramma del ponte fra le due lingue") { gc, W, H, t, M in
-                PonteInterprete.disegna(&gc, W, H, t, M, la: "IT", lb: "?", frasi: [])
-            }
-            .corniceOlo(Color.ciano)
-            Pannello(titolo: "LINGUA", tinta: Color.ciano) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(Lingua.tutte) { l in
-                        TastoComando(testo: "\(l.bandiera) \(l.nome)") {   // le bandierine sì, ma nella scheda di JARVIS
-                            Suoni.tocco()
-                            scegli(l)
-                        }
-                    }
-                }
-            }
         }
     }
 }

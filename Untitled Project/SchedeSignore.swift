@@ -17,6 +17,8 @@ struct CorniceScheda<Contenuto: View>: View {
     var fotocamera = false          // Scanner: quando è pronta, il suono delle sezioni con fotocamera al posto di «pronta»
     /// 26 ott notte (il signore, «JARVIS Music»): la testata come Studio e Social, «J.A.R.V.I.S.» e sotto il nome della sezione.
     var marchio = false
+    /// 9 nov (Interprete): quando cambia, la pagina scorre in fondo (una frase nuova nella conversazione si vede subito).
+    var fondo: Int? = nil
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
@@ -74,23 +76,30 @@ struct CorniceScheda<Contenuto: View>: View {
 
     /// La pagina che scorre: il contenuto, che a fine caricamento si stampa dall'alto tutto insieme (un blocco solo).
     private var pagina: some View {
-        ScrollView {
-            // UNA vista sola (non i riquadri uno per uno: su una lista di viste la stampa finirebbe su ognuna), già pronta sotto il
-            // caricamento (come `resto` nel mockup, nascosto finché non si stampa): a fine caricamento si scopre e basta, senza
-            // fotogrammi vuoti
-            VStack(alignment: .leading, spacing: 16) { contenuto() }
-                .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
-                .allowsHitTesting(mostrato)
-                .accessibilityHidden(!mostrato)
-            .padding(16)
-            .padding(.bottom, 30)
-            // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
-            // larga esattamente quanto lo schermo e scorre solo in verticale, come nel mockup.
-            .containerRelativeFrame(.horizontal)
+        ScrollViewReader { lettore in
+            ScrollView {
+                // UNA vista sola (non i riquadri uno per uno: su una lista di viste la stampa finirebbe su ognuna), già pronta sotto il
+                // caricamento (come `resto` nel mockup, nascosto finché non si stampa): a fine caricamento si scopre e basta, senza
+                // fotogrammi vuoti
+                VStack(alignment: .leading, spacing: 16) { contenuto() }
+                    .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
+                    .allowsHitTesting(mostrato)
+                    .accessibilityHidden(!mostrato)
+                .padding(16)
+                .padding(.bottom, 30)
+                // 26 ott sera (video 21:29, SATELLITE): trascinando la mappa la pagina scorreva anche di lato. La pagina è
+                // larga esattamente quanto lo schermo e scorre solo in verticale, come nel mockup.
+                .containerRelativeFrame(.horizontal)
+                .id("paginaScheda")
+            }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .scrollDismissesKeyboard(.interactively)
+            .scrollDisabled(!mostrato)
+            .onChange(of: fondo) { _, n in
+                guard n != nil, mostrato else { return }
+                withAnimation(.easeOut(duration: 0.3)) { lettore.scrollTo("paginaScheda", anchor: .bottom) }
+            }
         }
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .scrollDismissesKeyboard(.interactively)
-        .scrollDisabled(!mostrato)
     }
 }
 
