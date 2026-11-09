@@ -762,8 +762,8 @@ struct ContentView: View {
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.35).padding(.trailing, mini ? 1 : ContentView.margineDock)   // foto 02:49: spazio 7
-                    .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
-                    .animation(.spring(duration: 0.5), value: mostraImpostazioni)
+                    // 9 nov notte (il signore: «l'icona si anima quando chiudo la sezione»): ferma come le altre icone del Dock e come
+                    // nel mockup (prima girava di 90° all'apertura, coperta dalla sezione, e si vedeva tornare indietro alla chiusura)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
@@ -1243,6 +1243,9 @@ struct ContentView: View {
                 pila.togli(s)
             }
             if riprendo == s { riprendo = nil }
+            // 9 nov notte (il signore: «la rotella di impostazioni non ha il suono di apertura scheda»): Impostazioni sale senza
+            // caricamento e non aveva suono; ora quello d'apertura delle schede, solo quando si apre davvero (non da dietro)
+            if s == .impostazioni, pila.voce(s) == nil { Suoni.schedaApre() }
             let occhiata: Occhiata? = s == .occhi ? jarvis.occhi : nil
             let lingua: Lingua? = s == .interprete ? jarvis.interprete : nil
             let pagina: AperturaPagina? = aperturaPagina.flatMap { s == .pagina($0.sezione) ? $0 : nil }
