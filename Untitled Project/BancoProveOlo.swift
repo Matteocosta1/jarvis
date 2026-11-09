@@ -56,7 +56,8 @@ struct BancoProveOlo: View {
         var m = 0
         while m <= fine {
             let h = Double(m) / 60
-            var b = h < 6.5 ? 55 + 2.5 * sin(h * 1.4) : h < 8 ? 60 + (h - 6.5) * 9 : 72 + 5 * sin(h * 0.8)
+            var b: Double
+            if h < 6.5 { b = 55 + 2.5 * sin(h * 1.4) } else if h < 8 { b = 60 + (h - 6.5) * 9 } else { b = 72 + 5 * sin(h * 0.8) }
             if h > 17.5 && h < 18.5 { b = 92 + 26 * sin((h - 17.5) * .pi) }
             oggi.append((m: Double(m), v: b.rounded()))
             m += 10
@@ -67,8 +68,8 @@ struct BancoProveOlo: View {
         d.minimo = Int(oggi.map { $0.v }.min() ?? 51)
         d.massimo = Int(oggi.map { $0.v }.max() ?? 75)
         d.hrv = 42
-        d.riposo30 = (0..<30).map { 57 + 3 * sin(Double($0) * 0.7) + Double($0 % 3) }
-        d.hrv30 = (0..<30).map { 40 + 8 * sin(Double($0) * 0.5) + Double($0 % 4) }
+        d.riposo30 = (0..<30).map { (i: Int) -> Double in let s: Double = 3 * sin(Double(i) * 0.7); return 57 + s + Double(i % 3) }
+        d.hrv30 = (0..<30).map { (i: Int) -> Double in let s: Double = 8 * sin(Double(i) * 0.5); return 40 + s + Double(i % 4) }
         return d
     }
 
@@ -138,7 +139,10 @@ struct BancoProveOlo: View {
         d.db = "214 MB"
         d.righe = 48210
         d.storage = "36 MB · 12 FILE"
-        d.minuti = (0..<60).map { i in (r: max(0, Int((3 + 2 * sin(Double(i) * 0.7) + (i % 17 == 5 ? 4 : 0)).rounded())), e: 0) }
+        d.minuti = (0..<60).map { (i: Int) -> (r: Int, e: Int) in
+            let picco: Double = i % 17 == 5 ? 4 : 0, v: Double = 3 + 2 * sin(Double(i) * 0.7) + picco
+            return (r: max(0, Int(v.rounded())), e: 0)
+        }
         return d
     }
 
