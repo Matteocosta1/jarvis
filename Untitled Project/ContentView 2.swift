@@ -623,7 +623,12 @@ struct ContentView: View {
 
     private var suggerimento: String {
         switch jarvis.fase {
-        case .attesa: return jarvis.micSpento ? "Non ascolto nulla · tocchi il reattore per parlare" : "Tocchi il reattore e parli"
+        case .attesa:
+            // 9 nov (logica approvata dal signore): la riga dice cosa sente in ciascuno dei tre stati
+            if jarvis.micSpento { return "Non ascolto nulla · tocchi il reattore per parlare" }
+            if jarvis.musicaSuona { return "Dica «Jarvis»: abbasso la musica" }
+            if jarvis.riservato { return "Sento solo «Jarvis» · un tocco per tutto" }
+            return "Mi parli · un tocco: solo «Jarvis»"
         case .ascolto: return "La ascolto, signore…"
         case .elaboro: return "Un momento…"
         case .parlo: return "Tocchi il reattore per interrompermi"
@@ -959,6 +964,8 @@ struct ContentView: View {
             } else {
                 Button { tastiera = false; jarvis.toccaReattore() } label: { reattore }
                     .buttonStyle(StileStark())
+                    // 9 nov (logica approvata dal signore): pressione lunga sul reattore = microfono SPENTO (sordo); un tocco lo riaccende
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono() })
                     .scaleEffect(acceso ? 1 : 0.7)
                     .opacity(acceso ? 1 : 0)
                     .accessibilityLabel("Parla con Jarvis")
@@ -1036,6 +1043,7 @@ struct ContentView: View {
                     if !piccolo { jarvis.toccaReattore() }
                 } label: { reattore }
                 .buttonStyle(StileStark())
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in if !piccolo { jarvis.spegniMicrofono() } })   // 9 nov: SPENTO
                 .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
                 .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
                 .opacity(acceso ? 1 : 0)

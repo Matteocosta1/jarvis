@@ -151,7 +151,26 @@ final class Jarvis: NSObject, ObservableObject {
         didSet { if micSpento != oldValue { aggiornaRichiamo() } }
     }
     /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO».
-    var etichettaFase: String { fase == .attesa && micSpento ? "MICROFONO SPENTO" : fase.rawValue }
+    /// 9 nov (logica approvata dal signore): IN ATTESA (ascolta tutto), RISERVATO (solo «Jarvis»: scelto col tocco o con la musica),
+    /// SPENTO (sordo: pressione lunga sul reattore).
+    var etichettaFase: String {
+        guard fase == .attesa else { return fase.rawValue }
+        if micSpento { return "SPENTO" }
+        return riservato || musicaSuona ? "RISERVATO" : fase.rawValue
+    }
+    /// 9 nov: RISERVATO scelto a mano (tocco sul reattore in attesa): sente solo «Jarvis», niente frasi, conversazioni, TV, battiti.
+    @Published var riservato = false {
+        didSet { if riservato != oldValue { aggiornaRichiamo() } }
+    }
+    private var spentoLungo = Date.distantPast     // la pressione lunga: il rilascio che segue non è un tocco
+    /// 9 nov: pressione lunga sul reattore (o «Jarvis, spegni il microfono»): SPENTO, sordo davvero. Un tocco lo riaccende.
+    func spegniMicrofono() {
+        guard !micSpento else { return }
+        spentoLungo = Date()
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        riservato = false
+        micSpento = true
+    }
     /// 9 nov (il signore: «mentre suona la canzone dico Jarvis, la musica si abbassa, ci parlo, risponde, e dopo uno o due secondi
     /// la musica risfuma verso l'alto»): mentre suona la musica (Apple Music, Spotify… o il player di Shazam) l'orecchio dell'attesa
     /// sente solo «Jarvis» (niente frasi senza nome, niente battiti di mani, niente orecchio mentre parla): prima sentiva la canzone
@@ -160,9 +179,6 @@ final class Jarvis: NSObject, ObservableObject {
     @Published private(set) var musicaSuona = false {
         didSet {
             guard musicaSuona != oldValue else { return }
-            // 9 nov (il signore: «con la musica, che venga da Shazam o da Musica, dico Jarvis e non torna in ascolto»): con la musica
-            // il microfono non resta mai spento a mano: deve sentire «Jarvis»
-            if musicaSuona && micSpento { micSpento = false }
             aggiornaRichiamo()
         }
     }
@@ -390,14 +406,17 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Interazione
 
     func toccaReattore() {
+        if Date().timeIntervalSince(spentoLungo) < 0.8 { return }   // 9 nov: il dito alzato dopo la pressione lunga non è un tocco
         fermaBenvenuto()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
         switch fase {
         case .attesa:
-            // 24 ott: in attesa il tocco spegne il microfono; il tocco dopo lo riaccende e ascolta subito (come prima)
-            // 9 nov: con la musica il tocco ascolta subito (la musica si abbassa), non spegne il microfono
-            if micSpento || musicaSuona { micSpento = false; Task { await avviaAscolto(bip: true) } } else { micSpento = true }
+            // 9 nov (logica approvata dal signore): SPENTO → il tocco lo riaccende e ascolta subito; con la musica il tocco ascolta
+            // subito (la musica si abbassa); altrimenti il tocco passa fra IN ATTESA e RISERVATO (solo «Jarvis»)
+            if micSpento { micSpento = false; Task { await avviaAscolto(bip: true) } }
+            else if musicaSuona { Task { await avviaAscolto(bip: true) } }
+            else { riservato.toggle() }
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
         case .parlo, .elaboro:
@@ -628,7 +647,7 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
             // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
-            let serve = !inBenvenuto && !avvioInCorso && !micSpento && !musicaSuona && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
+            let serve = !inBenvenuto && !avvioInCorso && !micSpento && !musicaSuona && !riservato && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
                 && !(occhi != nil && fase == .elaboro)          // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
             guard serve else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
@@ -640,7 +659,8 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
-        richiamo.soloNome = musicaSuona                  // 9 nov: con la musica solo «Jarvis»
+        richiamo.conMusica = musicaSuona                 // 9 nov: con la musica la cancellazione dell'eco
+        richiamo.soloNome = musicaSuona || riservato     // 9 nov: RISERVATO (a mano o con la musica): solo «Jarvis»
         avvioRichiamo?.cancel()
         guard richiamoServe else { richiamo.ferma(); restituisciMusica(); return }
         guard !richiamo.attivo else { return }
@@ -712,7 +732,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Due battiti di mani.
     private func applaudito() {
-        guard fase == .attesa, !inBenvenuto, !musicaSuona else { return }   // 9 nov: con la musica i colpi di batteria non sono battiti
+        guard fase == .attesa, !inBenvenuto, !musicaSuona, !riservato else { return }   // 9 nov: con la musica (e in RISERVATO) niente battiti
         if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
         ultimiBattiti = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -843,6 +863,13 @@ final class Jarvis: NSObject, ObservableObject {
         let frase = sottovoce(fraseIntera)
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
+        // 9 nov (logica approvata dal signore): «spegni il microfono» = SPENTO (come la pressione lunga sul reattore)
+        let ordine = frase.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+        if ["spegni il microfono", "spegni microfono", "microfono spento", "chiudi il microfono"].contains(ordine) {
+            spegniMicrofono()
+            annuncia("Microfono spento, Sir. Un tocco sul reattore e torno ad ascoltarla.")
+            return true
+        }
         // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…): subito, senza cervello, prima delle storpiature
         if let d = ComandoDedicato.riconosci(frase) {
             // build 23: dentro LiDAR «mostrami la stanza in 3D» è il 3D di LiDAR (come «mostrami il 3D»), non SATELLITE
@@ -2338,6 +2365,10 @@ final class Jarvis: NSObject, ObservableObject {
     /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
+        // 9 nov (il signore: «se chiudo l'app la musica deve spegnersi, non continuare su Apple Music»): uscendo da JARVIS (anche
+        // bloccando lo schermo) si ferma la musica dell'app Musica e il player di Shazam. Spotify Apple non lo lascia fermare.
+        if LettoreMusica.sistemaSuona { LettoreMusica.condiviso.pausa() }
+        AscoltoShazam.condiviso.chiudi()
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello

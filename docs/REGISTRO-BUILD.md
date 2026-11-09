@@ -531,6 +531,8 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 
 ## Prossima build (numero da chiedere) — in preparazione
+- Microfono, logica nuova approvata dal signore (9 nov, «bellissima logica, facciamola»): tre stati sotto il reattore. IN ATTESA (ascolta tutto), RISERVATO (solo «Jarvis»: tocco sul reattore, o da solo mentre suona la musica, con la cancellazione dell'eco), SPENTO (sordo: pressione lunga sul reattore o «Jarvis, spegni il microfono»; un tocco lo riaccende e ascolta). Con la musica: «Jarvis» o tocco → la musica sfuma, ascolta, risponde, risale dopo 1,5 s; se era SPENTO resta spento (la privacy vince). La riga sotto dice cosa sente. Mockup uguale. Suono della pressione lunga: lo sceglie il signore.
+- Uscendo da JARVIS (anche bloccando lo schermo) si fermano la musica dell'app Musica e il player di Shazam (prima continuava su Apple Music). Spotify non si può fermare da fuori.
 - Musica (9 nov, il signore: «con la musica, che venga da Shazam o da Musica, dico Jarvis e non torna in ascolto», sotto il reattore «MICROFONO SPENTO»): la musica non veniva riconosciuta (bastava un tocco sul reattore per spegnere il microfono). Ora quattro letture insieme (app Musica, player di Shazam, audio delle altre app); con la musica il microfono non resta spento a mano; il microfono dell'attesa con la musica e l'altoparlante dell'iPhone ha la cancellazione dell'eco (la canzone che esce dal telefono non copre il «Jarvis»), abbassamento delle altre app al minimo; con cuffie/casse Bluetooth no.
 
 ## 12.0 (2) — MARK XII · 9 nov mattina · numero confermato dal signore («perfetto, produciamo la build»)

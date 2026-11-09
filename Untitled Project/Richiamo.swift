@@ -36,15 +36,15 @@ final class Richiamo {
     private(set) var sveglio = false     // ha sentito «Jarvis»: sta raccogliendo la frase
     /// 9 nov (il signore: «mentre suona la canzone dico Jarvis, la musica si abbassa, ci parlo»): con la musica conta solo «Jarvis»
     /// (niente frasi senza nome, niente seguito, niente nome in fondo alla frase): la canzone non lo sveglia da sola.
-    var soloNome = false {
-        // con la musica il microfono passa alla cancellazione dell'eco (e torna normale dopo): si riaccende col nuovo modo
-        didSet { if soloNome != oldValue, acceso { spegni(); accendi() } }
-    }
+    var soloNome = false
     /// 9 nov: la musica esce dall'altoparlante dell'iPhone, a pochi centimetri dal microfono: senza aiuto copre il «Jarvis». Con la
     /// musica e l'altoparlante dell'iPhone si accende la cancellazione dell'eco (come l'orecchio mentre JARVIS parla), con
     /// l'abbassamento delle altre app al minimo; con cuffie o casse Bluetooth no (passerebbero alla qualità da telefonata).
+    var conMusica = false {
+        didSet { if conMusica != oldValue, acceso { spegni(); accendi() } }
+    }
     private var conEco: Bool {
-        guard soloNome else { return false }
+        guard conMusica else { return false }
         let uscite = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
         return uscite.contains(.builtInSpeaker) || uscite.contains(.builtInReceiver)
     }
