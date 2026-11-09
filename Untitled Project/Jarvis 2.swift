@@ -215,7 +215,11 @@ final class Jarvis: NSObject, ObservableObject {
         // il player di Shazam dentro JARVIS (anteprima e video), e l'audio delle altre app (Spotify, un video)
         let sessione = AVAudioSession.sharedInstance()
         let altre: Bool = sessione.isOtherAudioPlaying || sessione.secondaryAudioShouldBeSilencedHint
-        let suona: Bool = altre || LettoreMusica.sistemaSuona || AscoltoShazam.condiviso.suonaOra
+        // 9 nov sera (il signore: «il disco gira sempre anche se la musica è spenta»): lo stato del lettore si leggeva solo a sezione
+        // aperta; ora anche qui, una volta al secondo, così il disco nel Dock si ferma quando la musica si ferma (anche dall'isola)
+        let lettore = LettoreMusica.condiviso
+        lettore.aggiorna()
+        let suona: Bool = altre || lettore.suona || AscoltoShazam.condiviso.suonaOra
         if suona { silenzioMusica = 0; musicaSuona = true; return }
         silenzioMusica += 1
         if silenzioMusica >= 2 { musicaSuona = false }
@@ -687,6 +691,9 @@ final class Jarvis: NSObject, ObservableObject {
         avvioRichiamo = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.richiamoServe else { return }
+            // 9 nov sera: con la musica, prima di riaccendere il «Jarvis» la musica dev'essere tornata su
+            if self.musicaSuona, self.fase == .attesa { await self.rilasciaMusica() }
+            guard !Task.isCancelled, self.richiamoServe, !self.richiamo.attivo else { return }
             self.richiamo.avvia()
         }
     }
@@ -699,7 +706,21 @@ final class Jarvis: NSObject, ObservableObject {
             try? await Task.sleep(for: .milliseconds(1500))
             guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo,
                   !AscoltoShazam.condiviso.suonaDentro else { return }   // la canzone di Shazam suona dentro JARVIS: l'audio resta acceso
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            await self.rilasciaMusica()
+        }
+    }
+
+    /// 9 nov sera (il signore: «dopo la risposta di Jarvis la musica non torna»): la musica abbassata torna su solo quando l'audio di
+    /// JARVIS si spegne davvero. A volte iOS dice «occupato» (un suono che finisce, il microfono che si libera) e prima non si
+    /// riprovava: la musica restava bassa. Ora: niente più «abbassa gli altri», poi si spegne, riprovando fino a 6 volte (2 s).
+    func rilasciaMusica() async {
+        let sessione = AVAudioSession.sharedInstance()
+        for _ in 0..<6 {
+            guard fase == .attesa, inCoda.isEmpty, !richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }
+            try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
+            do { try sessione.setActive(false, options: .notifyOthersOnDeactivation); return } catch {
+                try? await Task.sleep(for: .milliseconds(330))
+            }
         }
     }
 
@@ -1960,7 +1981,9 @@ final class Jarvis: NSObject, ObservableObject {
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
                   !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }   // 9 nov: né la canzone di Shazam
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            if self.musicaSuona { await self.rilasciaMusica() } else {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
         }
         if Jarvis.usaAscoltoCloud { liberoMacFinoA = Date().addingTimeInterval(8) }   // Mac: per 8 secondi il seguito va senza «Jarvis»
         strumenti.apriInSospeso()    // WhatsApp, Mappe, telefono: si aprono quando JARVIS ha finito di parlare
@@ -2070,6 +2093,15 @@ final class Jarvis: NSObject, ObservableObject {
                 Task { @MainActor [weak self] in self?.aggiorna(testo: testo, finale: finale, errore: errore, ascolto: mio) }
             }
             armaSilenzio(secondi: silenzio ?? 5)   // tempo per iniziare a parlare
+            // 9 nov sera: con la musica (anche abbassata) il riconoscimento sente le parole della canzone e il silenzio non arriva
+            // mai: la musica restava bassa a lungo. Con la musica l'ascolto dura al massimo 10 secondi, poi manda quello che ha.
+            if musicaSuona {
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(10))
+                    guard let self, self.turnoAscolto == mio, self.fase == .ascolto else { return }
+                    self.fermaAscolto(invia: !self.parziale.isEmpty)
+                }
+            }
         } catch {
             fermaAscolto(invia: false)
             if await riprovaAscolto(bip: bip, tentativo: tentativo) { return }

@@ -530,6 +530,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Prossima build (numero da chiedere) — in preparazione
+- Musica (9 nov sera, il signore): il disco nel Dock girava anche a musica ferma (lo stato del lettore si leggeva solo a sezione aperta): ora letto ogni secondo. Dopo la risposta di JARVIS (o tornando in RISERVATO) la musica restava bassa: l'audio di JARVIS ora si spegne davvero, riprovando fino a 2 s, prima di riaccendere il «Jarvis». Con la musica l'ascolto dura al massimo 10 s (le parole della canzone non lasciano mai arrivare il silenzio).
+
 ## 12.0 (4) — MARK XII · 9 nov pomeriggio · numero confermato dal signore («12.4» = 12.0 (4))
 - Ricontrollo della logica musica/microfono: l'audio di JARVIS non si spegne più mentre la canzone di Shazam (anteprima o video) suona dentro JARVIS (prima, a fine risposta o al cambio di stato, poteva fermarla); «Jarvis» con la musica: se l'ascolto non parte, il «Jarvis» in attesa si riaccende da solo.
 - Musica che si fermava pochi secondi dopo la partenza (12.0 (3), il signore: «parte, pochi secondi, si riblocca»): era la cancellazione dell'eco accesa sul microfono dell'attesa quando parte la musica (la modalità «chiamata» di iOS ferma la musica delle altre app). Tolta: con la musica resta RISERVATO (solo «Jarvis») senza cancellazione dell'eco.
