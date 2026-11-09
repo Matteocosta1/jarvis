@@ -328,7 +328,7 @@ final class Jarvis: NSObject, ObservableObject {
         super.init()
         AmbienteSonoro.condiviso.jarvisSuona(true)   // si apre con la musica d'avvio: non è «confusione»
         sintesi.delegate = self
-        seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa va in pausa
+        seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa sente solo «Jarvis»
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica]) }   // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
@@ -387,7 +387,7 @@ final class Jarvis: NSObject, ObservableObject {
         switch fase {
         case .attesa:
             // 24 ott: in attesa il tocco spegne il microfono; il tocco dopo lo riaccende e ascolta subito (come prima)
-            // 9 nov: con la musica l'orecchio è già in pausa: il tocco ascolta subito (la musica si abbassa)
+            // 9 nov: con la musica il tocco ascolta subito (la musica si abbassa), non spegne il microfono
             if micSpento || musicaSuona { micSpento = false; Task { await avviaAscolto(bip: true) } } else { micSpento = true }
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
@@ -648,7 +648,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    /// 9 nov: con la musica e l'orecchio in pausa, tornato in attesa (anche da un ascolto senza frase) l'audio si restituisce:
+    /// 9 nov: con la musica, tornato in attesa (anche da un ascolto senza frase) l'audio si restituisce:
     /// la musica abbassata dall'ascolto torna al suo volume. Un attimo dopo, così una domanda appena partita non la rialza.
     private func restituisciMusica() {
         guard musicaSuona, fase == .attesa, !Jarvis.usaAscoltoCloud else { return }
