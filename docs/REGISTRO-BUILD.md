@@ -530,6 +530,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Prossima build (numero da chiedere) — in preparazione
+- Musica (9 nov, il signore: «con la musica, che venga da Shazam o da Musica, dico Jarvis e non torna in ascolto», sotto il reattore «MICROFONO SPENTO»): la musica non veniva riconosciuta (bastava un tocco sul reattore per spegnere il microfono). Ora quattro letture insieme (app Musica, player di Shazam, audio delle altre app); con la musica il microfono non resta spento a mano; il microfono dell'attesa con la musica e l'altoparlante dell'iPhone ha la cancellazione dell'eco (la canzone che esce dal telefono non copre il «Jarvis»), abbassamento delle altre app al minimo; con cuffie/casse Bluetooth no.
+
 ## 12.0 (2) — MARK XII · 9 nov mattina · numero confermato dal signore («perfetto, produciamo la build»)
 - Musica (9 nov, il signore): mentre suona la musica (Apple Music, Spotify, il player di Shazam) JARVIS sente solo «Jarvis»: niente frasi senza nome, niente battiti di mani (i colpi di batteria), niente orecchio mentre parla. Detto «Jarvis» (o toccato il reattore): bip, la musica si abbassa, ascolta e risponde; 1,5 s dopo la risposta la musica risale. Sul Mac con la musica l'attesa resta spenta.
 - Cuore: tolto ANELLI (il signore: «togliamolo così almeno sono 3»): BATTITO, PETTO, ECG, anche al polso.

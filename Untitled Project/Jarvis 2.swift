@@ -158,7 +158,13 @@ final class Jarvis: NSObject, ObservableObject {
     /// (la voce del cantante, i colpi di batteria come battiti) e rispondeva da solo. Detto «Jarvis»: la musica si abbassa (l'ascolto
     /// ha .duckOthers), JARVIS ascolta e risponde; un secondo e mezzo dopo la risposta la musica risale. Anche il tocco sul reattore.
     @Published private(set) var musicaSuona = false {
-        didSet { if musicaSuona != oldValue { aggiornaRichiamo() } }
+        didSet {
+            guard musicaSuona != oldValue else { return }
+            // 9 nov (il signore: «con la musica, che venga da Shazam o da Musica, dico Jarvis e non torna in ascolto»): con la musica
+            // il microfono non resta mai spento a mano: deve sentire «Jarvis»
+            if musicaSuona && micSpento { micSpento = false }
+            aggiornaRichiamo()
+        }
     }
     private var guardiaMusica: Task<Void, Never>?
     private var silenzioMusica = 0              // secondi di fila senza musica: fra due canzoni l'orecchio non si riaccende per un attimo
@@ -175,8 +181,11 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func leggiMusica() {
-        let altre: Bool = AVAudioSession.sharedInstance().isOtherAudioPlaying      // Apple Music, Spotify, un video in un'altra app
-        let suona: Bool = altre || AscoltoShazam.condiviso.suonaOra                 // il player di Shazam suona dentro JARVIS
+        // 9 nov: quattro letture insieme (una sola non bastava sul telefono): l'app Musica (anche dalla sezione Musica e da Shazam),
+        // il player di Shazam dentro JARVIS (anteprima e video), e l'audio delle altre app (Spotify, un video)
+        let sessione = AVAudioSession.sharedInstance()
+        let altre: Bool = sessione.isOtherAudioPlaying || sessione.secondaryAudioShouldBeSilencedHint
+        let suona: Bool = altre || LettoreMusica.sistemaSuona || AscoltoShazam.condiviso.suonaOra
         if suona { silenzioMusica = 0; musicaSuona = true; return }
         silenzioMusica += 1
         if silenzioMusica >= 2 { musicaSuona = false }

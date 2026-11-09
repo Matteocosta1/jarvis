@@ -27,6 +27,9 @@ final class LettoreMusica: ObservableObject {
 
     private init() { aggiorna() }
 
+    /// 9 nov: l'app Musica sta suonando adesso? Letto al momento (anche a sezione chiusa), per l'orecchio di JARVIS con la musica.
+    static var sistemaSuona: Bool { SystemMusicPlayer.shared.state.playbackStatus == .playing }
+
     /// Mentre la sezione (o il polso) guarda: legge il lettore quattro volte al secondo (brano, play, casuale, ripeti).
     func segui() async {
         while !Task.isCancelled {
