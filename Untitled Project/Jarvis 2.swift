@@ -150,8 +150,41 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var micSpento = false {
         didSet { if micSpento != oldValue { aggiornaRichiamo() } }
     }
-    /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO».
-    var etichettaFase: String { fase == .attesa && micSpento ? "MICROFONO SPENTO" : fase.rawValue }
+    /// La scritta della fase sotto il reattore: in attesa col microfono spento, «MICROFONO SPENTO»; con la musica, «MICROFONO IN PAUSA».
+    var etichettaFase: String {
+        guard fase == .attesa else { return fase.rawValue }
+        if micSpento { return "MICROFONO SPENTO" }
+        return musicaSuona ? "MICROFONO IN PAUSA" : fase.rawValue
+    }
+    /// 9 nov (il signore, scelta 3: «somiglia alla soluzione di Apple»): mentre suona la musica (Apple Music, Spotify… o il player
+    /// di Shazam) l'orecchio dell'attesa è in pausa: niente «Jarvis», niente battiti di mani, niente frasi, e niente orecchio mentre
+    /// parla. Prima sentiva la canzone (la voce del cantante, i colpi di batteria come battiti) e rispondeva da solo. Si tocca il
+    /// reattore: la musica si abbassa (l'ascolto ha già .duckOthers), JARVIS ascolta e risponde, poi la musica torna su. In pausa o
+    /// a canzone finita l'orecchio si riaccende da solo.
+    @Published private(set) var musicaSuona = false {
+        didSet { if musicaSuona != oldValue { aggiornaRichiamo() } }
+    }
+    private var guardiaMusica: Task<Void, Never>?
+    private var silenzioMusica = 0              // secondi di fila senza musica: fra due canzoni l'orecchio non si riaccende per un attimo
+
+    /// Guarda una volta al secondo se suona musica (costa niente: legge solo lo stato dell'audio).
+    private func seguiMusica() {
+        guardiaMusica?.cancel()
+        guardiaMusica = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.leggiMusica()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func leggiMusica() {
+        let altre: Bool = AVAudioSession.sharedInstance().isOtherAudioPlaying      // Apple Music, Spotify, un video in un'altra app
+        let suona: Bool = altre || AscoltoShazam.condiviso.suonaOra                 // il player di Shazam suona dentro JARVIS
+        if suona { silenzioMusica = 0; musicaSuona = true; return }
+        silenzioMusica += 1
+        if silenzioMusica >= 2 { musicaSuona = false }
+    }
 
     @Published var fase: Fase = .attesa {
         didSet {
@@ -299,6 +332,7 @@ final class Jarvis: NSObject, ObservableObject {
         super.init()
         AmbienteSonoro.condiviso.jarvisSuona(true)   // si apre con la musica d'avvio: non è «confusione»
         sintesi.delegate = self
+        seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa va in pausa
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
         if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica]) }   // le frasi ponte sono già pronte in cache, a costo zero
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
@@ -357,7 +391,8 @@ final class Jarvis: NSObject, ObservableObject {
         switch fase {
         case .attesa:
             // 24 ott: in attesa il tocco spegne il microfono; il tocco dopo lo riaccende e ascolta subito (come prima)
-            if micSpento { micSpento = false; Task { await avviaAscolto(bip: true) } } else { micSpento = true }
+            // 9 nov: con la musica l'orecchio è già in pausa: il tocco ascolta subito (la musica si abbassa)
+            if micSpento || musicaSuona { micSpento = false; Task { await avviaAscolto(bip: true) } } else { micSpento = true }
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
         case .parlo, .elaboro:
@@ -579,7 +614,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        !inBenvenuto && !avvioInCorso && !micSpento && Impostazioni.richiamo && richiamoConsentito && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
+        !inBenvenuto && !avvioInCorso && !micSpento && !musicaSuona && Impostazioni.richiamo && richiamoConsentito
+            && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
             && !(occhi != nil && fase == .elaboro)      // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
     }
 
@@ -587,7 +623,7 @@ final class Jarvis: NSObject, ObservableObject {
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
             // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
-            let serve = !inBenvenuto && !avvioInCorso && !micSpento && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
+            let serve = !inBenvenuto && !avvioInCorso && !micSpento && !musicaSuona && Impostazioni.richiamo && richiamoConsentito && fase != .ascolto
                 && !(occhi != nil && fase == .elaboro)          // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
             guard serve else { attesaMac.ferma(); return }
             guard !attesaMac.attivo else { return }
@@ -600,7 +636,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
         avvioRichiamo?.cancel()
-        guard richiamoServe else { richiamo.ferma(); return }
+        guard richiamoServe else { richiamo.ferma(); restituisciMusica(); return }
         guard !richiamo.attivo else { return }
         // in attesa un attimo di respiro (il microfono di quando parlava si libera); mentre pensa, subito.
         // M6: prima erano 450 ms, per lasciar finire il segnale «pronto», che col richiamo acceso non suona mai: intanto
@@ -610,6 +646,17 @@ final class Jarvis: NSObject, ObservableObject {
             try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.richiamoServe else { return }
             self.richiamo.avvia()
+        }
+    }
+
+    /// 9 nov: con la musica e l'orecchio in pausa, tornato in attesa (anche da un ascolto senza frase) l'audio si restituisce:
+    /// la musica abbassata dall'ascolto torna al suo volume. Un attimo dopo, così una domanda appena partita non la rialza.
+    private func restituisciMusica() {
+        guard musicaSuona, fase == .attesa, !Jarvis.usaAscoltoCloud else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard let self, self.musicaSuona, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !self.richiamo.attivo else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
 
@@ -1762,7 +1809,7 @@ final class Jarvis: NSObject, ObservableObject {
         guard fase != .ascolto else { return }   // mai prendersi l'audio mentre il signore parla
         // sul Mac niente orecchio mentre parla: è un secondo microfono (con il riconoscimento di Apple) che lascia muto quello
         // dell'attesa; lì per fermarlo basta toccare il reattore
-        let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud
+        let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud && !musicaSuona   // 9 nov: la canzone lo interromperebbe
         if inCoda.isEmpty {
             let sessione = AVAudioSession.sharedInstance()
             if Jarvis.usaAscoltoCloud {

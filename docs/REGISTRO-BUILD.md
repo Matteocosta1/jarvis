@@ -530,6 +530,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Prossima build (numero da chiedere al signore) — in preparazione
+- Musica (9 nov, scelta 3 del signore): mentre suona la musica (Apple Music, Spotify, il player di Shazam) l'orecchio dell'attesa è in pausa: niente «Jarvis», battiti di mani, frasi né orecchio mentre parla; sotto il reattore «MICROFONO IN PAUSA». Tocco sul reattore: la musica si abbassa, ascolta, risponde, la musica torna su. Ferma la musica, l'orecchio si riaccende da solo. Mockup uguale.
+
 ## 12.0 (1) — MARK XII · 9 nov mattina · il signore: «passiamo alla Mark 12… 12 (1)». Contiene tutto quello della 11.0 (19) qui sotto, più MARK XII a schermo (iPhone e polso).
 
 ## 11.0 (19) — 9 nov notte · numero scelto dal signore (19) · commit 96e0e08 · controllo di compilazione VERDE (0 errori, 0 warning, run 42545348244)
