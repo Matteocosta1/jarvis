@@ -530,6 +530,8 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (1) — MARK XII · 9 nov mattina · il signore: «passiamo alla Mark 12… 12 (1)». Contiene tutto quello della 11.0 (19) qui sotto, più MARK XII a schermo (iPhone e polso).
+
 ## 11.0 (19) — 9 nov notte · numero scelto dal signore (19) · commit 96e0e08 · controllo di compilazione VERDE (0 errori, 0 warning, run 42545348244)
 La 11.0 (18) + le correzioni della notte (screenshot e video del signore, 01:34–02:24). Mockup Mark XI aggiornato con le stesse cose.
 - YouTube (Shazam e Browser): «Questo video non è disponibile · 152-4». La pagina del player si presentava come youtube.com; ora come Vinyl Hustler: lettore ufficiale (IFrame API) con l'origine dell'app (it.discosizer.jarvis). In Shazam, se un video non si può guardare, parte il successivo (video di riserva).
