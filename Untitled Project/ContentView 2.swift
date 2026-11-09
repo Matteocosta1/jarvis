@@ -1493,9 +1493,9 @@ struct ContentView: View {
         switch v.sezione {
         case .impostazioni:
             // 9 nov (il signore: «facciamola come le altre: click, caricamento, apertura»): il caricamento HUD con i suoni di tutte le
-            // sezioni, poi la pagina si stampa dall'alto (ConBarraChiudi legge la stampa); «Fatto» anche nel caricamento, come nella pagina
+            // sezioni, poi la pagina si stampa dall'alto (ConBarraChiudi legge la stampa)
             ImpostazioniView().environmentObject(jarvis)
-                .aperturaHUD("Impostazioni", icona: "gearshape", testo: "Fatto")
+                .aperturaHUD("Impostazioni", icona: "gearshape")
                 .paginaPiena()
         case .browser:
             BrowserPrivato()
@@ -2438,7 +2438,8 @@ struct ImpostazioniView: View {
             .contentMargins(.horizontal, 16, for: .scrollContent)
             // 5 nov (il signore: «se scorro si vede quella barra grigia»): «Fatto» in una riga sua sopra la pagina, come «Chiudi»
             // 7 nov sera: la testata nella riga di «Fatto», come in tutte le sezioni
-            .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Fatto",
+            // 9 nov (il signore: «chiudi»): «Chiudi» come tutte le sezioni senza fotocamera e come il mockup (prima «Fatto»)
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testo: "Chiudi",
                                      testata: DatiTestata(titolo: "Impostazioni", sottotitolo: "configurazione nucleo", icona: "gearshape")) {
                 Portachiavi.salva(parola.trimmingCharacters(in: .whitespacesAndNewlines))
                 chiudi()

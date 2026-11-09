@@ -547,6 +547,7 @@ La 11.0 (18) + le correzioni della notte (screenshot e video del signore, 01:34�
   - Al polso: Cuore, Meteo, Email, Vitals, Costi, GitHub, Supabase e Archivio mostrano in piccolo la prova scelta sull'iPhone.
   - Al polso l'ologramma dell'icona scelta più grande: da 0,6 a 0,95 (le scritte della misura di prima).
   - Impostazioni si apre come le altre sezioni: clic, caricamento HUD (suono che sfuma e «pronta»), poi la pagina si stampa dall'alto; la rotella resta animata. Prima saliva senza caricamento e il suono d'apertura restava acceso troppo.
+  - Impostazioni: in alto a destra «Chiudi» (prima «Fatto»), come le altre sezioni senza fotocamera e come il mockup.
   - Cervello v123 (col via del signore): la spesa giorno per giorno del mese, per TORRI (prova generale superata).
   - Versione di prova (Debug, mai su TestFlight): il banco degli ologrammi coi dati del mockup (-provaBanco) e l'apertura di una sezione (-provaSezione), per le foto nel simulatore su GitHub (workflow «Prova»).
 
