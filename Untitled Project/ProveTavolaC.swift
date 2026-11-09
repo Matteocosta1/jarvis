@@ -208,7 +208,7 @@ final class ProveGithub {
         for k in 0..<4 {
             let b = Double(k) * 0.785 + t * 0.4
             var q: P3?
-            for i in 0...40 { let a = Double(i) / 40 * OP.due, p = s.P(cos(a) * 0.22 * cos(b), cos(a) * 0.22 * sin(b), 0.32 + sin(a) * 0.22 * s.nasce); if let q { F.metti(k > 0 ? 1 : 3, q, p) }; q = p }
+            for i in 0...40 { let a: Double = Double(i) / 40 * OP.due, r: Double = cos(a) * 0.22, z: Double = 0.32 + sin(a) * 0.22 * s.nasce, p = s.P(r * cos(b), r * sin(b), z); if let q { F.metti(k > 0 ? 1 : 3, q, p) }; q = p }
         }
         Tav.cerchio(&F, s, 0.22, 0.32, 1, n: 40); F.metti(2, s.P(0, 0, 0), s.P(0, 0, 0.1)); Tav.cerchio(&F, s, 0.3, 0, 1, n: 40)
         Tav.cerchio(&F, s, 1.0, 0, 0, n: 72); Tav.cerchio(&F, s, 0.62, 0, 0, n: 56)
@@ -256,10 +256,11 @@ final class ProveGithub {
             let p = P3(cos(a) * o.0, sin(a) * o.0 * cos(o.1), sin(a) * o.0 * sin(o.1))
             return P3(p.x * cos(o.2) - p.y * sin(o.2), p.x * sin(o.2) + p.y * cos(o.2), p.z) * s.nasce
         }
-        for (i, o) in orb.prefix(R.count).enumerated() { var q: P3?; for k in 0...72 { let p = s.P(Q(o, Double(k) / 72 * OP.due)); if let q { F.metti(i == 0 ? 2 : 1, q, p) }; q = p } }
+        for (i, o) in orb.prefix(R.count).enumerated() { var q: P3?; for k in 0...72 { let p = s.Pv(Q(o, Double(k) / 72 * OP.due)); if let q { F.metti(i == 0 ? 2 : 1, q, p) }; q = p } }
         for k in 0..<3 {
             var q: P3?
-            for i in 0...24 { let a = Double(i) / 24 * OP.due, p = s.P(cos(a) * 0.12, sin(a) * 0.12 * cos(Double(k) * 1.05), sin(a) * 0.12 * sin(Double(k) * 1.05)); if let q { F.metti(4, q, p) }; q = p }
+            let ck: Double = cos(Double(k) * 1.05), sk: Double = sin(Double(k) * 1.05)
+            for i in 0...24 { let a: Double = Double(i) / 24 * OP.due, r: Double = sin(a) * 0.12, p = s.P(cos(a) * 0.12, r * ck, r * sk); if let q { F.metti(4, q, p) }; q = p }
         }
         Tav.traccia(&gc, F, piccolo)
         let c = s.P(0, 0, 0)
@@ -270,7 +271,7 @@ final class ProveGithub {
         for (i, r) in R.enumerated() {
             let msg = Array(r.commit.prefix(4)), nm = Double(max(1, msg.count))
             for (k, m) in msg.enumerated() {
-                let a = t * (0.9 - Double(i) * 0.2) + Double(k) * (OP.due / nm), p = s.P(Q(orb[i], a))
+                let a = t * (0.9 - Double(i) * 0.2) + Double(k) * (OP.due / nm), p = s.Pv(Q(orb[i], a))
                 Tav.alone(&gc, p, i == 0 && k == 0 ? 9 : 6, i == 0 && k == 0 ? 1 : 0.55, Tav.bianco)
                 el.append((r, m, k, p))
             }
@@ -382,8 +383,8 @@ final class ProveSupabase {
         var nodi: [(f: (nome: String, versione: Int, attiva: Bool), q: P3, p: P3)] = []
         for (i, f) in Fn.enumerated() {
             let a = Double(i) / Double(max(1, Fn.count)) * OP.due + 0.8, q = P3(cos(a) * 0.9 * s.nasce, sin(a) * 0.9 * s.nasce, 0.27 + 0.2 * sin(Double(i) * 2))
-            F.metti(1, s.P(q), s.P(0, 0, 0.27)); Tav.cerchio(&F, s, 0.09, q.z, 3, n: 20, cx: q.x, cy: q.y)
-            nodi.append((f, q, s.P(q)))
+            F.metti(1, s.Pv(q), s.P(0, 0, 0.27)); Tav.cerchio(&F, s, 0.09, q.z, 3, n: 20, cx: q.x, cy: q.y)
+            nodi.append((f, q, s.Pv(q)))
         }
         Tav.traccia(&gc, F, piccolo)
         let c0 = s.P(0, 0, 0.27)
@@ -472,13 +473,18 @@ final class ProveArchivio {
     }
 
     /// Il disegno dentro la tavola: foto (le montagne), audio (l'onda), documento (le righe).
-    private static func disegno(_ F: inout FasciOlo, _ s: ScenaOlo, _ g: String, _ cx: Double, _ cy: Double, _ z0: Double, _ w: Double, _ h: Double, _ gr: Int) {
+    private static func disegno(_ F: inout FasciOlo, _ s: ScenaTav, _ g: String, _ cx: Double, _ cy: Double, _ z0: Double, _ w: Double, _ h: Double, _ gr: Int) {
         if g == "foto" {
             let p: [(Double, Double)] = [(-0.6, 0.25), (-0.15, 0.6), (0.15, 0.4), (0.35, 0.52), (0.6, 0.25)]
             for k in 1..<p.count { F.metti(gr, s.P(cx + w * p[k - 1].0, cy, z0 + h * p[k - 1].1), s.P(cx + w * p[k].0, cy, z0 + h * p[k].1)) }
         } else if g == "audio" {
             var q: P3?
-            for k in 0...24 { let u = Double(k) / 24, p = s.P(cx - w * 0.65 + u * w * 1.3, cy, z0 + h * (0.45 + 0.2 * sin(Double(k) * 1.9) * sin(u * .pi))); if let q { F.metti(gr, q, p) }; q = p }
+            for k in 0...24 {
+                let u: Double = Double(k) / 24, px: Double = cx - w * 0.65 + u * w * 1.3, onda: Double = 0.2 * sin(Double(k) * 1.9) * sin(u * .pi)
+                let p = s.P(px, cy, z0 + h * (0.45 + onda))
+                if let q { F.metti(gr, q, p) }
+                q = p
+            }
         } else {
             for r in 0..<5 { let z = z0 + h * (0.72 - Double(r) * 0.12); F.metti(gr, s.P(cx - w * 0.6, cy, z), s.P(cx + w * (r == 4 ? 0.1 : 0.6), cy, z)) }
         }
@@ -536,26 +542,27 @@ final class ProveArchivio {
         var nuv: [(nome: String, cc: P3, f: [FileOlo], tot: Int)] = []
         for (i, c) in cart.enumerated() {
             let a = Double(i) / nc * OP.due + t * 0.2, cc = P3(cos(a) * 0.78 * s.nasce, sin(a) * 0.78 * s.nasce, 0.3 + 0.12 * sin(Double(i) * 2.1))
-            F.metti(0, s.P(0, 0, 0.3), s.P(cc))
+            F.metti(0, s.P(0, 0, 0.3), s.Pv(cc))
             let f = D.file.filter { $0.cartella == c.nome }
             nuv.append((c.nome, cc, f, max(c.n, f.count)))
         }
         Tav.traccia(&gc, F, piccolo)
         for (i, q) in nuv.enumerated() {
-            Tav.alone(&gc, s.P(q.cc), s.sz * 0.3, 0.12)
+            Tav.alone(&gc, s.Pv(q.cc), s.sz * 0.3, 0.12)
             for (k, f) in q.f.prefix(30).enumerated() {
                 let a = Double(k) * 2.39996 + t * (0.6 + Double(i) * 0.1), r = 0.06 + 0.04 * Double(k + 1).squareRoot()
-                let p = s.P(q.cc.x + cos(a) * r, q.cc.y + sin(a) * r, q.cc.z + 0.06 * sin(a * 1.7 + t))
+                let px: Double = q.cc.x + cos(a) * r, py: Double = q.cc.y + sin(a) * r, pz: Double = q.cc.z + 0.06 * sin(a * 1.7 + t)
+                let p = s.P(px, py, pz)
                 Tav.alone(&gc, p, 3 + min(6, Double(f.kb) / 1024 * 1.4), 0.75, Tav.bianco)
             }
         }
         Tav.alone(&gc, s.P(0, 0, 0.3), 10, 0.6, Tav.bianco)
         guard !piccolo else { return }
-        for (i, q) in nuv.enumerated() { let p = s.P(q.cc); OP.scritta(&gc, "\(OP.taglia(q.nome.uppercased(), 12)) · \(q.tot)", p.x, p.y - s.sz * 0.22, 6.5, 800, OP.c(0.95)); M.zona(p.x, p.y, 20, i) }
+        for (i, q) in nuv.enumerated() { let p = s.Pv(q.cc); OP.scritta(&gc, "\(OP.taglia(q.nome.uppercased(), 12)) · \(q.tot)", p.x, p.y - s.sz * 0.22, 6.5, 800, OP.c(0.95)); M.zona(p.x, p.y, 20, i) }
         let tot = D.file.reduce(0) { $0 + $1.kb }
         Tav.testate(&gc, W, "NUVOLA DEI FILE", "\(D.file.count) FILE", "\(ProveArchivio.peso(tot)) IN TUTTO")
         if let i = M.scelta, i >= 0, i < nuv.count {
-            let q = nuv[i], p = s.P(q.cc)
+            let q = nuv[i], p = s.Pv(q.cc)
             OP.riquadro(&gc, W, H, p.x, p.y, [q.nome.uppercased(), "\(q.tot) FILE · \(ProveArchivio.peso(q.f.reduce(0) { $0 + $1.kb }))", "ULTIMO: \(OP.taglia(q.f.first?.nome ?? "—", 24))"],
                         t - M.sceltaT, codice: "CARTELLA")
         }
@@ -568,12 +575,12 @@ final class ProveArchivio {
         let Fl = Array(D.file.prefix(30)), n = Fl.count, cartelle = D.cartelle.map { $0.nome }
         let su = { (u: Double) -> P3 in let a = u * OP.due * 1.6, r = 0.75 - u * 0.4; return P3(cos(a) * r, sin(a) * r, (0.05 + u * 1.25) * s.nasce) }
         var q: P3?
-        for k in 0...120 { let p = s.P(su(Double(k) / 120)); if let q { F.metti(1, q, p) }; q = p }
+        for k in 0...120 { let p = s.Pv(su(Double(k) / 120)); if let q { F.metti(1, q, p) }; q = p }
         F.metti(0, s.P(0, 0, 0), s.P(0, 0, 1.35 * s.nasce))
         let pt: [(f: FileOlo, p: P3)] = Fl.enumerated().map { i, f in
             let v = su(1 - Double(i) / Double(max(1, n - 1)))
-            F.metti(0, s.P(v), s.P(0, 0, v.z))
-            return (f, s.P(v))
+            F.metti(0, s.Pv(v), s.P(0, 0, v.z))
+            return (f, s.Pv(v))
         }
         Tav.traccia(&gc, F, piccolo)
         for (i, q) in pt.enumerated() {

@@ -26,7 +26,7 @@ struct OpzioniOlo {
 }
 
 /// La scena montata: centro, misura, giro e inclinazione, quanto è nata (0…1) e la proiezione.
-struct ScenaOlo {
+struct ScenaTav {
     let cx: Double
     let cy: Double
     let base: Double
@@ -36,7 +36,7 @@ struct ScenaOlo {
     let nasce: Double
 
     func P(_ x: Double, _ y: Double, _ z: Double) -> P3 { Olo.proietta(x, y, z, ang, al, cx, cy, sz) }
-    func P(_ v: P3) -> P3 { Olo.proietta(v.x, v.y, v.z, ang, al, cx, cy, sz) }
+    func Pv(_ v: P3) -> P3 { Olo.proietta(v.x, v.y, v.z, ang, al, cx, cy, sz) }
 }
 
 enum Tav {
@@ -53,13 +53,13 @@ enum Tav {
 
     /// scenaOlo: il proiettore, il cono e la prospettiva.
     static func scena(_ gc: inout GraphicsContext, _ W: Double, _ H: Double, _ t: Double, _ M: ManoOlo, _ piccolo: Bool,
-                      _ o: OpzioniOlo) -> ScenaOlo {
+                      _ o: OpzioniOlo) -> ScenaTav {
         let cx = W / 2, base = piccolo ? H - 3 : H - 12, rx = piccolo ? W * 0.3 : min(W * o.rx, 90)
         Olo.pavimento(&gc, cx, base, rx, t, n: piccolo ? 20 : 48)
         let sz = (piccolo ? H * 0.5 : min(W * 0.34, H * 0.42)) * o.sz, cy = base - (piccolo ? 4 : 10) - sz * o.su
         let ang = (o.oscilla != 0 ? o.oscilla * sin(t * 0.3) : t * o.giro) + M.giro * o.mano
         if o.cono { Olo.cono(&gc, cx, base, rx, cy - sz * o.conoSu, sz * o.conoW, a: o.conoA) }
-        return ScenaOlo(cx: cx, cy: cy, base: base, sz: sz, ang: ang, al: o.al, nasce: OP.lis(t / o.nasce))
+        return ScenaTav(cx: cx, cy: cy, base: base, sz: sz, ang: ang, al: o.al, nasce: OP.lis(t / o.nasce))
     }
 
     /// tracciaOlo: le linee raccolte, nello stile di sempre (0-5 dal tenue al bianco, l'alone sui chiari).
@@ -70,7 +70,7 @@ enum Tav {
     }
 
     /// cerchioF: un cerchio orizzontale di raggio r a quota z (centro cx, cy), fino a una frazione del giro.
-    static func cerchio(_ F: inout FasciOlo, _ s: ScenaOlo, _ r: Double, _ z: Double, _ g: Int, n: Int = 48,
+    static func cerchio(_ F: inout FasciOlo, _ s: ScenaTav, _ r: Double, _ z: Double, _ g: Int, n: Int = 48,
                         cx: Double = 0, cy: Double = 0, fino: Double = 1) {
         var q: P3?
         let fine = Int(Double(n) * fino)
@@ -83,7 +83,7 @@ enum Tav {
     }
 
     /// geoOlo: un punto sul globo (gradi); longitudine 0 davanti a chi guarda.
-    static func geo(_ lat: Double, _ lon: Double, _ r: Double = 1) -> P3 {
+    nonisolated static func geo(_ lat: Double, _ lon: Double, _ r: Double = 1) -> P3 {
         let a = lat * .pi / 180, b = lon * .pi / 180
         return P3(r * cos(a) * sin(b), -r * cos(a) * cos(b), r * sin(a))
     }
@@ -102,9 +102,9 @@ enum Tav {
     ]
 
     /// globoOlo: paralleli, meridiani e continenti (davanti più chiari). Restituisce il punto (lat, lon) proiettato.
-    static func globo(_ F: inout FasciOlo, _ s: ScenaOlo, _ r: Double, giroLon: Double) -> (Double, Double) -> P3 {
+    static func globo(_ F: inout FasciOlo, _ s: ScenaTav, _ r: Double, giroLon: Double) -> (Double, Double) -> P3 {
         let raggio = r * s.nasce
-        let G = { (lat: Double, lon: Double) -> P3 in s.P(geo(lat, lon + giroLon, raggio)) }
+        let G = { (lat: Double, lon: Double) -> P3 in s.Pv(geo(lat, lon + giroLon, raggio)) }
         for lat in [-60.0, -30, 0, 30, 60] {
             var q: P3?
             for k in 0...48 { let p = G(lat, -180 + Double(k) * 7.5); if let q { F.metti(p.z < 0 ? 1 : 0, q, p) }; q = p }
@@ -164,21 +164,21 @@ enum Tav {
     }
 
     /// bezOlo: la curva di Bézier quadratica.
-    static func bez(_ a: P3, _ b: P3, _ c: P3, _ u: Double) -> P3 {
+    nonisolated static func bez(_ a: P3, _ b: P3, _ c: P3, _ u: Double) -> P3 {
         let v = 1 - u
         return a * (v * v) + b * (2 * v * u) + c * (u * u)
     }
 
     /// Un seme sempre uguale per una parola (hashOlo del mockup): 0…100002.
-    static func seme(_ s: String) -> Int {
+    nonisolated static func seme(_ s: String) -> Int {
         var h = 7
         for c in s.unicodeScalars { h = (h * 31 + Int(c.value)) % 100_003 }
         return h
     }
 
     /// Le cifre all'italiana, con due decimali e la virgola.
-    static func soldi(_ v: Double) -> String { String(format: "%.2f", v).replacingOccurrences(of: ".", with: ",") }
-    static func uno(_ v: Double) -> String { String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",") }
+    nonisolated static func soldi(_ v: Double) -> String { String(format: "%.2f", v).replacingOccurrences(of: ".", with: ",") }
+    nonisolated static func uno(_ v: Double) -> String { String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",") }
 
     /// «ADESSO», «12 MIN FA», «3 H FA», «2 G FA».
     static func fa(_ d: Date?) -> String {

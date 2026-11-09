@@ -524,7 +524,8 @@ final class ProveTelefono {
             let dst = stazioni[ci], v = chiama ? (t * 1.5).truncatingRemainder(dividingBy: 1) : 0.5
             gc.stroke(Tav.spezzata([io, meglio, dst]), with: .color(OP.b(chiama ? 0.8 : 0.4)), style: StrokeStyle(lineWidth: chiama ? 1.4 : 0.8, dash: [3, 3]))
             if chiama {
-                let p = v < 0.5 ? io + (meglio - io) * (v * 2) : meglio + (dst - meglio) * ((v - 0.5) * 2)
+                let da: P3 = v < 0.5 ? io : meglio, verso: P3 = v < 0.5 ? meglio : dst, u: Double = v < 0.5 ? v * 2 : (v - 0.5) * 2
+                let p: P3 = da + (verso - da) * u
                 Tav.alone(&gc, p, 7, 0.9, Tav.bianco)
             }
         }

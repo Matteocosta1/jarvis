@@ -113,7 +113,8 @@ final class ProveMeteo {
                 q.y = -dy * 0.95 + (OP.caso(giroCaso + 1) - 0.5) * 1.8 * abs(dx)
             }
             particelle[i] = q
-            let z = 0.18 + 0.06 * sin(Double(q.k)), a = s.P(q.x, q.y, z), b = s.P(q.x - dx * 0.07 * (0.5 + vel), q.y - dy * 0.07 * (0.5 + vel), z)
+            let z: Double = 0.18 + 0.06 * sin(Double(q.k)), coda: Double = 0.07 * (0.5 + vel)
+            let a = s.P(q.x, q.y, z), b = s.P(q.x - dx * coda, q.y - dy * coda, z)
             tratti.move(to: CGPoint(x: a.x, y: a.y)); tratti.addLine(to: CGPoint(x: b.x, y: b.y))
         }
         gc.stroke(tratti, with: .color(OP.c(0.6)), style: Olo.tratto(1.1))
@@ -193,7 +194,7 @@ final class ProveEdith {
             (0...48).map { k in let a = Double(k) / 48 * OP.due, rr = 0.36 + 0.035 * cos(2 * a) - 0.02 * sin(a); return P3(cxL + cos(a) * rr * 1.15, 0, 0.18 + sin(a) * rr * 0.82) }
         }
         let L = [lente(-0.5), lente(0.5)]
-        for l in L { for k in 1..<l.count where Double(k) / Double(l.count) <= s.nasce { F.metti(3, s.P(l[k - 1]), s.P(l[k])) } }
+        for l in L { for k in 1..<l.count where Double(k) / Double(l.count) <= s.nasce { F.metti(3, s.Pv(l[k - 1]), s.Pv(l[k])) } }
         F.metti(3, s.P(-0.09, 0, 0.36), s.P(0.09, 0, 0.36))
         for lato in [-1.0, 1.0] {
             F.metti(2, s.P(lato * 0.91, 0, 0.32), s.P(lato * 0.98, 0.22, 0.34)); F.metti(1, s.P(lato * 0.98, 0.22, 0.34), s.P(lato * 0.98, 0.95, 0.3))
@@ -202,7 +203,7 @@ final class ProveEdith {
         Tav.traccia(&gc, F, piccolo)
         for (i, l) in L.enumerated() {
             let c = s.P(i == 1 ? 0.5 : -0.5, 0, 0.18)
-            gc.fill(Tav.spezzata(l.map { s.P($0) }, chiusa: true), with: .color(OP.s(0.07)))
+            gc.fill(Tav.spezzata(l.map { s.Pv($0) }, chiusa: true), with: .color(OP.s(0.07)))
             Tav.alone(&gc, c, s.sz * 0.4, 0.07)
         }
         guard !piccolo else { return }
@@ -255,7 +256,7 @@ final class ProveEdith {
             let k = c.fatto ? OP.lis((t - (parte[i] ?? t)) / 1.2) : 0
             let a = t * 0.45 + ai
             let vol = c.ok ? P3(cos(a) * 0.8, sin(a) * 0.8, 0.55 + 0.07 * sin(t * 2 + Double(i))) : P3(cos(ai) * 0.36, sin(ai) * 0.36, 0.42 + 0.03 * sin(t * 3))
-            let p3 = terra + (vol - terra) * k, p = s.P(p3), w = 6 + 2 * k
+            let p3 = terra + (vol - terra) * k, p = s.Pv(p3), w = 6 + 2 * k
             var dr = Path(); Olo.linea(&dr, p.x - w, p.y, p.x + w, p.y); Olo.linea(&dr, p.x, p.y - 2, p.x, p.y + 2)
             gc.stroke(dr, with: .color(ProveEdith.colore(c)), lineWidth: 1.2)
             if k > 0.3 { gc.stroke(Olo.ellisse(p.x - w, p.y, 3, 1), with: .color(ProveEdith.colore(c)), lineWidth: 0.8); gc.stroke(Olo.ellisse(p.x + w, p.y, 3, 1), with: .color(ProveEdith.colore(c)), lineWidth: 0.8) }
@@ -394,11 +395,13 @@ final class ProvePostaTavola {
         for (d, i) in lista {
             let mail = posta[i], a = d * 0.55, cx = sin(a) * 1.0, cy = -cos(a) * 0.5 + 0.5, w = 0.42, h = 0.56, z0 = 0.1, fr = abs(d) < 0.5, g = fr ? 4 : 1
             let rx = cos(a) * w, ry = sin(a) * w, hz = h * s.nasce
-            let c = [s.P(cx - rx, cy - ry, z0), s.P(cx + rx, cy + ry, z0), s.P(cx + rx, cy + ry, z0 + hz), s.P(cx - rx, cy - ry, z0 + hz)]
+            let x0: Double = cx - rx, x1: Double = cx + rx, y0: Double = cy - ry, y1: Double = cy + ry, zt: Double = z0 + hz
+            let c: [P3] = [s.P(x0, y0, z0), s.P(x1, y1, z0), s.P(x1, y1, zt), s.P(x0, y0, zt)]
             gc.fill(Tav.spezzata(c, chiusa: true), with: .color(OP.s(fr ? 0.1 : 0.04)))
             var Fk = FasciOlo(6)
             for k in 0..<4 { Fk.metti(g, c[k], c[(k + 1) % 4]) }
-            let tab = [s.P(cx - rx, cy - ry, z0 + hz), s.P(cx - rx * 0.4, cy - ry * 0.4, z0 + hz), s.P(cx - rx * 0.3, cy - ry * 0.3, z0 + (h + 0.06) * s.nasce), s.P(cx - rx * 0.9, cy - ry * 0.9, z0 + (h + 0.06) * s.nasce)]
+            let zl: Double = z0 + (h + 0.06) * s.nasce
+            let tab: [P3] = [s.P(x0, y0, zt), s.P(cx - rx * 0.4, cy - ry * 0.4, zt), s.P(cx - rx * 0.3, cy - ry * 0.3, zl), s.P(cx - rx * 0.9, cy - ry * 0.9, zl)]
             Fk.metti(g - 1, tab[0], tab[3]); Fk.metti(g - 1, tab[3], tab[2]); Fk.metti(g - 1, tab[2], tab[1])
             Tav.traccia(&gc, Fk, piccolo, k: fr ? 1.1 : 0.8)
             guard !piccolo else { continue }
@@ -434,32 +437,32 @@ enum ProveMessaggiTavola {
         var nomi: [String] = [], per: [String: [MessaggiOlo.Voce]] = [:]
         for v in D.voci { if per[v.nome] == nil { nomi.append(v.nome) }; per[v.nome, default: []].append(v) }
         let n = Double(max(1, nomi.count)), io = P3(0, 0, 0.3)
-        let nodi: [(nm: String, k: Int, q: P3, ult: MessaggiOlo.Voce)] = nomi.enumerated().compactMap { i, nm in
+        let nodi: [(nm: String, k: Int, q: P3, ult: MessaggiOlo.Voce)] = nomi.enumerated().compactMap { (i: Int, nm: String) -> (nm: String, k: Int, q: P3, ult: MessaggiOlo.Voce)? in
             guard let l = per[nm], let u = l.first else { return nil }
             let a = Double(i) / n * OP.due + 0.3, r = (0.95 - min(0.4, Double(l.count) * 0.1)) * s.nasce, z = 0.25 + 0.25 * sin(Double(i) * 2.3)
             return (nm, l.count, P3(cos(a) * r, sin(a) * r, z), u)
         }
-        for d in nodi { F.metti(1, s.P(io), s.P(d.q)); F.metti(0, s.P(d.q.x, d.q.y, 0), s.P(d.q)) }
-        if nodi.count > 2 { for (i, d) in nodi.enumerated() { F.metti(0, s.P(d.q), s.P(nodi[(i + 1) % nodi.count].q)) } }
+        for d in nodi { F.metti(1, s.Pv(io), s.Pv(d.q)); F.metti(0, s.P(d.q.x, d.q.y, 0), s.Pv(d.q)) }
+        if nodi.count > 2 { for (i, d) in nodi.enumerated() { F.metti(0, s.Pv(d.q), s.Pv(nodi[(i + 1) % nodi.count].q)) } }
         Tav.cerchio(&F, s, 0.12, 0.3, 3, n: 24); Tav.cerchio(&F, s, 1.0, 0, 0, n: 64)
         Tav.traccia(&gc, F, piccolo)
-        let pc = s.P(io)
+        let pc = s.Pv(io)
         Tav.alone(&gc, pc, s.sz * 0.35, 0.25, Tav.bianco)
         for (i, d) in nodi.enumerated() {
-            let p = s.P(d.q)
+            let p = s.Pv(d.q)
             Tav.alone(&gc, p, 8 + Double(d.k) * 2, M.scelta == i ? 0.8 : 0.45, d.ult.tipo == "whatsapp" ? Tav.verde : Tav.bianco)
             gc.stroke(Olo.ellisse(p.x, p.y, 3 + Double(d.k), 3 + Double(d.k)), with: .color(OP.b(0.9)), lineWidth: 1)
             for (k, v) in (per[d.nm] ?? []).prefix(3).enumerated() {
                 let fr = recente(v) ? 1.4 : 0.7, u = (t * 0.6 * fr + Double(k) * 0.33 + Double(i) * 0.17).truncatingRemainder(dividingBy: 1), w = v.ricevuto ? u : 1 - u
-                Tav.alone(&gc, s.P(d.q + (io - d.q) * w), 5, 0.8, Tav.bianco)
+                Tav.alone(&gc, s.Pv(d.q + (io - d.q) * w), 5, 0.8, Tav.bianco)
             }
         }
         guard !piccolo else { return }
         OP.scritta(&gc, "LEI", pc.x, pc.y + 3, 6.5, 800, OP.b(0.95))
-        for (i, d) in nodi.enumerated() { let p = s.P(d.q); OP.scritta(&gc, d.nm.uppercased(), p.x, p.y - 9 - Double(d.k), 6.5, 700, OP.c(0.95)); M.zona(p.x, p.y, 14, i) }
+        for (i, d) in nodi.enumerated() { let p = s.Pv(d.q); OP.scritta(&gc, d.nm.uppercased(), p.x, p.y - 9 - Double(d.k), 6.5, 700, OP.c(0.95)); M.zona(p.x, p.y, 14, i) }
         Tav.testate(&gc, W, "RETE COMUNICAZIONI", "\(D.voci.count) MESSAGGI", "\(nodi.count) PERSONE")
         if let i = M.scelta, i >= 0, i < nodi.count {
-            let d = nodi[i], p = s.P(d.q)
+            let d = nodi[i], p = s.Pv(d.q)
             OP.riquadro(&gc, W, H, p.x, p.y, [d.nm.uppercased(), "«\(OP.taglia(d.ult.testo, 28))»", "\(d.ult.ricevuto ? "RICEVUTO" : "MANDATO DA JARVIS") · \(Tav.fa(d.ult.quando))",
                                                "\(d.k) MESSAGGI · \(d.ult.tipo == "whatsapp" ? "WHATSAPP" : "IMESSAGE")"], t - M.sceltaT, codice: "NODO")
         }
@@ -472,10 +475,11 @@ enum ProveMessaggiTavola {
         let V = Array(D.voci.prefix(12))
         let orb: [String: (Double, Double)] = ["imessage": (0.6, 0.35), "whatsapp": (1.0, -0.45)]
         let Q = { (r: Double, inc: Double, a: Double) -> P3 in P3(cos(a) * r * s.nasce, sin(a) * r * cos(inc) * s.nasce, sin(a) * r * sin(inc) * s.nasce) }
-        for (r, inc) in orb.values { var q: P3?; for k in 0...72 { let p = s.P(Q(r, inc, Double(k) / 72 * OP.due)); if let q { F.metti(1, q, p) }; q = p } }
+        for (r, inc) in orb.values { var q: P3?; for k in 0...72 { let p = s.Pv(Q(r, inc, Double(k) / 72 * OP.due)); if let q { F.metti(1, q, p) }; q = p } }
         for k in 0..<3 {
             var q: P3?
-            for i in 0...32 { let a = Double(i) / 32 * OP.due, p = s.P(cos(a) * 0.14, sin(a) * 0.14 * cos(Double(k)), sin(a) * 0.14 * sin(Double(k))); if let q { F.metti(3, q, p) }; q = p }
+            let ck: Double = cos(Double(k)), sk: Double = sin(Double(k))
+            for i in 0...32 { let a: Double = Double(i) / 32 * OP.due, r: Double = sin(a) * 0.14, p = s.P(cos(a) * 0.14, r * ck, r * sk); if let q { F.metti(3, q, p) }; q = p }
         }
         Tav.traccia(&gc, F, piccolo)
         var conta: [String: Int] = ["imessage": 0, "whatsapp": 0]
@@ -483,9 +487,9 @@ enum ProveMessaggiTavola {
         for v in V {
             let c = v.tipo == "whatsapp" ? "whatsapp" : "imessage", o = orb[c] ?? (0.6, 0.35), r = o.0, inc = o.1, k = conta[c] ?? 0
             conta[c] = k + 1
-            let a = 1.5708 - Double(k) * 0.55 + t * (c == "whatsapp" ? 0.12 : 0.2), q = Q(r, inc, a), p = s.P(q)
+            let a = 1.5708 - Double(k) * 0.55 + t * (c == "whatsapp" ? 0.12 : 0.2), q = Q(r, inc, a), p = s.Pv(q)
             if v.ricevuto {
-                let c2 = s.P(q * 0.75)
+                let c2 = s.Pv(q * 0.75)
                 var coda = Path(); coda.move(to: CGPoint(x: p.x, y: p.y)); coda.addLine(to: CGPoint(x: c2.x, y: c2.y))
                 gc.stroke(coda, with: .linearGradient(Gradient(colors: [OP.b(0.6), OP.b(0)]), startPoint: CGPoint(x: p.x, y: p.y), endPoint: CGPoint(x: c2.x, y: c2.y)), lineWidth: 1.2)
             }
@@ -495,7 +499,7 @@ enum ProveMessaggiTavola {
         Tav.alone(&gc, s.P(0, 0, 0), s.sz * 0.3, 0.3, Tav.bianco)
         guard !piccolo else { return }
         for (nome, chiave) in [("IMESSAGE", "imessage"), ("WHATSAPP", "whatsapp")] {
-            if let o = orb[chiave] { let p = s.P(Q(o.0, o.1, 3.6)); OP.scritta(&gc, nome, p.x, p.y + 10, 6, 700, OP.c(0.85)) }
+            if let o = orb[chiave] { let p = s.Pv(Q(o.0, o.1, 3.6)); OP.scritta(&gc, nome, p.x, p.y + 10, 6, 700, OP.c(0.85)) }
         }
         for (i, q) in sat.enumerated() { M.zona(q.p.x, q.p.y, 11, i) }
         Tav.testate(&gc, W, "ORBITE", "\(conta["imessage"] ?? 0) IMESSAGE · \(conta["whatsapp"] ?? 0) WHATSAPP", D.scelto.map { "SCRIVE A \($0.uppercased())" })
@@ -556,7 +560,13 @@ enum ProveConfidenteTavola {
         for k in 0..<5 {
             let r = 0.22 - Double(k) * 0.025
             var q: P3?
-            for i in 0...16 { let a = 3.3 + Double(i) / 16 * 2.7, p = s.P((-0.45 + cos(a) * r * 1.3) * nb, 0, Z + 0.45 + (-0.3 + sin(a) * r * 0.75 - Double(k) * 0.02) * 0.82 * nb); if let q { F.metti(2, q, p) }; q = p }
+            for i in 0...16 {
+                let a: Double = 3.3 + Double(i) / 16 * 2.7, px: Double = (-0.45 + cos(a) * r * 1.3) * nb
+                let pz: Double = Z + 0.45 + (-0.3 + sin(a) * r * 0.75 - Double(k) * 0.02) * 0.82 * nb
+                let p = s.P(px, 0, pz)
+                if let q { F.metti(2, q, p) }
+                q = p
+            }
         }
         F.metti(2, s.P(-0.05, 0, Z + 0.45 - 0.2 * 0.82), s.P(-0.18, 0, Z - 0.05)); F.metti(2, s.P(0.1, 0, Z + 0.45 - 0.3 * 0.82), s.P(-0.04, 0, Z - 0.05))
         Tav.traccia(&gc, F, piccolo)
@@ -641,7 +651,7 @@ enum ProveInterpreteTavola {
             for k in 0...40 {
                 let u = Double(k) / 40, la = it.lat + (dst.lat - it.lat) * u, lo = it.lon + (dst.lon - it.lon) * u
                 let h = 1 + 0.35 * sin(.pi * u) * min(1, abs(dst.lon - it.lon) / 60 + 0.3)
-                arco.append(s.P(Tav.geo(la, lo + giro, h * s.nasce)))
+                arco.append(s.Pv(Tav.geo(la, lo + giro, h * s.nasce)))
             }
             for k in 1..<arco.count { F.metti(4, arco[k - 1], arco[k]) }
         }
@@ -680,7 +690,8 @@ enum ProveInterpreteTavola {
                 var q: P3?
                 for b in 0...16 {
                     let X = cx - 0.42 + Double(b) * 0.0525, env = sin(.pi * Double(b) / 16)
-                    let amp = (on ? 0.35 : 0.08) * env * (0.3 + 0.7 * seme(fase, b + li * 31)) * (1 - Double(r) / 12) * s.nasce
+                    let forza: Double = on ? 0.35 : 0.08, rumore: Double = 0.3 + 0.7 * seme(fase, b + li * 31), cala: Double = 1 - Double(r) / 12
+                    let amp: Double = forza * env * rumore * cala * s.nasce
                     let p = s.P(X, y, 0.12 + amp)
                     if let q { F.metti(r == 0 ? (on ? 4 : 2) : on ? 2 : 0, q, p) }
                     q = p
@@ -736,7 +747,7 @@ enum ProveRicordiTavola {
             for p in 0..<8 {
                 for q in (p + 1)..<8 {
                     let diversi = (v[p].x != v[q].x ? 1 : 0) + (v[p].y != v[q].y ? 1 : 0) + (v[p].z != v[q].z ? 1 : 0)
-                    if diversi == 1 { F.metti(g - (v[p].y > cy && v[q].y > cy ? 1 : 0), s.P(v[p]), s.P(v[q])) }
+                    if diversi == 1 { F.metti(g - (v[p].y > cy && v[q].y > cy ? 1 : 0), s.Pv(v[p]), s.Pv(v[q])) }
                 }
             }
             Tav.traccia(&gc, F, piccolo, k: fr ? 1 : 0.75)
