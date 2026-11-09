@@ -674,7 +674,6 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
-        richiamo.conMusica = musicaSuona                 // 9 nov: con la musica la cancellazione dell'eco
         richiamo.soloNome = musicaSuona || riservato     // 9 nov: RISERVATO (a mano o con la musica): solo «Jarvis»
         avvioRichiamo?.cancel()
         guard richiamoServe else { richiamo.ferma(); restituisciMusica(); return }

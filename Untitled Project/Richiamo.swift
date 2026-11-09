@@ -37,17 +37,6 @@ final class Richiamo {
     /// 9 nov (il signore: «mentre suona la canzone dico Jarvis, la musica si abbassa, ci parlo»): con la musica conta solo «Jarvis»
     /// (niente frasi senza nome, niente seguito, niente nome in fondo alla frase): la canzone non lo sveglia da sola.
     var soloNome = false
-    /// 9 nov: la musica esce dall'altoparlante dell'iPhone, a pochi centimetri dal microfono: senza aiuto copre il «Jarvis». Con la
-    /// musica e l'altoparlante dell'iPhone si accende la cancellazione dell'eco (come l'orecchio mentre JARVIS parla), con
-    /// l'abbassamento delle altre app al minimo; con cuffie o casse Bluetooth no (passerebbero alla qualità da telefonata).
-    var conMusica = false {
-        didSet { if conMusica != oldValue, acceso { spegni(); accendi() } }
-    }
-    private var conEco: Bool {
-        guard conMusica else { return false }
-        let uscite = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
-        return uscite.contains(.builtInSpeaker) || uscite.contains(.builtInReceiver)
-    }
     private var resto = ""
     /// Fino a quando basta parlare, senza «Jarvis»: subito dopo una richiesta il signore può aggiungere ancora qualcosa.
     var liberoFinoA = Date.distantPast
@@ -153,7 +142,7 @@ final class Richiamo {
                 // 26 ott («Bentornato a casa» partito da solo chiudendo LiDAR, senza battiti): il microfono che si riaccende fa
                 // un fruscio/scatto d'avvio (sul polso misurato: ~0,6 s) che può sembrare due battiti. Per 1 s non conta.
                 BattitoMani.ignora(per: 1.0)
-                try Richiamo.collega(motore, condotto, mani, eco: conEco)
+                try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
                 try motore.start()
             }
@@ -455,12 +444,8 @@ final class Richiamo {
 
     // MARK: Ponti fuori dal thread principale
 
-    nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto, _ mani: BattitoMani, eco: Bool) throws {
+    nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto, _ mani: BattitoMani) throws {
         let input = motore.inputNode
-        if input.isVoiceProcessingEnabled != eco { try input.setVoiceProcessingEnabled(eco) }
-        if eco {      // la musica si abbassa il meno possibile
-            input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
-        }
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Richiamo", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
