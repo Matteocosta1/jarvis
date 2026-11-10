@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 12.0 (5) — MARK XII · 10 nov · il signore: «produci la build» (numero: il successivo, 5)
+## 12.0 (5) — MARK XII · 10 nov · il signore: «produci la build» (numero: il successivo, 5) · controllo di compilazione VERDE (0 errori, 0 warning, run 42731433588)
 - Musica · tre ologrammi interattivi come il mockup (il signore: «fai come le altre, 3 diversi ologrammi»): VINILE (giradischi a 33⅓ giri con l'inerzia, copertina vera sull'etichetta, braccio che avanza col brano, corona dello spettro; tocco sul disco play/pausa, sull'anello del tempo salta lì, sul braccio la scheda), ONDA (paesaggio dello spettro che scorre; tocco sull'asta salta, sul paesaggio play/pausa), CODA (copertina di adesso in piedi, i prossimi 6 in orbita con le copertine vere; tocco: scheda, di nuovo: parte; centro: play/pausa). Tolto il disco dal pannello (come il mockup). Polso: l'ologramma scelto in piccolo in testa a Musica. Lo spettro è disegnato (Apple non dà il segnale dei brani di Apple Music).
 - Archivio centrale: «Pianta casa nuova» spostata da «varie» a «LiDAR».
 - Cancellazione dell'eco col lettore interno: NON inclusa (rischio di fermare la musica come nella 12.0 (3)).
