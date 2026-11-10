@@ -16,6 +16,8 @@ nonisolated enum SezioneOlo: String, CaseIterable {
     case diario, sonno, briefing, spesa, serata, bea
     // 9 nov (build 19, il signore: «falli tutti J»): gli ologrammi della tavola, come il mockup
     case cuore, telefono, meteo, edith, posta, messaggi, confidente, interprete, traccia, vitals, github, supabase, archivio, costi
+    // 10 nov (il signore: «fai come le altre, 3 diversi ologrammi»): la Musica
+    case musica
 
     /// v270: Bea ha una chiave nuova (le prove sono cambiate: VETRO, SCUDO, RITRATTO); la scelta di prima si ritrova (SCUDO resta SCUDO).
     var chiave: String {
@@ -53,6 +55,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .supabase: return ["REATTORE", "RETE", "BATTITO"]
         case .archivio: return ["OFFICINA", "NUVOLA", "SPIRALE"]
         case .costi: return ["PALLADIO", "TORRI", "CLESSIDRA"]
+        case .musica: return ["VINILE", "ONDA", "CODA"]
         }
     }
 
@@ -79,6 +82,7 @@ nonisolated enum SezioneOlo: String, CaseIterable {
         case .supabase: return ["↔ GIRA · TOCCA UNA CAMERA", "↔ GIRA · TOCCA UNA FUNZIONE", "↔ GIRA · TOCCA UN MINUTO"]
         case .archivio: return ["↔ SFOGLIA · TOCCA LA TAVOLA", "↔ GIRA · TOCCA UNA CARTELLA", "↔ GIRA · TOCCA UN FILE"]
         case .costi: return ["↔ GIRA · TOCCA UNA BOBINA", "↔ GIRA · TOCCA UNA TORRE", "↔ GIRA · TOCCA LA CLESSIDRA"]
+        case .musica: return ["↔ GIRA · TOCCA IL DISCO", "↔ GIRA · TOCCA L'ASTA PER SALTARE", "↔ GIRA · TOCCA UN BRANO"]
         }
     }
 
@@ -621,7 +625,7 @@ struct OloSingolaVista: View {
 /// Le prove di un ologramma nella sezione, come il mockup v262: la tela col disegno scelto e, sotto, le chip (tre). Il dito di lato lo
 /// gira (con lo slancio), il tocco su un elemento apre il suo riquadro; passando a un'altra prova, una scansione scende e la ridisegna.
 /// La scelta resta (anche sul polso). Si ferma con «Riduci movimento» (resta il disegno finito) e quando la sezione è dietro.
-struct ProveOloVista: View {
+struct ProveOloVista<Simboli: View>: View {
     let sezione: SezioneOlo
     let altezza: CGFloat
     /// La prova `k` riparte da capo (il suo stato: pagine uscite, penna, monete…).
@@ -637,13 +641,18 @@ struct ProveOloVista: View {
     @Environment(\.accessibilityReduceMotion) private var riduci
     @Environment(\.sezioneDietro) private var dietro
 
+    /// 10 nov (Musica): le viste che la tela disegna dentro di sé (le copertine vere), lette dalle prove con `resolveSymbol`.
+    let simboli: Simboli
+
     init(sezione: SezioneOlo, altezza: CGFloat, margini: EdgeInsets = EdgeInsets(top: 4, leading: 10, bottom: 10, trailing: 10),
-         crea: @escaping (Int) -> Void, disegna: @escaping (Int, inout GraphicsContext, Double, Double, Double, ManoOlo) -> Void) {
+         crea: @escaping (Int) -> Void, disegna: @escaping (Int, inout GraphicsContext, Double, Double, Double, ManoOlo) -> Void,
+         @ViewBuilder simboli: () -> Simboli) {
         self.sezione = sezione
         self.altezza = altezza
         self.margini = margini
         self.crea = crea
         self.disegna = disegna
+        self.simboli = simboli()
         _scelta = AppStorage(wrappedValue: 0, sezione.chiave)
     }
 
@@ -669,6 +678,8 @@ struct ProveOloVista: View {
             Canvas { gc, size in
                 _ = tocchi                                        // con «Riduci movimento»: un tocco ridisegna
                 MotoreOlo.fotogramma(&gc, size, t, mano, aiuto: aiuto) { g, W, H in disegna(k, &g, W, H, t, mano) }
+            } symbols: {
+                simboli
             }
         }
         .frame(height: altezza)
@@ -698,6 +709,14 @@ struct ProveOloVista: View {
         inizio = Date()
         ritocco += 1
         PonteTelefono.condiviso.invia()                           // il polso segue la scelta
+    }
+}
+
+extension ProveOloVista where Simboli == EmptyView {
+    /// Le sezioni senza simboli (tutte tranne Musica).
+    init(sezione: SezioneOlo, altezza: CGFloat, margini: EdgeInsets = EdgeInsets(top: 4, leading: 10, bottom: 10, trailing: 10),
+         crea: @escaping (Int) -> Void, disegna: @escaping (Int, inout GraphicsContext, Double, Double, Double, ManoOlo) -> Void) {
+        self.init(sezione: sezione, altezza: altezza, margini: margini, crea: crea, disegna: disegna, simboli: { EmptyView() })
     }
 }
 #endif

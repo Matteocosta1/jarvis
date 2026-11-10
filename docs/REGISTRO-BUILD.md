@@ -530,7 +530,10 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## Prossima build (numero da chiedere) — in preparazione
+## 12.0 (5) — MARK XII · 10 nov · il signore: «produci la build» (numero: il successivo, 5)
+- Musica · tre ologrammi interattivi come il mockup (il signore: «fai come le altre, 3 diversi ologrammi»): VINILE (giradischi a 33⅓ giri con l'inerzia, copertina vera sull'etichetta, braccio che avanza col brano, corona dello spettro; tocco sul disco play/pausa, sull'anello del tempo salta lì, sul braccio la scheda), ONDA (paesaggio dello spettro che scorre; tocco sull'asta salta, sul paesaggio play/pausa), CODA (copertina di adesso in piedi, i prossimi 6 in orbita con le copertine vere; tocco: scheda, di nuovo: parte; centro: play/pausa). Tolto il disco dal pannello (come il mockup). Polso: l'ologramma scelto in piccolo in testa a Musica. Lo spettro è disegnato (Apple non dà il segnale dei brani di Apple Music).
+- Archivio centrale: «Pianta casa nuova» spostata da «varie» a «LiDAR».
+- Cancellazione dell'eco col lettore interno: NON inclusa (rischio di fermare la musica come nella 12.0 (3)).
 - Musica, lettore NOSTRO dentro JARVIS (9 nov sera, il signore: «fai un lettore nostro interno», «come Apple Music»): `ApplicationMusicPlayer` al posto dell'app Musica, per la sezione Musica, «Jarvis, metti…», Shazam e il polso. Chiudendo JARVIS la musica finisce; «Chiudi» sulla sezione la ferma; mandata dietro o in background (Home, altra app, schermo bloccato) continua col disco che gira e JARVIS nella Dynamic Island; l'app Musica non viene più toccata. Volume coi tasti dell'iPhone. Con «Jarvis» (o un tocco) la musica va in pausa e riparte 1,5 s dopo la risposta (Apple non permette a un'app di abbassare il proprio lettore). Tolto il trucco del blocco schermo.
 - Musica (9 nov sera, il signore): il disco nel Dock girava anche a musica ferma (lo stato del lettore si leggeva solo a sezione aperta): ora letto ogni secondo. Dopo la risposta di JARVIS (o tornando in RISERVATO) la musica restava bassa: l'audio di JARVIS ora si spegne davvero, riprovando fino a 2 s, prima di riaccendere il «Jarvis». Con la musica l'ascolto dura al massimo 10 s (le parole della canzone non lasciano mai arrivare il silenzio).
 

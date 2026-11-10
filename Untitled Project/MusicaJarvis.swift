@@ -80,6 +80,45 @@ final class LettoreMusica: ObservableObject {
         if c != casuale { casuale = c }
         let r = lettore.state.repeatMode == MusicKit.MusicPlayer.RepeatMode.one
         if r != ripeti { ripeti = r }
+        // 10 nov: i prossimi in coda, per l'ologramma CODA (non pubblicati: l'ologramma li legge a ogni fotogramma)
+        var nuovi: [MusicKit.MusicPlayer.Queue.Entry] = []
+        if let e {
+            let tutte = Array(lettore.queue.entries)
+            if let i = tutte.firstIndex(where: { $0.id == e.id }) { nuovi = Array(tutte.dropFirst(i + 1).prefix(6)) }
+        }
+        if nuovi.map(\.id) != prossimi.map(\.id) { prossimi = nuovi }
+    }
+
+    /// I prossimi brani in coda dopo quello di adesso (al massimo 6).
+    private(set) var prossimi: [MusicKit.MusicPlayer.Queue.Entry] = []
+
+    /// CODA: toccato due volte un brano in orbita, parte (salta avanti fino a lui).
+    func suonaProssimo(_ k: Int) async {
+        guard k >= 0, k < prossimi.count else { return }
+        fermataDaJarvis = false
+        do {
+            for _ in 0...k { try await lettore.skipToNextEntry() }
+        } catch {
+            errore = "Apple Music: \(error.localizedDescription)"
+        }
+        await play()
+    }
+
+    /// I dati per gli ologrammi di MUSICA (VINILE, ONDA, CODA), letti a ogni fotogramma.
+    var datiOlo: DatiMusicaOlo {
+        DatiMusicaOlo(ora: BranoMusicaOlo(titolo: titolo, artista: artista, album: album, durata: durata ?? 0),
+                      t: voce == nil ? 0 : tempo, suona: suona, jPausa: fermataDaJarvis,
+                      prossimi: prossimi.map(LettoreMusica.branoOlo),
+                      playPausa: { Suoni.tocco(); Task { await LettoreMusica.condiviso.playPausa() } },
+                      vaiA: { f in Suoni.tocco(); LettoreMusica.condiviso.vaiA(f) },
+                      suonaProssimo: { k in Suoni.tocco(); Task { await LettoreMusica.condiviso.suonaProssimo(k) } })
+    }
+
+    private static func branoOlo(_ e: MusicKit.MusicPlayer.Queue.Entry) -> BranoMusicaOlo {
+        if case .song(let s)? = e.item {
+            return BranoMusicaOlo(titolo: s.title, artista: s.artistName, album: s.albumTitle ?? "—", durata: s.duration ?? 0)
+        }
+        return BranoMusicaOlo(titolo: e.title, artista: e.subtitle ?? "—", album: e.title, durata: 0)
     }
 
     // MARK: la qualità (decisione 33)
@@ -137,7 +176,10 @@ final class LettoreMusica: ObservableObject {
 
     // MARK: i tasti
 
-    func playPausa() async { if suona { pausa() } else { await play() } }
+    func playPausa() async {
+        fermataDaJarvis = false                                    // il signore ha preso il comando: niente ripresa automatica
+        if suona { pausa() } else { await play() }
+    }
 
     func play() async {
         LettoreMusica.preparaAudio()
@@ -392,6 +434,9 @@ struct VistaMusica: View {
 
     var body: some View {
         CorniceScheda(titolo: "Musica", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
+            // 10 nov (il signore: «fai come le altre, 3 diversi ologrammi»): in testa l'ologramma con VINILE, ONDA, CODA, come il mockup
+            OlogrammaMusicaProve(lettore: lettore)
+                .corniceOlo(Color.ciano)
             PannelloOraMusica(lettore: lettore)
             if let avviso {
                 Pannello(tinta: .ciano) { Text(avviso).font(.footnote).foregroundStyle(.orange) }
@@ -797,15 +842,32 @@ struct CopertinaMusica: View {
 // MARK: - Il riquadro di quello che suona
 
 /// Il riquadro in alto: disco, titolo, artista, album, il tempo, i cinque tasti e «APPLE MUSIC · LOSSLESS» (la qualità vera).
-struct PannelloOraMusica: View {
+/// 10 nov · gli ologrammi di MUSICA (ProveMusica.swift): la tela con le copertine vere di Apple Music come simboli
+/// (la prima quella di adesso, poi i prossimi in coda); senza copertina, quella disegnata dal nome dell'album.
+struct OlogrammaMusicaProve: View {
     @ObservedObject var lettore: LettoreMusica
-    @State private var largo: CGFloat = 333
+    @State private var prove = ProveMusica()
 
     var body: some View {
-        let lato = max(120, min(240, (largo - 28) * 0.7))          // come nel mockup: min(240 px, 70%)
+        let copertine: [Artwork?] = [lettore.copertina] + (0..<6).map { $0 < lettore.prossimi.count ? lettore.prossimi[$0].artwork : nil }
+        ProveOloVista(sezione: .musica, altezza: 260, crea: { prove.crea($0) },
+                      disegna: { k, gc, W, H, t, M in prove.disegna(k, &gc, W, H, t, M, LettoreMusica.condiviso.datiOlo, piccolo: false) },
+                      simboli: {
+                          ForEach(copertine.indices, id: \.self) { i in
+                              if let a = copertine[i] {
+                                  ArtworkImage(a, width: 240, height: 240).tag(CopertinaOlo.simbolo(i))
+                              }
+                          }
+                      })
+    }
+}
+
+struct PannelloOraMusica: View {
+    @ObservedObject var lettore: LettoreMusica
+
+    var body: some View {
+        // 10 nov: il disco è passato nell'ologramma (VINILE), come il mockup (tolto `.mu-disco`)
         VStack(spacing: 10) {
-            DiscoMusica(lettore: lettore)
-                .frame(width: lato, height: lato)
             VStack(spacing: 2) {
                 Text(lettore.titolo).font(.system(size: 18, weight: .bold)).foregroundStyle(.white).lineLimit(1)
                 Text(lettore.artista).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo).lineLimit(1)
@@ -842,7 +904,6 @@ struct PannelloOraMusica: View {
                                    startRadius: 0, endRadius: 280),
                     in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.ciano.opacity(0.28), lineWidth: 1))
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largo = $0 }
     }
 
     private func tasto(_ tipo: IconaTastoMusica.Tipo, _ nome: String, premuto: Bool? = nil, azione: @escaping () -> Void) -> some View {

@@ -10,6 +10,7 @@ struct VistaMusicaOrologio: View {
     @State private var lettoAlle = Date()              // quando è arrivato lo stato: il tempo scorre da lì fino alla lettura dopo
     @State private var caricato = false
     @State private var muto = false                    // l'iPhone non ha risposto
+    @State private var prove = ProveMusica()           // 10 nov: l'ologramma in piccolo (la prova scelta sull'iPhone)
     private let ciano = TintaOrologio.ciano
 
     var body: some View {
@@ -19,6 +20,9 @@ struct VistaMusicaOrologio: View {
                     if let e = s.errore {
                         Text(e).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center)
                     }
+                    // 10 nov: come sull'iPhone, in testa l'ologramma di MUSICA (VINILE, ONDA o CODA, quella scelta sull'iPhone)
+                    ProvaOloPiccola(sezione: .musica) { k, gc, W, H, t, M in prove.disegna(k, &gc, W, H, t, M, dati(s), piccolo: true) }
+                        .frame(height: 74)
                     Text(s.titolo).font(.system(size: 14, weight: .bold)).lineLimit(2).multilineTextAlignment(.center)
                     Text(s.artista).font(.footnote).foregroundStyle(ciano).lineLimit(1)
                     tempo(s)
@@ -51,6 +55,14 @@ struct VistaMusicaOrologio: View {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+    }
+
+    /// I dati dell'ologramma: il tempo scorre da solo tra una lettura e l'altra, se suona.
+    private func dati(_ s: PonteOrologio.StatoMusica) -> DatiMusicaOlo {
+        let d = s.durata ?? 0
+        let t = s.suona ? min(d > 0 ? d : .infinity, s.tempo + Date().timeIntervalSince(lettoAlle)) : s.tempo
+        return DatiMusicaOlo(ora: BranoMusicaOlo(titolo: s.titolo, artista: s.artista, album: s.titolo, durata: d), t: t, suona: s.suona,
+                             jPausa: false, prossimi: [])
     }
 
     /// La barra del tempo con i minuti ai lati; tra una lettura e l'altra il tempo avanza da solo se suona.
