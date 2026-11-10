@@ -108,7 +108,7 @@ final class LettoreMusica: ObservableObject {
     var datiOlo: DatiMusicaOlo {
         DatiMusicaOlo(ora: BranoMusicaOlo(titolo: titolo, artista: artista, album: album, durata: durata ?? 0),
                       t: voce == nil ? 0 : tempo, suona: suona, jPausa: fermataDaJarvis,
-                      prossimi: prossimi.map(LettoreMusica.branoOlo),
+                      prossimi: prossimi.map { LettoreMusica.branoOlo($0) },
                       playPausa: { Suoni.tocco(); Task { await LettoreMusica.condiviso.playPausa() } },
                       vaiA: { f in Suoni.tocco(); LettoreMusica.condiviso.vaiA(f) },
                       suonaProssimo: { k in Suoni.tocco(); Task { await LettoreMusica.condiviso.suonaProssimo(k) } })
