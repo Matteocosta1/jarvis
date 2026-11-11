@@ -19,6 +19,9 @@ struct CorniceScheda<Contenuto: View>: View {
     var marchio = false
     /// 9 nov (Interprete): quando cambia, la pagina scorre in fondo (una frase nuova nella conversazione si vede subito).
     var fondo: Int? = nil
+    /// 12 nov (Musica › CERCA, il signore: «apre la tastiera e non mi fa selezionare niente perché la tastiera va sopra»): quando
+    /// cambia (e non è nil), la pagina scorre fino alla vista con questo id, in alto: il campo e i risultati restano sopra la tastiera.
+    var ancora: String? = nil
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
@@ -98,6 +101,10 @@ struct CorniceScheda<Contenuto: View>: View {
             .onChange(of: fondo) { _, n in
                 guard n != nil, mostrato else { return }
                 withAnimation(.easeOut(duration: 0.3)) { lettore.scrollTo("paginaScheda", anchor: .bottom) }
+            }
+            .onChange(of: ancora) { _, a in
+                guard let a, mostrato else { return }
+                withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)) { lettore.scrollTo(a, anchor: .top) }
             }
         }
     }
