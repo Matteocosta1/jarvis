@@ -456,10 +456,11 @@ struct VistaMusica: View {
             OlogrammaMusicaProve(lettore: lettore)
                 .corniceOlo(Color.ciano)
             PannelloOraMusica(lettore: lettore)
+            // 12 nov (il signore: «il messaggio d'errore arancione puoi toglierlo del tutto, mi infastidisce»): gli errori del lettore
+            // non si scrivono più nella pagina (come il mockup, che non li ha). Resta solo l'avviso quando manca il permesso o
+            // l'abbonamento ad Apple Music, senza il quale la sezione non può funzionare
             if let avviso {
                 Pannello(tinta: .ciano) { Text(avviso).font(.footnote).foregroundStyle(.orange) }
-            } else if let e = lettore.errore {
-                Pannello(tinta: .ciano) { Text(e).font(.footnote).foregroundStyle(.orange) }
             }
             schede
             VStack(alignment: .leading, spacing: 14) { pagina }
