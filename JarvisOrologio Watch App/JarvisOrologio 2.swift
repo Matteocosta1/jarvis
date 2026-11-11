@@ -106,6 +106,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var fineVoce = Date.distantPast            // quando il signore ha smesso di parlare (l'ultima frase)
     private var limiteInizio: TimeInterval = 7         // quanto aspettare che cominci a parlare
     private var voceSentita: TimeInterval = 0          // M7: quanti secondi di voce nella frase (decide la pausa di fine frase)
+    /// 12 nov (il dialogo nuovo al polso, come l'iPhone dell'11 nov): «ascoltami» o «fammi finire» detto da solo → l'ascolto dopo
+    /// aspetta almeno 3,5 s di silenzio e lo lascia parlare fino a 90 s. Al polso le parole arrivano solo a frase finita
+    /// (le trascrive il cervello), quindi vale per l'ascolto DOPO, non dentro la stessa frase.
+    private var ascoltoLungo = false
+    private var ascoltoLungoProssimo = false
     /// M7: la frase con cui il signore interrompe è registrata insieme alla voce di JARVIS: queste parole poi si tolgono.
     private var ecoDaTogliere: String?
     private var ecoMonitor = ""                        // quello che JARVIS ha detto da quando l'orecchio registra
@@ -342,9 +347,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
         daUnire = nil
         // solo «aspetta», «ascoltami»: lo riascolto, la frase vera arriva adesso. Come sull'iPhone (`instrada`) vale sempre,
         // non solo dopo un'interruzione: prima, detto al microfono che si riapre dopo la risposta, andava al cervello come domanda.
-        if aVoce, Seguito.soloAspetta(testo) {
+        if aVoce, Seguito.soloAspetta(testo) || JarvisOrologio.soloLasciamiFinire(testo) {
             daUnire = prima                                     // se l'aveva interrotto, la domanda interrotta resta da completare
             ferma()
+            // 12 nov: «ascoltami», «fammi finire», «lasciami parlare»: l'ascolto che parte adesso è quello lungo
+            let t = testo.lowercased()
+            if t.contains("ascolt") || JarvisOrologio.soloLasciamiFinire(testo) { ascoltoLungoProssimo = true }
             // se tace: «Mi dica, Sir» 5 secondi dopo che ha smesso di parlare (fine frase e trascrizione sono già passate)
             let limite = max(1.5, Dialogo.silenzioDopoAspetta - Date().timeIntervalSince(fineVoce))
             Task { await self.ascolta(limiteInizio: limite, aspetta: .aspetta) }
@@ -366,12 +374,28 @@ final class JarvisOrologio: NSObject, ObservableObject {
         rispostaInStoria = false
         // una domanda di prima rimasta senza risposta (un errore, «Stop») non resta; quella interrotta sì
         if storia.last?["role"] == "user", prima == nil { storia.removeLast() }
-        storia.append(["role": "user", "content": perCervello ?? testo])
+        storia.append(JarvisOrologio.battuta("user", perCervello ?? testo))
         inCorso = testo
-        storia = Array(storia.suffix(12))
+        storia = Array(storia.suffix(20))                  // 12 nov: 20 battute (prima 12); quelle vecchie le esclude il cervello
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
         domandaAVoce = aVoce
         compito = Task { await self.turno(nuovoTentativo: true) }
+    }
+
+    /// 12 nov: «fammi finire», «lasciami parlare», «non interrompermi» detti da soli (al massimo 6 parole).
+    nonisolated static func soloLasciamiFinire(_ frase: String) -> Bool {
+        let parole = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
+        guard !parole.isEmpty, parole.count <= 6 else { return false }
+        let t = " " + parole.joined(separator: " ") + " "
+        return [" fammi finire ", " lasciami finire ", " fammi parlare ", " lasciami parlare ", " non interrompermi "].contains { t.contains($0) }
+    }
+
+    /// 12 nov (come l'iPhone dell'11 nov, il caso Pierpaolo): ogni battuta porta il momento in cui è stata detta («quando», in
+    /// millisecondi). Il cervello mette giorno e ora davanti alle frasi di prima e lascia fuori quelle di più di 8 ore fa.
+    /// Le battute salvate prima di oggi non l'hanno: il cervello le tratta come prima.
+    nonisolated static func battuta(_ ruolo: String, _ testo: String) -> [String: String] {
+        ["role": ruolo, "content": testo, "quando": String(Int64(Date().timeIntervalSince1970 * 1000))]
     }
 
     /// La nota che va davanti alla frase quando il signore aveva interrotto la risposta a `prima` (il cervello la riconosce lì).
@@ -420,7 +444,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         if rispostaInStoria, storia.last?["role"] == "assistant" {
             storia[storia.count - 1]["content"] = Dialogo.rispostaInterrotta(storia[storia.count - 1]["content"] ?? "", detto: dettoFinora)
         } else if !risposta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, storia.last?["role"] == "user" {
-            storia.append(["role": "assistant", "content": Dialogo.rispostaInterrotta(risposta, detto: dettoFinora)])
+            storia.append(JarvisOrologio.battuta("assistant", Dialogo.rispostaInterrotta(risposta, detto: dettoFinora)))
         }
         rispostaInStoria = false
     }
@@ -487,6 +511,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         chiudiAttesa()
         limiteInizio = limite
         dopoAspetta = aspetta
+        ascoltoLungo = ascoltoLungoProssimo                // 12 nov: dopo «ascoltami» da solo, l'ascolto lungo
+        ascoltoLungoProssimo = false
         voceSentita = 0
         tickVoce = 0
         sommaVoce = 0
@@ -558,7 +584,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 // M7: la pausa di fine frase come sull'iPhone, per quanto si può senza le parole (l'orologio non le ha finché
                 // non trascrive): una risposta corta («sì», «che ore sono?») 0,8 s come prima; una frase normale 1,2 s;
                 // un discorso lungo 1,6 s (lì le pause per pensare sono più probabili). Prima 0,8 s per tutto: tagliava i pensieri.
-                let pausa = voceSentita < 1.5 ? 0.8 : (voceSentita > 6 ? 1.6 : 1.2)
+                // 12 nov (il signore: «dico tre parole e già risponde», anche al polso): un po' più di pazienza (1,0 / 1,4 / 1,8 s
+                // invece di 0,8 / 1,2 / 1,6) e il suo ritmo imparato: se riprende spesso subito dopo l'invio, la pausa cresce (fino a
+                // ×1,5); con «ascoltami» almeno 3,5 s.
+                let base = (voceSentita < 1.5 ? 1.0 : (voceSentita > 6 ? 1.8 : 1.4)) * RitmoSignore.condiviso.fattore
+                let pausa = ascoltoLungo ? max(base, 3.5) : base
                 if ora.timeIntervalSince(da) > pausa { fermaEInvia(); return }
             } else {
                 silenzioDa = ora
@@ -577,7 +607,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             case .miDica: stato = nil; dopoAspetta = .no   // nemmeno dopo «Mi dica»: torna in attesa, in silenzio
             case .no: stato = "Non ho sentito nulla, Sir. Tocchi il reattore e parli."
             }
-        } else if durata > 25 {
+        } else if durata > (ascoltoLungo ? 90 : 45) {          // 12 nov: prima 25 s (un discorso si tagliava a metà); 90 con «ascoltami»
             fermaEInvia()
         }
     }
@@ -587,7 +617,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let fondoStanza = fondo
         livelloUltimaFrase = contaVoce > 0 ? sommaVoce / Float(contaVoce) : nil   // build 30: si impara se la trascrizione ha parole
         let senzaAggiunta = ascoltoDaAggiunta || !primoPiano                      // build 30: niente aggiunta dopo un'aggiunta
+        // 12 nov: il suo ritmo. Una frase chiusa riporta piano ai tempi normali; se poi riprende a parlare (aggiunta), sale
+        if ascoltoDaAggiunta { RitmoSignore.condiviso.ripresa() } else { RitmoSignore.condiviso.fraseChiusaBene() }
         ascoltoDaAggiunta = false
+        ascoltoLungo = false
         fineVoce = silenzioDa ?? Date()
         dopoAspetta = .no                                // ha parlato: l'attesa dopo «aspetta» è chiusa (la rimette chiedi, se serve)
         timerAscolto?.invalidate()
@@ -727,6 +760,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         var t = (grezzo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if fase == .parlo || giaParlato { t = Dialogo.togliEco(t, detto: risposta).trimmingCharacters(in: .whitespacesAndNewlines) }   // la voce di JARVIS non conta
         guard !t.isEmpty, !JarvisOrologio.soloRumore(t), t.contains(where: { $0.isLetter }) else { return }   // solo rumore: niente
+        RitmoSignore.condiviso.ripresa()                 // 12 nov: aveva ancora da dire: la prossima volta un po' più di pazienza
         // parole vere: come prima, la domanda si ferma e parte insieme all'aggiunta
         var prima: Task<TrascrittoOrologio, Never>?
         if fase == .elaboro && inCorso == nil {
@@ -989,7 +1023,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if !q.isEmpty {
                 guard let aggiunta = testo, !aggiunta.isEmpty else { chiedi(q, aVoce: true); return }   // l'aggiunta non si è capita: vale la prima
                 if storia.last?["role"] == "user" { storia.removeLast() }                  // una domanda vecchia senza risposta
-                storia.append(["role": "user", "content": q])                              // la prima, come domanda interrotta
+                storia.append(JarvisOrologio.battuta("user", q))                           // la prima, come domanda interrotta
                 daUnire = q
                 quandoDaUnire = Date()
                 chiedi(aggiunta, aVoce: true)
@@ -1332,7 +1366,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     risposta = TagVoce.togli(testo)                               // i toni della voce non si vedono
                     rispostaGrezza = ""
                     stato = nil
-                    storia.append(["role": "assistant", "content": TagVoce.togli(testo)])
+                    storia.append(JarvisOrologio.battuta("assistant", TagVoce.togli(testo)))
                     rispostaInStoria = true                                      // se ora la interrompe, qui si segna il punto
                     compito = nil
                     riascolta = true                                             // detta la risposta, riascolta da solo
@@ -1552,7 +1586,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         var base = storia
         if base.last?["role"] == "user", prima == nil { base.removeLast() }
         base.append(["role": "user", "content": ""])
-        base = Array(base.suffix(12))
+        base = Array(base.suffix(20))                    // 12 nov: come `chiedi` (20 battute)
         while base.first?["role"] == "assistant" { base.removeFirst() }
         base.removeLast()
         return base
@@ -1599,9 +1633,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         fase = .elaboro
         rispostaInStoria = false
         if storia.last?["role"] == "user", prima == nil { storia.removeLast() }
-        storia.append(["role": "user", "content": prima.map { JarvisOrologio.notaInterruzione($0) + testo } ?? testo])
+        storia.append(JarvisOrologio.battuta("user", prima.map { JarvisOrologio.notaInterruzione($0) + testo } ?? testo))
         inCorso = testo
-        storia = Array(storia.suffix(12))
+        storia = Array(storia.suffix(20))
         while storia.first?["role"] == "assistant" { storia.removeFirst() }
         domandaAVoce = true
         iniziaFlussoVoce()
@@ -1642,7 +1676,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         risposta = parziale + "\n\n" + messaggio
         rispostaGrezza = ""
-        if storia.last?["role"] == "user" { storia.append(["role": "assistant", "content": risposta]) }
+        if storia.last?["role"] == "user" { storia.append(JarvisOrologio.battuta("assistant", risposta)) }
         rispostaInStoria = false                       // un errore non è una risposta da completare (sull'iPhone idTurno = nil)
         if giaParlato {
             bufferFrase = ""                           // la frase rimasta a metà non si dice: si passa all'errore

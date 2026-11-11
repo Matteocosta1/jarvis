@@ -97,6 +97,7 @@
 				avvioorologio.m4a,
 				Benessere.swift,
 				Build22.swift,
+				DialogoVivo.swift,
 				chatcarica.m4a,
 				chatsvuota.m4a,
 				clicktesta.m4a,

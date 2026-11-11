@@ -28,6 +28,7 @@ enum IsolaJarvis {
             case "ferma": MotoreGuida.condiviso.ferma(); chiudi()
             case "pausa", "riprendi", "stoprec": rec?(a)
             case "ok": chiudiPioggia()
+            case "finevoce": fineDialogo?()
             default: break
             }
         }
@@ -111,6 +112,32 @@ enum IsolaJarvis {
 
     static func fineRec() {
         if attivita?.content.state.tipo == "rec" { chiudi() }
+    }
+
+    // MARK: VOCE (12 nov, #16): il dialogo che continua fuori dall'app
+
+    /// «Fine» sull'isola della VOCE: il dialogo finisce e il microfono si spegne (lo imposta JARVIS).
+    static var fineDialogo: (() -> Void)?
+
+    /// La VOCE si accende (iOS lo permette solo con l'app ancora davanti: si chiama quando l'app sta uscendo) o si aggiorna.
+    /// Non prende mai il posto di un'altra attività di JARVIS (Travel, Guida, Rec): quelle contano di più, e il pallino
+    /// arancione di iOS dice comunque che il microfono è acceso.
+    static func voce(fase: String, riga: String) {
+        let s = AttivitaJarvis.ContentState(tipo: "voce", esci: nil, sigla: nil, coloreSigla: nil, oraMezzo: nil, freccia: nil, via: nil,
+                                            metri: nil, riga: riga, fase: fase)
+        if let a = attivita {
+            guard a.content.state.tipo == "voce" else { return }
+            guard a.content.state != s else { return }
+            Task { await a.update(ActivityContent(state: s, staleDate: nil)) }
+        } else {
+            avvia(s, meta: "JARVIS", fine: nil)
+        }
+    }
+
+    static var voceAccesa: Bool { attivita?.content.state.tipo == "voce" }
+
+    static func fineVoce() {
+        if voceAccesa { chiudi() }
     }
 
     // MARK: PIOGGIA (26 ott sera): la accende il cervello; qui solo «Ok»

@@ -6,11 +6,12 @@ import AppIntents
 // Questo file è sia nell'app (che accende, aggiorna e spegne l'attività) sia nell'estensione JarvisIsola (che la disegna).
 // TRAVEL: dopo «Avvisami», il conto alla rovescia per uscire e la linea da prendere. GUIDA: la guida a piedi di SATELLITE
 // col telefono in tasca: la freccia, la via e i metri. 26 ott sera (sì del signore): REC (il Wiretap registra anche fuori
-// dall'app), PIOGGIA (il radar, anche ad app chiusa).
+// dall'app), PIOGGIA (il radar, anche ad app chiusa). 12 nov (#16, il signore: «procedi»): VOCE, il dialogo che continua fuori
+// dall'app (il disegno del mockup approvato della build 32, con Apri e Fine al posto di Muto e Fine).
 
 nonisolated struct AttivitaJarvis: ActivityAttributes {
     nonisolated struct ContentState: Codable, Hashable, Sendable {
-        /// "travel", "guida", "rec" o "pioggia".
+        /// "travel", "guida", "rec", "pioggia" o "voce".
         var tipo: String
         /// TRAVEL: quando uscire. PIOGGIA: quando comincia (il conto alla rovescia lo fa iOS, anche ad app chiusa).
         var esci: Date?
@@ -28,6 +29,9 @@ nonisolated struct AttivitaJarvis: ActivityAttributes {
         /// REC: da quando conta (già spostato delle pause) e, in pausa, i secondi registrati fin lì.
         var inizio: Date? = nil
         var pausaSecondi: Int? = nil
+        /// VOCE (12 nov, #16): la fase del dialogo fuori dall'app, come la scritta sotto il reattore («LA ASCOLTO», «ELABORO»,
+        /// «PARLO», «IN ATTESA»). La riga è quello che sente o quello che risponde.
+        var fase: String? = nil
     }
     /// Dove va: il luogo di SATELLITE (TRAVEL, GUIDA); «Wiretap» o «Radar» per le altre.
     var meta: String
