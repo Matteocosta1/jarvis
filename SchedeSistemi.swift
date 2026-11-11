@@ -718,7 +718,7 @@ struct VistaArchivio: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(f.s("nome")).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
                 if !f.s("descrizione").isEmpty { Text(f.s("descrizione")).font(.system(size: 12)).foregroundStyle(Color.tenue).lineLimit(2) }
-                Text("\(f.s("cartella")) · \(f.n("kb")) KB · \(f.s("quando"))").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
+                Text("\(f.s("cartella")) · \(max(1, f.n("kb"))) KB · \(f.s("quando"))").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.tenue)
             }
             Spacer(minLength: 0)
             Image(systemName: "arrow.up.right.square").font(.system(size: 13)).foregroundStyle(Color.tenue)

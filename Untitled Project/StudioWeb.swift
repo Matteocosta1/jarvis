@@ -758,10 +758,11 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
                 let nome = (p["nome"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Progetto \(id)"
                 var senzaAnteprima = p
                 senzaAnteprima["mini"] = nil
+                senzaAnteprima["grande"] = nil                         // revisione 11 nov: anche l'anteprima grande dell'app, è a parte
                 if let dati = try? JSONSerialization.data(withJSONObject: senzaAnteprima, options: [.prettyPrinted]) {
                     ArchivioCentrale.copia(nome: nome, cartella: "studio", tipo: "application/json", dati: dati, descrizione: "Studio · progetto")
                 }
-                if let mini = p["mini"] as? String, let virgola = mini.firstIndex(of: ","), mini.hasPrefix("data:image"),
+                if let mini = (p["grande"] as? String) ?? (p["mini"] as? String), let virgola = mini.firstIndex(of: ","), mini.hasPrefix("data:image"),
                    let img = Data(base64Encoded: String(mini[mini.index(after: virgola)...])) {
                     ArchivioCentrale.copia(nome: nome + " anteprima", cartella: "studio", tipo: mini.contains("png") ? "image/png" : "image/jpeg",
                                            dati: img, descrizione: "Studio · anteprima del progetto")

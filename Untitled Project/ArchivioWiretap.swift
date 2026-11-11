@@ -50,7 +50,8 @@ struct ArchivioWiretap: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(f.s("nome").replacingOccurrences(of: ".txt", with: "")).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo).lineLimit(1)
-                        Text("\(f.s("quando")) · \(f.n("kb")) KB").font(.system(size: 11, design: .monospaced)).foregroundStyle(Color.tenue).lineLimit(1)
+                        // un testo breve pesa meno di 1 KB: si scrive 1, come il mockup
+                        Text("\(f.s("quando")) · \(max(1, f.n("kb"))) KB").font(.system(size: 11, design: .monospaced)).foregroundStyle(Color.tenue).lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())

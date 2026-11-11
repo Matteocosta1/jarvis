@@ -54,16 +54,21 @@ enum Posizione {
         if stato == .notDetermined { gestore.requestWhenInUseAuthorization(); return nil }
         guard stato == .authorizedWhenInUse || stato == .authorizedAlways else { return nil }
         if let l = fresca() { return dizionario(l) }
-        if let l = gestore.location, l.horizontalAccuracy >= 0 {
+        // revisione 11 nov: solo se non è troppo vecchia (15 minuti). Una posizione di ore fa può essere di un'altra città (app
+        // rimasta chiusa durante un viaggio) e finirebbe nei ricordi come «dove l'ho messo»: allora si aspetta quella nuova
+        if let l = gestore.location, l.horizontalAccuracy >= 0, Date().timeIntervalSince(l.timestamp) < 900 {
             rinfresca()                                    // la prossima domanda avrà quella nuova
             return dizionario(l)
         }
+        gestore.stopUpdatingLocation()                     // fermo e riavvio: anche da fermo arriva subito una lettura nuova
         risveglia()
         for _ in 0..<10 {                                  // nessuna posizione: fino a 1 secondo, a passi di 100 ms
             try? await Task.sleep(for: .milliseconds(100))
             if let l = fresca() { return dizionario(l) }
         }
-        return gestore.location.map(dizionario)
+        // niente di fresco in 1 secondo: quella vecchia va bene solo se recente (15 minuti), altrimenti meglio nessuna
+        guard let l = gestore.location, l.horizontalAccuracy >= 0, Date().timeIntervalSince(l.timestamp) < 900 else { return nil }
+        return dizionario(l)
     }
 
     private static var ultimoRinfresco = Date.distantPast

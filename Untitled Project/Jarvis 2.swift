@@ -291,9 +291,10 @@ final class Jarvis: NSObject, ObservableObject {
     /// 11 nov: quando è arrivata l'ultima parola nuova (il suono da solo, senza parole, non tiene aperto l'ascolto all'infinito)
     private var ultimaParolaAscolto = Date.distantPast
     /// 11 nov (#16): il dialogo continua fuori dall'app; quando finisce il microfono si spegne
-    private var dialogoFuori = false
+    /// Pubblicati: la schermata (ContentView) li legge per tenere acceso il microfono fuori dall'app finché il dialogo continua.
+    @Published private(set) var dialogoFuori = false
     private var chiusuraFuori: Task<Void, Never>?
-    private var micChiusoFuori = false             // dialogo finito fuori dall'app: microfono spento finché non torna nell'app
+    @Published private(set) var micChiusoFuori = false   // dialogo finito fuori dall'app: microfono spento finché non torna nell'app
     /// 11 nov · risposta anticipata: la risposta preparata durante la pausa del signore (nil: nessuna)
     private var anticipo: Anticipo?
     private var timerAnticipo: Timer?
@@ -1484,7 +1485,8 @@ final class Jarvis: NSObject, ObservableObject {
         let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
         if misuraTurno == id { misura["ms_gps"] = Int(Date().timeIntervalSince(inizioGps) * 1000) }
         if let posizione { corpo["posizione"] = posizione }
-        if let t = tempiDaMandare { corpo["tempi_app"] = t; tempiDaMandare = nil }   // 11 nov: i tempi del turno di prima
+        // 11 nov: i tempi del turno di prima (solo se questa richiesta parte davvero: con l'anticipo adottato è già fatta)
+        if primo == nil, let t = tempiDaMandare { corpo["tempi_app"] = t; tempiDaMandare = nil }
         // iOS ci lascia finire la risposta anche se lo schermo si spegne o il signore cambia app per un momento
         let sfondo = UIApplication.shared.beginBackgroundTask(withName: "jarvis-risposta") { }
         defer { if sfondo != .invalid { UIApplication.shared.endBackgroundTask(sfondo) } }
@@ -2562,9 +2564,9 @@ final class Jarvis: NSObject, ObservableObject {
         // appena capisce che il dialogo è finito richiuda il microfono»): con un dialogo in corso (JARVIS parla, pensa, lo ascolta,
         // o ha appena risposto) il dialogo continua fuori dall'app. Finito il dialogo, `chiudiDialogoFuori` spegne il microfono.
         // Senza dialogo in corso resta la regola del 25 ott: quello che stava sentendo si butta.
-        if !Jarvis.usaAscoltoCloud, !micSpento, fase != .attesa || richiamo.sveglio || Date() < richiamo.seguitoFinoA {
+        if dialogoPuoContinuareFuori {
             dialogoFuori = true
-            if fase == .attesa { chiudiDialogoFuori(fra: 8) }
+            chiudiDialogoFuori(fra: 8)       // finché il dialogo è vivo si riguarda ogni 8 s; finita la risposta riparte da capo
             return
         }
         // 9 nov sera (il signore: «come Apple Music»): in background (Home, altra app, schermo bloccato) la musica continua; la
@@ -2598,8 +2600,10 @@ final class Jarvis: NSObject, ObservableObject {
         chiusuraFuori?.cancel()
         chiusuraFuori = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(secondi))
-            guard let self, !Task.isCancelled, self.dialogoFuori, UIApplication.shared.applicationState != .active,
-                  self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { return }
+            guard let self, !Task.isCancelled, self.dialogoFuori, UIApplication.shared.applicationState != .active else { return }
+            // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
+            // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
+            guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { self.chiudiDialogoFuori(fra: secondi); return }
             self.dialogoFuori = false
             self.micChiusoFuori = true
             self.richiamo.ferma()
@@ -2608,6 +2612,14 @@ final class Jarvis: NSObject, ObservableObject {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
         }
+    }
+
+    /// 11 nov (#16): c'è un dialogo che può continuare fuori dall'app (JARVIS ascolta, pensa o parla, o ha appena risposto e il
+    /// seguito vale ancora). La schermata lo usa per non spegnere il «Jarvis» quando l'app va dietro (revisione 11 nov: prima il
+    /// microfono dell'attesa si spegneva comunque appena l'app usciva dal primo piano, e il seguito fuori dall'app non si sentiva).
+    var dialogoPuoContinuareFuori: Bool {
+        !Jarvis.usaAscoltoCloud && !micSpento && !micChiusoFuori
+            && (dialogoFuori || fase != .attesa || richiamo.sveglio || Date() < richiamo.seguitoFinoA)
     }
 
     /// 11 nov (#16): di nuovo nell'app: il dialogo torna quello di sempre e il microfono dell'attesa si riaccende.
@@ -3328,6 +3340,9 @@ extension Jarvis {
         storia.append(Jarvis.perCervello(m))
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                                     "a_voce": true, "anticipo": true]
+        // revisione 11 nov: come il turno normale, anche l'anticipo passa dall'arbitro (se la stessa frase l'ha sentita l'orologio,
+        // risponde uno solo). La fine della frase è adesso: il signore ha appena smesso di parlare
+        corpo["arbitro"] = ["id": Impostazioni.idDispositivo, "fine": Int64(Date().timeIntervalSince1970 * 1000)] as [String: Any]
         if let schermo = Schermo.perCervello(sezione: sezioneAperta) { corpo["schermo"] = schermo }
         let base = corpo
         a.compito = Task { [weak self] in

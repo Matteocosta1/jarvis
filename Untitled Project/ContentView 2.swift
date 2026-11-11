@@ -79,9 +79,10 @@ struct ContentView: View {
 
     /// Il richiamo «Jarvis» resta in ascolto ovunque nell'app (schede, Occhi, Cucina, Impostazioni, SISTEMI, Browser, LiDAR…),
     /// tranne dove il microfono serve già a qualcun altro: Interprete, Allenatore, Sentinella, Wiretap, Shazam, La mia voce,
-    /// e (per ora) Profiler e Scanner. App in secondo piano: spento.
+    /// e (per ora) Profiler e Scanner. App in secondo piano: spento, tranne se un dialogo è in corso (11 nov, #16: finisce lui).
     private var schermoLibero: Bool {
-        let inPrimoPiano: Bool = scena == .active
+        // 11 nov (#16): fuori dall'app il microfono resta acceso solo finché il dialogo continua (poi JARVIS lo richiude)
+        let inPrimoPiano: Bool = scena == .active || jarvis.dialogoPuoContinuareFuori
         let micLibero: Bool = jarvis.interprete == nil && !jarvis.allenatore && !jarvis.micOccupato && !mostraSentinella && pila.voce(.wiretap) == nil   // MARK XI: il Wiretap registra anche dietro
         let nienteEscluso: Bool = scheda != .shazam && scheda != .scanner && sorgenteFoto == nil && !mostraProfiler
         // iPhone, tastiera aperta (23 ott): JARVIS resta in attesa e appena lei parla passa in ascolto; mentre preme i tasti il microfono

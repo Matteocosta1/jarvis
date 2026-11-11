@@ -543,6 +543,14 @@ Il signore (11 nov): «fai tutto quello che vuoi fare per migliorare il tutto co
 - Memoria senza doppioni prudente: verificato sui 24 fatti veri che due fatti diversi arrivano a 0,93 di somiglianza, quindi «stesso fatto» solo con 0,97 E metà delle parole in comune (la v124 usava 0,92: rimasta online pochi minuti, nessun fatto toccato).
 - Prova generale del cervello: 3 domande + 2 prove del dialogo (conversazione di ieri esclusa, anticipo sospeso e ripreso) (#15).
 - Mockup aggiornato (ARCHIVIO di LiDAR e Wiretap).
+- **Revisione dell'11 nov notte (il signore: «cerca errori… massima competenza»)**, corretti nella stessa 12.0 (7):
+  - fuori dall'app (#16) il microfono dell'attesa si spegneva comunque appena l'app usciva dal primo piano (la schermata toglieva il permesso): il seguito senza «Jarvis» fuori dall'app non si sentiva. Ora il permesso resta finché il dialogo è vivo;
+  - fuori dall'app, un ascolto finito senza frase (silenzio) lasciava il microfono acceso per sempre: ora JARVIS ricontrolla ogni 8 s e lo richiude a dialogo finito;
+  - posizione: quella vecchia si usa subito solo se ha meno di 15 minuti (una di ore prima poteva essere di un'altra città e finire nei ricordi «dove l'ho messo»); se no si aspetta quella nuova (al massimo 1 s, GPS riavviato per averla anche da fermi);
+  - risposta anticipata: passa dall'arbitro come le domande normali (iPhone e orologio non rispondono in due alla stessa frase); i tempi del turno di prima non si perdono più quando l'anticipo è adottato;
+  - Studio › copie nell'Archivio: niente anteprima grande dentro il file del progetto (pesava inutilmente), l'anteprima a parte è quella grande;
+  - Archivio e Wiretap › ARCHIVIO: i testi brevi mostravano «0 KB»: ora 1 KB, come il mockup;
+  - controllati senza correzioni: musica (lettore interno, ologrammi, disco del Dock, pausa con «Jarvis»), riavvio del riconoscimento (niente doppio tap), cervello v125 (modelli, finestra, filo, anticipo sospeso e ripreso, costi che contano solo le chiamate a Claude).
 - Non fatti in questa build: dialogo nuovo sull'orologio (anticipo, voce nel silenzio: il polso ha il suo ascolto), Live Activity del dialogo fuori dall'app, murale (#6).
 
 **Nota numeri (11 nov):** su TestFlight «12.0 (5)» contiene il codice della **12.0 (4)** (Xcode fermo alla build 4 del 9 nov: il Pull della 5 non era arrivato, il numero l'ha alzato Xcode al caricamento). La 12.0 (5) qui sotto non è mai stata installata: tutto il suo contenuto è nella 12.0 (7).
