@@ -4,7 +4,7 @@ import ActivityKit
 import AppIntents
 
 // MARK: - MARK X · DYNAMIC ISLAND di JARVIS (mockup approvato, build 32), disegnata da iOS fuori dall'app.
-// Compatta: a sinistra la linea (TRAVEL), la freccia con la via (GUIDA), il punto rosso (REC) o la nuvola (PIOGGIA);
+// Compatta: a sinistra la linea (TRAVEL), la freccia con la via (GUIDA), il punto rosso (REC), la nuvola (PIOGGIA) o il reattore (VOCE);
 // a destra in ciano «esci 4′», i metri, il tempo registrato o i minuti alla pioggia.
 // Grande (tocco lungo): il numero grande, la riga ciano in maiuscolo, la riga bianca e i due tasti (il secondo rosso).
 // Nella schermata bloccata la stessa cosa della grande. I tasti che aprono JARVIS sono collegamenti (it.discosizer.jarvis://isola/…),
@@ -68,6 +68,38 @@ private struct Nuvola: View {
     }
 }
 
+/// VOCE (12 nov): il reattore di JARVIS in piccolo (nel mockup la copia del reattore; qui fermo: l'isola non anima i disegni).
+private struct ReattoreIsola: View {
+    let lato: CGFloat
+    var body: some View {
+        ZStack {
+            Circle().stroke(ciano.opacity(0.45), lineWidth: max(1, lato * 0.05))
+            Circle().stroke(ciano, lineWidth: max(1.2, lato * 0.08)).padding(lato * 0.17)
+            Circle().fill(ciano).frame(width: lato * 0.3, height: lato * 0.3).shadow(color: ciano, radius: lato * 0.12)
+        }
+        .frame(width: lato, height: lato)
+    }
+}
+
+/// VOCE: le quattro barre della voce (mentre ascolta o parla), come nel mockup.
+private struct BarreVoce: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 1.5) {
+            ForEach([5.0, 9.0, 6.0, 8.0], id: \.self) { h in Capsule().fill(ciano).frame(width: 2, height: h) }
+        }
+    }
+}
+
+/// VOCE: la parola dell'isola stretta («LA ASCOLTO» → ASCOLTO, «ELABORO» → PENSO), come nel mockup.
+private func parolaVoce(_ fase: String?) -> String {
+    switch fase {
+    case "LA ASCOLTO": return "ASCOLTO"
+    case "ELABORO": return "PENSO"
+    case "PARLO": return "PARLO"
+    default: return "ATTESA"
+    }
+}
+
 /// A sinistra nell'isola stretta.
 private struct SinistraCompatta: View {
     let stato: AttivitaJarvis.ContentState
@@ -89,6 +121,8 @@ private struct SinistraCompatta: View {
                 Nuvola()
                 Text("Pioggia").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
             }
+        case "voce":
+            ReattoreIsola(lato: 22)
         default:
             HStack(spacing: 6) {
                 Text(stato.freccia ?? "↑").font(.system(size: 16, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
@@ -119,6 +153,11 @@ private struct DestraCompatta: View {
                 Text(timerInterval: i...Date.distantFuture, countsDown: false, showsHours: true)
                     .font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
                     .frame(maxWidth: 64)
+            }
+        case "voce":
+            HStack(spacing: 5) {
+                Text(parolaVoce(stato.fase)).font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
+                if stato.fase == "LA ASCOLTO" || stato.fase == "PARLO" { BarreVoce() }
             }
         default:
             Text("\(stato.metri ?? 0) m").font(.system(size: 12, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
@@ -170,6 +209,8 @@ private struct Grande: View {
             }
             .font(.system(size: 38, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(ciano)
             .frame(maxWidth: 120, alignment: .leading)
+        case "voce":
+            ReattoreIsola(lato: 58)
         default:
             Text(stato.freccia ?? "↑").font(.system(size: 44, weight: .bold, design: .monospaced)).foregroundStyle(ciano)
         }
@@ -191,6 +232,8 @@ private struct Grande: View {
             }
         case "pioggia":
             Text(stato.esci.map { $0 > Date() } == true ? "RADAR · PIOGGIA IN ARRIVO" : "RADAR · STA PIOVENDO")
+        case "voce":
+            Text("J.A.R.V.I.S. · \(stato.fase ?? "IN ATTESA")")
         default:
             Text("GUIDA · \((stato.via ?? meta).uppercased()) · \(stato.metri ?? 0) M")
         }
@@ -207,6 +250,9 @@ private struct Grande: View {
         case "pioggia":
             collegamento("Radar", "radar")
             azione("Ok", "ok", rosso: true)
+        case "voce":
+            collegamento("Apri", "apri")
+            azione("Fine", "finevoce", rosso: true)
         default:
             collegamento("Apri", "guida")
             azione("Ferma guida", "ferma", rosso: true)

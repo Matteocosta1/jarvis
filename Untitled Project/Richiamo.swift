@@ -51,6 +51,9 @@ final class Richiamo {
     private var precedente = ""         // l'ultima trascrizione ricevuta
     private var prima = ""              // ciò che ha già detto dopo il richiamo, prima che il riconoscimento ripartisse da capo
     private var soloDopoNome = true      // vero: conta ciò che segue «Jarvis»; falso: conta tutta la frase (seguito senza nome)
+    /// 12 nov: quante parole del pezzo arrivano fino a «Jarvis» compreso, quando si è svegliato. Se poi il riconoscimento
+    /// ritocca il nome («Giarvis», «service»…), la domanda si prende lo stesso dalla parola dopo, invece di perderla.
+    private var paroleFinoAlNome = 0
     private var corrente = ""
     /// «Che ore sono, Jarvis?»: la frase intera col nome in fondo; vale se dopo il nome il signore non aggiunge altro.
     private var vocativo: String?
@@ -349,6 +352,7 @@ final class Richiamo {
                 }
                 guard let dopo = trovato else { if fine { riavvia(recentiDa: condotto.ultimaFine) }; return }
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
+                paroleFinoAlNome = soloDopoNome ? max(0, Richiamo.contaParole(segmento) - Richiamo.contaParole(dopo)) : 0
                 sveglio = true
                 prima = ""
                 corrente = dopo
@@ -366,10 +370,16 @@ final class Richiamo {
                     corrente = ""
                     inizioSegmento = 0
                     soloDopoNome = false
+                    paroleFinoAlNome = 0
                 }
                 let segmento = Richiamo.dallaParola(inizioSegmento, testo)
                 if soloDopoNome {
                     if let dopo = Richiamo.dopoRichiamo(segmento) { corrente = dopo }
+                    else if paroleFinoAlNome > 0, Richiamo.contaParole(segmento) > paroleFinoAlNome {
+                        // 12 nov (il signore: «ho detto Jarvis, è andato in ascolto ma non ha ascoltato la domanda»): il riconoscimento
+                        // aveva ritoccato il nome e prima la domanda detta dopo non entrava mai (restava vuota). Ora: dalla parola dopo
+                        corrente = Richiamo.dallaParola(paroleFinoAlNome, segmento).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+                    }
                     // «Che ore sono, Jarvis?» e niente dopo il nome: vale la frase intera
                     vocativo = corrente.isEmpty && prima.isEmpty && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
                 } else {

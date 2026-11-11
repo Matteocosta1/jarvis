@@ -369,6 +369,8 @@ struct ContentView: View {
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
             if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
             if fase == .active { jarvis.tornaDavanti() }            // 11 nov (#16): il dialogo fuori dall'app finisce qui
+            // 12 nov: l'app sta uscendo con un dialogo in corso: l'isola VOCE si accende adesso (iOS la permette solo da davanti)
+            if fase == .inactive, jarvis.dialogoPuoContinuareFuori { jarvis.aggiornaIsolaVoce() }
         }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in

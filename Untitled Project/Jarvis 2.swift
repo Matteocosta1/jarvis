@@ -219,6 +219,7 @@ final class Jarvis: NSObject, ObservableObject {
             BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
             aggiornaRichiamo()
+            if dialogoFuori || IsolaJarvis.voceAccesa { aggiornaIsolaVoce() }   // 12 nov: l'isola VOCE segue il dialogo fuori dall'app
         }
     }
     @Published var parziale = ""
@@ -398,6 +399,7 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.consegna = { [weak self] frase in self?.motivoChiusura = "richiamo"; self?.fraseRichiamo(frase) }
         cloud.iniziaFrase = { [weak self] chiave in self?.suonoIniziato(chiave) }   // 11 nov: il primo suono della risposta (i tempi)
         richiamo.applauso = { [weak self] in self?.applaudito() }
+        IsolaJarvis.fineDialogo = { [weak self] in self?.fineDialogoFuori() }   // 12 nov: «Fine» sull'isola VOCE
         richiamo.inRisposta = { [weak self] in self?.fase == .elaboro && self?.idTurno != nil }   // idea C: una risposta in preparazione
         strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
@@ -2571,6 +2573,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         // 9 nov sera (il signore: «come Apple Music»): in background (Home, altra app, schermo bloccato) la musica continua; la
         // musica è del lettore dentro JARVIS, quindi chiudendo JARVIS finisce da sola. «Chiudi» sulla sezione la ferma.
+        IsolaJarvis.fineVoce()                         // 12 nov: accesa mentre l'app usciva, ma il dialogo non continua: si spegne
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello
@@ -2604,14 +2607,45 @@ final class Jarvis: NSObject, ObservableObject {
             // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
             // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
             guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { self.chiudiDialogoFuori(fra: secondi); return }
-            self.dialogoFuori = false
-            self.micChiusoFuori = true
-            self.richiamo.ferma()
-            self.orecchio.ferma()
-            if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            }
+            self.spegniMicFuori()
         }
+    }
+
+    /// Il dialogo fuori dall'app è finito: microfono spento, audio libero (se non suona musica), isola VOCE chiusa.
+    private func spegniMicFuori() {
+        chiusuraFuori?.cancel()
+        dialogoFuori = false
+        micChiusoFuori = true
+        richiamo.ferma()
+        orecchio.ferma()
+        if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+        IsolaJarvis.fineVoce()
+    }
+
+    /// 12 nov · «Fine» sull'isola VOCE: il dialogo finisce subito (JARVIS tace, l'ascolto si butta) e il microfono si spegne.
+    func fineDialogoFuori() {
+        guard dialogoFuori || IsolaJarvis.voceAccesa else { return }
+        interrompi()
+        if fase == .ascolto { fermaAscolto(invia: false) }
+        if richiamo.sveglio { richiamo.ferma() }
+        richiamo.seguitoFinoA = .distantPast
+        if UIApplication.shared.applicationState == .active { dialogoFuori = false; IsolaJarvis.fineVoce() } else { spegniMicFuori() }
+    }
+
+    /// 12 nov · l'isola VOCE (mockup approvato, build 32): la fase come sotto il reattore e la riga di quello che sente o risponde.
+    /// iOS la lascia accendere solo con l'app ancora davanti: la schermata la chiama mentre l'app esce, poi si aggiorna da sola.
+    func aggiornaIsolaVoce() {
+        guard !Jarvis.usaAscoltoCloud else { return }
+        let riga: String
+        switch fase {
+        case .ascolto: riga = parziale.isEmpty ? "La ascolto, Sir." : "«\(parziale)»"
+        case .elaboro: riga = messaggi.last(where: { $0.ruolo == "user" }).map { "«\($0.testo)»" } ?? "…"
+        case .parlo: riga = messaggi.last(where: { $0.ruolo == "assistant" && !$0.testo.isEmpty })?.testo ?? "…"
+        case .attesa: riga = "Mi dica pure, Sir: la ascolto."
+        }
+        IsolaJarvis.voce(fase: fase.rawValue, riga: String(riga.prefix(160)))
     }
 
     /// 11 nov (#16): c'è un dialogo che può continuare fuori dall'app (JARVIS ascolta, pensa o parla, o ha appena risposto e il
@@ -2626,6 +2660,7 @@ final class Jarvis: NSObject, ObservableObject {
     func tornaDavanti() {
         chiusuraFuori?.cancel()
         dialogoFuori = false
+        IsolaJarvis.fineVoce()                          // 12 nov: dentro JARVIS l'isola VOCE non serve
         if micChiusoFuori { micChiusoFuori = false; aggiornaRichiamo() }
     }
 
