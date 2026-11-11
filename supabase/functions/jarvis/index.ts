@@ -740,7 +740,18 @@ async function vettoreDi(testo: string): Promise<number[] | null> {
 /// 11 nov (#13, approvato dal signore): niente doppioni nella memoria. Un fatto nuovo quasi uguale a uno che c'è già (stesso
 /// significato, somiglianza ≥ 0,92) aggiorna quello vecchio invece di aggiungerne un altro (prima: la regola dello «zitto» due volte).
 async function memoriaSenzaDoppioni(fatto: string, categoria: string): Promise<{ aggiornato: boolean }> {
-  const simile = (await vicini("jarvis_memoria", fatto, 1, 0.92).catch(() => []))[0];
+  // 11 nov, verificato sui 24 fatti veri: con questi vettori anche due fatti DIVERSI arrivano a 0,93-0,94 di somiglianza
+  // («parli in modo umano» e «impari dal dialogo»). Quindi è lo stesso fatto solo se è vicinissimo (0,97) E dice quasi le stesse
+  // parole (almeno metà in comune): altrimenti si salva come fatto nuovo (meglio un doppione che un ricordo sovrascritto).
+  const vicino = (await vicini("jarvis_memoria", fatto, 1, 0.97).catch(() => []))[0];
+  let simile: { id: number } | null = null;
+  if (vicino) {
+    const { data: vecchio } = await db.from("jarvis_memoria").select("id, fatto").eq("id", vicino.id).maybeSingle();
+    const parole = (t: string) => new Set(t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+    const a = parole(fatto), b = parole(String(vecchio?.fatto ?? ""));
+    const comuni = [...a].filter((w) => b.has(w)).length, unione = new Set([...a, ...b]).size;
+    if (vecchio && unione && comuni / unione >= 0.5) simile = { id: Number(vecchio.id) };
+  }
   if (simile) {
     const { error } = await db.from("jarvis_memoria").update({ fatto, categoria, vettore: null }).eq("id", simile.id);
     if (error) throw error;
