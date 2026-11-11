@@ -1063,6 +1063,8 @@ struct IconaVinile: View {
 /// schermo, e solo mentre suona. Con «Riduci movimento» resta fermo.
 struct VinileDock: View {
     @ObservedObject private var lettore = LettoreMusica.condiviso
+    // 11 nov (il signore: «musica accesa, disco gira»): gira anche con la canzone di Shazam che suona dentro JARVIS (anteprima o video)
+    @ObservedObject private var shazam = AscoltoShazam.condiviso
     @Environment(\.accessibilityReduceMotion) private var ridotto
     @State private var base: Double = 0                // dove si è fermato (gradi)
     @State private var da: Date?                       // da quando gira
@@ -1071,7 +1073,7 @@ struct VinileDock: View {
         TimelineView(.animation(minimumInterval: nil, paused: da == nil)) { t in
             IconaVinile().rotationEffect(.degrees(angolo(t.date)))
         }
-        .onChange(of: lettore.suona && !ridotto, initial: true) { _, gira in
+        .onChange(of: (lettore.suona || shazam.suonaDentro) && !ridotto, initial: true) { _, gira in
             if gira {
                 if da == nil { da = Date() }
             } else if da != nil {
