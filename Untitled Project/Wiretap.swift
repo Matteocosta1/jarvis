@@ -311,6 +311,8 @@ struct VistaWiretap: View {
                     .accessibilityLabel(w.attivo ? "Ferma" : "Registra")
                     Text("Avvisi i presenti che sta registrando.")
                         .font(.footnote).foregroundStyle(Color.tenue)
+                    // 11 nov (approvato il 10 nov): l'ARCHIVIO delle registrazioni salvate, quando il Wiretap è fermo e vuoto
+                    if !w.attivo && w.testo.isEmpty { ArchivioWiretap() }
                 } else {
                     Button {
                         Suoni.tocco()

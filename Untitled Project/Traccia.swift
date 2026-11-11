@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import AVFoundation
 import UserNotifications
@@ -156,6 +157,12 @@ struct PannelliTraccia: View {
         await ricarica()
         sceltoId = id
         let via = (riga["luogo"] as? String) ?? (riga["testo"] as? String) ?? "posizione salvata"
+        // 11 nov (approvato il 10 nov): il luogo anche nell'Archivio centrale, cartella traccia (con il link per le Mappe)
+        let coordinate = String(format: "%.6f,%.6f", lat, lon)
+        ArchivioCentrale.copiaTesto(nome: "Luogo · \(via)", cartella: "traccia",
+                                    testo: ["TRACCIA · LUOGO SALVATO", ArchivioCentrale.quando(), "", "Dove: \(via)", "Coordinate: \(coordinate)",
+                                            "Mappe: https://maps.apple.com/?ll=\(coordinate)&q=\(via.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"].joined(separator: "\n"),
+                                    descrizione: "Traccia · \(via)")
         await PannelliTraccia.notifica("Luogo salvato, Sir: \(via).")
     }
 

@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import UIKit
 import Vision
@@ -338,8 +339,17 @@ struct VistaScanner: View {
             Suoni.pronto()                                   // prodotto trovato: la conferma, come le altre
             withAnimation(.spring(duration: 0.4)) { prodotto = v }
             let nuovo = Passato(codice: v.s("codice"), nome: v.s("nome"), marca: v.s("marca"), voto: v.n("voto"), immagine: v.s("immagine"))
+            let giaVisto = storico.contains { $0.codice == nuovo.codice }
             storico = [nuovo] + storico.filter { $0.codice != nuovo.codice }.prefix(29)
             VistaScanner.salva(storico)
+            // 11 nov (approvato il 10 nov): il prodotto nuovo anche nell'Archivio centrale, cartella scanner
+            if !giaVisto {
+                let titolo = [nuovo.nome, nuovo.marca].filter { !$0.isEmpty }.joined(separator: " · ")
+                ArchivioCentrale.copiaTesto(nome: titolo.isEmpty ? "Prodotto \(nuovo.codice)" : titolo, cartella: "scanner",
+                                            testo: ["SCANNER · \(titolo)", ArchivioCentrale.quando(), "", "Codice a barre: \(nuovo.codice)",
+                                                    "Voto: \(nuovo.voto)/100", "Scheda: https://world.openfoodfacts.org/product/\(nuovo.codice)"].joined(separator: "\n"),
+                                            descrizione: "Scanner · voto \(nuovo.voto)/100")
+            }
         }
     }
 

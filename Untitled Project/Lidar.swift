@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import Combine
 import SceneKit
@@ -121,6 +122,24 @@ final class ArchivioLidar: ObservableObject {
         scansioni.removeAll { $0.id == s.id }
         scansioni.insert(s, at: 0)
         scrivi()
+        // 11 nov (approvato il 10 nov): la copia nell'Archivio centrale, cartella lidar: la scheda con le misure e il modello 3D
+        let nome = "\(s.nome) · \(ArchivioCentrale.quando(s.data))"
+        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioLidar.scheda(s), descrizione: "LiDAR · Interno · \(LidarFormato.m2(s.area))")
+        if FileManager.default.fileExists(atPath: s.file3D.path) {
+            ArchivioCentrale.copiaFile(s.file3D, nome: nome + " 3D", cartella: "lidar", tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · modello 3D")
+        }
+    }
+
+    /// La scheda di una stanza per l'Archivio: tutte le misure, leggibili da chiunque.
+    nonisolated static func scheda(_ s: ScansioneLidar) -> String {
+        var righe = ["LIDAR · INTERNO · \(s.nome)", ArchivioCentrale.quando(s.data), "",
+                     "Superficie: \(LidarFormato.m2(s.area))", "Perimetro: \(LidarFormato.m(s.perimetro))",
+                     "Altezza: \(LidarFormato.m(s.altezza, 2))", "Volume: \(LidarFormato.n(s.volume, 0)) m³",
+                     "Pareti: \(s.pareti.count) (\(s.pareti.map { LidarFormato.m($0.lunghezza, 2) }.joined(separator: ", ")))",
+                     "Porte: \(s.porte.count) · Finestre: \(s.finestre.count) · Aperture: \(s.aperture.count)",
+                     "Capienza indicativa: \(s.capienza) persone (1,2 per m²; quella autorizzata la fissano uscite e commissione)"]
+        if !s.oggetti.isEmpty { righe.append("Arredi: \(s.oggetti.joined(separator: ", "))") }
+        return righe.joined(separator: "\n")
     }
     func cancella(_ s: ScansioneLidar) {
         scansioni.removeAll { $0.id == s.id }
@@ -195,7 +214,8 @@ struct VistaLidar: View {
                 switch fase {
                 case .menu:
                     ScrollView {
-                        MenuLidar(modo: $modo, corpo: $corpo, stile: $stile) { avviaScansione() }
+                        MenuLidar(modo: $modo, corpo: $corpo, stile: $stile, scansiona: { avviaScansione() },
+                                  apriStanza: { s in apri(s); fase = .risultato })   // 11 nov: l'ARCHIVIO del menu
                             .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 24)   // 7 nov: la testata allo stesso posto delle altre sezioni
                     }
                 case .scansione, .elaboro:

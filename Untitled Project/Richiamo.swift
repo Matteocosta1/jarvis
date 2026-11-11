@@ -380,11 +380,10 @@ final class Richiamo {
             self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
             // solo «Jarvis»: gli lascio qualche secondo per iniziare la domanda; poi le solite pause
             // («Che ore sono, Jarvis?»: la frase c'è già, la pausa è quella della frase)
-            let attesa = resto.isEmpty ? (vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0) : Jarvis.pausaFineFrase(resto)
-            timerSilenzio?.invalidate()
-            timerSilenzio = Timer.scheduledTimer(withTimeInterval: attesa, repeats: false) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.chiudi() }
-            }
+            // 11 nov: con il ritmo del signore e, se ha detto «ascoltami» o «fammi finire», almeno 3,5 secondi
+            let base = resto.isEmpty ? (vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0) : Jarvis.pausaFineFrase(resto) * RitmoSignore.condiviso.fattore
+            let attesa = Jarvis.chiedeAscoltoLungo(resto) ? max(base, 3.5) : base
+            armaChiusura(attesa)
             // «fine» qui è il riconoscimento che chiude un pezzo: se la frase non è finita, riparto e continuo ad ascoltare
             if fine { continuaDopoFine() }
             return
@@ -426,6 +425,23 @@ final class Richiamo {
 
     /// La frase è finita: la consegno a JARVIS e continuo ad ascoltare con il microfono acceso, così se il signore
     /// riprende subito a parlare («…e anche un'altra cosa») l'attacco non si perde. Se a JARVIS non servo, mi spegne lui.
+    /// 11 nov (analisi del dialogo): la frase si chiude dopo il silenzio, ma il silenzio conta solo se il microfono non sente più
+    /// la voce: le parole trascritte possono arrivare in ritardo. Senza parole nuove da 6 secondi il suono è solo rumore: si chiude.
+    private func armaChiusura(_ secondi: Double) {
+        timerSilenzio?.invalidate()
+        timerSilenzio = Timer.scheduledTimer(withTimeInterval: secondi, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.sveglio else { return }
+                let quieto = VoceAttiva.condivisa.secondiDiSilenzio
+                if quieto + 0.05 < secondi, Date().timeIntervalSince(self.ultimoParziale) < 6 {
+                    self.armaChiusura(max(0.25, secondi - quieto))
+                    return
+                }
+                self.chiudi()
+            }
+        }
+    }
+
     private func chiudi() {
         guard sveglio else { return }
         let frase = resto.isEmpty ? (vocativo ?? "") : resto
@@ -457,6 +473,7 @@ final class Richiamo {
             mani.analizza(buffer)                                // due battiti di mani: JARVIS si sveglia
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
+            VoceAttiva.condivisa.misura(buffer)                 // 11 nov: la voce dal suono (la fine frase non dipende solo dalle parole)
         }
     }
 

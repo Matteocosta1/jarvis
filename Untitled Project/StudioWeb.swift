@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import UIKit
 import WebKit
@@ -216,6 +217,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
     private weak var web: WKWebView?
     private var archivio: [String: String] = RegiaStudio.leggiArchivio()
     private var salvataggio: Task<Void, Never>?
+    private var copiaStudio: Task<Void, Never>?    // 11 nov: la copia dei progetti nell'Archivio centrale (dopo 30 s di calma)
     private let dettatura = Wiretap()
     private var chiuso = false
     private let apertura: AperturaPagina
@@ -358,6 +360,7 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             guard let k = o["k"] as? String else { return }
             if let v = o["v"] as? String { archivio[k] = v } else { archivio[k] = nil }
             salvaPresto()
+            if k == "jarvisStudioArchivio1" { copiaProgettiPresto() }
         case "cervello":                                                 // CREA libero: la ricetta dei pezzi
             let prompt = o["prompt"] as? String ?? ""
             Task { let r = await RegiaStudio.chiediCervello(prompt); self.rispondi(id, r) }
@@ -738,6 +741,37 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             self?.salvaOra()
         }
     }
+    /// 11 nov (approvato il 10 nov): i progetti dello Studio anche nell'Archivio centrale, cartella studio. Lo Studio salva a ogni
+    /// tocco: la copia parte solo dopo 30 secondi di calma, e solo per i progetti cambiati da allora (il progetto in JSON, con
+    /// l'anteprima in JPEG se c'è).
+    private func copiaProgettiPresto() {
+        copiaStudio?.cancel()
+        copiaStudio = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled, let self, let json = self.archivio["jarvisStudioArchivio1"],
+                  let d = json.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  let progetti = o["progetti"] as? [[String: Any]] else { return }
+            var copiati = UserDefaults.standard.dictionary(forKey: "studioCopiati11nov") as? [String: Double] ?? [:]
+            for p in progetti {
+                guard let id = p["id"] as? String, let quando = (p["data"] as? NSNumber)?.doubleValue,
+                      (copiati[id] ?? 0) < quando, (p["oggetti"] as? [Any])?.isEmpty == false else { continue }
+                let nome = (p["nome"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Progetto \(id)"
+                var senzaAnteprima = p
+                senzaAnteprima["mini"] = nil
+                if let dati = try? JSONSerialization.data(withJSONObject: senzaAnteprima, options: [.prettyPrinted]) {
+                    ArchivioCentrale.copia(nome: nome, cartella: "studio", tipo: "application/json", dati: dati, descrizione: "Studio · progetto")
+                }
+                if let mini = p["mini"] as? String, let virgola = mini.firstIndex(of: ","), mini.hasPrefix("data:image"),
+                   let img = Data(base64Encoded: String(mini[mini.index(after: virgola)...])) {
+                    ArchivioCentrale.copia(nome: nome + " anteprima", cartella: "studio", tipo: mini.contains("png") ? "image/png" : "image/jpeg",
+                                           dati: img, descrizione: "Studio · anteprima del progetto")
+                }
+                copiati[id] = quando
+            }
+            UserDefaults.standard.set(copiati, forKey: "studioCopiati11nov")
+        }
+    }
+
     private func salvaOra() {
         guard let u = RegiaStudio.fileArchivio, let d = try? JSONEncoder().encode(archivio) else { return }
         try? d.write(to: u, options: .atomic)

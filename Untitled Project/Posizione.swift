@@ -45,19 +45,35 @@ enum Posizione {
         risveglia()
     }
 
-    /// Posizione recente (al massimo 3 minuti), oppure una nuova lettura aspettando al massimo 1 secondo.
-    /// Niente posizione = nil: JARVIS lavora lo stesso.
+    /// La posizione da mandare con la domanda, SENZA far aspettare la domanda (11 nov, analisi dei tempi): con il signore fermo
+    /// il GPS (filtro di 25 m) non manda più letture nuove, e dopo 3 minuti ogni domanda aspettava fino a 1 secondo in più.
+    /// Ora: c'è una posizione (anche di qualche minuto fa, da fermo è la stessa)? Va subito, e intanto se ne chiede una nuova per
+    /// la prossima domanda. Solo se non ce n'è nessuna si aspetta, al massimo 1 secondo. Niente posizione = nil: JARVIS lavora lo stesso.
     static func attuale() async -> [String: Any]? {
         let stato = gestore.authorizationStatus
         if stato == .notDetermined { gestore.requestWhenInUseAuthorization(); return nil }
         guard stato == .authorizedWhenInUse || stato == .authorizedAlways else { return nil }
         if let l = fresca() { return dizionario(l) }
+        if let l = gestore.location, l.horizontalAccuracy >= 0 {
+            rinfresca()                                    // la prossima domanda avrà quella nuova
+            return dizionario(l)
+        }
         risveglia()
-        for _ in 0..<10 {                                  // fino a 1 secondo, a passi di 100 ms
+        for _ in 0..<10 {                                  // nessuna posizione: fino a 1 secondo, a passi di 100 ms
             try? await Task.sleep(for: .milliseconds(100))
             if let l = fresca() { return dizionario(l) }
         }
-        return gestore.location.map(dizionario)            // anche una vecchia è meglio di niente
+        return gestore.location.map(dizionario)
+    }
+
+    private static var ultimoRinfresco = Date.distantPast
+    /// Una lettura nuova in sottofondo: fermare e riavviare il GPS lo fa rispondere subito anche da fermo (col filtro di 25 m
+    /// altrimenti tace). Al massimo una volta ogni 30 secondi.
+    private static func rinfresca() {
+        guard Date().timeIntervalSince(ultimoRinfresco) > 30 else { return }
+        ultimoRinfresco = Date()
+        gestore.stopUpdatingLocation()
+        risveglia()
     }
 
     private static func fresca() -> CLLocation? {

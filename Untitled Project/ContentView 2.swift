@@ -367,6 +367,7 @@ struct ContentView: View {
         .onChange(of: scena) { _, fase in
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
             if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
+            if fase == .active { jarvis.tornaDavanti() }            // 11 nov (#16): il dialogo fuori dall'app finisce qui
         }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in

@@ -1,5 +1,7 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
+import QuickLook
 import UIKit
 import SceneKit
 import simd
@@ -301,8 +303,16 @@ final class ArchivioModi {
             let url = ArchivioLidar.cartella.appendingPathComponent("oggetto-\(r.id.uuidString).usdz")
             if Self.esporta(o, url) { nomeFile = url.lastPathComponent }
         }
-        voci.insert(ModoSalvato(id: r.id, modo: r.modo, data: r.data, sotto: r.sotto, righe: r.righe.map { [$0.0, $0.1] }, file: nomeFile), at: 0)
+        let voce = ModoSalvato(id: r.id, modo: r.modo, data: r.data, sotto: r.sotto, righe: r.righe.map { [$0.0, $0.1] }, file: nomeFile)
+        voci.insert(voce, at: 0)
         if let d = try? JSONEncoder().encode(voci) { try? d.write(to: indice, options: .atomic) }
+        // 11 nov (approvato il 10 nov): la copia nell'Archivio centrale, cartella lidar: le misure e, se c'è, il modello 3D
+        let nome = "\(voce.modo.nome) · \(ArchivioCentrale.quando(voce.data))"
+        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioModi.scheda(voce), descrizione: "LiDAR · \(voce.modo.nome) · \(voce.sotto)")
+        if let f = nomeFile {
+            ArchivioCentrale.copiaFile(ArchivioLidar.cartella.appendingPathComponent(f), nome: nome + " 3D", cartella: "lidar",
+                                       tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · \(voce.modo.nome) · modello 3D")
+        }
     }
 
     /// La maglia dell'oggetto, coi colori veri, in USDZ.
@@ -457,6 +467,8 @@ struct MenuLidar: View {
     @Binding var corpo: CorpoLidar
     @Binding var stile: StileLidar
     let scansiona: () -> Void
+    /// 11 nov: l'ARCHIVIO in fondo al menu (tocco su una stanza: si riapre col suo risultato)
+    var apriStanza: ((ScansioneLidar) -> Void)? = nil
 
     /// Il modo vero: in Corpo, Postura o Texture (la «Statua»).
     private var vero: ModoLidar { modo == .corpo && corpo == .statua ? .statua : modo }
@@ -497,6 +509,7 @@ struct MenuLidar: View {
             }
             PannelloAVoce(frasi: vero.voce.map { "«\($0)»" })
             TastoLidar(testo: "Scansiona", azione: scansiona)
+            if let apriStanza { ArchivioLidarMenu(stanze: ArchivioLidar.condiviso, apriStanza: apriStanza) }
         }
     }
 }
@@ -536,6 +549,164 @@ struct RisultatoModoVista: View {
                 if let studio { TastoLidarStudio(azione: studio) }      // come il mockup: Salva · Studio · Modalità · Chiedi
                 TastoLidar(testo: "Modalità", azione: altra)
                 TastoLidar(testo: "Chiedi", azione: chiedi)
+            }
+        }
+    }
+}
+
+// MARK: - 11 nov · ARCHIVIO di LiDAR: i modi salvati (Oggetto, Corpo, Esterno, Setup, Misura, Texture)
+
+extension ArchivioModi {
+    /// La scheda di un modo salvato per l'Archivio centrale: le righe delle misure, leggibili da chiunque.
+    nonisolated static func scheda(_ v: ModoSalvato) -> String {
+        (["LIDAR · \(v.modo.nome.uppercased()) · \(v.sotto)", ArchivioCentrale.quando(v.data), ""]
+            + v.righe.map { $0.joined(separator: ": ") }).joined(separator: "\n")
+    }
+
+    /// Elimina un modo salvato e il suo modello 3D dal telefono (la copia nell'Archivio centrale resta: si toglie da lì).
+    func cancella(_ v: ModoSalvato) {
+        if let u = file3D(v) { try? FileManager.default.removeItem(at: u) }
+        voci.removeAll { $0.id == v.id }
+        if let d = try? JSONEncoder().encode(voci) { try? d.write(to: indice, options: .atomic) }
+    }
+
+    /// Il modello 3D accanto (USDZ), se c'è ancora sul telefono.
+    func file3D(_ v: ModoSalvato) -> URL? {
+        guard let f = v.file else { return nil }
+        let u = ArchivioLidar.cartella.appendingPathComponent(f)
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
+    }
+}
+
+/// 11 nov (approvato il 10 nov: «perfetto»): l'ARCHIVIO nel menu di LiDAR, con tutto quello che è stato salvato: le stanze
+/// (Interno) e i modi (Esterno, Setup, Oggetto, Corpo, Misura, Texture), dal più recente. Tocco su una stanza: si riapre col suo
+/// risultato (pianta, ologramma, texture). Tocco su un modo: si aprono le sue misure, con 3D (AR Quick Look, se c'è il modello) e
+/// CONDIVIDI. ELIMINA › CONFERMA come nel resto di LiDAR. Ogni salvataggio va anche nell'Archivio centrale, cartella lidar.
+struct ArchivioLidarMenu: View {
+    @ObservedObject var stanze: ArchivioLidar
+    let apriStanza: (ScansioneLidar) -> Void
+    @State private var modi: [ModoSalvato] = ArchivioModi.condiviso.voci
+    @State private var aperto: UUID?
+    @State private var daEliminare: UUID?
+    @State private var giro = 0
+    @State private var anteprima3D: URL?
+
+    private enum Voce: Identifiable {
+        case stanza(ScansioneLidar), modo(ModoSalvato)
+        var id: UUID { switch self { case .stanza(let s): return s.id; case .modo(let m): return m.id } }
+        var data: Date { switch self { case .stanza(let s): return s.data; case .modo(let m): return m.data } }
+    }
+
+    private var voci: [Voce] {
+        (stanze.scansioni.map { Voce.stanza($0) } + modi.map { Voce.modo($0) }).sorted { $0.data > $1.data }
+    }
+
+    var body: some View {
+        Pannello(titolo: "ARCHIVIO", tinta: .ciano) {
+            if voci.isEmpty {
+                Text("Ancora niente di salvato. Ogni scansione salvata resta qui (e nell'Archivio, cartella lidar).")
+                    .font(.system(size: 13)).foregroundStyle(Color.tenue).fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(voci) { v in
+                        riga(v)
+                        if v.id != voci.last?.id { Divider().overlay(Color.ciano.opacity(0.12)) }
+                    }
+                }
+            }
+        }
+        .onAppear { modi = ArchivioModi.condiviso.voci }
+        .quickLookPreview($anteprima3D)
+    }
+
+    @ViewBuilder private func riga(_ v: Voce) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Button {
+                    Suoni.tocco()
+                    switch v {
+                    case .stanza(let s): apriStanza(s)
+                    case .modo(let m): withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { aperto = aperto == m.id ? nil : m.id }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(titolo(v)).font(.system(size: 14)).foregroundStyle(ColoriHUD.testo).lineLimit(1)
+                        Text(dettaglio(v)).font(.system(size: 11, design: .monospaced)).foregroundStyle(Color.tenue).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(StileStark())
+                let sicuro = daEliminare == v.id
+                let rosso = Color(red: 1, green: 107 / 255, blue: 107 / 255)                                    // #ff6b6b
+                Button { elimina(v) } label: {
+                    Text(sicuro ? "CONFERMA" : "ELIMINA")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1)
+                        .foregroundStyle(sicuro ? rosso : Color.ciano)
+                        .padding(.vertical, 6).padding(.horizontal, 8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(sicuro ? rosso.opacity(0.6) : Color.ciano.opacity(0.3), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(StileStark())
+                .accessibilityLabel(sicuro ? "Conferma: elimina \(titolo(v))" : "Elimina \(titolo(v))")
+            }
+            if case .modo(let m) = v, aperto == m.id {
+                ForEach(Array(m.righe.enumerated()), id: \.offset) { _, r in RigaHUD(r.first ?? "", r.count > 1 ? r[1] : "") }
+                HStack(spacing: 6) {
+                    if let u = ArchivioModi.condiviso.file3D(m) {
+                        ChipLidar(testo: "3D", premuto: false) { anteprima3D = u }
+                    }
+                    ShareLink(items: condivisi(m)) {
+                        Text("CONDIVIDI").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity).padding(.vertical, 8).padding(.horizontal, 8).foregroundStyle(Color.ciano)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(0.3), lineWidth: 1))
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 11)
+    }
+
+    private func titolo(_ v: Voce) -> String {
+        switch v {
+        case .stanza(let s): return s.nome
+        case .modo(let m): return m.modo.nome
+        }
+    }
+
+    private func dettaglio(_ v: Voce) -> String {
+        switch v {
+        case .stanza(let s): return "INTERNO · \(LidarFormato.m2(s.area)) · \(s.data.formatted(date: .numeric, time: .shortened))"
+        case .modo(let m): return "\(m.sotto.uppercased()) · \(m.data.formatted(date: .numeric, time: .shortened))"
+        }
+    }
+
+    /// Le misure in un file di testo e, se c'è, il modello 3D.
+    private func condivisi(_ m: ModoSalvato) -> [URL] {
+        var out: [URL] = []
+        let testo = FileManager.default.temporaryDirectory.appendingPathComponent("LiDAR \(m.modo.nome) \(ArchivioCentrale.quando(m.data)).txt")
+        if (try? ArchivioModi.scheda(m).write(to: testo, atomically: true, encoding: .utf8)) != nil { out.append(testo) }
+        if let u = ArchivioModi.condiviso.file3D(m) { out.append(u) }
+        return out
+    }
+
+    /// Il primo tocco chiede CONFERMA per 3 secondi, il secondo elimina (dal telefono; la copia nell'Archivio centrale resta).
+    private func elimina(_ v: Voce) {
+        guard daEliminare == v.id else {
+            Suoni.tocco()
+            daEliminare = v.id
+            giro += 1
+            let mio = giro
+            Task { try? await Task.sleep(for: .seconds(3)); if giro == mio { daEliminare = nil } }
+            return
+        }
+        Suoni.pronto()
+        daEliminare = nil
+        withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) {
+            switch v {
+            case .stanza(let s): stanze.cancella(s)
+            case .modo(let m): ArchivioModi.condiviso.cancella(m); modi = ArchivioModi.condiviso.voci
             }
         }
     }

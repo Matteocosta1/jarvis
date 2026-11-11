@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import SwiftUI
 import MapKit
 import Combine
@@ -44,6 +45,9 @@ final class ArchivioFotoSat: ObservableObject {
         do { try dati.write(to: url(f), options: .atomic) } catch { return false }
         foto.insert(f, at: 0)
         scrivi()
+        // 11 nov (approvato il 10 nov): la copia nell'Archivio centrale, cartella satellite
+        ArchivioCentrale.copia(nome: "\(luogo) · \(ArchivioCentrale.quando(f.quando))", cartella: "satellite", tipo: "image/jpeg", dati: dati,
+                               descrizione: "Satellite · \(luogo) · \(da) · \(cam)")
         return true
     }
 

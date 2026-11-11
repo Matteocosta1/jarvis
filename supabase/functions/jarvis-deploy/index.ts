@@ -119,7 +119,8 @@ async function provaAccensione(slug: string) {
   return { ok: false, dettagli: [ultimo] };
 }
 
-/// Tre domande vere al cervello di prova: una semplice, una con uno strumento (meteo), una che legge il database (Bea).
+/// Tre domande vere al cervello di prova: una semplice, una con uno strumento (meteo), una che legge il database (Bea);
+/// e due prove del dialogo (11 nov): la conversazione di ieri non entra, la risposta anticipata sospesa riparte e finisce.
 async function provaCervello(slug: string) {
   const acceso = await provaAccensione(slug);
   if (!acceso.ok) return acceso;
@@ -146,5 +147,55 @@ async function provaCervello(slug: string) {
       return { ok: false, d: `${q.slice(16, 50)}… → ${(e as Error).message.slice(0, 120)}` };
     }
   }));
-  return { ok: esiti.every((e) => e.ok), dettagli: esiti.map((e) => `${e.ok ? "✓" : "✗"} ${e.d}`) };
+  // 11 nov (#15): due prove del dialogo, oltre alle tre domande
+  const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug)]);
+  const tutte = [...esiti, ...dialogo];
+  return { ok: tutte.every((e) => e.ok), dettagli: tutte.map((e) => `${e.ok ? "✓" : "✗"} ${e.d}`) };
+}
+
+/// Una richiesta al cervello di prova: le righe NDJSON della risposta.
+async function chiedi(slug: string, corpo: Record<string, unknown>): Promise<any[]> {
+  const r = await fetch(`${BASE}/functions/v1/${slug}`, {
+    method: "POST", signal: AbortSignal.timeout(70_000),
+    headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
+    body: JSON.stringify({ dispositivo: "iphone", prova_generale: true, ...corpo }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return (await r.text()).split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } });
+}
+
+/// Le battute di più di 8 ore fa non entrano nella conversazione (il caso Pierpaolo): un arrivo di ieri non è un arrivo di adesso.
+async function provaFinestraVecchia(slug: string) {
+  const ora = Date.now(), ieri = ora - 26 * 3600_000;
+  try {
+    const righe = await chiedi(slug, { messaggi: [
+      { role: "user", content: "È appena arrivato Gualtierino, salutalo.", quando: ieri },
+      { role: "assistant", content: "Benvenuto, Gualtierino.", quando: ieri + 4000 },
+      { role: "user", content: "Prova generale: chi è appena arrivato qui? Se non lo sai dillo in una frase.", quando: ora },
+    ] });
+    const errore = righe.find((x) => x?.t === "errore"), testo = String(righe.find((x) => x?.t === "fine")?.testo ?? "").trim();
+    const ok = !errore && !!testo && !/gualtierin/i.test(testo);
+    return { ok, d: `finestra di ieri → ${errore ? `errore: ${String(errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
+  } catch (e) { return { ok: false, d: `finestra di ieri → ${(e as Error).message.slice(0, 120)}` }; }
+}
+
+/// La risposta anticipata: con uno strumento si ferma («sospeso»), poi l'app la fa ripartire (continua con «esegui») e arriva in fondo.
+async function provaAnticipo(slug: string) {
+  try {
+    const righe = await chiedi(slug, { a_voce: true, anticipo: true,
+      messaggi: [{ role: "user", content: "Prova generale: che tempo fa adesso a Milano? Una frase sola.", quando: Date.now() }] });
+    const errore = righe.find((x) => x?.t === "errore");
+    if (errore) return { ok: false, d: `anticipo → errore: ${String(errore.d).slice(0, 120)}` };
+    if (righe.some((x) => x?.t === "no_anticipo")) return { ok: true, d: "anticipo → spento (ANTICIPO=off)" };
+    let fine = righe.find((x) => x?.t === "fine");
+    const sosp = righe.find((x) => x?.t === "sospeso");
+    if (!fine && sosp) {
+      const dopo = await chiedi(slug, { messaggi: [], continua: { lavoro: sosp.lavoro, modello: sosp.modello, azioni: sosp.azioni, detto: sosp.detto, esegui: true } });
+      const e2 = dopo.find((x) => x?.t === "errore");
+      if (e2) return { ok: false, d: `anticipo ripreso → errore: ${String(e2.d).slice(0, 120)}` };
+      fine = dopo.find((x) => x?.t === "fine");
+    }
+    const testo = String(fine?.testo ?? "").trim();
+    return { ok: !!testo, d: `anticipo${sosp ? " (sospeso e ripreso)" : ""} → ${testo.slice(0, 120) || "nessuna risposta"}` };
+  } catch (e) { return { ok: false, d: `anticipo → ${(e as Error).message.slice(0, 120)}` }; }
 }
