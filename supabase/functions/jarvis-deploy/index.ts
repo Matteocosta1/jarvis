@@ -142,7 +142,7 @@ async function provaCervello(slug: string) {
       const fine = righe.find((x) => x?.t === "fine");
       const testo = String(fine?.testo ?? "").trim();
       const ok = !errore && !!testo && !/mi sono perso|non ho trovato nulla da dire|fiato che ho/i.test(testo);
-      return { ok, d: `${q.slice(16, 50)}… → ${errore ? `errore: ${String(errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
+      return { ok, d: `${q.slice(16, 50)}… → ${errore ? `errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };   // il dettaglio tecnico, non la frase per il signore
     } catch (e) {
       return { ok: false, d: `${q.slice(16, 50)}… → ${(e as Error).message.slice(0, 120)}` };
     }
@@ -175,7 +175,7 @@ async function provaFinestraVecchia(slug: string) {
     ] });
     const errore = righe.find((x) => x?.t === "errore"), testo = String(righe.find((x) => x?.t === "fine")?.testo ?? "").trim();
     const ok = !errore && !!testo && !/gualtierin/i.test(testo);
-    return { ok, d: `finestra di ieri → ${errore ? `errore: ${String(errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
+    return { ok, d: `finestra di ieri → ${errore ? `errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
   } catch (e) { return { ok: false, d: `finestra di ieri → ${(e as Error).message.slice(0, 120)}` }; }
 }
 
@@ -185,14 +185,14 @@ async function provaAnticipo(slug: string) {
     const righe = await chiedi(slug, { a_voce: true, anticipo: true,
       messaggi: [{ role: "user", content: "Prova generale: che tempo fa adesso a Milano? Una frase sola.", quando: Date.now() }] });
     const errore = righe.find((x) => x?.t === "errore");
-    if (errore) return { ok: false, d: `anticipo → errore: ${String(errore.d).slice(0, 120)}` };
+    if (errore) return { ok: false, d: `anticipo → errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` };
     if (righe.some((x) => x?.t === "no_anticipo")) return { ok: true, d: "anticipo → spento (ANTICIPO=off)" };
     let fine = righe.find((x) => x?.t === "fine");
     const sosp = righe.find((x) => x?.t === "sospeso");
     if (!fine && sosp) {
       const dopo = await chiedi(slug, { messaggi: [], continua: { lavoro: sosp.lavoro, modello: sosp.modello, azioni: sosp.azioni, detto: sosp.detto, esegui: true } });
       const e2 = dopo.find((x) => x?.t === "errore");
-      if (e2) return { ok: false, d: `anticipo ripreso → errore: ${String(e2.d).slice(0, 120)}` };
+      if (e2) return { ok: false, d: `anticipo ripreso → errore: ${String(e2.tecnico ?? e2.d).slice(0, 120)}` };
       fine = dopo.find((x) => x?.t === "fine");
     }
     const testo = String(fine?.testo ?? "").trim();
