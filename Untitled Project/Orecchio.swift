@@ -42,6 +42,10 @@ final class Orecchio {
     private static let paroleStop = ["jarvis", "giarvis", "jervis", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio", "muto", "muta", "taci",
                                      "un attimo", "stop", "ehi", "hey", "bro", "fratello"]
 
+    /// 12 nov (il signore: «in riservato gli stavo parlando e mi ha subito risposto»): in RISERVATO, mentre JARVIS parla, la
+    /// risposta la fermano solo le parole d'ordine («Jarvis», «basta», «aspetta»…), non una frase qualsiasi detta a qualcun altro.
+    var soloParoleDOrdine = false
+
     var attivo: Bool { acceso }
     /// Il signore gli sta parlando sopra e l'orecchio sta raccogliendo la sua frase (difetto 6 del 25 ott: in sottofondo si butta).
     var raccoglie: Bool { inPresa }
@@ -177,6 +181,7 @@ final class Orecchio {
                 zittisci?()
             }
             let parole = Orecchio.parole(segmento)
+            if !inPresa, soloParoleDOrdine { if fine { riavvia() }; return }   // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
             if !inPresa {
                 // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
                 let mie = Set(Orecchio.parole(testoDetto))

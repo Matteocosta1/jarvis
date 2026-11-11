@@ -183,6 +183,22 @@ final class LettoreMusica: ObservableObject {
 
     func play() async {
         LettoreMusica.preparaAudio()
+        // 12 nov (screenshot del signore: «Apple Music: Impossibile completare l'operazione. MPMusicPlayerControllerErrorDomain 1»):
+        // il lettore è di JARVIS e appena aperto è vuoto; Play con la coda vuota dava quell'errore (lo spiega Apple: «no queue»).
+        // Prima, col lettore di sistema, ripartiva quello che aveva l'app Musica. Ora: riparte da quello che ha ascoltato di recente
+        if lettore.queue.entries.isEmpty {
+            guard await CatalogoMusica.autorizzato() else { errore = CatalogoMusica.senzaPermesso; aggiorna(); return }
+            var r = MusicRecentlyPlayedRequest<Song>()
+            r.limit = 25
+            if let brani = try? await r.response().items, !brani.isEmpty {
+                lettore.queue = ApplicationMusicPlayer.Queue(for: Array(brani))
+            }
+            guard !lettore.queue.entries.isEmpty else {
+                errore = "Niente in coda, Sir: scelga un brano da Oggi, Radio, Libreria o Cerca."
+                aggiorna()
+                return
+            }
+        }
         do { try await lettore.play(); errore = nil } catch { errore = "Apple Music: \(error.localizedDescription)" }
         aggiorna()
     }

@@ -457,11 +457,12 @@ final class Jarvis: NSObject, ObservableObject {
         case .ascolto:
             if ascoltoCloud { chiudiAscoltoCloud(turno: turnoAscolto) } else { fermaAscolto(invia: true, toccato: true) }   // Mac: toccato = ho finito
         case .parlo, .elaboro:
+            // 12 nov (il signore: «se clicco sul reattore mentre parla lo devo spegnere»): il tocco lo zittisce e basta, e JARVIS
+            // torna in attesa nello stato di prima (IN ATTESA o RISERVATO). Prima il tocco lo zittiva e lo metteva in ascolto: se
+            // aveva sentito per sbaglio, ripartiva da capo. La domanda interrotta resta: la frase dopo può completarla (come sempre)
             segnaInterruzione()
-            micSpento = false               // ha toccato per parlare: il microfono si riaccende
-            ascoltaDopo = false             // ascolta adesso: dopo la prossima risposta il microfono non si riapre da solo
-            interrompi()                    // lo zittisce e ascolta subito
-            Task { await avviaAscolto(bip: true) }
+            ascoltaDopo = false             // dopo il tocco il microfono non si riapre da solo
+            interrompi()
         }
     }
 
@@ -1997,6 +1998,7 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .parlo
         orecchio.testoDetto += " " + frase          // così l'orecchio riconosce la propria eco
         if Jarvis.usaAscoltoCloud { dettoMac += " " + frase; dettoMacFino = Date().addingTimeInterval(30) }
+        orecchio.soloParoleDOrdine = riservato         // 12 nov: in RISERVATO solo «Jarvis», «basta», «aspetta»… lo fermano
         if conOrecchio, !micSpento, !orecchio.attivo { orecchio.avvia() }   // microfono spento a mano: non ascolta nemmeno mentre parla
         if vocePerCloud {
             // solo le frasi della risposta portano il loro «prima» (le ultime due, fino a 300 caratteri); frasi ponte e annunci no
