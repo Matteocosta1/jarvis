@@ -541,6 +541,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
   - nei tempi del turno c'è il motivo, se ha parlato sopra senza fermarlo («orecchio»: eco, segnale, folla, orologio, riservato).
 - **La regia sa cosa fanno anche le sezioni chiuse**: stamattina JARVIS ha detto «non posso scrivere nella ricerca della Musica» perché vedeva solo le azioni delle sezioni aperte. Ora nella riga [Schermo] c'è «SA FARE ANCHE DA CHIUSE» (imparato da ogni sezione quando si presenta e ricordato; prima della prima apertura quello scritto nel codice): la regia apre la sezione e fa l'azione. Se il cervello dà al valore un nome diverso, la regia lo riconosce lo stesso.
 - Mockup: il simulatore interrompe già così (parlare sopra lo ferma, i segnali d'ascolto no); musica e isola non cambiano nel disegno.
+- **Controllo di compilazione**: verde, zero errori e zero avvisi (run 43198991577, commit c0222ec), prove del dialogo superate (anche «parla sopra»).
 
 ## 12.0 (10) — MARK XII · 12 nov mattina · numero chiesto dal signore («fai 12.10») · build unica · cervello v128 · controllo di compilazione: vedi l'ultima riga
 
