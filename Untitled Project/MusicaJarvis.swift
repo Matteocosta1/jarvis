@@ -713,6 +713,7 @@ struct VistaMusica: View {
             ForEach(lista) { s in
                 riga(titolo: s.title, sotto: [s.artistName, s.albumTitle].compactMap { $0 }.joined(separator: " · "),
                      destra: s.duration.map(Self.mmss) ?? "", artwork: s.artwork, ora: lettore.eQuello(s.title, s.artistName)) {
+                    cercaAttivo = false                    // 12 nov: scelto un brano dalla ricerca, la tastiera scende (come Apple Music)
                     Task { await lettore.metti(lista, da: s) }
                 }
             }
