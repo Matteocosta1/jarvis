@@ -1258,7 +1258,8 @@ final class Jarvis: NSObject, ObservableObject {
             return true
         }
         let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
-        switch ComandoVocale.riconosci(frase, dentro: dentro) {
+        // 12.0 (10): «apri la spesa e aggiungi il latte» va al cervello, che fa i due passi con la regia
+        switch FineFrase.comandoComposto(frase) ? nil : ComandoVocale.riconosci(frase, dentro: dentro) {
         case .apri(let reparto)?:
             apriReparto(reparto)
             return true
@@ -2189,7 +2190,7 @@ final class Jarvis: NSObject, ObservableObject {
         if ComandoDedicato.riconosci(frase) != nil || ComandoOcchi.riconosci(frase) != nil || Storpiature.cerca(frase) != nil { return true }
         if BrowserVoce.aperto || LidarAperta.aperta || lidarAperto { return true }
         let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
-        return ComandoVocale.riconosci(frase, dentro: dentro) != nil
+        return !FineFrase.comandoComposto(frase) && ComandoVocale.riconosci(frase, dentro: dentro) != nil
     }
 
     /// Idea D: la frase del giro unico si fa come prima, con il testo già trascritto (la richiesta è già chiusa).

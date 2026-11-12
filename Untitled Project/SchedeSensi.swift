@@ -90,6 +90,48 @@ struct VistaShazam: View {
         }
         // 9 nov notte: chiusa la sezione col player aperto, l'assaggio si ferma come con «Chiudi» del player
         .onDisappear { if aperta != nil { ascolto.chiudi() } }
+        .regia("Shazam", stato: testoSchermo, azioni: azioniRegia)       // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Shazam per JARVIS: cosa sta facendo, cosa suona nel player, le ultime canzoni riconosciute.
+    private var testoSchermo: String {
+        var pezzi: [String?] = ["stato: \(sottotitolo)"]
+        if let t = aperta { pezzi.append("nel player: «\(t.titolo)» di \(t.artista)" + (t.album.map { ", album \($0)" } ?? "")) }
+        let ultime: [String] = storico.prefix(8).enumerated().map { "\($0.offset + 1). \($0.element.titolo) – \($0.element.artista)" }
+        if !ultime.isEmpty { pezzi.append("riconosciute di recente: " + ultime.joined(separator: "; ")) }
+        return Schermo.unisci("Shazam", pezzi)
+    }
+
+    /// Cosa sa fare Shazam per JARVIS: rimettere una canzone già riconosciuta, aggiungerla alla libreria, chiudere il player,
+    /// togliere una canzone dalla cronologia (col sì).
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("suona", "rimette una canzone riconosciuta (per titolo, artista o posizione)", valore: "quale",
+                        frasi: ["rimetti *", "suona *", "rifammi sentire *", "metti *"]) { v in
+                guard let t = Regia.scegli(v["quale"] ?? "", fra: storico, testo: { "\($0.titolo) \($0.artista)" }) else { return .no("non è fra le riconosciute") }
+                await suona(t)
+                return .fatto("nel player: \(t.titolo) di \(t.artista)", battuta: { Battute.musicaMetti(t.titolo) })
+            },
+            AzioneRegia("libreria", "aggiunge alla libreria di Apple Music la canzone nel player", frasi: ["aggiungila alla libreria", "salvala", "aggiungi alla libreria"]) { _ in
+                guard aperta != nil else { return .no("nessuna canzone nel player") }
+                await aggiungiLibreria()
+                if let e = ascolto.errore { return .no(e, battuta: { e }) }
+                return .fatto("aggiunta alla libreria", battuta: { Battute.una("shazam.libreria", ["In libreria, Sir.", "Salvata. Questa resta.", "Aggiunta alla collezione."]) })
+            },
+            AzioneRegia("chiudi_player", "chiude il player (la musica si ferma)", frasi: ["chiudi il player", "basta così"]) { _ in
+                guard aperta != nil else { return .no("il player è già chiuso") }
+                chiudiPlayer()
+                return .fatto("player chiuso", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("elimina", "toglie una canzone dalla cronologia di Shazam", valore: "quale", conferma: true) { v in
+                guard let t = Regia.scegli(v["quale"] ?? "", fra: storico, testo: { "\($0.titolo) \($0.artista)" }) else { return .no("non è fra le riconosciute") }
+                withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)) { storico.removeAll { $0.id == t.id } }
+                VistaShazam.salva(storico)
+                return .fatto("tolta dalla cronologia: \(t.titolo)")
+            },
+        ]
     }
 
     private var sottotitolo: String {
@@ -629,6 +671,51 @@ struct VistaFotoScheda: View {
             if let foto, let k = aperta { VistaImmagini(immagini: foto, iniziale: k) }
         }
         .chiudiFoglioDietro { aperta = nil }                    // 4 nov: il visore (iOS) non resta sopra la sezione che sale
+        .regia("Foto", stato: testoSchermo, azioni: azioniRegia)         // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Le foto per JARVIS: periodo, ricerca, quante foto, le parole capite dalla ricerca.
+    private var testoSchermo: String {
+        Schermo.unisci("Foto", ["periodo \(periodo.rawValue)", Schermo.campo("cerca", cerca),
+                                foto.map { "\($0.count) foto a schermo" } ?? "la galleria si sta aprendo",
+                                capite.isEmpty ? nil : "la ricerca ha capito: " + capite.joined(separator: ", "), nota])
+    }
+
+    /// Cosa sa fare Foto per JARVIS: cercare (cane, mare, concerto…), cambiare periodo, aprire una foto, togliere la ricerca.
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("cerca", "cerca nelle foto per contenuto (cane, mare, concerto, vinile…)", valore: "cosa",
+                        frasi: ["cerca *", "cercami *", "trova *", "trovami *", "mostrami le foto con *", "le foto con *", "foto con *"]) { v in
+                let c = (v["cosa"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !c.isEmpty else { return .no("niente da cercare") }
+                Suoni.tocco()
+                cerca = c
+                return .fatto("cerco «\(c)» in tutte le foto", battuta: { Battute.una("foto.cerca", ["Cerco \(c), Sir.", "Ecco le foto con \(c).", "Setaccio la galleria: \(c)."]) })
+            },
+            AzioneRegia("periodo", "oggi, ieri, 7 giorni, 30 giorni, tutte", valore: "quando", frasi: ["di *", "quelle di *", "periodo *"]) { v in
+                let k = Regia.chiave(v["quando"] ?? "")
+                let scelto: Periodo? = k.contains("oggi") ? .oggi : k.contains("ieri") ? .ieri : (k.contains("settiman") || k.contains("7")) ? .settimana
+                    : (k.contains("mese") || k.contains("30")) ? .mese : (k.contains("tutt") || k.contains("sempre")) ? .tutte : nil
+                guard let p = scelto else { return .no("periodo sconosciuto") }
+                Suoni.tocco()
+                periodo = p
+                return .fatto("periodo \(p.rawValue)", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("apri", "apre una foto a schermo intero (per posizione: la prima, la terza, l'ultima)", valore: "quale",
+                        frasi: ["apri la *", "apri l *", "mostrami la *", "ingrandisci la *"]) { v in
+                guard let f = foto, !f.isEmpty, let n = Regia.ordinale(v["quale"] ?? "") else { return .no("quale foto?") }
+                let k = n > 0 ? n - 1 : f.count + n
+                guard k >= 0, k < f.count else { return .no("non ci sono tante foto") }
+                aperta = k
+                return .fatto("foto \(k + 1) di \(f.count) aperta", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("pulisci", "toglie la ricerca", frasi: ["togli la ricerca", "pulisci la ricerca", "tutte le foto"]) { _ in
+                cerca = ""
+                return .fatto("ricerca tolta", battuta: { Battute.lampo() })
+            },
+        ]
     }
 
     private func carica() async {
@@ -728,13 +815,22 @@ struct VistaSerata: View {
         }
         .task { await caricaElenco() }
         .task(id: scelta?.id) { if let s = scelta { await carica(s) } }
-        .sulloSchermo(testoSchermo)
+        .regia("Serata", stato: testoSchermo, azioni: [                  // 12.0 (10): la regia
+            AzioneRegia("scegli", "mostra i conti di un'altra serata (per nome, data o posizione: l'ultima, la seconda)", valore: "quale",
+                        frasi: ["fammi vedere *", "mostrami *", "apri *", "scegli *"]) { v in
+                guard let s = Regia.scegli(v["quale"] ?? "", fra: serate, testo: { "\($0.nome) \($0.data)" }) else { return .no("serata non trovata") }
+                Suoni.tocco()
+                scelta = s
+                return .fatto("serata \(s.nome) del \(s.data): i conti arrivano", battuta: { Battute.una("serata.scegli", ["Ecco \(s.nome), Sir.", "I conti di \(s.nome).", "\(s.nome): vediamo i numeri."]) })
+            },
+        ])
     }
 
     /// 8 nov notte: cosa vede JARVIS della Serata (la serata scelta e i suoi conti come sono a schermo).
     private var testoSchermo: String {
         guard let s = scelta else { return Schermo.unisci("Serata", [errore.map { "errore: \($0)" } ?? "i conti si stanno aprendo"]) }
         let quale = "serata scelta: \(s.nome) del \(s.data)" + (s.chiusa ? " (chiusa)" : " (aperta)")
+            + " · serate in elenco: " + serate.prefix(8).map { "\($0.nome) \($0.data)" }.joined(separator: ", ")
         let numeri: String
         if let conti { numeri = "conti a schermo: " + Schermo.esito(conti, massimo: 1500) }
         else { numeri = errore.map { "errore: \($0)" } ?? "conti in caricamento" }

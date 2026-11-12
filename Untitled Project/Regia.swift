@@ -319,22 +319,67 @@ final class Regia {
     /// Le azioni più usate partono subito: la frase chiede un'azione della sezione davanti («aggiungi il latte» con la Spesa
     /// davanti)? Allora la fa e restituisce la battuta di JARVIS (vuota: basta la vibrazione). Nil: la frase va al cervello.
     func subito(_ frase: String) async -> String? {
-        guard let d = nomeDavanti else { return nil }
         let parole = Regia.paroleComando(frase)
-        guard !parole.isEmpty else { return nil }
-        for a in azioni(di: d) where !a.conferma {
+        guard !parole.isEmpty, !FineFrase.comandoComposto(frase) else { return nil }   // più comandi in fila: li fa il cervello
+        // prima la sezione davanti, poi le azioni che valgono ovunque (i tasti della musica, se c'è qualcosa in coda)
+        let d = nomeDavanti ?? "JARVIS"
+        let davanti = nomeDavanti.map { azioni(di: $0) } ?? []
+        for a in davanti + globali where !a.conferma {
             for schema in a.frasi {
                 guard let valore = Regia.combacia(parole, schema) else { continue }
+                // «apri la spesa» con la Posta davanti è la sezione Spesa, non una mail che parla di spesa
+                if a.nome == "apri", !valore.isEmpty, Regia.destinazione(valore) != nil { continue }
                 var valori: [String: String] = [:]
                 if let v = a.valore, !valore.isEmpty { valori[v] = valore }
                 let e = await a.esegui(valori)
+                if !e.ok && e.battuta == nil { continue }         // non era per questa azione: si prova la prossima (o il cervello)
                 if e.ok { evento("\(d): \(Regia.taglia(e.dato, 80))") }
-                if !e.ok && e.battuta == nil { return nil }       // non era una frase per lei: decide il cervello
                 return e.battuta?() ?? ""
             }
         }
         return nil
     }
+
+    /// Le azioni rapide che valgono ovunque, con qualsiasi sezione davanti: i tasti della musica, se c'è qualcosa in coda.
+    private var globali: [AzioneRegia] { LettoreMusica.condiviso.voce != nil ? Regia.tastiMusica : [] }
+
+    /// I tasti della musica, a voce (la sezione MUSICA e ovunque se c'è musica in coda). Frasi cortissime: mentre JARVIS parla
+    /// la musica è in pausa.
+    static let tastiMusica: [AzioneRegia] = [
+        AzioneRegia("play", "fa partire o riprende la musica", frasi: ["play", "riprendi", "riparti", "fai partire", "rimetti la musica", "riprendi la musica"]) { _ in
+            let l = LettoreMusica.condiviso
+            await l.play()
+            if let e = l.errore { return .no(e, battuta: { e }) }
+            return .fatto("in riproduzione: \(l.titolo)", battuta: { Battute.musica("play") })
+        },
+        AzioneRegia("pausa", "mette in pausa", frasi: ["pausa", "metti in pausa", "stop", "ferma", "ferma la musica", "stoppa"]) { _ in
+            LettoreMusica.condiviso.pausa()
+            return .fatto("musica in pausa", battuta: { Battute.musica("pausa") })
+        },
+        AzioneRegia("avanti", "brano successivo", frasi: ["avanti", "prossimo", "prossima", "salta", "brano successivo", "il prossimo",
+                                                          "la prossima", "next", "cambia brano", "cambia canzone", "skip"]) { _ in
+            let l = LettoreMusica.condiviso
+            await l.avanti()
+            return .fatto("brano successivo", battuta: { Battute.musica("avanti") })
+        },
+        AzioneRegia("indietro", "brano precedente (o da capo)", frasi: ["indietro", "precedente", "torna indietro", "brano precedente",
+                                                                        "canzone precedente", "da capo"]) { _ in
+            await LettoreMusica.condiviso.indietro()
+            return .fatto("brano precedente", battuta: { Battute.musica("indietro") })
+        },
+        AzioneRegia("casuale", "accende o spegne l'ordine casuale", frasi: ["casuale", "riproduzione casuale", "mescola", "shuffle"]) { _ in
+            let l = LettoreMusica.condiviso
+            l.cambiaCasuale()
+            let acceso = l.casuale
+            return .fatto(acceso ? "ordine casuale" : "ordine normale", battuta: { Battute.musica("casuale", acceso: acceso) })
+        },
+        AzioneRegia("ripeti", "ripete lo stesso brano (sì/no)", frasi: ["ripeti", "ripeti il brano", "a ripetizione", "ripeti questa"]) { _ in
+            let l = LettoreMusica.condiviso
+            l.cambiaRipeti()
+            let acceso = l.ripeti
+            return .fatto(acceso ? "ripete il brano" : "ripeti spento", battuta: { Battute.musica("ripeti", acceso: acceso) })
+        },
+    ]
 
     /// Le parole di un comando: minuscole, senza accenti né punteggiatura, senza il nome e le cortesie davanti e in fondo.
     static func paroleComando(_ frase: String) -> [String] {
@@ -366,6 +411,37 @@ final class Regia {
     private static let altroMondo: Set<String> = ["musica", "canzone", "canzoni", "brano", "playlist", "sveglia", "timer", "promemoria",
                                                   "calendario", "appuntamento", "messaggio", "messaggi", "mail", "email", "posta", "foto",
                                                   "video", "sezione", "sezioni", "chat", "conversazione", "meteo", "jarvis", "telefono"]
+
+    /// «la prima», «seconda», «3», «l'ultima»: la posizione in un elenco (1 = la prima; -1 = l'ultima). Nil: non è una posizione.
+    static func ordinale(_ s: String) -> Int? {
+        let p = FineFrase.paroleNude(s).filter { !["la", "il", "l", "lo", "numero", "mail", "email", "riga", "voce"].contains($0) }
+        guard let w = p.first, p.count <= 2 else { return nil }
+        if let n = Int(w), n > 0 { return n }
+        if w == "ultima" || w == "ultimo" { return -1 }
+        if w == "penultima" || w == "penultimo" { return -2 }
+        let ordine = ["prim", "second", "terz", "quart", "quint", "sest", "settim", "ottav", "non", "decim"]
+        if let i = ordine.firstIndex(where: { w == $0 + "a" || w == $0 + "o" }) { return i + 1 }
+        let numeri = ["uno", "due", "tre", "quattro", "cinque", "sei", "sette", "otto", "nove", "dieci"]
+        if let i = numeri.firstIndex(of: w) { return i + 1 }
+        return nil
+    }
+
+    /// L'elemento di un elenco scelto a voce: per posizione («la seconda», «l'ultima») o per parole contenute nel testo di ciascuno.
+    static func scegli<T>(_ detto: String, fra elementi: [T], testo: (T) -> String) -> T? {
+        guard !elementi.isEmpty else { return nil }
+        if let n = ordinale(detto) {
+            if n > 0 { return n <= elementi.count ? elementi[n - 1] : nil }
+            return elementi.count + n >= 0 ? elementi[elementi.count + n] : nil
+        }
+        let chiavi = FineFrase.paroleNude(detto).filter { $0.count > 2 && !["della", "delle", "dello", "degli", "che", "con", "per", "dal", "dalla", "mail", "email"].contains($0) }
+        guard !chiavi.isEmpty else { return nil }
+        let punti = elementi.map { e -> Int in
+            let t = FineFrase.paroleNude(testo(e)).joined(separator: " ")
+            return chiavi.filter { t.contains($0) }.count
+        }
+        guard let migliore = punti.max(), migliore > 0, let i = punti.firstIndex(of: migliore) else { return nil }
+        return elementi[i]
+    }
 
     /// Il sì del signore a una domanda di conferma: «sì», «vai», «mandalo», «procedi», «certo»… e niente «no», «aspetta», «ma».
     static func eAssenso(_ frase: String) -> Bool {
@@ -411,7 +487,7 @@ final class Regia {
         Destinazione(nome: "Bea", chiavi: ["bea", "beatrice"], strada: .apri(.bea)),
         Destinazione(nome: "Satellite", chiavi: ["satellite", "mappa", "mappe", "intelligence", "travel", "viaggio"], strada: .apri(.satellite)),
         Destinazione(nome: "Ricordi", chiavi: ["ricordi", "traccia", "luoghi"], strada: .apri(.ricordi)),
-        Destinazione(nome: "Scanner", chiavi: ["scanner", "codice", "codiceabarre"], strada: .apri(.scanner), dopoLaVoce: true),
+        Destinazione(nome: "Scanner", chiavi: ["scanner", "codiceabarre", "barcode"], strada: .apri(.scanner), dopoLaVoce: true),
         Destinazione(nome: "Shazam", chiavi: ["shazam"], strada: .apri(.shazam), dopoLaVoce: true),
         Destinazione(nome: "Occhi", chiavi: ["occhi", "fotocamera", "camera"], strada: .apri(.occhi), dopoLaVoce: true),
         Destinazione(nome: "Cucina", chiavi: ["cucina", "frigo", "dispensa"], strada: .apri(.cucina), dopoLaVoce: true),
@@ -424,7 +500,7 @@ final class Regia {
         Destinazione(nome: "Browser", chiavi: ["browser", "internet", "web", "google"], strada: .apri(.browser)),
         Destinazione(nome: "EDITH", chiavi: ["edith", "sicurezza"], strada: .apri(.edith)),
         Destinazione(nome: "Costi", chiavi: ["costi", "spese", "consumi"], strada: .apri(.costi)),
-        Destinazione(nome: "GitHub", chiavi: ["github", "cantiere", "codice"], strada: .apri(.github)),
+        Destinazione(nome: "GitHub", chiavi: ["github", "cantiere", "repository"], strada: .apri(.github)),
         Destinazione(nome: "Supabase", chiavi: ["supabase", "salamacchine", "database"], strada: .apri(.supabase)),
         Destinazione(nome: "Archivio", chiavi: ["archivio", "file", "documenti"], strada: .apri(.archivio)),
         Destinazione(nome: "Sistemi", chiavi: ["sistemi"], strada: .apri(.sistemi)),
@@ -437,7 +513,7 @@ final class Regia {
 
     /// Le sezioni che si presentano alla regia (stato e azioni): per le altre JARVIS vede la riga di `Schermo` e non aspetta che
     /// si presentino. Si aggiorna quando una sezione entra nella regia.
-    static let conLaRegia: Set<String> = ["Spesa"]
+    static let conLaRegia: Set<String> = ["Spesa", "Email", "Meteo", "Briefing", "Musica", "Messaggi", "Telefono", "Bea", "Diario", "Sonno", "Cuore", "Shazam", "Foto", "Serata", "Ricordi", "Satellite", "GitHub", "Supabase", "Archivio", "Costi", "EDITH", "Vitals"]
 
     static func destinazione(_ nome: String) -> Destinazione? {
         let k = chiave(nome)

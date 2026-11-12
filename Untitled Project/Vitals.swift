@@ -73,6 +73,40 @@ struct VistaVitals: View {
         }
         .preferredColorScheme(.dark)
         .aperturaHUD("Vitals", icona: "waveform.path.ecg")
+        .regia("Vitals", stato: testoSchermo, azioni: [                  // 12.0 (10): la regia
+            AzioneRegia("periodo", "il periodo dei grafici: 7, 30 o 90 giorni", valore: "giorni", frasi: ["ultimi *", "periodo *", "mostrami gli ultimi *"]) { v in
+                guard let g = Self.periodo(v["giorni"] ?? "") else { return .no("periodo non valido: 7, 30 o 90 giorni") }
+                withAnimation(.easeInOut(duration: 0.25)) { giorni = g }
+                return .fatto("periodo \(g) giorni", battuta: { Battute.lampo() })
+            },
+        ])
+    }
+
+    /// 12.0 (10): «7», «una settimana», «trenta giorni», «un mese», «tre mesi», «90» → 7, 30 o 90 (nil: non è un periodo).
+    static func periodo(_ detto: String) -> Int? {
+        let k = Regia.chiave(detto)
+        let cifre = Int(k.filter(\.isNumber)) ?? 0
+        if cifre == 7 || k.contains("sette") || k.contains("settiman") { return 7 }
+        if cifre == 90 || k.contains("novanta") || k.contains("tremesi") || k.contains("3mesi") || k.contains("trimestre") { return 90 }
+        if cifre == 30 || k.contains("trenta") || k.contains("mese") { return 30 }
+        return nil
+    }
+
+    /// 12.0 (10): i Vitals per JARVIS, come a schermo: oggi dall'app Salute e le medie del periodo scelto.
+    private var testoSchermo: String {
+        var pezzi: [String?] = ["periodo \(giorni) giorni"]
+        if let o = oggi {
+            let battito: String = o.battito.map { "\($0)" + (o.battitoMedia.map { " (media 7 gg \($0))" } ?? "") } ?? "—"
+            pezzi.append("oggi: sonno \(o.sonno ?? "—")" + (o.orari.map { " (\($0))" } ?? "") + ", battito \(battito), passi \(o.passi.map { "\($0)" } ?? "—"), energia \(o.calorie.map { "\($0) kcal" } ?? "—")")
+            if !o.allenamenti.isEmpty { pezzi.append("allenamenti: " + o.allenamenti.joined(separator: ", ")) }
+        }
+        if let d = dati {
+            pezzi.append("medie del periodo: umore \(d.mediaUmore.map { String(format: "%.1f", $0) } ?? "—")/10, sonno \(d.mediaSonno.map { String(format: "%.1f", $0) } ?? "—") ore, battito \(d.mediaBattito.map { "\(Int($0))" } ?? "—")")
+            if !d.frasi.isEmpty { pezzi.append("lettura: " + d.frasi.joined(separator: " ")) }
+        } else if let errore {
+            pezzi.append("errore: \(errore)")
+        }
+        return Schermo.unisci("Vitals", pezzi)
     }
 
     // MARK: Pezzi della pagina

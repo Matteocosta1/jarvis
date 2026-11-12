@@ -241,6 +241,133 @@ enum Battute {
         una("spesa.nonce", ["\(maiuscola(cosa)) non è in lista, Sir.", "Non trovo \(cosa) nella lista.", "In lista \(cosa) non c'è, Sir."])
     }
 
+    // MARK: La posta
+
+    static func postaAperta(_ nome: String, oggetto: String) -> String {
+        if diFretta { return una("posta.lampo", ["Eccola.", "Aperta.", "Ecco, Sir."]) }
+        return una("posta.apri", ["La mail di \(nome), Sir.", "Ecco \(nome): «\(oggetto)».", "Aperta. Scrive \(nome).",
+                                  "\(nome), Sir. Vediamo cosa vuole.", "«\(oggetto)», da \(nome)."])
+    }
+
+    static func postaCartella(_ nome: String, quante: Int?) -> String {
+        if nome == "Indesiderata" {
+            return una("posta.spam", ["Indesiderata, Sir. Entriamo coi guanti.", "La posta che nessuno ha chiesto, Sir.", "Lo scantinato della casella, Sir."])
+        }
+        if nome == "Cestino" { return una("posta.cestino", ["Il cestino, Sir. Frughiamo con discrezione.", "Cestino aperto."]) }
+        return una("posta.cartella", ["Cartella \(nome).", "Eccoci in \(nome), Sir.", "\(nome), Sir."])
+    }
+
+    static func postaNonLette(_ n: Int) -> String {
+        switch n {
+        case 0: return una("posta.zero", ["Nessuna da leggere, Sir. Casella in ordine.", "Tutto letto. Ammirevole, Sir.", "Zero non lette: un raro momento di pace."])
+        case 1: return una("posta.una", ["Una sola da leggere, Sir.", "Una mail la aspetta."])
+        default: return una("posta.tante", ["\(n) da leggere, Sir.", "Ecco le \(n) non lette.", "\(n) mail aspettano il suo verdetto, Sir."])
+        }
+    }
+
+    // MARK: La musica (frasi cortissime: la musica è in pausa mentre JARVIS parla)
+
+    static func musica(_ azione: String, acceso: Bool = true) -> String {
+        switch azione {
+        case "avanti": return una("mus.avanti", ["Avanti.", "Prossimo brano.", "Cambio pista, Sir.", "Ecco il prossimo."])
+        case "indietro": return una("mus.indietro", ["Indietro.", "Torno al brano di prima.", "Riavvolgo, Sir."])
+        case "pausa": return una("mus.pausa", ["In pausa.", "Pausa, Sir.", "Musica ferma."])
+        case "play": return una("mus.play", ["Si riparte.", "Musica, Sir.", "Ripartiamo."])
+        case "casuale": return acceso ? una("mus.casuale", ["Casuale: lascio decidere al destino.", "Ordine casuale, Sir."])
+                                      : una("mus.ordine", ["Casuale spento: si torna all'ordine.", "Di nuovo in ordine, Sir."])
+        case "ripeti": return acceso ? una("mus.ripeti", ["Lo stesso brano a ripetizione, Sir.", "Ripeti attivo: questo non ci stanca."])
+                                     : una("mus.nonripeti", ["Ripeti spento.", "Basta replica, Sir."])
+        default: return lampo()
+        }
+    }
+
+    static func musicaMetti(_ nome: String) -> String {
+        if diFretta { return una("mus.metti.lampo", ["Ecco.", "Parte.", "In onda."]) }
+        let base = una("mus.metti", ["Ecco \(nome).", "Parte \(nome), Sir.", "\(nome): ottima scelta.", "Metto \(nome).", "In onda: \(nome)."])
+        guard spirito(0.2) else { return base }
+        return base + " " + una("mus.volume", ["Il volume lo lascio a lei: Apple non me lo permette.", "Alzi pure: io tengo il tempo."])
+    }
+
+    static func musicaCerca(_ testo: String, trovati: Int) -> String {
+        if trovati == 0 { return una("mus.cerca.zero", ["Niente per «\(testo)», Sir.", "Apple Music non conosce «\(testo)»."]) }
+        return una("mus.cerca", ["Ecco cosa trovo per «\(testo)».", "\(trovati) risultati per «\(testo)», Sir.", "Cercato: \(testo)."])
+    }
+
+    // MARK: Sistemi (GitHub, Supabase, Costi, Archivio)
+
+    static func repoAperto(_ nome: String) -> String {
+        if diFretta { return una("gh.lampo", ["\(nome).", "Eccolo.", "Aperto."]) }
+        let base = una("gh.apri", ["Ecco \(nome), Sir.", "Cantiere \(nome): ultimi lavori a schermo.", "\(nome) sul tavolo.",
+                                   "\(nome), aperto. Commit, issue, tutto in fila."])
+        guard spirito(0.25) else { return base }
+        return base + " " + una("gh.spirito", ["Il codice non mente. I commenti, a volte.", "Se trova un errore, è stato il compilatore.",
+                                               "Ogni riga ha una storia. Alcune, un po' tormentate."])
+    }
+
+    /// La sala macchine ricontrollata: con gli errori del periodo, se ce ne sono.
+    static func salaMacchine(errori: Int, ore: Int) -> String {
+        if errori > 0 {
+            return una("supa.errori", ["\(errori == 1 ? "Un errore" : "\(errori) errori") nelle ultime \(ore) ore, Sir: sono a schermo.",
+                                       "Sala macchine ricontrollata: \(errori == 1 ? "c'è un errore" : "ci sono \(errori) errori") da guardare."])
+        }
+        if diFretta { return lampo() }
+        let base = una("supa.agg", ["Sala macchine ricontrollata.", "Dati freschi dal motore, Sir.", "Motore ascoltato: ecco i valori.",
+                                    "Ricontrollato tutto, Sir."])
+        guard spirito(0.3) else { return base }
+        return base + " " + una("supa.spirito", ["Nessun errore nel periodo: gira liscio.", "Zero errori. Il motore fa le fusa."])
+    }
+
+    static func costiRifatti() -> String {
+        if diFretta { return lampo() }
+        let base = una("costi.agg", ["Conti rifatti, Sir.", "Ricalcolato al centesimo.", "Ecco i conti aggiornati.", "Bilancio ricontrollato, Sir."])
+        guard spirito(0.25) else { return base }
+        return base + " " + una("costi.spirito", ["I numeri sono a schermo: li ho contati due volte.", "Nessuna sorpresa nascosta tra le righe."])
+    }
+
+    static func archivioTrovati(_ n: Int, _ cosa: String) -> String {
+        if n == 0 { return una("arch.zero", ["Niente per «\(cosa)», Sir.", "Negli schedari «\(cosa)» non c'è.", "Archivio setacciato: di «\(cosa)» nessuna traccia."]) }
+        if diFretta { return una("arch.lampo", ["\(n) file.", "Trovati."]) }
+        return una("arch.cerca", ["\(n == 1 ? "Un file" : "\(n) file") per «\(cosa)», Sir.", "Schedari consultati: \(n == 1 ? "ne trovo uno" : "ne trovo \(n)").",
+                                  "Ecco cosa trovo per «\(cosa)»."])
+    }
+
+    // MARK: Messaggi e telefono
+
+    static func messaggioA(_ nome: String) -> String {
+        if diFretta { return una("msg.a.lampo", ["A \(nome).", "\(nome), Sir."]) }
+        return una("msg.a", ["Scriviamo a \(nome). Detti pure.", "A \(nome), Sir. Cosa scriviamo?", "\(nome) in linea. La ascolto.",
+                             "Pronto per \(nome), Sir: mi dica il testo."])
+    }
+
+    static func messaggioCanale(_ canale: String) -> String {
+        una("msg.canale." + canale, ["Su \(canale).", "\(canale), Sir.", "Passo a \(canale)."])
+    }
+
+    static func telefonoComposto(_ numero: String) -> String {
+        una("tel.componi", ["Numero in tastiera, Sir.", "Composto: \(numero).", "\(numero), pronto da chiamare."])
+    }
+
+    // MARK: Bea
+
+    static func beaSegnato(_ tipo: String, _ testo: String) -> String {
+        if diFretta { return una("bea.lampo", ["Segnato.", "Annotato, Sir.", "Fatto."]) }
+        switch tipo {
+        case "gusto": return una("bea.gusto", ["Annotato: le piace \(testo).", "\(maiuscola(testo)): in archivio fra le cose che ama.",
+                                               "Segnato, Sir. Queste informazioni valgono oro."])
+        case "non_piace": return una("bea.nonpiace", ["Annotato: niente \(testo). Evitiamo incidenti diplomatici.", "Segnato fra le cose da evitare."])
+        case "promessa": return una("bea.promessa", ["Promessa registrata, Sir. Gliela ricorderò io.", "Annotata. Le promesse a Bea non scadono."])
+        case "regalo", "idea": return una("bea.idea", ["Idea in cassaforte, Sir.", "Annotata. Al momento giusto gliela ricordo."])
+        case "data": return una("bea.data", ["Data segnata, Sir. Avviso una settimana prima e il giorno stesso.", "In calendario mentale, Sir."])
+        default: return una("bea.nota", ["Da non dimenticare: segnato.", "Annotato, Sir."])
+        }
+    }
+
+    // MARK: Il meteo
+
+    static func meteoAggiornato(_ gradi: String, _ cielo: String) -> String {
+        una("meteo.agg", ["Aggiornato: \(gradi), \(cielo).", "Dati freschi, Sir: \(gradi) e \(cielo).", "Cielo ricontrollato: \(cielo), \(gradi)."])
+    }
+
     /// La lista vuota letta.
     static func spesaVuota() -> String {
         una("spesa.vuota.letta", ["La lista è vuota, Sir. Frigo pieno o memoria corta?", "Niente da comprare, Sir. Per ora.",

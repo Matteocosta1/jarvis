@@ -113,6 +113,7 @@ struct VistaMusicaOrologio: View {
     private func leggi(_ comando: String) async {
         if let s = await PonteOrologio.condiviso.musica(comando) {
             stato = s
+            RegiaPolso.condivisa.musica = s                // 12.0 (10): la regia al polso sa cosa suona
             lettoAlle = Date()
             muto = false
         } else {

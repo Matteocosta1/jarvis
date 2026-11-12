@@ -470,7 +470,88 @@ struct VistaMusica: View {
         // dietro la sezione resta viva (niente onDisappear) e la musica continua, col disco del Dock che gira
         .onDisappear { lettore.ferma() }
         .task { await caricaOggi() }
-        .sulloSchermo(testoSchermo)
+        .regia("Musica", stato: testoSchermo, azioni: azioniRegia)       // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare MUSICA per JARVIS: i tasti del lettore, le schede, cercare, mettere un brano, una playlist o una radio fra quelli
+    /// a schermo (per nome o posizione: «metti la seconda», «suona Bohemian Rhapsody»), aprire una playlist o un album.
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("metti", "fa suonare un brano, una playlist, un album o una radio a schermo (nome o posizione)", valore: "quale",
+                        frasi: ["metti *", "suona *", "fammi sentire *", "riproduci *", "metti su *"]) { v in await regiaMetti(v["quale"] ?? "") },
+            AzioneRegia("cerca", "cerca brani in Apple Music e li mostra", valore: "testo",
+                        frasi: ["cerca *", "cercami *", "trova *", "trovami *"]) { v in await regiaCerca(v["testo"] ?? "") },
+            AzioneRegia("scheda", "cambia scheda: oggi, radio, libreria, cerca", valore: "nome",
+                        frasi: ["scheda *", "vai alla scheda *", "vai su *", "vai in *", "apri la scheda *"]) { v in regiaScheda(v["nome"] ?? "") },
+            AzioneRegia("apri", "apre una playlist o un album a schermo", valore: "quale",
+                        frasi: ["apri la playlist *", "apri l album *", "apri playlist *", "apri album *"]) { v in regiaApri(v["quale"] ?? "") },
+        ] + Regia.tastiMusica
+    }
+
+    private func regiaMetti(_ quale: String) async -> EsitoRegia {
+        var voci: [(nome: String, suona: () async -> Void)] = []
+        if let r = aperta, let t = braniAperta {
+            voci.append((nome: r.nome, suona: { await lettore.metti(t, da: nil) }))
+            for x in t { voci.append((nome: "\(x.title) \(x.artistName)", suona: { await lettore.metti(t, da: x) })) }
+        } else {
+            switch scheda {
+            case .cerca:
+                for x in risultati { voci.append((nome: "\(x.title) \(x.artistName)", suona: { await lettore.metti(risultati, da: x) })) }
+            case .radio:
+                for x in radio ?? [] { voci.append((nome: x.stazione.name, suona: { await lettore.metti(x.stazione) })) }
+            case .libreria:
+                for p in playlist ?? [] { voci.append((nome: p.name, suona: { await lettore.metti(p) })) }
+                let tutti = brani ?? []
+                for x in tutti.prefix(300) { voci.append((nome: "\(x.title) \(x.artistName)", suona: { await lettore.metti(tutti, da: x) })) }
+            case .oggi:
+                for x in recenti { voci.append((nome: "\(x.albumTitle ?? x.title) \(x.artistName)", suona: { await lettore.metti(x) })) }
+                for p in perLeiPlaylist { voci.append((nome: p.name, suona: { await lettore.metti(p) })) }
+                for a in perLeiAlbum { voci.append((nome: "\(a.title) \(a.artistName)", suona: { await lettore.metti(a) })) }
+                for x in momento { voci.append((nome: "\(x.title) \(x.artistName)", suona: { await lettore.metti(momento, da: x) })) }
+            }
+        }
+        guard let scelta = Regia.scegli(quale, fra: voci, testo: { $0.nome }) else { return .no("«\(quale)» non è a schermo") }
+        Suoni.tocco()
+        await scelta.suona()
+        if let e = lettore.errore { return .no(e, battuta: { e }) }
+        let nome = lettore.voce?.title ?? scelta.nome
+        return .fatto("in riproduzione: \(nome)", battuta: { Battute.musicaMetti(nome) })
+    }
+
+    private func regiaCerca(_ t: String) async -> EsitoRegia {
+        let q = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return .no("niente da cercare") }
+        Suoni.tocco()
+        aperta = nil
+        scheda = .cerca
+        let r = await CatalogoMusica.cerca(q)
+        risultati = r
+        cercato = q
+        testo = q
+        let primi = r.prefix(5).enumerated().map { "\($0.offset + 1). \($0.element.title) – \($0.element.artistName)" }.joined(separator: "; ")
+        return .fatto(r.isEmpty ? "nessun risultato per «\(q)»" : "risultati per «\(q)»: \(primi)", battuta: { Battute.musicaCerca(q, trovati: r.count) })
+    }
+
+    private func regiaScheda(_ nome: String) -> EsitoRegia {
+        let k = Regia.chiave(nome)
+        guard let s = Scheda.allCases.first(where: { k.contains(Regia.chiave($0.rawValue)) }) else { return .no("scheda «\(nome)» sconosciuta") }
+        Suoni.tocco()
+        lettore.errore = nil
+        scheda = s
+        aperta = nil
+        Task { await carica(s) }
+        return .fatto("scheda \(s.rawValue)", battuta: { Battute.lampo() })
+    }
+
+    private func regiaApri(_ quale: String) -> EsitoRegia {
+        let raccolte: [RaccoltaMusica] = perLeiPlaylist.map { RaccoltaMusica.playlist($0) } + perLeiAlbum.map { RaccoltaMusica.album($0) }
+            + (playlist ?? []).map { RaccoltaMusica.playlist($0) }
+        guard let r = Regia.scegli(quale, fra: raccolte, testo: { $0.nome }) else { return .no("«\(quale)» non è a schermo") }
+        Suoni.tocco()
+        apri(r)
+        return .fatto("aperta \(r.nome)", battuta: { Battute.lampo() })
     }
 
     /// 8 nov notte: cosa vede JARVIS di MUSICA (il brano di adesso, la scheda, la raccolta aperta, la ricerca e i risultati).

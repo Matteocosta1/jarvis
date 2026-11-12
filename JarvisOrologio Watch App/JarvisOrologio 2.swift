@@ -1206,7 +1206,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return
             }
             // un comando («apri il diario», «fammi vedere il meteo»): la sezione si apre qui, senza passare dal cervello
-            var comando = ComandoVocale.riconosci(testo)
+            // (12.0 (10): più comandi in una frase vanno al cervello, che li fa in fila con la regia al polso)
+            var comando = FineFrase.comandoComposto(testo) ? nil : ComandoVocale.riconosci(testo)
             // i comandi rapidi che sull'orologio hanno la loro sezione: «scrivi il diario» → Diario, «ho bisogno di parlarti» → Confidente
             if case .rapido(let a)? = comando {
                 switch a {
@@ -1237,6 +1238,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
             // «traduci in inglese»: come la sezione Interprete dell'orologio, già sulla lingua
             if case .interprete(let codice)? = comando, let lingua = ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first {
                 chiedi("Fammi da interprete in \(lingua): ti dirò una frase, tu traducila in \(lingua) e dimmela ad alta voce.")
+                return
+            }
+            // 12.0 (10): con la MUSICA davanti sul polso, «pausa», «avanti», «indietro», «play» partono subito, con la battuta di
+            // JARVIS (ma «dicevi?», «vai avanti» dopo un'interruzione restano la ripresa della sua frase)
+            if ripresaValida() == nil, let tasto = RegiaPolso.condivisa.tastoDetto(testo) {
+                compito = nil
+                daUnire = nil
+                inCorso = nil
+                parla(await RegiaPolso.condivisa.subito(tasto))
                 return
             }
             chiedi(testo, aVoce: true)
@@ -1487,6 +1497,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 let d = (try? JSONSerialization.data(withJSONObject: ["trovato": false, "errore": e] as [String: Any])) ?? Data("{}".utf8)
                 return (String(decoding: d, as: UTF8.self), true)
             }
+        case "regia":                                             // 12.0 (10): la regia al polso (sezioni e musica)
+            stato = "all'opera"
+            return await RegiaPolso.condivisa.esegui(input)
         default:
             return ("{\"errore\": \"strumento \(nome) non disponibile sull'orologio: va fatto dall'iPhone\"}", true)
         }
@@ -1509,7 +1522,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // 25 ott, crash della 27: l'orologio (arm64_32) ha Int a 32 bit; i millisecondi dal 1970 (~1,76 bilioni) non ci stanno
         // e Int(...) chiudeva l'app appena preparata la domanda. Per «fine» si usa Int64.
         do {
-            var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti]
+            var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti,
+                                        "strumenti_client_def": [RegiaPolso.definizione],          // 12.0 (10): la regia al polso
+                                        "schermo": RegiaPolso.condivisa.catalogo()]
             if let u = unico {
                 // idea D: la cronologia come la preparerebbe `chiedi`, senza la domanda nuova (la aggiunge il cervello con la nota)
                 corpo["messaggi"] = storiaSenzaDomanda(prima: u.canale.prima)
@@ -1628,7 +1643,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     let detto: Any = e["detto"] ?? ""
                     let continua: [String: Any] = ["lavoro": lavoro, "risultati": risultati,
                                                    "modello": modello, "azioni": azioniFatte, "detto": detto]
-                    corpo = ["messaggi": [Any](), "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti, "continua": continua]
+                    corpo = ["messaggi": [Any](), "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti,
+                             "strumenti_client_def": [RegiaPolso.definizione], "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
                 }
             }
@@ -1806,7 +1822,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard !testo.isEmpty else { return false }
         if let d = ComandoDedicato.riconosci(testo), d != .salvaLuogo { return false }
         if JarvisOrologio.fraseDellIPhone(testo) != nil { return false }
-        var comando = ComandoVocale.riconosci(testo)
+        var comando = FineFrase.comandoComposto(testo) ? nil : ComandoVocale.riconosci(testo)
         if case .rapido(let a)? = comando {
             switch a {
             case .diario, .confidente: return false
@@ -1815,6 +1831,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         if case .apri(_)? = comando { return false }
         if case .pagina? = comando { return false }                 // MARK X: Studio e Social
+        if ripresaValida() == nil, RegiaPolso.condivisa.tastoDetto(testo) != nil { return false }   // 12.0 (10): i tasti della musica
         if case .interprete(let codice)? = comando,
            ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first != nil { return false }
         if Dialogo.volume(testo).cambio != nil { return false }

@@ -78,12 +78,29 @@ struct VistaGitHub: View {
         .task { await carica() }
         .onDisappear { dettatura.ferma() }
         .onChange(of: dettatura.testo) { _, nuovo in if dettatura.attivo { titoloIssue = (baseIssue + " " + nuovo).trimmingCharacters(in: .whitespaces) } }
-        .sulloSchermo(testoSchermo)
+        .regia("GitHub", stato: testoSchermo, azioni: [                 // 12.0 (10): la regia
+            AzioneRegia("apri", "apre un repository (per nome o posizione)", valore: "repo", frasi: ["apri il repository *", "apri *", "mostrami *"]) { v in
+                guard let p = pagina, let r = Regia.scegli(v["repo"] ?? "", fra: p.lista("repository"), testo: { $0.s("nome") }) else { return .no("repository non trovato") }
+                Suoni.tocco()
+                repoScelto = r.s("nome")
+                await caricaDettaglio(r.s("nome"))
+                return .fatto("repository \(r.s("nome")): " + (dettaglio.map { Schermo.esito($0.d, massimo: 800) } ?? "dettaglio non disponibile"),
+                              battuta: { Battute.repoAperto(r.s("nome")) })
+            },
+            AzioneRegia("tutti", "torna all'elenco dei repository", frasi: ["tutti i repository", "torna all elenco", "indietro"]) { _ in
+                guard repoScelto != nil else { return .no("l'elenco è già a schermo") }
+                repoScelto = nil
+                dettaglio = nil
+                return .fatto("elenco dei repository", battuta: { Battute.lampo() })
+            },
+        ])
     }
 
     /// 8 nov notte: cosa vede JARVIS di GitHub (il repository aperto e il suo dettaglio, la issue che sta scrivendo).
     private var testoSchermo: String {
-        Schermo.unisci("GitHub", [repoScelto.map { "repository aperto: \($0)" } ?? "nessun repository aperto",
+        let elenco: String? = repoScelto == nil ? pagina.map { p in "repository: " + p.lista("repository").prefix(12).map { r in
+            r.s("nome") + (r.n("issue_aperte") > 0 ? " (\(r.n("issue_aperte")) issue)" : "") + (r.s("da").isEmpty ? "" : " · \(r.s("da"))") }.joined(separator: "; ") } : nil
+        return Schermo.unisci("GitHub", [repoScelto.map { "repository aperto: \($0)" } ?? "nessun repository aperto", elenco,
                                  dettaglio.map { "dettaglio a schermo: " + Schermo.esito($0.d, massimo: 1200) },
                                  Schermo.campo("titolo della issue che sta scrivendo (non ancora aperta)", titoloIssue),
                                  errore.map { "errore: \($0)" }])
@@ -297,6 +314,7 @@ struct VistaSupabase: View {
     @State private var memoria: [Voce] = []
     @State private var mostraMemoria = false
     @State private var battito: Voce?
+    @State private var saltaRicarica = false      // 12.0 (10): il periodo cambiato dalla regia si ricarica una volta sola
 
     var body: some View {
         CorniceScheda(titolo: "Supabase", sottotitolo: stato.map { "\($0.voce("progetto")?.s("nome") ?? "") · \($0.voce("progetto")?.s("stato") ?? "")".lowercased() } ?? "entro in sala macchine",
@@ -325,7 +343,7 @@ struct VistaSupabase: View {
                     Text("6 ore").tag(6); Text("24 ore").tag(24); Text("3 giorni").tag(72)
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: ore) { Task { await carica() } }
+                .onChange(of: ore) { if saltaRicarica { saltaRicarica = false } else { Task { await carica() } } }
                 if problemi > 0 {
                     Pannello(titolo: "ERRORI RECENTI", tinta: .red) {
                         ForEach(Array((richieste + console).prefix(25).enumerated()), id: \.offset) { _, r in
@@ -384,6 +402,41 @@ struct VistaSupabase: View {
                 try? await Task.sleep(for: .seconds(30))
             }
         }
+        .regia("Supabase", stato: testoSchermo, azioni: [               // 12.0 (10): la regia
+            AzioneRegia("periodo", "gli errori delle ultime 6 ore, 24 ore o 3 giorni", valore: "ore", frasi: ["ultime *", "ultimi *"]) { v in
+                let k = Regia.chiave(v["ore"] ?? "")                      // «6», «sei ore», «24», «un giorno», «tre giorni», «72»
+                let cifre = Int(k.filter(\.isNumber)) ?? 0
+                let nuovo = cifre >= 48 || k.contains("3giorn") || k.contains("tregiorn") || k.contains("settantadue") ? 72
+                    : (cifre == 6 || k.contains("sei") ? 6 : 24)
+                if nuovo != ore { saltaRicarica = true; ore = nuovo }
+                await carica()
+                let errori = erroriNelPeriodo, periodo = ore
+                return .fatto("periodo \(periodo) ore: \(errori) errori", battuta: { Battute.salaMacchine(errori: errori, ore: periodo) })
+            },
+            AzioneRegia("aggiorna", "ricarica la sala macchine", frasi: ["aggiorna", "ricarica"]) { _ in
+                await carica()
+                let errori = erroriNelPeriodo, periodo = ore
+                return .fatto("aggiornato: \(errori) errori nelle ultime \(periodo) ore", battuta: { Battute.salaMacchine(errori: errori, ore: periodo) })
+            },
+        ])
+    }
+
+    /// 12.0 (10): gli errori del periodo scelto (richieste e console), come nell'ologramma.
+    private var erroriNelPeriodo: Int {
+        let log = stato?.voce("log")
+        return (log?.lista("richieste").count ?? 0) + (log?.lista("console").count ?? 0)
+    }
+
+    /// 12.0 (10): la sala macchine per JARVIS: spazio, righe, errori del periodo, il battito dell'ultima ora.
+    private var testoSchermo: String {
+        guard let st = stato else { return Schermo.unisci("Supabase", [errore.map { "errore: \($0)" } ?? "la sala macchine si sta aprendo"]) }
+        let problemi = erroriNelPeriodo
+        let storage = st.lista("storage").reduce(0.0) { $0 + (Double($1.s("mb")) ?? 0) }
+        return Schermo.unisci("Supabase", ["progetto \(st.voce("progetto")?.s("nome") ?? "") (\(st.voce("progetto")?.s("stato") ?? ""))",
+                                           "database \(st.s("database_mb")) MB, \(st.n("righe_totali")) righe",
+                                           String(format: "storage %.0f MB", storage), "errori nelle ultime \(ore) ore: \(problemi)",
+                                           battito.map { b in let m = b.lista("minuti")
+                                               return "ultima ora: \(m.reduce(0) { $0 + $1.n("richieste") }) richieste, \(m.reduce(0) { $0 + $1.n("errori") }) errori" }])
     }
 
     /// I dati per l'ologramma: tabelle, funzioni, database, storage, errori e il battito dell'ultima ora.
@@ -675,7 +728,36 @@ struct VistaArchivio: View {
         } message: { Text(daEliminare?.s("nome") ?? "") }
         // 4 nov: la fotocamera, il foglio del link, la scelta dei file e la domanda (iOS) non restano sopra la sezione che sale
         .chiudiFoglioDietro { scatta = false; daCondividere = nil; scegliFile = false; daEliminare = nil }
-        .sulloSchermo(testoSchermo)
+        .regia("Archivio", stato: testoSchermo, azioni: [               // 12.0 (10): la regia
+            AzioneRegia("cartella", "mostra una cartella (o «tutto»)", valore: "nome", frasi: ["cartella *", "apri la cartella *", "vai in *"]) { v in
+                let k = Regia.chiave(v["nome"] ?? "")
+                if k.contains("tutt") { cartella = nil; return .fatto("tutte le cartelle", battuta: { Battute.lampo() }) }
+                guard let c = Regia.scegli(v["nome"] ?? "", fra: cartelle, testo: { $0.s("nome") }) else { return .no("cartella non trovata") }
+                cartella = c.s("nome")
+                return .fatto("cartella \(c.s("nome"))", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("cerca", "cerca nell'archivio", valore: "cosa", frasi: ["cerca *", "cercami *", "trova *", "trovami *"]) { v in
+                cerca = v["cosa"] ?? ""
+                await carica()
+                let n = (file ?? []).count, cosa = cerca
+                return .fatto("trovati \(n) file per «\(cosa)»", battuta: { Battute.archivioTrovati(n, cosa) })
+            },
+            AzioneRegia("apri", "apre un file (per nome o posizione)", valore: "file", frasi: ["apri *", "aprimi *", "fammi vedere *"]) { v in
+                guard let f = Regia.scegli(v["file"] ?? "", fra: file ?? [], testo: { $0.s("nome") }) else { return .no("file non trovato") }
+                await apriFile(f)
+                return .fatto("aperto \(f.s("nome"))", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("condividi", "prepara il link per condividere un file (valido un'ora)", valore: "file") { v in
+                guard let f = Regia.scegli(v["file"] ?? "", fra: file ?? [], testo: { $0.s("nome") }) else { return .no("file non trovato") }
+                await condividi(f)
+                return .fatto("link di condivisione pronto per \(f.s("nome"))")
+            },
+            AzioneRegia("elimina", "elimina un file dall'archivio", valore: "file", conferma: true) { v in
+                guard let f = Regia.scegli(v["file"] ?? "", fra: file ?? [], testo: { $0.s("nome") }) else { return .no("file non trovato") }
+                await elimina(f)
+                return .fatto("eliminato \(f.s("nome"))")
+            },
+        ])
     }
 
     /// 8 nov notte: cosa vede JARVIS dell'Archivio (la cartella, la ricerca, i file a schermo nell'ordine).
@@ -842,6 +924,24 @@ struct VistaCosti: View {
             }
         }
         .task { await carica() }
+        .regia("Costi", stato: testoSchermo, azioni: [                  // 12.0 (10): la regia
+            AzioneRegia("aggiorna", "ricalcola i costi", frasi: ["aggiorna", "ricarica", "ricalcola"]) { _ in
+                await carica()
+                return .fatto("costi aggiornati", battuta: { Battute.costiRifatti() })
+            },
+        ])
+    }
+
+    /// 12.0 (10): i costi per JARVIS, come a schermo (stima dai token).
+    private var testoSchermo: String {
+        guard let c = dati else { return Schermo.unisci("Costi", [errore.map { "errore: \($0)" } ?? "i costi si stanno calcolando"]) }
+        let modelli = c.lista("modelli").map { "\(Self.nomeModello($0.s("modello"))) \(Self.soldi($0.s("dollari")))$ (\($0.n("chiamate")) risposte)" }
+        let voce: String? = c.voce("voce").map { "voce ElevenLabs: piano \($0.s("piano")), \($0.n("percento"))% usato, rinnovo \($0.s("rinnovo"))" }
+        return Schermo.unisci("Costi", ["mese \(c.s("mese")): \(Self.soldi(c.s("dollari_mese")))$ (\(c.n("chiamate_mese")) risposte)",
+                                        "oggi \(Self.soldi(c.s("dollari_oggi")))$, ieri \(Self.soldi(c.s("dollari_ieri")))$, 7 giorni \(Self.soldi(c.s("dollari_7_giorni")))$",
+                                        modelli.isEmpty ? nil : "cervello: " + modelli.joined(separator: ", "), voce,
+                                        "fissi: " + c.lista("fissi").map { "\($0.s("nome")) \($0.s("costo"))" }.joined(separator: ", "),
+                                        "stima dai token con i listini pubblici"])
     }
 
     @ViewBuilder private func pannelloCervello(_ c: Voce) -> some View {

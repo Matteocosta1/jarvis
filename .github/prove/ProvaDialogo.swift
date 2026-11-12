@@ -21,6 +21,7 @@ struct ProvaDialogo {
         provaRichiami()
         provaRiprese()
         provaResto()
+        provaComposti()
         print(errori == 0 ? "\nTutte le prove del dialogo superate." : "\n\(errori) prove del dialogo NON superate.")
         exit(errori == 0 ? 0 : 1)
     }
@@ -173,6 +174,20 @@ struct ProvaDialogo {
         for (frase, domanda, libera, attesa) in casi {
             let r = FineFrase.chiedeDiContinuare(frase, dopoDomanda: domanda, libera: libera)
             controlla(r == attesa, "ripresa «\(frase)»\(domanda ? " dopo una domanda" : "")\(libera ? " senza nome" : "") = \(r) (attesa \(attesa))")
+        }
+    }
+
+    /// 12.0 (10): più comandi in una frase vanno al cervello (la regia li fa in fila); le frasi normali no.
+    static func provaComposti() {
+        let casi: [(String, Bool)] = [
+            ("apri la spesa e aggiungi il latte", true), ("Jarvis, chiudi tutto e poi dimmi il meteo", true),
+            ("apri il meteo e dimmi se piove domani", true), ("metti pausa e apri la posta", true),
+            ("aggiungi il latte e togli il pane", true), ("apri la spesa", false), ("aggiungi pane e latte", false),
+            ("aggiungi latte, uova e pane", false), ("Bea e io andiamo al cinema", false), ("che tempo fa domani e sabato?", false),
+            ("dimmi chi ha vinto e perché", false), ("apri Bea", false),
+        ]
+        for (frase, atteso) in casi {
+            controlla(FineFrase.comandoComposto(frase) == atteso, "comando composto «\(frase)» = \(FineFrase.comandoComposto(frase))")
         }
     }
 

@@ -276,7 +276,74 @@ struct VistaMessaggi: View {
         .onChange(of: scelto) { salvaBozza() }
         // 12 nov (CampoInAlto): toccato il campo, la pagina lo porta in cima: la rubrica (o Invia) resta sopra la tastiera
         .onChange(of: scrivendo) { _, su in if su { CampoInAlto.porta(scelto == nil ? "messaggiCerca" : "messaggiTesto") } }
-        .sulloSchermo(testoSchermo)
+        .regia("Messaggi", stato: testoSchermo, azioni: azioniRegia)     // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare Messaggi per JARVIS: scegliere a chi scrivere, scrivere o completare il testo, il canale, e inviare (solo col
+    /// sì del signore: l'invio lo controlla l'app, come la conferma di tutte le azioni che escono verso il mondo).
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("a", "sceglie a chi scrivere (nome in rubrica)", valore: "chi",
+                        frasi: ["scrivi a *", "messaggio a *", "scrivi un messaggio a *", "manda un messaggio a *", "scriviamo a *"]) { v in
+                regiaA(v["chi"] ?? "")
+            },
+            AzioneRegia("testo", "scrive il testo del messaggio (al posto di quello che c'è)", valore: "testo") { v in
+                let t = (v["testo"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard scelto != nil else { return .no("prima scegli a chi scrivere (azione a)") }
+                testo = t
+                return .fatto("bozza: «\(t)»")
+            },
+            AzioneRegia("aggiungi", "aggiunge in fondo al testo", valore: "testo") { v in
+                let t = (v["testo"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard scelto != nil, !t.isEmpty else { return .no("niente da aggiungere") }
+                testo = (testo + " " + t).trimmingCharacters(in: .whitespaces)
+                return .fatto("bozza: «\(testo)»")
+            },
+            AzioneRegia("canale", "iMessage o WhatsApp", valore: "nome",
+                        frasi: ["su whatsapp", "con whatsapp", "whatsapp", "su imessage", "con imessage", "imessage", "sms", "con un sms"]) { v in
+                regiaCanale(v["nome"] ?? "")
+            },
+            AzioneRegia("cambia", "torna alla rubrica per scegliere un altro destinatario", frasi: ["cambia destinatario", "un altro contatto"]) { _ in
+                dettatura.ferma()
+                scelto = nil
+                esito = nil
+                return .fatto("rubrica: scegli a chi scrivere", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("svuota", "cancella il testo scritto", conferma: true) { _ in
+                testo = ""
+                return .fatto("testo cancellato")
+            },
+            AzioneRegia("invia", "manda il messaggio così com'è", conferma: true) { _ in
+                guard let s = scelto, numeroScelto != nil, !testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    return .no("manca il destinatario o il testo")
+                }
+                let mandato = testo
+                let c = canale
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { invia() } } else { invia() }
+                return .fatto(c == .imessage ? "inviato a \(s.nome): «\(mandato)»" : "WhatsApp si apre col messaggio pronto per \(s.nome): tocca Invia lui")
+            },
+        ]
+    }
+
+    private func regiaA(_ chi: String) -> EsitoRegia {
+        let nome = chi.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !nome.isEmpty, FineFrase.paroleNude(nome).count <= 3 else { return .no("«\(chi)»: troppo lungo per un nome") }
+        guard let c = Regia.scegli(nome, fra: contatti, testo: { $0.nome }) else {
+            cerca = nome
+            return .no("\(nome) non è in rubrica", battuta: { "Non trovo \(nome) in rubrica, Sir. Ho messo il nome nella ricerca." })
+        }
+        scegli(c)
+        return .fatto("destinatario: \(c.nome) (\(numeroScelto ?? "senza numero")), canale \(canale.rawValue)", battuta: { Battute.messaggioA(c.nome) })
+    }
+
+    private func regiaCanale(_ nome: String) -> EsitoRegia {
+        let k = Regia.chiave(nome)
+        let nuovo: Canale = k.contains("whats") ? .whatsapp : .imessage
+        Suoni.tocco()
+        canale = nuovo
+        return .fatto("canale \(nuovo.rawValue)", battuta: { Battute.messaggioCanale(nuovo.rawValue) })
     }
 
     /// 8 nov notte: cosa vede JARVIS dei Messaggi (a chi scrive, il canale, la bozza; senza nessuno scelto, la ricerca e gli ultimi).
@@ -513,7 +580,47 @@ struct VistaTelefono: View {
             Button("Chiama") { if let d = daChiamare { chiama(nome: d.0, numero: d.1) } }
             Button("Annulla", role: .cancel) {}
         }
-        .sulloSchermo(testoSchermo)
+        .regia("Telefono", stato: testoSchermo, azioni: azioniRegia)     // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare il Telefono per JARVIS: le pagine, comporre un numero, cercare in rubrica, chiamare (solo col sì del signore; i
+    /// numeri d'emergenza mai a voce: li chiama lui col dito).
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("pagina", "tastiera, rubrica o recenti", valore: "nome", frasi: ["vai alla *", "vai in *", "apri la *", "mostrami la *"]) { v in
+                let k = Regia.chiave(v["nome"] ?? "")
+                guard let p = Pagina.allCases.first(where: { k.contains(Regia.chiave($0.rawValue)) }) else { return .no("pagina sconosciuta") }
+                Suoni.tocco()
+                pagina = p
+                return .fatto("pagina \(p.rawValue)", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("componi", "scrive un numero sulla tastiera", valore: "numero", frasi: ["componi *", "fai il numero *"]) { v in
+                let n = Rubrica.pulisci(v["numero"] ?? "")
+                guard n.count >= 3 else { return .no("numero non valido") }
+                pagina = .tastiera
+                numero = n
+                return .fatto("numero sulla tastiera: \(n)" + (contattoDelNumero.map { " (\($0.nome))" } ?? ""), battuta: { Battute.telefonoComposto(n) })
+            },
+            AzioneRegia("cerca", "cerca in rubrica", valore: "chi", frasi: ["cerca *", "cercami *", "trova *"]) { v in
+                pagina = .rubrica
+                cerca = v["chi"] ?? ""
+                return .fatto("rubrica: \(filtrati.prefix(5).map(\.nome).joined(separator: ", "))", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("chiama", "chiama un contatto (per nome) o il numero sulla tastiera", valore: "chi", conferma: true) { v in
+                let chi = (v["chi"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                var bersaglio: (nome: String, numero: String)?
+                if chi.isEmpty, !numero.isEmpty { bersaglio = (contattoDelNumero?.nome ?? numero, numero) }
+                else if let c = Regia.scegli(chi, fra: contatti, testo: { $0.nome }), let n = c.primoNumero { bersaglio = (c.nome, n) }
+                else if Rubrica.pulisci(chi).count >= 3 { bersaglio = (chi, Rubrica.pulisci(chi)) }
+                guard let b = bersaglio else { return .no("non trovo «\(chi)» in rubrica") }
+                let emergenza: Set<String> = ["112", "113", "115", "118", "1515", "1530", "911", "999"]
+                guard !emergenza.contains(Rubrica.pulisci(b.numero)) else { return .no("i numeri d'emergenza li chiama il signore col dito, mai JARVIS a voce") }
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { chiama(nome: b.nome, numero: b.numero) } } else { chiama(nome: b.nome, numero: b.numero) }
+                return .fatto("chiamata a \(b.nome) (\(b.numero)): iOS chiede un tocco di conferma")
+            },
+        ]
     }
 
     /// 8 nov notte: cosa vede JARVIS del Telefono (la pagina, il numero sulla tastiera e di chi è, la ricerca, le ultime chiamate).

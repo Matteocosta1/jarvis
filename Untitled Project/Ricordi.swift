@@ -96,7 +96,50 @@ struct VistaRicordi: View {
         .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
         .preferredColorScheme(.dark)
         .aperturaHUD("Ricordi", icona: "brain.head.profile")
-        .sulloSchermo(testoSchermo)
+        .regia("Ricordi", stato: testoSchermo, azioni: azioniRegia)      // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare Ricordi per JARVIS: le schede (Traccia, Ricordi, Posti), cercare, la guida verso un luogo, salvare il posto
+    /// dove si trova, segnare fatto un ricordo, toglierne uno (col sì).
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("scheda", "traccia, ricordi o posti", valore: "nome", frasi: ["scheda *", "vai in *", "vai ai *", "vai alla *", "mostrami i *"]) { v in
+                let k = Regia.chiave(v["nome"] ?? "")
+                guard let n = Scheda.allCases.first(where: { k.contains(Regia.chiave($0.rawValue)) }) else { return .no("scheda sconosciuta") }
+                Suoni.tocco()
+                scheda = n
+                return .fatto("scheda \(n.rawValue)", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("cerca", "cerca nei ricordi", valore: "cosa", frasi: ["cerca *", "cercami *", "trova *"]) { v in
+                scheda = .ricordi
+                cerca = v["cosa"] ?? ""
+                return .fatto("cerco «\(cerca)» nei ricordi", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("guida", "accende la guida (fotocamera e frecce) verso il luogo salvato più recente", frasi: ["portami al luogo", "guidami", "accendi la guida"]) { _ in
+                scheda = .traccia
+                guidaAccesa = true
+                return .fatto("guida accesa in Traccia", battuta: { Battute.una("ricordi.guida", ["Guida accesa, Sir. Segua la freccia.", "Rotta impostata: mi segua."]) })
+            },
+            AzioneRegia("salva_qui", "salva il posto dove si trova adesso", frasi: ["ricorda questo luogo", "salva questo posto", "segna questo posto"]) { _ in
+                scheda = .traccia
+                salvaDaFare = true
+                return .fatto("salvo il posto dove si trova", battuta: { Battute.una("ricordi.salva", ["Posizione salvata, Sir.", "Segnato sulla mappa.", "Questo posto non me lo scordo."]) })
+            },
+            AzioneRegia("fatto", "segna fatto un ricordo a schermo (per posizione o parole)", valore: "quale") { v in
+                guard let d = dati, let r = Regia.scegli(v["quale"] ?? "", fra: d.ricordi, testo: { $0.testo }) else { return .no("ricordo non trovato") }
+                await fatto(r.id)
+                return .fatto("fatto: \(r.testo.prefix(80))")
+            },
+            AzioneRegia("elimina", "toglie un ricordo (per posizione o parole)", valore: "quale", conferma: true) { v in
+                guard let d = dati, let r = Regia.scegli(v["quale"] ?? "", fra: scheda == .posti ? d.posti : d.ricordi, testo: { $0.testo }) else {
+                    return .no("ricordo non trovato")
+                }
+                await elimina(r.id)
+                return .fatto("tolto: \(r.testo.prefix(80))")
+            },
+        ]
     }
 
     /// 8 nov notte: cosa vede JARVIS di Ricordi (la scheda, la ricerca, le prime righe a schermo nell'ordine).

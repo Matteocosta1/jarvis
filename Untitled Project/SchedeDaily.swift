@@ -48,7 +48,14 @@ struct VistaMeteo: View {
             radar = await Radar.chiedi()
             radarFinito = true
         }
-        .sulloSchermo(testoSchermo)
+        .regia("Meteo", stato: testoSchermo, azioni: [                  // 12.0 (10): la regia
+            AzioneRegia("aggiorna", "ricarica il meteo di qui", frasi: ["aggiorna", "aggiorna il meteo", "ricarica", "ricontrolla"]) { _ in
+                await carica()
+                guard let c = meteo?.currentWeather else { return .no(errore ?? "meteo non disponibile") }
+                let g = gradi(c.temperature), cielo = c.condition.description
+                return .fatto("adesso \(g), \(cielo)", battuta: { Battute.meteoAggiornato(g, cielo.lowercased()) })
+            },
+        ])
     }
 
     /// 8 nov notte: cosa vede JARVIS del meteo (il luogo a schermo, adesso e i prossimi giorni, come li vede il signore).
@@ -284,6 +291,34 @@ struct VistaBriefing: View {
             }
         }
         .task { await carica() }
+        .regia("Briefing", stato: testoSchermo, azioni: [])                // 12.0 (10): la giornata, per JARVIS
+    }
+
+    /// 12.0 (10): la giornata come la vede il signore (meteo, agenda, posta, spesa, promesse, salute): JARVIS ne parla con lui.
+    private var testoSchermo: String {
+        guard caricato else { return Schermo.unisci("Briefing", ["la giornata si sta caricando"]) }
+        var pezzi: [String?] = []
+        if let m = meteo {
+            pezzi.append("meteo \(Int(m.temperature.converted(to: .celsius).value.rounded()))°, \(m.condition.description)" + (massima.map { ", \($0)" } ?? ""))
+        }
+        if calendarioNegato { pezzi.append("agenda: manca il permesso del calendario") }
+        else if eventi.isEmpty { pezzi.append("agenda: nessun impegno oggi") }
+        else {
+            let righe: [String] = eventi.prefix(10).map { e in
+                let ora = e.isAllDay ? "tutto il giorno" : e.startDate.formatted(date: .omitted, time: .shortened)
+                let dove = (e.location ?? "").isEmpty ? "" : " (\(e.location ?? ""))"
+                return "\(ora) \(e.title ?? "")\(dove)"
+            }
+            pezzi.append("agenda: " + righe.joined(separator: "; "))
+        }
+        if let p = posta { pezzi.append("posta: \(p.nonLette) non lette su \(p.totale) nelle ultime 24 ore") }
+        pezzi.append("spesa: \(spesa) cose da comprare")
+        if !promesse.isEmpty { pezzi.append("promesse in sospeso: " + promesse.map { "\($0.0) (\($0.1))" }.joined(separator: "; ")) }
+        if let s = salute {
+            let dati: [String] = [s.sonno.map { "sonno \($0)" }, s.battito.map { "battito a riposo \($0) bpm" }, s.passi.map { "passi oggi \($0)" }].compactMap { $0 }
+            if !dati.isEmpty { pezzi.append(dati.joined(separator: ", ")) }
+        }
+        return Schermo.unisci("Briefing", pezzi)
     }
 
     private var saluto: String {
@@ -519,7 +554,76 @@ struct VistaPosta: View {
             }
         }
         .chiudiFoglioDietro { aperta = nil }                 // MARK XI: la mail aperta non resta sopra la sezione che va dietro
-        .sulloSchermo(testoSchermo)
+        .regia("Email", stato: testoSchermo, azioni: azioniRegia)          // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare la Posta per JARVIS: aprire una mail (la prima, la terza, quella di Marco), cambiare cartella e periodo, solo
+    /// le non lette.
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("apri", "apre una mail nel lettore: per posizione (prima, terza, ultima) o per chi scrive/oggetto", valore: "quale",
+                        frasi: ["apri la mail di *", "apri l email di *", "apri la mail *", "apri l email *", "leggimi la mail di *",
+                                "aprimi la mail di *", "apri la *", "apri l *", "apri quella di *"]) { v in regiaApri(v["quale"] ?? "") },
+            AzioneRegia("non_lette", "mostra solo le non lette", frasi: ["solo non lette", "solo le non lette", "mostrami le non lette",
+                                                                           "le non lette", "fammi vedere le non lette"]) { _ in
+                regiaNonLette(true)
+            },
+            AzioneRegia("tutte", "mostra anche quelle già lette", frasi: ["tutte", "mostrami tutte", "anche le lette", "tutte le mail"]) { _ in
+                regiaNonLette(false)
+            },
+            AzioneRegia("cartella", "cambia cartella: arrivo, inviata, indesiderata, bozze, cestino, archivio", valore: "nome",
+                        frasi: ["apri la cartella *", "cartella *", "vai in *", "vai nella cartella *", "mostrami *", "apri *"]) { v in
+                regiaCartella(v["nome"] ?? "")
+            },
+            AzioneRegia("periodo", "quanto indietro guarda Arrivo: 1, 3 o 7 giorni", valore: "giorni",
+                        frasi: ["ultime 24 ore", "ultimo giorno", "ultimi 3 giorni", "ultimi tre giorni", "ultima settimana", "ultimi 7 giorni"]) { v in
+                regiaPeriodo(v["giorni"] ?? "")
+            },
+        ]
+    }
+
+    private func regiaApri(_ quale: String) -> EsitoRegia {
+        guard let lista = posta, !lista.isEmpty else { return .no("nessuna mail a schermo") }
+        guard let m = Regia.scegli(quale, fra: lista, testo: { "\($0.nome) \($0.da) \($0.oggetto)" }), !m.chiave.isEmpty else {
+            return .no("nessuna mail corrisponde a «\(quale)»")
+        }
+        Suoni.tocco()
+        aperta = m
+        return .fatto("aperta la mail di \(m.nome): «\(m.oggetto)»", battuta: { Battute.postaAperta(m.nome, oggetto: m.oggetto) })
+    }
+
+    private func regiaCartella(_ nome: String) -> EsitoRegia {
+        let k = Regia.chiave(nome)
+        let mappa: [(String, String)] = [("arriv", "arrivo"), ("inbox", "arrivo"), ("ricevut", "arrivo"), ("inviat", "inviata"),
+                                         ("spedit", "inviata"), ("indesiderat", "indesiderata"), ("spam", "indesiderata"), ("bozz", "bozze"),
+                                         ("cestin", "cestino"), ("eliminat", "cestino"), ("archivi", "archivio")]
+        guard let scelta = mappa.first(where: { k.contains($0.0) })?.1 else { return .no("cartella «\(nome)» sconosciuta") }
+        let etichetta = Self.cartelle.first { $0.chiave == scelta }?.etichetta ?? scelta
+        if cartella != scelta {
+            Suoni.tocco()
+            aperta = nil
+            posta = nil
+            errore = nil
+            cartella = scelta
+        }
+        return .fatto("cartella \(etichetta)", battuta: { Battute.postaCartella(etichetta, quante: nil) })
+    }
+
+    private func regiaNonLette(_ solo: Bool) -> EsitoRegia {
+        if cartella != "arrivo" { cartella = "arrivo"; posta = nil }
+        soloNonLette = solo
+        let n = posta?.filter { !$0.letta }.count
+        return .fatto(solo ? "solo non lette" : "tutte le mail", battuta: { solo ? (n.map { Battute.postaNonLette($0) } ?? "Solo le non lette, Sir.") : Battute.lampo() })
+    }
+
+    private func regiaPeriodo(_ giorni: String) -> EsitoRegia {
+        let k = Regia.chiave(giorni)
+        let nuove = k.contains("settiman") || k.contains("7") || k.contains("sette") ? 168 : (k.contains("3") || k.contains("tre") ? 72 : 24)
+        if cartella != "arrivo" { cartella = "arrivo"; posta = nil }
+        ore = nuove
+        return .fatto("arrivo, ultime \(nuove) ore", battuta: { Battute.lampo() })
     }
 
     /// 8 nov notte: cosa vede JARVIS della posta (la cartella e le righe a schermo, nell'ordine). La mail aperta la dice il lettore.
@@ -662,7 +766,16 @@ struct LettoreMail: View {
         }
         .background(PelleLuce(tinta: tinta))          // 8 nov (scelta del signore, 09:49): LUCE, la scheda olografica trasparente
         .task { await carica() }
-        .sulloSchermo(testoSchermo)
+        .regia("Email", stato: testoSchermo, azioni: [                     // 12.0 (10): la mail aperta, per JARVIS
+            AzioneRegia("chiudi_mail", "richiude la mail aperta e torna all'elenco") { _ in
+                chiudi()
+                return .fatto("mail chiusa, torna l'elenco")
+            },
+            AzioneRegia("apri_in_mail", "apre questa mail nell'app Mail di Apple (esce da JARVIS)") { _ in
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { apriInMail() } } else { apriInMail() }
+                return .fatto("l'app Mail si apre su questa mail appena hai finito la frase")
+            },
+        ])
     }
 
     /// 8 nov notte: la mail aperta, come la vede il signore («leggimela», «cosa devo rispondere?», «è una truffa?»).

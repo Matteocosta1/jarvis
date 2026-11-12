@@ -116,7 +116,31 @@ struct VistaEdith: View {
             }
             Text("Solo difesa: le sue cose, e dati pubblici prima di fidarsi di qualcuno.").font(.system(size: 9)).foregroundStyle(Color.tenue)
         }
-        .sulloSchermo(testoSchermo)
+        .regia("EDITH", stato: testoSchermo, azioni: [                   // 12.0 (10): la regia (la password solo a mano)
+            AzioneRegia("controlla", "scrive il dato nel suo campo e fa partire il controllo. tipo: porte (dato = IP; vuoto = la rete di adesso), fughe (mail), link (testo o link), dominio, azienda (partita IVA), iban, numero, reputazione (nome, azienda o sito). La password solo a mano: non esce dal telefono",
+                        valore: "tipo, dato") { v in
+                let dato = (v["dato"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let chiave: String
+                switch Regia.chiave(v["tipo"] ?? "") {
+                case "porte", "porta", "rete", "ip": chiave = "porte"; ip = dato
+                case "fughe", "fuga", "mail", "email": chiave = "fughe"; email = dato
+                case "link", "sms", "testo": chiave = "link"; link = dato
+                case "dominio", "domini", "sito": chiave = "dominio"; dominio = dato
+                case "azienda", "piva", "partitaiva": chiave = "azienda"; piva = dato
+                case "iban": chiave = "iban"; iban = dato
+                case "numero", "telefono": chiave = "numero"; numero = dato
+                case "reputazione", "nome": chiave = "reputazione"; reputazione = dato
+                case "password": return .no("la password si controlla solo a mano, nel suo campo: non esce dal telefono")
+                default: return .no("controllo sconosciuto: porte, fughe, link, dominio, azienda, iban, numero, reputazione")
+                }
+                guard !inCorso.contains(chiave) else { return .no("il controllo \(chiave) è già in corso") }
+                guard let c = corpo(chiave) else { return .no("manca il dato da controllare") }
+                Suoni.tocco()
+                campoAttivo = nil
+                await controlla(chiave, c)
+                return .fatto("esito \(chiave): " + (esiti[chiave].map { Schermo.esito($0.d) } ?? "nessun esito"))
+            },
+        ])
         .onChange(of: campoAttivo) { _, c in if let c { CampoInAlto.porta("edith-" + c) } }   // 12 nov: il campo toccato sale in cima
     }
 

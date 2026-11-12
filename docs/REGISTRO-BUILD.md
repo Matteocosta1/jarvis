@@ -530,6 +530,28 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (10) — MARK XII · 12 nov mattina · numero chiesto dal signore («fai 12.10») · build unica · cervello v127 (le novità del cervello sono pronte in locale, si pubblicano solo col suo via) · controllo di compilazione: vedi l'ultima riga
+
+**Dialogo (iPhone e Watch)**
+- Recupero dopo il silenzio: se JARVIS ha taciuto su una frase («non era per me») e lei entro 8 secondi dice «Jarvis?», «ci sei?», «mi senti?», «dico a te», «allora?», la frase riparte. Col nome o col tocco è sicuro (niente silenzio possibile); senza nome decide il cervello.
+- «Dicevi?», «stavi dicendo?», «Jarvis, continua pure», «scusa, vai avanti»: JARVIS finisce la SUA frase dal punto esatto, da solo se la risposta era arrivata tutta (dopo una pausa lunga comincia con «Dicevo…»); se aveva già finito lo dice.
+- Tempo dalla risposta (`dopo_risposta_s`) e recupero (`recupero`) mandati al cervello.
+- Più comandi in una frase («apri la spesa e aggiungi il latte», «chiudi tutto e dimmi il meteo») non li prende più il comando locale (si perdeva il secondo): vanno al cervello, che li fa in fila con la regia (iPhone e Watch). Prove nel controllo Dialogo.
+
+**La Regia (iPhone)**
+- Strumento unico «regia» descritto dall'app (funziona col cervello v127): apre, chiude, porta davanti, mette da parte le sezioni e fa le loro azioni, anche più passi di fila. Il cervello vede nella riga [Schermo] la sezione davanti (cosa mostra e cosa sa fare), quelle dietro, quelle che si aprono e cosa è appena successo.
+- Conferma solo per inviare, eliminare, pubblicare, chiamare: il sì lo controlla l'app (ultima frase, detta dopo la domanda, entro 3 minuti). I numeri d'emergenza mai a voce. Le sezioni con fotocamera o microfono si aprono quando JARVIS ha finito la frase.
+- Azioni rapide senza cervello per la sezione davanti e i tasti della musica, con le frasi di JARVIS (Battute: tante varianti, mai ripetute di fila, spirito dosato, mai di notte, frasi brevissime quando i comandi arrivano di fila).
+- Sezioni nella regia: Spesa, Email, Meteo, Briefing, Musica, Messaggi, Telefono, Bea, Diario, Sonno, Cuore, Shazam, Foto, Serata, Ricordi, Satellite, GitHub, Supabase, Archivio, Costi, EDITH (la password solo a mano), Vitals. Le altre si aprono e si chiudono; Browser (privato), Wiretap (il verbale parte solo a richiesta), Sentinella, Profiler, LiDAR, Scanner, Occhi, Cucina, Interprete, Trainer, Confidente hanno il loro ascolto e restano fuori dalle azioni. Studio e Social (pagine web) si aprono soltanto.
+
+**La Regia al polso (Watch)**
+- Stesso strumento, nei limiti dell'orologio: il cervello vede quale sezione è aperta sul polso, apre e chiude le sezioni dell'orologio e comanda la musica dell'iPhone. Con la Musica davanti, «pausa», «avanti», «indietro», «play» partono subito con la battuta di JARVIS.
+
+**Cervello (pronto, NON pubblicato: aspetta il via)**
+- Paragrafo REGIA nel sistema (dialogo come JARVIS con Tony in laboratorio/missione), note del recupero (scusa brevissima; col nome mai silenzio), silenzio più prudente (dopo pochi secondi dalla risposta, al polso), gli errori di silenzio registrati in jarvis_consumi («silenzio_sbagliato») e usati come esempi.
+
+**Mockup**: simulatore aggiornato (Regia, Recupero e ripresa) con le stesse frasi dell'app.
+
 ## 12.0 (9) — MARK XII · 12 nov notte · numero confermato dal signore («la 8 l'ho caricata ma non installata, fai 9 e metti tutto») · build unica · cervello v127 pubblicato (prova generale superata, con le prove del dialogo) · controllo di compilazione: vedi l'ultima riga
 Revisione del dialogo (il signore: «hai trovato questi errori… massima competenza») e tutte le migliorie (il signore: «tutti»; l'intonazione accesa subito, non solo misurata). Mac escluso da filo, conversazioni, fili aperti, archivista e giornata (lo usa anche Matteo).
 - **Errori corretti (13)**:

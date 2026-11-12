@@ -306,6 +306,31 @@ nonisolated enum FineFrase {
             .filter { p in !nomiNudi.contains(where: { p.hasPrefix($0) }) }
     }
 
+    /// 12.0 (10) · la regia: più comandi in una frase («apri la spesa e aggiungi il latte», «chiudi tutto e poi dimmi il meteo»).
+    /// Non li fa l'app da sola (il primo si aprirebbe e il secondo andrebbe perso): vanno al cervello, che li fa in fila con lo
+    /// strumento «regia». Basta un legame («e», «poi», «quindi», «dopo») seguito da un verbo di comando.
+    static func comandoComposto(_ testo: String) -> Bool {
+        let p = paroleNude(testo)
+        guard p.count >= 4 else { return false }
+        let legami: Set<String> = ["e", "ed", "poi", "quindi", "dopo"]
+        let ponte: Set<String> = ["poi", "anche", "intanto", "dopo", "pure", "subito"]
+        for (i, w) in p.enumerated() where i >= 2 && legami.contains(w) {
+            var j = i + 1
+            while j < p.count, ponte.contains(p[j]) { j += 1 }               // «e poi», «e intanto», «e anche»
+            if j < p.count, verbiComposti.contains(p[j]) { return true }
+        }
+        return false
+    }
+
+    private static let verbiComposti: Set<String> = [
+        "aggiungi", "aggiungimi", "togli", "toglimi", "leva", "levami", "metti", "mettimi", "segna", "segnami", "scrivi", "scrivimi",
+        "manda", "mandami", "mandagli", "mandale", "invia", "chiama", "chiamami", "cerca", "cercami", "leggi", "leggimi", "dimmi",
+        "apri", "aprimi", "chiudi", "chiudila", "chiudilo", "fammi", "suona", "avvia", "accendi", "spegni", "prendi", "compra",
+        "mostra", "mostrami", "porta", "portami", "controlla", "aggiorna", "cambia", "imposta", "ricordami", "spunta", "svuota",
+        "rispondi", "inoltra", "salva", "salvami", "elimina", "cancella", "dammi", "trova", "trovami", "guarda", "mettila",
+        "mettilo", "riproduci", "fai", "torna", "vai",
+    ]
+
     /// Nella frase c'è il nome di JARVIS (anche storpiato).
     static func haNome(_ testo: String) -> Bool {
         testo.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()

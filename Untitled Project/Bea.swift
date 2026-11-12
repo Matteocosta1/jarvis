@@ -140,14 +140,80 @@ struct VistaBea: View {
         }
         .chiudiFoglioDietro { sceltaContatto = false; pensiero = nil }   // 4 nov: i fogli (iOS) non restano sopra la sezione che sale
         .preferredColorScheme(.dark)
-        .sulloSchermo(testoSchermo)
+        .regia("Bea", stato: testoSchermo, azioni: azioniRegia)         // 12.0 (10): la regia
     }
 
-    /// 8 nov notte: cosa vede JARVIS di Bea (quello che sta scrivendo nella scheda, il «Ti penso» pronto a schermo).
+    /// 8 nov notte: cosa vede JARVIS di Bea (quello che sta scrivendo nella scheda, il «Ti penso» pronto a schermo). 12.0 (10): anche
+    /// la scheda a schermo (date, promesse, gusti, idee, note), così JARVIS ne parla e la aggiorna.
     private var testoSchermo: String {
-        Schermo.unisci("Bea", [Schermo.campo("sta scrivendo (\(tipoNuovo.nome), non ancora salvato)", nuovo),
-                              pensiero.map { "messaggio «Ti penso» proposto a schermo (non ancora mandato): «\($0)»" },
-                              errorePensiero.map { "errore: \($0)" }])
+        var scheda: [String?] = []
+        if let d = dati {
+            let date: [String] = d.date.prefix(4).map { r in r.traGiorni == 0 ? "\(r.testo) oggi" : "\(r.testo) tra \(r.traGiorni) giorni" }
+            func voci(_ titolo: String, _ v: [DatiBea.Voce]) -> String? { v.isEmpty ? nil : "\(titolo): " + v.prefix(8).map(\.testo).joined(separator: ", ") }
+            scheda = [date.isEmpty ? nil : "prossime date: " + date.joined(separator: "; "), voci("promesse", d.promesse), voci("le piace", d.gusti),
+                      voci("non le piace", d.nonPiace), voci("idee", d.idee), voci("regali", d.regali), voci("da non dimenticare", d.note)]
+        }
+        return Schermo.unisci("Bea", scheda + [Schermo.campo("sta scrivendo (\(tipoNuovo.nome), non ancora salvato)", nuovo),
+                                               pensiero.map { "messaggio «Ti penso» proposto a schermo (non ancora mandato): «\($0)»" },
+                                               errorePensiero.map { "errore: \($0)" }])
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare la scheda di Bea per JARVIS: segnare gusti, cose che non le piacciono, promesse, idee, regali, note; preparare
+    /// il «Ti penso»; aprire chiamata, Messaggi o WhatsApp (chiamare solo col sì; il 112 mai a voce: resta col dito).
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("le_piace", "segna una cosa che le piace", valore: "cosa", frasi: ["le piace *", "a bea piace *", "segna che le piace *"]) { v in
+                await regiaSegna(.gusto, v["cosa"] ?? "")
+            },
+            AzioneRegia("non_le_piace", "segna una cosa che non le piace", valore: "cosa",
+                        frasi: ["non le piace *", "a bea non piace *", "segna che non le piace *"]) { v in await regiaSegna(.non_piace, v["cosa"] ?? "") },
+            AzioneRegia("promessa", "segna una promessa fatta a lei", valore: "cosa",
+                        frasi: ["le ho promesso *", "ho promesso a bea *", "promessa *"]) { v in await regiaSegna(.promessa, v["cosa"] ?? "") },
+            AzioneRegia("regalo", "segna un'idea regalo", valore: "cosa", frasi: ["idea regalo *", "regalo *", "regalarle *"]) { v in
+                await regiaSegna(.regalo, v["cosa"] ?? "")
+            },
+            AzioneRegia("idea", "segna un'idea per lei", valore: "cosa", frasi: ["idea per lei *", "idea *"]) { v in await regiaSegna(.idea, v["cosa"] ?? "") },
+            AzioneRegia("nota", "segna una cosa da non dimenticare", valore: "cosa", frasi: ["da non dimenticare *", "non dimenticare *"]) { v in
+                await regiaSegna(.nota, v["cosa"] ?? "")
+            },
+            AzioneRegia("ti_penso", "prepara due righe «Ti penso» da mandarle (le manda lui)", frasi: ["ti penso", "scrivile ti penso", "mandale un ti penso"]) { _ in
+                guard !numero.isEmpty else { return .no("manca il numero di Bea nella scheda") }
+                await nuovoPensiero()
+                if let e = errorePensiero { return .no(e, battuta: { e }) }
+                return .fatto("«Ti penso» pronto a schermo: «\(pensiero ?? "")»; lo manda lui da WhatsApp o Messaggi",
+                              battuta: { Battute.una("bea.tipenso", ["Ecco due righe per lei, Sir. Le ritocchi pure.", "Scritto. Il tocco finale è suo.",
+                                                                     "Pronto, Sir: parole sue, penna mia."]) })
+            },
+            AzioneRegia("whatsapp", "apre WhatsApp sulla chat di Bea") { _ in
+                guard !numero.isEmpty else { return .no("manca il numero di Bea") }
+                let u = "https://wa.me/\(Rubrica.internazionale(numero))"
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { apri(u) } } else { apri(u) }
+                return .fatto("WhatsApp si apre sulla chat di Bea appena hai finito la frase")
+            },
+            AzioneRegia("messaggio", "apre Messaggi sulla chat di Bea") { _ in
+                guard !numero.isEmpty else { return .no("manca il numero di Bea") }
+                let u = "sms:\(Rubrica.pulisci(numero))"
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { apri(u) } } else { apri(u) }
+                return .fatto("Messaggi si apre sulla chat di Bea appena hai finito la frase")
+            },
+            AzioneRegia("chiama", "chiama Bea", conferma: true) { _ in
+                guard !numero.isEmpty else { return .no("manca il numero di Bea") }
+                let u = "tel:\(Rubrica.pulisci(numero))"
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { apri(u) } } else { apri(u) }
+                return .fatto("chiamata a Bea: iOS chiede un tocco di conferma")
+            },
+        ]
+    }
+
+    private func regiaSegna(_ tipo: TipoBea, _ testo: String) async -> EsitoRegia {
+        let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return .no("niente da segnare") }
+        Suoni.tocco()
+        _ = await VistaVitals.chiama(["bea_aggiungi": ["tipo": tipo.rawValue, "testo": t] as [String: Any]])
+        await carica()
+        return .fatto("segnato (\(tipo.nome)): \(t)", battuta: { Battute.beaSegnato(tipo.rawValue, t) })
     }
 
     private var sottotitolo: String {

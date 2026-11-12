@@ -862,6 +862,28 @@ struct VistaDiario: View {
         .confirmationDialog("Cancellare tutto il diario? Non si torna indietro.", isPresented: $cancellaTutto, titleVisibility: .visible) {
             Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
         }
+        .regia("Diario", stato: testoSchermo, azioni: [                 // 12.0 (10): la regia
+            AzioneRegia("scrivi", "fa partire la pagina di oggi a voce (JARVIS fa la domanda e ascolta)",
+                        frasi: ["scrivi la pagina di oggi", "scrivi il diario", "scriviamo", "aggiungi a oggi", "scrivi la pagina"]) { _ in
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { scrivi() } } else { scrivi() }
+                return .fatto("la pagina di oggi parte a voce appena hai finito la frase", battuta: { "" })
+            },
+        ])
+    }
+
+    /// 12.0 (10): il diario a schermo, per JARVIS: quante pagine, se oggi c'è, le ultime sere (umore, punteggio, energia, temi).
+    private var testoSchermo: String {
+        guard let p = pagine else { return Schermo.unisci("Diario", [errore.map { "errore: \($0)" } ?? "le pagine si stanno aprendo"]) }
+        let ultime: [String] = p.prefix(6).map { x in
+            var r = x.giornoTesto
+            if let u = x.umore { r += " umore \(u)" }
+            if let v = x.punteggio { r += ", voto \(v)/10" }
+            if let e = x.energia { r += ", energia \(e)/10" }
+            if !x.temi.isEmpty { r += ", temi " + x.temi.prefix(4).joined(separator: "/") }
+            return r
+        }
+        return Schermo.unisci("Diario", ["\(p.count) pagine", paginaDiOggi == nil ? "oggi non ancora scritta" : "oggi già scritta",
+                                         ultime.isEmpty ? nil : "ultime sere: " + ultime.joined(separator: "; ")])
     }
 
     private var sottotitolo: String {
@@ -1062,6 +1084,15 @@ struct VistaSonno: View {
                 caricato = true
             }
         }
+        .regia("Sonno", stato: testoSchermo, azioni: [])                 // 12.0 (10): la notte, per JARVIS
+    }
+
+    /// 12.0 (10): la notte a schermo, per JARVIS (quanto ha dormito, le fasi, la media, i pisolini).
+    private var testoSchermo: String {
+        guard caricato else { return Schermo.unisci("Sonno", ["i dati della notte si stanno caricando"]) }
+        return Schermo.unisci("Sonno", [oggi?.sonno.map { "dormito stanotte \($0)" + (oggi?.orari.map { " (\($0))" } ?? "") } ?? "nessun dato della notte",
+                                        media.map { String(format: "media 14 notti %.1f h", $0) }, confronto, oggi?.fasi.map { "fasi: \($0)" },
+                                        oggi?.pisolini.map { "pisolini di oggi: \($0)" }, oggi?.notaSonno])
     }
 
     private var media: Double? { notti.isEmpty ? nil : notti.map(\.1).reduce(0, +) / Double(notti.count) }
@@ -1202,6 +1233,16 @@ struct VistaCuoreTelefono: View {
                 caricato = true
             }
         }
+        .regia("Cuore", stato: testoSchermo, azioni: [])                 // 12.0 (10): il cuore, per JARVIS (l'SOS resta col dito)
+    }
+
+    /// 12.0 (10): il cuore a schermo, per JARVIS.
+    private var testoSchermo: String {
+        guard caricato else { return Schermo.unisci("Cuore", ["i battiti si stanno caricando"]) }
+        let adesso: String? = ultimo.map { "adesso \(Int($0.1)) bpm (alle \($0.0.formatted(date: .omitted, time: .shortened)))" }
+        let minmax: String? = battiti.isEmpty ? nil : "oggi da \(Int(battiti.map(\.1).min() ?? 0)) a \(Int(battiti.map(\.1).max() ?? 0)) bpm"
+        return Schermo.unisci("Cuore", [adesso ?? "nessun battito di oggi", oggi?.battito.map { "a riposo \($0) bpm" },
+                                        oggi?.battitoMedia.map { "media a riposo 7 giorni \($0)" }, hrv.last.map { "HRV \(Int($0.1)) ms" }, minmax])
     }
 
     private var ultimo: (Date, Double)? { battiti.last }

@@ -217,7 +217,59 @@ struct VistaSatellite: View {
             guard (n.userInfo?["reparto"] as? String) == Reparto.satellite.rawValue, caricato, richiesta.azione != nil else { return }
             Task { await eseguiVoce(sulPosto: true) }
         }
-        .sulloSchermo(testoSchermo)
+        .regia("Satellite", stato: testoSchermo, azioni: azioniRegia)    // 12.0 (10): la regia
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare SATELLITE per JARVIS: scegliere un luogo salvato (la mappa ci vola), la ricognizione su un indirizzo, i filtri,
+    /// e per il luogo scelto NAVIGA (la strada), GUIDA (fotocamera e frecce) e il DOSSIER.
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("scegli", "porta la mappa su un luogo salvato (per nome)", valore: "luogo",
+                        frasi: ["portami su *", "vola su *", "mostrami *", "vai su *", "fammi vedere *"]) { v in
+                guard let l = Regia.scegli(v["luogo"] ?? "", fra: tutti, testo: { "\($0.nome) \($0.via) \($0.persona ?? "")" }) else {
+                    return .no("luogo non fra quelli salvati: per un indirizzo nuovo c'è ricognizione")
+                }
+                Suoni.tocco()
+                filtro = .tutti
+                sceltoChiave = l.chiave
+                scorri += 1
+                return .fatto("sulla mappa: \(l.nome)" + (l.via.isEmpty ? "" : ", \(l.via)") + " · \(distanza(l))",
+                              battuta: { Battute.una("sat.scegli", ["\(l.nome), Sir.", "In volo su \(l.nome).", "Eccolo: \(l.nome), \(distanza(l))."]) })
+            },
+            AzioneRegia("ricognizione", "cerca un indirizzo o un posto nuovo e ci vola sopra (distanza, meteo)", valore: "indirizzo",
+                        frasi: ["ricognizione su *", "ricognizione a *", "cerca l indirizzo *"]) { v in
+                let via = (v["indirizzo"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !via.isEmpty else { return .no("quale indirizzo?") }
+                indirizzo = via
+                await vai()
+                if let a = avviso { return .no(a, battuta: { a }) }
+                return .fatto("ricognizione su \(via)" + (ricognizione.map { " · \(distanza($0))" } ?? ""), battuta: { "" })
+            },
+            AzioneRegia("filtro", "tutti, luoghi, locali, persone", valore: "quali", frasi: ["solo i *", "solo le *", "filtro *"]) { v in
+                let k = Regia.chiave(v["quali"] ?? "")
+                guard let c = CategoriaSat.allCases.first(where: { k.contains(Regia.chiave($0.rawValue)) }) else { return .no("filtro sconosciuto") }
+                Suoni.tocco()
+                filtro = c
+                return .fatto("filtro \(c.rawValue): \(visibili.count) luoghi", battuta: { Battute.lampo() })
+            },
+            AzioneRegia("naviga", "apre NAVIGA (la strada) verso il luogo scelto", frasi: ["naviga", "portami lì", "come ci arrivo"]) { _ in
+                guard let l = scelto else { return .no("nessun luogo scelto") }
+                apri(.naviga(l))
+                return .fatto("NAVIGA verso \(l.nome)", battuta: { Battute.una("sat.naviga", ["Rotta verso \(l.nome), Sir.", "Strada pronta: \(l.nome)."]) })
+            },
+            AzioneRegia("guida", "accende GUIDA (fotocamera e frecce) verso il luogo scelto", frasi: ["guidami", "guidami lì", "accendi la guida"]) { _ in
+                guard let l = scelto else { return .no("nessun luogo scelto") }
+                apri(.guida(l))
+                return .fatto("GUIDA verso \(l.nome)", battuta: { "" })
+            },
+            AzioneRegia("dossier", "apre il DOSSIER del luogo scelto (note, visite, meteo)", frasi: ["dossier", "apri il dossier", "il dossier"]) { _ in
+                guard let l = scelto else { return .no("nessun luogo scelto") }
+                apri(.dossier(l))
+                return .fatto("DOSSIER di \(l.nome)", battuta: { Battute.una("sat.dossier", ["Il dossier di \(l.nome), Sir.", "Fascicolo aperto: \(l.nome)."]) })
+            },
+        ]
     }
 
     /// 8 nov notte: cosa vede JARVIS di SATELLITE («portami qui», «che posto è questo?», «che tempo fa lì?» parlano del luogo scelto).

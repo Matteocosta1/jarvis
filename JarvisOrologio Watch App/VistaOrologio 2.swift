@@ -179,7 +179,17 @@ struct VistaOrologio: View {
             // build 23, decisione 39: la guida chiesta dal polso non parte sull'iPhone: JARVIS dice il motivo
             let j = jarvis
             GuidaPolso.condivisa.annuncia = { [weak j] motivo in j?.annunciaGuida(motivo) }
+            // 12.0 (10): la regia al polso apre e chiude le sezioni con le strade della schermata
+            let regia = RegiaPolso.condivisa
+            regia.apri = { r in apri(r) }
+            regia.apriPolso = { s in apriPolso(s) }
+            regia.chiudi = { mostraVitals = false; mostraSentinella = false; scheda = nil; polso = nil }
         }
+        // 12.0 (10): la regia al polso sa quale sezione è aperta (anche chiusa col dito)
+        .onChange(of: scheda) { _, _ in aggiornaRegia() }
+        .onChange(of: polso) { _, _ in aggiornaRegia() }
+        .onChange(of: mostraVitals) { _, _ in aggiornaRegia() }
+        .onChange(of: mostraSentinella) { _, _ in aggiornaRegia() }
         .onChange(of: scena) { _, fase in
             jarvis.scenaCambiata(attiva: fase == .active)       // build 30: fuori schermo niente ascolti da soli
             if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi(); jarvis.vaInSottofondo() }
@@ -202,6 +212,15 @@ struct VistaOrologio: View {
             // 26 ott sera (il signore: «troppi bip, si perde la naturalezza»): niente vibrazione quando comincia e finisce di parlare
             if nuova == .attesa { iconaAttiva = nil }
         }
+    }
+
+    /// 12.0 (10): la sezione aperta sul polso, per la regia (nil: la schermata principale).
+    private func aggiornaRegia() {
+        if mostraVitals { RegiaPolso.condivisa.davanti = "Vitals" }
+        else if mostraSentinella { RegiaPolso.condivisa.davanti = "Sentinella" }
+        else if let scheda { RegiaPolso.condivisa.davanti = RegiaPolso.nome(scheda) }
+        else if let polso { RegiaPolso.condivisa.davanti = RegiaPolso.nome(polso) }
+        else { RegiaPolso.condivisa.davanti = nil }
     }
 
     /// Apre una sezione dal tocco o dalla voce; se ce n'è una aperta, prima torna indietro.
