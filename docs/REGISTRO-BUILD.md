@@ -552,6 +552,8 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 **Mockup**: simulatore aggiornato (Regia, Recupero e ripresa) con le stesse frasi dell'app.
 
+**Controllo di compilazione**: verde, zero errori e zero avvisi (run 43186722137, commit 9bbdc8b), prove del dialogo superate.
+
 ## 12.0 (9) — MARK XII · 12 nov notte · numero confermato dal signore («la 8 l'ho caricata ma non installata, fai 9 e metti tutto») · build unica · cervello v127 pubblicato (prova generale superata, con le prove del dialogo) · controllo di compilazione: vedi l'ultima riga
 Revisione del dialogo (il signore: «hai trovato questi errori… massima competenza») e tutte le migliorie (il signore: «tutti»; l'intonazione accesa subito, non solo misurata). Mac escluso da filo, conversazioni, fili aperti, archivista e giornata (lo usa anche Matteo).
 - **Errori corretti (13)**:
