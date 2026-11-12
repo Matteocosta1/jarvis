@@ -2533,10 +2533,11 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 11 nov: la pausa di fine frase di questo ascolto: quella della frase, almeno 3,5 s con «ascoltami», e un po' più lunga
     /// se il signore di recente riprendeva spesso a parlare subito dopo l'invio (il suo ritmo, imparato da `RitmoSignore`).
+    /// 12 nov (A2, P3): chi dice «ehm», «cioè» o ripete le parole piccole sta cercando le parole (un po' più di pazienza); la voce che
+    /// scende in fondo dice che ha finito (si risponde prima), quella sospesa che vuole continuare (un po' di più). Vedi `FineFrase.conVoce`.
     private func pausaAscolto(_ testo: String) -> Double {
-        var base = Jarvis.pausaFineFrase(testo) * RitmoSignore.condiviso.fattore
-        // 12 nov (A2): chi ripete parole o dice «ehm», «cioè», «tipo» sta cercando le parole: un po' più di pazienza
-        if base >= 1, ComeParla.esitazioni(testo) >= 2 { base = min(2.6, base * 1.3) }
+        let base = FineFrase.conVoce(lessicale: Jarvis.pausaFineFrase(testo), ritmo: RitmoSignore.condiviso.fattore,
+                                     esitazioni: FineFrase.esitazioni(testo), fine: Intonazione.condivisa.giudizio().fine)
         return max(ascoltoLungo ? max(base, 3.5) : base, pausaMinimaAscolto)
     }
 
@@ -2548,76 +2549,10 @@ final class Jarvis: NSObject, ObservableObject {
                 " aspetta che finisco ", " ascoltami bene "].contains { t.contains($0) }
     }
 
-    /// Quanto silenzio aspettare prima di considerare finita la frase, come farebbe una persona che ascolta:
-    /// non conta solo il silenzio ma cosa è stato detto.
-    /// - «che tempo fa oggi?», «sì», «apri la Sentinella»: la frase è chiusa, si risponde quasi subito;
-    /// - «oggi ero a Bari…», «allora, ti racconto…»: è un racconto, chi parla di solito continua; si aspetta di più;
-    /// - «…e», «…perché», «…ehm»: si è fermato a metà, sta pensando; si aspetta ancora di più.
-    /// Revisione del dialogo (24 ott): stessa tabella di tempi, ma nell'ordine giusto. Prima il «?» veniva dopo la frase
-    /// sospesa, e «Che ore sono?», «Chi è?», «Perché?» aspettavano 2,4 s («sono», «è», «perché» sembravano parole a metà);
-    /// «No, aspetta», «Ok senti» erano prese per risposte brevi e tagliate a 0,6 s. Prova: rev_dialogo/pausa_v2.py.
-    nonisolated static func pausaFineFrase(_ testo: String) -> Double {
-        let basso = testo.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "’", with: "'").lowercased()
-        var parole = basso.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
-        // il nome o un richiamo davanti non fa parte della frase («Jarvis, apri il meteo» è un comando come «apri il meteo»)
-        while let p = parole.first, ["ehi", "hey", "ei"].contains(p) || Richiamo.nomi.contains(where: { p.hasPrefix($0) }) {
-            parole.removeFirst()
-        }
-        guard let ultima = parole.last, let prima = parole.first else { return 1.2 }
-        let frase = parole.joined(separator: " ")
-
-        // domanda chiusa: il punto di domanda del riconoscimento («Che ore sono?», «Chi è?», «Perché?», «E sabato?»)
-        if basso.hasSuffix("?") { return 0.7 }
-
-        // 12 nov (A2): l'ultima parola ripetuta («ci sono ancora delle delle», «che che»): sta cercando la parola, aspetta
-        if parole.count >= 2, parole[parole.count - 1] == parole[parole.count - 2] { return 2.4 }
-
-        // risposte brevi, anche di due o tre parole: «sì», «no grazie», «va bene», «sì, mandala pure»
-        let brevi: Set<String> = ["sì", "si", "no", "ok", "okay", "certo", "esatto", "grazie", "mille", "perfetto", "va", "bene", "giusto",
-                                  "bravo", "basta", "stop", "ferma", "avanti", "pausa", "dai", "fatto", "procedi", "vai", "confermo",
-                                  "pure", "sir", "mandala", "mandalo", "mandale", "mandali", "inviala", "invialo", "fallo", "falla"]
-        if parole.count <= 3 && parole.allSatisfy({ brevi.contains($0) }) { return 0.6 }
-
-        // domanda breve senza «?» che finisce col verbo («che ore sono», «chi è», «che impegni ho»): è chiusa, non sospesa
-        let interrogative: Set<String> = ["che", "cosa", "cos'è", "quanto", "quanti", "quanta", "quante", "chi", "dove", "qual", "quale",
-                                          "quali", "c'è", "com'è", "dov'è"]
-        let verbiFinali: Set<String> = ["sono", "è", "ho", "hai", "sei", "siamo", "c'è"]
-        if interrogative.contains(prima), verbiFinali.contains(ultima), parole.count >= 2, parole.count <= 6, !basso.contains("?") { return 1.2 }
-
-        // si è fermato a metà o sta pensando ad alta voce («…e», «…perché», «no, aspetta», «fammi pensare»)
-        let sospese: Set<String> = ["e", "ed", "o", "ma", "che", "perché", "poi", "di", "del", "della", "dei", "delle", "a", "al",
-                                    "alla", "ai", "da", "dal", "dalla", "in", "nel", "nella", "con", "per", "su", "sul", "tra", "fra",
-                                    "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "mi", "ti", "ci", "si", "se", "quando",
-                                    "dove", "come", "anche", "quindi", "cioè", "tipo", "ehm", "eh", "mmm", "allora", "praticamente",
-                                    "comunque", "però", "mentre", "oppure", "magari", "sono", "è", "ho", "hai", "abbiamo", "volevo",
-                                    "vorrei", "devo", "dobbiamo", "questo", "questa", "quel", "quella", "mio", "mia", "tuo", "tua"]
-        // «aspetta», «senti», «guarda» in fondo: sta per dire la cosa vera (non «mi senti», «lo guarda»)
-        let segnali: Set<String> = ["aspetta", "senti", "ascolta", "guarda", "scusa"]
-        let cliticoPrima = parole.count >= 2 && ["mi", "ci", "lo", "la", "li", "le", "ti"].contains(parole[parole.count - 2])
-        if sospese.contains(ultima) || (segnali.contains(ultima) && !cliticoPrima)
-            || ["fammi pensare", "fammi capire", "fammi dire"].contains(frase) { return 2.4 }
-        if basso.hasSuffix(",") || basso.hasSuffix("…") || basso.hasSuffix("...") { return 2.0 }
-
-        // domanda chiusa senza «?»: solo le interrogative vere («che tempo fa domani»). «Come», «quando», «mi», «hai»…
-        // senza «?» aprono spesso un racconto («Quando ero piccolo…», «Mi sono svegliato tardi…»): lì l'attesa è normale
-        if interrogative.contains(prima), parole.count >= 2, parole.count <= 10 { return 0.8 }
-
-        // comandi: «apri…», «metti…», «chiama…», «guarda là in fondo» (ma «Guarda, oggi…» è un racconto)
-        let comandi: Set<String> = ["apri", "chiudi", "metti", "chiama", "manda", "scrivi", "accendi", "spegni", "ferma", "avvia",
-                                    "leggi", "cerca", "dimmi", "fammi", "ricordami", "imposta", "alza", "abbassa", "guarda",
-                                    "scansiona", "traduci", "attiva", "disattiva", "riproduci", "salta", "segna", "aggiungi",
-                                    "togli", "cancella", "mostrami", "trova", "calcola", "prenota", "fai"]
-        let guardaRacconto = prima == "guarda" && (parole.count > 5 || basso.contains("guarda,"))
-        if comandi.contains(prima), parole.count <= 10, !guardaRacconto { return 0.9 }
-
-        // racconto: chi parla sta esponendo un pensiero, di solito continua
-        let racconto = ["oggi", "ieri", "stamattina", "stasera", "allora", "ascolta", "senti", "praticamente", "sai", "comunque",
-                        "quindi", "ti volevo", "volevo", "ti racconto", "ti devo", "devo dirti", "pensavo", "secondo me", "io", "noi",
-                        "l'altro giorno", "prima", "aspetta", "scusa"]
-        if guardaRacconto || racconto.contains(where: { frase == $0 || frase.hasPrefix($0 + " ") }) { return 1.8 }
-        if parole.count >= 15 { return 1.6 }                    // discorso lungo: pause di pensiero più probabili
-        return 1.2
-    }
+    /// Quanto silenzio aspettare prima di considerare finita la frase, come farebbe una persona che ascolta (le regole stanno in
+    /// `FineFrase.pausa`, nel file del dialogo vivo: le prova da sole il controllo di compilazione). 12 nov (errore 1): via la regola
+    /// della parola ripetuta in fondo («sì sì», «no no», «ok ok» aspettavano 2,4 s invece di 0,6).
+    nonisolated static func pausaFineFrase(_ testo: String) -> Double { FineFrase.pausa(testo, nomi: Richiamo.nomi) }
 
     private func armaSilenzio(secondi: Double) {
         timerSilenzio?.invalidate()

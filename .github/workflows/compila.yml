@@ -25,7 +25,18 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks | grep -E "iOS|watchOS" || true
 
+      - name: Prove del dialogo
+        # 12 nov (P7): le regole di fine frase, i segnali d'ascolto e l'intonazione (DialogoVivo.swift) provate da sole
+        run: |
+          set -o pipefail
+          esito=0
+          xcrun swiftc -O -parse-as-library "Untitled Project/DialogoVivo.swift" .github/prove/ProvaDialogo.swift -o prova-dialogo 2>&1 | tee prove.log || esito=1
+          if [ "$esito" = "0" ]; then ./prova-dialogo 2>&1 | tee -a prove.log || esito=1; fi
+          { echo "## Prove del dialogo"; echo '```'; tail -80 prove.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $esito
+
       - name: Compila
+        if: always()
         run: |
           set -o pipefail
           : > build.log
