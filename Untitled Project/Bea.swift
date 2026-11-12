@@ -520,6 +520,7 @@ struct VistaBea: View {
             .onChange(of: tipoNuovo) { _, t in conGiorno = t == .data }
             TextField(tipoNuovo.esempio, text: $nuovo, axis: .vertical)
                 .lineLimit(1...3)
+                .campoRegia("aggiungi", testo: $nuovo)                 // 12.0 (12) · B2: JARVIS ci scrive a voce
                 .focused($scrivendo)
                 .id("beaAggiungi")
                 .foregroundStyle(.white)
@@ -712,6 +713,7 @@ struct TiPenso: View {
             Text("TI PENSO").font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
             TextField("", text: $testo, axis: .vertical)
                 .lineLimit(2...6)
+                .campoRegia("testo", testo: $testo)                    // 12.0 (12) · B2
                 .font(.system(size: 17))
                 .foregroundStyle(.white)
                 .padding(12)

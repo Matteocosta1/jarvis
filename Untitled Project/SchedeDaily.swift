@@ -55,6 +55,17 @@ struct VistaMeteo: View {
                 let g = gradi(c.temperature), cielo = c.condition.description
                 return .fatto("adesso \(g), \(cielo)", battuta: { Battute.meteoAggiornato(g, cielo.lowercased()) })
             },
+            // 12.0 (12) · B1: «che tempo fa» da qualsiasi schermata: il Meteo si apre e JARVIS dice il dato che conta, senza cervello
+            AzioneRegia("adesso", "com'è il tempo adesso e oggi (massima, pioggia)", frasi: ["che tempo fa", "com e il tempo", "che tempo c e"]) { _ in
+                if meteo == nil { await carica() }
+                guard let w = meteo else { return .no(errore ?? "meteo non disponibile") }
+                let c = w.currentWeather, oggi = w.dailyForecast.first
+                let g = gradi(c.temperature), cielo = c.condition.description.lowercased()
+                let massima: String? = oggi.map { gradi($0.highTemperature) }
+                let pioggia: Int? = oggi.map { Int(($0.precipitationChance * 100).rounded()) }
+                return .fatto("adesso \(g), \(cielo); oggi massima \(massima ?? "—"), pioggia \(pioggia.map { "\($0)%" } ?? "—")",
+                              battuta: { Battute.meteoAdesso(g, cielo, massima: massima, pioggia: pioggia) })
+            },
         ])
     }
 
@@ -872,6 +883,7 @@ struct VistaSpesa: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus").foregroundStyle(tinta)
                         TextField("Aggiunga: latte, pane, detersivo…", text: $nuovo)
+                            .campoRegia("aggiungi", testo: $nuovo, cerca: true) { Task { await aggiungi(nuovo) } }   // 12.0 (12) · B2
                             .focused($scrivendo)
                             .foregroundStyle(.white)
                             .submitLabel(.done)
@@ -1016,7 +1028,7 @@ struct VistaSpesa: View {
         [
             AzioneRegia("aggiungi", "mette in lista una o più cose", valore: "cosa",
                         frasi: ["aggiungi *", "aggiungimi *", "segna *", "segnami *", "manca *", "mancano *", "metti in lista *",
-                                "devo comprare *", "compra *", "comprami *", "prendi *"]) { v in regiaAggiungi(v["cosa"] ?? "") },
+                                "devo comprare *", "compra *", "comprami *"]) { v in regiaAggiungi(v["cosa"] ?? "") },   // 12.0 (12): via «prendi *» («prendi nota…»)
             AzioneRegia("togli", "toglie dalla lista", valore: "cosa",
                         frasi: ["togli *", "toglimi *", "leva *", "levami *", "cancella *", "rimuovi *", "depenna *"]) { v in regiaTogli(v["cosa"] ?? "") },
             AzioneRegia("preso", "spunta: messo nel carrello", valore: "cosa",
@@ -1037,7 +1049,13 @@ struct VistaSpesa: View {
 
     /// Le cose dette in una frase: «latte, uova e pane» → latte · uova · pane (senza articoli né «un po' di»).
     static func cose(_ testo: String) -> [String] {
-        let separa = testo.replacingOccurrences(of: ";", with: ",").replacingOccurrences(of: " ed ", with: ",")
+        // 12.0 (12): «il latte alla lista», «pane in lista», «uova nella spesa»: dove va non è una cosa da comprare
+        var t = " " + testo.lowercased() + " "
+        for coda in [" alla lista della spesa ", " nella lista della spesa ", " alla lista ", " nella lista ", " in lista ", " alla spesa ",
+                     " nella spesa ", " per la spesa ", " da comprare "] {
+            t = t.replacingOccurrences(of: coda, with: " ")
+        }
+        let separa = t.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ";", with: ",").replacingOccurrences(of: " ed ", with: ",")
             .replacingOccurrences(of: " e ", with: ",").replacingOccurrences(of: " anche ", with: ",")
         let articoli = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una ", "un'", "del ", "dello ", "della ", "dei ",
                         "degli ", "delle ", "dell'", "un po' di ", "un po di ", "anche ", "altro ", "altra ", "altri ", "altre "]

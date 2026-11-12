@@ -80,6 +80,7 @@ private struct MailPriorita: View {
                 Group {
                     if cambia && mail.serveRisposta {
                         TextField("La risposta", text: $bozza, axis: .vertical)
+                            .campoRegia("risposta", testo: $bozza)   // 12.0 (12) · B2 (l'invio resta col sì)
                             .focused($fuoco)
                             .foregroundStyle(ColoriHUD.testo)
                     } else {

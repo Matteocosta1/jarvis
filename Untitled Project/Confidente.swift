@@ -89,6 +89,7 @@ struct VistaConfidente: View {
                                 .padding(.horizontal, 5).padding(.vertical, 8)
                         }
                         TextEditor(text: $testo)
+                            .campoRegia("conversazione", testo: $testo)   // 12.0 (12) · B2
                             .focused($scrivendo)
                             .scrollContentBackground(.hidden)
                             .font(.system(size: 15))
@@ -112,6 +113,7 @@ struct VistaConfidente: View {
                     }
 
                     TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
+                        .campoRegia("domanda", testo: $domanda)   // 12.0 (12) · B2
                         .lineLimit(1...3)
                         .padding(12)
                         .foregroundStyle(.white)

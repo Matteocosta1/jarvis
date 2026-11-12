@@ -806,6 +806,10 @@ final class Jarvis: NSObject, ObservableObject {
     /// dal punto esatto (dopo una pausa lunga con un «dicevo…» davanti, come una persona); se no, la frase va al cervello con la
     /// risposta interrotta e il cervello continua da lì (come prima). Falso: non è una ripresa.
     private func riprendiSeChiesto(_ frase: String) -> Bool {
+        // 12.0 (12) · errore 2: con la musica in coda e la Musica davanti (o la canzone che suona, o ferma mentre JARVIS parlava),
+        // «avanti», «indietro», «play» sono i tasti della musica; per la sua frase restano «dicevi?», «continua»
+        let l = LettoreMusica.condiviso
+        if l.voce != nil, Regia.eTastoMusica(frase), Regia.condivisa.davantiNome == "Musica" || musicaSuona || l.fermataDaJarvis { return false }
         guard rispostaInterrotta != nil, !BrowserVoce.aperto, interruzioneValida() != nil,
               FineFrase.chiedeDiContinuare(frase, dopoDomanda: interrottaSuDomanda, libera: fraseLibera) else { return false }
         guard interrottaCompleta, let id = rispostaInterrotta, let i = messaggi.lastIndex(where: { $0.id == id }), i == messaggi.count - 1,
@@ -864,6 +868,7 @@ final class Jarvis: NSObject, ObservableObject {
         let forza = VoceAttiva.condivisa.forzaMedia
         let segnali = segnaliFrase(inizio: inizio ?? fine, secondi: secondi)
         voceCome = ComeParla.condiviso.riga(testo: testo, secondi: secondi, forzaDb: forza, segnali: segnali.note)
+        Battute.sentito(voceCome)                         // 12.0 (12) · B5: le battute di JARVIS seguono come sta (ride, sospira, va di fretta)
         if secondi > 0 { ComeParla.condiviso.impara(testo: testo, secondi: secondi, forzaDb: forza) }
         if segnali.sussurra { Jarvis.sussurroFino = Date().addingTimeInterval(120) }
         else if Date() < Jarvis.sussurroFino { Jarvis.sussurroFino = .distantPast }
@@ -948,7 +953,9 @@ final class Jarvis: NSObject, ObservableObject {
         let ultimaDomanda = messaggi.last(where: { $0.ruolo == "user" })
         let vicino = ultimaDomanda.map { Date().timeIntervalSince($0.data) < (riprende ? 300 : 60) } ?? false
         fraseAVoce = pulito.isEmpty ? frase : pulito   // solo una frase nuova e intera: se era un comando storpiato, si impara
-        await invia(pulito.isEmpty ? frase : pulito, comeSeguito: vicino)
+        // 12.0 (12) · errore 1: «riprendo il discorso» solo se la frase è ellittica («e sabato?», «anche a lui») o se ha detto
+        // «aspetta» (stamattina ogni frase entro un minuto era «seguito» e il cervello mescolava la musica col muro dell'ufficio)
+        await invia(pulito.isEmpty ? frase : pulito, comeSeguito: vicino && (riprende || FineFrase.fraseEllittica(pulito.isEmpty ? frase : pulito)))
     }
 
     // MARK: Richiamo («Jarvis» in attesa)
@@ -1222,7 +1229,11 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func eseguiComandoLocale(_ fraseIntera: String) -> Bool {
-        let frase = sottovoce(fraseIntera)
+        // 12.0 (12) · B3: cambiare idea mentre parla, vale l'ultima intenzione («apri il meteo, anzi la spesa» apre la spesa);
+        // «…anzi lascia stare» non apre niente (la frase va avanti e la regia risponde «lasciamo stare»)
+        let ripensata = FineFrase.ultimaIntenzione(fraseIntera)
+        if ripensata.isEmpty { return false }
+        let frase = sottovoce(ripensata)
         if frase.isEmpty { return true }                    // solo «sbatti» o «voce normale»: fatto
         if Benvenuto.eFraseDiTony(frase) { fraseDiTony(); return true }
         // 9 nov (logica approvata dal signore): «spegni il microfono» = SPENTO (come la pressione lunga sul reattore)
@@ -2190,7 +2201,10 @@ final class Jarvis: NSObject, ObservableObject {
         if ComandoDedicato.riconosci(frase) != nil || ComandoOcchi.riconosci(frase) != nil || Storpiature.cerca(frase) != nil { return true }
         if BrowserVoce.aperto || LidarAperta.aperta || lidarAperto { return true }
         let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
-        return !FineFrase.comandoComposto(frase) && ComandoVocale.riconosci(frase, dentro: dentro) != nil
+        // 12.0 (12) · B1: anche quello che la regia fa da sola (niente risposta anticipata del cervello: sarebbe buttata)
+        if Regia.condivisa.forseLocale(frase) { return true }
+        let ripensata = FineFrase.ultimaIntenzione(frase)
+        return !ripensata.isEmpty && !FineFrase.comandoComposto(ripensata) && ComandoVocale.riconosci(ripensata, dentro: dentro) != nil
     }
 
     /// Idea D: la frase del giro unico si fa come prima, con il testo già trascritto (la richiesta è già chiusa).
@@ -2996,6 +3010,38 @@ final class Jarvis: NSObject, ObservableObject {
         dialogoFuori = false
         IsolaJarvis.fineVoce()                          // 12 nov: dentro JARVIS l'isola VOCE non serve
         if micChiusoFuori { micChiusoFuori = false; aggiornaRichiamo() }
+        proponiAbitudine()                              // 12.0 (12) · B6
+    }
+
+    /// 12.0 (12) · B6: rientrato in JARVIS, se a quest'ora di solito fa una cosa (apre la spesa, mette Sfera) JARVIS la propone,
+    /// una volta sola: «Le metto Sfera Ebbasta, come al solito?». Un sì la fa subito (Regia.proposta). Solo se è tutto calmo:
+    /// in attesa, niente sezioni davanti, niente musica, non in RISERVATO, voce accesa, non di notte (Abitudini).
+    private func proponiAbitudine() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard let self, self.fase == .attesa, !self.inBenvenuto, !self.musicaSuona, !self.riservato, !self.micSpento, !Impostazioni.muto,
+                  UIApplication.shared.applicationState == .active, Regia.condivisa.davantiNome == nil, Regia.condivisa.proposta == nil,
+                  let p = Abitudini.previsione() else { return }
+            let frase: String
+            let fai: @MainActor () async -> String?
+            if p.tipo == "sezione" {
+                frase = Battute.propostaSezione(Abitudini.detta(p.cosa))
+                let nome = p.cosa
+                fai = { await Regia.condivisa.apriDaFuori(nome) }
+            } else {
+                frase = Battute.propostaMusica(p.cosa)
+                let cosa = p.tipo == "playlist" ? "playlist " + p.cosa : p.cosa
+                fai = {
+                    guard let e = await LettoreMusica.condiviso.mettiDetto(cosa) else { return "Non la trovo più, Sir." }
+                    if let errore = e.errore { return errore }
+                    return Battute.musicaMetti(e.nome ?? p.cosa)
+                }
+            }
+            Abitudini.proposta(p)
+            Regia.condivisa.proposta = (frase, Date(), fai)
+            Regia.condivisa.evento("proposto: \(frase)")
+            self.annuncia(frase)
+        }
     }
 
     private func fermaAscolto(invia: Bool, toccato: Bool = false) {
@@ -3805,7 +3851,7 @@ extension Jarvis {
         let detta = Jarvis.fraseAnticipabile(frase)
         guard Jarvis.normaAnticipo(detta).split(separator: " ").count >= 2, !comandoLocale(frase), !comandoLocale(detta) else { return nil }
         var m = Messaggio(ruolo: "user", testo: detta)
-        if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < 60 { m.seguito = true }
+        if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < 60, FineFrase.fraseEllittica(detta) { m.seguito = true }   // 12.0 (12)
         return m
     }
 

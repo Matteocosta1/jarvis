@@ -133,6 +133,7 @@ struct VistaScanner: View {
         }
         HStack(spacing: 8) {
             TextField("oppure scriva il numero del codice", text: $codiceAMano)
+                .campoRegia("codice", testo: $codiceAMano, cerca: true) { if codiceAMano.filter(\.isNumber).count >= 6 { trovato(codiceAMano) } }   // 12.0 (12) · B2
                 .keyboardType(.numberPad)
                 .focused($codiceAttivo)
                 .font(.system(size: 14, design: .monospaced))

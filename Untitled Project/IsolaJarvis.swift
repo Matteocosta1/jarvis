@@ -29,6 +29,7 @@ enum IsolaJarvis {
             case "pausa", "riprendi", "stoprec": rec?(a)
             case "ok": chiudiPioggia()
             case "finevoce": fineDialogo?(); chiudiVoci()       // 12.0 (11): si chiude sempre, anche se l'app era stata chiusa
+            case "ascolta": Comandi.condiviso.richiesta = .ascolta  // 12.0 (12) · B4: il controllo JARVIS (Centro di Controllo)
             default: break
             }
         }

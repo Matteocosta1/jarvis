@@ -1242,7 +1242,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             }
             // 12.0 (10): con la MUSICA davanti sul polso, «pausa», «avanti», «indietro», «play» partono subito, con la battuta di
             // JARVIS (ma «dicevi?», «vai avanti» dopo un'interruzione restano la ripresa della sua frase)
-            if ripresaValida() == nil, let tasto = RegiaPolso.condivisa.tastoDetto(testo) {
+            if let tasto = RegiaPolso.condivisa.tastoDetto(testo) {     // 12.0 (12) · errore 2: con la Musica davanti, «avanti» è la canzone
                 compito = nil
                 daUnire = nil
                 inCorso = nil
@@ -1831,7 +1831,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         if case .apri(_)? = comando { return false }
         if case .pagina? = comando { return false }                 // MARK X: Studio e Social
-        if ripresaValida() == nil, RegiaPolso.condivisa.tastoDetto(testo) != nil { return false }   // 12.0 (10): i tasti della musica
+        if RegiaPolso.condivisa.tastoDetto(testo) != nil { return false }   // 12.0 (10): i tasti della musica (12.0 (12): anche dopo un'interruzione)
         if case .interprete(let codice)? = comando,
            ComandoVocale.lingueAVoce.first(where: { $0.codice == codice })?.parole.first != nil { return false }
         if Dialogo.volume(testo).cambio != nil { return false }

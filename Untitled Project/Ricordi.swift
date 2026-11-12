@@ -165,6 +165,7 @@ struct VistaRicordi: View {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
                 TextField("Cerchi: chiavi, Luca, vino…", text: $cerca).foregroundStyle(.white)
+                    .campoRegia("ricerca", testo: $cerca, cerca: true)   // 12.0 (12) · B2
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }
             .listRowBackground(Color.ciano.opacity(0.06))
@@ -213,6 +214,7 @@ struct VistaRicordi: View {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
                 TextField("Cerchi un posto: bar, Luca, studio…", text: $cerca).foregroundStyle(.white)
+                    .campoRegia("ricerca", testo: $cerca, cerca: true)   // 12.0 (12) · B2
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }
             .listRowBackground(Color.ciano.opacity(0.06))

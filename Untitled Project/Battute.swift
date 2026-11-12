@@ -30,8 +30,24 @@ enum Battute {
         }
     }
 
-    /// Il signore va di fretta: un comando a pochi secondi dall'ultima battuta.
-    static var diFretta: Bool { Date().timeIntervalSince(ultimaDetta) < 6 }
+    /// Il signore va di fretta: un comando a pochi secondi dall'ultima battuta, o la voce più veloce del solito (B5).
+    static var diFretta: Bool { Date().timeIntervalSince(ultimaDetta) < 6 || umore == .fretta }
+
+    // MARK: B5 · come sta il signore (12.0 (12))
+
+    /// Come sta il signore adesso, da come ha parlato (ComeParla: risate, sospiri, velocità, forza): le battute si adattano, come
+    /// fa un amico. Vale 10 minuti dall'ultima frase che l'ha mostrato.
+    enum Umore { case normale, allegro, giu, fretta }
+    private static var umoreSentito: (umore: Umore, quando: Date) = (.normale, .distantPast)
+    static var umore: Umore { Date().timeIntervalSince(umoreSentito.quando) < 600 ? umoreSentito.umore : .normale }
+
+    /// La riga di ComeParla dell'ultima frase («ha appena riso», «più veloce del solito»…): aggiorna l'umore.
+    static func sentito(_ come: String?) {
+        guard let c = come?.lowercased(), !c.isEmpty else { return }
+        if c.contains("riso") { umoreSentito = (.allegro, Date()) }
+        else if c.contains("sospirato") || (c.contains("più lento") && c.contains("più bassa")) { umoreSentito = (.giu, Date()) }
+        else if c.contains("più veloce") { umoreSentito = (.fretta, Date()) }
+    }
 
     /// Una variante della situazione `chiave`, mai una di quelle uscite di recente.
     static func una(_ chiave: String, _ varianti: [String]) -> String {
@@ -47,7 +63,9 @@ enum Battute {
 
     /// Ogni tanto, non sempre, un tocco di spirito dopo la frase: mai di notte, mai se va di fretta.
     static func spirito(_ probabilita: Double = 0.3) -> Bool {
-        momento != .notte && !diFretta && Double.random(in: 0..<1) < probabilita
+        // B5: col signore giù o di fretta niente battute; se ride, JARVIS sta al gioco più volentieri
+        let p = umore == .allegro ? min(0.8, probabilita * 1.6) : probabilita
+        return momento != .notte && !diFretta && umore != .giu && Double.random(in: 0..<1) < p
     }
 
     /// Le frasi da una parola per i comandi a raffica.
@@ -329,6 +347,53 @@ enum Battute {
         if diFretta { return una("arch.lampo", ["\(n) file.", "Trovati."]) }
         return una("arch.cerca", ["\(n == 1 ? "Un file" : "\(n) file") per «\(cosa)», Sir.", "Schedari consultati: \(n == 1 ? "ne trovo uno" : "ne trovo \(n)").",
                                   "Ecco cosa trovo per «\(cosa)»."])
+    }
+
+    // MARK: 12.0 (12) · B2, B3, B6, il meteo
+
+    /// B2: ha scritto in un campo di testo per lui.
+    static func campoScritto(_ campo: String, _ testo: String) -> String {
+        if diFretta { return una("campo.lampo", ["Scritto.", "Fatto.", "Eccolo."]) }
+        return una("campo", ["Scritto, Sir.", "Ecco «\(testo)».", "Digitato per lei.", "«\(testo)»: fatto. Le dita può tenerle in tasca.",
+                             "Scritto nel campo \(campo)."])
+    }
+
+    /// B3: ha annullato quello che aspettava il sì.
+    static func annullato() -> String {
+        una("annullato", ["Annullato, Sir.", "Fermo tutto. Non parte niente.", "Come non detto.", "Annullato. Resta tutto com'era."])
+    }
+
+    /// B3: ha cambiato idea e non vuole più niente.
+    static func lasciamoStare() -> String {
+        una("lasciamo", ["Va bene, lasciamo stare.", "Come non detto, Sir.", "Ricevuto: niente.", "D'accordo. Quando vuole, sono qui."])
+    }
+
+    /// B6: JARVIS propone quello che il signore fa di solito a quest'ora (`cosa`: «la spesa», «Sfera Ebbasta»…).
+    static func propostaSezione(_ cosa: String) -> String {
+        una("proposta.sez", ["Le apro \(cosa), come sempre a quest'ora?", "È l'ora in cui di solito apre \(cosa). Vado?",
+                             "Le preparo \(cosa), Sir?", "Il solito, Sir? Le apro \(cosa)."])
+    }
+
+    static func propostaMusica(_ cosa: String) -> String {
+        una("proposta.mus", ["Le metto \(cosa), come al solito?", "A quest'ora di solito c'è \(cosa). Vado?", "\(maiuscola(cosa)), Sir? È quasi tradizione.",
+                             "Le faccio partire \(cosa)?"])
+    }
+
+    /// B1: «che tempo fa», detto da qualsiasi schermata (la sezione Meteo si apre e JARVIS dice il dato che conta).
+    static func meteoAdesso(_ gradi: String, _ cielo: String, massima: String?, pioggia: Int?) -> String {
+        let base: String
+        if let m = massima {
+            base = una("meteo.ora", ["Adesso \(gradi), \(cielo). Oggi si arriva a \(m).", "\(maiuscola(cielo)), \(gradi). Massima di oggi \(m).",
+                                     "Fuori \(gradi) e \(cielo); oggi fino a \(m)."])
+        } else {
+            base = una("meteo.ora.breve", ["Adesso \(gradi), \(cielo).", "\(maiuscola(cielo)), \(gradi)."])
+        }
+        guard let p = pioggia else { return base }
+        if p >= 50 { return base + " " + una("meteo.pioggia", ["Pioggia al \(p) per cento: meglio l'ombrello.", "L'ombrello oggi non è un vezzo, Sir.",
+                                                                "Probabile pioggia: ombrello in tasca."]) }
+        if p < 20, spirito(0.5) { return base + " " + una("meteo.asciutto", ["L'ombrello può restare a casa.", "Niente pioggia in vista.",
+                                                                              "Cielo dalla nostra parte, Sir."]) }
+        return base
     }
 
     // MARK: Messaggi e telefono

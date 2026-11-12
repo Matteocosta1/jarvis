@@ -361,6 +361,7 @@ struct VistaSatellite: View {
         Pannello(titolo: "RICOGNIZIONE", tinta: tinta) {
             HStack(spacing: 8) {
                 TextField("Indirizzo", text: $indirizzo)
+                    .campoRegia("indirizzo", testo: $indirizzo, cerca: true) { Task { await vai() } }   // 12.0 (12) · B2
                     .focused($indirizzoAttivo)
                     .font(.system(size: 14)).foregroundStyle(ColoriHUD.chiaro)
                     .textInputAutocapitalization(.words)

@@ -581,6 +581,7 @@ struct VistaFotoScheda: View {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(tinta)
                 TextField("Cosa cerca? cane, mare, concerto, vinile…", text: $cerca).foregroundStyle(.white).submitLabel(.search)
+                    .campoRegia("ricerca", testo: $cerca, cerca: true)   // 12.0 (12) · B2
                     .focused($cercaAttiva)
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }

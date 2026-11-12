@@ -331,6 +331,61 @@ nonisolated enum FineFrase {
         "mettilo", "riproduci", "fai", "torna", "vai",
     ]
 
+    /// 12.0 (12) · errore 1: la frase riprende il discorso di prima solo se è ellittica, come fra persone («e sabato?», «anche a
+    /// lui», «del brano», «che domani passo da lui», «no, l'altra»): corta, o che comincia attaccata alla frase di prima. Una frase
+    /// intera con un argomento suo è nuova (stamattina «Sfera Ebbasta, Popstar» detto per la musica è stato letto come il seguito
+    /// del discorso sul muro dell'ufficio, perché tutte le frasi entro un minuto erano «seguito»).
+    static func fraseEllittica(_ testo: String) -> Bool {
+        let p = paroleNude(testo)
+        guard p.count > 3 else { return true }
+        return attacchiSeguito.contains(p[0])
+    }
+
+    private static let attacchiSeguito: Set<String> = [
+        "e", "ed", "ma", "anche", "invece", "pero", "poi", "quindi", "allora", "oppure", "o", "no", "si", "cioe", "anzi", "pure",
+        "neanche", "nemmeno", "magari", "piuttosto", "comunque", "intanto", "che", "per", "con", "a", "al", "allo", "alla", "ai",
+        "agli", "alle", "di", "del", "dello", "della", "dei", "degli", "delle", "da", "dal", "dalla", "dai", "in", "nel", "nella",
+        "nei", "su", "sul", "sulla", "tipo", "lui", "lei", "loro", "quello", "quella", "quelli", "quelle", "questo", "questa",
+        "stesso", "stessa", "ne", "li", "gli", "tranne", "senza", "almeno", "solo", "soltanto",
+    ]
+
+    /// 12.0 (12) · B3, cambiare idea mentre parla: vale l'ultima intenzione. «Metti Sfera… no anzi, metti i Daft Punk» →
+    /// «metti i Daft Punk»; «aggiungi il latte, anzi la panna» → «aggiungi la panna»; «apri la posta, anzi lascia stare» → ""
+    /// (niente da fare). Senza ripensamenti, la frase com'è. Serve ai comandi che l'app fa da sola: al cervello va la frase intera.
+    static func ultimaIntenzione(_ testo: String) -> String {
+        // le parole com'erano dette (per tenere maiuscole e accenti dei valori) e piegate per i confronti
+        var parole: [(detta: String, piegata: String)] = []
+        for w in testo.split(whereSeparator: { $0.isWhitespace }) {
+            let detta = String(w).trimmingCharacters(in: CharacterSet(charactersIn: ",.;:!?…«»\"'"))
+            let piegata = detta.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+                .filter { $0.isLetter || $0.isNumber }
+            if !piegata.isEmpty { parole.append((detta, piegata)) }
+        }
+        let p = parole.map { $0.piegata }
+        // l'ultimo ripensamento: «anzi», «no anzi», «o meglio», «no aspetta», «cioè no», «scusa no», «ripensandoci», «no»+comando
+        var taglio: Int?
+        var i = 0
+        while i < p.count {
+            let due = i + 1 < p.count ? p[i] + " " + p[i + 1] : ""
+            if ["no anzi", "o meglio", "no aspetta", "cioe no", "scusa no", "no scusa", "no no"].contains(due) { taglio = i + 2; i += 2; continue }
+            if p[i] == "anzi" || p[i] == "ripensandoci" { taglio = i + 1 }
+            else if p[i] == "no", i > 0, i + 1 < p.count, verbiComposti.contains(p[i + 1]) { taglio = i + 1 }
+            i += 1
+        }
+        guard let t = taglio, t > 0 else { return testo }
+        let resto = Array(parole[min(t, parole.count)...])
+        let r = resto.map { $0.piegata }
+        // «…anzi» in fondo («non è male, anzi»): non è un ripensamento
+        if r.isEmpty { return testo }
+        // «lascia stare», «niente», «lascia perdere», «non importa»: non fa niente
+        if ["niente", "nulla", "lascia", "lasciamo", "non"].contains(r[0]) { return "" }
+        if verbiComposti.contains(r[0]) || ["play", "pausa", "chiudi", "apri"].contains(r[0]) { return resto.map { $0.detta }.joined(separator: " ") }
+        // il valore nuovo col verbo di prima: «metti Sfera, anzi i Daft Punk» → «metti i Daft Punk»
+        guard let primo = p.first, verbiComposti.contains(primo) else { return resto.map { $0.detta }.joined(separator: " ") }
+        // il verbo con le parole fisse che lo seguono («metti in lista», «aggiungi alla spesa» restano col valore nuovo)
+        return ([parole[0].detta] + resto.map { $0.detta }).joined(separator: " ")
+    }
+
     /// 12.0 (11) · l'interruzione, come fra persone: le parole che il signore dice davvero mentre JARVIS parla, separate dalla sua
     /// eco. Una parola è eco solo se JARVIS la sta dicendo E fa coppia con una vicina come nella sua frase («il bar ha perso»
     /// sentito mentre lo dice). Prima bastava che JARVIS l'avesse usata una volta: «ma», «non», «cosa», «dici» del signore

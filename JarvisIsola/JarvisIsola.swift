@@ -12,7 +12,10 @@ import AppIntents
 
 @main
 struct IsolaJarvisBundle: WidgetBundle {
-    var body: some Widget { IsolaJarvisWidget() }
+    var body: some Widget {
+        IsolaJarvisWidget()
+        if #available(iOS 18.0, *) { ControlloJarvis() }        // 12.0 (12) · B4: il controllo JARVIS
+    }
 }
 
 private let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)

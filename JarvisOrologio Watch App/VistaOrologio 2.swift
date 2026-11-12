@@ -442,6 +442,7 @@ struct VistaOrologio: View {
                     .transition(.opacity)
                     .opacity(acceso ? 1 : 0)
                 Button { jarvis.toccaReattore() } label: { reattore }   // 26 ott sera: niente click in più, la vibrazione d'inizio ascolto basta
+                    .modifier(DoppioTocco())                                // 12.0 (12) · C2: il doppio tocco delle dita fa come il tocco
                     .buttonStyle(StileStarkOrologio())
                     .scaleEffect(acceso ? 1 : 0.6)
                     .opacity(acceso ? 1 : 0)
@@ -1327,5 +1328,18 @@ struct BarraSvuotaOrologio: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// 12.0 (12) · C2: sugli Apple Watch col doppio tocco delle dita (Series 9 e successivi, Ultra 2, watchOS 11) il gesto fa come il
+/// tocco sul reattore: ferma JARVIS mentre parla e lo mette in ascolto, senza toccare lo schermo. Sul SE 2 il gesto non c'è:
+/// resta il tocco.
+private struct DoppioTocco: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(watchOS 11.0, *) {
+            content.handGestureShortcut(.primaryAction)
+        } else {
+            content
+        }
     }
 }

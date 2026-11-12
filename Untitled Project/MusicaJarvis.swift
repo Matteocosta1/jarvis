@@ -267,9 +267,49 @@ final class LettoreMusica: ObservableObject {
         await avvia()                                              // 12.0 (11): parte subito (non ripassa dal controllo della coda)
     }
 
+    /// 12.0 (12) · B1: «metti Popstar di Sfera Ebbasta», «fammi sentire i Daft Punk», «metti la playlist Allenamento» detto da
+    /// qualsiasi schermata: cerca (nel catalogo, o fra le sue playlist se dice «playlist») e fa partire il risultato che combacia
+    /// davvero con le parole dette, senza aprire la sezione. Nil: niente di abbastanza simile (decide il cervello: «metti a posto
+    /// la cucina» non fa partire una canzone a caso). Altrimenti il nome di quello che suona, o il perché non parte.
+    func mettiDetto(_ detto: String) async -> (nome: String?, errore: String?)? {
+        guard await CatalogoMusica.autorizzato() else { return (nil, CatalogoMusica.senzaPermesso) }
+        var parole = FineFrase.paroleNude(detto)
+        let attacchi: Set<String> = ["la", "il", "lo", "l", "i", "gli", "le", "un", "una", "po", "di", "qualcosa", "canzone", "brano", "pezzo",
+                                     "album", "disco", "musica", "dei", "degli", "delle", "del", "della"]
+        let playlist = parole.contains("playlist")
+        parole.removeAll { $0 == "playlist" }
+        while let f = parole.first, attacchi.contains(f) { parole.removeFirst() }
+        guard !parole.isEmpty else { return nil }
+        let cercato = parole.joined(separator: " ")
+        if playlist {
+            let tutte = await CatalogoMusica.playlistLibreria()
+            let punti = tutte.map { LettoreMusica.punteggio(cercato, in: $0.name) }
+            guard let m = punti.max(), m >= 0.6, let i = punti.firstIndex(of: m) else { return nil }
+            await metti(tutte[i])
+            if let e = errore { return (nil, e) }
+            return (tutte[i].name, nil)
+        }
+        let brani = await CatalogoMusica.cerca(cercato)
+        let punti = brani.prefix(12).map { LettoreMusica.punteggio(cercato, in: "\($0.title) \($0.artistName)") }
+        guard let m = punti.max(), m >= 0.6, let i = punti.firstIndex(of: m) else { return nil }
+        await metti(brani, da: brani[i])
+        if let e = errore { return (nil, e) }
+        return ("\(brani[i].title) di \(brani[i].artistName)", nil)
+    }
+
+    /// Quanto le parole dette stanno nel nome trovato (0…1): conta le parole di almeno 3 lettere («di», «e» non contano).
+    nonisolated static func punteggio(_ detto: String, in nome: String) -> Double {
+        let cercate = FineFrase.paroleNude(detto).filter { $0.count >= 3 }
+        guard !cercate.isEmpty else { return 0 }
+        let trovate = FineFrase.paroleNude(nome)
+        let dentro = cercate.filter { c in trovate.contains { $0 == c || ($0.count >= 4 && c.count >= 4 && ($0.hasPrefix(c) || c.hasPrefix($0))) } }
+        return Double(dentro.count) / Double(cercate.count)
+    }
+
     /// Una cosa sola: un brano, una radio, una playlist intera.
     func metti<T: PlayableMusicItem>(_ cosa: T) async {
         guard await CatalogoMusica.autorizzato() else { errore = CatalogoMusica.senzaPermesso; return }
+        if let p = cosa as? Playlist { Abitudini.segna("playlist", p.name) }      // 12.0 (12) · B6: le sue abitudini
         lettore.queue = [cosa]
         codaMessa = true
         await avvia()
@@ -700,6 +740,7 @@ struct VistaMusica: View {
         HStack(spacing: 8) {
             Text("⌕").foregroundStyle(Color.ciano)
             TextField("", text: $testo, prompt: Text("Artisti, brani, album").foregroundStyle(Color.tenue))
+                .campoRegia("ricerca", testo: $testo, cerca: true)       // 12.0 (12) · B2: «scrivi nella ricerca Popstar»
                 .font(.system(size: 15)).foregroundStyle(.white)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.search)

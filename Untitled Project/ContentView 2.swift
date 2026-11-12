@@ -1502,6 +1502,7 @@ struct ContentView: View {
     /// in cui sono state davanti (le chiuse escono), per «Jarvis, quella di prima».
     private func davantiCambiata(_ d: UUID?) {
         Regia.condivisa.evento(pila.voci.first { $0.id == d }.map { "davanti \($0.sezione.nome)" } ?? "davanti JARVIS")   // 12.0 (10)
+        if let v = pila.voci.first(where: { $0.id == d }) { Abitudini.segna("sezione", v.sezione.nome) }   // 12.0 (12) · B6: le sue abitudini
         if let d {
             giroDavanti.removeAll { id in id == d || !pila.voci.contains { $0.id == id } }
             giroDavanti.append(d)

@@ -196,6 +196,7 @@ struct VistaGitHub: View {
         Pannello(titolo: dettatura.attivo ? "LA ASCOLTO…" : "NUOVA ISSUE", tinta: tinta) {
             HStack(spacing: 10) {
                 TextField("Titolo del problema o dell'idea, o lo detti", text: $titoloIssue)
+                    .campoRegia("titolo", testo: $titoloIssue)       // 12.0 (12) · B2 (aprire la issue resta col tasto)
                     .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(.white)
                     .padding(10).background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 10))
                 Button {
@@ -634,6 +635,7 @@ struct VistaArchivio: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Color.tenue)
                     TextField("Cerca nell'archivio", text: $cerca)
+                        .campoRegia("ricerca", testo: $cerca, cerca: true) { Task { await carica() } }   // 12.0 (12) · B2
                         .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(.white)
                         .submitLabel(.search).onSubmit { Task { await carica() } }
                         .focused($cercaAttiva)
@@ -654,6 +656,7 @@ struct VistaArchivio: View {
                 }
                 Pannello(titolo: "CARICA", tinta: tinta) {
                     TextField("Cartella (es. denim, serate, contratti)", text: $cartellaNuova)
+                        .campoRegia("cartella nuova", testo: $cartellaNuova)   // 12.0 (12) · B2
                         .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(.white)
                         .padding(8).background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 8))
                     HStack(spacing: 10) {

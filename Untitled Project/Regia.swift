@@ -170,11 +170,84 @@ final class Regia {
         var viste = Set<String>()
         var tutte: [AzioneRegia] = []
         for s in scene(di: nome) { for a in s.azioni where viste.insert(Regia.chiave(a.nome)).inserted { tutte.append(a) } }
+        if let scrivi = azioneScrivi(nome) { tutte.append(scrivi) }      // 12.0 (12) · B2: i campi di testo della sezione
         return tutte
     }
 
     /// Il nome della sezione davanti (nil: JARVIS è davanti).
     private var nomeDavanti: String? { pila?.voceDavanti?.sezione.nome }
+    /// 12.0 (12): il nome della sezione davanti, per chi sta fuori dalla regia (Jarvis: «avanti» con la Musica davanti).
+    var davantiNome: String? { nomeDavanti }
+
+    // MARK: B2 · i campi di testo (12.0 (12))
+
+    /// Il signore non deve scrivere nei campi: ogni campo di testo di una sezione si presenta alla regia (`campoRegia`), che ci
+    /// scrive dentro a voce («scrivi nella ricerca Popstar») e, se è un campo di ricerca, la fa partire.
+    private struct Campo {
+        let sezione: String
+        let nome: String
+        let scrivi: (String) -> Void
+        let leggi: () -> String
+        let invio: (() -> Void)?
+        let cerca: Bool
+    }
+    private var campiTesto: [UUID: Campo] = [:]
+
+    func mettiCampo(_ chiave: UUID, sezione: String, nome: String, scrivi: @escaping (String) -> Void, leggi: @escaping () -> String,
+                    invio: (() -> Void)?, cerca: Bool) {
+        campiTesto[chiave] = Campo(sezione: sezione, nome: nome, scrivi: scrivi, leggi: leggi, invio: invio, cerca: cerca)
+    }
+
+    func togliCampo(_ chiave: UUID) { campiTesto[chiave] = nil }
+
+    private func campi(di nome: String) -> [Campo] {
+        let k = Regia.chiave(nome)
+        return campiTesto.values.filter { Regia.chiave($0.sezione) == k }.sorted { $0.nome < $1.nome }
+    }
+
+    /// L'azione che scrive nei campi della sezione: «testo» (e «campo», se ce n'è più di uno; «invia»: «sì» per premere il tasto).
+    private func azioneScrivi(_ nome: String) -> AzioneRegia? {
+        let lista = campi(di: nome)
+        guard !lista.isEmpty else { return nil }
+        let nomi = lista.map { c in c.nome + (c.leggi().isEmpty ? "" : " («\(Regia.taglia(c.leggi(), 40))»)") }.joined(separator: ", ")
+        return AzioneRegia("scrivi_campo", "scrive nel campo di testo (campi: \(nomi)); invia=sì preme il suo tasto", valore: "testo",
+                           frasi: ["scrivi *", "scrivici *", "digita *", "scrivi nel campo *"]) { [weak self] v in
+            guard let self else { return .no("regia non pronta") }
+            return self.scriviNelCampo(sezione: nome, campo: v["campo"], testo: v["testo"] ?? "", invia: Regia.chiave(v["invia"] ?? "") == "si")
+        }
+    }
+
+    private func scriviNelCampo(sezione: String, campo detto: String?, testo grezzo: String, invia: Bool) -> EsitoRegia {
+        let lista = campi(di: sezione)
+        var testo = grezzo.trimmingCharacters(in: .whitespacesAndNewlines)
+        var scelto: Campo?
+        if let d = detto, !d.isEmpty { scelto = Regia.scegli(d, fra: lista, testo: { $0.nome }) }
+        // «scrivi nella ricerca Popstar»: il campo detto davanti al testo
+        if scelto == nil {
+            let p = testo.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+            let attacchi: Set<String> = ["nel", "nella", "nello", "nell", "in", "sul", "sulla", "al", "alla", "campo"]
+            if let primo = p.first.map({ Regia.chiave($0) }), attacchi.contains(primo) {
+                for c in lista {
+                    let parole = c.nome.split(separator: " ").count
+                    var k = 1
+                    while k < p.count, Regia.chiave(p[k]) == "campo" { k += 1 }
+                    if p.count > k + parole - 1, Regia.chiave(p[k..<(k + parole)].joined()) == Regia.chiave(c.nome) {
+                        scelto = c
+                        testo = p[(k + parole)...].joined(separator: " ")
+                        break
+                    }
+                }
+            }
+        }
+        guard let c = scelto ?? lista.first else { return .no("qui non ci sono campi di testo") }
+        guard !testo.isEmpty else { return .no("niente da scrivere") }
+        c.scrivi(testo)
+        evento("\(sezione): scritto «\(Regia.taglia(testo, 40))» in \(c.nome)")
+        if (invia || c.cerca), let invio = c.invio { invio() }
+        let nomeCampo = c.nome, scritto = testo
+        return .fatto("scritto «\(testo)» nel campo \(c.nome)" + ((invia || c.cerca) && c.invio != nil ? " e premuto il suo tasto" : ""),
+                      battuta: { Battute.campoScritto(nomeCampo, scritto) })
+    }
 
     private func statoDi(_ nome: String) -> String? {
         let righe = scene(di: nome).map(\.stato).filter { !$0.isEmpty }
@@ -194,6 +267,7 @@ final class Regia {
             pezzi.append("DAVANTI \(d): " + Regia.taglia(stato, 3000))
             let a = azioni(di: d)
             if !a.isEmpty { pezzi.append("azioni \(d): " + Regia.elenco(a)) }
+            if let p = proposta, Date().timeIntervalSince(p.quando) < 45 { pezzi.append("HAI APPENA PROPOSTO: \(p.testo) (se dice sì la fa l'app)") }
         } else {
             pezzi.append("DAVANTI JARVIS (la schermata principale)")
         }
@@ -374,26 +448,263 @@ final class Regia {
 
     /// Le azioni più usate partono subito: la frase chiede un'azione della sezione davanti («aggiungi il latte» con la Spesa
     /// davanti)? Allora la fa e restituisce la battuta di JARVIS (vuota: basta la vibrazione). Nil: la frase va al cervello.
-    func subito(_ frase: String) async -> String? {
+    func subito(_ fraseDetta: String) async -> String? {
+        // 12.0 (12) · B6: aveva appena proposto qualcosa («La solita playlist?»): un sì la fa, qualsiasi altra frase la lascia cadere
+        if let p = proposta {
+            proposta = nil
+            if Date().timeIntervalSince(p.quando) < 45, Regia.eAssenso(fraseDetta) {
+                evento("fatta la proposta: \(p.testo)")
+                return await p.fai() ?? ""
+            }
+        }
+        // 12.0 (12) · B3: «annulla», «lascia stare», «non mandarlo» con un invio (o un'eliminazione) in attesa del sì
+        if inSospeso != nil, Regia.eAnnulla(fraseDetta) {
+            inSospeso = nil
+            evento("annullato")
+            return Battute.annullato()
+        }
+        // 12.0 (12) · B3: vale l'ultima intenzione («metti Sfera… no anzi, i Daft Punk»); vuota: ha cambiato idea, niente da fare
+        let frase = FineFrase.ultimaIntenzione(fraseDetta)
+        if frase.isEmpty { return fraseDetta.isEmpty ? nil : Battute.lasciamoStare() }
         let parole = Regia.paroleComando(frase)
-        guard !parole.isEmpty, !FineFrase.comandoComposto(frase) else { return nil }   // più comandi in fila: li fa il cervello
+        guard !parole.isEmpty else { return nil }
+        // 12.0 (12) · B1: più comandi in fila («apri la spesa e aggiungi il latte»): se l'app li sa fare tutti, li fa lei subito
+        if FineFrase.comandoComposto(frase) { return await subitoComposto(frase) }
+        return await subitoUno(frase)
+    }
+
+    /// Un comando solo: la sezione davanti, i tasti della musica, poi (B1) le intenzioni che valgono da qualsiasi schermata.
+    private func subitoUno(_ frase: String) async -> String? {
+        let parole = Regia.paroleComando(frase)
+        guard !parole.isEmpty else { return nil }
         // prima la sezione davanti, poi le azioni che valgono ovunque (i tasti della musica, se c'è qualcosa in coda)
         let d = nomeDavanti ?? "JARVIS"
         let davanti = nomeDavanti.map { azioni(di: $0) } ?? []
         for a in davanti + globali where !a.conferma {
             for schema in a.frasi {
-                guard let valore = Regia.combacia(parole, schema) else { continue }
+                guard let m = Regia.combaciaDove(parole, schema) else { continue }
+                let valore = m.valore
                 // «apri la spesa» con la Posta davanti è la sezione Spesa, non una mail che parla di spesa
                 if a.nome == "apri", !valore.isEmpty, Regia.destinazione(valore) != nil { continue }
                 var valori: [String: String] = [:]
-                if let v = a.valore, !valore.isEmpty { valori[v] = valore }
+                // i campi di testo vogliono le parole come sono state dette (maiuscole e accenti), non piegate
+                if let v = a.valore, !valore.isEmpty { valori[v] = a.nome == "scrivi_campo" ? Regia.originale(frase, da: m.da, a: m.a) : valore }
                 let e = await a.esegui(valori)
                 if !e.ok && e.battuta == nil { continue }         // non era per questa azione: si prova la prossima (o il cervello)
                 if e.ok { evento("\(d): \(Regia.taglia(e.dato, 80))") }
                 return e.battuta?() ?? ""
             }
         }
+        return await intenzione(frase)
+    }
+
+    // MARK: B1 · da qualsiasi schermata (12.0 (12))
+
+    /// Le intenzioni frequenti riconosciute da qualsiasi schermata: la regia apre la sezione se serve e fa l'azione, senza
+    /// cervello, con la battuta di JARVIS. Le frasi dicono la sezione («alla spesa», «in lista»): «metti in ordine la stanza»
+    /// non finisce nella lista. Quelle senza (`frasiDentro`) valgono quando la sezione è già davanti o è stata appena aperta
+    /// nella stessa frase («apri la spesa e aggiungi il latte»).
+    private struct Intenzione {
+        let sezione: String
+        let azione: String
+        let valore: String?
+        let frasi: [String]
+        var frasiDentro: [String] = []
+    }
+
+    private static let intenzioni: [Intenzione] = [
+        Intenzione(sezione: "Spesa", azione: "aggiungi", valore: "cosa",
+                   frasi: ["aggiungi * alla spesa", "aggiungi * alla lista della spesa", "aggiungi * alla lista", "aggiungi * in lista",
+                           "metti * in lista", "metti * nella lista", "metti * alla spesa", "metti in lista *", "segna * nella spesa",
+                           "segna * nella lista", "segna * in lista", "devo comprare *", "compra *", "comprami *"],
+                   frasiDentro: ["aggiungi *", "aggiungimi *", "segna *", "segnami *", "metti *"]),
+        Intenzione(sezione: "Spesa", azione: "togli", valore: "cosa",
+                   frasi: ["togli * dalla spesa", "togli * dalla lista", "leva * dalla lista", "leva * dalla spesa", "cancella * dalla lista",
+                           "cancella * dalla spesa", "depenna *"],
+                   frasiDentro: ["togli *", "toglimi *", "leva *", "levami *", "cancella *"]),
+        Intenzione(sezione: "Spesa", azione: "preso", valore: "cosa", frasi: ["ho preso * della spesa"], frasiDentro: ["ho preso *", "preso *", "spunta *"]),
+        Intenzione(sezione: "Meteo", azione: "adesso", valore: nil,
+                   frasi: ["che tempo fa", "che tempo fa oggi", "che tempo fa adesso", "che tempo fa fuori", "com e il tempo", "com e il tempo oggi",
+                           "com e il meteo", "che tempo c e", "dimmi il meteo", "dimmi che tempo fa", "il meteo di oggi", "meteo di oggi"]),
+    ]
+
+    /// B1: un'intenzione detta da qualsiasi schermata (o, `dentro`, con la sua sezione davanti). Nil: non è sua.
+    private func intenzione(_ frase: String, dentro: String? = nil) async -> String? {
+        let parole = Regia.paroleComando(frase)
+        for i in Regia.intenzioni {
+            let schemi = i.frasi + ((dentro ?? nomeDavanti) == i.sezione ? i.frasiDentro : [])
+            for schema in schemi {
+                guard let valore = Regia.combacia(parole, schema) else { continue }
+                var valori: [String: String] = [:]
+                if let v = i.valore, !valore.isEmpty { valori[v] = valore }
+                let e = await passo(Passo(sezione: i.sezione, azione: i.azione, valori: valori))
+                if !e.ok && e.battuta == nil { return nil }       // la sezione non l'ha fatta: decide il cervello
+                return e.battuta?() ?? ""
+            }
+        }
+        // la musica: «metti Popstar di Sfera Ebbasta», «fammi sentire i Daft Punk», «metti un po' di musica»
+        return await musicaDetta(frase)
+    }
+
+    private static let frasiMetti = ["metti su *", "metti *", "mettimi *", "fammi sentire *", "fammi ascoltare *", "riproduci *", "suona *",
+                                     "suonami *", "fai partire *", "spara *"]
+    private static let musicaGenerica: Set<String> = ["metti un po di musica", "metti musica", "metti della musica", "metti la musica",
+                                                       "metti su un po di musica", "metti su qualcosa", "metti qualcosa", "fammi sentire qualcosa",
+                                                       "fammi sentire un po di musica", "un po di musica", "musica", "metti un po di musica dai"]
+
+    /// B1: la musica da qualsiasi schermata, senza aprire la sezione: cerca, sceglie il risultato che combacia davvero con le
+    /// parole dette e lo fa partire (la musica suona dietro, il disco gira nel Dock). Nil: non era musica, o niente di
+    /// abbastanza simile: decide il cervello.
+    private func musicaDetta(_ frase: String) async -> String? {
+        let parole = Regia.paroleComando(frase)
+        if Regia.musicaGenerica.contains(parole.joined(separator: " ")) {
+            let l = LettoreMusica.condiviso
+            await l.play()
+            if let e = l.errore { return e }
+            evento("musica: play")
+            return Battute.musica("play")
+        }
+        for schema in Regia.frasiMetti {
+            guard let m = Regia.combaciaDove(parole, schema, altro: Regia.nonMusica) else { continue }
+            let detto = Regia.originale(frase, da: m.da, a: m.a)
+            guard let esito = await LettoreMusica.condiviso.mettiDetto(detto) else { return nil }
+            if let e = esito.errore { return e }
+            guard let nome = esito.nome else { return nil }
+            evento("musica: \(Regia.taglia(nome, 60))")
+            Abitudini.segna("musica", detto)
+            return Battute.musicaMetti(nome)
+        }
         return nil
+    }
+
+    /// Parole che dicono che «metti …» non è musica (una sveglia, la lista, un posto, una pausa): va al cervello.
+    private static let nonMusica: Set<String> = ["sveglia", "timer", "promemoria", "lista", "spesa", "calendario", "appuntamento", "messaggio",
+                                                 "messaggi", "mail", "email", "posta", "foto", "video", "sezione", "sezioni", "chat", "jarvis",
+                                                 "telefono", "ordine", "posto", "pausa", "nota", "appunti", "parte", "luce", "luci", "allarme",
+                                                 "volume", "sottovoce", "silenzioso", "riservato"]
+
+    // MARK: B1 · più comandi in fila, senza cervello (12.0 (12))
+
+    /// «Apri la spesa e aggiungi il latte», «chiudi tutto e dimmi il meteo», «apri la musica e metti Sfera»: se l'app sa fare
+    /// ogni pezzo li fa uno dopo l'altro, subito; se anche uno solo non lo sa fare, nessuno parte e la frase va al cervello
+    /// (che li fa in fila con la regia). La battuta è quella dell'ultimo pezzo.
+    private func subitoComposto(_ frase: String) async -> String? {
+        let pezzi = Regia.pezzi(frase)
+        guard pezzi.count >= 2, pezzi.count <= 4 else { return nil }
+        // prima si controlla che si sappiano fare tutti (senza fare niente), con la sezione che sarà davanti a ogni passo
+        var davanti = nomeDavanti
+        var piano: [(pezzo: String, tipo: Pezzo)] = []
+        for p in pezzi {
+            guard let t = riconosci(p, davanti: davanti) else { return nil }
+            if case .apri(let n) = t { davanti = n }
+            if case .chiudiTutto = t { davanti = nil }
+            if case .intenzione(let n) = t { davanti = n }
+            piano.append((p, t))
+        }
+        var battuta: String?
+        for (k, voce) in piano.enumerated() {
+            switch voce.tipo {
+            case .apri(let n):
+                let e = await apri(n)
+                guard e.ok else { return k == 0 ? nil : (e.battuta?() ?? "") }
+                battuta = Regia.aperturaDi(n)
+            case .chiudiTutto:
+                vai?(.chiudiTutto)
+                evento("chiuse tutte le sezioni")
+                try? await Task.sleep(for: .milliseconds(350))
+                battuta = Battute.chiusoTutto()
+            case .intenzione(let n):
+                battuta = await intenzione(voce.pezzo, dentro: n)
+            case .musica:
+                battuta = await musicaDetta(voce.pezzo)
+            }
+        }
+        evento("in fila: " + pezzi.joined(separator: " → "))
+        return battuta ?? ""
+    }
+
+    private enum Pezzo { case apri(String), chiudiTutto, intenzione(String), musica }
+
+    /// 12.0 (12): la frase la farebbe la regia da sola? (Senza fare niente: serve per non chiedere al cervello una risposta
+    /// anticipata che sarebbe buttata.)
+    func forseLocale(_ frase: String) -> Bool {
+        let f = FineFrase.ultimaIntenzione(frase)
+        if f.isEmpty { return true }
+        if inSospeso != nil, Regia.eAnnulla(f) { return true }
+        if let p = proposta, Date().timeIntervalSince(p.quando) < 45, Regia.eAssenso(f) { return true }
+        let pezzi = FineFrase.comandoComposto(f) ? Regia.pezzi(f) : [f]
+        var davanti = nomeDavanti
+        for pezzo in pezzi {
+            guard let t = riconosci(pezzo, davanti: davanti) else { return false }
+            switch t {
+            case .apri(let n), .intenzione(let n): davanti = n
+            case .chiudiTutto: davanti = nil
+            case .musica: break
+            }
+        }
+        return true
+    }
+
+    /// Cosa sarebbe un pezzo di frase per l'app, con `davanti` come sezione davanti in quel momento. Nil: non lo sa fare da sola.
+    private func riconosci(_ pezzo: String, davanti: String?) -> Pezzo? {
+        let parole = Regia.paroleComando(pezzo)
+        guard !parole.isEmpty else { return nil }
+        let j = parole.joined(separator: " ")
+        if ["chiudi tutto", "chiudi tutte le sezioni", "chiudile tutte"].contains(j) { return .chiudiTutto }
+        for schema in ["apri *", "aprimi *", "mostrami *", "vai alla *", "vai al *", "vai in *", "portami alla *", "portami al *", "porta davanti *"] {
+            if let v = Regia.combacia(parole, schema, altro: []), let d = Regia.destinazione(v), !d.dopoLaVoce { return .apri(d.nome) }
+        }
+        for i in Regia.intenzioni {
+            let schemi = i.frasi + (davanti == i.sezione ? i.frasiDentro : [])
+            if schemi.contains(where: { Regia.combacia(parole, $0) != nil }) { return .intenzione(i.sezione) }
+        }
+        if Regia.musicaGenerica.contains(j) || Regia.frasiMetti.contains(where: { Regia.combacia(parole, $0, altro: Regia.nonMusica) != nil }) {
+            return .musica
+        }
+        return nil
+    }
+
+    /// I pezzi di una frase con più comandi: «apri la spesa e poi aggiungi il latte» → «apri la spesa» · «aggiungi il latte».
+    /// Si taglia solo davanti a un verbo di comando («aggiungi pane e latte» resta un pezzo solo).
+    static func pezzi(_ frase: String) -> [String] {
+        let parole = frase.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let legami: Set<String> = ["e", "ed", "poi", "quindi", "dopo"]
+        let ponte: Set<String> = ["poi", "anche", "intanto", "dopo", "pure", "subito"]
+        var pezzi: [[String]] = [[]]
+        var i = 0
+        while i < parole.count {
+            let w = Regia.chiave(parole[i])
+            if legami.contains(w), !(pezzi.last ?? []).isEmpty {
+                var j = i + 1
+                while j < parole.count, ponte.contains(Regia.chiave(parole[j])) { j += 1 }
+                if j < parole.count, FineFrase.comandoComposto("x y " + w + " " + parole[j...].joined(separator: " ")) {
+                    pezzi.append([])
+                    i = j
+                    continue
+                }
+            }
+            pezzi[pezzi.count - 1].append(parole[i])
+            i += 1
+        }
+        return pezzi.map { $0.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,;.")) }.filter { !$0.isEmpty }
+    }
+
+    // MARK: B6 · la proposta (12.0 (12))
+
+    /// Quello che JARVIS ha appena proposto («Le metto la solita playlist?»): un sì nei 45 secondi dopo la fa, senza cervello.
+    var proposta: (testo: String, quando: Date, fai: @MainActor () async -> String?)?
+
+    /// Apre una sezione da fuori (la proposta di Abitudini): come «apri».
+    func apriDaFuori(_ nome: String) async -> String? {
+        let e = await apri(nome)
+        guard e.ok else { return nil }
+        return Regia.aperturaDi(nome)
+    }
+
+    /// La frase d'apertura della sezione (Battute), come quando la si apre a voce.
+    static func aperturaDi(_ nome: String) -> String {
+        guard let d = destinazione(nome), case .apri(let r) = d.strada else { return "" }
+        return Battute.apertura(r) ?? ""
     }
 
     /// Le azioni rapide che valgono ovunque, con qualsiasi sezione davanti: i tasti della musica, se c'è qualcosa in coda.
@@ -438,6 +749,29 @@ final class Regia {
     ]
 
     /// Le parole di un comando: minuscole, senza accenti né punteggiatura, senza il nome e le cortesie davanti e in fondo.
+    /// 12.0 (12): quante parole restano togliendo solo le cortesie davanti (per ritrovare le parole com'erano dette).
+    static func paroleComandoDavanti(_ frase: String) -> Int {
+        var p = FineFrase.paroleNude(frase)
+        while let f = p.first, cortesieDavanti.contains(f) { p.removeFirst() }
+        return p.count
+    }
+
+    private static let cortesieDavanti: Set<String> = ["ok", "okay", "dai", "allora", "ehi", "hey", "per", "favore", "senti", "ecco", "bene", "perfetto", "sir"]
+
+    /// 12.0 (12) · errore 2: la frase è un tasto della musica («avanti», «pausa»…)?
+    static func eTastoMusica(_ frase: String) -> Bool {
+        let p = paroleComando(frase)
+        return tastiMusica.contains { a in a.frasi.contains { combacia(p, $0) != nil } }
+    }
+
+    /// 12.0 (12) · B3: «annulla», «lascia stare», «non mandarlo» con qualcosa in attesa del sì.
+    static func eAnnulla(_ frase: String) -> Bool {
+        let p = paroleComando(frase).joined(separator: " ")
+        return ["annulla", "annullalo", "annullala", "lascia stare", "lascia perdere", "non mandarlo", "non mandarla", "non inviarlo", "non inviarla",
+                "no non mandarlo", "no non mandarla", "no lascia stare", "no annulla", "non farlo", "no non farlo", "non chiamare", "non chiamarlo",
+                "non chiamarla", "non eliminarlo", "non eliminarla", "ferma tutto", "niente", "no niente", "lascia"].contains(p)
+    }
+
     static func paroleComando(_ frase: String) -> [String] {
         var p = FineFrase.paroleNude(frase)
         let davanti: Set<String> = ["ok", "okay", "dai", "allora", "ehi", "hey", "per", "favore", "senti", "ecco", "bene", "perfetto", "sir"]
@@ -450,17 +784,52 @@ final class Regia {
     /// La frase combacia con lo schema? «aggiungi *»: le parole dello schema all'inizio, il resto (almeno una parola) è il valore;
     /// senza «*» la frase deve essere proprio quella. Nil: non combacia. Il valore non può parlare d'altro (musica, sveglie,
     /// messaggi…): quella frase va al cervello.
-    static func combacia(_ parole: [String], _ schema: String) -> String? {
+    static func combacia(_ parole: [String], _ schema: String, altro: Set<String>? = nil) -> String? {
+        combaciaDove(parole, schema, altro: altro)?.valore
+    }
+
+    /// 12.0 (12): come `combacia`, con dove sta il valore fra le parole (per riprenderlo com'era detto) e l'asterisco anche in
+    /// mezzo («aggiungi * alla spesa»). Il valore non comincia con «che» («segna che domani…» non è una cosa da comprare).
+    static func combaciaDove(_ parole: [String], _ schema: String, altro: Set<String>? = nil) -> (valore: String, da: Int, a: Int)? {
         let s = FineFrase.paroleNude(schema.replacingOccurrences(of: "*", with: " stellaregia "))
-        let conValore = s.last == "stellaregia"
-        let fisse = conValore ? Array(s.dropLast()) : s
-        guard parole.count >= fisse.count + (conValore ? 1 : 0), Array(parole.prefix(fisse.count)) == fisse else { return nil }
-        if !conValore { return parole.count == fisse.count ? "" : nil }
-        var resto = Array(parole.dropFirst(fisse.count))
+        guard let k = s.firstIndex(of: "stellaregia") else { return parole == s ? ("", 0, 0) : nil }
+        let prima = Array(s[..<k]), dopo = Array(s[(k + 1)...])
+        guard parole.count >= prima.count + dopo.count + 1, Array(parole.prefix(prima.count)) == prima,
+              Array(parole.suffix(dopo.count)) == dopo else { return nil }
+        var da = prima.count
+        let a = parole.count - dopo.count
         let articoli: Set<String> = ["il", "lo", "la", "i", "gli", "le", "l", "un", "uno", "una", "del", "dello", "della", "dei", "degli", "delle", "anche"]
-        while let f = resto.first, articoli.contains(f) { resto.removeFirst() }
-        guard !resto.isEmpty, !resto.contains(where: { Regia.altroMondo.contains($0) }) else { return nil }
-        return resto.joined(separator: " ")
+        while da < a, articoli.contains(parole[da]) { da += 1 }
+        let resto = Array(parole[da..<a])
+        let fuori = altro ?? Regia.altroMondo
+        guard !resto.isEmpty, resto.first != "che", !resto.contains(where: { fuori.contains($0) }) else { return nil }
+        return (resto.joined(separator: " "), da, a)
+    }
+
+    /// 12.0 (12): le parole dalla `da` alla `a` (contate come `paroleComando`) prese dalla frase com'era detta: maiuscole, accenti,
+    /// apostrofi («Popstar», «perché», «l'ombrello»).
+    static func originale(_ frase: String, da: Int, a: Int) -> String {
+        // i pezzi di parola come li conta `paroleNude` (lettere e cifre), con dove stanno nella frase
+        var pezzi: [Range<String.Index>] = []
+        var inizio: String.Index?
+        var i = frase.startIndex
+        while i < frase.endIndex {
+            let c = frase[i]
+            if c.isLetter || c.isNumber { if inizio == nil { inizio = i } }
+            else if let s = inizio { pezzi.append(s..<i); inizio = nil }
+            i = frase.index(after: i)
+        }
+        if let s = inizio { pezzi.append(s..<frase.endIndex) }
+        // via il nome di JARVIS (come `paroleNude`) e le cortesie davanti (come `paroleComando`)
+        let nude = FineFrase.paroleNude(frase)
+        pezzi = pezzi.filter { r in
+            let p = String(frase[r]).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            return !FineFrase.nomiJarvis.contains(where: { p.hasPrefix($0) })
+        }
+        let davanti = nude.count - Regia.paroleComandoDavanti(frase)
+        let x = davanti + da, y = davanti + a
+        guard x < y, y <= pezzi.count else { return nude.dropFirst(x).prefix(max(0, y - x)).joined(separator: " ") }
+        return String(frase[pezzi[x].lowerBound..<pezzi[y - 1].upperBound])
     }
 
     /// Parole che, dentro il valore di una frase rapida, dicono che la frase parla d'altro: va al cervello.
@@ -601,6 +970,7 @@ private struct PresentaRegia: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .environment(\.sezioneRegia, nome)                   // 12.0 (12) · B2: i campi di testo dentro sanno di chi sono
             .sulloSchermo(stato)
             .onAppear { Regia.condivisa.metti(chiave, nome: nome, stato: stato, azioni: azioni, davanti: !dietro) }
             .onChange(of: stato) { _, nuovo in Regia.condivisa.metti(chiave, nome: nome, stato: nuovo, azioni: azioni, davanti: !dietro) }
@@ -613,6 +983,48 @@ extension View {
     /// La sezione dice a JARVIS cosa mostra e cosa sa fare (vedi `Regia`). Vale anche come `sulloSchermo`.
     func regia(_ nome: String, stato: String, azioni: [AzioneRegia]) -> some View {
         modifier(PresentaRegia(nome: nome, stato: stato, azioni: azioni))
+    }
+
+    /// 12.0 (12) · B2: il campo di testo si presenta alla regia, che ci scrive a voce. `cerca`: è un campo di ricerca, scritto il
+    /// testo parte da solo `invio` (se c'è); senza, `invio` lo preme solo se il signore lo chiede («scrivi … e invia»).
+    func campoRegia(_ nome: String, testo: Binding<String>, cerca: Bool = false, invio: (() -> Void)? = nil) -> some View {
+        modifier(CampoRegia(nome: nome, testo: testo, cerca: cerca, invio: invio))
+    }
+}
+
+/// Di quale sezione sono i campi di testo qui dentro (lo dice `regia`).
+private struct ChiaveSezioneRegia: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var sezioneRegia: String? {
+        get { self[ChiaveSezioneRegia.self] }
+        set { self[ChiaveSezioneRegia.self] = newValue }
+    }
+}
+
+/// 12.0 (12) · B2: un campo di testo che la regia sa riempire.
+private struct CampoRegia: ViewModifier {
+    let nome: String
+    @Binding var testo: String
+    let cerca: Bool
+    let invio: (() -> Void)?
+    @Environment(\.sezioneRegia) private var sezione
+    @State private var chiave = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { registra() }
+            .onChange(of: sezione) { _, _ in registra() }
+            .onDisappear { Regia.condivisa.togliCampo(chiave) }
+    }
+
+    private func registra() {
+        guard let sezione else { return }
+        let campo = $testo
+        Regia.condivisa.mettiCampo(chiave, sezione: sezione, nome: nome, scrivi: { campo.wrappedValue = $0 }, leggi: { campo.wrappedValue },
+                                   invio: invio, cerca: cerca)
     }
 }
 #endif

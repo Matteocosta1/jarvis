@@ -402,6 +402,7 @@ struct VistaMessaggi: View {
         HStack {
             Image(systemName: "magnifyingglass").foregroundStyle(tinta)
             TextField("Cerchi un contatto", text: $cerca).foregroundStyle(.white).focused($scrivendo)
+                .campoRegia("contatto", testo: $cerca, cerca: true)      // 12.0 (12) · B2
             if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
         }
         .padding(12).background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 12))
@@ -437,6 +438,7 @@ struct VistaMessaggi: View {
     private var dettatore: some View {
         Pannello(titolo: dettatura.attivo ? "LA ASCOLTO…" : "IL MESSAGGIO", tinta: tinta) {
             TextEditor(text: $testo)
+                .campoRegia("messaggio", testo: $testo)                // 12.0 (12) · B2 (l'invio resta «invia», col sì)
                 .scrollContentBackground(.hidden)
                 .font(.system(size: 17))
                 .foregroundStyle(.white)
@@ -741,6 +743,7 @@ struct VistaTelefono: View {
         HStack {
             Image(systemName: "magnifyingglass").foregroundStyle(tinta)
             TextField("Cerchi un contatto", text: $cerca).foregroundStyle(.white).focused($cercaAttiva)
+                .campoRegia("contatto", testo: $cerca, cerca: true)      // 12.0 (12) · B2
             if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
         }
         .padding(12).background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 12))

@@ -62,3 +62,18 @@ struct ComandoIsola: LiveActivityIntent {
         return .result()
     }
 }
+
+/// 12.0 (12) · B4: il controllo JARVIS nel Centro di Controllo, sulla schermata bloccata e sul tasto Azione (iOS 18): un tocco
+/// apre JARVIS già in ascolto, senza cercare l'app. L'app lo riceve da `ComandiIsola` («ascolta»), come Siri e il tasto Azione.
+struct ParlaDalControllo: AppIntent {
+    nonisolated static var title: LocalizedStringResource { "Parla con JARVIS" }
+    nonisolated static var description: IntentDescription { IntentDescription("Apre JARVIS già in ascolto.") }
+    nonisolated static var openAppWhenRun: Bool { true }
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        await MainActor.run { ComandiIsola.esegui?("ascolta") }
+        return .result()
+    }
+}

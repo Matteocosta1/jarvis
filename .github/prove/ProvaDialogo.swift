@@ -23,6 +23,8 @@ struct ProvaDialogo {
         provaResto()
         provaComposti()
         provaParlaSopra()
+        provaEllittiche()
+        provaRipensamenti()
         print(errori == 0 ? "\nTutte le prove del dialogo superate." : "\n\(errori) prove del dialogo NON superate.")
         exit(errori == 0 ? 0 : 1)
     }
@@ -189,6 +191,34 @@ struct ProvaDialogo {
         ]
         for (frase, atteso) in casi {
             controlla(FineFrase.comandoComposto(frase) == atteso, "comando composto «\(frase)» = \(FineFrase.comandoComposto(frase))")
+        }
+    }
+
+    /// 12.0 (12): il seguito del discorso solo per le frasi ellittiche.
+    static func provaEllittiche() {
+        let casi: [(String, Bool)] = [
+            ("e sabato?", true), ("del brano", true), ("anche a lui", true), ("che domani alle otto passo da lui", true),
+            ("no, quella di ieri sera", true), ("e se lo mandassi anche a Pier?", true), ("Sfera Ebbasta Popstar", true),
+            ("metti Popstar di Sfera Ebbasta", false), ("mi ha chiesto se gli faccio l'ufficio", false),
+            ("che tempo fa domani a Milano", true), ("dimmi cosa ho in programma oggi", false), ("Hai visto che hai iniziato a seguire Sfera", false),
+        ]
+        for (frase, atteso) in casi {
+            controlla(FineFrase.fraseEllittica(frase) == atteso, "frase ellittica «\(frase)» = \(FineFrase.fraseEllittica(frase))")
+        }
+    }
+
+    /// 12.0 (12): cambiare idea mentre parla, vale l'ultima intenzione.
+    static func provaRipensamenti() {
+        let casi: [(String, String)] = [
+            ("Metti Sfera… no anzi, metti i Daft Punk", "metti i Daft Punk"), ("metti Sfera Ebbasta, anzi i Daft Punk", "metti i Daft Punk"),
+            ("aggiungi il latte, anzi la panna", "aggiungi la panna"), ("apri la posta, anzi lascia stare", ""),
+            ("apri il meteo, no aspetta, apri la spesa", "apri la spesa"), ("metti Sfera, no, metti Drake", "metti Drake"),
+            ("metti Sfera Ebbasta", "metti Sfera Ebbasta"), ("non ci sono novità", "non ci sono novità"), ("no", "no"),
+            ("che tempo fa, anzi niente", ""), ("non è male, anzi", "non è male, anzi"),
+        ]
+        for (frase, atteso) in casi {
+            let r = FineFrase.ultimaIntenzione(frase)
+            controlla(r == atteso, "ultima intenzione «\(frase)» = «\(r)» (attesa «\(atteso)»)")
         }
     }
 
