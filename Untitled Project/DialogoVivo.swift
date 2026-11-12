@@ -18,13 +18,15 @@ nonisolated final class VoceAttiva: @unchecked Sendable {
     private var ultimaVoce: TimeInterval = 0
     private var pronta = false              // il fondo si è assestato (qualche pezzo di audio dopo l'azzeramento)
     private var pezzi = 0
+    private var sommaForza: Float = 0       // 12 nov (A3): quanto la voce sta sopra il fondo, sommato sui pezzi di voce
+    private var pezziVoce = 0
 
     private static var ora: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
     /// Un ascolto nuovo: il fondo si rimisura da capo (la stanza può essere cambiata).
     func azzera() {
         lock.lock()
-        fondo = -60; ultimaVoce = 0; pronta = false; pezzi = 0
+        fondo = -60; ultimaVoce = 0; pronta = false; pezzi = 0; sommaForza = 0; pezziVoce = 0
         lock.unlock()
     }
 
@@ -42,8 +44,14 @@ nonisolated final class VoceAttiva: @unchecked Sendable {
         else if db < fondo { fondo = fondo * 0.7 + db * 0.3 }            // nel silenzio il fondo scende subito
         else { fondo += (db - fondo) * 0.004 }                            // col rumore costante sale piano
         // voce: ben sopra il fondo (9 dB) e non un sussurro dell'ambiente (-50 dB)
-        if pronta, db > fondo + 9, db > -50 { ultimaVoce = t }
+        if pronta, db > fondo + 9, db > -50 { ultimaVoce = t; sommaForza += db - fondo; pezziVoce += 1 }
         lock.unlock()
+    }
+
+    /// 12 nov (A3): di quanti decibel, in media, la voce di questo ascolto stava sopra il rumore della stanza (nil: troppo poca voce).
+    var forzaMedia: Double? {
+        lock.lock(); defer { lock.unlock() }
+        return pezziVoce >= 15 ? Double(sommaForza / Float(pezziVoce)) : nil
     }
 
     /// Da quanti secondi il microfono non sente la voce (grande se non l'ha mai sentita).
@@ -76,5 +84,65 @@ final class RitmoSignore {
     private func cambia(_ v: Double) {
         fattore = min(1.5, max(1, v))
         UserDefaults.standard.set(fattore, forKey: chiave)
+    }
+}
+
+/// 12 nov (A3, piano del dialogo approvato dal signore): come parla il signore in questa frase, rispetto al suo solito.
+/// Velocità (parole al secondo), forza della voce sopra il fondo della stanza ed esitazioni (parole ripetute, «ehm», «cioè»).
+/// Il suo solito si impara qui, sul telefono, frase dopo frase; finché non conosce il suo solito (8 frasi) dice solo le esitazioni.
+/// La riga va al cervello («[Come parla: …]») per scegliere il registro: più calmo se è agitato, più leggero se è allegro.
+@MainActor
+final class ComeParla {
+    static let condiviso = ComeParla()
+    private let chiave = "comeParla12nov"
+    private var velocita: Double
+    private var forza: Double
+    private var campioni: Int
+
+    private init() {
+        let d = UserDefaults.standard.dictionary(forKey: chiave) ?? [:]
+        velocita = d["velocita"] as? Double ?? 0
+        forza = d["forza"] as? Double ?? 0
+        campioni = d["campioni"] as? Int ?? 0
+    }
+
+    /// Parole ripetute di seguito («delle delle») e intercalari di chi sta pensando.
+    nonisolated static func esitazioni(_ testo: String) -> Int {
+        let p = testo.lowercased().split(whereSeparator: { !$0.isLetter && $0 != "'" }).map(String.init)
+        guard p.count >= 2 else { return 0 }
+        let intercalari: Set<String> = ["ehm", "eh", "mmm", "mh", "uhm", "cioè", "tipo", "praticamente", "insomma", "boh"]
+        var n = p.filter { intercalari.contains($0) }.count
+        for k in 1..<p.count where p[k] == p[k - 1] && p[k].count > 1 { n += 1 }
+        return n
+    }
+
+    /// La riga per il cervello (nil: niente di notevole).
+    func riga(testo: String, secondi: Double, forzaDb: Double?) -> String? {
+        let parole = testo.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).count
+        var note: [String] = []
+        if campioni >= 8 {
+            if parole >= 5, secondi > 1 {
+                let v = Double(parole) / secondi
+                if v > velocita * 1.25 { note.append("più veloce del solito") } else if v < velocita * 0.75 { note.append("più lento del solito") }
+            }
+            if let f = forzaDb {
+                if f > forza + 5 { note.append("voce più forte del solito") } else if f < forza - 5 { note.append("voce più bassa del solito") }
+            }
+        }
+        if ComeParla.esitazioni(testo) >= 2 { note.append("esita (ripete parole, «ehm», «cioè»)") }
+        return note.isEmpty ? nil : note.joined(separator: ", ")
+    }
+
+    /// Una frase finita: il suo solito si aggiorna piano (media mobile).
+    func impara(testo: String, secondi: Double, forzaDb: Double?) {
+        let parole = testo.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).count
+        guard parole >= 5, secondi > 1 else { return }
+        let v = Double(parole) / secondi
+        guard v > 0.5, v < 7 else { return }
+        let peso = campioni < 8 ? 1 / Double(campioni + 1) : 0.1
+        velocita += (v - velocita) * peso
+        if let f = forzaDb { forza = forza == 0 ? f : forza + (f - forza) * peso }
+        campioni += 1
+        UserDefaults.standard.set(["velocita": velocita, "forza": forza, "campioni": campioni] as [String: Any], forKey: chiave)
     }
 }
