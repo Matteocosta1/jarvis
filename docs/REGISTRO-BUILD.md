@@ -574,7 +574,7 @@ Revisione del dialogo (il signore: «hai trovato questi errori… massima compet
 - **P8 · SpeechAnalyzer**: rimandato. Serve iOS 26 e il signore resta su iOS 18 col 15 Pro. Ci sarà una build dedicata sul 16 Pro Max, coi due motori a confronto sulle stesse frasi.
 - **Riassunti in sottofondo**: le conversazioni si riassumono ogni 10 minuti (pg_cron `jarvis-episodi` → briefing v30 → cervello).
 - **Mockup** (v. 1794454754-34e8): il simulatore del dialogo usa le regole vere dell'app. Nuove prove: «Sì, sì», «Ho capito», «Bea, mi passi il sale?», «Analizzami gli incassi di sabato» (con la frase d'attesa), «🤫 Che ore sono?». Ci sono anche la domanda sul punto e «Mi dica, Sir» dopo «aspetta» (prima mancava nel simulatore).
-- **Commit e controllo**: de99601 VERDE (run 43144988984); e879106 VERDE (run 43148228194, 0 errori, 0 warning, prove del dialogo superate).
+- **Commit e controllo**: de99601 VERDE (run 43144988984); e879106 VERDE (run 43148228194, 0 errori, 0 warning, prove del dialogo superate); **6e5684e VERDE (run 43149749888, 0 errori, 0 warning, prove del dialogo superate): è la build da caricare** (Pull + Archive + TestFlight).
 
 ## 12.0 (8) — MARK XII · 12 nov notte · numero confermato dal signore · build unica col dialogo umano (il signore: «una build sola») · cervello v126 pubblicato (prova generale superata) · controllo di compilazione VERDE (0 errori, 0 warning) su 23bb131, run 43134708298
 Dalla prova della 12.0 (7) sul telefono (12 nov, 00:30–00:55, video e screenshot del signore) e dalle sue richieste:
