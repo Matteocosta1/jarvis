@@ -101,8 +101,19 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var dettoFinora = ""
     private var rispostaInStoria = false
     /// «Aspetta» e poi silenzio: dopo 5 secondi «Mi dica, Sir» e lo ascolta ancora; se tace, torna in attesa (deciso dal signore).
-    private enum DopoAspetta { case no, aspetta, miDica }
+    /// 12 nov (P6, come l'iPhone): `fraseAMeta`, il cervello ha detto che la frase era rimasta a metà: se tace, JARVIS chiede il
+    /// pezzo che manca, sul punto («Cosa gli ha detto, Sir?»).
+    private enum DopoAspetta { case no, aspetta, miDica, fraseAMeta }
     private var dopoAspetta = DopoAspetta.no
+    /// 12 nov (P6): la prossima domanda è la frase a metà rimandata (il cervello sa che il signore si è fermato lì); `dopoAspettoTurno`
+    /// vale per la richiesta in corso (anche se riparte per la parola d'ordine)
+    private var dopoAspettoProssimo = false
+    private var dopoAspettoTurno = false
+    /// 12 nov (P5, come l'iPhone): la frase l'ha presa l'ascolto in attesa (senza tocco): se non era per JARVIS, il cervello tace
+    private var liberaProssima = false
+    private var liberaTurno = false
+    /// 12 nov (P5): domanda, risposta e immagini a schermo prima della frase presa in attesa: se non era per JARVIS, tornano quelle
+    private var schermoPrima: (domanda: String, risposta: String, immagini: [FotoOrologio])?
     /// 12 nov (A1, come l'iPhone): la frase su cui il cervello ha detto che il signore non aveva finito; la prossima frase detta
     /// a voce (entro due minuti) la continua e partono insieme
     private var fraseIncompleta: (testo: String, quando: Date)?
@@ -258,6 +269,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case .ascolto:
             dopoAspetta = .no                            // come `fermaAscolto(invia: false)` dell'iPhone: niente «Mi dica, Sir» dopo
             primaParte = nil                             // la frase di prima non parte con un'aggiunta che non c'è più
+            fraseIncompleta = nil                        // 12 nov (E12): né il seguito di una frase rimasta a metà
             ferma()
         case .attesa:
             break
@@ -291,6 +303,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         inCorso = nil
         rispostaInStoria = false
         dopoAspetta = .no
+        fraseIncompleta = nil                            // 12 nov (E12)
+        schermoPrima = nil
         storia = []
         domanda = ""
         risposta = ""
@@ -346,6 +360,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
         if Self.eSoloSilenzio(testo) {                          // «muto», «stop», «basta», «zitto», «Jarvis, basta»: tace e resta in attesa
             if fase == .elaboro || fase == .parlo { segnaInterruzione() }
+            fraseIncompleta = nil                               // 12 nov (E12): zittito, la frase rimasta a metà non si riprende
             ferma()
             return
         }
@@ -375,6 +390,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // al suo posto nella cronologia, con la risposta per quanto l'aveva sentita.
         var perCervello: String?
         if let prima { perCervello = JarvisOrologio.notaInterruzione(prima) + testo }
+        schermoPrima = (domanda: domanda, risposta: risposta, immagini: immagini)
         domanda = testo
         risposta = ""
         rispostaGrezza = ""
@@ -389,7 +405,33 @@ final class JarvisOrologio: NSObject, ObservableObject {
         storia = Array(storia.suffix(20))                  // 12 nov: 20 battute (prima 12); quelle vecchie le esclude il cervello
         while storia.first?["role"] == "assistant" { storia.removeFirst() }   // la cronologia deve iniziare con l'utente
         domandaAVoce = aVoce
+        dopoAspettoTurno = dopoAspettoProssimo && aVoce    // 12 nov (P6): la frase a metà rimandata
+        dopoAspettoProssimo = false
+        liberaTurno = liberaProssima && aVoce              // 12 nov (P5): presa dall'ascolto in attesa
+        liberaProssima = false
         compito = Task { await self.turno(nuovoTentativo: true) }
+    }
+
+    /// 12 nov (P6, come l'iPhone): la frase era rimasta a metà («Gli ho detto che…») e il signore tace. Come una persona, JARVIS
+    /// chiede il pezzo che manca, sul punto («Cosa gli ha detto, Sir?»): la frase riparte uguale, col segno che si è fermato lì.
+    private func rispondiAFraseAMeta() {
+        dopoAspetta = .no
+        guard let frase = fraseIncompletaValida else { return }
+        fraseIncompleta = nil
+        dopoAspettoProssimo = true
+        chiedi(frase, aVoce: true)
+    }
+
+    /// 12 nov (P5, come l'iPhone): la frase presa dall'ascolto in attesa non era per JARVIS (parlava con un'altra persona, al
+    /// telefono, alla TV). Come una persona, non dice niente: la frase esce dalla cronologia, sullo schermo torna quello di prima
+    /// e l'orologio torna in attesa, in silenzio.
+    private func silenzioDalCervello() {
+        if storia.last?["role"] == "user" { storia.removeLast() }
+        if let s = schermoPrima { domanda = s.domanda; risposta = s.risposta; immagini = s.immagini } else { domanda = "" }
+        schermoPrima = nil
+        inCorso = nil
+        flussoAperto = false
+        tornaInAttesaMuto()
     }
 
     /// 12 nov: «fammi finire», «lasciami parlare», «non interrompermi» detti da soli (al massimo 6 parole).
@@ -506,6 +548,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// o dopo «Mi dica, Sir» (se tace: torna in attesa in silenzio).
     private func ascolta(automatico auto: Bool = false, limiteInizio limite: TimeInterval = 7, aspetta: DopoAspetta = .no) async {
         daAttesa = false                                 // ascolto chiesto (tocco, voce, complicazione): reagisce come sempre
+        liberaProssima = false                           // 12 nov (P5): la frase che arriva adesso è chiesta
         provaSilenziosa = nil
         guard await AVAudioApplication.requestRecordPermission() else {
             stato = "Mi serve il microfono, Sir: lo attivi in Impostazioni › Privacy e sicurezza › Microfono."
@@ -614,8 +657,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
             fase = .attesa
             switch dopoAspetta {
             case .aspetta: stato = nil; miDica()          // «aspetta» e poi silenzio: «Mi dica, Sir» (deciso dal signore, 24 ott)
-            case .miDica: stato = nil; dopoAspetta = .no   // nemmeno dopo «Mi dica»: torna in attesa, in silenzio
-            case .no: stato = "Non ho sentito nulla, Sir. Tocchi il reattore e parli."
+            case .fraseAMeta: stato = nil; rispondiAFraseAMeta()   // 12 nov (P6): frase a metà e silenzio: la domanda sul punto
+            case .miDica: stato = nil; dopoAspetta = .no; fraseIncompleta = nil   // nemmeno dopo «Mi dica»: torna in attesa, in silenzio
+            case .no: stato = "Non ho sentito nulla, Sir. Tocchi il reattore e parli."; fraseIncompleta = nil   // E12
             }
         } else if durata > (ascoltoLungo ? 90 : 45) {          // 12 nov: prima 25 s (un discorso si tagliava a metà); 90 con «ascoltami»
             fermaEInvia()
@@ -995,6 +1039,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             self.stato = "Trascrivo…"
             let prima = self.primaParte
             self.primaParte = nil
+            self.liberaProssima = true                   // 12 nov (P5): presa in attesa, senza tocco: se non era per JARVIS, tace
             self.compito = Task { await self.dopoTrascrizione(Task { TrascrittoOrologio(testo: t, errore: nil, vuoto: false) }, eco: nil, prima: prima) }
         }
     }
@@ -1045,6 +1090,24 @@ final class JarvisOrologio: NSObject, ObservableObject {
         if eco != nil, let s = sospesa {
             sospesa = nil
             if esito.vuoto || (esito.errore == nil && JarvisOrologio.soloRumore(testo ?? "")) { riprendiRisposta(s); return }
+            // 12 nov (P1, come l'iPhone nei limiti del polso: le sue parole arrivano solo a frase finita, quindi la voce si è già
+            // fermata): «sì», «certo», «esatto», «ah ok» detti mentre JARVIS parlava sono segnali d'ascolto, JARVIS riprende da dove
+            // si era fermato; «ho capito», «ok grazie», «sì sì sì»: ha capito, JARVIS resta fermo lì (il punto è già segnato)
+            if esito.errore == nil, let t = testo {
+                switch FineFrase.segnaleDAscolto(t) {
+                case .ascolto:
+                    riprendiRisposta(s)
+                    return
+                case .chiusura:
+                    compito = nil
+                    stato = nil
+                    fase = .attesa
+                    dopoRisposta()
+                    return
+                case .nessuno:
+                    break
+                }
+            }
         }
         if esito.vuoto {
             compito = nil
@@ -1275,7 +1338,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     /// `lascia`, `soloTesto`, `ripiega`: idea D, il giro unico si ferma dopo la trascrizione (comando dell'app, testo per
     /// l'aggiunta, trascrizione fallita nel cervello).
-    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione, lascia(String), soloTesto, ripiega, silenzio, aspetto }
+    /// `silenzio`: c'era solo rumore; `nonPerMe` (12 nov, P5): il cervello dice che la frase presa in attesa non era per JARVIS.
+    private enum Esito { case fine(String), nonAutorizzato, errore(String), client([String: Any]), doppione, lascia(String), soloTesto, ripiega, silenzio,
+                         nonPerMe, aspetto }
 
     /// Strumenti che l'orologio sa eseguire per il cervello.
     static let strumenti = ["salute_battito", "salute_riepilogo", "riconosci_musica", "meteo_qui", "foto_cerca"]
@@ -1362,11 +1427,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 corpo["prefisso_domanda"] = (u.canale.prima.map { JarvisOrologio.notaInterruzione($0) } ?? "") + (fraseIncompletaValida.map { $0 + " " } ?? "")
                 corpo["a_voce"] = true
                 corpo["capisce_aspetto"] = true
+                // 12 nov (P5, come l'iPhone): l'orologio sa tacere se la frase non era per JARVIS; questa l'ha presa l'ascolto in
+                // attesa, senza tocco (il cervello tace solo se dentro non c'è «Jarvis»)
+                corpo["capisce_silenzio"] = true
+                if u.canale.silenzioso { corpo["ascolto_libero"] = true }
                 corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int64(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             } else if domandaAVoce {
                 // idea B: se anche il Mac (o l'iPhone) ha sentito la stessa frase, il cervello fa rispondere uno solo
                 corpo["a_voce"] = true
-                corpo["capisce_aspetto"] = true          // 12 nov (A1): il cervello può dire che il signore non ha finito
+                // 12 nov (A1): il cervello può dire che il signore non ha finito; P6: la frase a metà rimandata, la domanda sul punto
+                if dopoAspettoTurno { corpo["dopo_aspetto"] = true } else { corpo["capisce_aspetto"] = true }
+                corpo["capisce_silenzio"] = true         // 12 nov (P5)
+                if liberaTurno { corpo["ascolto_libero"] = true }
                 corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int64(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
@@ -1408,9 +1480,14 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 case .silenzio:
                     tornaInAttesaMuto()                          // 26 ott sera: era solo rumore, JARVIS resta in attesa senza dire niente
                     return
+                case .nonPerMe:
+                    guard !Task.isCancelled else { return }
+                    silenzioDalCervello()                        // 12 nov (P5): la frase non era per JARVIS: non dice niente
+                    return
                 case .aspetto:
                     // 12 nov (A1): il cervello dice che il signore non aveva finito («gli ho detto…»): niente risposta, l'orologio
-                    // lo riascolta e la frase dopo continua questa; se tace, «Mi dica, Sir» come dopo «aspetta»
+                    // lo riascolta e la frase dopo continua questa. P6 (revisione del dialogo, come l'iPhone): se tace, verso i 3
+                    // secondi dalla sua ultima parola JARVIS chiede il pezzo che manca (prima «Mi dica, Sir» dopo 5 secondi)
                     guard !Task.isCancelled else { return }
                     if storia.last?["role"] == "user" { storia.removeLast() }
                     if !domanda.isEmpty { fraseIncompleta = (domanda, Date()) }
@@ -1419,7 +1496,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     stato = nil
                     flussoAperto = false
                     fase = .attesa
-                    Task { await self.ascolta(limiteInizio: Dialogo.silenzioDopoAspetta, aspetta: .aspetta) }
+                    let resta = max(1.2, 3.0 - Date().timeIntervalSince(fineVoce))
+                    Task { await self.ascolta(limiteInizio: resta, aspetta: .fraseAMeta) }
                     return
                 case .ripiega:
                     // idea D: il cervello non è riuscito a trascrivere: la strada di prima (le orecchie in cloud, più servizi in gara)
@@ -1567,6 +1645,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 return .doppione
             case "aspetto":
                 return .aspetto                          // 12 nov (A1): il signore non ha finito di parlare
+            case "silenzio":
+                return .nonPerMe                         // 12 nov (P5): la frase presa in attesa non era per JARVIS
             case "trascritto":
                 // idea D: la frase detta, trascritta dal cervello dentro questa stessa richiesta
                 guard let canale, canale.esito == nil else { break }   // un nuovo tentativo dopo la linea caduta: già fatto
@@ -1656,6 +1736,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // 12 nov (A1): la frase rimasta a metà e il suo seguito sono una domanda sola (il cervello l'ha già ricevuta così)
         let completa = (fraseIncompletaValida.map { $0 + " " } ?? "") + testo
         fraseIncompleta = nil
+        schermoPrima = (domanda: domanda, risposta: risposta, immagini: immagini)   // 12 nov (P5)
         domanda = completa
         risposta = ""
         rispostaGrezza = ""

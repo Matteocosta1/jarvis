@@ -48,6 +48,16 @@ final class Richiamo {
     var inRisposta: (() -> Bool)?
     /// L'ultima volta che ha sentito parlare (anche frasi non per lui): JARVIS non attacca il riempitivo sopra il signore.
     private(set) var ultimaVoce = Date.distantPast
+    /// 12 nov (revisione del dialogo, errore 3): la pausa minima che JARVIS chiede per la frase in corso (la risposta anticipata ha
+    /// detto «aspetto»: il signore non ha finito, 3 secondi). Prima su questa strada non valeva: dopo «Jarvis, gli ho detto che…» la
+    /// frase si chiudeva alla pausa normale e il cervello era costretto a rispondere alla frase a metà.
+    var pausaMinima: ((String) -> Double)?
+    /// 12 nov (P5): la frase in corso è partita da «Jarvis» (falso: presa dall'ascolto libero, dal seguito, dall'aggiunta).
+    private(set) var conNome = true
+    /// 12 nov (A3): quando ha cominciato a dire la frase in corso (per la velocità del «come parla»).
+    private(set) var inizioFrase: Date?
+    /// Quanto è durata la frase finora: dalla prima parola all'ultima parola sentita.
+    var durataFrase: Double { inizioFrase.map { max(0, ultimoParziale.timeIntervalSince($0)) } ?? 0 }
     private var precedente = ""         // l'ultima trascrizione ricevuta
     private var prima = ""              // ciò che ha già detto dopo il richiamo, prima che il riconoscimento ripartisse da capo
     private var soloDopoNome = true      // vero: conta ciò che segue «Jarvis»; falso: conta tutta la frase (seguito senza nome)
@@ -353,6 +363,9 @@ final class Richiamo {
                 guard let dopo = trovato else { if fine { riavvia(recentiDa: condotto.ultimaFine) }; return }
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 paroleFinoAlNome = soloDopoNome ? max(0, Richiamo.contaParole(segmento) - Richiamo.contaParole(dopo)) : 0
+                conNome = soloDopoNome
+                inizioFrase = adesso
+                VoceAttiva.condivisa.iniziaFrase()                  // 12 nov: forza della voce e intonazione di questa frase
                 sveglio = true
                 prima = ""
                 corrente = dopo
@@ -388,17 +401,35 @@ final class Richiamo {
             }
             resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
             self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
-            // solo «Jarvis»: gli lascio qualche secondo per iniziare la domanda; poi le solite pause
-            // («Che ore sono, Jarvis?»: la frase c'è già, la pausa è quella della frase)
-            // 11 nov: con il ritmo del signore e, se ha detto «ascoltami» o «fammi finire», almeno 3,5 secondi
-            let base = resto.isEmpty ? (vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0) : Jarvis.pausaFineFrase(resto) * RitmoSignore.condiviso.fattore
-            let attesa = Jarvis.chiedeAscoltoLungo(resto) ? max(base, 3.5) : base
-            armaChiusura(attesa)
+            armaChiusura(attesaPer(resto))
             // «fine» qui è il riconoscimento che chiude un pezzo: se la frase non è finita, riparto e continuo ad ascoltare
             if fine { continuaDopoFine() }
             return
         }
         if fine { if sveglio { continuaDopoFine() } else { riavvia(recentiDa: condotto.ultimaFine) } }
+    }
+
+    /// Il silenzio che chiude la frase in corso. Solo «Jarvis»: qualche secondo per iniziare la domanda; «Che ore sono, Jarvis?»: la
+    /// frase c'è già, la pausa è quella della frase. 11 nov: con il ritmo del signore e, se ha detto «ascoltami» o «fammi finire»,
+    /// almeno 3,5 secondi. 12 nov (errore 3): le stesse regole dell'ascolto normale (esitazioni, intonazione) e la pausa minima di
+    /// JARVIS (risposta anticipata con «aspetto»).
+    private func attesaPer(_ resto: String) -> Double {
+        let base: Double
+        if resto.isEmpty { base = vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0 }
+        else {
+            base = FineFrase.conVoce(lessicale: Jarvis.pausaFineFrase(resto), ritmo: RitmoSignore.condiviso.fattore,
+                                     esitazioni: FineFrase.esitazioni(resto), fine: Intonazione.condivisa.giudizio().fine)
+        }
+        let lunga = Jarvis.chiedeAscoltoLungo(resto) ? max(base, 3.5) : base
+        return max(lunga, pausaMinima?(resto) ?? 0)
+    }
+
+    /// 12 nov (errore 3): la risposta anticipata ha appena detto «aspetto». La frase si chiude dopo la pausa nuova, contata
+    /// dall'ultima voce sentita (non da adesso: il giudizio del cervello arriva circa un secondo e mezzo dopo).
+    func riarmaChiusura() {
+        guard sveglio else { return }
+        let attesa = attesaPer(resto)
+        armaChiusura(attesa, giaPassati: min(VoceAttiva.condivisa.secondiDiSilenzio, attesa))
     }
 
     /// Controlla con l'impronta se chi sta parlando è il signore; se sì, lo sveglia con la frase che sta dicendo.
@@ -437,9 +468,10 @@ final class Richiamo {
     /// riprende subito a parlare («…e anche un'altra cosa») l'attacco non si perde. Se a JARVIS non servo, mi spegne lui.
     /// 11 nov (analisi del dialogo): la frase si chiude dopo il silenzio, ma il silenzio conta solo se il microfono non sente più
     /// la voce: le parole trascritte possono arrivare in ritardo. Senza parole nuove da 6 secondi il suono è solo rumore: si chiude.
-    private func armaChiusura(_ secondi: Double) {
+    /// `giaPassati`: il silenzio già trascorso (la pausa conta dall'ultima voce sentita).
+    private func armaChiusura(_ secondi: Double, giaPassati: Double = 0) {
         timerSilenzio?.invalidate()
-        timerSilenzio = Timer.scheduledTimer(withTimeInterval: secondi, repeats: false) { [weak self] _ in
+        timerSilenzio = Timer.scheduledTimer(withTimeInterval: max(0.25, secondi - giaPassati), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.sveglio else { return }
                 let quieto = VoceAttiva.condivisa.secondiDiSilenzio

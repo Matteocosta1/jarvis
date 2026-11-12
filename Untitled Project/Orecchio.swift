@@ -14,6 +14,9 @@ final class Orecchio {
     var interrotto: ((String) -> Void)?
     /// Chiamato appena il signore inizia a parlare: JARVIS deve tacere e mettersi in ascolto, l'orecchio continua da solo.
     var zittisci: (() -> Void)?
+    /// 12 nov (P1): il signore ha detto «ho capito», «sì sì sì», «ok grazie» mentre JARVIS parlava: finisce la frase e si ferma.
+    var capito: (() -> Void)?
+    private var chiusuraChiesta = false
     /// Le parole che JARVIS sta dicendo in questo momento: servono a riconoscere la propria eco.
     var testoDetto = ""
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
@@ -52,11 +55,13 @@ final class Orecchio {
 
     func avvia() {
         voluto = true
+        chiusuraChiesta = false
         accendi()
     }
 
     func ferma() {
         voluto = false
+        chiusuraChiesta = false
         inPresa = false
         voceConfermata = false
         primaPresa = ""
@@ -183,8 +188,15 @@ final class Orecchio {
             let parole = Orecchio.parole(segmento)
             if !inPresa, soloParoleDOrdine { if fine { riavvia() }; return }   // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
             if !inPresa {
-                // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
+                // 12 nov (P1, revisione del dialogo): fra persone «sì», «mh», «certo», «esatto», «ah ok» detti mentre l'altro parla sono
+                // segnali d'ascolto: chi parla continua (prima due parole bastavano a zittirlo). «Ho capito», «sì sì sì», «ok grazie»: ha
+                // capito, JARVIS finisce la frase che sta dicendo e si ferma (più sotto, dopo gli stessi controlli di una frase vera:
+                // eco, orologio, impronta della voce). Le parole che sta dicendo JARVIS (la sua eco) non contano
                 let mie = Set(Orecchio.parole(testoDetto))
+                let proprie = parole.filter { !mie.contains($0) }
+                let segnale = proprie.isEmpty ? FineFrase.SegnaleAscolto.nessuno : FineFrase.segnaleDAscolto(proprie.joined(separator: " "))
+                if segnale == .ascolto { if fine { riavvia() }; return }
+                // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
                 let estranee = parole.filter { !mie.contains($0) }
                 // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
                 guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
@@ -214,6 +226,12 @@ final class Orecchio {
                             self.valuta(self.precedente, fine: false, turno: mio)
                         }
                     }
+                    if fine { riavvia() }
+                    return
+                }
+                if segnale == .chiusura {
+                    // P1: ha capito. JARVIS finisce la frase che sta dicendo e si ferma (una volta sola per risposta)
+                    if !chiusuraChiesta { chiusuraChiesta = true; capito?() }
                     if fine { riavvia() }
                     return
                 }

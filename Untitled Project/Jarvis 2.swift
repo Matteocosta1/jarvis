@@ -310,6 +310,12 @@ final class Jarvis: NSObject, ObservableObject {
     /// 12 nov (A3): quando il signore ha cominciato a parlare in questo ascolto, e la riga su come ha parlato (per il cervello)
     private var inizioParlato: Date?
     private var voceCome: String?
+    /// 12 nov (P1): il signore ha detto «ho capito» mentre JARVIS parlava: finita la frase in corso, JARVIS si ferma
+    private var fermaDopoFrase = false
+    /// 12 nov (P5): la frase che sta per partire l'ha presa l'ascolto libero, senza «Jarvis» (se non era per lui, il cervello tace)
+    private var fraseLibera = false
+    /// 12 nov (P3): com'è finita la voce nell'ultima frase (va nei tempi del turno, per regolare le soglie sui dati veri)
+    private var ultimaIntonazione: Intonazione.Giudizio?
     /// 12 nov (B4): la frase d'attesa preparata dal cervello per questa risposta (al posto di quella a caso)
     private var ponteDelCervello: String?
     /// 11 nov · dove comincia la finestra della conversazione mandata al cervello (scorre a scatti di 20 battute)
@@ -407,6 +413,8 @@ final class Jarvis: NSObject, ObservableObject {
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
+        orecchio.capito = { [weak self] in self?.chiusuraGentile() }               // 12 nov (P1): «ho capito» mentre parla
+        richiamo.pausaMinima = { [weak self] resto in self?.pausaMinimaPer(resto) ?? 0 }   // 12 nov (errore 3)
         richiamo.sveglia = { [weak self] in self?.richiamato() }
         richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t; self?.programmaAnticipo(t) } }
         richiamo.consegna = { [weak self] frase in self?.motivoChiusura = "richiamo"; self?.fraseRichiamo(frase) }
@@ -540,7 +548,8 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// «Aspetta» e poi silenzio (deciso dal signore, 24 ott): dopo 5 secondi JARVIS dice «Mi dica, Sir» e lo ascolta,
     /// senza bip, come dopo la domanda del diario. Se tace ancora, torna in attesa in silenzio: non lo ripete.
-    private enum DopoAspetta { case no, aspetta, miDica }
+    /// 12 nov (P6): `fraseAMeta`, il cervello ha detto che la frase era rimasta a metà: se tace, JARVIS chiede il pezzo che manca.
+    private enum DopoAspetta { case no, aspetta, miDica, fraseAMeta }
     private var dopoAspetta = DopoAspetta.no
 
     private func miDica() {
@@ -642,8 +651,10 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 12 nov (A1, piano del dialogo approvato dal signore): il cervello dice che il signore non aveva finito («Gli ho detto»,
     /// «ci sono ancora delle…»). Come una persona, JARVIS non risponde: la risposta vuota sparisce, la domanda resta, e lo
-    /// riascolta in silenzio. Quello che dice adesso è il seguito di quella frase (come dopo «aspetta»); se tace, dopo 5 secondi
-    /// «Mi dica, Sir.», la stessa regola di «aspetta» decisa dal signore il 24 ottobre.
+    /// riascolta in silenzio. Quello che dice adesso è il seguito di quella frase (come dopo «aspetta»).
+    /// 12 nov (P6, revisione del dialogo): se tace, non più «Mi dica, Sir» 5 secondi dopo: verso i 3 secondi dalla sua ultima
+    /// parola (come quando lo dice la risposta anticipata) JARVIS chiede il pezzo che manca, sul punto («Cosa gli ha detto?»), già
+    /// preparato mentre aspettava. «Mi dica, Sir» resta per «aspetta» e silenzio.
     private func aspettoDalCervello(id: UUID) {
         idTurno = nil
         compitoPonte?.cancel()
@@ -655,7 +666,8 @@ final class Jarvis: NSObject, ObservableObject {
         if let i = messaggi.firstIndex(where: { $0.id == id }), messaggi[i].testo.isEmpty { messaggi.remove(at: i); salva() }
         aspettoSu = messaggi.last(where: { $0.ruolo == "user" }).map { Jarvis.normaAnticipo($0.testo) }
         aggiuntaInArrivo = true
-        dopoAspetta = .aspetta
+        dopoAspetta = .fraseAMeta
+        let resta = max(1.2, 3.0 - (misuraDa.map { Date().timeIntervalSince($0) } ?? 1.5))   // ~3 s dalla sua ultima parola
         switch fase {
         case .ascolto:
             return                                   // ha già ripreso a parlare: lo sta ascoltando
@@ -664,8 +676,102 @@ final class Jarvis: NSObject, ObservableObject {
         case .elaboro, .attesa:
             fase = .attesa
             if richiamo.sveglio { return }           // il «Jarvis» in attesa sta già raccogliendo le sue parole
-            Task { await avviaAscolto(silenzio: Dialogo.silenzioDopoAspetta) }
+            Task {
+                await avviaAscolto(silenzio: resta)
+                preparaDomandaSulPunto()             // dopo: l'ascolto che parte butta le risposte anticipate di prima
+            }
         }
+    }
+
+    /// 12 nov (P6): la frase era rimasta a metà («Gli ho detto che…») e il signore tace. Come una persona, JARVIS chiede il pezzo
+    /// che manca, sul punto («Cosa gli ha detto?»): la frase riparte uguale e il cervello sa che lui si è fermato lì (dopo_aspetto).
+    /// La domanda è quasi sempre già pronta: preparata mentre lui taceva (`preparaDomandaSulPunto`), parte appena scade il silenzio.
+    private func rispondiAFraseAMeta() {
+        dopoAspetta = .no
+        aggiuntaInArrivo = false
+        guard let i = messaggi.lastIndex(where: { $0.ruolo == "user" }), i == messaggi.count - 1 else { scartaAnticipo(); return }
+        let u = messaggi[i]
+        messaggi.remove(at: i)
+        salva()
+        aspettoSu = Jarvis.normaAnticipo(u.testo)
+        fraseAVoce = u.testo                         // è una frase detta a voce: il cervello la tratta come tale
+        fineFraseVoce = Date()                       // i tempi del turno contano da adesso, non dal silenzio voluto
+        Task { await invia(u.testo, comeAggiunta: u.aggiunta == true, comeSeguito: u.seguito == true, interrottoSu: u.interruzione,
+                           nascosto: u.nascosto, ripetuta: true) }
+    }
+
+    /// 12 nov (P6): mentre JARVIS aspetta in silenzio che il signore continui la frase rimasta a metà, la domanda sul punto si prepara
+    /// già (risposta anticipata con `dopo_aspetto`): se lui tace, parte allo scadere senza un altro giro dal cervello; se riprende a
+    /// parlare, si butta. La frase resta in chat: per il cervello si manda senza di lei, com'è la conversazione quando parte davvero.
+    private func preparaDomandaSulPunto() {
+        guard anticipoAcceso, fase == .ascolto, dopoAspetta == .fraseAMeta, let u = messaggi.last, u.ruolo == "user",
+              u.interruzione == nil, u.aggiunta != true, u.nascosto == nil else { return }
+        var m = Messaggio(ruolo: "user", testo: u.testo)
+        if u.seguito == true { m.seguito = true }
+        lanciaAnticipo(m, dopoAspetto: true, senza: u.id)
+    }
+
+    /// 12 nov (P5): la frase presa dall'ascolto libero non era per JARVIS (parlava con un'altra persona, al telefono, alla TV). Come
+    /// una persona, JARVIS non dice niente: la frase e la risposta vuota spariscono dalla chat e torna in attesa, in silenzio.
+    private func silenzioDalCervello(id: UUID) {
+        concludiDoppione(id: id)
+        aggiuntaInArrivo = false
+        dopoAspetta = .no
+    }
+
+    /// 12 nov (P1): «ho capito», «sì sì sì», «ok grazie» mentre JARVIS parla. Come una persona finisce la frase che sta dicendo e si
+    /// ferma: il resto della risposta non arriva più e non si dice (in chat resta quello che è arrivato, e il cervello sa fin dove l'ha
+    /// sentita). Se in quel momento non sta dicendo una frase della risposta (aspetta il resto dal cervello, o sta dicendo la frase
+    /// d'attesa), si ferma subito, come col tocco sul reattore.
+    private func chiusuraGentile() {
+        guard fase == .parlo || fase == .elaboro, idTurno != nil else { return }
+        compitoRete?.cancel()
+        compitoRete = nil
+        compitoPonte?.cancel()
+        bufferVoce = ""                              // la frase a metà nel buffer non parte
+        if frasiRisposta.isEmpty { segnaInterruzione(); ascoltaDopo = false; interrompi(); return }
+        fermaDopoFrase = true
+    }
+
+    /// 12 nov (errore 3): la pausa minima per la frase che il richiamo sta raccogliendo: 3 s se è quella su cui il cervello ha detto
+    /// «aspetto» (con parole nuove si torna alla pausa normale).
+    private func pausaMinimaPer(_ resto: String) -> Double {
+        guard pausaMinimaAscolto > 0, let s = aspettoSu else { return 0 }
+        if Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(resto)) == s { return pausaMinimaAscolto }
+        pausaMinimaAscolto = 0
+        return 0
+    }
+
+    /// 12 nov (A3, P2, P3): una frase detta a voce è finita (ascolto o richiamo). Come ha parlato rispetto al suo solito (velocità,
+    /// forza, esitazioni) e cosa ha sentito il classificatore dei suoni (una risata, un sospiro, un sussurro) → `voceCome` per il
+    /// cervello; il suo solito impara; il sussurro accende la risposta sottovoce; l'intonazione finale va nei tempi del turno.
+    private func chiudiFraseDetta(testo: String, inizio: Date?, fine: Date) {
+        let secondi = inizio.map { max(0, fine.timeIntervalSince($0)) } ?? 0
+        let forza = VoceAttiva.condivisa.forzaMedia
+        let segnali = segnaliFrase(inizio: inizio ?? fine, secondi: secondi)
+        voceCome = ComeParla.condiviso.riga(testo: testo, secondi: secondi, forzaDb: forza, segnali: segnali.note)
+        if secondi > 0 { ComeParla.condiviso.impara(testo: testo, secondi: secondi, forzaDb: forza) }
+        if segnali.sussurra { Jarvis.sussurroFino = Date().addingTimeInterval(120) }
+        else if Date() < Jarvis.sussurroFino { Jarvis.sussurroFino = .distantPast }
+        // com'era finita la voce quando ha smesso di parlare (adesso, dopo la pausa, sarebbe sempre «incerta»)
+        ultimaIntonazione = Intonazione.condivisa.giudizio(ora: Jarvis.ultimaVoceSentita() + 0.1)
+    }
+
+    /// L'istante (orologio di sistema) dell'ultima voce sentita dal microfono; adesso se non l'ha mai sentita.
+    nonisolated private static func ultimaVoceSentita() -> TimeInterval {
+        let silenzio = VoceAttiva.condivisa.secondiDiSilenzio
+        return ProcessInfo.processInfo.systemUptime - (silenzio < 30 ? silenzio : 0)
+    }
+
+    /// 12 nov (P2): risate, sospiri e sussurro della frase cominciata a `inizio`. Il sussurro vale solo se la voce non aveva altezza
+    /// (si sussurra senza voce): una voce lontana o bassa, che il classificatore può scambiare per un sussurro, non lo è, e JARVIS non
+    /// risponde sottovoce per sbaglio.
+    private func segnaliFrase(inizio: Date, secondi: Double) -> (note: [String], sussurra: Bool) {
+        let s = AmbienteSonoro.condiviso.segnaliVoce(inizio: inizio)
+        guard s.sussurra else { return s }
+        let sonore = Intonazione.condivisa.misure(ultimi: max(1, secondi) + 0.5, ora: Jarvis.ultimaVoceSentita() + 0.1).count
+        if sonore < 8 { return (note: s.note + ["sussurra"], sussurra: true) }
+        return (note: s.note, sussurra: false)
     }
 
     /// Decide se la frase è una domanda nuova o il completamento della precedente, e la manda al cervello.
@@ -796,6 +902,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Ha sentito «Jarvis»: reattore in ascolto, il richiamo continua a raccogliere la frase.
     private func richiamato() {
         anticipiTurno = 0                                // 11 nov: una frase nuova dopo «Jarvis»: fino a 3 risposte anticipate
+        pausaMinimaAscolto = 0                           // 12 nov (errore 3): la pausa lunga valeva per la frase di prima
         scartaAnticipo()
         Posizione.scalda()                               // difetto 5: il GPS si sveglia mentre il signore dice la frase
         // 9 nov: con la musica il microfono dell'attesa non abbassa la canzone: detto «Jarvis», si passa all'ascolto vero, che la
@@ -924,6 +1031,10 @@ final class Jarvis: NSObject, ObservableObject {
         let testo = frase.trimmingCharacters(in: .whitespacesAndNewlines)
         if testo.isEmpty { scartaAnticipo(); return }   // ha detto solo «Jarvis» e poi nulla: torno in attesa
         if foto == nil, eseguiComando(testo) { scartaAnticipo(); return }
+        // 12 nov (errore 3): anche dopo «Jarvis…» il «come parla»; P5: la frase presa senza il nome (ascolto libero, seguito)
+        let inizio = richiamo.inizioFrase
+        chiudiFraseDetta(testo: testo, inizio: inizio, fine: inizio.map { $0.addingTimeInterval(richiamo.durataFrase) } ?? Date())
+        fraseLibera = !richiamo.conNome
         Task { await instrada(testo) }
     }
 
@@ -936,7 +1047,9 @@ final class Jarvis: NSObject, ObservableObject {
     /// Revisione del dialogo (24 ott, M1): quando una parola è l'ordine e quando no lo decide `Dialogo.volume`, uguale sull'orologio
     /// («qual è il piano per stasera?» e «ma è una voce normale?» sono domande, non ordini).
     private static var sottovoceFino = Date.distantPast
-    static var volumeVoce: Float { Date() < sottovoceFino ? 0.05 : 1 }   // sottovoce: appena udibile, da vicino
+    /// 12 nov (P2): il signore sussurra: JARVIS risponde sottovoce finché lui sussurra (torna normale alla prima frase detta a voce piena)
+    static var sussurroFino = Date.distantPast
+    static var volumeVoce: Float { Date() < sottovoceFino || Date() < sussurroFino ? 0.05 : 1 }   // sottovoce: appena udibile, da vicino
 
     /// Toglie «piano» dalla frase (e accende il sottovoce) o riconosce «voce normale»; restituisce il resto della frase.
     private func sottovoce(_ frase: String) -> String {
@@ -1338,6 +1451,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     func interrompi() {
         idTurno = nil                       // la risposta è fermata: un annuncio o un errore detti dopo non sono più «la risposta»
+        fermaDopoFrase = false
         fermaBenvenuto()
         liberoMacFinoA = .distantPast
         compitoRete?.cancel()
@@ -1358,8 +1472,9 @@ final class Jarvis: NSObject, ObservableObject {
         if fase != .ascolto { fase = .attesa }
     }
 
+    /// `ripetuta`: la stessa frase rimandata da JARVIS (P6, la domanda sul punto): non è una frase nuova, il suo ritmo non cambia.
     func invia(_ testoGrezzo: String, unisciA: UUID? = nil, comeAggiunta: Bool = false, comeSeguito: Bool = false, interrottoSu: String? = nil,
-               nascosto: String? = nil) async {
+               nascosto: String? = nil, ripetuta: Bool = false) async {
         rispostaInterrotta = nil                      // una domanda è partita (anche scritta): l'interruzione di prima è chiusa
         quandoInterrotto = nil
         domandaInterrotta = nil
@@ -1375,10 +1490,12 @@ final class Jarvis: NSObject, ObservableObject {
         aspettoSu = nil
         let comeParla = fineVoce == nil ? nil : voceCome      // A3: solo per le frasi dette a voce
         voceCome = nil
+        let libera = fraseLibera && fineVoce != nil           // 12 nov (P5): presa senza «Jarvis» dall'ascolto libero
+        fraseLibera = false
         ponteDelCervello = nil
         // 11 nov: il ritmo del signore. Ha ripreso a parlare subito dopo che la frase era stata chiusa (aggiunta): era stato tagliato,
         // la prossima volta JARVIS aspetta un po' di più; una frase detta e chiusa bene riporta piano ai tempi normali
-        if fineVoce != nil { if unisciA != nil || comeAggiunta { RitmoSignore.condiviso.ripresa() } else { RitmoSignore.condiviso.fraseChiusaBene() } }
+        if fineVoce != nil, !ripetuta { if unisciA != nil || comeAggiunta { RitmoSignore.condiviso.ripresa() } else { RitmoSignore.condiviso.fraseChiusaBene() } }
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
         let giroDaMandare = fotoGiro
@@ -1405,7 +1522,7 @@ final class Jarvis: NSObject, ObservableObject {
             // 11 nov · risposta anticipata: la frase è proprio quella su cui JARVIS stava già preparando la risposta? Allora si
             // adotta quella (è già pronta o quasi) invece di farne un'altra
             if let a = anticipo, !a.adottato, fotoDaMandare == nil, giroDaMandare.isEmpty, allegatoDaMandare == nil, a.vale(per: m, dopo: messaggi.last?.id) {
-                adotta(a, fineVoce: fineVoce)
+                adotta(a, fineVoce: fineVoce, libera: libera)
                 return
             }
             messaggi.append(m)
@@ -1438,10 +1555,11 @@ final class Jarvis: NSObject, ObservableObject {
         let fotoDaRimettere = fotoStoria
         compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare,
                                               fotoStoria: fotoDaRimettere, id: risposta.id, fineVoce: fineVoce,
-                                              dopoAspetto: dopoAspetto, comeParla: comeParla) }
-        // interrotto e subito un'aggiunta: una persona risponde e basta, non riempie di nuovo il vuoto
+                                              dopoAspetto: dopoAspetto, comeParla: comeParla, libera: libera) }
+        // interrotto e subito un'aggiunta: una persona risponde e basta, non riempie di nuovo il vuoto; P5: una frase presa senza
+        // «Jarvis» forse non era per lui: niente frase d'attesa prima di saperlo; P6: la domanda sul punto si fa e basta
         let appenaRiempito = Date().timeIntervalSince(ultimoPonte) < 20
-        if unisciA == nil && !comeAggiunta && !appenaRiempito { armaPonte(id: risposta.id, testo: testo) }
+        if unisciA == nil && !comeAggiunta && !appenaRiempito && !libera && !dopoAspetto { armaPonte(id: risposta.id, testo: testo) }
         else { compitoPonte?.cancel(); inizioTurno = Date() }
     }
 
@@ -1509,11 +1627,11 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// `lascia` e `ripiega`: idea D, il giro unico si ferma dopo la trascrizione (frase da fare come prima, trascrizione fallita).
     fileprivate enum Esito { case fine(String, [String]), client([String: Any]), errore(String), doppione, lascia(String), ripiega,
-                         sospeso([String: Any]), noAnticipo, aspetto }
+                         sospeso([String: Any]), noAnticipo, aspetto, silenzio }
 
     private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], allegato: String? = nil,
                        fotoStoria: (Int, [Data])? = nil, id: UUID, fineVoce: Date? = nil, unico: GiroUnicoMac? = nil,
-                       primo: Esito? = nil, dopoAspetto: Bool = false, comeParla: String? = nil) async {
+                       primo: Esito? = nil, dopoAspetto: Bool = false, comeParla: String? = nil, libera: Bool = false) async {
         defer { unico?.libera() }          // idea D: l'attesa del Mac può mandare la frase dopo, qualunque cosa succeda qui
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi]
         if let unico {
@@ -1531,6 +1649,9 @@ final class Jarvis: NSObject, ObservableObject {
             corpo["capisce_aspetto"] = true
             if dopoAspetto { corpo["dopo_aspetto"] = true }
             if let comeParla { corpo["voce_come"] = comeParla }
+            // 12 nov (P5): l'app sa tacere se la frase non era per JARVIS; la frase è stata presa senza «Jarvis»
+            corpo["capisce_silenzio"] = true
+            if libera { corpo["ascolto_libero"] = true }
         }
         corpo["ponte_contesto"] = true      // 12 nov (B4): con Opus il cervello prepara la frase d'attesa sulla richiesta
         if let fs = fotoStoria {      // la foto di poco fa, rimessa al suo posto nella conversazione
@@ -1576,6 +1697,9 @@ final class Jarvis: NSObject, ObservableObject {
                     return
                 case .aspetto:
                     aspettoDalCervello(id: id)      // 12 nov (A1): il signore non aveva finito: JARVIS lo riascolta in silenzio
+                    return
+                case .silenzio:
+                    silenzioDalCervello(id: id)     // 12 nov (P5): la frase non era per JARVIS: non dice niente
                     return
                 case .errore(let msg):
                     idTurno = nil                   // un messaggio d'errore non è una risposta da completare
@@ -1746,9 +1870,13 @@ final class Jarvis: NSObject, ObservableObject {
                 return .noAnticipo
             case "aspetto":
                 return .aspetto                 // 12 nov (A1): il cervello dice che il signore non ha finito di parlare
+            case "silenzio":
+                return .silenzio                // 12 nov (P5): la frase presa dall'ascolto libero non era per JARVIS
             case "ponte":
-                // 12 nov (B4): la frase d'attesa sulla richiesta (solo per la risposta vera, non per quella anticipata)
-                if deposito == nil || deposito?.adottato == true, let f = e["d"] as? String, !f.isEmpty { ponteDelCervello = f }
+                // 12 nov (B4, P4): la frase d'attesa sulla richiesta. Nella risposta anticipata resta da parte: vale se la si adotta
+                if let f = e["d"] as? String, !f.isEmpty {
+                    if let d = deposito, !d.adottato { d.ponte = f } else { ponteDelCervello = f }
+                }
             case "fine":
                 if let d = deposito, let l = e["lavoro"] { d.lavoroFine = l }    // 11 nov: solo nella risposta anticipata
                 if let d = deposito, !d.adottato { preparaVoce(d, finita: true) }
@@ -2055,6 +2183,7 @@ final class Jarvis: NSObject, ObservableObject {
         // i toni («[whispers]») li sa dire solo la voce di JARVIS dal cloud: la voce dell'iPhone li salta
         let detta = vocePerCloud ? frase : TagVoce.togli(frase)
         if detta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
+        if vocePerCloud, detta.contains("[laughs]") { AmbienteSonoro.condiviso.jarvisRide(per: 6) }   // 12 nov (P2): è la sua risata
         let u = AVSpeechUtterance(string: detta)
         u.voice = Jarvis.voceScelta()
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.03
@@ -2096,6 +2225,14 @@ final class Jarvis: NSObject, ObservableObject {
         // H2: il signore l'ha sentita tutta; se poi interrompe, il cervello sa che questa c'era
         if detta, let r = diRisposta {
             if let d = dettoRisposta, d.id == r.id { dettoRisposta = (d.id, d.testo + " " + r.frase) } else { dettoRisposta = (r.id, r.frase) }
+        }
+        // 12 nov (P1): aveva detto «ho capito» mentre JARVIS parlava: finita questa frase si ferma, come col tocco sul reattore
+        if fermaDopoFrase, detta, diRisposta != nil {
+            fermaDopoFrase = false
+            segnaInterruzione()
+            ascoltaDopo = false
+            interrompi()
+            return
         }
         guard inCoda.isEmpty else { return }
         if flussoFinito { fineParlato() } else if fase == .parlo { fase = .elaboro }   // detto tutto, il resto è in arrivo
@@ -2236,6 +2373,7 @@ final class Jarvis: NSObject, ObservableObject {
             pausaMinimaAscolto = 0                     // 12 nov (A1)
             inizioParlato = nil                        // 12 nov (A3)
             voceCome = nil
+            fraseLibera = false                        // 12 nov (P5): questa frase è chiesta (tocco, «Mi dica», risposta a una domanda)
             ascoltoLungo = ascoltoLungoProssimo        // «ascoltami» detto da solo: l'ascolto che parte adesso è quello lungo
             ascoltoLungoProssimo = false
             ultimaParolaAscolto = Date()
@@ -2338,6 +2476,7 @@ final class Jarvis: NSObject, ObservableObject {
         if senzaSottovoce.isEmpty { return false }                        // solo «piano» o «voce normale»: fatto, niente rito
         if Benvenuto.eFraseDiTony(senzaSottovoce) { fraseDiTony(); return false }
         if foto == nil, eseguiComando(senzaSottovoce) { return false }
+        fraseLibera = !conNome                                            // 12 nov (P5): presa senza «Jarvis»
         Task { await instrada(senzaSottovoce) }
         return false
     }
@@ -2408,7 +2547,8 @@ final class Jarvis: NSObject, ObservableObject {
         guard registratore.haParlato else {            // non ha detto niente: torna in attesa, in silenzio
             stato = nil
             fase = .attesa
-            if dopoAspetta == .aspetta { miDica() } else { aggiuntaInArrivo = false; dopoAspetta = .no }   // come sull'iPhone
+            if dopoAspetta == .aspetta { miDica() } else if dopoAspetta == .fraseAMeta { rispondiAFraseAMeta() }
+            else { aggiuntaInArrivo = false; dopoAspetta = .no }   // come sull'iPhone
             return
         }
         let registratore = self.registratore
@@ -2554,10 +2694,11 @@ final class Jarvis: NSObject, ObservableObject {
     /// della parola ripetuta in fondo («sì sì», «no no», «ok ok» aspettavano 2,4 s invece di 0,6).
     nonisolated static func pausaFineFrase(_ testo: String) -> Double { FineFrase.pausa(testo, nomi: Richiamo.nomi) }
 
-    private func armaSilenzio(secondi: Double) {
+    /// `giaPassati`: il silenzio già trascorso (12 nov, errore 4: la pausa lunga del «aspetto» conta dall'ultima voce sentita).
+    private func armaSilenzio(secondi: Double, giaPassati: Double = 0) {
         timerSilenzio?.invalidate()
         let mio = turnoAscolto
-        timerSilenzio = Timer.scheduledTimer(withTimeInterval: secondi, repeats: false) { [weak self] _ in
+        timerSilenzio = Timer.scheduledTimer(withTimeInterval: max(0.25, secondi - giaPassati), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.turnoAscolto == mio, self.fase == .ascolto else { return }
                 // 11 nov (analisi del dialogo): il silenzio si decideva solo dalle parole trascritte. In una sessione lunga il
@@ -2699,12 +2840,9 @@ final class Jarvis: NSObject, ObservableObject {
         richiesta = nil
         compito = nil
         let testo = parziale
-        // 12 nov (A3): come ha parlato in questa frase rispetto al suo solito (velocità, forza, esitazioni); poi il suo solito impara
-        if invia, let t0 = inizioParlato, !testo.isEmpty, ultimoParzialeAscolto != .distantPast {
-            let secondi = ultimoParzialeAscolto.timeIntervalSince(t0)
-            let forza = VoceAttiva.condivisa.forzaMedia
-            voceCome = ComeParla.condiviso.riga(testo: testo, secondi: secondi, forzaDb: forza)
-            ComeParla.condiviso.impara(testo: testo, secondi: secondi, forzaDb: forza)
+        // 12 nov (A3, P2, P3): come ha parlato in questa frase rispetto al suo solito; risate, sospiri, sussurri; intonazione finale
+        if invia, !testo.isEmpty, ultimoParzialeAscolto != .distantPast {
+            chiudiFraseDetta(testo: testo, inizio: inizioParlato, fine: ultimoParzialeAscolto)
         }
         inizioParlato = nil
         parziale = ""
@@ -2722,6 +2860,8 @@ final class Jarvis: NSObject, ObservableObject {
             if foto == nil { Task { await self.instrada(testo) } } else { Task { await self.invia(testo) } }
         } else if invia, !toccato, dopoAspetta == .aspetta {
             miDica()                                 // «aspetta» e poi silenzio per 5 secondi: «Mi dica, Sir» (deciso dal signore)
+        } else if invia, !toccato, dopoAspetta == .fraseAMeta {
+            rispondiAFraseAMeta()                    // 12 nov (P6): frase a metà e silenzio: JARVIS chiede il pezzo che manca
         } else {
             aggiuntaInArrivo = false                 // non ha detto niente (anche dopo «Mi dica»): torna in attesa, in silenzio
             dopoAspetta = .no
@@ -2759,10 +2899,13 @@ final class Jarvis: NSObject, ObservableObject {
         }
         input.removeTap(onBus: 0)
         nonisolated(unsafe) let richiesta = r
-        input.installTap(onBus: 0, bufferSize: 1024, format: formato) { buffer, _ in
+        // 12 nov (P2): anche qui il classificatore dei suoni (risate, sospiri, sussurri del signore; folla, musica, TV)
+        let ambiente = AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)
+        input.installTap(onBus: 0, bufferSize: 1024, format: formato) { buffer, quando in
             richiesta.append(buffer)
             Volume.voce.misura(buffer)          // il reattore si gonfia con la voce
             VoceAttiva.condivisa.misura(buffer) // 11 nov: c'è ancora la voce del signore? (la fine frase non dipende solo dalle parole)
+            ambiente?.analizza(buffer, posizione: quando.sampleTime)
         }
     }
 
@@ -3355,6 +3498,8 @@ extension Jarvis {
         var compito: Task<Void, Never>?
         var lavoroFine: Any?                       // il lavoro del cervello a risposta finita (per i ricordi, se si adotta)
         var voceFatta = false                      // 12 nov (E1): l'audio della prima frase è già in preparazione
+        var ponte: String?                         // 12 nov (P4): la frase d'attesa preparata dal cervello per questa risposta
+        var dopoAspetto = false                    // 12 nov (P6): chiede il pezzo che manca (o risponde): niente frase d'attesa
         fileprivate var esito: Esito?
         private var finito = false
         private var attese: [CheckedContinuation<Void, Never>] = []
@@ -3401,7 +3546,9 @@ extension Jarvis {
     fileprivate func programmaAnticipo(_ testo: String) {
         timerAnticipo?.invalidate()
         guard anticipoAcceso, fase == .ascolto else { return }
-        if let a = anticipo, !a.adottato, Jarvis.normaAnticipo(a.messaggio.testo) != Jarvis.normaAnticipo(testo) { scartaAnticipo() }
+        // 12 nov: il confronto con la frase come la vede il cervello (senza «allora», «senti», «ok» davanti): prima «allora gli ho detto
+        // che» non era mai uguale a «gli ho detto che» e la risposta anticipata si buttava a ogni parola, anche quella di riserva
+        if let a = anticipo, !a.adottato, Jarvis.normaAnticipo(a.messaggio.testo) != Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(testo)) { scartaAnticipo() }
         let t = testo
         timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.provaAnticipo(t) }
@@ -3418,16 +3565,36 @@ extension Jarvis {
             return
         }
         guard let m = messaggioAnticipabile(t) else { return }
+        // 12 nov (errore 4): sulla frase su cui il cervello ha già detto «aspetto» non si rifà la risposta normale (poteva dire di nuovo
+        // «aspetto», venire adottata e finire in 8 secondi di silenzio e un «Mi dica»): si fa quella di riserva, che sa dove si è fermato
+        lanciaAnticipo(m, dopoAspetto: aspettoSu != nil && aspettoSu == Jarvis.normaAnticipo(m.testo))
+    }
+
+    /// La richiesta della risposta anticipata. `dopoAspetto`: la frase è quella su cui il cervello ha detto «aspetto» (errore 4):
+    /// il cervello risponde comunque, o chiede il pezzo che manca (P6). `senza`: la frase è ancora in chat (P6, aspettando che
+    /// continui) ma partirà dopo esserne tolta: la conversazione per il cervello e il punto in cui si adotta sono quelli di allora.
+    private func lanciaAnticipo(_ m: Messaggio, dopoAspetto: Bool, senza: UUID? = nil) {
         anticipiTurno += 1
-        let a = Anticipo(messaggio: m, ultimoPrima: messaggi.last?.id)
+        var ultimoPrima = messaggi.last?.id
+        if let s = senza, let i = messaggi.firstIndex(where: { $0.id == s }) { ultimoPrima = i > 0 ? messaggi[i - 1].id : nil }
+        let a = Anticipo(messaggio: m, ultimoPrima: ultimoPrima)
+        a.dopoAspetto = dopoAspetto
         anticipo = a
-        var storia: [[String: Any]] = finestraCervello().map(Jarvis.perCervello)
+        var storia: [[String: Any]] = finestraCervello().filter { $0.id != senza }.map(Jarvis.perCervello)
         storia.append(Jarvis.perCervello(m))
+        // 12 nov (P4, P5): anche qui la frase d'attesa sulla richiesta e il silenzio se la frase non era per JARVIS
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
-                                    "a_voce": true, "anticipo": true, "capisce_aspetto": true]   // 12 nov (A1)
+                                    "a_voce": true, "anticipo": true, "capisce_silenzio": true, "ponte_contesto": true]
+        if dopoAspetto { corpo["dopo_aspetto"] = true } else { corpo["capisce_aspetto"] = true }   // 12 nov (A1)
+        if richiamo.sveglio && !richiamo.conNome { corpo["ascolto_libero"] = true }
         // 12 nov (A3): come sta parlando finora (senza aggiornare il suo solito: la frase non è ancora chiusa)
-        if let t0 = inizioParlato, let riga = ComeParla.condiviso.riga(testo: parziale, secondi: ultimoParzialeAscolto.timeIntervalSince(t0),
-                                                                      forzaDb: VoceAttiva.condivisa.forzaMedia) { corpo["voce_come"] = riga }
+        let inizio: Date? = richiamo.sveglio ? richiamo.inizioFrase : inizioParlato
+        let ultima: Date? = richiamo.sveglio ? richiamo.inizioFrase.map { $0.addingTimeInterval(richiamo.durataFrase) } : ultimoParzialeAscolto
+        if let t0 = inizio, let t1 = ultima {
+            let secondi = max(0, t1.timeIntervalSince(t0))
+            if let riga = ComeParla.condiviso.riga(testo: m.testo, secondi: secondi, forzaDb: VoceAttiva.condivisa.forzaMedia,
+                                                    segnali: segnaliFrase(inizio: t0, secondi: secondi).note) { corpo["voce_come"] = riga }
+        }
         // revisione 11 nov: come il turno normale, anche l'anticipo passa dall'arbitro (se la stessa frase l'ha sentita l'orologio,
         // risponde uno solo). La fine della frase è adesso: il signore ha appena smesso di parlare
         corpo["arbitro"] = ["id": Impostazioni.idDispositivo, "fine": Int64(Date().timeIntervalSince1970 * 1000)] as [String: Any]
@@ -3472,13 +3639,18 @@ extension Jarvis {
 
     /// 12 nov (A1): la risposta anticipata dice che il signore non ha finito («[aspetto]»): non si adotta, e la pausa di fine frase
     /// di questo ascolto diventa di almeno 3 secondi finché la frase resta quella. Se poi tace, la frase parte con `dopo_aspetto`.
+    /// 12 nov (revisione del dialogo): errore 3, dopo «Jarvis…» la frase la raccoglie il richiamo, che ha la sua chiusura: la pausa
+    /// nuova vale anche lì; errore 4, i 3 secondi contano dall'ultima voce sentita (non da adesso: il giudizio arriva ~1,5 s dopo) e la
+    /// risposta per quella frase si prepara subito, sapendo che si è fermato lì: se tace, parte allo scadere senza altra attesa.
     fileprivate func anticipoAspetta(_ a: Anticipo) {
         guard anticipo === a, !a.adottato, fase == .ascolto else { return }
         anticipo = nil
         anticipiButtati += 1
         aspettoSu = Jarvis.normaAnticipo(a.messaggio.testo)
         pausaMinimaAscolto = 3
-        armaSilenzio(secondi: pausaAscolto(parziale))
+        if richiamo.sveglio { richiamo.riarmaChiusura() }
+        else { armaSilenzio(secondi: pausaAscolto(parziale), giaPassati: min(VoceAttiva.condivisa.secondiDiSilenzio, 3)) }
+        if anticipiTurno < 3, anticipoAcceso { lanciaAnticipo(a.messaggio, dopoAspetto: true) }
     }
 
     /// 12 nov (E1): appena la risposta anticipata ha la sua prima frase, la voce di quella frase si prepara in sottofondo (senza
@@ -3526,7 +3698,7 @@ extension Jarvis {
     }
 
     /// Il signore ha finito ed era proprio la frase anticipata: la risposta (già pronta, o in arrivo) diventa quella vera.
-    fileprivate func adotta(_ a: Anticipo, fineVoce: Date?) {
+    fileprivate func adotta(_ a: Anticipo, fineVoce: Date?, libera: Bool = false) {
         timerAnticipo?.invalidate()
         a.adottato = true
         anticipo = nil
@@ -3573,7 +3745,9 @@ extension Jarvis {
                 await self.turno(storia: storia, foto: nil, id: risposta.id, fineVoce: fineVoce)
             }
         }
-        if arrivati.isEmpty, Date().timeIntervalSince(ultimoPonte) >= 20 { armaPonte(id: risposta.id, testo: a.messaggio.testo) }
+        if let p = a.ponte { ponteDelCervello = p }        // 12 nov (P4): la frase d'attesa che il cervello ha preparato per lei
+        // come in `invia`: niente frase d'attesa per la domanda sul punto (P6) né per una frase presa senza «Jarvis» (P5)
+        if arrivati.isEmpty, !a.dopoAspetto, !libera, Date().timeIntervalSince(ultimoPonte) >= 20 { armaPonte(id: risposta.id, testo: a.messaggio.testo) }
         else { compitoPonte?.cancel(); inizioTurno = Date() }
     }
 
@@ -3611,6 +3785,11 @@ extension Jarvis {
         misura = ["esito": "voce", "chiusura": motivoChiusura.isEmpty ? "altro" : motivoChiusura, "riavvii": riavviiAscolto,
                   "ritmo": (RitmoSignore.condiviso.fattore * 100).rounded() / 100, "termico": ProcessInfo.processInfo.thermalState.rawValue,
                   "battute": finestraCervello().count, "anticipo": esitoAnticipo, "buttati": anticipiButtati]
+        // 12 nov (P3): com'era finita la voce (scende, sospesa, incerta), per regolare le soglie dell'intonazione sui dati veri
+        if let g = ultimaIntonazione {
+            misura["into"] = g.fine.rawValue; misura["into_liv"] = g.livello; misura["into_pend"] = g.pendenza; misura["into_punti"] = g.punti
+        }
+        ultimaIntonazione = nil
         anticipiButtati = 0
         motivoChiusura = ""
     }
