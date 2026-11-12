@@ -286,6 +286,180 @@ nonisolated enum FineFrase {
         case .incerta: return p
         }
     }
+
+    // MARK: 12.0 (10) · Riprendere il filo (deciso dal signore: «voglio più comandi per ricominciare a parlare con lui e che mi finisca
+    // la frase… comandi umani… perché voglio un perfetto dialogo umano»)
+
+    /// Il nome di JARVIS come lo storpia il riconoscimento («Giarvis», «Jervis»…): una lista sola per iPhone, Mac e polso.
+    static let nomiJarvis = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+    private static let nomiNudi = ["jarvi", "giarvi", "jervis", "charvis", "jarves", "jarbis"]   // gli stessi, senza accenti
+
+    /// Quanto JARVIS ricorda la frase su cui ha taciuto perché credeva che il signore parlasse con qualcun altro (deciso dal
+    /// signore: 8 secondi). Entro quel tempo «Jarvis?», «ci sei?», «dico a te» vogliono dire che era per lui.
+    static let memoriaSilenzio: TimeInterval = 8
+
+    /// Le parole per il confronto con le frasi fatte: minuscole, senza accenti («lì» = «li», «perché» = «perche»), l'apostrofo
+    /// separa («dov'eri» = «dov eri»), senza il nome di JARVIS (anche storpiato).
+    static func paroleNude(_ testo: String) -> [String] {
+        testo.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+            .filter { p in !nomiNudi.contains(where: { p.hasPrefix($0) }) }
+    }
+
+    /// Nella frase c'è il nome di JARVIS (anche storpiato).
+    static func haNome(_ testo: String) -> Bool {
+        testo.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber }).contains { p in nomiNudi.contains(where: { p.hasPrefix($0) }) }
+    }
+
+    /// Il cuore della frase: via le parole di contorno davanti («ma», «dai», «scusa», «no niente»…) e in fondo («pure», «dai»,
+    /// «per favore»…), finché resta almeno una parola.
+    private static func cuore(_ parole: [String], davanti: Set<String>, dietro: Set<String>) -> String {
+        var w = parole
+        var cambiato = true
+        while cambiato, w.count > 1 {
+            cambiato = false
+            if let f = w.first, davanti.contains(f) { w.removeFirst(); cambiato = true; continue }
+            if let l = w.last, dietro.contains(l) { w.removeLast(); cambiato = true; continue }
+            if w.count > 2, w[w.count - 2] == "per", w[w.count - 1] == "favore" { w.removeLast(2); cambiato = true }
+        }
+        return w.joined(separator: " ")
+    }
+
+    private static let davantiRichiamo: Set<String> = ["ma", "e", "ehi", "hey", "ei", "oh", "ohi", "ehm", "scusa", "scusami", "dai",
+                                                        "insomma", "allora", "quindi", "beh", "be", "ok", "okay", "sir", "si", "o",
+                                                        "senti", "ascolta"]
+    private static let dietroRichiamo: Set<String> = ["dai", "eh", "allora", "sir", "o", "no", "ora", "adesso", "insomma", "scusa",
+                                                       "ehi", "oh", "pure", "almeno", "si"]
+    /// I richiami puri: chi li dice vuole la risposta alla frase di prima, così com'era.
+    private static let richiamiPuri: Set<String> = [
+        // ci sei? mi senti?
+        "ci sei", "ci sei ancora", "sei li", "sei qui", "sei ancora li", "sei ancora qui", "sei sveglio", "sei ancora sveglio",
+        "sei acceso", "sei connesso", "sei in linea", "pronto", "ehi", "hey", "oh", "ohi", "eh", "ehila", "allo", "senti", "ascolta",
+        "ascoltami", "ci senti", "mi senti", "mi hai sentito", "hai sentito", "mi ascolti", "mi stai ascoltando", "mi stai sentendo",
+        "mi hai ascoltato", "non mi senti", "non mi hai sentito", "non hai sentito", "hai sentito cosa ho detto",
+        "hai sentito cosa ti ho detto", "hai sentito la domanda", "hai capito", "mi hai capito", "non hai capito", "non mi hai capito",
+        "hai capito cosa ho detto", "hai capito cosa ti ho detto", "hai capito la domanda",
+        // allora?
+        "allora", "beh", "be", "quindi", "dunque", "e quindi", "e dunque", "e allora", "insomma", "cosa aspetti", "che aspetti",
+        // rispondi
+        "rispondi", "rispondimi", "mi rispondi", "non mi rispondi", "non rispondi", "perche non rispondi", "perche non mi rispondi",
+        "perche non parli", "perche stai zitto", "perche taci", "non parli", "parla", "parlami", "dimmi qualcosa", "di qualcosa",
+        "dici qualcosa",
+        // dico a te
+        "dico a te", "dicevo a te", "dico proprio a te", "dicevo proprio a te", "parlo con te", "parlavo con te",
+        "sto parlando con te", "stavo parlando con te", "parlo a te", "parlavo a te", "sto parlando a te", "stavo parlando a te",
+        "era per te", "e per te", "era proprio per te", "e proprio per te", "chiedo a te", "chiedevo a te", "lo chiedo a te",
+        "lo chiedevo a te", "domandavo a te", "lo domandavo a te", "a te", "proprio a te", "con te", "tu", "proprio tu", "te",
+        "dicevo te", "dico a te dico",
+        // dormi?
+        "dormi", "stai dormendo", "ti sei addormentato", "ti sei incantato", "ti sei bloccato", "sei bloccato", "sei morto",
+        "funzioni", "funzioni ancora", "tutto bene", "che succede", "che fai", "che stai facendo", "cosa fai",
+    ]
+    /// I richiami che chiedono anche un parere sulla frase di prima: vanno al cervello dopo di lei.
+    private static let richiamiConParere: Set<String> = [
+        "che dici", "cosa dici", "che mi dici", "che ne dici", "tu che dici", "tu che ne dici", "che ne pensi", "cosa ne pensi",
+        "tu che ne pensi", "tu cosa ne pensi", "e tu", "e tu che dici", "e tu che ne pensi", "e tu cosa ne pensi", "tu cosa dici",
+        "secondo te", "e secondo te", "e tu cosa dici",
+    ]
+
+    /// 12.0 (10): JARVIS ha appena taciuto su una frase (credeva che il signore parlasse con qualcun altro) e il signore lo richiama.
+    /// Come una persona che si accorge che parlavano proprio a lei, JARVIS risponde alla frase di prima.
+    /// - Returns: nil se non è un richiamo; "" se è un richiamo puro («Jarvis?», «ci sei?», «mi senti?», «allora?», «dico a te»,
+    ///   «rispondi»: si risponde alla frase di prima così com'era); la frase stessa se chiede anche un parere su quella frase
+    ///   («tu che ne pensi?», «e tu?»: va al cervello dopo la frase di prima).
+    static func richiamoDopoSilenzio(_ testo: String) -> String? {
+        let p = paroleNude(testo)
+        if p.isEmpty { return haNome(testo) ? "" : nil }          // il nome da solo: «Jarvis?», «Jarvis!»
+        guard p.count <= 8 else { return nil }
+        let c = cuore(p, davanti: davantiRichiamo, dietro: dietroRichiamo)
+        // «e tu?» chiede un parere (la «e» davanti non è contorno, qui)
+        if richiamiConParere.contains(p.joined(separator: " ")) || richiamiConParere.contains(c) {
+            return testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return richiamiPuri.contains(c) ? "" : nil
+    }
+
+    private static let davantiRipresa: Set<String> = ["no", "niente", "nulla", "scusa", "scusami", "perdonami", "perdona", "pardon",
+                                                       "ok", "okay", "si", "va", "bene", "ah", "oh", "eh", "ehm", "dai", "ma", "allora",
+                                                       "prego", "anzi", "certo", "sir", "ehi", "hey", "giusto", "ecco", "vabbe"]
+    private static let dietroRipresa: Set<String> = ["pure", "dai", "sir", "prego", "allora", "scusa", "scusami", "grazie", "ok", "eh",
+                                                      "tranquillo"]
+    /// Chiedono senza dubbio di riprendere la frase di JARVIS, anche presi senza «Jarvis» («dicevi?», «dove eri rimasto?»).
+    private static let ripreseChiare: Set<String> = [
+        "dicevi", "stavi dicendo", "cosa dicevi", "che dicevi", "cosa stavi dicendo", "che stavi dicendo", "dicevi qualcosa",
+        "stavi dicendo qualcosa", "dicevi tu", "cosa stavi per dire", "che stavi per dire", "stavi per dire",
+        "continua quello che dicevi", "continua quello che stavi dicendo", "continua il discorso", "continua la frase",
+        "continua la risposta", "vai avanti con il discorso", "vai avanti col discorso", "finisci la frase", "finisci di dire",
+        "finisci il discorso", "finisci quello che dicevi", "finisci quello che stavi dicendo", "finisci la risposta",
+        "riprendi il discorso", "riprendi da dove eri", "riprendi da dove eri rimasto", "riprendi da dove ti eri fermato",
+        "ricomincia da dove eri", "ricomincia da dove eri rimasto", "da dove eri rimasto", "dove eri rimasto", "dov eri rimasto",
+        "dove eravamo rimasti", "dov eravamo rimasti", "ti ho interrotto", "ti ho interrotto continua", "ti ho interrotto vai avanti",
+        "non volevo interromperti", "non volevo interromperti continua", "scusa se ti ho interrotto", "se ti ho interrotto",
+    ]
+    /// «Continua», «vai avanti», «finisci»: la ripresa, detti a lui (col nome, toccando il reattore o in dialogo).
+    private static let ripreseGeneriche: Set<String> = [
+        "continua", "continua continua", "continua a dire", "puoi continuare", "prosegui", "vai avanti", "vai pure avanti",
+        "vai avanti a dire", "finisci", "puoi finire", "riprendi", "dove eravamo",
+    ]
+    /// «Vai», «avanti», «prego», «dimmi», «e poi?»: riprendono la frase di JARVIS, ma dopo una sua domanda sono la risposta.
+    private static let ripreseSemplici: Set<String> = ["vai", "vai pure", "avanti", "prego", "dimmi", "dimmi pure", "e poi", "poi",
+                                                        "sentiamo", "ti ascolto", "ti sto ascoltando", "sono tutto orecchi"]
+
+    /// 12.0 (10): il signore ha interrotto JARVIS e adesso gli chiede di finire la sua frase: «dicevi?», «continua pure», «scusa,
+    /// vai avanti», «finisci», «prego», «dove eri rimasto?».
+    /// - `dopoDomanda`: JARVIS si è fermato su una sua domanda («…lo mando?»): «vai», «avanti», «prego» sono la risposta.
+    /// - `libera`: la frase l'ha presa l'ascolto libero, senza «Jarvis»: valgono solo quelle che parlano della sua frase («dicevi?»);
+    ///   «continua» o «vai avanti» potevano essere per un'altra persona.
+    static func chiedeDiContinuare(_ testo: String, dopoDomanda: Bool = false, libera: Bool = false) -> Bool {
+        let p = paroleNude(testo)
+        guard !p.isEmpty, p.count <= 9 else { return false }
+        let c = cuore(p, davanti: davantiRipresa, dietro: dietroRipresa)
+        if ripreseChiare.contains(c) { return true }
+        if libera { return false }
+        return ripreseGeneriche.contains(c) || (!dopoDomanda && ripreseSemplici.contains(c))
+    }
+
+    /// 12.0 (10): i secondi fra la fine dell'ultima risposta di JARVIS e l'inizio della frase del signore, con un decimale (per il
+    /// cervello: una frase detta a pochi secondi dalla risposta è quasi sempre per JARVIS). Nil se non c'è o è troppo lontana.
+    static func dopoRisposta(fine: Date?, inizio: Date?) -> Double? {
+        guard let fine, let inizio else { return nil }
+        let s = inizio.timeIntervalSince(fine)
+        return s >= 0 && s < 600 ? (s * 10).rounded() / 10 : nil
+    }
+
+    /// Il resto della risposta interrotta da dire: quello che viene dopo le frasi già dette (`detto`, con o senza i toni della
+    /// voce come «[laughs]»). Nil se il punto non si ritrova; vuoto se l'aveva già detta tutta.
+    static func restoDaDire(_ completa: String, detto: String) -> String? {
+        let d = detto.replacingOccurrences(of: #"\[[^\]]*\]"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if d.isEmpty { return completa.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let k = taglio(completa, dopo: d) else { return nil }
+        return String(completa[k...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Dove finisce, dentro `testo`, la parte già detta. Contano solo lettere e cifre: spazi, a capo e punteggiatura possono
+    /// cambiare fra le frasi dette una per una e il testo intero. Nil se il detto non è l'inizio del testo. (Qui dal 12.0 (10),
+    /// per le prove automatiche; `Dialogo.taglio` la usa.)
+    static func taglio(_ testo: String, dopo detto: String) -> String.Index? {
+        let voluti = detto.compactMap { c -> String? in c.isLetter || c.isNumber ? String(c).lowercased() : nil }
+        guard !voluti.isEmpty else { return nil }
+        var k = 0
+        var i = testo.startIndex
+        while i < testo.endIndex {
+            let c = testo[i]
+            i = testo.index(after: i)
+            guard c.isLetter || c.isNumber else { continue }
+            guard String(c).lowercased() == voluti[k] else { return nil }
+            k += 1
+            if k == voluti.count {
+                // la punteggiatura attaccata all'ultima parola detta («…domani piove.») resta con la parte detta
+                while i < testo.endIndex, !testo[i].isWhitespace, !testo[i].isLetter, !testo[i].isNumber { i = testo.index(after: i) }
+                return i
+            }
+        }
+        return nil
+    }
 }
 
 // MARK: - 12 nov · L'intonazione (P3, revisione del dialogo approvata dal signore: «provala già adesso»)

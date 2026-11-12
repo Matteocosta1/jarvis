@@ -138,23 +138,7 @@ nonisolated enum Dialogo {
     /// Dove finisce, dentro `testo`, la parte già detta. Contano solo lettere e cifre: spazi, a capo e punteggiatura
     /// possono cambiare fra le frasi dette una per una e il testo intero. Nil se il detto non è l'inizio del testo.
     static func taglio(_ testo: String, dopo detto: String) -> String.Index? {
-        let voluti = detto.compactMap { c -> String? in c.isLetter || c.isNumber ? String(c).lowercased() : nil }
-        guard !voluti.isEmpty else { return nil }
-        var k = 0
-        var i = testo.startIndex
-        while i < testo.endIndex {
-            let c = testo[i]
-            i = testo.index(after: i)
-            guard c.isLetter || c.isNumber else { continue }
-            guard String(c).lowercased() == voluti[k] else { return nil }
-            k += 1
-            if k == voluti.count {
-                // la punteggiatura attaccata all'ultima parola detta («…domani piove.») resta con la parte detta
-                while i < testo.endIndex, !testo[i].isWhitespace, !testo[i].isLetter, !testo[i].isNumber { i = testo.index(after: i) }
-                return i
-            }
-        }
-        return nil
+        FineFrase.taglio(testo, dopo: detto)                // 12.0 (10): una copia sola, provata dal controllo di compilazione
     }
 
     // MARK: L'eco sull'orologio
@@ -321,7 +305,7 @@ nonisolated enum Dialogo {
                 if !unita[..<r.lowerBound].split(separator: " ").contains(where: { discorso.contains(String($0)) }) { return ("", .normale) }
             }
         }
-        let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+        let nomi = FineFrase.nomiJarvis
         var inizio = 0                                   // la frase vera comincia dopo «Jarvis», «ehi», «ok»
         while inizio < p.count, nomi.contains(where: { p[inizio].hasPrefix($0) }) || ["ehi", "hey", "ok", "okay"].contains(p[inizio]) { inizio += 1 }
         let verbiVoce: Set<String> = ["parla", "parlami", "rispondi", "rispondimi"]

@@ -892,7 +892,144 @@ struct VistaSpesa: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sulloSchermo(testoSchermo)
+        .regia("Spesa", stato: testoSchermo, azioni: azioniRegia)      // 12.0 (10): JARVIS vede la lista e la muove
+    }
+
+    // MARK: 12.0 (10) · La regia
+
+    /// Cosa sa fare la Spesa per JARVIS: le cose si aggiungono, si tolgono, si spuntano e si rimettono a voce, anche più insieme
+    /// («latte, uova e pane»), subito e senza il cervello con le frasi rapide; svuotare tutta la lista chiede il sì del signore.
+    private var azioniRegia: [AzioneRegia] {
+        [
+            AzioneRegia("aggiungi", "mette in lista una o più cose", valore: "cosa",
+                        frasi: ["aggiungi *", "aggiungimi *", "segna *", "segnami *", "manca *", "mancano *", "metti in lista *",
+                                "devo comprare *", "compra *", "comprami *", "prendi *"]) { v in regiaAggiungi(v["cosa"] ?? "") },
+            AzioneRegia("togli", "toglie dalla lista", valore: "cosa",
+                        frasi: ["togli *", "toglimi *", "leva *", "levami *", "cancella *", "rimuovi *", "depenna *"]) { v in regiaTogli(v["cosa"] ?? "") },
+            AzioneRegia("preso", "spunta: messo nel carrello", valore: "cosa",
+                        frasi: ["ho preso *", "preso *", "spunta *", "ho messo nel carrello *"]) { v in regiaPreso(v["cosa"] ?? "") },
+            AzioneRegia("rimetti", "riporta in lista una cosa spuntata", valore: "cosa", frasi: ["rimetti *", "rimettimi *"]) { v in
+                regiaRimetti(v["cosa"] ?? "")
+            },
+            AzioneRegia("svuota", "toglie tutte le cose da comprare", conferma: true) { _ in regiaSvuota() },
+            AzioneRegia("whatsapp", "apre WhatsApp con la lista scritta: sceglie lui a chi mandarla") { _ in
+                guard !daComprare.isEmpty,
+                      let t = testoDaCondividere.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))),
+                      let u = URL(string: "https://wa.me/?text=\(t)") else { return .no("la lista è vuota") }
+                if let dopo = Regia.condivisa.dopoLaVoce { dopo { apriLink(u) } } else { apriLink(u) }
+                return .fatto("WhatsApp si apre con la lista scritta appena hai finito la frase")
+            },
+        ]
+    }
+
+    /// Le cose dette in una frase: «latte, uova e pane» → latte · uova · pane (senza articoli né «un po' di»).
+    static func cose(_ testo: String) -> [String] {
+        let separa = testo.replacingOccurrences(of: ";", with: ",").replacingOccurrences(of: " ed ", with: ",")
+            .replacingOccurrences(of: " e ", with: ",").replacingOccurrences(of: " anche ", with: ",")
+        let articoli = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una ", "un'", "del ", "dello ", "della ", "dei ",
+                        "degli ", "delle ", "dell'", "un po' di ", "un po di ", "anche ", "altro ", "altra ", "altri ", "altre "]
+        return separa.split(separator: ",").map { pezzo -> String in
+            var t = pezzo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            var cambiato = true
+            while cambiato {
+                cambiato = false
+                for a in articoli where t.hasPrefix(a) { t = String(t.dropFirst(a.count)); cambiato = true }
+            }
+            return t.trimmingCharacters(in: CharacterSet(charactersIn: " .!?"))
+        }.filter { !$0.isEmpty }
+    }
+
+    /// La voce della lista che corrisponde a quella detta: uguale, poi che comincia così, poi che la contiene («latte» → «latte intero»).
+    static func trova(_ detta: String, in voci: [Voce]) -> Voce? {
+        let d = Regia.chiave(detta)
+        guard !d.isEmpty else { return nil }
+        return voci.first { Regia.chiave($0.testo) == d } ?? voci.first { Regia.chiave($0.testo).hasPrefix(d) }
+            ?? voci.first { Regia.chiave($0.testo).contains(d) || d.contains(Regia.chiave($0.testo)) }
+    }
+
+    private func regiaAggiungi(_ testo: String) -> EsitoRegia {
+        let chieste = VistaSpesa.cose(testo)
+        guard !chieste.isEmpty else { return .no("non ho capito cosa aggiungere") }
+        let gia = chieste.filter { c in VistaSpesa.trova(c, in: daComprare).map { Regia.chiave($0.testo) == Regia.chiave(c) } ?? false }
+        let nuove = chieste.filter { c in !gia.contains(c) }
+        Suoni.tocco()
+        // subito in lista (la vede e JARVIS lo dice), poi il cervello della lista e la lista vera
+        let base = -Int(Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 1_000_000) * 100)
+        withAnimation(.spring(duration: 0.35)) {
+            for (k, n) in nuove.enumerated() { daComprare.append(Voce(id: base - 1 - k, testo: n)) }   // provvisorie: id negativi
+        }
+        let totale = daComprare.count
+        if !nuove.isEmpty {
+            Task {
+                for n in nuove { _ = await VistaVitals.chiama(["ricordo_aggiungi": n, "tipo": "spesa"]) }
+                await carica()
+            }
+        }
+        var dato = nuove.isEmpty ? "niente di nuovo" : "aggiunto \(Battute.elenco(nuove))"
+        if !gia.isEmpty { dato += "; c'era già \(Battute.elenco(gia))" }
+        return .fatto(dato + "; in lista \(totale) cose", battuta: { Battute.spesaAggiunta(chieste, totale: totale, gia: gia) })
+    }
+
+    private func regiaTogli(_ testo: String) -> EsitoRegia {
+        let chieste = VistaSpesa.cose(testo)
+        let tutto: Set<String> = ["tutto", "tutta", "tutte", "lista", "tutta la lista"]
+        guard !chieste.isEmpty, !chieste.contains(where: { tutto.contains($0) }) else { return .no("per vuotare la lista c'è «svuota»") }
+        var tolte: [Voce] = []
+        var mancano: [String] = []
+        for c in chieste {
+            if let v = VistaSpesa.trova(c, in: daComprare), !tolte.contains(v) { tolte.append(v) } else { mancano.append(c) }
+        }
+        guard !tolte.isEmpty else {
+            let m = Battute.elenco(mancano)
+            return .no("\(m) non è in lista", battuta: { Battute.spesaNonCe(m) })
+        }
+        withAnimation(.spring(duration: 0.35)) { daComprare.removeAll { v in tolte.contains(v) } }
+        Task { for v in tolte where v.id > 0 { _ = await VistaVitals.chiama(["ricordo_elimina": v.id]) } }
+        let resta = daComprare.count
+        var dato = "tolto \(Battute.elenco(tolte.map(\.testo)))"
+        if !mancano.isEmpty { dato += "; non c'era \(Battute.elenco(mancano))" }
+        return .fatto(dato + "; in lista \(resta) cose", battuta: { Battute.spesaTolta(tolte.map(\.testo), resta: resta) })
+    }
+
+    private func regiaPreso(_ testo: String) -> EsitoRegia {
+        let chieste = VistaSpesa.cose(testo)
+        let prese = chieste.compactMap { VistaSpesa.trova($0, in: daComprare) }
+        guard !prese.isEmpty else {
+            let m = Battute.elenco(chieste)
+            return .no("\(m) non è da comprare", battuta: { Battute.spesaNonCe(m) })
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Suoni.fatto()
+        withAnimation(.spring(duration: 0.35)) {
+            daComprare.removeAll { v in prese.contains(v) }
+            nelCarrello.insert(contentsOf: prese, at: 0)
+        }
+        Task { for v in prese where v.id > 0 { _ = await VistaVitals.chiama(["ricordo_fatto": v.id]) } }
+        let resta = daComprare.count
+        return .fatto("nel carrello \(Battute.elenco(prese.map(\.testo))); da comprare ancora \(resta)",
+                      battuta: { Battute.spesaPresa(prese.map(\.testo), resta: resta) })
+    }
+
+    private func regiaRimetti(_ testo: String) -> EsitoRegia {
+        let rimesse = VistaSpesa.cose(testo).compactMap { VistaSpesa.trova($0, in: nelCarrello) }
+        guard !rimesse.isEmpty else { return .no("nel carrello non c'è") }
+        Suoni.tocco()
+        withAnimation(.spring(duration: 0.35)) {
+            nelCarrello.removeAll { v in rimesse.contains(v) }
+            daComprare.append(contentsOf: rimesse)
+        }
+        Task { for v in rimesse where v.id > 0 { _ = await VistaVitals.chiama(["ricordo_ripristina": v.id]) } }
+        let totale = daComprare.count
+        return .fatto("di nuovo in lista \(Battute.elenco(rimesse.map(\.testo))); in lista \(totale) cose",
+                      battuta: { Battute.spesaAggiunta(rimesse.map(\.testo), totale: totale) })
+    }
+
+    private func regiaSvuota() -> EsitoRegia {
+        let tutte = daComprare
+        guard !tutte.isEmpty else { return .fatto("la lista era già vuota") }
+        withAnimation(.spring(duration: 0.35)) { daComprare.removeAll() }
+        Task { for v in tutte where v.id > 0 { _ = await VistaVitals.chiama(["ricordo_elimina": v.id]) } }
+        return .fatto("lista svuotata: tolte \(tutte.count) cose")
     }
 
     /// 8 nov notte: cosa vede JARVIS della spesa (la lista, il carrello di questa visita, quello che sta scrivendo).

@@ -54,6 +54,13 @@ final class Richiamo {
     var pausaMinima: ((String) -> Double)?
     /// 12 nov (P5): la frase in corso è partita da «Jarvis» (falso: presa dall'ascolto libero, dal seguito, dall'aggiunta).
     private(set) var conNome = true
+    /// 12.0 (10): fino a quando, dopo una frase su cui JARVIS ha taciuto (credeva che il signore parlasse con un altro), i richiami
+    /// senza «Jarvis» («ci sei?», «mi senti?», «dico a te») lo svegliano: sono 8 secondi (deciso dal signore).
+    var recuperoFinoA = Date.distantPast
+    /// 12.0 (10): la frase in corso l'ha presa solo perché sembrava un richiamo dopo il silenzio (se alla fine non lo è, si butta).
+    private(set) var perRecupero = false
+    /// 12.0 (10): c'è una frase taciuta da rivendicare: «Jarvis» da solo non aspetta 5 secondi la domanda, risponde a quella.
+    var recuperoPronto: (() -> Bool)?
     /// 12 nov (A3): quando ha cominciato a dire la frase in corso (per la velocità del «come parla»).
     private(set) var inizioFrase: Date?
     /// Quanto è durata la frase finora: dalla prima parola all'ultima parola sentita.
@@ -74,7 +81,7 @@ final class Richiamo {
     private var ultimoParziale = Date.distantPast
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
-    nonisolated static let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+    nonisolated static let nomi = FineFrase.nomiJarvis      // 12.0 (10): una lista sola per iPhone, Mac e polso
     /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «bro, …», «fratello, …».
     nonisolated static let risposteBrevi: Set<String> = ["sì", "si", "no", "ok", "okay", "grazie", "perfetto", "certo", "esatto",
                                                          "bravo", "basta", "avanti", "pausa", "stop", "dimmi", "allora", "senti"]
@@ -317,6 +324,7 @@ final class Richiamo {
                 var trovato = Richiamo.dopoRichiamo(segmento)
                 soloDopoNome = true
                 vocativo = trovato?.isEmpty == true && !soloNome && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+                var perIlRecupero = false
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
                 // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)
                 if trovato == nil, !OrologioInUso.attivo, !soloNome {
@@ -348,6 +356,10 @@ final class Richiamo {
                         || Benvenuto.eFraseDiTony(t)
                         || (Impostazioni.ascoltoSempre && !affollato && (parole.count >= 2 || breve)) {
                         trovato = t; soloDopoNome = false
+                    } else if !t.isEmpty, adesso < recuperoFinoA, !affollato, FineFrase.richiamoDopoSilenzio(t) != nil {
+                        // 12.0 (10): subito dopo una frase su cui JARVIS ha taciuto, «ci sei?», «dico a te» lo richiamano anche
+                        // senza nome (poi decide il cervello se era davvero per lui)
+                        trovato = t; soloDopoNome = false; perIlRecupero = true
                     } else if !t.isEmpty, Impostazioni.ascoltoSempre || inAggiunta, affollato, VoceDelSignore.attiva {
                         // in mezzo alla gente: risponde solo alla voce del signore. Se stiamo già parlando (fiducia di
                         // conversazione) passa anche un «sì»; altrimenti si controlla l'impronta su una frase vera.
@@ -364,6 +376,7 @@ final class Richiamo {
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 paroleFinoAlNome = soloDopoNome ? max(0, Richiamo.contaParole(segmento) - Richiamo.contaParole(dopo)) : 0
                 conNome = soloDopoNome
+                perRecupero = perIlRecupero
                 inizioFrase = adesso
                 VoceAttiva.condivisa.iniziaFrase()                  // 12 nov: forza della voce e intonazione di questa frase
                 sveglio = true
@@ -415,7 +428,9 @@ final class Richiamo {
     /// JARVIS (risposta anticipata con «aspetto»).
     private func attesaPer(_ resto: String) -> Double {
         let base: Double
-        if resto.isEmpty { base = vocativo.map { Jarvis.pausaFineFrase($0) } ?? 5.0 }
+        // solo «Jarvis»: 5 secondi per cominciare la domanda; ma subito dopo una frase su cui ha taciuto, «Jarvis?» è il richiamo
+        // (12.0 (10)): risponde a quella dopo una pausa normale
+        if resto.isEmpty { base = vocativo.map { Jarvis.pausaFineFrase($0) } ?? (recuperoPronto?() == true ? 1.2 : 5.0) }
         else {
             base = FineFrase.conVoce(lessicale: Jarvis.pausaFineFrase(resto), ritmo: RitmoSignore.condiviso.fattore,
                                      esitazioni: FineFrase.esitazioni(resto), fine: Intonazione.condivisa.giudizio().fine)

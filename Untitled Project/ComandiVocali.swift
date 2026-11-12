@@ -118,52 +118,9 @@ enum Reparto: String, Identifiable, Equatable {
     var id: String { rawValue }
 
     /// La frase di JARVIS quando apre il reparto (il Wiretap tace: registrerebbe sé stesso; le schede parlano da sole).
-    var annuncio: String? {
-        switch self {
-        case .sentinella: return "Sentinella in posizione, Sir."
-        case .occhi: return "Occhi aperti, Sir."
-        case .giro: return "Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare."
-        case .profiler: return "Profiler pronto. Inquadri il soggetto."
-        case .cucina: return "Cucina. Inquadri frigo, dispensa o piatto, Sir."
-        case .scanner: return "Scanner pronto. Inquadri il codice a barre, Sir."
-        case .wiretap: return nil
-        case .satellite: return "Satellite, Sir."
-        case .diario: return "Il diario, Sir."
-        case .sonno: return "Il suo sonno, Sir."
-        case .cuore: return "Il suo cuore, Sir."
-        case .vitals: return "Vitals, Sir."
-        case .confidente: return "Confidente. La ascolto, Sir."
-        case .allenatore: return "Personal trainer pronto, Sir."
-        case .bea: return "Bea, Sir."
-        case .briefing: return "Il briefing, Sir."
-        case .meteo: return "Il meteo, Sir."
-        case .email: return "La posta, Sir."
-        case .spesa: return "La lista della spesa, Sir."
-        case .shazam: return "Shazam. Faccia sentire, Sir."
-        case .foto: return "Le sue foto, Sir."
-        case .ricordi: return "I ricordi, Sir."
-        case .interprete: return "Interprete. In che lingua, Sir?"
-        case .browser: return "Browser, Sir."
-        case .serata: return "I conti della serata, Sir."
-        case .messaggi: return "Messaggi, Sir. A chi scriviamo?"
-        case .telefono: return "Telefono, Sir."
-        case .lidar:
-            #if os(iOS)
-            return "LiDAR, Sir."                                // build 23: si apre sul menu dei modi (le frasi dei modi parlano da sé)
-            #else
-            return "LiDAR pronto. Muova l'iPhone lungo le pareti, Sir."
-            #endif
-        case .github: return "Il cantiere su GitHub, Sir."
-        case .supabase: return "Sala macchine, Sir."
-        case .archivio: return "L'archivio, Sir."
-        case .costi: return "I costi, Sir."
-        case .edith: return "EDITH, Sir."
-        case .sistemi: return "Sistemi, Sir."
-        case .impostazioni: return "Impostazioni, Sir."
-        case .pulisci: return nil                     // parla il cestino: carta appallottolata
-        case .musica: return "La musica, Sir."
-        }
-    }
+    /// 12.0 (10) (il signore: «tante tante frasi… non le solite»): tante varianti in Battute.swift, mai due volte uguale; la prima
+    /// di ogni sezione è quella di sempre.
+    var annuncio: String? { Battute.apertura(self) }
 }
 
 /// I comandi vocali di JARVIS: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro», «torna».

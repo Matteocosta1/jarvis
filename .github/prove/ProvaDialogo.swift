@@ -18,12 +18,15 @@ struct ProvaDialogo {
         provaSegnali()
         provaConVoce()
         provaIntonazione()
+        provaRichiami()
+        provaRiprese()
+        provaResto()
         print(errori == 0 ? "\nTutte le prove del dialogo superate." : "\n\(errori) prove del dialogo NON superate.")
         exit(errori == 0 ? 0 : 1)
     }
 
     static func provaPause() {
-        let nomi = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
+        let nomi = FineFrase.nomiJarvis
         let casi: [(String, Double)] = [
             ("sì sì", 0.6), ("no no", 0.6), ("ok ok", 0.6), ("grazie grazie", 0.6), ("sì", 0.6), ("va bene", 0.6), ("sì, mandala pure", 0.6),
             ("Che ore sono?", 0.7), ("Perché?", 0.7), ("che ore sono", 1.2), ("Gli ho detto che", 2.4), ("ci sono ancora delle delle", 2.4),
@@ -135,5 +138,56 @@ struct ProvaDialogo {
         }
         g = into.giudizio(ora: t + 0.2)
         controlla(g.fine == .incerta, "solo rumore → \(g.fine) (\(into.misure(ultimi: 5, ora: t).count) misure)")
+    }
+
+    /// 12.0 (10): richiamare JARVIS dopo che ha taciuto («Jarvis?», «ci sei?», «dico a te»; «tu che ne pensi?» va con la frase).
+    static func provaRichiami() {
+        let casi: [(String, String?)] = [
+            ("Jarvis?", ""), ("Jarvis!", ""), ("", nil), ("ci sei?", ""), ("Jarvis, ci sei?", ""), ("ma ci sei o no?", ""),
+            ("mi senti?", ""), ("allora?", ""), ("e allora?", ""), ("dico a te", ""), ("sto parlando con te, Jarvis", ""),
+            ("sì, dico a te", ""), ("senti, ci sei?", ""), ("rispondi per favore", ""), ("perché non mi rispondi?", ""),
+            ("sei lì?", ""), ("pronto?", ""), ("hai sentito cosa ho detto?", ""),
+            ("tu che ne pensi?", "tu che ne pensi?"), ("e tu?", "e tu?"), ("Jarvis, secondo te?", "Jarvis, secondo te?"),
+            ("Bea, mi passi il sale?", nil), ("allora domani andiamo da Marco", nil), ("sì", nil), ("no", nil), ("ok", nil),
+            ("che tempo fa domani", nil), ("ci sono ancora delle cose da fare", nil),
+        ]
+        for (frase, atteso) in casi {
+            let r = FineFrase.richiamoDopoSilenzio(frase)
+            controlla(r == atteso, "richiamo dopo il silenzio «\(frase)» = \(r.map { "«\($0)»" } ?? "nessuno") (atteso \(atteso.map { "«\($0)»" } ?? "nessuno"))")
+        }
+    }
+
+    /// 12.0 (10): «dicevi?», «continua pure», «scusa, vai avanti» riprendono la frase di JARVIS; dopo una sua domanda «vai» è la
+    /// risposta; senza «Jarvis» (ascolto libero) valgono solo quelle che parlano della sua frase.
+    static func provaRiprese() {
+        let casi: [(String, Bool, Bool, Bool)] = [   // frase, dopo una domanda, presa senza nome, attesa
+            ("dicevi?", false, false, true), ("scusa, dicevi?", false, false, true), ("continua pure", false, false, true),
+            ("continua pure", false, true, false), ("Jarvis, continua", false, false, true), ("scusa, vai avanti", false, false, true),
+            ("vai", false, false, true), ("vai", true, false, false), ("vai", false, true, false), ("prego", false, false, true),
+            ("prego", true, false, false), ("no niente, continua", false, false, true), ("dove eri rimasto?", false, false, true),
+            ("dove eri rimasto?", false, true, true), ("dov'eri rimasto?", false, false, true), ("ti ho interrotto, scusa", false, false, true),
+            ("continua a cercare su Google", false, false, false), ("vai avanti con la spesa", false, false, false),
+            ("va bene, continua", false, false, true), ("finisci la frase", false, true, true), ("e poi?", false, false, true),
+            ("e poi?", true, false, false), ("avanti tutta", false, false, false), ("no", false, false, false), ("sì", false, false, false),
+        ]
+        for (frase, domanda, libera, attesa) in casi {
+            let r = FineFrase.chiedeDiContinuare(frase, dopoDomanda: domanda, libera: libera)
+            controlla(r == attesa, "ripresa «\(frase)»\(domanda ? " dopo una domanda" : "")\(libera ? " senza nome" : "") = \(r) (attesa \(attesa))")
+        }
+    }
+
+    /// 12.0 (10): il resto della risposta da dire dopo l'interruzione, dal punto esatto.
+    static func provaResto() {
+        let completa = "Domani sole a Milano, ventidue gradi. Giovedì invece pioggia. Porti l'ombrello, Sir."
+        let casi: [(String, String?)] = [
+            ("Domani sole a Milano, ventidue gradi.", "Giovedì invece pioggia. Porti l'ombrello, Sir."),
+            ("[laughs] Domani sole a Milano, ventidue gradi.", "Giovedì invece pioggia. Porti l'ombrello, Sir."),
+            ("Domani sole a Milano, ventidue gradi. Giovedì invece pioggia.", "Porti l'ombrello, Sir."),
+            ("", completa), (completa, ""), ("Ieri pioggia.", nil),
+        ]
+        for (detto, atteso) in casi {
+            let r = FineFrase.restoDaDire(completa, detto: detto)
+            controlla(r == atteso, "resto dopo «\(detto.prefix(30))» = \(r.map { "«\($0.prefix(40))»" } ?? "nessuno")")
+        }
     }
 }

@@ -95,6 +95,7 @@
 				apertura.m4a,
 				avvio.m4a,
 				avvioorologio.m4a,
+				Battute.swift,
 				Benessere.swift,
 				Build22.swift,
 				DialogoVivo.swift,

@@ -213,6 +213,8 @@ struct ContentView: View {
             .onAppear {
                 Aptica.prepara()
                 MotoreGuida.condiviso.parla = { [jarvis] frase in jarvis.annuncia(frase) }   // build 23: la GUIDA di SATELLITE parla
+                Regia.condivisa.pila = pila                                                 // 12.0 (10): la regia vede le sezioni aperte
+                Regia.condivisa.vai = { strada in regiaVai(strada) }                        // e le muove
                 accendi()
                 if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
                 if primaApertura {
@@ -1406,6 +1408,20 @@ struct ContentView: View {
         chiudiTutto()
     }
 
+    /// 12.0 (10): le strade della regia (Regia.swift), come i comandi a voce delle sezioni ma senza le frasi di JARVIS: parla il
+    /// cervello, che sa cosa ha fatto.
+    private func regiaVai(_ strada: Regia.Strada) {
+        switch strada {
+        case .apri(let r): apriReparto(r)
+        case .pagina(let nome): jarvis.apriPagina(nome, voce: nil, scheda: nil, parla: false)
+        case .chiudi(let nome): if let v = pila.voci.first(where: { $0.sezione.nome == nome }) { chiudiDietro(v.id) }
+        case .chiudiTutto: chiudiTutteLeSezioni()
+        case .daParte: if pila.voceDavanti != nil { liberaSopra(); naviga.chiesta = .aggancio }
+        case .diPrima: if let id = sezioneDiPrima() { liberaSopra(); naviga.chiesta = .porta(id) }
+        case .sfoglia: if !pila.voci.isEmpty { liberaSopra(); naviga.chiesta = .sfoglio }
+        }
+    }
+
     /// MARK XI (4 nov, il signore): i comandi a voce delle sezioni aperte. JARVIS parla solo quando non si vede cosa è successo
     /// (una sezione chiusa dietro, una che non c'è) e solo se il microfono è il suo: dalle sezioni col microfono (Wiretap,
     /// Interprete, Trainer…) la sua voce finirebbe nell'ascolto, e lì basta la vibrazione.
@@ -1418,7 +1434,9 @@ struct ContentView: View {
         switch c {
         case .chiudiSezioni:
             fatto()
+            let cerano = !pila.voci.isEmpty
             chiudiTutteLeSezioni()
+            if parla && cerano { jarvis.annuncia(Battute.chiusoTutto()) }      // 12.0 (10): «Fatto, Sir. Tavolo sgombro.»
         case .chiudiSezione(let nome):
             guard let v = pila.voci.first(where: { $0.sezione.nome == nome }) else { dici("La sezione \(nome) non è aperta, Sir."); return }
             fatto()
@@ -1438,6 +1456,7 @@ struct ContentView: View {
             fatto()
             liberaSopra()
             naviga.chiesta = .porta(id)
+            if parla, let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { jarvis.annuncia(Battute.diPrima(nome)) }   // 12.0 (10)
         case .daParte:
             guard pila.voceDavanti != nil || naviga.modo == .sfoglio else {
                 dici(pila.voci.isEmpty ? "Nessuna sezione aperta, Sir." : "Nessuna sezione davanti, Sir.")
@@ -1445,6 +1464,7 @@ struct ContentView: View {
             }
             fatto()
             liberaSopra()
+            if parla, let nome = pila.voceDavanti?.sezione.nome { jarvis.annuncia(Battute.messaDaParte(nome)) }   // 12.0 (10)
             naviga.chiesta = .aggancio
         default:
             break
@@ -1481,6 +1501,7 @@ struct ContentView: View {
     /// È cambiata la sezione davanti: a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma; e si ricorda l'ordine
     /// in cui sono state davanti (le chiuse escono), per «Jarvis, quella di prima».
     private func davantiCambiata(_ d: UUID?) {
+        Regia.condivisa.evento(pila.voci.first { $0.id == d }.map { "davanti \($0.sezione.nome)" } ?? "davanti JARVIS")   // 12.0 (10)
         if let d {
             giroDavanti.removeAll { id in id == d || !pila.voci.contains { $0.id == id } }
             giroDavanti.append(d)
