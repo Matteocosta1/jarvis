@@ -39,7 +39,11 @@ enum Battute {
     /// fa un amico. Vale 10 minuti dall'ultima frase che l'ha mostrato.
     enum Umore { case normale, allegro, giu, fretta }
     private static var umoreSentito: (umore: Umore, quando: Date) = (.normale, .distantPast)
-    static var umore: Umore { Date().timeIntervalSince(umoreSentito.quando) < 600 ? umoreSentito.umore : .normale }
+    static var umore: Umore {
+        // la fretta passa prima (3 minuti); allegria e giornata storta restano un po' di più (10 minuti)
+        let durata: TimeInterval = umoreSentito.umore == .fretta ? 180 : 600
+        return Date().timeIntervalSince(umoreSentito.quando) < durata ? umoreSentito.umore : .normale
+    }
 
     /// La riga di ComeParla dell'ultima frase («ha appena riso», «più veloce del solito»…): aggiorna l'umore.
     static func sentito(_ come: String?) {

@@ -530,6 +530,25 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (12) — MARK XII · 12 nov · il signore: «in una sola build fai tutti i miglioramenti tranne C1 e C3… la build deve essere la 12.12» · build unica · cervello v128 (le novità del cervello per B5 e la regia sono pronte in locale: si pubblicano col suo via) · controllo di compilazione: vedi l'ultima riga
+
+**Errori corretti**
+- **1 · il «seguito» su ogni frase**: «riprendo il discorso» va al cervello solo se la frase è ellittica («e sabato?», «anche a lui», «del brano», «che domani passo da lui») o dopo «aspetta». Stamattina ogni frase entro un minuto era «seguito» e il cervello ha mescolato la musica col muro dell'ufficio. Anche per la risposta anticipata (FineFrase.fraseEllittica, con le prove).
+- **2 · «avanti» ambiguo**: con la musica in coda e la Musica davanti (o la canzone che suona, o ferma mentre JARVIS parla) «avanti», «indietro», «play» sono i tasti della musica, anche dopo un'interruzione; per la sua frase restano «dicevi?», «continua». Sull'orologio uguale con la Musica davanti.
+- **3 · «prendi…» con la Spesa aperta**: tolto dalle frasi rapide («prendi nota…» finiva in lista). In più un valore che comincia con «che» non è mai una cosa («segna che domani…»), e «il latte alla lista» diventa «latte».
+
+**Miglioramenti**
+- **B1 · subito da qualsiasi schermata e in fila**, senza cervello: «metti Popstar di Sfera Ebbasta» (cerca e parte solo se il risultato combacia davvero con le parole dette; la musica suona dietro, senza aprire la sezione; «metti la playlist …» cerca fra le sue playlist), «aggiungi il pane alla lista», «togli … dalla lista», «che tempo fa» (il Meteo si apre e JARVIS dice adesso, la massima e la pioggia, con l'ombrello se serve). Più comandi in una frase («apri la spesa e aggiungi il latte», «chiudi tutto e dimmi il meteo», «apri la musica e metti Sfera»): se l'app li sa fare tutti li fa lei uno dopo l'altro, subito; se no nessuno parte e va tutto al cervello.
+- **B2 · mai più campi da scrivere**: ogni campo di testo delle sezioni si presenta alla regia (Musica, Messaggi, Telefono, Bea, Ricordi, Foto, Satellite, Scanner, Spesa, Posta › Priorità, Archivio, GitHub, Confidente). «Scrivi nella ricerca Popstar»: JARVIS scrive com'è detto (maiuscole e accenti) e, se è una ricerca, parte. Il cervello lo fa con scrivi_campo. Con più campi e nessuno detto, decide il cervello.
+- **B3 · cambiare idea**: «metti Sfera… no anzi, metti i Daft Punk» → i Daft Punk; «apri il meteo, anzi la spesa» → la spesa; «…anzi lascia stare» → «Va bene, lasciamo stare.»; «annulla», «non mandarlo» con un invio in attesa del sì → annullato (FineFrase.ultimaIntenzione, con le prove).
+- **B4 · il controllo JARVIS** (iOS 18): nel Centro di Controllo, sulla schermata bloccata e sul tasto Azione; un tocco apre JARVIS già in ascolto.
+- **B5 · il lato emotivo**: le battute seguono come sta il signore (ride: più spirito; sospira o è giù: niente battute; va di fretta: frasi cortissime). Nel cervello (da pubblicare col via) l'umore di JARVIS che dura la giornata, mostrato con misura, e al massimo un'iniziativa da amico al giorno.
+- **B6 · prevedere l'azione**: JARVIS impara a che ora apre le sezioni e cosa fa suonare (resta sul telefono). Rientrando nell'app all'ora giusta propone una volta («Le metto Sfera Ebbasta, come al solito?»): un sì la fa subito. Almeno 3 giorni su 3 settimane, mai di notte, al massimo due proposte al giorno, mai con musica, RISERVATO o una sezione davanti.
+- **C2 · doppio tocco al polso**: sugli Apple Watch col doppio tocco delle dita (Series 9 e successivi, Ultra 2) il gesto fa come il tocco sul reattore. Sul SE 2 resta il tocco.
+- La regia sa dire al cervello che cosa ha appena proposto («HAI APPENA PROPOSTO»).
+- Mockup (v. 1794486362-2481): pannello SUBITO nel simulatore, «Controllo JARVIS» fra i gesti del telefono; corretti due «</div>» in più della 12.0 (10) che chiudevano in anticipo il contenitore dei pannelli.
+- Non in questa build (decisione del signore): C1 (SpeechAnalyzer e il modello di Apple sul 16 Pro Max) e C3 (microfono più lungo al polso).
+
 ## 12.0 (11) — MARK XII · 12 nov mattina · dalla prova della 12.0 (10) sul telefono (il signore, 11:00) e dalla conversazione di stamattina nel cervello · build unica · cervello v128 (invariato) · controllo di compilazione: vedi l'ultima riga
 
 - **Musica, il brano scelto non partiva** (errore della 12.0 (8)): messa la coda, Play la trovava ancora vuota (iOS la riempie con un attimo di ritardo) e si fermava con «Niente in coda». Succedeva toccando un brano in Cerca, in Libreria, in Radio e quando JARVIS metteva musica a voce (registri 10:44–10:45: «Sfera Ebbasta», «Popstar»). Ora il brano scelto si prepara e parte subito; il ripiego sui brani ascoltati di recente vale solo per Play quando non è mai stato scelto niente.

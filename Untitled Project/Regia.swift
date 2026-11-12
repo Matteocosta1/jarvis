@@ -239,6 +239,8 @@ final class Regia {
                 }
             }
         }
+        // con più campi e nessuno detto, non si tira a indovinare (Messaggi: contatto o messaggio?): decide il cervello
+        if scelto == nil, lista.count > 1 { return .no("quale campo? \(lista.map(\.nome).joined(separator: ", "))") }
         guard let c = scelto ?? lista.first else { return .no("qui non ci sono campi di testo") }
         guard !testo.isEmpty else { return .no("niente da scrivere") }
         c.scrivi(testo)
@@ -517,7 +519,7 @@ final class Regia {
                    frasi: ["aggiungi * alla spesa", "aggiungi * alla lista della spesa", "aggiungi * alla lista", "aggiungi * in lista",
                            "metti * in lista", "metti * nella lista", "metti * alla spesa", "metti in lista *", "segna * nella spesa",
                            "segna * nella lista", "segna * in lista", "devo comprare *", "compra *", "comprami *"],
-                   frasiDentro: ["aggiungi *", "aggiungimi *", "segna *", "segnami *", "metti *"]),
+                   frasiDentro: ["aggiungi *", "aggiungimi *", "segna *", "segnami *"]),      // «metti …» resta la musica
         Intenzione(sezione: "Spesa", azione: "togli", valore: "cosa",
                    frasi: ["togli * dalla spesa", "togli * dalla lista", "leva * dalla lista", "leva * dalla spesa", "cancella * dalla lista",
                            "cancella * dalla spesa", "depenna *"],
