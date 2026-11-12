@@ -312,6 +312,9 @@ final class Jarvis: NSObject, ObservableObject {
     private var voceCome: String?
     /// 12 nov (P1): il signore ha detto «ho capito» mentre JARVIS parlava: finita la frase in corso, JARVIS si ferma
     private var fermaDopoFrase = false
+    /// 12 nov (P1): la frase della risposta che sta suonando adesso; se è una domanda, «sì» detto sopra è la risposta del signore
+    private var fraseInVoce: String?
+    private var assensoInDomanda: (testo: String, quando: Date)?
     /// 12 nov (P5): la frase che sta per partire l'ha presa l'ascolto libero, senza «Jarvis» (se non era per lui, il cervello tace)
     private var fraseLibera = false
     /// 12 nov (P3): com'è finita la voce nell'ultima frase (va nei tempi del turno, per regolare le soglie sui dati veri)
@@ -414,6 +417,8 @@ final class Jarvis: NSObject, ObservableObject {
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
         orecchio.capito = { [weak self] in self?.chiusuraGentile() }               // 12 nov (P1): «ho capito» mentre parla
+        orecchio.domandaInCorso = { [weak self] in self?.fraseInVoce?.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?") ?? false }
+        orecchio.rispostaAllaDomanda = { [weak self] t in self?.assensoInDomanda = (testo: t, quando: Date()) }
         richiamo.pausaMinima = { [weak self] resto in self?.pausaMinimaPer(resto) ?? 0 }   // 12 nov (errore 3)
         richiamo.sveglia = { [weak self] in self?.richiamato() }
         richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t; self?.programmaAnticipo(t) } }
@@ -1452,6 +1457,8 @@ final class Jarvis: NSObject, ObservableObject {
     func interrompi() {
         idTurno = nil                       // la risposta è fermata: un annuncio o un errore detti dopo non sono più «la risposta»
         fermaDopoFrase = false
+        fraseInVoce = nil
+        assensoInDomanda = nil
         fermaBenvenuto()
         liberoMacFinoA = .distantPast
         compitoRete?.cancel()
@@ -2226,12 +2233,23 @@ final class Jarvis: NSObject, ObservableObject {
         if detta, let r = diRisposta {
             if let d = dettoRisposta, d.id == r.id { dettoRisposta = (d.id, d.testo + " " + r.frase) } else { dettoRisposta = (r.id, r.frase) }
         }
+        fraseInVoce = nil
         // 12 nov (P1): aveva detto «ho capito» mentre JARVIS parlava: finita questa frase si ferma, come col tocco sul reattore
         if fermaDopoFrase, detta, diRisposta != nil {
             fermaDopoFrase = false
             segnaInterruzione()
             ascoltaDopo = false
             interrompi()
+            return
+        }
+        // 12 nov (P1): aveva detto «sì», «va bene» mentre JARVIS faceva questa domanda: finita la domanda, quella è la sua risposta.
+        // Se dopo la domanda c'era ancora altro, si ferma qui (il cervello sa fin dove l'ha sentito); poi la sua frase parte come detta
+        if detta, diRisposta != nil, let a = assensoInDomanda, Date().timeIntervalSince(a.quando) < 20 {
+            assensoInDomanda = nil
+            if !inCoda.isEmpty || !flussoFinito { segnaInterruzione(); ascoltaDopo = false; interrompi() } else { fineParlato() }
+            fraseAVoce = a.testo
+            fineFraseVoce = Date()                   // i tempi del turno contano da quando la domanda è finita
+            Task { await instrada(a.testo) }
             return
         }
         guard inCoda.isEmpty else { return }
@@ -3796,6 +3814,7 @@ extension Jarvis {
 
     /// Una frase di JARVIS comincia a suonare: se è la prima della risposta misurata, il tempo è fatto (va col turno dopo).
     fileprivate func suonoIniziato(_ chiave: ObjectIdentifier) {
+        fraseInVoce = frasiRisposta[chiave]?.frase          // 12 nov (P1): se è una domanda, «sì» detto sopra è la risposta
         guard let da = misuraDa, let t = misuraTurno, frasiRisposta[chiave]?.id == t else { return }
         misura["ms_primo_suono"] = Int(Date().timeIntervalSince(da) * 1000)
         misura["ms_totale"] = Int(Date().timeIntervalSince(ultimoInvio) * 1000)

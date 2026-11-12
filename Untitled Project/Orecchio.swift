@@ -17,6 +17,10 @@ final class Orecchio {
     /// 12 nov (P1): il signore ha detto «ho capito», «sì sì sì», «ok grazie» mentre JARVIS parlava: finisce la frase e si ferma.
     var capito: (() -> Void)?
     private var chiusuraChiesta = false
+    /// 12 nov (P1): JARVIS sta facendo una domanda («…la chiamo?»): un «sì», un «va bene» detto adesso è la risposta, non un segnale
+    /// d'ascolto. `rispostaAllaDomanda` riceve le sue parole: JARVIS finisce la domanda e poi le prende come frase sua.
+    var domandaInCorso: (() -> Bool)?
+    var rispostaAllaDomanda: ((String) -> Void)?
     /// Le parole che JARVIS sta dicendo in questo momento: servono a riconoscere la propria eco.
     var testoDetto = ""
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
@@ -195,11 +199,13 @@ final class Orecchio {
                 let mie = Set(Orecchio.parole(testoDetto))
                 let proprie = parole.filter { !mie.contains($0) }
                 let segnale = proprie.isEmpty ? FineFrase.SegnaleAscolto.nessuno : FineFrase.segnaleDAscolto(proprie.joined(separator: " "))
-                if segnale == .ascolto { if fine { riavvia() }; return }
+                // mentre JARVIS fa una domanda, «sì» è la risposta (passa gli stessi controlli di una frase vera, qui sotto)
+                let allaDomanda = segnale == .ascolto && domandaInCorso?() == true
+                if segnale == .ascolto && !allaDomanda { if fine { riavvia() }; return }
                 // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
                 let estranee = parole.filter { !mie.contains($0) }
                 // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
-                guard parole.count >= 2, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                guard parole.count >= 2 || allaDomanda, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
                 // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
                 if OrologioInUso.attivo { if fine { riavvia() }; return }
@@ -226,6 +232,12 @@ final class Orecchio {
                             self.valuta(self.precedente, fine: false, turno: mio)
                         }
                     }
+                    if fine { riavvia() }
+                    return
+                }
+                if allaDomanda {
+                    // P1: la risposta alla domanda che JARVIS sta facendo: la finisce e poi la prende come frase del signore
+                    rispostaAllaDomanda?(proprie.joined(separator: " "))
                     if fine { riavvia() }
                     return
                 }

@@ -1096,6 +1096,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if esito.errore == nil, let t = testo {
                 switch FineFrase.segnaleDAscolto(t) {
                 case .ascolto:
+                    // ma se stava facendo una domanda («…la chiamo?»), quel «sì» è la risposta: va avanti come frase sua
+                    if JarvisOrologio.stavaChiedendo(s) { break }
                     riprendiRisposta(s)
                     return
                 case .chiusura:
@@ -1178,6 +1180,17 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let versi: Set<String> = ["ah", "ahah", "ahahah", "ahahahah", "haha", "hahaha", "hahahaha", "mh", "mmh", "mm", "hm", "hmm",
                                   "ehm", "uhm", "coff", "etciù", "etciu"]
         return parole.allSatisfy { versi.contains($0) }
+    }
+
+    /// 12 nov (P1): la frase che JARVIS stava dicendo quando il signore ha parlato era una domanda? (Serve la risposta arrivata tutta:
+    /// la frase interrotta è la prima dopo quelle dette per intero.)
+    private static func stavaChiedendo(_ s: RispostaSospesa) -> Bool {
+        guard let completa = s.completa else { return false }
+        let detto = TagVoce.togli(s.detto).trimmingCharacters(in: .whitespacesAndNewlines)
+        let resto: Substring
+        if detto.isEmpty { resto = completa[...] } else if let k = Dialogo.taglio(completa, dopo: detto) { resto = completa[k...] } else { return false }
+        guard let fine = resto.firstIndex(where: { ".!?".contains($0) }) else { return false }
+        return resto[fine] == "?"
     }
 
     /// Difetto 3: riprende la risposta fermata da un rumore. Se era già arrivata tutta, dice da solo le frasi che mancavano

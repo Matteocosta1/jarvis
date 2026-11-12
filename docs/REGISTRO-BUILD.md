@@ -530,6 +530,52 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (9) — MARK XII · 12 nov notte · numero confermato dal signore («la 8 l'ho caricata ma non installata, fai 9 e metti tutto») · build unica · cervello v127 pubblicato (prova generale superata, con le prove del dialogo) · controllo di compilazione: vedi l'ultima riga
+Revisione del dialogo (il signore: «hai trovato questi errori… massima competenza») e tutte le migliorie (il signore: «tutti»; l'intonazione accesa subito, non solo misurata). Mac escluso da filo, conversazioni, fili aperti, archivista e giornata (lo usa anche Matteo).
+- **Errori corretti (13)**:
+  - 1: «sì sì», «no no», «ok ok» aspettavano 2,4 s. Tolta la regola della parola ripetuta in fondo; le esitazioni vere restano («che che», «delle delle»).
+  - 2: una risata del signore faceva credere «gente o TV intorno» per 12 s e il seguito senza «Jarvis» si perdeva. Ora risate e applausi contano come folla solo insieme alla folla.
+  - 3: dopo «Jarvis…» la frase la chiudeva il richiamo con la pausa normale. Ora valgono anche lì esitazioni, intonazione e i 3 s del «[aspetto]».
+  - 4: i 3 s del «[aspetto]» contavano da quando arrivava il giudizio, circa 1,5 s dopo. Ora contano dall'ultima voce, e la risposta di riserva (con `dopo_aspetto`) parte subito. In più la risposta anticipata si buttava a ogni parola quando la frase cominciava con «allora», «senti», «ok» (confronto sbagliato), compresa quella di riserva.
+  - 5–11 (cervello v127):
+    - **Tempi**: la v126 aveva alzato il lavoro del cervello prima di Claude da 0,12–0,19 s a 0,26–0,56 s (2,4 s al primo turno). Adesso il vettore di significato si calcola una volta per testo e si aspetta al massimo 150 ms. Le conversazioni passate si cercano solo a inizio conversazione o quando lui parla del passato («l'altra volta», «qualche tempo fa»; non «che tempo fa»). I riassunti delle conversazioni sono usciti dal turno.
+    - **Riassunti**: corretti gli errori di riconoscimento (Discosizer, EDITH, JARVIS); niente deduzioni su salute o umore; niente date relative; le conversazioni banali sono segnate e non usate.
+    - **Fili aperti**: solo da conversazioni finite da meno di 36 ore, al massimo uno al giorno, mai chiusi da soli, senza numeri nell'etichetta.
+    - **Prima della pausa**: se la conversazione di prima non è ancora riassunta, le sue ultime battute arrivano comunque al cervello.
+    - **Notte (briefing v30)**: le battute si cancellano solo dopo essere state riassunte.
+    - **Dati sistemati**: chiusi i 5 fili aperti sbagliati e puliti gli episodi («Discosizer» al posto di «disco Pfizer», tolta una deduzione sulla salute, date assolute).
+  - 12: sull'orologio la frase rimasta a metà si attaccava a una frase nuova nei 2 minuti dopo, anche dopo «Mi dica», «muto» o una telefonata. Ora in quei casi si scarta.
+  - 13: nel «come parla» la forza della voce da sola (dipende da quanto è lontano il telefono) non va più al cervello: solo insieme a un cambio di velocità.
+- **P1 · segnali d'ascolto**:
+  - iPhone: «sì», «mh», «certo», «ah ok», «va bene» detti mentre JARVIS parla non lo fermano più.
+  - iPhone: con «ho capito», «ok grazie», «sì sì sì» finisce la frase che sta dicendo e si ferma.
+  - iPhone: un «sì» detto mentre JARVIS fa una domanda è la risposta: finita la domanda, parte come frase sua.
+  - Orologio: le parole arrivano solo a frase finita, quindi la voce si è già fermata. Un segnale d'ascolto lo fa riprendere da dove si era fermato, «ho capito» lo lascia fermo, «sì» a una domanda è la risposta.
+- **P2 · voce**:
+  - Il classificatore dei suoni c'è anche nell'ascolto normale; nel «come parla» vanno «ha appena riso», «ha sospirato», «sussurra».
+  - Se sussurra, JARVIS risponde sottovoce finché lui sussurra. Vale solo se la voce non ha altezza, così una voce lontana non lo inganna.
+  - Le risate di JARVIS («[laughs]») non contano.
+- **P3 · intonazione** (sul telefono, metodo YIN):
+  - Voce che scende: risponde prima (×0,7). Voce sospesa: fino a mezzo secondo in più.
+  - Non tocca mai le risposte brevi, le domande col «?» e le frasi a metà.
+  - Va nei tempi del turno (`into`, `into_liv`, `into_pend`, `into_punti`) per regolare le soglie sui dati veri.
+- **P4 · frase d'attesa**: la prepara il cervello sulla richiesta, per tutti i modelli e anche per la risposta anticipata. Non c'è mai per le frasi prese senza «Jarvis» né per la domanda sul punto.
+- **P5 · non era per me**:
+  - Vale per le frasi prese senza «Jarvis»: ascolto libero e seguito sull'iPhone, ascolto in attesa al polso.
+  - Se la frase era per un'altra persona, il cervello risponde «[silenzio]»: JARVIS tace e la frase sparisce (al polso torna lo schermo di prima).
+  - Mai con «Jarvis» dentro.
+- **P6 · domanda sul punto**:
+  - iPhone: frase a metà e silenzio → verso i 3 s dalla sua ultima parola «Cosa gli ha detto, Sir?», già preparata mentre aspettava.
+  - Orologio: arriva un paio di secondi dopo, perché non può prepararla mentre ascolta.
+  - «Mi dica, Sir» resta per «aspetta» seguito dal silenzio.
+- **P7 · prove automatiche**:
+  - 60 prove del dialogo a ogni [compila] (pause, esitazioni, segnali d'ascolto, intonazione su voci sintetiche: `.github/prove/ProvaDialogo.swift`).
+  - 6 prove del dialogo nella prova generale del cervello, 3 bloccanti (jarvis-deploy v26).
+- **P8 · SpeechAnalyzer**: rimandato. Serve iOS 26 e il signore resta su iOS 18 col 15 Pro. Ci sarà una build dedicata sul 16 Pro Max, coi due motori a confronto sulle stesse frasi.
+- **Riassunti in sottofondo**: le conversazioni si riassumono ogni 10 minuti (pg_cron `jarvis-episodi` → briefing v30 → cervello).
+- **Mockup** (v. 1794454754-34e8): il simulatore del dialogo usa le regole vere dell'app. Nuove prove: «Sì, sì», «Ho capito», «Bea, mi passi il sale?», «Analizzami gli incassi di sabato» (con la frase d'attesa), «🤫 Che ore sono?». Ci sono anche la domanda sul punto e «Mi dica, Sir» dopo «aspetta» (prima mancava nel simulatore).
+- **Commit e controllo**: de99601 VERDE (run 43144988984); e879106 VERDE (run 43148228194, 0 errori, 0 warning, prove del dialogo superate).
+
 ## 12.0 (8) — MARK XII · 12 nov notte · numero confermato dal signore · build unica col dialogo umano (il signore: «una build sola») · cervello v126 pubblicato (prova generale superata) · controllo di compilazione VERDE (0 errori, 0 warning) su 23bb131, run 43134708298
 Dalla prova della 12.0 (7) sul telefono (12 nov, 00:30–00:55, video e screenshot del signore) e dalle sue richieste:
 - **Orologio · dialogo nuovo** (il signore: «facciamolo… con massima competenza»): pause di fine frase un po' più lunghe (1,0 / 1,4 / 1,8 s invece di 0,8 / 1,2 / 1,6) per il suo ritmo imparato (RitmoSignore, anche al polso: DialogoVivo.swift ora è anche nel target dell'orologio); «ascoltami», «fammi finire», «lasciami parlare» detti da soli → l'ascolto dopo è lungo (almeno 3,5 s, fino a 90 s); frase massima 45 s (prima 25); battute con giorno e ora («quando») e 20 battute invece di 12, così vale anche al polso il caso Pierpaolo (le frasi di più di 8 ore fa non entrano). Non fattibile al polso: la risposta anticipata e «ascoltami» dentro la frase (l'orologio ha le parole solo a frase finita); il dialogo fuori dall'app (watchOS spegne il microfono col polso giù).
