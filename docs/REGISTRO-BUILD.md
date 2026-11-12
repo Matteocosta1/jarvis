@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 12.0 (10) — MARK XII · 12 nov mattina · numero chiesto dal signore («fai 12.10») · build unica · cervello v127 (le novità del cervello sono pronte in locale, si pubblicano solo col suo via) · controllo di compilazione: vedi l'ultima riga
+## 12.0 (10) — MARK XII · 12 nov mattina · numero chiesto dal signore («fai 12.10») · build unica · cervello v128 · controllo di compilazione: vedi l'ultima riga
 
 **Dialogo (iPhone e Watch)**
 - Recupero dopo il silenzio: se JARVIS ha taciuto su una frase («non era per me») e lei entro 8 secondi dice «Jarvis?», «ci sei?», «mi senti?», «dico a te», «allora?», la frase riparte. Col nome o col tocco è sicuro (niente silenzio possibile); senza nome decide il cervello.
@@ -547,7 +547,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 **La Regia al polso (Watch)**
 - Stesso strumento, nei limiti dell'orologio: il cervello vede quale sezione è aperta sul polso, apre e chiude le sezioni dell'orologio e comanda la musica dell'iPhone. Con la Musica davanti, «pausa», «avanti», «indietro», «play» partono subito con la battuta di JARVIS.
 
-**Cervello (pronto, NON pubblicato: aspetta il via)**
+**Cervello v128 (pubblicato col via del signore, 12 nov 10:05; prova generale superata, impronta 11a7894b…, commit fa32eb0)**
 - Paragrafo REGIA nel sistema (dialogo come JARVIS con Tony in laboratorio/missione), note del recupero (scusa brevissima; col nome mai silenzio), silenzio più prudente (dopo pochi secondi dalla risposta, al polso), gli errori di silenzio registrati in jarvis_consumi («silenzio_sbagliato») e usati come esempi.
 
 **Mockup**: simulatore aggiornato (Regia, Recupero e ripresa) con le stesse frasi dell'app.
