@@ -548,6 +548,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - La regia sa dire al cervello che cosa ha appena proposto («HAI APPENA PROPOSTO»).
 - Mockup (v. 1794486362-2481): pannello SUBITO nel simulatore, «Controllo JARVIS» fra i gesti del telefono; corretti due «</div>» in più della 12.0 (10) che chiudevano in anticipo il contenitore dei pannelli.
 - Non in questa build (decisione del signore): C1 (SpeechAnalyzer e il modello di Apple sul 16 Pro Max) e C3 (microfono più lungo al polso).
+- Controllo di compilazione: **verde**, 0 errori e 0 warning sui 4 bersagli (app, orologio, complicazione, Isola) — run 43217986617, commit 748d994.
 
 ## 12.0 (11) — MARK XII · 12 nov mattina · dalla prova della 12.0 (10) sul telefono (il signore, 11:00) e dalla conversazione di stamattina nel cervello · build unica · cervello v128 (invariato) · controllo di compilazione: vedi l'ultima riga
 
