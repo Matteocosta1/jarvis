@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 12.0 (12) — MARK XII · 12 nov · il signore: «in una sola build fai tutti i miglioramenti tranne C1 e C3… la build deve essere la 12.12» · build unica · cervello v128 (le novità del cervello per B5 e la regia sono pronte in locale: si pubblicano col suo via) · controllo di compilazione: vedi l'ultima riga
+## 12.0 (12) — MARK XII · 12 nov · il signore: «in una sola build fai tutti i miglioramenti tranne C1 e C3… la build deve essere la 12.12» · build unica · cervello **v129** (pubblicato col suo via il 12 nov alle 13:45: REGIA estesa con SA FARE, scrivi_campo, APPENA, HAI APPENA PROPOSTO, e il paragrafo EMOZIONI; impronta 19751330…, prova superata) · controllo di compilazione: vedi l'ultima riga
 
 **Errori corretti**
 - **1 · il «seguito» su ogni frase**: «riprendo il discorso» va al cervello solo se la frase è ellittica («e sabato?», «anche a lui», «del brano», «che domani passo da lui») o dopo «aspetta». Stamattina ogni frase entro un minuto era «seguito» e il cervello ha mescolato la musica col muro dell'ufficio. Anche per la risposta anticipata (FineFrase.fraseEllittica, con le prove).
