@@ -101,7 +101,56 @@ final class Regia {
             ordine = contatore
         }
         scene[chiave] = Scena(nome: nome, stato: stato, azioni: azioni, davanti: davanti, ordine: ordine)
+        impara(nome, azioni)
     }
+
+    // MARK: Cosa sanno fare anche da chiuse (12.0 (11))
+
+    /// Stamattina (12 nov, 10:45) il cervello ha detto «non posso cercare in Musica»: vedeva le azioni solo delle sezioni aperte.
+    /// Ogni sezione, quando si presenta, lascia qui le sue azioni (in breve: nome, valore, * se serve il sì), ricordate anche
+    /// dopo un riavvio; finché una sezione non si è mai aperta valgono quelle scritte qui sotto. La regia apre da sola la
+    /// sezione chiusa e poi fa l'azione.
+    private lazy var conosciute: [String: String] = Regia.seme.merging(
+        (UserDefaults.standard.dictionary(forKey: "regiaSaFare") as? [String: String]) ?? [:]) { _, imparata in imparata }
+
+    private func impara(_ nome: String, _ azioni: [AzioneRegia]) {
+        guard !azioni.isEmpty else { return }
+        var viste = Set<String>()
+        let breve = azioni.filter { viste.insert($0.nome).inserted }
+            .map { $0.nome + ($0.valore.map { "(\($0))" } ?? "") + ($0.conferma ? "*" : "") }.joined(separator: ", ")
+        let k = Regia.destinazione(nome)?.nome ?? nome
+        guard conosciute[k] != breve else { return }
+        // una sezione in più pezzi (la posta e la mail aperta): si tengono insieme
+        let prima = Set((conosciute[k] ?? "").components(separatedBy: ", ").filter { !$0.isEmpty })
+        let unite = (conosciute[k].map { [$0] } ?? []) + breve.components(separatedBy: ", ").filter { !prima.contains($0) }
+        conosciute[k] = unite.joined(separator: ", ")
+        var salvate = (UserDefaults.standard.dictionary(forKey: "regiaSaFare") as? [String: String]) ?? [:]
+        salvate[k] = conosciute[k]
+        UserDefaults.standard.set(salvate, forKey: "regiaSaFare")
+    }
+
+    /// Le azioni delle sezioni prima che si siano mai aperte (dal codice della 12.0 (11)).
+    private static let seme: [String: String] = [
+        "Spesa": "aggiungi(cosa), togli(cosa), preso(cosa), rimetti(cosa), svuota*, whatsapp",
+        "Email": "aggiorna, apri(quale), non_lette, tutte, cartella(nome), periodo(giorni), chiudi_mail, apri_in_mail",
+        "Meteo": "aggiorna",
+        "Musica": "metti(quale), cerca(testo), scheda(nome), apri(quale), play, pausa, avanti, indietro, casuale, ripeti",
+        "Messaggi": "a(chi), testo(testo), aggiungi(testo), canale(nome), cambia, svuota*, invia*",
+        "Telefono": "pagina(nome), componi(numero), cerca(chi), chiama(chi)*",
+        "Bea": "le_piace(cosa), non_le_piace(cosa), promessa(cosa), regalo(cosa), idea(cosa), nota(cosa), ti_penso, whatsapp, messaggio, chiama*",
+        "Diario": "scrivi",
+        "Shazam": "suona(quale), libreria, chiudi_player, elimina(quale)*",
+        "Foto": "cerca(cosa), periodo(quando), apri(quale), pulisci",
+        "Serata": "scegli(quale)",
+        "Ricordi": "scheda(nome), cerca(cosa), guida, salva_qui, fatto(quale), elimina(quale)*",
+        "Satellite": "scegli(luogo), ricognizione(indirizzo), filtro(quali), naviga, guida, dossier",
+        "GitHub": "apri(repo), tutti",
+        "Supabase": "periodo(ore), aggiorna",
+        "Archivio": "cartella(nome), cerca(cosa), apri(file), condividi(file), elimina(file)*",
+        "Costi": "aggiorna",
+        "EDITH": "controlla(tipo, dato)",
+        "Vitals": "periodo(giorni)",
+    ]
 
     func togli(_ chiave: UUID) { scene[chiave] = nil }
 
@@ -164,6 +213,11 @@ final class Regia {
             f.dateFormat = "HH:mm"
             pezzi.append("APPENA: " + recenti.map { "\(f.string(from: $0.quando)) \($0.testo)" }.joined(separator: "; "))
         }
+        // 12.0 (11): cosa sanno fare le sezioni chiuse (la regia le apre da sola e poi fa l'azione); in fondo, così se la riga è
+        // troppo lunga si accorcia questa e non quello che c'è davanti
+        let aperteNomi = Set(aperte.map(\.sezione.nome))
+        let chiuse = Regia.destinazioni.map(\.nome).filter { !aperteNomi.contains($0) }.compactMap { n in conosciute[n].map { "\(n): \($0)" } }
+        if !chiuse.isEmpty { pezzi.append("SA FARE ANCHE DA CHIUSE (la regia le apre da sola, poi l'azione): " + chiuse.joined(separator: "; ")) }
         return Regia.taglia(pezzi.joined(separator: " ‖ "), 5900)
     }
 
@@ -282,7 +336,9 @@ final class Regia {
         guard let a = tutte.first(where: { Regia.chiave($0.nome) == Regia.chiave(p.azione) }) else {
             return .no(tutte.isEmpty ? "\(d.nome) non ha azioni" : "\(d.nome) sa fare: " + tutte.map(\.nome).joined(separator: ", "))
         }
-        let e = await a.esegui(p.valori)
+        var valori = p.valori
+        if let k = a.valore, !k.contains(","), valori[k] == nil, valori.count == 1, let unico = valori.values.first { valori = [k: unico] }   // 12.0 (11)
+        let e = await a.esegui(valori)
         if e.ok { evento("\(d.nome): \(Regia.taglia(e.dato, 80))") }
         return e
     }

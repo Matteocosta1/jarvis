@@ -530,6 +530,18 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (11) — MARK XII · 12 nov mattina · dalla prova della 12.0 (10) sul telefono (il signore, 11:00) e dalla conversazione di stamattina nel cervello · build unica · cervello v128 (invariato) · controllo di compilazione: vedi l'ultima riga
+
+- **Musica, il brano scelto non partiva** (errore della 12.0 (8)): messa la coda, Play la trovava ancora vuota (iOS la riempie con un attimo di ritardo) e si fermava con «Niente in coda». Succedeva toccando un brano in Cerca, in Libreria, in Radio e quando JARVIS metteva musica a voce (registri 10:44–10:45: «Sfera Ebbasta», «Popstar»). Ora il brano scelto si prepara e parte subito; il ripiego sui brani ascoltati di recente vale solo per Play quando non è mai stato scelto niente.
+- **Isola VOCE ferma e impossibile da chiudere**: se iOS chiudeva JARVIS in sottofondo, l'isola restava accesa senza padrone e «Fine» non la trovava (serviva riavviare il telefono). Ora «Fine» spegne ogni isola VOCE accesa anche ad app chiusa; JARVIS spegne quelle rimaste quando riparte e quando lei rientra; l'isola scade da sola 2 minuti dopo l'ultimo aggiornamento.
+- **Interromperlo parlandogli sopra** (il signore: «difficilmente riesco a fermarlo… solo con Jarvis ascoltami»):
+  - l'eco: prima una parola del signore valeva come eco se JARVIS l'aveva usata in qualsiasi punto della risposta («ma», «non», «cosa» sparivano), e l'eco accumulata nella trascrizione «diluiva» le sue parole. Ora è eco solo se fa coppia con la vicina come nella frase di JARVIS, e contano le ultime quattro parole sentite: due sue bastano (FineFrase.paroleProprie e parlaSopra, con le prove nel controllo Dialogo);
+  - l'impronta della voce (idea C del 25 ott): ora vale solo con folla o TV intorno (scelta A); in casa la sua voce lo ferma sempre;
+  - restano: «sì», «mh», «certo» non lo fermano; «ho capito» gli fa finire la frase; in RISERVATO solo le parole d'ordine;
+  - nei tempi del turno c'è il motivo, se ha parlato sopra senza fermarlo («orecchio»: eco, segnale, folla, orologio, riservato).
+- **La regia sa cosa fanno anche le sezioni chiuse**: stamattina JARVIS ha detto «non posso scrivere nella ricerca della Musica» perché vedeva solo le azioni delle sezioni aperte. Ora nella riga [Schermo] c'è «SA FARE ANCHE DA CHIUSE» (imparato da ogni sezione quando si presenta e ricordato; prima della prima apertura quello scritto nel codice): la regia apre la sezione e fa l'azione. Se il cervello dà al valore un nome diverso, la regia lo riconosce lo stesso.
+- Mockup: il simulatore interrompe già così (parlare sopra lo ferma, i segnali d'ascolto no); musica e isola non cambiano nel disegno.
+
 ## 12.0 (10) — MARK XII · 12 nov mattina · numero chiesto dal signore («fai 12.10») · build unica · cervello v128 · controllo di compilazione: vedi l'ultima riga
 
 **Dialogo (iPhone e Watch)**

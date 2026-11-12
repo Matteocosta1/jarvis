@@ -3969,6 +3969,8 @@ extension Jarvis {
             misura["into"] = g.fine.rawValue; misura["into_liv"] = g.livello; misura["into_pend"] = g.pendenza; misura["into_punti"] = g.punti
         }
         ultimaIntonazione = nil
+        // 12.0 (11): se nell'ultimo minuto ha parlato sopra JARVIS senza fermarlo, il perché (eco, segnale, folla, orologio, riservato)
+        if let sc = orecchio.ultimoScarto, Date().timeIntervalSince(sc.quando) < 60 { misura["orecchio"] = sc.motivo }
         anticipiButtati = 0
         motivoChiusura = ""
     }

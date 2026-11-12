@@ -331,6 +331,32 @@ nonisolated enum FineFrase {
         "mettilo", "riproduci", "fai", "torna", "vai",
     ]
 
+    /// 12.0 (11) · l'interruzione, come fra persone: le parole che il signore dice davvero mentre JARVIS parla, separate dalla sua
+    /// eco. Una parola è eco solo se JARVIS la sta dicendo E fa coppia con una vicina come nella sua frase («il bar ha perso»
+    /// sentito mentre lo dice). Prima bastava che JARVIS l'avesse usata una volta: «ma», «non», «cosa», «dici» del signore
+    /// sparivano come eco e lui non riusciva a fermarlo.
+    static func paroleProprie(_ sentite: [String], detto: [String]) -> [String] {
+        let mie = Set(detto)
+        var coppie = Set<String>()
+        if detto.count > 1 { for i in 1..<detto.count { coppie.insert(detto[i - 1] + " " + detto[i]) } }
+        var proprie: [String] = []
+        for (i, p) in sentite.enumerated() {
+            guard mie.contains(p) else { proprie.append(p); continue }
+            let conPrima = i > 0 && coppie.contains(sentite[i - 1] + " " + p)
+            let conDopo = i + 1 < sentite.count && coppie.contains(p + " " + sentite[i + 1])
+            if !conPrima && !conDopo && sentite.count > 1 { proprie.append(p) }
+        }
+        return proprie
+    }
+
+    /// 12.0 (11): mentre JARVIS parla, il signore gli sta parlando sopra? Contano le ultime quattro parole sentite (l'eco
+    /// accumulata prima non «diluisce» più le sue): almeno due sono sue e almeno la metà.
+    static func parlaSopra(_ sentite: [String], detto: [String]) -> Bool {
+        let coda = Array(sentite.suffix(4))
+        let sue = paroleProprie(coda, detto: detto)
+        return sue.count >= 2 && sue.count * 2 >= coda.count
+    }
+
     /// Nella frase c'è il nome di JARVIS (anche storpiato).
     static func haNome(_ testo: String) -> Bool {
         testo.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()

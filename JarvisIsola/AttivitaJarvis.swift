@@ -54,6 +54,10 @@ struct ComandoIsola: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         let a = azione
+        // 12.0 (11): «Fine» sull'isola VOCE la spegne qui, sempre: anche se iOS aveva chiuso JARVIS e l'app non la ricorda più
+        if a == "finevoce" {
+            for v in Activity<AttivitaJarvis>.activities where v.content.state.tipo == "voce" { await v.end(nil, dismissalPolicy: .immediate) }
+        }
         await MainActor.run { ComandiIsola.esegui?(a) }
         return .result()
     }

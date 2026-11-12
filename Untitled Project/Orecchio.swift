@@ -135,6 +135,11 @@ final class Orecchio {
         }
     }
 
+    /// 12.0 (11): perché l'ultima voce sentita mentre JARVIS parlava non l'ha fermato («eco», «segnale», «folla», «orologio»,
+    /// «riservato»): va nei tempi del turno, per regolare le soglie sui dati veri invece di indovinare.
+    private(set) var ultimoScarto: (motivo: String, quando: Date)?
+    private func scarto(_ motivo: String) { ultimoScarto = (motivo, Date()) }
+
     /// Le parole di una frase, minuscole, senza punteggiatura.
     nonisolated private static func parole(_ t: String) -> [String] {
         t.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" }).map(String.init)
@@ -190,29 +195,31 @@ final class Orecchio {
                 zittisci?()
             }
             let parole = Orecchio.parole(segmento)
-            if !inPresa, soloParoleDOrdine { if fine { riavvia() }; return }   // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
+            if !inPresa, soloParoleDOrdine { scarto("riservato"); if fine { riavvia() }; return }   // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
             if !inPresa {
                 // 12 nov (P1, revisione del dialogo): fra persone «sì», «mh», «certo», «esatto», «ah ok» detti mentre l'altro parla sono
                 // segnali d'ascolto: chi parla continua (prima due parole bastavano a zittirlo). «Ho capito», «sì sì sì», «ok grazie»: ha
                 // capito, JARVIS finisce la frase che sta dicendo e si ferma (più sotto, dopo gli stessi controlli di una frase vera:
                 // eco, orologio, impronta della voce). Le parole che sta dicendo JARVIS (la sua eco) non contano
-                let mie = Set(Orecchio.parole(testoDetto))
-                let proprie = parole.filter { !mie.contains($0) }
+                // 12.0 (11): le parole sue, separate dall'eco di JARVIS (FineFrase.paroleProprie: eco solo se fa coppia come nella
+                // frase di JARVIS; prima «ma», «non», «cosa» del signore sparivano come eco perché JARVIS le aveva usate)
+                let dette = Orecchio.parole(testoDetto)
+                let proprie = FineFrase.paroleProprie(parole, detto: dette)
                 let segnale = proprie.isEmpty ? FineFrase.SegnaleAscolto.nessuno : FineFrase.segnaleDAscolto(proprie.joined(separator: " "))
                 // mentre JARVIS fa una domanda, «sì» è la risposta (passa gli stessi controlli di una frase vera, qui sotto)
                 let allaDomanda = segnale == .ascolto && domandaInCorso?() == true
-                if segnale == .ascolto && !allaDomanda { if fine { riavvia() }; return }
-                // è la mia eco? Se quasi tutte le parole stanno in ciò che sto dicendo, è l'altoparlante, non il signore
-                let estranee = parole.filter { !mie.contains($0) }
-                // in mezzo alla folla le voci degli altri non devono zittirlo: lì valgono solo le parole d'ordine («Jarvis», «basta»…)
-                guard parole.count >= 2 || allaDomanda, Double(estranee.count) >= Double(parole.count) * 0.5 else { if fine { riavvia() }; return }
+                if segnale == .ascolto && !allaDomanda { scarto("segnale"); if fine { riavvia() }; return }
+                // 12.0 (11): gli parla sopra? Contano le ultime parole sentite: almeno due sue (prima l'eco accumulata nella
+                // trascrizione «diluiva» le sue parole e solo «Jarvis, ascoltami» lo fermava)
+                guard FineFrase.parlaSopra(parole, detto: dette) || allaDomanda else { scarto("eco"); if fine { riavvia() }; return }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
                 // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
-                if OrologioInUso.attivo { if fine { riavvia() }; return }
-                // idea C (25 ott, approvata dal signore): con l'impronta della sua voce registrata anche in una stanza tranquilla
-                // la risposta la ferma solo la sua voce (o una parola d'ordine, qui sopra: «Jarvis», «basta», «muto», «aspetta»);
-                // le due parole di Bea o di un amico non la fermano più. Senza impronta, come prima: solo con la folla
-                if (AmbienteSonoro.condiviso.affollato || VoceDelSignore.attiva) && !voceConfermata {
+                if OrologioInUso.attivo { scarto("orologio"); if fine { riavvia() }; return }
+                // 12.0 (11), scelta A (il signore: «risolvi con massima competenza»): l'impronta della sua voce serve solo con folla o TV
+                // intorno, dove le voci degli altri non devono fermarlo. In casa basta la sua voce: sopra la voce di JARVIS il
+                // confronto dell'impronta sbagliava spesso e lo lasciava parlare (idea C del 25 ott: prima valeva sempre)
+                if AmbienteSonoro.condiviso.affollato && !voceConfermata {
+                    scarto("folla")
                     // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
                     // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
                     if VoceDelSignore.attiva && !controlloInCorso {

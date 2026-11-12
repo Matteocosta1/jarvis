@@ -28,10 +28,13 @@ enum IsolaJarvis {
             case "ferma": MotoreGuida.condiviso.ferma(); chiudi()
             case "pausa", "riprendi", "stoprec": rec?(a)
             case "ok": chiudiPioggia()
-            case "finevoce": fineDialogo?()
+            case "finevoce": fineDialogo?(); chiudiVoci()       // 12.0 (11): si chiude sempre, anche se l'app era stata chiusa
             default: break
             }
         }
+        // 12.0 (11): un'isola VOCE rimasta accesa da un'app chiusa da iOS (in sottofondo) non ha più padrone e restava fissa
+        // fino al riavvio del telefono. JARVIS che parte da zero non ha dialoghi in corso: le spegne
+        chiudiVoci()
         if #available(iOS 17.2, *) {
             Task {
                 for await dati in Activity<AttivitaJarvis>.pushToStartTokenUpdates {
@@ -125,19 +128,35 @@ enum IsolaJarvis {
     static func voce(fase: String, riga: String) {
         let s = AttivitaJarvis.ContentState(tipo: "voce", esci: nil, sigla: nil, coloreSigla: nil, oraMezzo: nil, freccia: nil, via: nil,
                                             metri: nil, riga: riga, fase: fase)
+        // 12.0 (11): l'isola ha una scadenza (2 minuti dall'ultimo aggiornamento): se l'app non la aggiorna più, iOS la dà per vecchia
+        let scade = Date().addingTimeInterval(120)
+        if attivita == nil, let orfana = Activity<AttivitaJarvis>.activities.first(where: { $0.content.state.tipo == "voce" }) {
+            attivita = orfana                                   // una VOCE già accesa (anche da prima): si aggiorna quella, non se ne apre un'altra
+        }
         if let a = attivita {
             guard a.content.state.tipo == "voce" else { return }
             guard a.content.state != s else { return }
-            Task { await a.update(ActivityContent(state: s, staleDate: nil)) }
+            Task { await a.update(ActivityContent(state: s, staleDate: scade)) }
         } else {
-            avvia(s, meta: "JARVIS", fine: nil)
+            avvia(s, meta: "JARVIS", fine: scade)
         }
     }
 
-    static var voceAccesa: Bool { attivita?.content.state.tipo == "voce" }
+    static var voceAccesa: Bool {
+        attivita?.content.state.tipo == "voce" || Activity<AttivitaJarvis>.activities.contains { $0.content.state.tipo == "voce" }
+    }
 
     static func fineVoce() {
-        if voceAccesa { chiudi() }
+        if attivita?.content.state.tipo == "voce" { attivita = nil }
+        chiudiVoci()
+    }
+
+    /// 12.0 (11): spegne tutte le isole VOCE che iOS tiene accese, non solo quella che l'app ricorda (dopo una chiusura in
+    /// sottofondo l'app non la ricordava più, e «Fine» non la chiudeva).
+    static func chiudiVoci() {
+        for a in Activity<AttivitaJarvis>.activities where a.content.state.tipo == "voce" {
+            Task { await a.end(nil, dismissalPolicy: .immediate) }
+        }
     }
 
     // MARK: PIOGGIA (26 ott sera): la accende il cervello; qui solo «Ok»

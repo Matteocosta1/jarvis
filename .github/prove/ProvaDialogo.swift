@@ -22,6 +22,7 @@ struct ProvaDialogo {
         provaRiprese()
         provaResto()
         provaComposti()
+        provaParlaSopra()
         print(errori == 0 ? "\nTutte le prove del dialogo superate." : "\n\(errori) prove del dialogo NON superate.")
         exit(errori == 0 ? 0 : 1)
     }
@@ -188,6 +189,20 @@ struct ProvaDialogo {
         ]
         for (frase, atteso) in casi {
             controlla(FineFrase.comandoComposto(frase) == atteso, "comando composto «\(frase)» = \(FineFrase.comandoComposto(frase))")
+        }
+    }
+
+    /// 12.0 (11): mentre JARVIS parla, la sua eco non lo ferma; due parole del signore sì (anche parole che JARVIS ha usato).
+    static func provaParlaSopra() {
+        let detto = "ecco l'analisi sir in tre punti ingressi bar e spese gli ingressi sono in linea con le ultime serate ma il bar non ha retto".split(separator: " ").map(String.init)
+        let casi: [(String, Bool)] = [
+            ("in tre punti ingressi", false), ("gli ingressi sono in linea", false), ("ingressi bar e spese gli ingressi", false),
+            ("in tre punti ingressi ma no", true), ("ma cosa dici", true), ("no fermati un attimo", true),
+            ("sono in linea con le ultime serate aspetta che ti dico", true), ("bar", false), ("ma il bar", false),
+        ]
+        for (sentite, atteso) in casi {
+            let p = sentite.split(separator: " ").map(String.init)
+            controlla(FineFrase.parlaSopra(p, detto: detto) == atteso, "parla sopra «\(sentite)» = \(FineFrase.parlaSopra(p, detto: detto))")
         }
     }
 
