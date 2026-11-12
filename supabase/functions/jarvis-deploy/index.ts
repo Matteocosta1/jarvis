@@ -147,10 +147,13 @@ async function provaCervello(slug: string) {
       return { ok: false, d: `${q.slice(16, 50)}… → ${(e as Error).message.slice(0, 120)}` };
     }
   }));
-  // 11 nov (#15): due prove del dialogo, oltre alle tre domande
+  // 11 nov (#15): due prove del dialogo, oltre alle tre domande; 12 nov (P7): le prove del dialogo umano (le «avvisi» non fermano
+  // la pubblicazione: un modello può sbagliare una volta un giudizio; le altre sì)
   const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug)]);
-  const tutte = [...esiti, ...dialogo];
-  return { ok: tutte.every((e) => e.ok), dettagli: tutte.map((e) => `${e.ok ? "✓" : "✗"} ${e.d}`) };
+  const umano = await provaDialogo(slug);
+  const tutte = [...esiti, ...dialogo, ...umano.filter((e) => e.bloccante)];
+  const avvisi = umano.filter((e) => !e.bloccante);
+  return { ok: tutte.every((e) => e.ok), dettagli: [...tutte.map((e) => `${e.ok ? "✓" : "✗"} ${e.d}`), ...avvisi.map((e) => `${e.ok ? "✓" : "⚠"} ${e.d}`)] };
 }
 
 /// Una richiesta al cervello di prova: le righe NDJSON della risposta.
@@ -198,4 +201,44 @@ async function provaAnticipo(slug: string) {
     const testo = String(fine?.testo ?? "").trim();
     return { ok: !!testo, d: `anticipo${sosp ? " (sospeso e ripreso)" : ""} → ${testo.slice(0, 120) || "nessuna risposta"}` };
   } catch (e) { return { ok: false, d: `anticipo → ${(e as Error).message.slice(0, 120)}` }; }
+}
+
+/// 12 nov (P7, revisione del dialogo): il dialogo umano. Frase a metà → «[aspetto]»; domanda intera → risposta (mai «aspetto»);
+/// frase detta a un'altra persona dal microfono sempre acceso → «[silenzio]»; con «Jarvis» dentro → mai silenzio; frase a metà e poi
+/// silenzio (dopo_aspetto) → risposta o domanda sul punto; «Sir» mai in due risposte brevi di fila.
+async function provaDialogo(slug: string): Promise<{ ok: boolean; d: string; bloccante: boolean }[]> {
+  const ora = Date.now();
+  type Caso = { nome: string; bloccante: boolean; atteso: "aspetto" | "silenzio" | "risposta" | "senza_sir"; corpo: Record<string, unknown> };
+  const casi: Caso[] = [
+    { nome: "frase a metà → aspetto", bloccante: false, atteso: "aspetto",
+      corpo: { a_voce: true, capisce_aspetto: true, messaggi: [{ role: "user", content: "Gli ho detto che", quando: ora }] } },
+    { nome: "domanda intera → risposta", bloccante: true, atteso: "risposta",
+      corpo: { a_voce: true, capisce_aspetto: true, messaggi: [{ role: "user", content: "Prova generale: quanto fa due più due? Una parola.", quando: ora }] } },
+    { nome: "a un'altra persona → silenzio", bloccante: false, atteso: "silenzio",
+      corpo: { a_voce: true, capisce_silenzio: true, ascolto_libero: true, messaggi: [{ role: "user", content: "Bea, mi passi il sale per favore?", quando: ora }] } },
+    { nome: "con «Jarvis» → mai silenzio", bloccante: true, atteso: "risposta",
+      corpo: { a_voce: true, capisce_silenzio: true, ascolto_libero: true, messaggi: [{ role: "user", content: "Jarvis, prova generale: quanto fa tre più tre? Una parola.", quando: ora }] } },
+    { nome: "frase a metà poi silenzio → domanda sul punto", bloccante: true, atteso: "risposta",
+      corpo: { a_voce: true, capisce_aspetto: true, dopo_aspetto: true, messaggi: [{ role: "user", content: "Gli ho detto che", quando: ora }] } },
+    { nome: "«Sir» non in due risposte brevi di fila", bloccante: false, atteso: "senza_sir",
+      corpo: { messaggi: [
+        { role: "user", content: "Accendi la torcia.", quando: ora - 20_000 },
+        { role: "assistant", content: "Accesa, Sir.", quando: ora - 18_000 },
+        { role: "user", content: "Grazie.", quando: ora },
+      ] } },
+  ];
+  return await Promise.all(casi.map(async (c) => {
+    try {
+      const righe = await chiedi(slug, c.corpo);
+      const errore = righe.find((x) => x?.t === "errore");
+      if (errore) return { ok: false, bloccante: c.bloccante, d: `${c.nome} → errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` };
+      const segnale = righe.find((x) => x?.t === "aspetto" || x?.t === "silenzio")?.t as string | undefined;
+      const testo = String(righe.find((x) => x?.t === "fine")?.testo ?? "").trim();
+      const visto = segnale ? `«${segnale}»` : testo.slice(0, 100) || "nessuna risposta";
+      const ok = c.atteso === "aspetto" || c.atteso === "silenzio" ? segnale === c.atteso
+        : c.atteso === "senza_sir" ? !segnale && !!testo && !/\bsir\b/i.test(testo)
+        : !segnale && !!testo && !/^\s*\[\s*(aspett|silenz)/i.test(testo);
+      return { ok, bloccante: c.bloccante, d: `${c.nome} → ${visto}` };
+    } catch (e) { return { ok: false, bloccante: c.bloccante, d: `${c.nome} → ${(e as Error).message.slice(0, 120)}` }; }
+  }));
 }

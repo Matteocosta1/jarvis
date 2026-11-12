@@ -94,8 +94,13 @@ const oraLeggibile = (iso: string) => new Intl.DateTimeFormat("it-IT", { timeZon
 
 async function leggiNotte() {
   const adesso = new Date();
-  // pulizia: le frasi oltre 3 giorni si cancellano; le proposte senza risposta da 2 giorni scadono
-  await db.from("jarvis_giornata").delete().lt("creato", new Date(adesso.getTime() - 3 * 86_400_000).toISOString());
+  // pulizia: le frasi oltre 3 giorni si cancellano; le proposte senza risposta da 2 giorni scadono.
+  // 12 nov (revisione del dialogo, errore 6): solo quelle già diventate un ricordo (jarvis_episodi) o del Mac (che non fa ricordi):
+  // prima si cancellavano anche le conversazioni non ancora riassunte, e quei ricordi andavano persi per sempre
+  const tre = new Date(adesso.getTime() - 3 * 86_400_000).toISOString();
+  const { data: ricordato } = await db.from("jarvis_episodi").select("fine").order("fine", { ascending: false }).limit(1).maybeSingle();
+  await db.from("jarvis_giornata").delete().eq("dispositivo", "mac").lt("creato", tre);
+  if (ricordato?.fine) await db.from("jarvis_giornata").delete().lt("creato", tre).lte("creato", ricordato.fine);
   await db.from("jarvis_impegni").update({ stato: "scaduto" }).eq("stato", "proposto").lt("giorno", giornoRoma(new Date(adesso.getTime() - 86_400_000)));
   const { data: frasi, error } = await db.from("jarvis_giornata").select("id, creato, signore, jarvis").eq("letto", false).order("creato").limit(400);
   if (error) throw error;
@@ -286,6 +291,16 @@ Deno.serve(async (req) => {
       if (!(e as any).errore) inviate++;
     }
     return json({ promesse: (data ?? []).length, inviate });
+  }
+  if (corpo.episodi === true) {                                                      // 12 nov: le conversazioni finite diventano ricordi (pg_cron ogni 10 minuti)
+    try {
+      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jarvis`, {
+        method: "POST", signal: AbortSignal.timeout(100_000),
+        headers: { "content-type": "application/json", "x-jarvis-token": Deno.env.get("JARVIS_TOKEN") ?? "" },
+        body: JSON.stringify({ episodi_chiudi: true }),
+      });
+      return json(await r.json().catch(() => ({ errore: `cervello ${r.status}` })));
+    } catch (e) { return json({ errore: (e as Error).message }); }
   }
   if (corpo.radar === true) {                                                        // RADAR (pg_cron ogni 10 minuti): il cervello decide, qui si avvisa
     try {
