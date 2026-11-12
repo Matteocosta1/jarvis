@@ -165,6 +165,7 @@ struct VistaSatellite: View {
     @State private var meteo: MeteoSat?
     @State private var meteoDi: String?
     @State private var indirizzo = ""
+    @FocusState private var indirizzoAttivo: Bool       // 12 nov: «Vai» chiude la tastiera, così si vede la mappa che vola
     @State private var cerca = false
     @State private var avviso: String?
     @State private var pagina: PaginaSat?
@@ -308,6 +309,7 @@ struct VistaSatellite: View {
         Pannello(titolo: "RICOGNIZIONE", tinta: tinta) {
             HStack(spacing: 8) {
                 TextField("Indirizzo", text: $indirizzo)
+                    .focused($indirizzoAttivo)
                     .font(.system(size: 14)).foregroundStyle(ColoriHUD.chiaro)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -325,6 +327,7 @@ struct VistaSatellite: View {
 
     /// «Vai»: l'indirizzo diventa il luogo RICOGNIZIONE, la mappa ci vola sopra e arriva l'avviso con distanza e meteo.
     private func vai() async {
+        indirizzoAttivo = false
         let via = indirizzo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !via.isEmpty, !cerca else { return }
         cerca = true

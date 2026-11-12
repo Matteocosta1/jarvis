@@ -230,6 +230,7 @@ struct VistaMessaggi: View {
             if let s = scelto {
                 destinatario(s)
                 dettatore
+                    .id("messaggiTesto")                     // 12 nov (CampoInAlto): scrivendo, in cima con i canali e Invia sotto
                 canali
                 TastoJarvis(testo: "Invia su \(canale.rawValue)", icona: "paperplane.fill", tinta: tinta) { invia() }
                     .disabled(testo.trimmingCharacters(in: .whitespaces).isEmpty || numeroScelto == nil)
@@ -273,6 +274,8 @@ struct VistaMessaggi: View {
         .onChange(of: testo) { salvaBozza() }
         .onChange(of: numeroScelto) { salvaBozza() }
         .onChange(of: scelto) { salvaBozza() }
+        // 12 nov (CampoInAlto): toccato il campo, la pagina lo porta in cima: la rubrica (o Invia) resta sopra la tastiera
+        .onChange(of: scrivendo) { _, su in if su { CampoInAlto.porta(scelto == nil ? "messaggiCerca" : "messaggiTesto") } }
         .sulloSchermo(testoSchermo)
     }
 
@@ -335,6 +338,7 @@ struct VistaMessaggi: View {
             if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
         }
         .padding(12).background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 12))
+        .id("messaggiCerca")                                 // 12 nov (CampoInAlto): con la tastiera su, in cima con i contatti sotto
         TastoJarvis(testo: "Detti a JARVIS: «scrivi a Marco…»", icona: "waveform", tinta: tinta) { chiedi("Jarvis, voglio mandare un messaggio: dimmi tu a chi e cosa, poi lo mandi.") }
         if contatti.isEmpty && caricato {
             Text("Rubrica vuota o non autorizzata: Impostazioni › JARVIS › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
@@ -486,6 +490,7 @@ struct VistaTelefono: View {
     @State private var registro: [VoceRegistro] = Registro.leggi("registroChiamate")
     @State private var caricato = false
     @State private var daChiamare: (String, String)?
+    @FocusState private var cercaAttiva: Bool                       // 12 nov (CampoInAlto): la ricerca nella rubrica ha la tastiera
     @State private var premuto: (k: String, quando: Date)?        // 9 nov: per l'ologramma (il tasto appena premuto)
     @State private var chiamata: Date?                               // e quando è partita l'ultima chiamata
 
@@ -628,10 +633,12 @@ struct VistaTelefono: View {
     @ViewBuilder private var rubrica: some View {
         HStack {
             Image(systemName: "magnifyingglass").foregroundStyle(tinta)
-            TextField("Cerchi un contatto", text: $cerca).foregroundStyle(.white)
+            TextField("Cerchi un contatto", text: $cerca).foregroundStyle(.white).focused($cercaAttiva)
             if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
         }
         .padding(12).background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 12))
+        .id("telefonoCerca")                                 // 12 nov (CampoInAlto): con la tastiera su, in cima con i contatti sotto
+        .onChange(of: cercaAttiva) { _, su in if su { CampoInAlto.porta("telefonoCerca") } }
         if contatti.isEmpty && caricato {
             Text("Rubrica vuota o non autorizzata: Impostazioni › JARVIS › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
         }

@@ -95,11 +95,12 @@ private struct MailPriorita: View {
                 .overlay(alignment: .leading) { Rectangle().fill(tinta).frame(width: 2) }
                 if mail.serveRisposta {
                     HStack(spacing: 8) {
-                        TastoComando(testo: etichettaInvia, attivo: stato == .pronta || isErrore) { Task { await invia() } }
+                        TastoComando(testo: etichettaInvia, attivo: stato == .pronta || isErrore) { fuoco = false; Task { await invia() } }
                         TastoComando(testo: "Cambia", attivo: stato != .inviata && stato != .invio) {
                             Suoni.tocco()
                             cambia = true
                             fuoco = true
+                            CampoInAlto.porta("priorita-\(mail.id)")   // 12 nov: la risposta in cima, Invia sopra la tastiera
                         }
                     }
                     if case .errore(let e) = stato {
@@ -108,6 +109,7 @@ private struct MailPriorita: View {
                 }
             }
         }
+        .id("priorita-\(mail.id)")                          // 12 nov (CampoInAlto)
     }
 
     private var isErrore: Bool { if case .errore = stato { return true } else { return false } }

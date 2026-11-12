@@ -502,6 +502,7 @@ struct VistaFotoScheda: View {
 
     @State private var periodo: Periodo = .oggi
     @State private var cerca = ""
+    @FocusState private var cercaAttiva: Bool            // 12 nov (CampoInAlto): la ricerca ha la tastiera
     @State private var foto: [Immagine]?
     @State private var nota: String?
     @State private var aperta: Int?
@@ -538,11 +539,14 @@ struct VistaFotoScheda: View {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(tinta)
                 TextField("Cosa cerca? cane, mare, concerto, vinile…", text: $cerca).foregroundStyle(.white).submitLabel(.search)
+                    .focused($cercaAttiva)
                 if !cerca.isEmpty { Button { cerca = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
             }
             .padding(12)
             .background(tinta.opacity(0.07))
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .id("fotoCerca")                                     // 12 nov (CampoInAlto): con la tastiera su, in cima con i risultati sotto
+            .onChange(of: cercaAttiva) { _, su in if su { CampoInAlto.porta("fotoCerca") } }
 
             // 11.0 (3): le cose capite, in fila col «+» (devono esserci tutte nella foto)
             if !capite.isEmpty {

@@ -23,6 +23,9 @@ struct VistaEdith: View {
     @State private var esiti: [String: Voce] = [:]
     @State private var inCorso: Set<String> = []
     @State private var esitoPassword: String?
+    /// 12 nov (CampoInAlto): il campo che ha la tastiera. Toccato un campo, la pagina lo porta in cima con sotto il suo tasto;
+    /// toccato il tasto, la tastiera scende e si vede il risultato (NUMERO e IP hanno tastiere senza «Invio»).
+    @FocusState private var campoAttivo: String?
 
     var body: some View {
         CorniceScheda(titolo: "EDITH", sottotitolo: "Sistema di Difesa e Riconoscimento", icona: "eyeglasses", tinta: tinta) {
@@ -95,7 +98,9 @@ struct VistaEdith: View {
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .padding(10).background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 10))
                     .foregroundStyle(.white)
-                Button { Suoni.tocco(); Task { await controllaPassword() } } label: { etichetta("Controlla", attivo: inCorso.contains("password")) }
+                    .focused($campoAttivo, equals: "password")
+                    .id("edith-password")
+                Button { Suoni.tocco(); campoAttivo = nil; Task { await controllaPassword() } } label: { etichetta("Controlla", attivo: inCorso.contains("password")) }
                     .buttonStyle(StileStark()).disabled(password.isEmpty || inCorso.contains("password"))
                 if let esitoPassword { Text(esitoPassword).font(.system(size: 13)).foregroundStyle(esitoPassword.hasPrefix("⚠️") ? .orange : .green) }
             }
@@ -112,6 +117,7 @@ struct VistaEdith: View {
             Text("Solo difesa: le sue cose, e dati pubblici prima di fidarsi di qualcuno.").font(.system(size: 9)).foregroundStyle(Color.tenue)
         }
         .sulloSchermo(testoSchermo)
+        .onChange(of: campoAttivo) { _, c in if let c { CampoInAlto.porta("edith-" + c) } }   // 12 nov: il campo toccato sale in cima
     }
 
     /// 8 nov notte: cosa vede JARVIS di EDITH (i campi scritti e i risultati già mostrati). La password non esce mai dal telefono:
@@ -138,6 +144,8 @@ struct VistaEdith: View {
             .keyboardType(tastiera).textInputAutocapitalization(.never).autocorrectionDisabled()
             .padding(10).background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 10))
             .foregroundStyle(.white)
+            .focused($campoAttivo, equals: segnaposto)
+            .id("edith-" + segnaposto)
     }
 
     private func etichetta(_ testo: String, attivo: Bool) -> some View {
@@ -152,6 +160,7 @@ struct VistaEdith: View {
     private func tasto(_ testo: String, chiave: String, corpo: @escaping () -> [String: Any]) -> some View {
         Button {
             Suoni.tocco()
+            campoAttivo = nil                          // 12 nov: la tastiera scende, il risultato si vede
             Task { await controlla(chiave, corpo()) }
         } label: { etichetta(testo, attivo: inCorso.contains(chiave)) }
         .buttonStyle(StileStark())

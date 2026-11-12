@@ -563,6 +563,7 @@ struct VistaArchivio: View {
     @State private var fotoScelta: PhotosPickerItem?
     @State private var scegliFile = false
     @State private var caricamento: String?
+    @FocusState private var cercaAttiva: Bool            // 12 nov (CampoInAlto)
     @State private var daEliminare: Voce?
     @State private var scatta = false
     @State private var daCondividere: URL?
@@ -582,9 +583,12 @@ struct VistaArchivio: View {
                     TextField("Cerca nell'archivio", text: $cerca)
                         .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(.white)
                         .submitLabel(.search).onSubmit { Task { await carica() } }
+                        .focused($cercaAttiva)
                     if !cerca.isEmpty { Button { cerca = ""; Task { await carica() } } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) } }
                 }
                 .padding(10).background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 10))
+                .id("archivioCerca")                                 // 12 nov (CampoInAlto): con la tastiera su, in cima
+                .onChange(of: cercaAttiva) { _, su in if su { CampoInAlto.porta("archivioCerca") } }
                 if !cartelle.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {

@@ -1,4 +1,7 @@
 #if os(iOS)
+import Foundation
+import Combine
+import UIKit
 import SwiftUI
 import Charts
 import HealthKit
@@ -19,15 +22,13 @@ struct CorniceScheda<Contenuto: View>: View {
     var marchio = false
     /// 9 nov (Interprete): quando cambia, la pagina scorre in fondo (una frase nuova nella conversazione si vede subito).
     var fondo: Int? = nil
-    /// 12 nov (Musica › CERCA, il signore: «apre la tastiera e non mi fa selezionare niente perché la tastiera va sopra»): quando
-    /// cambia (e non è nil), la pagina scorre fino alla vista con questo id, in alto: il campo e i risultati restano sopra la tastiera.
-    var ancora: String? = nil
     @ViewBuilder let contenuto: () -> Contenuto
     @Environment(\.chiudiOVia) private var chiudi
     @State private var mostrato = false
     @State private var stampa: CGFloat = 0           // quanto del contenuto è già «stampato» (0 → 1), come .stampa2 del mockup
     @State private var caricamentoVia = false
     @State private var apertaDa = Date()
+    @State private var tastieraAperta = false           // 12 nov: la tastiera di iOS è su (vedi CampoInAlto)
 
     var body: some View {
         ZStack {
@@ -84,7 +85,12 @@ struct CorniceScheda<Contenuto: View>: View {
                 // UNA vista sola (non i riquadri uno per uno: su una lista di viste la stampa finirebbe su ognuna), già pronta sotto il
                 // caricamento (come `resto` nel mockup, nascosto finché non si stampa): a fine caricamento si scopre e basta, senza
                 // fotogrammi vuoti
-                VStack(alignment: .leading, spacing: 16) { contenuto() }
+                VStack(alignment: .leading, spacing: 16) {
+                    contenuto()
+                    // 12 nov (CampoInAlto): con la tastiera su, lo spazio perché il campo toccato possa salire in cima alla pagina
+                    // anche quando sotto c'è poco (una ricerca appena cominciata, il tasto Verifica)
+                    if tastieraAperta { Color.clear.frame(height: 420).accessibilityHidden(true) }
+                }
                     .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
                     .allowsHitTesting(mostrato)
                     .accessibilityHidden(!mostrato)
@@ -102,11 +108,35 @@ struct CorniceScheda<Contenuto: View>: View {
                 guard n != nil, mostrato else { return }
                 withAnimation(.easeOut(duration: 0.3)) { lettore.scrollTo("paginaScheda", anchor: .bottom) }
             }
-            .onChange(of: ancora) { _, a in
-                guard let a, mostrato else { return }
-                withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)) { lettore.scrollTo(a, anchor: .top) }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in tastieraAperta = true }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in tastieraAperta = false }
+            // 12 nov: un campo da scrivere toccato (CampoInAlto.porta) sale in cima alla pagina, appena la tastiera ha fatto posto
+            .onReceive(NotificationCenter.default.publisher(for: .jarvisCampoInAlto)) { n in
+                guard mostrato, let id = n.userInfo?["id"] as? String else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)) { lettore.scrollTo(id, anchor: .top) }
+                }
             }
         }
+    }
+}
+
+// MARK: - 12 nov · La tastiera non copre mai quello che serve (il signore, Musica › CERCA: «apre la tastiera e non mi fa selezionare
+// niente perché la tastiera va sopra»; «non voglio errori da principianti»)
+// iOS, quando si tocca un campo, sposta la pagina quel tanto che basta a vedere il campo appena sopra la tastiera: quello che sta
+// SOTTO il campo (i risultati di una ricerca, il tasto Verifica, Invia) resta coperto. Un campo così, appena prende la tastiera,
+// chiama `CampoInAlto.porta("id")` (con l'id messo sulla vista da portare su): la pagina lo porta in cima, e sotto restano visibili
+// i risultati o il suo tasto. Ogni pagina con la cornice delle schede (CorniceScheda) lo fa da sola; un id per sezione.
+
+extension Notification.Name {
+    /// Un campo da scrivere chiede alla sua pagina di salire in cima (userInfo «id»: l'id della vista).
+    static let jarvisCampoInAlto = Notification.Name("JarvisCampoInAlto")
+}
+
+enum CampoInAlto {
+    static func porta(_ id: String) {
+        NotificationCenter.default.post(name: .jarvisCampoInAlto, object: nil, userInfo: ["id": id])
     }
 }
 

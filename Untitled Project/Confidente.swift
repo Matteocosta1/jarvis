@@ -57,6 +57,7 @@ struct VistaConfidente: View {
     var body: some View {
         ZStack {
             SfondoSezione()   // 7 nov: lo sfondo di tutte le sezioni
+            ScrollViewReader { lettore in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia: il mio è un parere, non una sentenza.")
@@ -99,6 +100,7 @@ struct VistaConfidente: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 0.8))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(AngoliOlo(tinta: Color.ciano).padding(-1).allowsHitTesting(false))   // 27 ott: la cornice olografica
+                    .id("confidenteTesto")                    // 12 nov (CampoInAlto)
 
                     // 4 nov (il signore): la bozza resta riaprendo; «Cancella», come in Messaggi, la svuota
                     if !testo.isEmpty || !domanda.isEmpty {
@@ -138,8 +140,19 @@ struct VistaConfidente: View {
                         .font(.footnote).foregroundStyle(Color.tenue)
                 }
                 .padding(16)
+                // 12 nov (CampoInAlto, come le altre schede): con la tastiera su, lo spazio perché il testo possa salire in cima
+                if scrivendo { Color.clear.frame(height: 220).accessibilityHidden(true) }
             }
             .scrollDismissesKeyboard(.interactively)
+            // 12 nov: toccato il testo, la pagina lo porta in cima: sotto restano la domanda e «Chieda a JARVIS», sopra la tastiera
+            .onChange(of: scrivendo) { _, su in
+                guard su else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)) { lettore.scrollTo("confidenteTesto", anchor: .top) }
+                }
+            }
+            }
             .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
         }
         .task { stato = await SaluteOggi.leggi() }

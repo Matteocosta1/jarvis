@@ -27,6 +27,7 @@ struct VistaScanner: View {
     @State private var prodotto: Voce?
     @State private var errore: String?
     @State private var codiceAMano = ""
+    @FocusState private var codiceAttivo: Bool          // 12 nov: la tastiera numerica non ha «Invio»: la chiude la freccia
     @State private var storico: [Passato] = []
     @State private var mostraIngredienti = false
     @State private var chiediCancella = false         // 7 nov: «Cancella la cronologia», come in Shazam
@@ -133,11 +134,12 @@ struct VistaScanner: View {
         HStack(spacing: 8) {
             TextField("oppure scriva il numero del codice", text: $codiceAMano)
                 .keyboardType(.numberPad)
+                .focused($codiceAttivo)
                 .font(.system(size: 14, design: .monospaced))
                 .padding(.horizontal, 12).frame(height: 42)
                 .background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(tinta.opacity(0.25), lineWidth: 1))
-            Button { trovato(codiceAMano) } label: {
+            Button { codiceAttivo = false; trovato(codiceAMano) } label: {
                 Image(systemName: "arrow.right").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.fondo)
                     .frame(width: 42, height: 42).background(tinta).clipShape(RoundedRectangle(cornerRadius: 10))
             }

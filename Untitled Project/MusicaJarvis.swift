@@ -450,8 +450,7 @@ struct VistaMusica: View {
     @State private var conti: [String: Int] = [:]        // quanti brani ha ogni playlist / album (id → numero)
 
     var body: some View {
-        CorniceScheda(titolo: "Musica", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto,
-                      ancora: cercaAttivo && scheda == .cerca ? "cercaMusica" : nil) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
+        CorniceScheda(titolo: "Musica", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
             // 10 nov (il signore: «fai come le altre, 3 diversi ologrammi»): in testa l'ologramma con VINILE, ONDA, CODA, come il mockup
             OlogrammaMusicaProve(lettore: lettore)
                 .corniceOlo(Color.ciano)
@@ -607,8 +606,8 @@ struct VistaMusica: View {
                 .focused($cercaAttivo)
                 .accessibilityLabel("Cerca in Apple Music")
         }
-        .id("cercaMusica")                                    // 12 nov: con la tastiera aperta la pagina porta qui il campo, in alto
-        .onChange(of: cercaAttivo) { _, aperta in if aperta { lettore.errore = nil } }
+        .id("cercaMusica")                                    // 12 nov: con la tastiera aperta la pagina porta il campo in cima
+        .onChange(of: cercaAttivo) { _, aperta in if aperta { CampoInAlto.porta("cercaMusica") } }
         .padding(.horizontal, 12)
         .frame(height: 42)
         .background(Color.fondo.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
@@ -626,8 +625,7 @@ struct VistaMusica: View {
         if !cercato.isEmpty {
             if risultati.isEmpty { vuoto("NESSUN RISULTATO") } else { listaBrani(risultati) }
         }
-        // 12 nov: con la tastiera aperta, spazio sotto i risultati perché il campo possa salire in alto anche con pochi risultati
-        if cercaAttivo { Color.clear.frame(height: 380).accessibilityHidden(true) }
+
     }
 
     // MARK: il dettaglio di una playlist (o di un album) con «Riproduci»

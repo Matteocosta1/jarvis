@@ -44,6 +44,7 @@ struct VistaBea: View {
     var body: some View {
         ZStack {
             SfondoSezione(tinta: tinta)                 // 7 nov: lo stesso sfondo in ogni sezione (SfondoSezione)
+            ScrollViewReader { lettore in
             List {
                 Section {
                     ologramma.listRowBackground(Color.clear)
@@ -68,6 +69,16 @@ struct VistaBea: View {
             .contentMargins(.top, 16, for: .scrollContent)
             .contentMargins(.horizontal, 16, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
+            // 12 nov (CampoInAlto, come le altre schede): toccato il campo di AGGIUNGI, la lista lo porta in cima, con sotto il tasto
+            // Aggiungi sopra la tastiera (il campo va a capo: la tastiera non ha «Invio» per chiudersi)
+            .onChange(of: scrivendo) { _, su in
+                guard su else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    withAnimation(.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)) { lettore.scrollTo("beaAggiungi", anchor: .top) }
+                }
+            }
+            }
             // 8 nov sera: mentre carica non si vede (come `resto` nel mockup); a fine caricamento si stampa dall'alto, un blocco solo
             .modifier(StampaDallAlto(progresso: stampa, tinta: tinta))
             .allowsHitTesting(mostrato)
@@ -444,6 +455,7 @@ struct VistaBea: View {
             TextField(tipoNuovo.esempio, text: $nuovo, axis: .vertical)
                 .lineLimit(1...3)
                 .focused($scrivendo)
+                .id("beaAggiungi")
                 .foregroundStyle(.white)
             if tipoNuovo == .promessa { Toggle("Con una scadenza", isOn: $conGiorno).tint(tinta) }
             if conGiorno {
