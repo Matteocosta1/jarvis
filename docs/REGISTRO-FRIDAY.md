@@ -17,9 +17,10 @@
 - Tolti anche i loro comandi a voce, le battute, le destinazioni della regia, le icone e le notifiche (SOS di Bea, radar pioggia).
 - Spostati dove servono ancora: `Voce` e `URL: Identifiable` (SchedeSignore), `AngoliOlo` (Ologramma), `ChipSat` (Ricordi), le curve di salita e discesa `StratoPagina` (PaginaPiena).
 - Resta `Studio3D/three.module.min.js`: lo usa l'aereo olografico degli Occhi (AEREO).
+- La canzone che non si trova né su Apple Music né fra le anteprime non si cerca più su YouTube (lo faceva il Browser): resta l'avviso.
 - Il primo avvio aspetta la parola d'ordine, che in JARVIS si scrive in Impostazioni: in FRIDAY arriva in fase 3, col cervello.
 - L'SOS della sezione Bea di JARVIS (`Bea.swift`, commit `414fc09`) si riprende per l'SOS di FRIDAY (fase 4).
-- Codice rimasto ma non più usato, da togliere in un secondo passo: i banchi di prova degli ologrammi delle sezioni tolte (BancoProveOlo, ProveTavolaA/B/C/Viste, OlogrammiSezioni, i loro casi in SezioneOlo), GuidaCondivisa, i campi video di AscoltoShazam, alcune parole in Vocabolario, OrecchioComandi e Abitudini, l'elenco dei banchi in `prova.yml`.
+- Codice rimasto ma non più usato, da togliere in un secondo passo: i banchi di prova degli ologrammi delle sezioni tolte (BancoProveOlo, ProveTavolaA/B/C/Viste, OlogrammiSezioni, i loro casi in SezioneOlo), GuidaCondivisa, AscoltoShazam (senza la scheda Shazam e senza l'orologio nessuno lo usa più), alcune parole in Vocabolario, OrecchioComandi e Abitudini, l'elenco dei banchi in `prova.yml`.
 
 ## Sezioni: da JARVIS a FRIDAY
 Corona del mockup: SENSI (Occhi, Foto, Frigo, Cucina, Scanner) · CORPO (Pilates, Makeup, Vitals, Sonno, Ciclo, Testa) · CONTATTI (Mail, Messaggi, Telefono, Interprete) · STRUMENTI (Gestionale, Armadio, Nando, Spesa, Musica) · MENTE (Diario, Confidente, Memoria). In alto: Musica, Cestino, Difesa, Account, SOS.
@@ -43,4 +44,4 @@ Corona del mockup: SENSI (Occhi, Foto, Frigo, Cucina, Scanner) · CORPO (Pilates
 | Build | Data | Contenuto | Esito |
 |---|---|---|---|
 | — | 13 nov | Fase 1: il progetto FRIDAY (solo iPhone), codice identico a JARVIS 13.1 (1) | verde (run 43523299661) |
-| — | 14 nov | Fase 1b: via le sezioni solo di JARVIS | da compilare |
+| — | 14 nov | Fase 1b: via le sezioni solo di JARVIS | verde (commit `696d376`, run 43528636242) |
