@@ -1,6 +1,7 @@
 #if os(iOS)
 import Foundation
 import UIKit
+import MusicKit           // il brano che suona (LettoreMusica.voce) entra nel filo
 
 // MARK: - 12.0 (16) · FA MENTRE PARLA: le frasi del dialogo che l'app fa da sola
 // Il signore (13 nov sera): «ogni frase, in qualsiasi forma la dica, diventa un'azione su qualsiasi sezione. Le cose semplici le fa
