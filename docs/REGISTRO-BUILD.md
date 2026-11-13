@@ -538,6 +538,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - La voce continua dopo icone e chat: microfono, fine dell'audio d'avvio e «avvio finito» aspettano la fine del file. Se il signore chiede qualcosa (tasto Azione, reattore, JARVIS che ascolta o parla, lettura di una notifica, risposta in arrivo) la voce sfuma in 0,5 s e le icone mancanti arrivano subito. Senza suoni o senza file: come prima.
 - Apple Watch: `avvioorologio.m4a` = stessa traccia al polso (+15%, mono, 23 click; il 24° lo suona l'app); il microfono aspetta la fine della voce; tocco sul reattore (o JARVIS che ascolta/parla) = la voce sfuma.
 - Mockup (v. 1794556857-870c): SFUMATA è l'avvio predefinito anche nel mockup; al polso (+15%) la traccia nuova.
+- Controllo di compilazione (commit 5067fe5, run 43389974315): **verde** · 0 errori, 0 warning · prove del dialogo superate. Manca solo il numero 14 nel progetto, appena il signore conferma.
 
 ## 12.0 (13) — MARK XII · 13 nov notte · numero chiesto al signore (00:55: «è la 12.0 (13)?» → «continua pure») · build unica · cervello **v130** (archivio, risata, frase ponte: via del signore 00:53 «fai quello che proponi» e 01:11 punto 4 «ok») · controllo di compilazione: vedi l'ultima riga
 
