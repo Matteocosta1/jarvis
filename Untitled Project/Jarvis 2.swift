@@ -220,6 +220,7 @@ final class Jarvis: NSObject, ObservableObject {
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
             aggiornaRichiamo()
             if dialogoFuori || IsolaJarvis.voceAccesa { aggiornaIsolaVoce() }   // 12 nov: l'isola VOCE segue il dialogo fuori dall'app
+            if fase == .ascolto || fase == .parlo { Suoni.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
         }
     }
     @Published var parziale = ""
@@ -1623,6 +1624,7 @@ final class Jarvis: NSObject, ObservableObject {
         // dell'avvio le spegneva l'audio a metà frase. Vale per gli avvisi, la domanda del diario della sera e il Tocco d'aiuto di Bea
         // (la sua schermata d'allarme si apre subito: aspetta solo la voce)
         guard avvioInCorso else { leggiAdesso(testo); return }
+        Suoni.sfumaAvvio()                  // 12.0 (14): la voce dell'avvio (JARVIS II) sfuma a icone finite, poi la lettura
         Task { @MainActor [weak self] in
             let inizio = Date()
             while self?.avvioInCorso == true, Date().timeIntervalSince(inizio) < 8 { try? await Task.sleep(for: .milliseconds(50)) }
@@ -1784,6 +1786,7 @@ final class Jarvis: NSObject, ObservableObject {
             // 13 nov: l'app si è appena aperta (notifica delle 9) e la sequenza d'avvio riempie già l'attesa: la frase ponte ci finirebbe
             // sopra. A sequenza finita la risposta, se è arrivata, parte subito; la frase d'attesa solo se dopo un secondo non c'è ancora
             var dopoAvvio = false
+            if self?.avvioInCorso == true { Suoni.sfumaAvvio() }   // 12.0 (14): la voce dell'avvio sfuma, la risposta non aspetta 16 s
             while !Task.isCancelled, self?.avvioInCorso == true { dopoAvvio = true; try? await Task.sleep(for: .milliseconds(100)) }
             if dopoAvvio { try? await Task.sleep(for: .seconds(1)) }
             // il signore sta parlando proprio adesso (l'ascolto lo sente, anche se non è per me): non gli parlo sopra
@@ -2066,6 +2069,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// 13 nov: aspetta che finisca la sequenza d'avvio (al massimo 8 s; interrompibile come il resto del turno).
     private func attendiFineAvvio(id: UUID) async throws {
         guard avvioInCorso else { return }
+        Suoni.sfumaAvvio()                  // 12.0 (14): la voce dell'avvio sfuma a icone finite
         let inizio = Date()
         while avvioInCorso, Date().timeIntervalSince(inizio) < 8 { try await Task.sleep(for: .milliseconds(30)) }
         if misuraTurno == id { misura["ms_avvio"] = Int(Date().timeIntervalSince(inizio) * 1000) }

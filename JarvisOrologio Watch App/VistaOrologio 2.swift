@@ -46,9 +46,28 @@ enum SuoniOrologio {
         if let p = lettoreAvvio {
             lettoreAvvio = nil
             if fra > 0 { p.play(atTime: p.deviceCurrentTime + fra) } else { p.play() }
-            lettori.append(p); return
+            lettori.append(p); lettoreVoce = p; return
         }
         suona(file("avvioorologio") ?? file("avvio"), volume: 1.0)
+    }
+    // 12.0 (14) · l'avvio è JARVIS II (16,6 s): la voce continua dopo le icone. Il microfono aspetta che finisca; se il signore
+    // tocca il reattore o JARVIS deve parlare, sfuma in mezzo secondo (come sull'iPhone).
+    private static var lettoreVoce: AVAudioPlayer?
+    private static var chiudiVoce = false
+    static func sfumaAvvio() { if lettoreVoce != nil { chiudiVoce = true } }   // solo se l'avvio è in corso: niente richieste vecchie
+    static func attendiFineAvvio() async {
+        try? await Task.sleep(for: .milliseconds(100))                  // play(atTime:) può partire un attimo dopo
+        while let p = lettoreVoce, p.isPlaying {
+            if chiudiVoce {
+                p.setVolume(0, fadeDuration: 0.5)
+                try? await Task.sleep(for: .milliseconds(520))
+                p.stop()
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        lettoreVoce = nil
+        chiudiVoce = false
     }
     /// L'avvio si carica prima: quando parte, parte all'istante (le icone sono agganciate alla musica).
     static func preparaAvvio() {
@@ -402,6 +421,7 @@ struct VistaOrologio: View {
             let ricarica = chatDa != nil
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds((ricarica ? 1.4 : 0.4) / v))   // la coda della musica (o il suono della chat) finisce prima
+                await SuoniOrologio.attendiFineAvvio()                  // 12.0 (14): la voce di JARVIS II finisce (o sfuma) prima del microfono
                 jarvis.ascoltaDopoAvvio()
             }
             try? await Task.sleep(for: .seconds(2.2 / v))

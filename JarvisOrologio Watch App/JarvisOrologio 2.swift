@@ -59,6 +59,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     @Published var fase: Fase = .attesa {
         didSet {
             if fase != oldValue { segnalaUso() }
+            if fase != .attesa { SuoniOrologio.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
             // build 31: in attesa il microfono resta acceso come sull'iPhone (`apriAttesa`); fuori dall'attesa si chiude
             if fase == .attesa { if oldValue != .attesa { programmaAttesa() } } else { chiudiAttesa() }
         }

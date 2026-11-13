@@ -242,7 +242,15 @@ enum Suoni {
     /// variazione da un'icona all'altra. Stile: «hud» (predefinito), «note» (la scala di prima) o «off».
     static func plim(_ indice: Int) {
         guard attivi else { return }
-        if indice == 0, let url = file("avvio") { riproduci(url, volume: 1.0) }   // musica d'avvio: 100%
+        if indice == 0, let url = file("avvio"), let p = try? AVAudioPlayer(contentsOf: url) {   // musica d'avvio: 100%
+            // 12.0 (14): l'avvio è JARVIS II (16,6 s, la voce continua dopo le icone): il lettore resta qui, così si sa quando
+            // finisce e lo si può sfumare se il signore chiede qualcosa prima
+            p.volume = 1.0
+            lettoreAvvio?.stop()
+            lettoreAvvio = p
+            p.play()
+            BattitoMani.ignora(per: p.duration + 0.2)                 // un suono dell'app non è un battito di mani
+        }
         if let url = file("plim") { riproduci(url, volume: 1.0); return }   // pim delle icone: 100% (l'avvio si deve sentire)
         let stile = UserDefaults.standard.string(forKey: "suonoAvvio") ?? "off"   // sintesi solo se scelta apposta
         guard stile != "off" else { return }
@@ -256,6 +264,33 @@ enum Suoni {
         lettori.append(p)
         p.play()
         BattitoMani.ignora(per: max(0.5, p.duration + 0.2))          // un «tick» dell'app non è un battito di mani
+    }
+
+    // MARK: 12.0 (14) · la voce dell'avvio (JARVIS II)
+
+    private static var lettoreAvvio: AVAudioPlayer?
+    private static var chiudiCoda = false
+
+    /// Il file d'avvio sta ancora suonando (le icone e la chat sono già finite: resta la voce).
+    static var avvioSuona: Bool { lettoreAvvio?.isPlaying == true }
+
+    /// Il signore chiede qualcosa (tasto Azione, reattore, una notifica da leggere): la voce dell'avvio sfuma in mezzo secondo.
+    /// Durante le icone non si tocca: la richiesta vale da quando la sequenza è finita (la raccoglie `attendiFineAvvio`).
+    static func sfumaAvvio() { if lettoreAvvio != nil { chiudiCoda = true } }   // solo se l'avvio è in corso: niente richieste vecchie
+
+    /// Aspetta che il file d'avvio finisca da solo, oppure lo sfuma (0,5 s) appena qualcuno lo chiede.
+    static func attendiFineAvvio() async {
+        while let p = lettoreAvvio, p.isPlaying {
+            if chiudiCoda {
+                p.setVolume(0, fadeDuration: 0.5)
+                try? await Task.sleep(for: .milliseconds(520))
+                p.stop()
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        lettoreAvvio = nil
+        chiudiCoda = false
     }
 
     /// Chiusura della sequenza: «sistemi in linea», un doppio ping discendente, morbido.

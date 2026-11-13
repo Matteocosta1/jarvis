@@ -45,6 +45,11 @@ enum Avvio {
     /// prima 10) distribuite su tutto lo SCARICO della musica, 2,885 → 3,724 s; Bea sull'ultimo colpo (scelto sul mock, «Dopo»).
     static let colpi: [Double] = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 1.01, 1.16, 1.31, 1.46, 1.61, 1.87, 2.02, 2.17, 2.32, 2.47,
                                   2.885, 2.969, 3.053, 3.137, 3.220, 3.304, 3.388, 3.472, 3.556, 3.640, 3.724]
+    /// 12.0 (14) · l'avvio è JARVIS II (versione SFUMATA, scelta dal signore il 13 nov): le icone in alto non arrivano più con la corona
+    /// ma coi suoni di caricamento del finale, una alla volta da Social a Impostazioni, ognuna su un suono. Secondi dall'inizio del file
+    /// (il file non è accelerato: niente ÷ velocità), misurati sull'attacco: click d'inizio · tick · bip · bip · bip · bip (passo ~0,5 s,
+    /// mezzo ciclo dei bip). Il bagliore del titolo arriva con l'ultima. Stessi tempi del mockup (`TESTA_VOCE`).
+    static let testaVoce: [Double] = [11.738, 12.287, 12.821, 13.334, 13.821, 14.306]
 }
 
 enum TempiChat {

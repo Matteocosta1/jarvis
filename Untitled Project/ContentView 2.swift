@@ -476,17 +476,21 @@ struct ContentView: View {
             let ritardoAudio = AVAudioSession.sharedInstance().outputLatency   // il suono arriva all'altoparlante un attimo dopo
             let zero = CACurrentMediaTime() + ritardoAudio
             Aptica.avvio(tempi: tempiAptica.map { $0 + ritardoAudio })
-            // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta e alla STESSA distanza fra loro:
-            // la prima si posa sul colpo della prima icona della corona, l'ultima sul colpo dell'ultima. Partono 110 ms prima del colpo.
-            let colpoVero = { (k: Int) in colpi[k] - (k >= coda ? Avvio.anticipoCoda : 0) }
-            let nTesta = ContentView.postoTesta.totale, primoColpo = colpoVero(0), ultimoColpo = colpoVero(elenco.count - 1)
+            // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
+            // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
+            // da Social a Impostazioni; il bagliore del titolo con l'ultima. Se la voce dell'avvio viene sfumata prima (il signore
+            // chiede qualcosa) arrivano tutte insieme alla fine della sequenza (qui sotto, dopo `attendiFineAvvio`).
+            let nTesta = ContentView.postoTesta.totale
             Task { @MainActor in
                 for j in 0..<nTesta {
-                    let posa = primoColpo + Double(j) * (ultimoColpo - primoColpo) / Double(max(1, nTesta - 1))
+                    let posa = Avvio.testaVoce[min(j, Avvio.testaVoce.count - 1)]
                     let manca = zero + posa - 0.110 - CACurrentMediaTime()
                     if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
-                    withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = j + 1 }
+                    guard testaArrivate < nTesta else { return }               // sono già arrivate tutte (voce sfumata prima)
+                    withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = max(testaArrivate, j + 1) }
                 }
+                try? await Task.sleep(for: .milliseconds(110))                 // l'ultima si posa sul suo bip: lì il bagliore
+                withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
             }
             // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
             let inLinea = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v)
@@ -519,9 +523,18 @@ struct ContentView: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
-            testaArrivate = ContentView.postoTesta.totale                 // per sicurezza: a sistemi in linea ci sono tutte
-            withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
+            if !Suoni.avvioSuona {                                        // senza la voce dell'avvio (file mancante): come prima
+                testaArrivate = ContentView.postoTesta.totale             // per sicurezza: a sistemi in linea ci sono tutte
+                withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
+            }
             await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
+            // 12.0 (14): la voce di JARVIS II continua dopo icone e chat (fino a 16,6 s). Il microfono aspetta che finisca: aperto
+            // prima sentirebbe la voce dell'avvio. Se il signore chiede qualcosa (tasto Azione, reattore, notifica) sfuma in 0,5 s.
+            await Suoni.attendiFineAvvio()
+            if testaArrivate < ContentView.postoTesta.totale {            // voce sfumata prima dei suoi bip: le icone arrivano adesso
+                withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = ContentView.postoTesta.totale }
+                withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
+            }
             if !Impostazioni.richiamo { await Suoni.fineAvvioAudio() }   // col «Jarvis» acceso l'audio lo prende lui, come nella 12
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
             if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
@@ -580,7 +593,8 @@ struct ContentView: View {
             // 7 nov notte (il signore: «se lo lancio dal tasto Azione il volume è basso»): durante l'avvio il microfono aspetta la fine
             // della musica, come aprendo dall'icona (col microfono aperto l'iPhone abbassa l'altoparlante e i tasti del volume non
             // regolano più la musica). A JARVIS già acceso il tasto Azione resta immediato.
-            if jarvis.avvioInCorso { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
+            // 12.0 (14): la voce dell'avvio (JARVIS II) sfuma appena icone e chat sono finite: il signore vuole parlare
+            if jarvis.avvioInCorso { ascoltaDopoAvvio = true; Suoni.sfumaAvvio() } else { jarvis.ascoltaSubito() }
         case .briefing:
             Task { await jarvis.invia("Buongiorno Jarvis, il briefing per favore.") }
         case .leggi(let testo):

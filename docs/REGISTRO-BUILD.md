@@ -530,6 +530,15 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (14) — MARK XII · 13 nov mattina · **numero da confermare col signore** (il progetto resta a 13 finché non dice sì) · build unica · cervello invariato
+
+**Avvio nuovo: JARVIS II + click «in evidenza», sfumata** (il signore: «perfetto confermo la sfumata la voglio nella nuova build»; il file JARVIS II l'ha creato lui in un'altra chat)
+- iPhone e Mac: `avvio.m4a` = JARVIS II con i click di caricamento puliti (presi dalla musica di prima togliendo il resto) agli stessi tempi delle icone della corona, accelerazione finale compresa, e la coda che sfuma (16,6 s · −12,6 LUFS · −0,9 dBTP).
+- Le icone in alto (Social, Musica, Studio, Sistemi, Cestino, Impostazioni) non arrivano più coi colpi della corona: arrivano coi suoni di caricamento del finale parlato (11,74 · 12,29 · 12,82 · 13,33 · 13,82 · 14,31 s, `Avvio.testaVoce`), una alla volta, 110 ms prima del loro suono; il bagliore del titolo con l'ultima. Come nel mockup approvato.
+- La voce continua dopo icone e chat: microfono, fine dell'audio d'avvio e «avvio finito» aspettano la fine del file. Se il signore chiede qualcosa (tasto Azione, reattore, JARVIS che ascolta o parla, lettura di una notifica, risposta in arrivo) la voce sfuma in 0,5 s e le icone mancanti arrivano subito. Senza suoni o senza file: come prima.
+- Apple Watch: `avvioorologio.m4a` = stessa traccia al polso (+15%, mono, 23 click; il 24° lo suona l'app); il microfono aspetta la fine della voce; tocco sul reattore (o JARVIS che ascolta/parla) = la voce sfuma.
+- Mockup (v. 1794556857-870c): SFUMATA è l'avvio predefinito anche nel mockup; al polso (+15%) la traccia nuova.
+
 ## 12.0 (13) — MARK XII · 13 nov notte · numero chiesto al signore (00:55: «è la 12.0 (13)?» → «continua pure») · build unica · cervello **v130** (archivio, risata, frase ponte: via del signore 00:53 «fai quello che proponi» e 01:11 punto 4 «ok») · controllo di compilazione: vedi l'ultima riga
 
 **LiDAR (il signore: «migliora al massimo il LiDAR… fai quello che proponi»)**
