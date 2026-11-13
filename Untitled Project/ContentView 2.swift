@@ -685,7 +685,7 @@ struct ContentView: View {
     /// Da 390 punti in su (15 Pro compreso) resta tutto com'era.
     static let larghezzaStretta: CGFloat = 385
     /// MARK X (26 ott): il nome della versione sotto il titolo.
-    static let marca = "MARK XII"                        // 9 nov: MARK XII, Version 12.0 (il signore: «passiamo alla Mark 12», build 1)
+    static let marca = "MARK XIII"                       // 13 nov: MARK XIII, Version 13.0 build 1 (il signore: «perfetto tutto nella 13.0»)
     /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra). Studio e Social arrivano con le tappe 2 e 3.
     enum postoTesta { static let social = 0, musica = 1, studio = 2, sistemi = 3, cestino = 4, impostazioni = 5, totale = 6 }
     /// 5 nov (il signore: «vanno distanziate un minimo»): il margine per lato di ogni icona in alto, 3,5 punti (era 2): fra due

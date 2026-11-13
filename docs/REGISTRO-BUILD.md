@@ -530,7 +530,11 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## Dopo la 12.0 (17) — MARK XII · 13 nov sera · il dialogo (numero di build da confermare col signore; nel progetto resta 17 finché non lo dice)
+## 13.0 (1) — MARK XIII · 13 nov sera · numero deciso dal signore (21:55, «perfetto tutto nella 13.0»: Version 13.0, Build 1 su app, Watch, complicazione e isola) · build unica · cervello invariato (v135)
+
+**Contiene tutto**: la 12.0 (17) (Salute letta mentre parla, iPhone bloccato, Vitals col riposo detto a voce; la 17 non va caricata a parte) + il dialogo qui sotto + **MARK XIII**: la scritta sotto il titolo su iPhone e Mac («MARK XIII»), l'avvio del polso («J.A.R.V.I.S. · MARK XIII», tenuta su una riga sugli schermi piccoli) e il mockup (versione «MARK XIII · 13.0 (1)», titolo «JARVIS Mark XIII»). Stessa grafica, stesso posto, stesso bagliore: cambia solo il numero.
+
+### Il dialogo
 
 **Il dialogo: il filo del discorso, fa mentre parla, lavorare insieme, i widget FILO** (il signore, 13 nov 20:05–20:58: la giornata d'esempio «deve essere questo lo stile»; mockup 12.0 (16) approvato, v1216/q16-7). Solo iPhone (e Mac):
 - **Il filo** (Filo.swift): ogni cosa mostrata, detta o fatta entra nel discorso col suo genere e numero (il messaggio di Bea, Bea, la canzone, la risposta del meteo, il post): «leggimi quello di Bea», «rispondile che…», «mandalo anche a lei», «questa salvala», «quello di prima». Il cervello vede la riga FILO in [Schermo].
