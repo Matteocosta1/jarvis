@@ -530,6 +530,10 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (16) — MARK XII · 13 nov sera · confermata dal signore («fallo», 18:46) · build unica · cervello invariato (v134)
+
+**Tasto Azione: avvio completo** (il signore: «nella nuova build c'è l'avvio sbagliato… dal tasto Azione»). Dalla 12.0 (14) il tasto Azione premuto ad app chiusa faceva sfumare la voce di JARVIS II appena finite le prime icone (e le icone in alto arrivavano tutte insieme invece che sui bip del finale). Ora dal tasto Azione l'avvio è identico a quello dall'icona: voce intera, icone in alto sui bip, poi il bip e JARVIS ascolta. Con JARVIS già acceso il tasto Azione resta immediato. Invariati: tocco sul reattore e notifiche durante l'avvio (la voce sfuma), Siri e gli altri comandi.
+
 ## 12.0 (15) — MARK XII · 13 nov pomeriggio · numero confermato dal signore («concordo», 14:03, sulla proposta «build 12.0 (15)») · build unica · cervello **v134**
 
 **Perché** (prova del signore 13:45–13:56 sulla 12.0 (14), log di Supabase): mentre JARVIS parlava la voce si abbassava e si fermava per ogni rumore (in un turno sei volte, «senza parole»: i colpi sul tavolo; una volta fermo 2,7 s per un rumore; si è fermato anche col plim della carica). Il signore: «si deve fermare solo per una voce umana che dice parole vere»; «una persona interrotta si zittisce e ascolta, un minimo di sfumatura sì, la dissolvenza no»; «a volte riparte con "ehm…" o "dicevo…": è umano»; niente «sì», «ah», «ok» quando lo si interrompe. In più: tono che cambiava senza motivo, la battuta sul Daytona attaccata al «reattore sul petto», tre domande su «quale presentazione».

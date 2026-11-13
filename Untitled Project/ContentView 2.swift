@@ -595,9 +595,11 @@ struct ContentView: View {
     private func eseguiComando() {
         guard let r = comandi.richiesta, !Portachiavi.leggi().isEmpty else { return }
         comandi.richiesta = nil
-        // 13 nov: ogni comando che apre JARVIS (tasto Azione, Siri, una notifica: briefing, avviso, pioggia, Bea) è il signore che chiede
-        // qualcosa: la voce dell'avvio sfuma appena icone e chat sono finite, e quello che ha chiesto non le finisce sopra
-        Suoni.sfumaAvvio()
+        // 13 nov: ogni comando che apre JARVIS (Siri, una notifica: briefing, avviso, pioggia, Bea) è il signore che chiede qualcosa: la
+        // voce dell'avvio sfuma appena icone e chat sono finite, e quello che ha chiesto non le finisce sopra.
+        // 12.0 (16) (il signore: «dal tasto Azione c'è l'avvio sbagliato»): il tasto Azione no. L'avvio è identico a quello dall'icona
+        // (voce intera, icone in alto sui bip del finale), poi il bip e JARVIS ascolta
+        if r != .ascolta { Suoni.sfumaAvvio() }
         switch r {
         case .ascolta:
             jarvis.interrompi()
@@ -605,7 +607,7 @@ struct ContentView: View {
             // della musica, come aprendo dall'icona (col microfono aperto l'iPhone abbassa l'altoparlante e i tasti del volume non
             // regolano più la musica). A JARVIS già acceso il tasto Azione resta immediato.
             // 12.0 (14): la voce dell'avvio (JARVIS II) sfuma appena icone e chat sono finite: il signore vuole parlare
-            if jarvis.avvioInCorso { ascoltaDopoAvvio = true; Suoni.sfumaAvvio() } else { jarvis.ascoltaSubito() }
+            if jarvis.avvioInCorso { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
         case .briefing:
             Task { await jarvis.invia("Buongiorno Jarvis, il briefing per favore.") }
         case .leggi(let testo):
