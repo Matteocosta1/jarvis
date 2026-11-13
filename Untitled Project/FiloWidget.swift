@@ -101,19 +101,16 @@ private struct SchedaFilo: View {
                                                     removal: .opacity.combined(with: .offset(x: 24))))
                     }
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contenuto = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
+                    contenuto = h
+                    if #unavailable(iOS 18.0) { sotto = h > Self.altezzaMassima + 4 }   // iOS 17: c'è altro sotto
+                }
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .frame(height: altezza)
-            .mask(Sfuma(sopra: sopra, sotto: sotto))
-            .onScrollGeometryChange(for: [Bool].self) { g in
-                [g.contentOffset.y > 4, g.contentOffset.y + g.containerSize.height < g.contentSize.height - 4]
-            } action: { _, v in
-                sopra = v[0]
-                sotto = v[1]
-            }
-            .onScrollPhaseChange { _, fase in Filo.condiviso.toccato(fase != .idle) }   // scorre: le notifiche aspettano
+            .mask { Sfuma(sopra: sopra, sotto: sotto) }
+            .modifier(ScorreFilo(sopra: $sopra, sotto: $sotto))           // iOS 18: la sfumatura e «scorre: le notifiche aspettano»
             .padding(.top, 6)
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
@@ -263,6 +260,29 @@ private struct ArgomentoVista: View {
         f.dateFormat = "HH:mm"
         return f
     }()
+}
+
+/// Dove è lo scorrimento (sfumatura sopra e sotto) e se il dito sta scorrendo (le notifiche aspettano). Su iOS 17 (l'app parte da
+/// iOS 17.6) queste due letture non ci sono: la sfumatura resta solo in basso quando c'è altro, e mentre si scorre conta il
+/// trascinamento della scheda.
+private struct ScorreFilo: ViewModifier {
+    @Binding var sopra: Bool
+    @Binding var sotto: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .onScrollGeometryChange(for: [Bool].self) { g in
+                    [g.contentOffset.y > 4, g.contentOffset.y + g.containerSize.height < g.contentSize.height - 4]
+                } action: { _, v in
+                    sopra = v[0]
+                    sotto = v[1]
+                }
+                .onScrollPhaseChange { _, fase in Filo.condiviso.toccato(fase != .idle) }
+        } else {
+            content
+        }
+    }
 }
 
 /// Una riga come si vede (l'agenda divisa per impegno).
