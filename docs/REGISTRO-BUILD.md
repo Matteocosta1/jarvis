@@ -551,6 +551,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - **Sovrapposizioni**: FILO si fa da parte (dissolvenza 0,2 s) col menu SISTEMI e con la tendina PROTOCOLLI aperti, stesso angolo.
 - Un trascinamento interrotto (chiamata, notifica) lasciava FILO «toccato» e le notifiche non sparivano più: ora si rilascia da solo.
 - Richiamato dal bordo, gli argomenti non lampeggiano più tutti (solo quello appena arrivato o aggiornato, come il mockup). Margine destro 10 come il mockup.
+- Controllo di compilazione: 1° giro (f22d917, run 43525144278) un avviso sull'orologio («will never be executed»), tolto; 2° giro (8e60703, run 43526510007): **verde · 0 errori, 0 warning**. **Questa è la 13.1 (1) da caricare** (Pull + Archive + TestFlight).
 
 ## 13.0 (1) — MARK XIII · 13 nov sera · numero deciso dal signore (21:55, «perfetto tutto nella 13.0»: Version 13.0, Build 1 su app, Watch, complicazione e isola) · build unica · cervello invariato (v135)
 
