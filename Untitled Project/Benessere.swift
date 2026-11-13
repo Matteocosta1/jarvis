@@ -1,5 +1,8 @@
 import Foundation
 import HealthKit
+#if os(iOS)
+import UIKit
+#endif
 
 /// «Come ho dormito?», «Quanto mi sono allenato?» e il pezzo di salute del briefing del mattino.
 /// Legge dall'app Salute: sonno della notte, battito a riposo (oggi e media della settimana), passi, calorie attive, allenamenti.
@@ -18,6 +21,13 @@ nonisolated enum Benessere {
 
     static func riepilogo(giorni: Int) async -> (String, Bool) {
         guard HKHealthStore.isHealthDataAvailable() else { return (json(["errore": "l'app Salute non è disponibile su questo dispositivo"]), true) }
+        // 13 nov (12.0 (17)): a iPhone bloccato Salute è chiusa a chiave e le letture tornavano vuote (zero passi, niente sonno): il
+        // cervello le prendeva per vere. Ora lo dice; e la Salute letta mentre il signore parla, così, non parte con la domanda
+        #if os(iOS)
+        guard await MainActor.run(body: { UIApplication.shared.isProtectedDataAvailable }) else {
+            return (json(["errore": "l'iPhone è bloccato: i dati di Salute si leggono solo a telefono sbloccato"]), true)
+        }
+        #endif
         do {
             try await negozio.requestAuthorization(toShare: [], read: tipi)
         } catch {
