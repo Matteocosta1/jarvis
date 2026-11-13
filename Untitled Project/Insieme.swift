@@ -191,9 +191,13 @@ final class Insieme {
         case .mostra(let cosa, let pron):
             return await mostra(cosa, pron: pron, frase: frase)
         case .togli:
-            return filo.togli() ? Battute.staccato() : "Non c'è niente in vista, Sir."
+            guard filo.togli() else { return "Non c'è niente in vista, Sir." }
+            Suoni.filoVia()
+            return Battute.staccato()
         case .togliTutti:
-            return filo.togliTutti() > 0 ? Battute.angoloLibero() : "Non c'è niente in vista, Sir."
+            guard filo.togliTutti() > 0 else { return "Non c'è niente in vista, Sir." }
+            Suoni.filoVia()
+            return Battute.angoloLibero()
         case .fissa(let q):
             aggiornaBrano()
             guard let r = q.genere == nil ? filo.questo : filo.cosa(genere: q.genere, plurale: q.plurale) else { return Battute.nienteDaMostrare() }

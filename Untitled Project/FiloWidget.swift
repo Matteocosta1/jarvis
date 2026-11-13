@@ -138,7 +138,7 @@ private struct SchedaFilo: View {
                 }
                 .onEnded { v in
                     if v.translation.width > 80, v.translation.width > abs(v.translation.height) * 2.5 {
-                        Suoni.sparisce()
+                        Suoni.filoVia()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
                         dx = 0
@@ -188,7 +188,7 @@ private struct ArgomentoVista: View {
                 LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
                     .frame(height: 1)
                 Button {
-                    Suoni.sparisce()
+                    Suoni.filoVia()
                     withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
                 } label: {
                     Image(systemName: "xmark")
