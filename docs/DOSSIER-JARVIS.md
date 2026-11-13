@@ -22,6 +22,7 @@ Assistente vocale personale di Alessandro, stile Iron Man. **App vera**, non una
 - **Voce**: ElevenLabs (endpoint `voceTts`), trascrizione Mac via Scribe (`trascrivi`); su iPhone `SFSpeechRecognizer`.
 - **Database serate**: Supabase «Discosizer Serate» (lettura). Org su piano Pro dal 15 ott.
 - **Push**: APNs (briefing, SOS Bea).
+- **Salute** (dal 13 nov: 12.0 (17), cervello v135): il dispositivo legge Salute mentre il signore parla (iPhone quando la frase parla di salute, orologio a ogni frase) e la manda con la domanda (`salute_pronta`; `SalutePronta` in `Benessere.swift`, `ArgomentoSalute` in `DialogoVivo.swift`): il cervello risponde in un passaggio solo. Il riposo detto a voce che Salute non ha: `riposo_segna` → `jarvis_riposi` → pagina di diario del giorno (`riposo_detto_min`) → Vitals.
 
 ## 3. Flusso di deploy (IMPORTANTE)
 

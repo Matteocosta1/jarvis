@@ -663,6 +663,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // dopo «aspetta»): prima il microfono restava a sentire la stanza anche col polso giù
         if !primoPiano && (auto || aspetta != .no) { return }
         PosizioneOrologio.scalda()                          // difetto 5: il GPS si sveglia mentre il signore parla
+        SalutePronta.prepara()                              // 13 nov (12.0 (17)): e Salute si legge intanto (al polso a ogni frase)
         zittisci()
         chiudiAggiunta(spegniAudio: false)
         chiudiAttesa()
@@ -963,6 +964,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// come un ascolto normale (stesse pause), senza perdere le prime parole. `eco`: le parole di JARVIS finite nel file.
     private func continuaAscolto(_ r: AVAudioRecorder, eco: String? = nil, daAggiunta: Bool = false) {
         PosizioneOrologio.scalda()                       // difetto 5: il GPS si sveglia mentre il signore parla
+        SalutePronta.prepara()                           // 13 nov (12.0 (17)): e Salute si legge intanto (al polso a ogni frase)
         timerAscolto?.invalidate()
         registratore = r
         automatico = false
@@ -1623,6 +1625,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
             }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
+            // 13 nov (12.0 (17)): la Salute letta mentre parlava va con la domanda; il cervello la usa solo se la domanda è sulla
+            // salute (watchOS non ha le parole dal vivo: qui non si sa ancora di cosa parla)
+            if raccoltaBriefing == nil, let salute = await SalutePronta.perDomanda(attesa: 0.5) { corpo["salute_pronta"] = salute }
             if let raccoltaBriefing {
                 corpo["briefing"] = true
                 corpo["briefing_telefono"] = await raccoltaBriefing.value
@@ -1715,6 +1720,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     corpo = ["messaggi": [Any](), "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti,
                              "strumenti_client_def": [RegiaPolso.definizione], "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
+                    if let salute = await SalutePronta.perDomanda(attesa: 0) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 }
             }
             fallisci("Mi sono perso in troppi passaggi, Sir. Riformuli pure.")

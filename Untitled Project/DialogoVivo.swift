@@ -606,6 +606,27 @@ nonisolated enum FineFrase {
     }
 }
 
+// MARK: - 13 nov · Di cosa parla la frase: la salute (12.0 (17), la Salute letta mentre il signore parla)
+
+/// La frase parla di sonno, riposo, cuore, passi o allenamenti? Serve all'iPhone per leggere Salute mentre il signore parla e mandarla
+/// insieme alla domanda: il cervello risponde in un passaggio solo, senza tornare al telefono a chiederla (13 nov: «come ho dormito?»
+/// faceva 8,2 e 6,1 secondi dalla fine della frase al primo suono). Larga di proposito: leggere Salute costa poco, e il cervello usa i
+/// dati solo se la domanda è davvero sulla salute.
+nonisolated enum ArgomentoSalute {
+    /// Inizi di parola che parlano di salute («dorm» = dormito, dormo, dormire…).
+    static let radici = ["dorm", "sonn", "pisolin", "ripos", "addorment", "svegliat", "insonn", "stanc", "battit", "pulsazion", "cuore",
+                         "cardi", "passi", "cammin", "allenament", "allenat", "palestra", "calori", "salute", "vitals", "diario"]
+    /// Espressioni di più parole (senza accenti).
+    static let espressioni = ["a letto", "nel letto", "come sto", "frequenza cardiaca", "attivita fisica"]
+
+    static func parla(_ testo: String) -> Bool {
+        let parole = FineFrase.parole(testo.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")))
+        if parole.contains(where: { p in radici.contains(where: { p.hasPrefix($0) }) }) { return true }
+        let unite = " " + parole.joined(separator: " ") + " "
+        return espressioni.contains { unite.contains(" \($0) ") }
+    }
+}
+
 // MARK: - 12 nov · L'intonazione (P3, revisione del dialogo approvata dal signore: «provala già adesso»)
 
 /// L'altezza della voce, misurata sul telefono mentre il signore parla. Chi ha finito di parlare abbassa la voce in fondo alla frase;

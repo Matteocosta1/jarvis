@@ -461,7 +461,7 @@ final class Jarvis: NSObject, ObservableObject {
             return Date().timeIntervalSince(t.quando) < FineFrase.memoriaSilenzio + 2
         }
         richiamo.sveglia = { [weak self] in self?.richiamato() }
-        richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t; self?.programmaAnticipo(t) } }
+        richiamo.testo = { [weak self] t in if self?.fase == .ascolto { self?.parziale = t; self?.programmaAnticipo(t); self?.preparaSalute(t) } }
         richiamo.consegna = { [weak self] frase in self?.motivoChiusura = "richiamo"; self?.fraseRichiamo(frase) }
         cloud.iniziaFrase = { [weak self] chiave in self?.suonoIniziato(chiave) }   // 11 nov: il primo suono della risposta (i tempi)
         richiamo.applauso = { [weak self] in self?.applaudito() }
@@ -1925,6 +1925,11 @@ final class Jarvis: NSObject, ObservableObject {
         let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
         if misuraTurno == id { misura["ms_gps"] = Int(Date().timeIntervalSince(inizioGps) * 1000) }
         if let posizione { corpo["posizione"] = posizione }
+        // 13 nov (12.0 (17)): la Salute letta mentre parlava (o adesso, per una domanda scritta) va con la domanda
+        if raccoltaBriefing == nil {
+            if storia.last?["role"] as? String == "user", let ultima = storia.last?["content"] as? String { preparaSalute(ultima) }
+            if let salute = await SalutePronta.perDomanda(attesa: 0.5) { corpo["salute_pronta"] = salute }
+        }
         if let raccoltaBriefing {
             corpo["briefing"] = true
             corpo["briefing_telefono"] = await raccoltaBriefing.value
@@ -1957,6 +1962,7 @@ final class Jarvis: NSObject, ObservableObject {
                     corpo = ["messaggi": [Any](), "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                              "strumenti_client_def": [Regia.definizione], "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
+                    if let salute = await SalutePronta.perDomanda(attesa: 0.5) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 case .fine(let testo, let azioni):
                     concludi(id: id, testo: testo, azioni: azioni)
                     return
@@ -2020,6 +2026,7 @@ final class Jarvis: NSObject, ObservableObject {
                     corpo = ["messaggi": [Any](), "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                              "strumenti_client_def": [Regia.definizione], "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
+                    if let salute = await SalutePronta.perDomanda(attesa: 0) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 }
             }
             idTurno = nil
@@ -2959,6 +2966,7 @@ final class Jarvis: NSObject, ObservableObject {
                 armaSilenzio(secondi: pausaAscolto(parziale))
             }
             programmaAnticipo(parziale)                // 11 nov: la risposta si prepara durante la pausa
+            preparaSalute(parziale)                    // 13 nov (12.0 (17)): se parla di salute, Salute si legge adesso
             if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a un minuto (90 s con «ascoltami»)
                 let mio = turnoAscolto
                 timerTetto = Timer.scheduledTimer(withTimeInterval: ascoltoLungo ? 90 : 60, repeats: false) { [weak self] _ in
@@ -4235,6 +4243,8 @@ extension Jarvis {
             guard let self else { return }
             var c = base
             if let posizione = await Posizione.attuale() { c["posizione"] = posizione }
+            // 13 nov (12.0 (17)): la Salute letta mentre parlava, se la frase l'ha chiesta (al massimo mezzo secondo di attesa)
+            if let salute = await SalutePronta.perDomanda(attesa: 0.5) { c["salute_pronta"] = salute }
             do {
                 let e = try await self.flusso(c, id: a.idRisposta, richiesta: UUID().uuidString, deposito: a)
                 a.chiudi(e)
@@ -4259,6 +4269,19 @@ extension Jarvis {
         var m = Messaggio(ruolo: "user", testo: detta)
         if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < 60, FineFrase.fraseEllittica(detta) { m.seguito = true }   // 12.0 (12)
         return m
+    }
+
+    /// 13 nov (12.0 (17), proposta approvata dal signore): mentre il signore parla, se la frase parla di salute (o JARVIS ne stava
+    /// parlando, o ha appena chiesto il diario della sera) Salute si legge subito: la domanda parte già con i dati e il cervello non
+    /// torna a chiederli (13 nov: 8,2 e 6,1 secondi dalla fine della frase al primo suono). Si chiama a ogni parola: costa niente.
+    fileprivate func preparaSalute(_ t: String) {
+        if ArgomentoSalute.parla(t) || discorsoSullaSalute { SalutePronta.prepara() }
+    }
+
+    /// L'ultima risposta di JARVIS (degli ultimi 10 minuti) parlava di salute, o era la domanda del diario della sera.
+    private var discorsoSullaSalute: Bool {
+        guard let u = messaggi.last(where: { $0.ruolo == "assistant" && !$0.testo.isEmpty }), Date().timeIntervalSince(u.data) < 600 else { return false }
+        return u.testo.hasPrefix("Diario") || ArgomentoSalute.parla(u.testo)
     }
 
     /// La frase come la manderebbe `instrada` (senza «Jarvis», «aspetta», «allora» davanti): la stessa per l'anticipo e per l'attesa.

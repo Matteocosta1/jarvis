@@ -195,18 +195,23 @@ struct DatiVitals {
         func numero(_ x: Any?) -> Double? { (x as? NSNumber)?.doubleValue }
         // umore dal diario (cervello) + sonno, battito e passi dall'app Salute, giorno per giorno
         var umori: [Date: Double] = [:], sonniDiario: [Date: Double] = [:], battitiDiario: [Date: Double] = [:]
+        var riposiDetti: [Date: Double] = [:]   // 13 nov (12.0 (17)): il riposo detto a voce, segnato nel diario della sera
         for s in o["serie"] as? [[String: Any]] ?? [] {
             guard let g = s["giorno"] as? String, let d = f.date(from: g) else { continue }
             let k = Calendar.current.startOfDay(for: d)
             if let p = numero(s["punteggio"]) { umori[k] = p }
             if let x = numero(s["sonno_ore"]) { sonniDiario[k] = x }
             if let x = numero(s["battito_riposo"]) { battitiDiario[k] = x }
+            if let x = numero(s["riposo_detto_ore"]) { riposiDetti[k] = x }
         }
         let tutti = Set(umori.keys).union(salute.keys).union(sonniDiario.keys)
         let limite = Calendar.current.date(byAdding: .day, value: -quanti, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
         giorni = tutti.filter { $0 >= limite }.sorted().map { k in
             let v = salute[k]
-            return Giorno(data: k, punteggio: umori[k], sonno: v?.sonnoOre.map { (($0 * 10).rounded()) / 10 } ?? sonniDiario[k],
+            // il sonno di Salute più il riposo detto a voce (il sonno del diario lo conta già); senza sonno di quel giorno il solo
+            // pisolino non diventa «il sonno del giorno»
+            let detto: Double = riposiDetti[k] ?? 0
+            return Giorno(data: k, punteggio: umori[k], sonno: v?.sonnoOre.map { (($0 + detto) * 10).rounded() / 10 } ?? sonniDiario[k],
                           battito: v?.battito ?? battitiDiario[k], passi: v?.passi)
         }
         pagine = (o["pagine"] as? [[String: Any]] ?? []).compactMap { p in

@@ -126,6 +126,17 @@ nonisolated enum Benessere {
         return (json(out), false)
     }
 
+    /// 13 nov (12.0 (17)): il permesso di leggere Salute è già stato chiesto? Se no, la lettura fatta mentre il signore parla non
+    /// parte: la finestra del permesso non deve comparire a metà frase (la chiede lo strumento del cervello, come sempre).
+    static func permessoGiaChiesto() async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            negozio.getRequestStatusForAuthorization(toShare: [], read: tipi) { stato, errore in
+                c.resume(returning: errore == nil && stato == .unnecessary)
+            }
+        }
+    }
+
     // MARK: Letture
 
     private static func categoria(_ tipo: HKCategoryType, da: Date, a: Date) async -> [HKCategorySample] {
@@ -223,5 +234,57 @@ nonisolated enum Benessere {
     private static func json(_ o: [String: Any]) -> String {
         guard let d = try? JSONSerialization.data(withJSONObject: o) else { return "{}" }
         return String(decoding: d, as: UTF8.self)
+    }
+}
+
+// MARK: - 13 nov · La Salute letta mentre il signore parla (12.0 (17))
+
+/// Proposta approvata dal signore il 13 nov («crea una nuova build… che include questo suggerimento su Salute»): quando parla di
+/// sonno, battito o passi, il dispositivo legge Salute mentre lui parla e manda i dati insieme alla domanda.
+/// Prima il cervello, davanti a «come ho dormito?», chiedeva al dispositivo di leggere Salute e aspettava (13 nov: 8,2 e 6,1 secondi
+/// dalla fine della frase al primo suono). Ora la lettura parte mentre il signore parla e va con la domanda: il cervello risponde in un
+/// passaggio solo. iPhone: quando le parole parlano di salute (`ArgomentoSalute`), o JARVIS ne stava parlando, o ha appena chiesto il
+/// diario della sera. Orologio: watchOS non ha le parole dal vivo, quindi si legge a ogni frase mentre la dice; il cervello usa i dati
+/// solo se la domanda è sulla salute. Una lettura vale 2 minuti; non si salva niente.
+@MainActor
+enum SalutePronta {
+    private static let validita: TimeInterval = 120
+    private static var dati: [String: String]?
+    private static var lettaIl = Date.distantPast
+    private static var inCorso = false
+    private static var chiestaIl = Date.distantPast
+
+    /// Comincia a leggere, se non c'è già una lettura fresca o in corso. Si può chiamare a ogni parola: costa niente.
+    static func prepara() {
+        chiestaIl = Date()
+        guard !inCorso, Date().timeIntervalSince(lettaIl) > validita else { return }
+        inCorso = true
+        Task { @MainActor in
+            dati = await leggi()
+            lettaIl = Date()
+            inCorso = false
+        }
+    }
+
+    /// I dati da mandare con la domanda, solo se una frase dell'ultimo minuto li ha chiesti. Se la lettura non è ancora finita si
+    /// aspetta al massimo `attesa` secondi; poi la domanda parte senza (e il cervello li chiede come prima).
+    static func perDomanda(attesa: Double) async -> [String: String]? {
+        guard Date().timeIntervalSince(chiestaIl) < 60 else { return nil }
+        let inizio = Date()
+        while inCorso, Date().timeIntervalSince(inizio) < attesa { try? await Task.sleep(for: .milliseconds(25)) }
+        guard !inCorso, var d = dati, Date().timeIntervalSince(lettaIl) < validita else { return nil }
+        d["eta_ms"] = String(Int(Date().timeIntervalSince(lettaIl) * 1000))
+        return d
+    }
+
+    private static func leggi() async -> [String: String]? {
+        guard await Benessere.permessoGiaChiesto() else { return nil }
+        var d: [String: String] = [:]
+        let (riepilogo, errore) = await Benessere.riepilogo(giorni: 7)   // 7 giorni di allenamenti: vale per ogni richiesta del cervello
+        if !errore { d["riepilogo"] = riepilogo }
+        #if os(watchOS)
+        d["battito"] = await Cuore.condiviso.riepilogo(ore: 3)           // al polso anche i battiti delle ultime ore (salute_battito)
+        #endif
+        return d.isEmpty ? nil : d
     }
 }

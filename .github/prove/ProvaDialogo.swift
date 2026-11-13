@@ -25,6 +25,7 @@ struct ProvaDialogo {
         provaParlaSopra()
         provaEllittiche()
         provaRipensamenti()
+        provaSalute()
         print(errori == 0 ? "\nTutte le prove del dialogo superate." : "\n\(errori) prove del dialogo NON superate.")
         exit(errori == 0 ? 0 : 1)
     }
@@ -251,6 +252,21 @@ struct ProvaDialogo {
         for (detto, atteso) in casi {
             let r = FineFrase.restoDaDire(completa, detto: detto)
             controlla(r == atteso, "resto dopo «\(detto.prefix(30))» = \(r.map { "«\($0.prefix(40))»" } ?? "nessuno")")
+        }
+    }
+
+    /// 12.0 (17): le frasi che fanno leggere Salute mentre il signore parla (quelle vere del 13 nov comprese) e quelle che non la fanno.
+    static func provaSalute() {
+        let casi: [(String, Bool)] = [
+            ("Buongiorno, come ho dormito", true), ("Gianni ascolta Prima quando ero a letto", true), ("come ho dormito Avis, come ho dormito prima", true),
+            ("non so se registra anche nel pomeriggio il sonno", true), ("ho dormito un paio d'ore fa", true), ("quanti passi ho fatto oggi?", true),
+            ("com'è il battito?", true), ("ho fatto un pisolino", true), ("sono stanchissimo", true), ("come sto ultimamente?", true),
+            ("quante calorie ho bruciato", true), ("Jarvis, diario", true), ("mi sono addormentato sul divano", true), ("com'è la mia attività fisica", true),
+            ("che tempo fa domani?", false), ("apri il meteo", false), ("manda un messaggio a Bea", false), ("ti ho detto", false),
+            ("ho letto la mail di Matteo", false), ("che ore sono", false), ("metti un po' di musica", false),
+        ]
+        for (frase, atteso) in casi {
+            controlla(ArgomentoSalute.parla(frase) == atteso, "salute «\(frase)» = \(ArgomentoSalute.parla(frase))")
         }
     }
 }
