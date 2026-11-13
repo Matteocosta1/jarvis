@@ -67,6 +67,25 @@ final class LettoreMusica: ObservableObject {
         }
     }
 
+    /// 12.0 (16): «questa salvala»: il brano che suona va nella sua libreria e nella playlist «Preferiti» (creata la prima volta).
+    /// Restituisce il titolo, o la frase da dire se non si è potuto.
+    func salvaNeiPreferiti() async -> (titolo: String?, errore: String?) {
+        aggiorna()
+        guard let e = voce, let item = e.item, case .song(let brano) = item else { return (nil, "Non sta suonando niente da salvare, Sir.") }
+        guard await CatalogoMusica.autorizzato() else { return (nil, CatalogoMusica.senzaPermesso) }
+        do {
+            try await MusicLibrary.shared.add(brano)
+            if let preferiti = await CatalogoMusica.playlistLibreria().first(where: { $0.name.localizedCaseInsensitiveCompare("Preferiti") == .orderedSame }) {
+                _ = try await MusicLibrary.shared.add(brano, to: preferiti)
+            } else {
+                _ = try await MusicLibrary.shared.createPlaylist(name: "Preferiti", description: "Salvati da JARVIS", items: [brano])
+            }
+            return (brano.title, nil)
+        } catch {
+            return (nil, "Apple Music non me l'ha lasciato salvare, Sir.")
+        }
+    }
+
     func aggiorna() {
         let e = lettore.queue.currentEntry
         if e?.id != voce?.id || e?.title != voce?.title { voce = e; leggiQualita() }

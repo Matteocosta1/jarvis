@@ -29,6 +29,9 @@ struct AperturaPagina: Identifiable {
 }
 
 enum PaginaMarkX {
+    /// 12.0 (16): il codice da far girare nella pagina aperta (Studio o Social), per il lavoro insieme sul post (Sessione.swift).
+    /// Lo mette la pagina quando si costruisce e lo toglie quando si smonta: nil, nessuna pagina aperta.
+    static var esegui: ((String) -> Void)?
     /// Da qualunque punto dell'app: la schermata principale apre la pagina (se ce n'è una aperta, prima la chiude).
     static func apri(_ a: AperturaPagina) {
         NotificationCenter.default.post(name: .jarvisApriPagina, object: nil, userInfo: ["a": a])

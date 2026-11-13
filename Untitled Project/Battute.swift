@@ -451,3 +451,85 @@ enum Battute {
                                    "Lista vuota. Il supermercato può aspettare."])
     }
 }
+
+// MARK: - 12.0 (16) · Il dialogo: i messaggi preparati, i widget FILO, il congedo, la fretta delle frasi secche
+
+extension Battute {
+    /// I numeri detti: 3 → «tre», 25 → «venticinque».
+    static func numero(_ n: Int) -> String {
+        let u = ["zero", "uno", "due", "tre", "quattro", "cinque", "sei", "sette", "otto", "nove", "dieci", "undici", "dodici", "tredici",
+                 "quattordici", "quindici", "sedici", "diciassette", "diciotto", "diciannove", "venti"]
+        if n >= 0 && n <= 20 { return u[n] }
+        let d = ["", "", "venti", "trenta", "quaranta", "cinquanta", "sessanta", "settanta", "ottanta", "novanta"]
+        guard n < 100 else { return String(n) }
+        let decina = d[n / 10], unita = n % 10
+        if unita == 0 { return decina }
+        return (unita == 1 || unita == 8 ? String(decina.dropLast()) : decina) + (unita == 3 ? "tré" : u[unita])
+    }
+
+    /// L'ora detta, con la preposizione: 1260 → «alle nove», 60 → «all'una», 720 → «a mezzogiorno», 1290 → «alle nove e mezza».
+    static func allOra(_ minuti: Int) -> String {
+        let ore = ["mezzanotte", "l'una", "le due", "le tre", "le quattro", "le cinque", "le sei", "le sette", "le otto", "le nove", "le dieci", "le undici", "mezzogiorno"]
+        var h = (minuti / 60) % 24, m = minuti % 60
+        let meno = m == 45
+        if meno { h = (h + 1) % 24; m = 0 }
+        let base = h == 0 ? ore[0] : h == 12 ? ore[12] : ore[h % 12 == 0 ? 12 : h % 12]
+        var detta = base
+        if meno { detta += " meno un quarto" } else if m == 30 { detta += " e mezza" } else if m == 15 { detta += " e un quarto" } else if m > 0 { detta += " e " + numero(m) }
+        if detta.hasPrefix("l'") { return "all'" + detta.dropFirst(2) }
+        if detta.hasPrefix("le ") { return "alle " + detta.dropFirst(3) }
+        return "a " + detta
+    }
+
+    /// Il messaggio preparato, riletto: parte solo col sì.
+    static func chiediMessaggio(_ chi: String, _ testo: String, whatsapp: Bool) -> String {
+        "\(Filo.a(chi).capitalizzata)\(whatsapp ? " su WhatsApp" : ""): «\(testo)» " + una("msg.chiedi", ["Lo mando, Sir?", "Glielo mando così?", "Parte così, Sir?", "Lo mando?"])
+    }
+    static func mandato(_ chi: String) -> String {
+        diFretta ? una("msg.ok.l", ["Mandato.", "Partito."]) : una("msg.ok", ["Mandato, Sir.", "Consegnato \(Filo.a(chi)).", "Partito.", "Inviato, Sir."])
+    }
+    static func fissato() -> String {
+        diFretta ? lampo() : una("filo.fissa", ["Fissato, Sir.", "Lo tengo in vista.", "In vista, Sir.", "Resta lì, in alto.", "Appuntato in alto, Sir."])
+    }
+    static func staccato() -> String { diFretta ? lampo() : una("filo.togli", ["Tolto, Sir.", "Via dall'angolo.", "Angolo libero, Sir.", "Staccato."]) }
+    static func angoloLibero() -> String { una("filo.tutti", ["Angolo libero, Sir.", "Tolti tutti.", "Pulito."]) }
+    static func ecco() -> String { diFretta ? lampo() : una("filo.ecco", ["Ecco, Sir.", "In vista.", "Ecco qui, Sir."]) }
+    static func nienteDaMostrare() -> String {
+        una("filo.niente", ["Non le ho ancora mostrato niente, Sir.", "Qui non c'è ancora niente da prendere, Sir.", "Mi manca il «questo», Sir."])
+    }
+    static func aChi() -> String { una("msg.achi", ["A chi, Sir?", "A chi lo mando, Sir?"]) }
+    static func salvataMusica(_ titolo: String) -> String {
+        diFretta ? una("mus.salva.l", ["Salvata.", "Nei Preferiti."]) : una("mus.salva", ["Salvata nei Preferiti, Sir.", "«\(titolo)» è nei Preferiti.", "Messa nei Preferiti, Sir."])
+    }
+
+    /// Il congedo: solo alla fine di una cosa vera, sempre variato (il signore, 13 nov).
+    static func congedo() -> String {
+        una("congedo", ["Sarà tutto, Sir?", "Le serve altro, Sir?", "Altro per lei, Sir?", "Posso fare altro, Sir?", "Nient'altro, Sir?", "C'è altro, Sir?", "Will that be all, Sir?"])
+    }
+    static func congedoOk() -> String { una("congedo.ok", ["Molto bene, Sir.", "A disposizione.", "Bene così, Sir.", "Quando vuole, Sir."]) }
+    static func prego() -> String { una("prego", ["Prego, Sir.", "Dovere, Sir.", "Si figuri, Sir."]) }
+
+    /// La fretta dalle frasi secche (il mockup 12.0 (16)): una frase di due o tre parole (o quattro senza parole che legano) è un
+    /// segno, doppio se arriva a raffica appena JARVIS ha finito; due punti in un minuto: risposte di una riga per tre minuti.
+    /// «Veloce», «al volo», «in breve»: subito; «con calma», «raccontami», una frase lunga: niente fretta.
+    static func ritmo(_ frase: String, dopoRisposta secondi: TimeInterval?) {
+        let p = FineFrase.paroleNude(frase)
+        let n = p.joined(separator: " ")
+        if ["veloce", "al volo", "in breve", "in due parole", "sbrigati", "taglia corto", "di corsa", "ho fretta", "rapido", "svelto"].contains(where: { n.contains($0) }) {
+            umoreSentito = (.fretta, Date()); segniFretta = []; return
+        }
+        if ["con calma", "raccontami", "spiegami", "fammi capire"].contains(where: { n.contains($0) }) || p.count >= 10 {
+            if umoreSentito.umore == .fretta { umoreSentito = (.normale, Date()) }
+            segniFretta = []; return
+        }
+        let legano: Set<String> = ["che", "come", "quanto", "quanti", "quando", "dove", "chi", "cosa", "il", "lo", "la", "i", "gli", "le", "un", "una",
+                                   "di", "del", "della", "al", "alla", "per", "mi", "ci", "fa", "ho", "hai", "e", "grazie", "favore", "scusa"]
+        guard p.count <= 3 || (p.count <= 4 && p.allSatisfy { !legano.contains($0) }), !p.contains(where: { ["grazie", "favore", "scusa"].contains($0) }) else { return }
+        let ora = Date()
+        let peso: Int = (secondi ?? 99) < 2.5 ? 2 : 1
+        let segno: (quando: Date, peso: Int) = (quando: ora, peso: peso)
+        segniFretta = segniFretta.filter { ora.timeIntervalSince($0.quando) < 60 } + [segno]
+        if segniFretta.reduce(0, { (somma: Int, s: (quando: Date, peso: Int)) in somma + s.peso }) >= 2 { umoreSentito = (.fretta, ora) }
+    }
+    private static var segniFretta: [(quando: Date, peso: Int)] = []
+}

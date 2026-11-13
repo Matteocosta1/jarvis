@@ -273,6 +273,10 @@ final class Regia {
         } else {
             pezzi.append("DAVANTI JARVIS (la schermata principale)")
         }
+        // 12.0 (16): il filo del discorso, il lavoro insieme, la fretta (subito dopo davanti: se la riga è lunga si accorcia altro)
+        if let f = Filo.condiviso.perCervello() { pezzi.append(f) }
+        if let ses = Sessione.condivisa.perCervello() { pezzi.append(ses) }
+        if Battute.umore == .fretta { pezzi.append("RITMO: il signore ha fretta: rispondi in una riga sola (se poi dice «dimmi meglio», la versione intera)") }
         let dietro = aperte.map(\.sezione.nome).filter { $0 != nomeDavanti }
         for n in dietro.suffix(6) {
             var riga = "DIETRO \(n)"
@@ -282,7 +286,7 @@ final class Regia {
             pezzi.append(riga)
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna JARVIS), di_prima, sfoglia, chiudi_tutto")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna JARVIS), di_prima, sfoglia, chiudi_tutto, mostra(titolo, riga): il widget FILO in alto a destra, senza aprire sezioni. «Mostrami…», «fammi vedere…» non aprono sezioni: rispondi in una riga e metti il dato nel widget (titolo una parola, riga il dato in breve); «apri…» apre la sezione")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -365,6 +369,7 @@ final class Regia {
             fatti.append(["sezione": p.sezione, "azione": p.azione, "ok": e.ok, "esito": e.dato])
             if !e.ok { break }
         }
+        if confermato, !fatti.isEmpty, fatti.allSatisfy({ $0["ok"] as? Bool == true }) { Congedo.condiviso.cosaVera() }   // 12.0 (16)
         var risposta: [String: Any] = ["fatti": fatti]
         if let d = nomeDavanti { risposta["davanti"] = d + (statoDi(d).map { ": " + Regia.taglia($0, 600) } ?? "") } else { risposta["davanti"] = "JARVIS" }
         return (Regia.json(risposta), false)
@@ -373,7 +378,7 @@ final class Regia {
     /// Un passo: le strade di sempre o un'azione di una sezione (che si apre da sola, se serve).
     private func passo(_ p: Passo) async -> EsitoRegia {
         switch Regia.chiave(p.azione) {
-        case "apri", "davanti", "porta", "mostra", "torna":
+        case "apri", "davanti", "porta", "torna":
             return await apri(p.sezione)
         case "chiudi":
             let nome: String? = p.sezione.isEmpty ? nomeDavanti : (Regia.destinazione(p.sezione)?.nome ?? p.sezione)
@@ -396,6 +401,17 @@ final class Regia {
         case "sfoglia", "sezioniaperte":
             vai?(.sfoglia)
             return .fatto("le sezioni aperte si sfogliano sullo schermo")
+        case "mostra", "widget", "filo":                                 // 12.0 (16): il widget FILO, senza aprire niente
+            let titolo = (p.valori["titolo"] ?? p.sezione).trimmingCharacters(in: .whitespacesAndNewlines)
+            let riga = (p.valori["riga"] ?? p.valori["testo"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            // «mostra» senza riga, con una sezione: come prima, la apre (i passi scritti prima della 12.0 (16))
+            if riga.isEmpty, !p.sezione.isEmpty, Regia.chiave(p.azione) == "mostra" { return await apri(p.sezione) }
+            guard !titolo.isEmpty, !riga.isEmpty else { return .no("mostra vuole titolo e riga") }
+            Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: String(titolo.prefix(14)), riga: String(riga.prefix(90)),
+                                  sezione: Regia.destinazione(p.sezione)?.nome)
+            Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: String(titolo.prefix(14)),
+                                          riga: riga, detto: "il widget " + titolo, testo: riga))
+            return .fatto("widget FILO: \(titolo) · \(riga)")
         default:
             break
         }
@@ -436,6 +452,11 @@ final class Regia {
         return .fatto("\(d.nome) davanti")
     }
 
+    /// 12.0 (16): un tocco su un widget FILO apre (o riporta davanti) la sua sezione.
+    func porta(_ nome: String) {
+        Task { _ = await apri(nome) }
+    }
+
     /// Aspetta (al massimo 2,5 s) che la sezione sia davanti e si sia presentata; restituisce cosa mostra.
     private func attendi(_ nome: String, conAzioni: Bool) async -> String? {
         for _ in 0..<50 {
@@ -458,6 +479,12 @@ final class Regia {
                 evento("fatta la proposta: \(p.testo)")
                 return await p.fai() ?? ""
             }
+        }
+        // 12.0 (16): il dialogo (Insieme.swift): «mostrami…», «leggimi quello di Bea», «rispondile che…», «mandalo anche a lei»,
+        // «questa salvala», il sì (o il no) a quello che l'app ha preparato. Nil: non è una sua frase, si va avanti
+        if let b = await Insieme.condiviso.prova(fraseDetta) {
+            evento("dialogo: \(Regia.taglia(fraseDetta, 60))")
+            return b
         }
         // 12.0 (12) · B3: «annulla», «lascia stare», «non mandarlo» con un invio (o un'eliminazione) in attesa del sì
         if inSospeso != nil, Regia.eAnnulla(fraseDetta) {
@@ -552,7 +579,9 @@ final class Regia {
                                      "suonami *", "fai partire *", "spara *"]
     private static let musicaGenerica: Set<String> = ["metti un po di musica", "metti musica", "metti della musica", "metti la musica",
                                                        "metti su un po di musica", "metti su qualcosa", "metti qualcosa", "fammi sentire qualcosa",
-                                                       "fammi sentire un po di musica", "un po di musica", "musica", "metti un po di musica dai"]
+                                                       "fammi sentire un po di musica", "un po di musica", "musica", "metti un po di musica dai",
+                                                       "mettimi un po di musica", "mettimi della musica", "mettimi qualcosa", "mettimi la musica",
+                                                       "mettimi musica", "mi metti un po di musica", "fammi ascoltare qualcosa", "fammi ascoltare un po di musica"]
 
     /// B1: la musica da qualsiasi schermata, senza aprire la sezione: cerca, sceglie il risultato che combacia davvero con le
     /// parole dette e lo fa partire (la musica suona dietro, il disco gira nel Dock). Nil: non era musica, o niente di
@@ -564,6 +593,7 @@ final class Regia {
             await l.play()
             if let e = l.errore { return e }
             evento("musica: play")
+            Insieme.condiviso.branoInCima()                              // 12.0 (16): «questa salvala» trova il brano
             return Battute.musica("play")
         }
         for schema in Regia.frasiMetti {
@@ -573,6 +603,7 @@ final class Regia {
             if let e = esito.errore { return e }
             guard let nome = esito.nome else { return nil }
             evento("musica: \(Regia.taglia(nome, 60))")
+            Insieme.condiviso.branoInCima()                              // 12.0 (16)
             Abitudini.segna("musica", detto)
             return Battute.musicaMetti(nome)
         }
@@ -630,6 +661,7 @@ final class Regia {
     /// 12.0 (12): la frase la farebbe la regia da sola? (Senza fare niente: serve per non chiedere al cervello una risposta
     /// anticipata che sarebbe buttata.)
     func forseLocale(_ frase: String) -> Bool {
+        if Insieme.condiviso.sua(frase) { return true }               // 12.0 (16): il dialogo
         let f = FineFrase.ultimaIntenzione(frase)
         if f.isEmpty { return true }
         if inSospeso != nil, Regia.eAnnulla(f) { return true }
@@ -653,7 +685,7 @@ final class Regia {
         guard !parole.isEmpty else { return nil }
         let j = parole.joined(separator: " ")
         if ["chiudi tutto", "chiudi tutte le sezioni", "chiudile tutte"].contains(j) { return .chiudiTutto }
-        for schema in ["apri *", "aprimi *", "mostrami *", "vai alla *", "vai al *", "vai in *", "portami alla *", "portami al *", "porta davanti *"] {
+        for schema in ["apri *", "aprimi *", "vai alla *", "vai al *", "vai in *", "portami alla *", "portami al *", "porta davanti *"] {   // 12.0 (16): «mostrami» è il widget FILO
             if let v = Regia.combacia(parole, schema, altro: []), let d = Regia.destinazione(v), !d.dopoLaVoce { return .apri(d.nome) }
         }
         for i in Regia.intenzioni {
@@ -940,7 +972,7 @@ final class Regia {
 
     /// Le sezioni che si presentano alla regia (stato e azioni): per le altre JARVIS vede la riga di `Schermo` e non aspetta che
     /// si presentino. Si aggiorna quando una sezione entra nella regia.
-    static let conLaRegia: Set<String> = ["Spesa", "Email", "Meteo", "Briefing", "Musica", "Messaggi", "Telefono", "Bea", "Diario", "Sonno", "Cuore", "Shazam", "Foto", "Serata", "Ricordi", "Satellite", "GitHub", "Supabase", "Archivio", "Costi", "EDITH", "Vitals"]
+    static let conLaRegia: Set<String> = ["Social", "Spesa", "Email", "Meteo", "Briefing", "Musica", "Messaggi", "Telefono", "Bea", "Diario", "Sonno", "Cuore", "Shazam", "Foto", "Serata", "Ricordi", "Satellite", "GitHub", "Supabase", "Archivio", "Costi", "EDITH", "Vitals"]
 
     static func destinazione(_ nome: String) -> Destinazione? {
         let k = chiave(nome)

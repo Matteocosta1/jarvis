@@ -352,6 +352,9 @@ struct ContentView: View {
                 // MARK XI: le sezioni, nel contenitore (davanti una, dietro le altre vive)
                 strato
                     .zIndex(25)
+                // 12.0 (16): i widget FILO («mostrami…», «fissalo»), in alto a destra sopra le sezioni
+                StratoFilo()
+                    .zIndex(26)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
             .environment(\.jarvisCoperto, pilaCopre)

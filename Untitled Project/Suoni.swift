@@ -181,7 +181,7 @@ enum Suoni {
     /// Prepara i lettori (all'apertura del contenitore delle sezioni), così il primo gesto non aspetta.
     static func preparaPagine() {
         // 8 nov notte: anche i suoni dell'apertura delle sezioni (vedi schedaApre)
-        for n in ["sparisce", "caricaolo", "scelta", "scheda", "schedapronta", "apertura", "aperturacamera"] { _ = pronti(n) }
+        for n in ["sparisce", "caricaolo", "scelta", "scheda", "schedapronta", "apertura", "aperturacamera", "filo"] { _ = pronti(n) }
     }
 
     /// Le pagine olografiche delle sezioni aperte compaiono. File: «caricaolo» (vadim «holographic interface menu opening»).
@@ -207,6 +207,11 @@ enum Suoni {
     /// File: «scelta» (soundshelfstudio «sci-fi ui click»). `fra`: fra quanti secondi deve sentirsi (quando la pagina arriva).
     static func sceltaPagina(fra: TimeInterval = 0) {
         _ = suonaPronto("scelta", volume: 1.0, fra: fra)
+    }
+
+    /// 12.0 (16): compare un widget di FILO («mostrami…», «fissalo»). File: «filo» (il signore, «chisper ui pop-up open»).
+    static func filo() {
+        _ = suonaPronto("filo", volume: 1.0)
     }
 
     private static var lettoriPronti: [String: [AVAudioPlayer]] = [:]

@@ -52,6 +52,8 @@ struct VistaStudio: View {
     /// web è trasparente sopra), la riga in alto è BarraSezione ferma dal primo istante, il caricamento è lo stesso (al centro, 120
     /// punti sotto); quando la pagina è sullo schermo il caricamento sfuma sulla pagina, come LiDAR (8 nov sera).
     @State private var caricamentoVia = false
+    /// 12.0 (16): il lavoro insieme sul post (Social › PUBBLICA): lo stato del compositore e le azioni di Social per la regia.
+    @ObservedObject private var sessione = Sessione.condivisa
 
     var body: some View {
         ZStack {
@@ -84,6 +86,9 @@ struct VistaStudio: View {
             }
         }
         .statusBarHidden(false)
+        // 12.0 (16): Social si presenta alla regia (cosa c'è in PUBBLICA, e didascalia, formato, quando, scheda, foto, pubblica)
+        .regia(nome == "Social" ? "Social" : "Studio", stato: nome == "Social" ? sessione.statoSocial : "Studio · banco 3D",
+               azioni: nome == "Social" ? sessione.azioniSocial() : [])
         .interactiveDismissDisabled(presa)
         .onAppear {
             BattitoMani.paginaAperta(true)                   // 26 ott: i tick della pagina (Web Audio) non sono battiti di mani
@@ -283,6 +288,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             ponte.addUserScript(WKUserScript(source: RegiaStudio.copioneFine(self.apertura), injectionTime: .atDocumentEnd, forMainFrameOnly: true))
             if let u = URL(string: "\(Self.schema)://app/markx.html") { w.load(URLRequest(url: u)) }
         }
+        // 12.0 (16): JARVIS muove la pagina aperta (il lavoro insieme sul post, Sessione.swift)
+        PaginaMarkX.esegui = { [weak self] codice in self?.esegui(codice) }
         return w
     }
 
@@ -299,6 +306,8 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
 
     func smonta() {
         chiuso = true
+        PaginaMarkX.esegui = nil                                        // 12.0 (16): la pagina non c'è più
+        Sessione.condivisa.social = Sessione.StatoSocial()
         dettatura.ferma()
         salvaOra()
         if let v = videoScelto { try? FileManager.default.removeItem(at: v) }
@@ -406,6 +415,10 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             parla(p.frase)
             if let json = p.json { esegui("window.__lidarVero && window.__lidarVero(\(json))") }
         // SOCIAL: i dati veri, le risposte, la pubblicazione, il calendario, l'automazione (funzione «social» del cervello)
+        case "socStato":                                                 // 12.0 (16): com'è il compositore di Social (per Sessione)
+            Sessione.condivisa.social = Sessione.StatoSocial(aperta: o["aperta"] as? Bool ?? false, scheda: o["scheda"] as? String ?? "",
+                                                             formato: o["formato"] as? String ?? "", quando: o["quando"] as? String ?? "",
+                                                             didascalia: o["dida"] as? String ?? "", foto: o["foto"] as? Bool ?? false)
         case "socialStato":
             // 26 ott (video del signore: ~9 s di «KR · CARICO…»): subito gli ultimi dati salvati sull'iPhone, poi quelli nuovi del
             // cervello appena arrivano. Il riassunto a voce («com'è andata la settimana?») aspetta i dati nuovi, mai quelli vecchi.
@@ -984,6 +997,40 @@ final class RegiaStudio: NSObject, WKURLSchemeHandler, WKScriptMessageHandler, W
             if (sez) void sez.offsetWidth;
             requestAnimationFrame(function(){ requestAnimationFrame(function(){ if (sez) sez.style.transition = ''; post({ tipo: 'pronta' }); }); }); };
           setTimeout(function(){ if (!via) radice.style.visibility = ''; }, 1500);   // per sicurezza: mai una pagina che resta nera
+          // 12.0 (16) · LAVORARE INSIEME (Sessione.swift): JARVIS muove il compositore di Social › PUBBLICA come lo muove il dito
+          // (stessi tasti, senza i tick), e l'app sa cosa c'è (messaggio «socStato»: scheda, formato, quando, didascalia, foto).
+          // La didascalia cambiata da JARVIS si accende un attimo, come nel mockup 12.0 (16).
+          var stSoc = document.createElement('style');
+          stSoc.textContent = '#scDida.q16-cambia{animation:q16cambia 1.1s ease-out}@keyframes q16cambia{0%{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.85),0 0 24px rgba(79,227,255,.75)}100%{box-shadow:0 0 0 0 rgba(79,227,255,0)}}';
+          document.head.appendChild(stSoc);
+          var socMuto = false;
+          if (typeof window.suona === 'function') { var s1 = window.suona; window.suona = function(id){ if (socMuto && id === 'aTick') return; return s1.apply(this, arguments); }; }
+          var socA = function(){ return sez ? sez.querySelector('.allen.sc') : null; };
+          var zittoSoc = function(f){ socMuto = true; try { f(); } finally { socMuto = false; } };
+          window.__jarvisSoc = {
+            tocca: function(q, forza){ var A = socA(); var b = A && A.querySelector(q); if (!b || (!forza && b.getAttribute('aria-pressed') === 'true')) return; zittoSoc(function(){ b.click(); }); },
+            quando: function(q){ var A = socA(); if (!A || A.querySelector('[data-quando="' + q + '"][aria-pressed="true"]')) return;
+              var b = document.createElement('button'); b.type = 'button'; b.hidden = true; b.dataset.quando = q; A.appendChild(b); zittoSoc(function(){ b.click(); }); b.remove(); },
+            dida: function(t, mostra){ var A = socA(); var ta = A && A.querySelector('#scDida'); if (!ta) return;
+              ta.value = t; ta.dispatchEvent(new Event('input', { bubbles: true })); statoSoc();
+              if (!mostra) return; ta.classList.remove('q16-cambia'); void ta.offsetWidth; ta.classList.add('q16-cambia');
+              var P = A.querySelector('#scPagina'); if (!P) return; var r = ta.getBoundingClientRect(), rp = P.getBoundingClientRect();
+              P.scrollTo({ top: Math.max(0, r.top - rp.top + P.scrollTop - P.clientHeight * 0.28), behavior: 'smooth' }); },
+            pubblica: function(){ var A = socA(); var b = A && A.querySelector('[data-az="pubblica"]'); if (!b) return;
+              zittoSoc(function(){ b.click(); });
+              requestAnimationFrame(function(){ var si = A.querySelector('.sc-conferma [data-ok="si"]'); if (si) zittoSoc(function(){ si.click(); }); }); }
+          };
+          var ultimoSoc = '', attesaSoc = null;
+          var statoSoc = function(){
+            var A = socA(), su = !!(A && sez.classList.contains('su'));
+            var v = function(q){ var e = A && A.querySelector(q); return e ? e.getAttribute(q.indexOf('data-quando') >= 0 ? 'data-quando' : q.indexOf('data-formato') >= 0 ? 'data-formato' : 'data-sc') || '' : ''; };
+            var ta = A && A.querySelector('#scDida'), ant = A && A.querySelector('.sc-anteprima');
+            var o = { tipo: 'socStato', aperta: su, scheda: su ? v('.sc-schede [data-sc][aria-pressed="true"]') : '', formato: su ? v('[data-formato][aria-pressed="true"]') : '',
+                      quando: su ? v('[data-quando][aria-pressed="true"]') : '', dida: su && ta ? ta.value : '', foto: !!(su && ant && !ant.querySelector(':scope > p')) };
+            var k = JSON.stringify(o); if (k === ultimoSoc) return; ultimoSoc = k; post(o); };
+          var segnaSoc = function(){ clearTimeout(attesaSoc); attesaSoc = setTimeout(statoSoc, 120); };
+          if (sez) new MutationObserver(segnaSoc).observe(sez, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-pressed'] });
+          document.addEventListener('input', segnaSoc, true);
           \(arrivo)
           var foto = \(foto);
           if (foto) { var im = new Image(); im.onload = function(){ \(conFoto) apri(); }; im.onerror = apri; im.src = foto; } else apri();

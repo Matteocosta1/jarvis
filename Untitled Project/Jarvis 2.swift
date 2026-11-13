@@ -479,6 +479,15 @@ final class Jarvis: NSObject, ObservableObject {
             self?.messaggi.last(where: { $0.ruolo == "user" }).map { (testo: $0.testo, quando: $0.data) }
         }
         Regia.condivisa.dopoLaVoce = { [weak self] lavoro in self?.dopoLaVoce(lavoro) }
+        // 12.0 (16): il dialogo. Le frasi dell'app lasciano aperto il seguito («sì», «leggimi quello di Bea» senza «Jarvis»); il
+        // congedo («Will that be all, Sir?») solo a cosa vera finita, quando il signore tace
+        Insieme.condiviso.parla = { [weak self] frase in self?.annunciaConSeguito(frase) }
+        Congedo.condiviso.chiedi = { [weak self] frase in self?.annunciaConSeguito(frase) }
+        Congedo.condiviso.inAttesa = { [weak self] in self?.fase == .attesa && self?.inCoda.isEmpty == true }
+        Congedo.condiviso.ultimaFrase = { [weak self] in
+            guard let self else { return .distantPast }
+            return max(self.inizioUltimaFrase ?? .distantPast, self.messaggi.last(where: { $0.ruolo == "user" })?.data ?? .distantPast)
+        }
         OcchiAperti.parla = { [weak self] frase in self?.annuncia(frase) }   // build 23: la voce dagli Occhi («Ecco cosa ho trovato, Sir.»)
         // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
         NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
@@ -650,6 +659,16 @@ final class Jarvis: NSObject, ObservableObject {
     /// Un messaggio scritto (Invia): se JARVIS stava pensando o rispondendo, vale come un'interruzione a voce (23 ott, chiesto dal signore):
     /// il cervello vede la domanda interrotta e decide se è il seguito o una domanda nuova, come nel dialogo a voce.
     func inviaScritto(_ testo: String) async {
+        // 12.0 (16): anche scritta, una frase del dialogo («rispondile che…», «mostrami il meteo», «sì») la fa subito l'app
+        let scritta = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !scritta.isEmpty, fase == .attesa, let battuta = await Regia.condivisa.subito(scritta) {
+            Congedo.condiviso.zitto()
+            messaggi.append(Messaggio(ruolo: "user", testo: scritta))
+            salva()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            if !battuta.isEmpty { annunciaConSeguito(battuta) }
+            return
+        }
         segnaInterruzione()                          // solo se c'è una risposta vera in corso (pensa o parla); altrimenti non fa niente
         if let q = interruzioneValida(), !testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             await invia(testo, interrottoSu: q)
@@ -982,11 +1001,14 @@ final class Jarvis: NSObject, ObservableObject {
         }
         // 12.0 (10): le azioni più usate della sezione davanti («aggiungi il latte» con la Spesa davanti) partono subito, senza il
         // cervello, con la battuta di JARVIS
+        Congedo.condiviso.zitto()                                         // 12.0 (16): ha parlato lui, niente congedo in arrivo
+        if !pulito.isEmpty { Battute.ritmo(pulito, dopoRisposta: FineFrase.dopoRisposta(fine: fineUltimaRisposta, inizio: inizioUltimaFrase)) }
         if !pulito.isEmpty, let battuta = await Regia.condivisa.subito(pulito) {
             chiudiInterruzione()
             fraseAVoce = ""
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            if !battuta.isEmpty { annuncia(battuta) }
+            // 12.0 (16): anche dopo una frase dell'app il seguito vale senza «Jarvis» (il dialogo continua)
+            if !battuta.isEmpty { annunciaConSeguito(battuta) } else { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
             return
         }
         let riprende = chiede || aggiuntaInArrivo           // «aspetta…» detto adesso o un attimo fa
@@ -1473,6 +1495,14 @@ final class Jarvis: NSObject, ObservableObject {
         flussoFinito = true
         accodaVoce(frase, forza: true)
     }
+
+    /// 12.0 (16): una frase dell'app nel dialogo (Insieme, il congedo, la battuta di un comando): finita la frase, per qualche
+    /// secondo il seguito vale senza «Jarvis» («sì», «leggimi quello di Bea»…), come dopo una risposta del cervello.
+    func annunciaConSeguito(_ frase: String) {
+        seguitoDopoAnnuncio = true
+        annuncia(frase)
+    }
+    private var seguitoDopoAnnuncio = false
 
     /// MARK X: STUDIO e SOCIAL, la pagina del mockup («crea una piastra…», «apri Instagram»). `parla`: JARVIS dice la sua frase;
     /// no quando la frase arriva dal microfono del Wiretap (4 nov: la sua voce finirebbe nella registrazione).
@@ -2398,6 +2428,7 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func concludi(id: UUID, testo: String, azioni: [String]) {
+        Filo.condiviso.risposta(testo, azioni: azioni, domanda: messaggi.last(where: { $0.ruolo == "user" })?.testo)   // 12.0 (16): il filo
         let giaDetto = testiGrezzi[id] ?? messaggi.first(where: { $0.id == id })?.testo ?? ""
         testiGrezzi[id] = nil
         if let i = messaggi.firstIndex(where: { $0.id == id }) {
@@ -2576,6 +2607,8 @@ final class Jarvis: NSObject, ObservableObject {
 
     private func fineParlato() {
         let eraRisposta = flussoFinito && idTurno != nil   // la risposta a una domanda (non un annuncio, una notifica, un errore)
+        let conSeguito = seguitoDopoAnnuncio && flussoFinito   // 12.0 (16): una frase del dialogo detta dall'app
+        if flussoFinito { seguitoDopoAnnuncio = false }
         if flussoFinito { idTurno = nil }        // risposta detta tutta: da qui in poi una frase nuova è una domanda nuova
         orecchio.ferma()
         orecchio.testoDetto = ""
@@ -2583,7 +2616,7 @@ final class Jarvis: NSObject, ObservableObject {
         lavoriDopoVoce.removeAll()
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
         // M6: finita la risposta, per qualche secondo il seguito vale anche senza «Jarvis» («Perché?», «E domani?»)
-        if eraRisposta { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
+        if eraRisposta || conSeguito { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
         fase = .attesa
         // 11 nov (#16): fuori dall'app il dialogo resta aperto per il seguito; se per 8 secondi non dice nulla, è finito
         if dialogoFuori { chiudiDialogoFuori(fra: 8) }
