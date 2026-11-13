@@ -663,6 +663,9 @@ struct ContentView: View {
         case .attesa:
             // 9 nov (logica approvata dal signore): la riga dice cosa sente in ciascuno dei tre stati
             if jarvis.micSpento { return "Non ascolto nulla · tocchi il reattore per parlare" }
+            // 13 nov: durante la voce dell'avvio il microfono è chiuso e un tocco fa parlare (la voce sfuma, poi ascolta): «Mi parli · un
+            // tocco: solo «Jarvis»» qui sarebbe falso. Le parole sono quelle di SPENTO, approvate il 9 nov
+            if jarvis.avvioInCorso { return "Tocchi il reattore per parlare" }
             if jarvis.musicaSuona { return "Dica «Jarvis»: abbasso la musica" }
             if jarvis.riservato { return "Sento solo «Jarvis» · un tocco per tutto" }
             return "Mi parli · un tocco: solo «Jarvis»"

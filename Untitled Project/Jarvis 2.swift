@@ -378,7 +378,8 @@ final class Jarvis: NSObject, ObservableObject {
     var soccorsoAperto = false
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     /// Durante la sequenza d'avvio il microfono resta spento: aprirlo cambia l'audio dell'iPhone e la musica uscirebbe bassa.
-    var avvioInCorso = true {
+    /// 13 nov: pubblicato, perché la riga sotto il reattore dice cosa succede durante l'avvio (ContentView, `suggerimento`).
+    @Published var avvioInCorso = true {
         didSet {
             guard avvioInCorso != oldValue else { return }
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio non è «confusione»
