@@ -396,11 +396,11 @@ enum ComandoVocale: Equatable {
         }
         #if os(iOS)
         let filo = soloFilo(t)                                  // 13.1: «mostrami…», «fammi vedere…» sono di FILO, non aprono
-        #else
-        let filo = false
-        #endif
         // MARK X · STUDIO e SOCIAL (le frasi del mockup, anche lunghe: «crea una piastra 80 per 40 per 4 con 4 fori»)
         if !filo, let p = paginaMarkX(t) { return p }
+        #else
+        if let p = paginaMarkX(t) { return p }
+        #endif
         #if os(iOS)
         // MARK X · BROWSER VIDEO: «fammi vedere dei video di Daft Punk dal vivo», «cercami i video del Milan» (anche frasi lunghe)
         if let k = t.firstIndex(where: { $0 == "video" || $0 == "filmati" }), k + 1 < t.count, t[..<k].contains(where: { ["fammi", "cercami", "cerca", "mostrami", "trovami", "metti", "voglio"].contains($0) }) {
@@ -623,7 +623,9 @@ enum ComandoVocale: Equatable {
         }
 
         // 13.1: da qui in giù si aprono le sezioni: con «mostrami…», «fammi vedere…», «vediamo…» no (sull'iPhone è FILO)
+        #if os(iOS)
         if filo { return nil }
+        #endif
 
         // build 23, MUSICA: «apri la musica», «mostrami la musica», «fammi vedere la musica», «vai alla musica»: solo così, corto.
         // «metti la musica», «accendi la musica», «fammi sentire la musica», «chiudi la musica», «apri la musica dei Daft Punk»
