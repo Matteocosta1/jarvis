@@ -452,8 +452,7 @@ enum Battute {
     }
 }
 
-// MARK: - 12.0 (16) · Il dialogo: i messaggi preparati, i widget FILO, il congedo, la fretta delle frasi secche (solo iPhone e Mac: il filo e il dialogo non sono sul polso)
-#if os(iOS)
+// MARK: - 12.0 (16) · Il dialogo: i messaggi preparati, i widget FILO, il congedo, la fretta delle frasi secche
 
 extension Battute {
     /// I numeri detti: 3 → «tre», 25 → «venticinque».
@@ -482,6 +481,7 @@ extension Battute {
         return "a " + detta
     }
 
+#if os(iOS)                // i messaggi preparati, i widget FILO, i Preferiti: solo iPhone e Mac (al polso non ci sono)
     /// Il messaggio preparato, riletto: parte solo col sì.
     static func chiediMessaggio(_ chi: String, _ testo: String, whatsapp: Bool) -> String {
         "\(Filo.a(chi).capitalizzata)\(whatsapp ? " su WhatsApp" : ""): «\(testo)» " + una("msg.chiedi", ["Lo mando, Sir?", "Glielo mando così?", "Parte così, Sir?", "Lo mando?"])
@@ -492,8 +492,8 @@ extension Battute {
     static func fissato() -> String {
         diFretta ? lampo() : una("filo.fissa", ["Fissato, Sir.", "Lo tengo in vista.", "In vista, Sir.", "Resta lì, in alto.", "Appuntato in alto, Sir."])
     }
-    static func staccato() -> String { diFretta ? lampo() : una("filo.togli", ["Tolto, Sir.", "Via dall'angolo.", "Angolo libero, Sir.", "Staccato."]) }
-    static func angoloLibero() -> String { una("filo.tutti", ["Angolo libero, Sir.", "Tolti tutti.", "Pulito."]) }
+    static func staccato() -> String { diFretta ? lampo() : una("filo.togli", ["Tolto, Sir.", "Via da FILO.", "Fatto, Sir.", "Tolto."]) }
+    static func angoloLibero() -> String { una("filo.tutti", ["FILO chiuso, Sir.", "Tolto tutto.", "Pulito."]) }
     static func ecco() -> String { diFretta ? lampo() : una("filo.ecco", ["Ecco, Sir.", "In vista.", "Ecco qui, Sir."]) }
     static func nienteDaMostrare() -> String {
         una("filo.niente", ["Non le ho ancora mostrato niente, Sir.", "Qui non c'è ancora niente da prendere, Sir.", "Mi manca il «questo», Sir."])
@@ -503,6 +503,7 @@ extension Battute {
         diFretta ? una("mus.salva.l", ["Salvata.", "Nei Preferiti."]) : una("mus.salva", ["Salvata nei Preferiti, Sir.", "«\(titolo)» è nei Preferiti.", "Messa nei Preferiti, Sir."])
     }
 
+#endif
     /// Il congedo: solo alla fine di una cosa vera, sempre variato (il signore, 13 nov).
     static func congedo() -> String {
         una("congedo", ["Sarà tutto, Sir?", "Le serve altro, Sir?", "Altro per lei, Sir?", "Posso fare altro, Sir?", "Nient'altro, Sir?", "C'è altro, Sir?", "Will that be all, Sir?"])
@@ -534,4 +535,3 @@ extension Battute {
     }
     private static var segniFretta: [(quando: Date, peso: Int)] = []
 }
-#endif

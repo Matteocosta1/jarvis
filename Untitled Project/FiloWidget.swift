@@ -2,177 +2,326 @@
 import SwiftUI
 import UIKit
 
-// MARK: - 12.0 (16) · I WIDGET FILO
-// Il signore (13 nov, 20:58): «io ti do dei comandi tipo mostrami e si apre filo che mostra quello che stiamo facendo, senza dover
-// aprire le sezioni… sono come dei widget». «Mostrami…», «Fammi vedere…», «Fissalo» mettono il dato in un mini-ologramma FILO in
-// alto a destra: fino a tre, il più nuovo in alto. Un tocco apre la sua sezione; trascinato a destra (o «toglilo») se ne va.
-// Disegno, misure e tempi come il mockup 12.0 (16) (v1216/q16-7.js: disegnaFilo, widget, disponi, togliW, toccoW).
+// MARK: - 13.0 · FILO, UNA SCHEDA SOLA
+// Il signore (13 nov, 22:33): «come FILO ma tutto raggruppato in un'unica tab, anziché aprirne varie per ogni argomento»; sotto le
+// icone di sistema in alto a destra, olografico, interattivo e navigabile. «Mostrami…» sparisce in 2,8 s come una notifica,
+// «fissalo» lo tiene, toccato resta finché lui non ha finito di scorrere. Ogni argomento ha la sua testata col nome e, in fondo a
+// destra sulla stessa linea, la X che chiude solo quello. Le cose sparite tornano con lo swipe dal bordo destro dello schermo
+// verso sinistra; lo swipe verso destra su FILO le rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro, giù e su.
+// Misure, colori e tempi come il mockup (v1216/q16-9.js, q16-9.css).
 
-/// Lo strato dei widget, sopra le sezioni (ContentView).
+/// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la striscia del bordo destro che lo richiama.
 struct StratoFilo: View {
     @ObservedObject private var filo = Filo.condiviso
 
     var body: some View {
-        let alto = (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 37      // nel mockup: 96 px dall'alto del telefono
+        let visti = filo.visti
+        let alto = filo.sottoIcone > 0 ? filo.sottoIcone + 6 : (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 58
         ZStack(alignment: .topTrailing) {
             Color.clear
-            ForEach(Array(filo.widget.enumerated()), id: \.element.id) { i, w in
-                WidgetFiloVista(w: w)
-                    .offset(y: alto + Double(i) * 68)
-                    .transition(.asymmetric(insertion: .identity,
-                                            removal: .offset(x: 172 * 1.3).combined(with: .opacity)
-                                                .animation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.22))))
+            if !visti.isEmpty {
+                SchedaFilo(argomenti: visti)
+                    .padding(.top, alto)
+                    .padding(.trailing, 10)
+                    .transition(.asymmetric(insertion: .identity, removal: .offset(x: 240).combined(with: .opacity)))   // la nascita la fa la scheda
+            }
+            // il bordo destro: con FILO via e qualcosa da richiamare, uno swipe verso sinistra lo riporta
+            if visti.isEmpty && !filo.argomenti.isEmpty {
+                Color.clear
+                    .frame(width: 16, height: 280)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 10).onEnded { v in
+                        guard v.translation.width < -36, abs(v.translation.height) < 60 else { return }
+                        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = filo.richiama() }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    })
+                    .padding(.top, alto)
+                    .accessibilityHidden(true)
             }
         }
-        .padding(.trailing, 12)
-        .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25), value: filo.widget.map(\.id))
         .ignoresSafeArea()
-        .allowsHitTesting(!filo.widget.isEmpty)
+        .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3), value: visti.isEmpty)
     }
 }
 
-/// Un widget: il punto di luce nell'angolo e il filo che scende al cartellino, come le etichette degli Occhi.
-private struct WidgetFiloVista: View {
-    let w: WidgetFilo
-    @State private var dx: Double = 0
-    @State private var inizio: Date?
+/// La nascita di FILO: si apre in largo su una riga sottile, poi in alto (scale .2,.04 → 1,.04 → 1,1), l'angolo in alto a destra fermo.
+private struct NascitaFilo: ViewModifier, Animatable {
+    var fase: Double
+    nonisolated var animatableData: Double {
+        get { fase }
+        set { fase = newValue }
+    }
+    func body(content: Content) -> some View {
+        let p = fase
+        let sx = p < 0.45 ? 0.2 + 0.8 * p / 0.45 : 1
+        let sy = p < 0.45 ? 0.04 : 0.04 + 0.96 * (p - 0.45) / 0.55
+        return content
+            .scaleEffect(x: sx, y: sy, anchor: .topTrailing)
+            .opacity(p < 0.45 ? p / 0.45 : 1)
+    }
+}
 
-    private static let larghezza: Double = 172
-    private static let altezza: Double = 62
+/// La scheda: la cornice olografica, la testata FILO, gli argomenti uno sotto l'altro che scorrono.
+private struct SchedaFilo: View {
+    let argomenti: [ArgomentoFilo]
+    @State private var nata = Date()
+    @State private var contenuto: CGFloat = 0
+    @State private var sopra = false        // c'è altro sopra (scorso giù)
+    @State private var sotto = false        // c'è altro sotto
+    @State private var dx: CGFloat = 0
+    @State private var fase: Double = 0     // la nascita (0 → 1)
+
+    static let larghezza: CGFloat = 212
+    static let altezzaMassima: CGFloat = 200
 
     var body: some View {
-        // le scritte già tagliate con «…» (taglia del mockup), una volta per aggiornamento, non a ogni fotogramma
-        let titolo = Self.taglia(w.titolo.uppercased(), 70, UIFont.monospacedSystemFont(ofSize: 8, weight: .bold))
-        let riga = Self.taglia(w.riga, Self.larghezza - 8 - 14, UIFont.systemFont(ofSize: 11.5, weight: .semibold))
-        let alle = Self.ora.string(from: w.alle)
-        TimelineView(.animation) { tl in
-            let t = tl.date.timeIntervalSince(w.nato)
-            let n = Self.nascita(t)
-            Canvas(rendersAsynchronously: false) { gc, size in
-                Self.disegna(&gc, size, t: t, titolo: titolo, riga: riga, alle: alle)
-            }
-            .frame(width: Self.larghezza, height: Self.altezza)
-            // la nascita: si apre in largo su una riga sottile, poi in alto (0,3 s; l'angolo in alto a destra resta fermo)
-            .scaleEffect(x: n.x, y: n.y, anchor: .topTrailing)
-            .opacity(n.a)
-        }
-        .frame(width: Self.larghezza, height: Self.altezza)
-        .offset(x: dx)
-        .opacity(1 - min(0.8, dx / 160))
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { v in
-                    if inizio == nil { inizio = Date() }
-                    dx = max(0, v.translation.width)
+        let altezza = min(Self.altezzaMassima, max(30, contenuto))
+        VStack(alignment: .leading, spacing: 0) {
+            // la testata: FILO e quanti argomenti
+            HStack(spacing: 7) {
+                Text("FILO")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1.6)
+                    .foregroundStyle(Olo.ciano.opacity(0.95))
+                    .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
+                if argomenti.count > 1 {
+                    Text("\(argomenti.count) ARGOMENTI")
+                        .font(.system(size: 7, weight: .semibold, design: .monospaced)).tracking(1.2)
+                        .foregroundStyle(Olo.ciano.opacity(0.62))
+                        .contentTransition(.numericText())
                 }
-                .onEnded { _ in
-                    let ms = max(1, Date().timeIntervalSince(inizio ?? Date()) * 1000)
-                    let v = dx / ms
-                    inizio = nil
-                    if dx > 64 || (dx > 18 && v > 0.5) {               // trascinato a destra: se ne va
+            }
+            .frame(height: 20)
+            .padding(.leading, 10)
+            .padding(.top, 2)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
+                        ArgomentoVista(a: a, primo: i == 0)
+                            .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -6)),
+                                                    removal: .opacity.combined(with: .offset(x: 24))))
+                    }
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contenuto = $0 }
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: altezza)
+            .mask(Sfuma(sopra: sopra, sotto: sotto))
+            .onScrollGeometryChange(for: [Bool].self) { g in
+                [g.contentOffset.y > 4, g.contentOffset.y + g.containerSize.height < g.contentSize.height - 4]
+            } action: { _, v in
+                sopra = v[0]
+                sotto = v[1]
+            }
+            .onScrollPhaseChange { _, fase in Filo.condiviso.toccato(fase != .idle) }   // scorre: le notifiche aspettano
+            .padding(.top, 6)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+            .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25), value: argomenti.map(\.id))
+        }
+        .frame(width: Self.larghezza, alignment: .leading)
+        .background {
+            // meno trasparente: il fondo scuro dentro la cornice, poi la cornice olografica (luce, filo, angoli, scansione)
+            TimelineView(.animation) { tl in
+                let t = tl.date.timeIntervalSince(nata)
+                Canvas(rendersAsynchronously: false) { gc, size in
+                    CorniceFilo.disegna(&gc, size, t: t)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        .offset(x: dx)
+        .opacity(1 - min(0.8, Double(dx) / 200))
+        // via con lo swipe a destra: solo un gesto chiaramente orizzontale (su e giù è per scorrere)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { v in
+                    Filo.condiviso.toccato(true)
+                    if v.translation.width > 0, v.translation.width > abs(v.translation.height) * 2.5 { dx = v.translation.width }
+                }
+                .onEnded { v in
+                    if v.translation.width > 80, v.translation.width > abs(v.translation.height) * 2.5 {
                         Suoni.sparisce()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        _ = Filo.condiviso.togli(w.id)
+                        withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
+                        dx = 0
                         return
                     }
-                    let tocco = dx < 6
                     withAnimation(.easeOut(duration: 0.2)) { dx = 0 }
-                    if tocco, let s = w.sezione {                        // un tocco: la sua sezione
-                        Suoni.tocco()
-                        Regia.condivisa.porta(s)
-                    }
+                    Filo.condiviso.toccato(false)
                 }
         )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(w.titolo): \(w.riga)")
-        .accessibilityHint("Tocchi per aprirlo, lo trascini a destra per toglierlo.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { if let s = w.sezione { Regia.condivisa.porta(s) } }
-        .accessibilityAction(named: "Togli") { _ = Filo.condiviso.togli(w.id) }
+        .modifier(NascitaFilo(fase: fase))
+        .onAppear { withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)) { fase = 1 } }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("FILO")
+        .accessibilityAction(named: "Nascondi") { Filo.condiviso.rimandaVia() }
+    }
+}
+
+/// Un argomento: la testata (il nome, la linea che corre, la X in fondo a destra) e le sue righe.
+private struct ArgomentoVista: View {
+    let a: ArgomentoFilo
+    let primo: Bool
+    @State private var accesa = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if !primo {
+                // tra un argomento e l'altro una linea di luce
+                LinearGradient(colors: [Olo.azzurro.opacity(0), Olo.azzurro.opacity(0.45), Olo.azzurro.opacity(0)], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: 1)
+                    .padding(.bottom, 8)
+                    .padding(.top, 10)
+            }
+            HStack(spacing: 6) {
+                Text(a.nome.uppercased())
+                    .font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1.8)
+                    .foregroundStyle(Olo.bianco)
+                    .shadow(color: Olo.azzurro.opacity(0.95), radius: 3.5)
+                    .lineLimit(1)
+                    .fixedSize()
+                if a.fisso {
+                    Text("◆")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Olo.bianco.opacity(0.95))
+                        .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
+                        .accessibilityLabel("fissato")
+                }
+                LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: 1)
+                Button {
+                    Suoni.sparisce()
+                    withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 6.5, weight: .bold))
+                        .foregroundStyle(Olo.bianco)
+                        .frame(width: 15, height: 15)
+                        .background(Circle().fill(Olo.azzurro.opacity(0.08)))
+                        .overlay(Circle().stroke(Olo.ciano.opacity(0.55), lineWidth: 1))
+                        .shadow(color: Olo.azzurro.opacity(0.35), radius: 3)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, -6)
+                .accessibilityLabel("Chiudi \(a.nome)")
+            }
+            .frame(minHeight: 24)
+            ForEach(righe) { r in
+                Button {
+                    if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(r.testo)
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
+                            .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let ora = r.ora {
+                            Text(ora)
+                                .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Olo.ciano.opacity(0.6))
+                        }
+                    }
+                    .padding(.vertical, 3)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(r.sezione == nil ? "" : "Apre \(r.sezione ?? "")")
+            }
+        }
+        // appena arrivato (o aggiornato) si accende un attimo
+        .brightness(accesa ? 0.35 : 0)
+        .onChange(of: a.giro, initial: true) {
+            accesa = true
+            withAnimation(.easeOut(duration: 0.5)) { accesa = false }
+        }
     }
 
-    /// La nascita del mockup: scale(.2,.04) → (1,.04) al 45 % → (1,1), 0,3 s con la curva (.2,.8,.2,1).
-    private static func nascita(_ t: Double) -> (x: Double, y: Double, a: Double) {
-        guard t < 0.3 else { return (1, 1, 1) }
-        let p = curva(max(0, t) / 0.3)
-        if p < 0.45 { let k = p / 0.45; return (0.2 + 0.8 * k, 0.04, k) }
-        return (1, 0.04 + 0.96 * (p - 0.45) / 0.55, 1)
+    /// L'agenda un impegno per riga («11:30 dentista», «18:00 palestra»), senza l'ora di quando è stata mostrata; le altre una riga
+    /// per dato, con l'ora.
+    private var righe: [RigaVista] {
+        var v: [RigaVista] = []
+        for r in a.righe {
+            if a.nome == "Agenda" {
+                for (k, pezzo) in r.riga.components(separatedBy: " · ").enumerated() {
+                    v.append(RigaVista(id: r.id + "#\(k)", testo: pezzo, sezione: r.sezione, ora: nil))
+                }
+            } else {
+                v.append(RigaVista(id: r.id, testo: r.riga, sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle)))
+            }
+        }
+        return v
     }
 
-    /// cubic-bezier(.2, .8, .2, 1): il progresso per un tempo 0…1.
-    private static func curva(_ x: Double) -> Double {
-        let (x1, y1, x2, y2) = (0.2, 0.8, 0.2, 1.0)
-        func b(_ s: Double, _ p1: Double, _ p2: Double) -> Double { 3 * (1 - s) * (1 - s) * s * p1 + 3 * (1 - s) * s * s * p2 + s * s * s }
-        var lo = 0.0, hi = 1.0, s = x
-        for _ in 0..<20 { s = (lo + hi) / 2; if b(s, x1, x2) < x { lo = s } else { hi = s } }
-        return b(s, y1, y2)
-    }
-
-    /// Taglia la scritta con «…» perché stia in `massimo` punti.
-    private static func taglia(_ s: String, _ massimo: Double, _ font: UIFont) -> String {
-        let a: [NSAttributedString.Key: Any] = [.font: font]
-        func largo(_ x: String) -> Double { Double((x as NSString).size(withAttributes: a).width) }
-        guard largo(s) > massimo else { return s }
-        var c = s
-        while c.count > 1, largo(c + "…") > massimo { c.removeLast() }
-        return c + "…"
-    }
-
-    private static let ora: DateFormatter = {
+    private static let formato: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         return f
     }()
+}
 
-    /// Il disegno (disegnaFilo del mockup), in punti: 172 × 62.
-    private static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, titolo: String, riga: String, alle: String) {
+/// Una riga come si vede (l'agenda divisa per impegno).
+private struct RigaVista: Identifiable {
+    let id: String
+    let testo: String
+    let sezione: String?
+    let ora: String?
+}
+
+/// La sfumatura in alto e in basso quando c'è altro da scorrere.
+private struct Sfuma: View {
+    let sopra: Bool
+    let sotto: Bool
+    var body: some View {
+        LinearGradient(stops: [.init(color: sopra ? .clear : .black, location: 0),
+                               .init(color: .black, location: sopra ? 0.18 : 0),
+                               .init(color: .black, location: sotto ? 0.78 : 1),
+                               .init(color: sotto ? .clear : .black, location: 1)],
+                       startPoint: .top, endPoint: .bottom)
+    }
+}
+
+/// La cornice olografica di FILO (corniceFilo del mockup): il punto di luce in alto a destra che pulsa, il filo che scende e
+/// corre sotto la testata, il fondo scuro, gli angoli, la riga di scansione che scende lenta.
+private enum CorniceFilo {
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double) {
         let W = Double(size.width), H = Double(size.height)
-        // si accende sfarfallando (nascita del mockup)
         let u0 = min(1, t / 0.5)
-        gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1
+        gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1          // si accende sfarfallando
+        let ax = W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
+        // il fondo (meno trasparente: la corona dietro si intuisce appena)
+        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.93)))
         gc.blendMode = .plusLighter
-        let ax = W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), lx = W - 22 - (W - 60) * u, ly = 24.0
-        // il punto di luce che pulsa
         let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
         gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(Olo.ciano.opacity(0.7 * (1 - pul))), lineWidth: 1)
         Olo.alone(&gc, CGPoint(x: ax, y: ay), 10, 0.5)
         gc.fill(Olo.ellisse(ax, ay, 2.4, 2.4), with: .color(Olo.bianco))
-        // il filo che scende al cartellino
         var f = Path()
-        f.move(to: CGPoint(x: ax, y: ay)); f.addLine(to: CGPoint(x: lx + 8, y: ly - 4)); f.addLine(to: CGPoint(x: 4, y: ly - 4))
+        f.move(to: CGPoint(x: ax, y: ay)); f.addLine(to: CGPoint(x: W - 24, y: ly - 4)); f.addLine(to: CGPoint(x: W - 24 - (W - 28) * u, y: ly - 4))
         gc.stroke(f, with: .color(Olo.ciano.opacity(0.85)), style: Olo.tratto(1.1))
-        // il cartellino che si allarga
-        let bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
-        let box = CGRect(x: bx + 0.5, y: by + 0.5, width: bw * u, height: bh)
         gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)),
                 with: .linearGradient(Gradient(colors: [Olo.azzurro.opacity(0.13), Olo.azzurro.opacity(0.02)]),
                                       startPoint: CGPoint(x: 0, y: by), endPoint: CGPoint(x: 0, y: by + bh)))
-        gc.stroke(Path(box), with: .color(Olo.ciano.opacity(0.35)), style: Olo.tratto(1.1))
+        gc.stroke(Path(CGRect(x: bx + 0.5, y: by + 0.5, width: bw * u, height: bh)), with: .color(Olo.ciano.opacity(0.32)), style: Olo.tratto(1.1))
         var ang = Path()
-        let k = 8.0
+        let k = 9.0
         let angoli: [(x: Double, y: Double, sx: Double, sy: Double)] = [(x: bx, y: by, sx: 1, sy: 1), (x: bx + bw * u, y: by, sx: -1, sy: 1),
                                                                          (x: bx, y: by + bh, sx: 1, sy: -1), (x: bx + bw * u, y: by + bh, sx: -1, sy: -1)]
         for (px, py, sx, sy) in angoli {
             ang.move(to: CGPoint(x: px + sx * k, y: py)); ang.addLine(to: CGPoint(x: px, y: py)); ang.addLine(to: CGPoint(x: px, y: py + sy * k))
         }
         gc.stroke(ang, with: .color(Olo.bianco.opacity(0.9)), style: Olo.tratto(1.5))
-        // le scritte (con il loro bagliore ciano)
-        gc.blendMode = .normal
-        var s = gc
-        s.addFilter(.shadow(color: Olo.azzurro.opacity(0.9), radius: 3))
-        s.draw(Text(titolo).font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color(red: 143 / 255, green: 240 / 255, blue: 1).opacity(0.95)),
-               at: CGPoint(x: 10, y: ly - 8), anchor: UnitPoint(x: 0, y: 0.8))
-        s.draw(Text(alle).font(.system(size: 7.5, weight: .medium, design: .monospaced))
-                .foregroundStyle(Olo.ciano.opacity(0.7)),
-               at: CGPoint(x: W - 30, y: ly - 8), anchor: UnitPoint(x: 1, y: 0.8))
-        if u > 0.6 {
-            var r = gc
-            r.addFilter(.shadow(color: Olo.azzurro.opacity(0.9), radius: 4))
-            r.draw(Text(riga).font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98)),
-                   at: CGPoint(x: 11, y: by + bh / 2 + 4.5), anchor: UnitPoint(x: 0, y: 0.8))
+        // la riga di scansione che scende lenta dentro la scheda
+        if bh > 12 {
+            let sy = by + (t * 26).truncatingRemainder(dividingBy: bh)
+            gc.fill(Path(CGRect(x: bx, y: sy - 10, width: bw * u, height: 10)),
+                    with: .linearGradient(Gradient(colors: [Olo.azzurro.opacity(0), Olo.azzurro.opacity(0.10)]),
+                                          startPoint: CGPoint(x: 0, y: sy - 10), endPoint: CGPoint(x: 0, y: sy)))
         }
     }
 }

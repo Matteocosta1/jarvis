@@ -442,6 +442,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         var perCervello: String?
         if let prima { perCervello = JarvisOrologio.notaInterruzione(prima) + testo }
         schermoPrima = (domanda: domanda, risposta: risposta, immagini: immagini)
+        dialogoSegna(testo)                                      // 13.0: la fretta delle frasi secche, niente congedo in arrivo
         domanda = testo
         risposta = ""
         rispostaGrezza = ""
@@ -638,9 +639,54 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// 13 nov: il signore ha toccato il reattore (o la complicazione) durante la sequenza d'avvio: a sequenza finita ascolta.
     private(set) var ascoltoDaAvvio = false
 
+    // MARK: 13.0 · il congedo e la fretta al polso (come l'iPhone, nei limiti dell'orologio)
+    // Il signore (13 nov): «adatta quello che puoi a Apple Watch e fai sì che funzioni bene». Al polso la frase arriva al cervello
+    // come audio: la fretta si conta sul testo trascritto e vale dalla frase dopo (riga RITMO nella regia del polso); il congedo
+    // («Will that be all, Sir?» e varianti) solo dopo una cosa vera fatta dal cervello (una nota, un promemoria, il diario…),
+    // 9 secondi di silenzio dopo la risposta, al massimo uno ogni 15 minuti, mai di fretta; la risposta la dà il cervello, che lo
+    // vede nella cronologia.
+
+    private var azioniTurno: [String] = []
+    private var congedoDopo = false
+    private var congedo: Task<Void, Never>?
+    private var ultimoCongedo = Date.distantPast
+
+    /// Gli strumenti che fanno una cosa vera (scrivono, segnano, mandano), non quelli che leggono.
+    nonisolated static func cosaVera(_ azioni: [String]) -> Bool {
+        let vere: Set<String> = ["memoria_salva", "memoria_dimentica", "note_salva", "note_completa", "ricorda", "ricordi_fatto", "diario_scrivi",
+                                 "diario_cancella", "riposo_segna", "archivio_salva", "archivio_elimina", "impegni_conferma", "bea_segna", "bea_fatto",
+                                 "posta_rispondi", "github_scrivi"]
+        return azioni.contains { vere.contains($0) }
+    }
+
+    /// La frase del signore, trascritta: conta per la fretta e ferma il congedo in arrivo.
+    private func dialogoSegna(_ testo: String) {
+        congedo?.cancel()
+        Battute.ritmo(testo, dopoRisposta: FineFrase.dopoRisposta(fine: fineUltimaRisposta, inizio: inizioUltimaFrase))
+    }
+
+    /// 9 secondi di silenzio dopo la risposta di una cosa vera: «Sarà tutto, Sir?» (sempre variato).
+    private func programmaCongedo() {
+        congedo?.cancel()
+        guard Battute.umore != .fretta, Date().timeIntervalSince(ultimoCongedo) > 15 * 60 else { return }
+        let da = Date()
+        congedo = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(9))
+            guard let self, !Task.isCancelled, self.fase == .attesa, self.primoPiano, !self.micSpento, Battute.umore != .fretta,
+                  (self.inizioUltimaFrase ?? .distantPast) <= da, Date().timeIntervalSince(self.ultimoCongedo) > 15 * 60 else { return }
+            self.ultimoCongedo = Date()
+            let frase = Battute.congedo()
+            self.storia.append(JarvisOrologio.battuta("assistant", frase))   // il cervello lo vede: «no, è tutto» si capisce
+            self.risposta = frase
+            self.riascolta = true
+            self.parla(frase)
+        }
+    }
+
     /// Detta la risposta: riascolta da solo (se il signore tace, il microfono si chiude dopo 2 secondi).
     private func dopoRisposta() {
         fineUltimaRisposta = Date()                     // 12.0 (10): per «dopo_risposta_s»
+        if congedoDopo { congedoDopo = false; programmaCongedo() }   // 13.0
         // build 31: detta la risposta JARVIS torna in attesa col microfono acceso (`apriAttesa`, come sull'iPhone): non serve
         // più l'ascolto da solo di 2 secondi che poi si chiudeva
         riascolta = false
@@ -651,6 +697,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// o dopo «Mi dica, Sir» (se tace: torna in attesa in silenzio).
     private func ascolta(automatico auto: Bool = false, limiteInizio limite: TimeInterval = 7, aspetta: DopoAspetta = .no) async {
         daAttesa = false                                 // ascolto chiesto (tocco, voce, complicazione): reagisce come sempre
+        congedo?.cancel()                                // 13.0: il signore parla: niente congedo
         liberaProssima = false                           // 12 nov (P5): la frase che arriva adesso è chiesta
         inizioUltimaFrase = Date()                       // 12.0 (10)
         provaSilenziosa = nil
@@ -1644,6 +1691,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     rispostaInStoria = true                                      // se ora la interrompe, qui si segna il punto
                     compito = nil
                     riascolta = true                                             // detta la risposta, riascolta da solo
+                    if JarvisOrologio.cosaVera(azioniTurno) { congedoDopo = true }   // 13.0: detta la risposta, forse il congedo
                     if giaParlato { chiudiFlussoVoce() } else { parla(testo) }   // già partito a frasi: dice solo il resto
                     return
                 case .nonAutorizzato:
@@ -1826,6 +1874,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 }
                 immagini = Array((immagini + nuove).prefix(10))
             case "fine":
+                azioniTurno = e["azioni"] as? [String] ?? []                  // 13.0: per il congedo (una cosa vera fatta?)
                 return .fine(e["testo"] as? String ?? rispostaGrezza)
             case "errore":
                 return .errore(e["d"] as? String ?? "Un intoppo tecnico, Sir.")
@@ -1933,6 +1982,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let completa = (fraseIncompletaValida.map { $0 + " " } ?? "") + testo
         fraseIncompleta = nil
         schermoPrima = (domanda: domanda, risposta: risposta, immagini: immagini)   // 12 nov (P5)
+        dialogoSegna(testo)                                      // 13.0: la fretta delle frasi secche, niente congedo in arrivo
         domanda = completa
         risposta = ""
         rispostaGrezza = ""

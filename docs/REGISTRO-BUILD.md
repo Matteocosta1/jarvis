@@ -530,6 +530,18 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Dopo la 13.0 (1) — MARK XIII · 13 nov notte · FILO in una scheda sola, congedo e fretta al polso (numero da confermare col signore: se la 13.0 (1) non è ancora caricata, si può caricare questa al suo posto)
+
+**FILO, una scheda sola** (il signore, 22:19–23:02: «va tutto sopra… un filo unico… un'unica tab»; mockup «JARVIS Mark XIII» rifatto e provato da lui; scelta SCORRI alle 23:02). Al posto dei tre riquadri impilati:
+- una tab olografica sotto le icone di sistema in alto a destra (punto di luce, filo, angoli, riga di scansione, fondo scuro quasi pieno); in testata «FILO» e quanti argomenti;
+- gli argomenti uno sotto l'altro (METEO, AGENDA, MESSAGGI, MUSICA…), ognuno con la sua testata e la X in fondo a destra sulla stessa linea, che chiude solo quello; l'agenda un impegno per riga; oltre 200 punti scorre (sfumatura sopra e sotto);
+- «Mostrami…» è una notifica: sparisce da sola in 2,8 s; «Fissalo» la tiene (◆ accanto al nome); toccata o scorsa resta, finito riparte il conto; il messaggio che aspetta il sì resta finché non risponde;
+- le cose sparite tornano con lo swipe verso sinistra dal bordo destro (nella fascia di FILO), lo swipe verso destra su FILO le rimanda via; «Toglilo» toglie la cosa di cui si parla, «Togli tutto» svuota FILO;
+- frasi nuove: «Via da FILO», «FILO chiuso» (non c'è più «l'angolo»). Il cervello mette i suoi dati con la regia «mostra», ora con la sezione (l'argomento).
+- Dal mockup tolti «Tutto su…» e «Confronta» (il signore, 22:18: non li vuole; restano risposte a voce del cervello).
+
+**Apple Watch: congedo e fretta** (il signore, 21:58 e 22:18: «adatta quello che puoi»). Fretta: le frasi secche trascritte contano come sull'iPhone e dalla frase dopo il cervello vede la riga RITMO nella regia del polso (una riga sola). Congedo: dopo una cosa vera fatta dal cervello (nota, promemoria, diario, memoria, riposo, archivio, impegni, Bea, posta, GitHub), 9 s di silenzio dopo la risposta, al massimo uno ogni 15 minuti, mai di fretta; la frase entra nella cronologia, così «no, è tutto» la capisce il cervello. FILO al polso no (lo schermo è troppo piccolo: resta su iPhone e Mac).
+
 ## 13.0 (1) — MARK XIII · 13 nov sera · numero deciso dal signore (21:55, «perfetto tutto nella 13.0»: Version 13.0, Build 1 su app, Watch, complicazione e isola) · build unica · cervello invariato (v135)
 
 **Contiene tutto**: la 12.0 (17) (Salute letta mentre parla, iPhone bloccato, Vitals col riposo detto a voce; la 17 non va caricata a parte) + il dialogo qui sotto + **MARK XIII**: la scritta sotto il titolo su iPhone e Mac («MARK XIII»), l'avvio del polso («J.A.R.V.I.S. · MARK XIII», tenuta su una riga sugli schermi piccoli) e il mockup (versione «MARK XIII · 13.0 (1)», titolo «JARVIS Mark XIII»). Stessa grafica, stesso posto, stesso bagliore: cambia solo il numero. Controllo di compilazione (run 43506171948): **verde** · 0 errori, 0 warning · prove del dialogo superate. **Questa è la 13.0 (1) da caricare** (Pull + Archive + TestFlight).

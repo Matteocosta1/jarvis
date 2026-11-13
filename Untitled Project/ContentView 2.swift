@@ -255,6 +255,7 @@ struct ContentView: View {
                             intestazione()
                                 .contentShape(Rectangle())
                                 .highPriorityGesture(gestoTestata)
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { Filo.condiviso.sottoIcone = $0 }   // 13.0: FILO sotto le icone
                             Spacer(minLength: 0)
                             corona()
                                 .frame(width: 430)
@@ -283,6 +284,7 @@ struct ContentView: View {
                         intestazione(mini: telefono && !reattoreGrande, stretta: g.size.width < ContentView.larghezzaStretta)
                             .contentShape(Rectangle())
                                 .highPriorityGesture(gestoTestata)
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { Filo.condiviso.sottoIcone = $0 }   // 13.0: FILO sotto le icone
                         // con la tastiera aperta (reattore piccolo) la riga di stato sotto il titolo: cosa fa JARVIS, cosa sente, gli avvisi
                         if telefono && !reattoreGrande && g.size.height > 300 {   // iPhone piccolo girato: non c'è posto, niente riga
                             rigaStato

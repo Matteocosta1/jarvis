@@ -286,7 +286,7 @@ final class Regia {
             pezzi.append(riga)
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna JARVIS), di_prima, sfoglia, chiudi_tutto, mostra(titolo, riga): il widget FILO in alto a destra, senza aprire sezioni. «Mostrami…», «fammi vedere…» non aprono sezioni: rispondi in una riga e metti il dato nel widget (titolo una parola, riga il dato in breve); «apri…» apre la sezione")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna JARVIS), di_prima, sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato in FILO, la scheda in alto a destra divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi…), senza aprire sezioni; sparisce da sola in 3 secondi, «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni: rispondi in una riga e metti il dato in FILO (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); «apri…» apre la sezione")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -410,7 +410,7 @@ final class Regia {
             Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: String(titolo.prefix(14)), riga: String(riga.prefix(90)),
                                   sezione: Regia.destinazione(p.sezione)?.nome)
             Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: String(titolo.prefix(14)),
-                                          riga: riga, detto: "il widget " + titolo, testo: riga))
+                                          riga: riga, detto: "il dato di " + titolo, testo: riga, sezione: Regia.destinazione(p.sezione)?.nome))
             return .fatto("widget FILO: \(titolo) · \(riga)")
         default:
             break

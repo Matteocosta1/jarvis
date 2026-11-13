@@ -68,7 +68,7 @@ final class Insieme {
                 x.testo = base + ", " + piu.prefix(1).lowercased() + String(piu.dropFirst())
                 x.quando = Date()
                 attesa = x
-                Filo.condiviso.mostra("bozza", titolo: Filo.a(x.chi).capitalizzata, riga: "«\(x.testo)»", sezione: "Messaggi", suono: false)
+                Filo.condiviso.mostra("bozza", titolo: Filo.a(x.chi).capitalizzata, riga: "«\(x.testo)»", sezione: "Messaggi", suono: false, resta: true)
                 return Battute.chiediMessaggio(x.chi, x.testo, whatsapp: x.whatsapp)
             }
         }
@@ -355,7 +355,7 @@ final class Insieme {
         attesa = Attesa(tipo: "messaggio", chi: chi, numero: num, testo: t, whatsapp: wa, quando: Date())
         Filo.condiviso.persona(chi)
         // il signore (13 nov 20:58): si lavora senza aprire sezioni: la bozza è un widget FILO finché non dice sì
-        Filo.condiviso.mostra("bozza", titolo: Filo.a(chi).capitalizzata, riga: "«\(t)»", sezione: "Messaggi")
+        Filo.condiviso.mostra("bozza", titolo: Filo.a(chi).capitalizzata, riga: "«\(t)»", sezione: "Messaggi", resta: true)   // aspetta il sì: non è una notifica
         return Battute.chiediMessaggio(chi, t, whatsapp: wa)
     }
 
