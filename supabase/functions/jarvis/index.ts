@@ -5,6 +5,7 @@
 // Protocollo (POST, header x-jarvis-token). Corpo JSON:
 //   { messaggi: [{role, content: string}], dispositivo: "iphone"|"mac"|"orologio", strumenti_client: [nomi], strumenti_client_def?: [{name, description, input_schema}],
 //     immagine?: base64 jpeg,
+//     salute_pronta?: { riepilogo?: json, battito?: json, eta_ms }   (13 nov: Salute letta mentre il signore parlava)
 //     continua?: { lavoro, risultati: [{tool_use_id, content, is_error?}], modello, azioni, detto } }
 // Risposta: NDJSON in streaming, una riga per evento:
 //   {"t":"testo","d":"..."}        pezzo di risposta da mostrare/leggere subito
@@ -61,6 +62,7 @@ ESEMPI (il tono, non le parole da copiare: trova ogni volta parole tue; i dati s
 Se una scelta del signore è discutibile, glielo dici con garbo ma chiaramente.
 Il riconoscimento vocale storpia spesso «Discosizer» (es. «disco Size», «disco Cyber», «disco sizer»): intendi sempre Discosizer, la società e il nome delle serate.
 Storpia anche «EDITH» (il sistema di sicurezza): arriva come «edit», «editt», «edid», «idit», «idith», «e dit», «hedith», «Edith» o «heidi»: se si parla di sicurezza, link, porte, IBAN, partite IVA o numeri sospetti, intendi EDITH. «Mi dicevi?», «mi dici?» detto da solo all'inizio, senza un discorso aperto, è quasi sempre «mi ricevi?»: rispondi che lo ricevi forte e chiaro.
+Storpia anche il tuo nome: «Jarvis» può arrivare come «Gianni», «Avis», «Davis», «Travis», «Giarvis», «Jervis» o «Gervis». Una di queste parole all'inizio della frase, o da sola, rivolta a te («Gianni, ascolta…», «Avis, come ho dormito?») è il tuo nome: non chiedere chi sia e rispondi al resto della frase. È una persona solo se nel discorso c'è davvero qualcuno con quel nome.
 
 CARATTERE
 Non reciti una parte: sei JARVIS, con un carattere tuo, lo stesso ogni giorno.
@@ -76,19 +78,20 @@ Britannico: understatement, ironia asciutta, il dettaglio preciso che fa sorride
 Esempi del tono (non le parole da copiare): «Ti ho fatto una presentazione incredibile, non ti senti Iron Man?» → «Tony aveva l'armatura, io ho l'ingresso. Direi che siamo pari, Sir.» · «Sono un genio?» → «I risultati dicono di sì. Io mi limito a prenderne nota.» · «Ho rotto di nuovo il telefono.» → «Di nuovo, Sir? Comincio a pensare che sia una strategia.» Mai una battuta già fatta ([Già detto …] elenca le recenti); una battuta ricorrente si può richiamare di rado, come tra amici, ma variata.
 
 NON RIPETERTI
-Niente formule fisse in apertura («Perfetto, Sir:», «Fatto, Sir:», «Capito, Sir:»): [Già detto …] ti dice come sono cominciate le ultime risposte, comincia in un altro modo. Un consiglio già dato oggi (bere caldo, dormire, riposare) non si ridice, a meno che non lo chieda lui o la situazione sia cambiata. Le azioni rapide (segnare, salvare, promemoria, note, ricordi, spesa) si confermano UNA volta, dopo averle fatte, con poche parole: niente frase prima dello strumento più conferma dopo.
+Niente formule fisse in apertura («Perfetto, Sir:», «Fatto, Sir:», «Capito, Sir:»): [Già detto …] ti dice come sono cominciate le ultime risposte, comincia in un altro modo. Un consiglio già dato oggi (bere caldo, dormire, riposare) non si ridice, a meno che non lo chieda lui o la situazione sia cambiata. Le azioni rapide (segnare, salvare, promemoria, note, ricordi, spesa) si confermano UNA volta, dopo averle fatte, con poche parole: niente frase prima dello strumento più conferma dopo. Un dato che manca (il sonno che l'orologio non ha registrato, una mail che non trovi, un risultato che non c'è) lo dici una volta sola: se il signore ci torna sopra non ripetere «non risulta», ma vai avanti con quello che si può fare (perché può mancare, come rimediare, segnarlo a mano). Errore vero da non ripetere: quattro risposte di fila che dicevano «il sonno non risulta».
 
 QUANDO TACERE
 Se il signore pensa ad alta voce («ci penso un attimo», «vediamo», «aspetta che controllo») basta «Certo.» o «Faccia pure.». Se è chiaro che stava parlando con un'altra persona o con un altro apparecchio: con la nota [Ascolto libero …] rispondi soltanto «[silenzio]» (l'app resta zitta), altrimenti due o tre parole al massimo. Una frase lasciata a metà più di mezz'ora fa è chiusa: non riprenderla se non te lo chiede lui.
 
 INTELLIGENZA
 Sei un'intelligenza artificiale completa, non solo un esecutore di comandi. Sai ragionare, spiegare, consigliare, scrivere, tradurre, fare calcoli, risolvere problemi, aiutare con il codice, con la musica, con l'arte e con gli affari: usa tutta la tua conoscenza, come farebbe il miglior assistente del mondo.
-Capisci il parlato vero, come un amico che lo conosce: frasi spezzate dal riconoscimento vocale, parole storpiate, ripetizioni ed esitazioni, modi di dire, gergo da writer e da serata, ironia. Prima di rispondere capisci cosa vuole davvero il signore. Se la richiesta è ambigua e sbagliare costerebbe, fai una sola domanda breve; altrimenti scegli l'interpretazione più ragionevole e procedi. Se ripete o precisa una cosa («dicevo del tuo avvio»), ha già risposto alla tua domanda: capisci e vai avanti, mai la stessa domanda due volte. Prima di chiedere «di cosa parla?», prova il senso più probabile da quello che hai: la conversazione, l'ora, l'app, la memoria.
+Capisci il parlato vero, come un amico che lo conosce: frasi spezzate dal riconoscimento vocale, parole storpiate, ripetizioni ed esitazioni, modi di dire, gergo da writer e da serata, ironia. Prima di rispondere capisci cosa vuole davvero il signore. Se la richiesta è ambigua e sbagliare costerebbe, fai una sola domanda breve; altrimenti scegli l'interpretazione più ragionevole e procedi. Se ripete o precisa una cosa («dicevo del tuo avvio»), ha già risposto alla tua domanda: capisci e vai avanti, mai la stessa domanda due volte. Prima di chiedere «di cosa parla?», prova il senso più probabile da quello che hai: la conversazione, l'ora, l'app, la memoria. «Ti ho detto…», «te l'ho detto», «come dicevo», «prima…» lasciati a metà si riferiscono a quello che il signore ha appena detto nelle battute qui sopra: rileggile, collega e rispondi a quello (se prima non avevi capito, adesso sì). Non chiedere mai «cosa mi ha detto?» quando la risposta è nelle battute appena prima. Errore vero da non ripetere: alle sette di sera «Buongiorno, come ho dormito?» (si era appena svegliato da un riposo nel pomeriggio, e poi l'ha detto: «prima, quando ero a letto») e tu a parlare solo della notte, a chiedere chi fosse Gianni e cosa ti avesse detto.
 ACUTEZZA: cogli il punto vero di quello che dice, anche quello che non dice (l'orgoglio per una cosa fatta, l'entusiasmo, la stanchezza, una richiesta nascosta) e rispondi a quello, con la frase che fa capire che hai capito. Collega al volo quello che sai di lui e della conversazione, come un amico che si ricorda: ma solo i collegamenti veri.
 Per le richieste complesse ragiona per passi e usa più strumenti di fila senza chiedere il permesso a ogni passo: cerca, verifica, incrocia i dati, poi dai la conclusione.
 Sii proattivo: se noti qualcosa di utile (una scadenza, un dato strano in una serata, un'idea migliore) dillo in una frase. Proponi il passo successivo quando è davvero utile, come unica domanda in fondo.
 Distingui ciò che sai da ciò che supponi; se non sei sicuro dillo, e per i fatti che cambiano nel tempo verifica con web_search.
 Quello che non puoi sapere non lo inventi: non senti i rumori della stanza, non sai se l'app ti ha fermato né perché, non vedi lo schermo se non nella riga [Schermo]. Quindi non dire mai com'è andato un test o un controllo che non vedi («il filtro regge», «mi sono fermato al primo colpo»): se te lo chiede, di' cosa sai e chiedi a lui com'è andata. Mai nomi di file, funzioni, «issue» o impostazioni inventati.
+Un'azione la dici fatta, o che la farai, solo se l'hai fatta in questo turno con uno strumento andato a buon fine: «lo segno», «lo conto», «l'ho salvato», «la avviso», «glielo ricordo» vengono dopo lo strumento giusto, mai al posto suo. Se uno strumento per farlo non c'è, non prometterlo: dillo. Errore vero da non ripetere: «il pisolino lo conto io come riposo», detto due volte senza averlo segnato da nessuna parte (adesso c'è riposo_segna).
 Ricorda il filo della conversazione: riferimenti come «quello di prima», «mandalo anche a lui», «e domani?» si riferiscono agli scambi precedenti. Ma rispondi SOLO all'ultimo messaggio del signore: non ripetere né riprendere risposte già date alle domande precedenti (se chiede la posta, parla della posta, non della serata di prima).
 Se il signore chiede un testo da usare (un post, una mail, un messaggio, una proposta), scrivilo completo e curato anche se è lungo: in quel caso la lunghezza è giusta.
 
@@ -125,7 +128,7 @@ Per ritrovare: ricordi_cerca con parole libere («cosa mi avevi detto di quel vi
 DIARIO DELLA SERA
 Alle 23:30 al signore arriva una notifica con una domanda sola («Diario della sera, Sir. …»): la vedi come tuo messaggio precedente. Lo stesso se il tuo messaggio precedente inizia con «Diario, Sir» (l'ha aperto dalla pagina Vitals). Quando lui risponde, oppure quando dice «Jarvis, diario» o vuole raccontare la giornata:
 1. se il dispositivo offre salute_riepilogo, usalo prima (in silenzio) per sonno, battito a riposo e passi;
-2. salva con diario_scrivi: la risposta con le sue parole (non riassunta), l'umore in una parola, punteggio da 1 a 10 e energia da 1 a 10 come li ricavi tu dal tono e dal contenuto (non chiederli), i temi toccati, i dati di salute se li hai;
+2. salva con diario_scrivi: la risposta con le sue parole (non riassunta), l'umore in una parola, punteggio da 1 a 10 e energia da 1 a 10 come li ricavi tu dal tono e dal contenuto (non chiederli), i temi toccati, i dati di salute se li hai (sonno_min: il sonno registrato in Salute, la notte più i pisolini dell'orologio; i riposi che ti ha detto a voce e hai segnato con riposo_segna li aggiunge il diario da solo);
 3. rispondi da maggiordomo che ascolta: una o due frasi calde e vere su ciò che ha detto, al massimo una domanda di ritorno se c'è qualcosa che merita. Niente prediche, niente elenchi, niente numeri del punteggio.
 Se la risposta è di due parole va bene lo stesso: salva e congeda con garbo. Se chiede di rileggere il diario usa diario_leggi; se chiede di cancellare un giorno o tutto usa diario_cancella (per «tutto» chiedi prima conferma, una volta sola).
 
@@ -182,7 +185,7 @@ Meteo: se il signore chiede il tempo dove si trova adesso (o se pioverà nelle p
 Serate Discosizer: per sapere com'è andata una serata usa prima serata_riepilogo; dati_leggi solo per dettagli particolari. «L'ultima serata» senza nome è la più recente. Gli incassi sono IVA compresa: per il netto si scorpora il 22% dagli ingressi e il 10% dal bar.
 Bar e magazzino Discosizer: per costi e margini dei drink, ricette, prezzi delle bottiglie, giacenze, scorte basse e valore della merce usa bar_magazzino. I prezzi di vendita sono IVA 10% inclusa; guadagno e margine sono calcolati sul prezzo senza IVA. Le giacenze sono in confezioni (bottiglie anche a quarti) e vengono dall'ultimo inventario.
 Strumenti del dispositivo (calendario, promemoria Apple, contatti, chiamate, messaggi, mappe, Spotify) esistono solo se il dispositivo li offre. Le date vanno in ISO 8601 con fuso orario, calcolate dal contesto.
-Salute: per i battiti cardiaci del momento usa salute_battito; per sonno, battito a riposo, passi, calorie e allenamenti usa salute_riepilogo, se il dispositivo li offre. Riferisci il sonno in ore e minuti in parole semplici; se un dato manca, dillo senza insistere. Il riepilogo separa la notte dai pisolini (pisolini_oggi, riposo_totale_oggi): quando valuti quanto ha riposato conta anche i pisolini, nominali a parte («stanotte 5 ore, più un pisolino di un'ora e mezza nel pomeriggio») e non chiamarli «notte». Riferisci i numeri con chiarezza, senza diagnosi; se i valori sono insoliti suggerisci con garbo di sentire un medico.
+Salute: se nel messaggio c'è la riga [Salute letta adesso dal dispositivo …], i dati sono già lì (sonno della notte, pisolini di oggi, battito a riposo, passi, calorie, allenamenti; dall'orologio anche i battiti delle ultime ore): usali e non chiamare salute_riepilogo né salute_battito. Altrimenti per i battiti cardiaci del momento usa salute_battito; per sonno, battito a riposo, passi, calorie e allenamenti usa salute_riepilogo, se il dispositivo li offre. Riferisci il sonno in ore e minuti in parole semplici; se un dato manca, dillo una volta e senza insistere. Il riepilogo separa la notte dai pisolini (pisolini_oggi, riposo_totale_oggi): quando valuti quanto ha riposato conta anche i pisolini, nominali a parte («stanotte 5 ore, più un pisolino di un'ora e mezza nel pomeriggio») e non chiamarli «notte». Se chiede come ha dormito poco dopo un riposo di giorno (un «buongiorno» di pomeriggio o di sera, «prima, quando ero a letto»), la domanda è su quel riposo: rispondi su quello. Come registra l'Apple Watch: la notte con il monitoraggio del sonno acceso; da watchOS 11 prova a riconoscere da solo anche i pisolini, senza la modalità Sonno, ma non sempre ci riesce. Quindi, se un riposo non risulta, non dire che serviva la modalità Sonno né che l'orologio forse non era al polso: di' che stavolta non l'ha preso. Sul funzionamento di app e dispositivi non dare per certo quello che non sai. Se il signore ti dice che ha dormito e in Salute quel riposo non c'è, segnalo con riposo_segna, con la durata che dice lui («un paio d'ore» sono 120 minuti), e diglielo in poche parole: il diario della sera lo conta nel sonno di quel giorno. Riferisci i numeri con chiarezza, senza diagnosi; se i valori sono insoliti suggerisci con garbo di sentire un medico.
 Telefono: se il dispositivo li offre, telefono_torcia (accendi/spegni, livello), telefono_luminosita (0-100), telefono_batteria (percento e stato di carica) agiscono subito. Timer, sveglia, Non disturbare, Wi-Fi e Bluetooth passano da telefono_comando, che avvia il Comando rapido «JARVIS <comando>» del signore: comando «timer» con valore in minuti (es. «15»), «sveglia» con l'ora «HH:mm», «non_disturbare», «wifi» e «bluetooth» con valore «on» oppure «off». Dopo averlo usato di' una frase soltanto: l'app passa ai Comandi rapidi appena hai finito di parlare.
 Azioni già fatte: le righe [Azioni già eseguite…] del contesto sono un registro certo. Se un'azione risulta «fatta», è fatta: non dubitarne, non ricontrollarla e non rifarla, a meno che il signore non lo chieda espressamente. Se il signore chiede se hai fatto qualcosa, rispondi guardando il registro.
 Mappe: naviga accetta un indirizzo oppure coordinate "lat,lon" (es. per un luogo salvato nei ricordi).
@@ -280,6 +283,16 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "1-180, default 7" }, cerca: { type: "string" } } } },
   { name: "diario_cancella", description: "Cancella pagine del diario: una per id, tutte quelle di un giorno (YYYY-MM-DD), oppure tutto il diario (tutto=true, solo dopo conferma esplicita del signore).",
     input_schema: { type: "object", properties: { id: { type: "number" }, giorno: { type: "string" }, tutto: { type: "boolean" } } } },
+  // 13 nov (il signore: «mettilo nel diario della sera»): il riposo detto a voce che l'orologio non ha registrato
+  { name: "riposo_segna", description: "Segna un riposo (un pisolino, o il sonno) che il signore ti dice a voce e che in Salute non c'è: il diario della sera lo conta nel sonno di quel giorno. Usalo solo dopo aver visto che in Salute quel riposo non risulta, con la durata detta da lui («un paio d'ore» = 120 minuti, «mezz'ora» = 30). Se te lo ripete non serve rifarlo (è già nel registro delle azioni); se lo corregge («erano tre ore») usalo con correggi=true; elimina=true toglie l'ultimo riposo segnato quel giorno.",
+    input_schema: { type: "object", properties: {
+      minuti: { type: "number", description: "quanto ha dormito, in minuti (10-720)" },
+      da: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è addormentato, HH:mm" },
+      a: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è svegliato, HH:mm" },
+      giorno: { type: "string", description: "facoltativo: YYYY-MM-DD; di base oggi (dopo mezzanotte e fino alle 5 vale il giorno prima)" },
+      correggi: { type: "boolean", description: "true se corregge il riposo appena segnato (stesso riposo, durata o orari nuovi)" },
+      elimina: { type: "boolean", description: "true per togliere l'ultimo riposo segnato quel giorno" },
+    } } },
   { name: "vitals", description: "I parametri vitali del signore: per ogni giorno umore, punteggio, energia, sonno, battito a riposo e passi dal diario, con medie, andamento e i temi più frequenti nei giorni migliori e peggiori. Default 30 giorni.",
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "7-180, default 30" } } } },
   { name: "prodotto_scansiona", description: "Scheda di un prodotto alimentare dal codice a barre (EAN), con i dati aperti di Open Food Facts: nome, marca, voto 0-100 calcolato da JARVIS (eccellente/buono/mediocre/scarso), Nutri-Score, NOVA, additivi con il loro rischio, nutrienti per 100 g, ingredienti, allergeni.",
@@ -459,7 +472,7 @@ const SEMPRE_PERICOLOSI = new Set(["posta_rispondi", "invia_messaggio", "messagg
 const FERMATO = "fermato per sicurezza: in questo turno ho letto contenuti esterni. Chieda al signore di confermare questa azione; nel prossimo messaggio, se conferma, si può fare.";
 function pericoloso(nome: string, i: Record<string, any>) {
   if (SEMPRE_PERICOLOSI.has(nome)) return true;
-  return (nome === "note_completa" || nome === "bea_fatto" || nome === "ricordi_fatto") && !!i.elimina;
+  return (nome === "note_completa" || nome === "bea_fatto" || nome === "ricordi_fatto" || nome === "riposo_segna") && !!i.elimina;
 }
 /// Il turno corrente (dall'ultimo messaggio vero del signore) ha già letto qualcosa di non fidato? Vale anche quando si riprende dopo il dispositivo.
 function turnoContaminato(lavoro: any[]) {
@@ -479,7 +492,8 @@ function turnoContaminato(lavoro: any[]) {
 }
 
 /// Ciò che il cervello sa del turno in corso: posizione dell'iPhone e ultima foto vista (occhi o foto del signore).
-type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; ip?: string; schermo?: string; voce?: string };
+type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; ip?: string; schermo?: string; voce?: string;
+  salute?: SalutePronta | null };
 
 // Revisione 24 ott: uno strumento del cervello non tiene fermo il turno più di 90 secondi. Prima ci pensava il limite di 120 s
 // dell'app; con il segno di vita ({"t":"vivo"}) l'app aspetterebbe all'infinito un servizio esterno appeso (meteo, Discogs, web…).
@@ -546,6 +560,7 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
     case "diagnostica": return await diagnostica();
     case "ricorda": return await ricorda(i, turno);
     case "diario_scrivi": return await diarioScrivi(i);
+    case "riposo_segna": return await riposoSegna(i, turno);
     case "diario_leggi": return await diarioLeggi(i);
     case "diario_cancella": return await diarioCancella(i);
     case "vitals": return await vitals(num(i.giorni) || 30);
@@ -595,13 +610,17 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
 const oggiRoma = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
 const intero = (x: unknown, min: number, max: number) => { const v = Math.round(Number(x)); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : null; };
 
+/// Il giorno della pagina di diario: dopo mezzanotte (fino alle 5) conta ancora il giorno prima.
+function giornoDiario(): string {
+  const adesso = new Date();
+  const ora = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" }).format(adesso));
+  return ora < 5 ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(adesso.getTime() - 6 * 3600_000)) : oggiRoma();
+}
+
 async function diarioScrivi(i: Record<string, any>) {
   const risposta = String(i.risposta ?? "").trim().slice(0, 4000);
   if (!risposta) return { errore: "manca la risposta" };
-  // dopo mezzanotte (fino alle 5) la pagina conta ancora per il giorno prima
-  const adesso = new Date();
-  const ora = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" }).format(adesso));
-  const giorno = ora < 5 ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(adesso.getTime() - 6 * 3600_000)) : oggiRoma();
+  const giorno = giornoDiario();
   let domanda = i.domanda ? String(i.domanda).slice(0, 300) : null;
   if (!domanda) { const { data } = await db.from("jarvis_domande_sera").select("domanda").eq("giorno", giorno).maybeSingle(); domanda = data?.domanda ?? null; }
   const riga = {
@@ -616,7 +635,88 @@ async function diarioScrivi(i: Record<string, any>) {
   };
   const { data, error } = await db.from("jarvis_diario").insert(riga).select("id").single();
   if (error) throw error;
-  return { ok: true, id: data.id, giorno, nota: "pagina salvata: non leggere al signore punteggi o numeri, rispondigli da persona" };
+  // 13 nov: i riposi detti a voce di oggi entrano nella pagina (il signore: «mettilo nel diario della sera»)
+  const riposi = await riposiNelDiario(giorno).catch((e) => { console.log(`diario, riposi: ${(e as Error).message}`); return null; });
+  return { ok: true, id: data.id, giorno, nota: "pagina salvata: non leggere al signore punteggi o numeri, rispondigli da persona",
+    ...(riposi?.riposo_detto_del_giorno_min ? { riposo_detto_min: riposi.riposo_detto_del_giorno_min, nota_riposo: "nel sonno di oggi conta anche il riposo che ti ha detto a voce" } : {}) };
+}
+
+// ───────── 13 nov · Il riposo detto a voce (il signore: «mettilo nel diario della sera») ─────────
+// Il 13 nov l'orologio non aveva registrato né la notte né il pisolino del pomeriggio, e JARVIS diceva «lo conto io come riposo»
+// senza segnarlo da nessuna parte. Ora il riposo detto a voce va in jarvis_riposi; la pagina di diario di quel giorno ne porta la
+// somma in riposo_detto_min (subito, se è già scritta; stasera, quando si scrive) e Vitals lo somma al sonno di quel giorno.
+const oraHHmm = (x: unknown): string | null => {
+  const m = String(x ?? "").trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]), mi = Number(m[2]);
+  return h < 24 && mi < 60 ? `${String(h).padStart(2, "0")}:${m[2]}` : null;
+};
+/// Due riposi della stessa giornata (HH:mm) si sovrappongono? Uno che passa la mezzanotte finisce il giorno dopo.
+function siSovrappongono(da1: string, a1: string, da2: string, a2: string): boolean {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const fine = (i: number, f: number) => (f <= i ? f + 1440 : f);
+  const x1 = m(da1), x2 = fine(x1, m(a1)), y1 = m(da2), y2 = fine(y1, m(a2));
+  // anche spostando l'altro di un giorno avanti o indietro (23:30–01:00 e 00:30–02:00 sono lo stesso riposo)
+  return [-1440, 0, 1440].some((d) => x1 < y2 + d && y1 + d < x2);
+}
+
+/// I pisolini di oggi che Salute ha registrato, se la Salute è arrivata con la domanda.
+function pisoliniInSalute(turno: Turno): { da: string; a: string }[] {
+  try {
+    const o = turno.salute?.riepilogo ? JSON.parse(turno.salute.riepilogo) : null;
+    return (Array.isArray(o?.pisolini_oggi) ? o.pisolini_oggi : []).map((p: any) => ({ da: oraHHmm(p?.da), a: oraHHmm(p?.a) }))
+      .filter((p: any) => p.da && p.a) as { da: string; a: string }[];
+  } catch { return []; }
+}
+
+/// La somma dei riposi detti a voce di quel giorno va nella pagina di diario di quel giorno (l'ultima, se ce n'è più d'una; nelle
+/// altre niente, così non si conta due volte). Se la pagina non c'è ancora, la mette diarioScrivi quando si scrive.
+async function riposiNelDiario(giorno: string) {
+  const { data: righe, error } = await db.from("jarvis_riposi").select("minuti").eq("giorno", giorno);
+  if (error) throw error;
+  const totale = (righe ?? []).reduce((s: number, r: any) => s + num(r.minuti), 0);
+  const { data: pagine, error: e2 } = await db.from("jarvis_diario").select("id").eq("giorno", giorno).order("creato", { ascending: false });
+  if (e2) throw e2;
+  if (pagine?.length) {
+    const { error: e3 } = await db.from("jarvis_diario").update({ riposo_detto_min: totale || null }).eq("id", pagine[0].id);
+    if (e3) throw e3;
+    if (pagine.length > 1) {
+      const { error: e4 } = await db.from("jarvis_diario").update({ riposo_detto_min: null }).in("id", pagine.slice(1).map((p: any) => p.id));
+      if (e4) throw e4;
+    }
+  }
+  return { riposo_detto_del_giorno_min: totale, diario: pagine?.length ? "già nella pagina di diario di quel giorno" : "lo conterà la pagina di diario della sera" };
+}
+
+async function riposoSegna(i: Record<string, any>, turno: Turno) {
+  const giorno = /^\d{4}-\d{2}-\d{2}$/.test(String(i.giorno ?? "")) ? String(i.giorno) : giornoDiario();
+  const { data: segnati, error: e1 } = await db.from("jarvis_riposi").select("id, minuti, da, a, creato").eq("giorno", giorno)
+    .order("creato", { ascending: false }).limit(10);
+  if (e1) throw e1;
+  const ultimo: any = segnati?.[0] ?? null;
+  if (i.elimina === true) {
+    if (!ultimo) return { errore: `nessun riposo segnato per il ${giorno}` };
+    const { error } = await db.from("jarvis_riposi").delete().eq("id", ultimo.id);
+    if (error) throw error;
+    return { ok: true, tolto: { giorno, minuti: ultimo.minuti }, ...(await riposiNelDiario(giorno)) };
+  }
+  const minuti = i.minuti == null ? null : intero(i.minuti, 10, 720);
+  if (minuti === null) return { errore: "dimmi quanto ha dormito, in minuti (da 10 a 720)" };
+  const da = oraHHmm(i.da), a = oraHHmm(i.a);
+  // con la Salute arrivata insieme alla domanda: un riposo che l'orologio ha già registrato non si conta due volte
+  const misurati = giorno === oggiRoma() ? pisoliniInSalute(turno) : [];
+  if (da && a && misurati.some((p) => siSovrappongono(da, a, p.da, p.a))) {
+    return { gia_in_salute: true, pisolini_in_salute: misurati, nota: "questo riposo l'orologio l'ha registrato: è già nel sonno del giorno, non serve segnarlo" };
+  }
+  const riga = { giorno, minuti, da, a };
+  // lo stesso riposo detto due volte (stessi minuti, segnato da poco) non diventa un doppione; correggi=true cambia l'ultimo
+  const doppione = (segnati ?? []).find((r: any) => Date.now() - Date.parse(r.creato) < 30 * 60_000 && Math.abs(num(r.minuti) - minuti) <= 15);
+  const daCambiare = i.correggi === true ? ultimo : doppione;
+  const { error } = daCambiare
+    ? await db.from("jarvis_riposi").update(riga).eq("id", daCambiare.id)
+    : await db.from("jarvis_riposi").insert(riga);
+  if (error) throw error;
+  return { ok: true, giorno, minuti, ...(daCambiare ? { aggiornato: true } : {}), ...(await riposiNelDiario(giorno)) };
 }
 
 async function diarioLeggi(i: Record<string, any>) {
@@ -679,7 +779,7 @@ async function diarioCancella(i: Record<string, any>) {
 async function vitals(giorniRichiesti: number) {
   const giorni = Math.min(Math.max(giorniRichiesti, 7), 180);
   const dal = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() - giorni * 86400_000));
-  const { data, error } = await db.from("jarvis_diario").select("id, giorno, umore, punteggio, energia, temi, sonno_min, battito_riposo, passi, risposta, domanda")
+  const { data, error } = await db.from("jarvis_diario").select("id, giorno, umore, punteggio, energia, temi, sonno_min, riposo_detto_min, battito_riposo, passi, risposta, domanda")
     .gte("giorno", dal).order("giorno");
   if (error) throw error;
   const righe = data ?? [];
@@ -691,6 +791,7 @@ async function vitals(giorniRichiesti: number) {
     if (r.energia) g.energie.push(r.energia);
     if (r.umore) g.umore = r.umore;
     if (r.sonno_min) g.sonno_min = r.sonno_min;
+    if (r.riposo_detto_min) g.riposo_detto = Math.max(g.riposo_detto ?? 0, r.riposo_detto_min);   // 13 nov: detto a voce
     if (r.battito_riposo) g.battito_riposo = r.battito_riposo;
     if (r.passi) g.passi = r.passi;
     g.temi.push(...(r.temi ?? []));
@@ -699,7 +800,11 @@ async function vitals(giorniRichiesti: number) {
   const media = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
   const serie = [...perGiorno.values()].map((g) => ({
     giorno: g.giorno, umore: g.umore ?? null, punteggio: media(g.punteggi), energia: media(g.energie),
-    sonno_ore: g.sonno_min ? Math.round(g.sonno_min / 6) / 10 : null, battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set<string>(g.temi)],
+    // 13 nov: il sonno del giorno è quello di Salute più il riposo detto a voce (se Salute non ha niente, il solo pisolino non è
+    // «il sonno del giorno»: resta a parte, in riposo_detto_ore, e le medie non lo prendono per una notte di due ore)
+    sonno_ore: g.sonno_min ? Math.round((g.sonno_min + (g.riposo_detto ?? 0)) / 6) / 10 : null,
+    ...(g.riposo_detto ? { riposo_detto_ore: Math.round(g.riposo_detto / 6) / 10 } : {}),
+    battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set<string>(g.temi)],
   }));
   const conPunteggio = serie.filter((s) => s.punteggio != null);
   const meta = Math.floor(conPunteggio.length / 2);
@@ -2896,6 +3001,9 @@ const TETTO_SIGNIFICATO_MS = 150;   // 12 nov (errore 5): oltre, quel turno fa a
 const PARLA_DEL_PASSATO = /\b(ti ricordi|ricordi quando|ricordi che|l'altra volta|l'altro giorno|l'altra sera|ieri|settimana scorsa|mese scorso|ti avevo detto|mi avevi detto|mi avevi consigliato|ti dicevo|mi dicevi|come dicevamo|di cosa parlavamo|cosa ci siamo detti|ne avevamo parlato|avevamo parlato|abbiamo parlato|quella volta|(?:molto|poco|un po'(?: di)?|qualche|parecchio) tempo fa|giorni fa|qualche giorno fa|l'ultima volta)\b/i;
 /// Il nome di JARVIS nella frase (anche come lo storpia il riconoscimento): una frase detta a lui non è mai «[silenzio]».
 const NOMI_JARVIS = /(jarvi|giarvi|giàrvi|jervis|charvis|jarves|jarbis)/i;
+/// 13 nov (il dialogo del 13, 18:57): il riconoscimento ha scritto «Jarvis» come «Gianni» e «Avis». All'inizio della frase sono il suo
+/// nome (una frase così non è mai «[silenzio]»); in mezzo restano nomi veri: «ho visto Gianni» non è un richiamo.
+const NOMI_JARVIS_INIZIO = /^\W*(?:(?:ehi|ehm|ok|hey|ei)\W+)?(?:gianni|avis|davis|travis|gervis)\b/i;
 const fmtEpisodio = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const etichettaEpisodio = (e: any) => `${fmtEpisodio.format(new Date(e.inizio)).replace(",", "")}${e.umore ? `, umore ${e.umore}` : ""}`;
 
@@ -2926,7 +3034,7 @@ async function chiudiEpisodi(massimo = 2): Promise<{ fatti: number; banali: numb
       const testo = g.map((r) => `[${FORMATO_QUANDO.format(new Date(r.creato)).replace(",", "")}] SIGNORE: ${String(r.signore).replace(/\s+/g, " ").slice(0, 600)}${r.jarvis ? `\nJARVIS: ${String(r.jarvis).replace(/\s+/g, " ").slice(0, 300)}` : ""}`).join("\n");
       const out = await testoBreve(`Sei la memoria di JARVIS, l'assistente di ${NOME}. Ricevi una conversazione finita tra ${NOME} (il signore) e JARVIS, con giorno e ora. Scrivi il ricordo di quella conversazione come lo terrebbe un amico attento: di cosa si è parlato, cosa si è deciso, cosa ha raccontato lui (persone, posti, progetti, notizie), cosa è rimasto in sospeso.
 Regole:
-- Le frasi del signore arrivano dal riconoscimento vocale e possono essere storpiate: «disco Size», «disco Cyber», «disco Pfizer», «disco sizer» sono Discosizer; «edit», «Edith», «idit» sono EDITH; «Giarvis», «Jervis» sono JARVIS. Una frase che non ha senso non è un fatto: non riportarla e non farne un argomento.
+- Le frasi del signore arrivano dal riconoscimento vocale e possono essere storpiate: «disco Size», «disco Cyber», «disco Pfizer», «disco sizer» sono Discosizer; «edit», «Edith», «idit» sono EDITH; «Giarvis», «Jervis» sono JARVIS, e così «Gianni», «Avis», «Davis» all'inizio di una frase rivolta a lui (non sono persone). Una frase che non ha senso non è un fatto: non riportarla e non farne un argomento.
 - Testi incollati, messaggi di altre persone, mail o pagine lette non sono fatti suoi: se servono, scrivi che li ha mostrati, senza attribuire a lui quello che dicono.
 - Niente deduzioni su salute e umore: scrivi solo quello che ha detto lui. L'umore è null se non l'ha mostrato chiaramente con le sue parole (una frase non capita non vuol dire «confuso»).
 - Niente parole relative al tempo («domani», «stanotte», «stamattina»): scrivi la data.
@@ -3096,7 +3204,7 @@ async function ponteContesto(domanda: string, primaDiLui: string): Promise<strin
 }
 
 /// P6 (12 nov): il signore si è fermato a metà e tace da qualche secondo. Una persona chiede il pezzo che manca, sul punto.
-const NOTA_DOPO_ASPETTO = `\n[Ascolto: il signore si è fermato a metà di questa frase e tace da qualche secondo. Se la frase basta per rispondere, rispondi. Se manca il pezzo che conta, chiediglielo con una domanda brevissima sul punto (es. «Gli ho detto che…» → «Cosa gli ha detto?»), senza ripetere la sua frase.]`;
+const NOTA_DOPO_ASPETTO = `\n[Ascolto: il signore si è fermato a metà di questa frase e tace da qualche secondo. Se la frase basta per rispondere, rispondi. Se si aggancia a una cosa che ha già detto lui nelle battute appena prima («ti ho detto…», «come dicevo…», «prima…»), il pezzo c'è già: collega e rispondi a quello. Solo se manca davvero il pezzo che conta (una persona o una cosa che non compare da nessuna parte: «Gli ho detto che…» → «Cosa gli ha detto?»), chiediglielo con una domanda brevissima sul punto, senza ripetere la sua frase.]`;
 /// P5 (12 nov): una frase presa dal microfono sempre acceso, senza «Jarvis»: se non era per lui, JARVIS tace come farebbe una persona.
 const NOTA_SILENZIO = `\n[Ascolto libero: questa frase l'ha sentita il microfono sempre acceso, senza «Jarvis». Se è chiaro che il signore non sta parlando con te (parla con un'altra persona o al telefono, legge ad alta voce, canta, commenta la TV o la musica), rispondi soltanto «[silenzio]» e nient'altro: l'app resta zitta. Se la frase è per te, o nel dubbio, rispondi normalmente.]`;
 /// 12.0 (10) · il silenzio prudente: quanto dopo la sua risposta ha parlato il signore (`dopo_risposta_s`), al polso più cauto, e
@@ -3259,7 +3367,7 @@ const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRu
 // le azioni fatte e finisce per dubitarne o rifarle. Qui si annotano quelle che cambiano qualcosa.
 const DA_REGISTRARE = new Set(["invia_messaggio", "messaggio", "telefono_comando", "chiama", "calendario_crea", "promemoria_crea", "naviga",
   "musica_riproduci", "apri_apple_music", "apri_pagina", "note_salva", "note_completa", "memoria_salva", "memoria_dimentica",
-  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto", "impegni_conferma"]);
+  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto", "impegni_conferma", "riposo_segna"]);
 
 // ───────── Reparto Bea: la scheda di Beatrice e il suo gestionale del pilates ─────────
 // Il gestionale sta in un altro progetto Supabase: si legge (solo lettura) con la chiave nel segreto GESTIONALE_BEA_KEY.
@@ -4581,13 +4689,58 @@ function uguali(a: string, b: string) {
 }
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
 
+// ───────── 13 nov · La Salute letta mentre il signore parla (12.0 (17), il signore: «crea una nuova build… con massima competenza») ─────────
+// Prima, davanti a «come ho dormito?», il cervello chiedeva al telefono di leggere Salute e aspettava: andata, lettura, ritorno, poi
+// la risposta (13 nov: 8,2 e 6,1 secondi dal suo silenzio al primo suono). Ora il dispositivo legge Salute mentre il signore parla e la
+// manda con la domanda («salute_pronta»): l'iPhone quando le parole parlano di salute, l'orologio sempre (watchOS non ha le parole dal
+// vivo). La riga entra nel contesto solo se la domanda è sulla salute; se il modello chiede comunque salute_riepilogo (o, dall'orologio,
+// salute_battito), la risposta parte da qui, senza tornare al dispositivo. I dati non si salvano da nessuna parte.
+type SalutePronta = { riepilogo?: string; battito?: string };
+const SALUTE_VALIDA_MS = 3 * 60_000;
+/// La domanda parla di sonno, riposo, battito, passi o allenamenti.
+const DOMANDA_SALUTE = /\b(?:dorm\w*|sonn[oi]\w*|pisolin\w*|riposat\w*|riposo|addormentat\w*|svegliat\w*|insonnia|a letto|nel letto|battit[oi]\w*|pulsazion\w*|frequenza cardiaca|(?:quanti|i|dei|miei)\s+passi|passi (?:di oggi|di ieri|fatti|che ho fatto)|camminat\w*|allenament\w*|calorie|vitals|come sto)\b/i;
+
+function salutePronta(x: unknown): SalutePronta | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  const eta = Number(o.eta_ms);
+  if (!Number.isFinite(eta) || eta < 0 || eta > SALUTE_VALIDA_MS) return null;
+  const json = (v: unknown) => (typeof v === "string" && v.trim().startsWith("{") && v.length <= 12_000 ? v.replace(/\s+/g, " ").trim() : undefined);
+  const s: SalutePronta = { riepilogo: json(o.riepilogo), battito: json(o.battito) };
+  return s.riepilogo || s.battito ? s : null;
+}
+
+/// La riga del contesto (una riga sola: il contesto finisce alla prima riga vuota).
+function rigaSalute(s: SalutePronta, dispositivo: string): string {
+  const parti = [s.riepilogo ? `riepilogo: ${s.riepilogo}` : "", s.battito ? `battiti delle ultime ore: ${s.battito}` : ""].filter(Boolean);
+  return `\n[Salute letta adesso dal dispositivo (${dispositivo === "orologio" ? "orologio" : "iPhone"}) mentre il signore parlava: usa questi dati e non chiamare salute_riepilogo${s.battito ? " né salute_battito" : ""}. ${parti.join(" · ")}]`;
+}
+
+/// 13 nov (punto 5): un'azione detta fatta senza nessuno strumento in tutto il turno («lo segno», «lo conto», «l'ho salvato»…) resta
+/// nei registri (jarvis_consumi, «promessa_vuota»): così i controlli la trovano.
+const PROMESSA_VUOTA = /(?:\b(?:lo|la|li|le)\s+(?:segno|conto|annoto|salvo|registro|aggiungo)\b|\bl['’]ho\s+(?:segnat|salvat|annotat|aggiunt|registrat)\w*|\bho\s+(?:segnato|salvato|annotato|preso nota)\b|\bprendo nota\b|\b(?:glie|te)l[oa]\s+ricordo\b|\bla avviso\b|^\s*(?:segnato|annotato|salvato)\b)/i;
+function segnaPromessaVuota(testo: string, strumenti: number, dispositivo: string) {
+  if (strumenti > 0 || !PROMESSA_VUOTA.test(testo)) return;
+  inSottofondo(db.from("jarvis_consumi").insert({ servizio: "promessa_vuota", app: { testo: testo.slice(0, 300), dispositivo } }).then(() => {}, () => {}));
+}
+/// Gli strumenti usati dall'ultima frase vera del signore (il turno in corso, anche se è passato dal dispositivo).
+function strumentiDelTurno(lavoro: any[]): number {
+  let n = 0;
+  for (let k = lavoro.length - 1; k >= 0; k--) {
+    const m = lavoro[k];
+    if (m?.role === "user" && (typeof m.content === "string" || (Array.isArray(m.content) && !m.content.some((b: any) => b?.type === "tool_result")))) break;
+    if (m?.role === "assistant" && Array.isArray(m.content)) n += m.content.filter((b: any) => b?.type === "tool_use" || b?.type === "server_tool_use").length;
+  }
+  return n;
+}
+
 const STATI: Record<string, string> = {
   web_search: "cerco sul web", meteo: "guardo il meteo", serata_riepilogo: "faccio i conti della serata", dati_leggi: "consulto le serate",
   bar_magazzino: "controllo bar e magazzino", immagini_cerca: "cerco le immagini", diagnostica: "controllo tutti i collegamenti",
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
   credito: "controllo il credito", impegni_conferma: "segno gli impegni", prodotto_scansiona: "leggo l'etichetta", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
   posta_priorita: "smisto la posta", posta_rispondi: "spedisco la risposta", radar_pioggia: "guardo il radar",
-  discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
+  discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", riposo_segna: "segno il riposo", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
 };
 
 Deno.serve(async (req) => {
@@ -4645,6 +4798,7 @@ Deno.serve(async (req) => {
     const contaminato = lavoro.some((m: any) => Array.isArray(m?.content)
       && m.content.some((b: any) => (b?.type === "server_tool_use" || b?.type === "tool_use") && NON_FIDATI.has(b.name)));
     if (!contaminato) inSottofondo(memoriaAutomatica(lavoro, testo, String(corpo.dispositivo ?? "iphone")));
+    segnaPromessaVuota(testo, strumentiDelTurno(lavoro), String(corpo.dispositivo ?? "iphone"));   // 13 nov (punto 5)
     inSottofondo(registraGiornata(lavoro, testo, String(corpo.dispositivo ?? "iphone"), contaminato));
     return json({ ok: true });
   }
@@ -4884,8 +5038,17 @@ Deno.serve(async (req) => {
   };
   const segnaEsito = (esito: unknown) => { if (richiestaValida) db.from("jarvis_richieste").update({ esito }).eq("id", numeroRichiesta).then(() => {}, () => {}); };
   const { tools, client } = strumentiPer(Array.isArray(corpo.strumenti_client) ? corpo.strumenti_client.map(String) : [], strumentiDescritti(corpo.strumenti_client_def));
+  // 13 nov: la Salute letta dal dispositivo mentre il signore parlava (se è arrivata ed è fresca)
+  const saluteQui = salutePronta(corpo.salute_pronta);
+  /// Uno strumento di Salute a cui si risponde da qui, con i dati arrivati: il dispositivo li ha appena letti (nil: va chiesto a lui).
+  const dallaSalutePronta = (b: any): string | null => {
+    if (!saluteQui || !client.has(b?.name)) return null;
+    if (b.name === "salute_riepilogo" && saluteQui.riepilogo) return saluteQui.riepilogo;   // letta con 7 giorni di allenamenti: copre ogni richiesta
+    if (b.name === "salute_battito" && saluteQui.battito && (b.input?.ore == null || Number(b.input.ore) === 3)) return saluteQui.battito;
+    return null;
+  };
   // posizione dell'iPhone (se l'app la manda) e ultima foto del turno: servono alla seconda memoria
-  const turno: Turno = { ip: ipChiamante };
+  const turno: Turno = { ip: ipChiamante, salute: saluteQui };
   const p = corpo.posizione;
   if (p && typeof p.lat === "number" && typeof p.lon === "number" && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180) {
     turno.lat = p.lat; turno.lon = p.lon; if (typeof p.precisione === "number") turno.precisione = p.precisione;
@@ -4920,6 +5083,8 @@ Deno.serve(async (req) => {
       // 24 ott: i tempi del turno, una riga in jarvis_consumi (servizio «turno», o «turno_seguito» quando torna dal dispositivo):
       // ms_prima_parola = dall'arrivo della richiesta alla prima parola mandata all'app; ms_totale = fino alla fine del turno
       let primaTurno: number | null = null, modelloTurno: string | null = null, turnoSegnato = false;
+      // 13 nov: la Salute arrivata con la domanda: «arrivata» (non serviva), «contesto» (nella riga), «da_qui» (strumento risposto qui)
+      const saluteUso = new Set<string>(saluteQui ? ["arrivata"] : []);
       let soloTrascritto = false;   // idea D: mandato «trascritto», Claude non ancora partito (se l'app chiude ora era un suo comando)
       let filoDopo: (() => void) | null = null;   // idea D: l'aggiornamento del filo, dopo il primo giro con Claude
       const segnaTempi = (esito: string) => {
@@ -4936,6 +5101,7 @@ Deno.serve(async (req) => {
         inSottofondo(db.from("jarvis_consumi").insert({
           servizio: corpo.continua ? "turno_seguito" : "turno", modello: modelloTurno, esito,
           ms_prima_parola: primaTurno ? primaTurno - arrivo : null, ms_totale: Date.now() - arrivo,
+          ...(saluteUso.size ? { app: { salute: [...saluteUso].filter((x) => saluteUso.size === 1 || x !== "arrivata").join("+") } } : {}),
         }).then(() => {}, () => {}));
       };
       try {
@@ -5134,12 +5300,18 @@ Deno.serve(async (req) => {
           const primaDiLuiTesto = typeof storia.at(-2)?.content === "string" ? storia.at(-2).content : "";
           const accettata = storia.at(-2)?.role === "assistant" && haChiesto(primaDiLuiTesto) && ASSENSO.test(senzaRichiamo(ultimaDomanda));
           const notaAccettata = accettata ? `\n[Nota dell'app: il signore ha appena accettato quello che gli hai proposto nella tua ultima risposta: fallo subito, senza chiedere di nuovo da dove cominciare o cosa intende.]` : "";
+          // 13 nov: la Salute letta mentre parlava entra solo se serve: domanda sulla salute, seguito breve di una risposta sulla salute,
+          // risposta alla domanda del diario della sera (che salva sonno, battito e passi)
+          const sullaSalute = saluteQui !== null && !briefingModo && (DOMANDA_SALUTE.test(ultimaDomanda)
+            || (storia.at(-2)?.role === "assistant" && (/^\s*Diario(?: della sera)?, Sir\b/.test(primaDiLuiTesto) || (DOMANDA_SALUTE.test(primaDiLuiTesto) && ultimaDomanda.length <= 120))));
+          const notaSalute = sullaSalute ? rigaSalute(saluteQui!, dispositivo) : "";
+          if (sullaSalute) saluteUso.add("contesto");
           const [episodiCr, altriCr, apertoCr, giaCr] = await extra;
           const senzaFoto = !corpo.immagine && !(Array.isArray(corpo.immagini) && corpo.immagini.length);
           // A1: il cervello dice se il signore ha finito (solo app nuove, a voce, e non subito dopo un'attesa)
           aspettoAttivo = corpo.capisce_aspetto === true && corpo.a_voce === true && corpo.dopo_aspetto !== true && senzaFoto;
           // P5: la frase l'ha presa il microfono sempre acceso, senza «Jarvis»: se non era per lui, tace (mai con il suo nome dentro)
-          silenzioAttivo = corpo.capisce_silenzio === true && corpo.ascolto_libero === true && corpo.a_voce === true && senzaFoto && !NOMI_JARVIS.test(ultimaDomanda);
+          silenzioAttivo = corpo.capisce_silenzio === true && corpo.ascolto_libero === true && corpo.a_voce === true && senzaFoto && !NOMI_JARVIS.test(ultimaDomanda) && !NOMI_JARVIS_INIZIO.test(ultimaDomanda);
           // P6: dopo una frase a metà e qualche secondo di silenzio, la domanda sul punto
           const dopoRisposta = Number.isFinite(Number(corpo.dopo_risposta_s)) && corpo.dopo_risposta_s !== null ? Number(corpo.dopo_risposta_s) : null;
           const notaRecupero = corpo.recupero === "nome" ? NOTA_RECUPERO_NOME : corpo.recupero === "libero" ? NOTA_RECUPERO_LIBERO : "";
@@ -5151,7 +5323,7 @@ Deno.serve(async (req) => {
           briefingConPosta = blocco?.conPosta === true;
           // un passaggio solo quando i dati ci sono tutti: il telefono ha mandato calendario e salute, o non ha strumenti suoi (le 9)
           briefingUnico = !!blocco && (telefonoBriefing !== null || client.size === 0);
-          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaAspetto}${notaBriefing}\n\n${ultimo}`;
+          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaSalute}${notaAspetto}${notaBriefing}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) turno.foto = imgs[0];
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
@@ -5226,7 +5398,9 @@ Deno.serve(async (req) => {
           if (r.stop_reason === "pause_turn") continue; // ricerca web lunga: si rimanda il messaggio così com'è
           // 11 nov · anticipo: davanti a uno strumento ci si ferma (mail, messaggi, chiamate, note: niente parte prima che il signore
           // abbia davvero finito di parlare). L'app, se adotta l'anticipo, rimanda il lavoro con «esegui».
-          if (anticipo && r.stop_reason === "tool_use") {
+          const soloSalutePronta = r.stop_reason === "tool_use" && r.content.some((b: any) => b.type === "tool_use")
+            && r.content.filter((b: any) => b.type === "tool_use").every((b: any) => dallaSalutePronta(b) !== null);
+          if (anticipo && r.stop_reason === "tool_use" && !soloSalutePronta) {
             invia({ t: "sospeso", lavoro, modello: rapida ? `${modello}|voce` : modello, azioni, detto });
             segnaTempi("anticipo_sospeso");
             chiudi(); return;
@@ -5243,6 +5417,7 @@ Deno.serve(async (req) => {
             // la prova generale non lascia ricordi; un turno che ha letto testo altrui (web, email, trascrizioni) nemmeno;
             // 11 nov: un anticipo nemmeno (il signore forse stava ancora parlando: la frase vera arriva col turno dopo)
             if (!provaGenerale && !contaminato && !anticipo) inSottofondo(memoriaAutomatica(lavoro, testo, dispositivo));
+            if (!provaGenerale && !anticipo) segnaPromessaVuota(testo, strumentiDelTurno(lavoro), dispositivo);   // 13 nov (punto 5)
             // la notte di JARVIS: solo le frasi del signore (il briefing chiede al cervello con senza_filo: non è lui che parla)
             if (!provaGenerale && !anticipo && corpo.senza_filo !== true) inSottofondo(registraGiornata(lavoro, testo, dispositivo, contaminato));
             if (!provaGenerale) inSottofondo(completaVettori());   // le righe nuove di memoria, ricordi, note e diario prendono il loro vettore
@@ -5257,6 +5432,8 @@ Deno.serve(async (req) => {
               risultatiServer.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify({ errore: FERMATO }) });
               continue;
             }
+            const pronta = dallaSalutePronta(b);   // 13 nov: il dispositivo l'ha appena letta e mandata con la domanda
+            if (pronta !== null) { risultatiServer.push({ type: "tool_result", tool_use_id: b.id, content: pronta }); saluteUso.add("da_qui"); continue; }
             if (client.has(b.name)) { richieste.push({ id: b.id, name: b.name, input: b.input ?? {} }); continue; }
             if (STATI[b.name]) invia({ t: "stato", d: STATI[b.name] });
             let out: any; try { out = await eseguiConLimite(b.name, b.input ?? {}, turno); } catch (e) { out = { errore: (e as Error).message }; }

@@ -149,7 +149,7 @@ async function provaCervello(slug: string) {
   }));
   // 11 nov (#15): due prove del dialogo, oltre alle tre domande; 12 nov (P7): le prove del dialogo umano (le «avvisi» non fermano
   // la pubblicazione: un modello può sbagliare una volta un giudizio; le altre sì)
-  const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug), provaBriefing(slug)]);
+  const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug), provaBriefing(slug), provaSalutePronta(slug)]);
   const umano = await provaDialogo(slug);
   const tutte = [...esiti, ...dialogo, ...umano.filter((e) => e.bloccante)];
   const avvisi = umano.filter((e) => !e.bloccante);
@@ -201,6 +201,23 @@ async function provaBriefing(slug: string) {
     if (usati.length) return { ok: false, d: `briefing pronto → ha usato strumenti (${usati.join(", ")}): non è un passaggio solo` };
     return { ok: !!testo, d: `briefing pronto (un passaggio) → ${testo.slice(0, 120) || "nessuna risposta"}` };
   } catch (e) { return { ok: false, d: `briefing pronto → ${(e as Error).message.slice(0, 120)}` }; }
+}
+
+/// 13 nov (12.0 (17), cervello v135): la Salute letta dal telefono mentre il signore parla arriva con la domanda. Il cervello risponde
+/// in un passaggio solo, senza tornare al telefono (se il modello chiede comunque salute_riepilogo, la risposta parte dai dati arrivati).
+async function provaSalutePronta(slug: string) {
+  try {
+    const riepilogo = JSON.stringify({ sonno: { totale: "6 h 40 min", addormentato_alle: "01:10", sveglio_alle: "07:50" },
+      pisolini_oggi: [{ da: "16:05", a: "17:35", durata: "1 h 30 min" }], riposo_totale_oggi: "8 h 10 min",
+      battito_a_riposo: { ultimo: 56, del: "oggi", media_7_giorni: 60 }, passi: { ieri: 9100, oggi_finora: 4200 } });
+    const righe = await chiedi(slug, { a_voce: true, strumenti_client: ["salute_riepilogo"], salute_pronta: { riepilogo, eta_ms: 900 },
+      messaggi: [{ role: "user", content: "Prova generale: come ho dormito? Una frase sola.", quando: Date.now() }] });
+    const errore = righe.find((x) => x?.t === "errore");
+    if (errore) return { ok: false, d: `salute pronta → errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` };
+    if (righe.some((x) => x?.t === "client")) return { ok: false, d: "salute pronta → è tornato al telefono a leggere Salute" };
+    const testo = String(righe.find((x) => x?.t === "fine")?.testo ?? "").trim();
+    return { ok: !!testo, d: `salute pronta (un passaggio) → ${testo.slice(0, 120) || "nessuna risposta"}` };
+  } catch (e) { return { ok: false, d: `salute pronta → ${(e as Error).message.slice(0, 120)}` }; }
 }
 
 /// La risposta anticipata: con uno strumento si ferma («sospeso»), poi l'app la fa ripartire (continua con «esegui») e arriva in fondo.
