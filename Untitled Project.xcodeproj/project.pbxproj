@@ -103,7 +103,6 @@
 				chatsvuota.m4a,
 				clicktesta.m4a,
 				corpo.bin,
-				filo.m4a,
 				OlogrammiSezioni.swift,
 				OlogrammiNuovi.swift,
 				ProveOlo.swift,

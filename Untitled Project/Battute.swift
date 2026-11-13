@@ -452,7 +452,8 @@ enum Battute {
     }
 }
 
-// MARK: - 12.0 (16) · Il dialogo: i messaggi preparati, i widget FILO, il congedo, la fretta delle frasi secche
+// MARK: - 12.0 (16) · Il dialogo: i messaggi preparati, i widget FILO, il congedo, la fretta delle frasi secche (solo iPhone e Mac: il filo e il dialogo non sono sul polso)
+#if os(iOS)
 
 extension Battute {
     /// I numeri detti: 3 → «tre», 25 → «venticinque».
@@ -533,3 +534,4 @@ extension Battute {
     }
     private static var segniFretta: [(quando: Date, peso: Int)] = []
 }
+#endif
