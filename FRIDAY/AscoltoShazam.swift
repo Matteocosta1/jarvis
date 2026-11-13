@@ -100,22 +100,6 @@ final class AscoltoShazam: ObservableObject {
         await playPausa()
     }
 
-    /// Il tasto YOUTUBE: il video della canzone (l'audio di Apple si ferma, YouTube vuole che il video si veda).
-    func video(titolo: String, artista: String) async {
-        let mio = giro
-        cercando = true
-        defer { if mio == giro { cercando = false } }
-        let (lista, e) = await CercaVideo.cerca("\(titolo) \(artista)")
-        guard mio == giro else { return }
-        guard let v = lista.first else { errore = e ?? "Nessun video per questa canzone, Sir."; return }
-        fermaAudio()
-        audioDaMusica()
-        videoRiserva = lista.dropFirst().map(\.id)
-        videoID = v.id
-        fonte = .video
-        errore = nil
-    }
-
     /// 9 nov (il signore: il video di riserva): il lettore di YouTube dice che questo video qui non si può guardare (chi l'ha
     /// caricato non lo permette, rimosso, privato…): parte da solo il prossimo trovato per la stessa canzone. Finiti, lo dice.
     func videoNonDisponibile(_ id: String, codice: Int) {

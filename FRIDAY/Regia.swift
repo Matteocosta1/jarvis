@@ -61,7 +61,7 @@ final class Regia {
 
     /// Le strade della schermata principale (le collega ContentView).
     enum Strada {
-        case apri(Reparto), pagina(String), chiudi(String), chiudiTutto, daParte, diPrima, sfoglia
+        case apri(Reparto), chiudi(String), chiudiTutto, daParte, diPrima, sfoglia
     }
     /// Esegue una strada (ContentView).
     var vai: ((Strada) -> Void)?
@@ -275,7 +275,6 @@ final class Regia {
         }
         // 12.0 (16): il filo del discorso, il lavoro insieme, la fretta (subito dopo davanti: se la riga è lunga si accorcia altro)
         if let f = Filo.condiviso.perCervello() { pezzi.append(f) }
-        if let ses = Sessione.condivisa.perCervello() { pezzi.append(ses) }
         if Battute.umore == .fretta { pezzi.append("RITMO: il signore ha fretta: rispondi in una riga sola (se poi dice «dimmi meglio», la versione intera)") }
         let dietro = aperte.map(\.sezione.nome).filter { $0 != nomeDavanti }
         for n in dietro.suffix(6) {
@@ -931,7 +930,6 @@ final class Regia {
     }
 
     static let destinazioni: [Destinazione] = [
-        Destinazione(nome: "Meteo", chiavi: ["meteo", "tempo", "previsioni"], strada: .apri(.meteo)),
         Destinazione(nome: "Spesa", chiavi: ["spesa", "lista", "listadellaspesa", "listaspesa"], strada: .apri(.spesa)),
         Destinazione(nome: "Email", chiavi: ["email", "posta", "mail", "mails"], strada: .apri(.email)),
         Destinazione(nome: "Messaggi", chiavi: ["messaggi", "messaggio", "sms", "whatsapp"], strada: .apri(.messaggi)),
@@ -940,39 +938,20 @@ final class Regia {
         Destinazione(nome: "Foto", chiavi: ["foto", "fotografie", "galleria", "rullino"], strada: .apri(.foto)),
         Destinazione(nome: "Diario", chiavi: ["diario"], strada: .apri(.diario)),
         Destinazione(nome: "Sonno", chiavi: ["sonno", "dormito"], strada: .apri(.sonno)),
-        Destinazione(nome: "Cuore", chiavi: ["cuore", "battito", "battiti"], strada: .apri(.cuore)),
-        Destinazione(nome: "Briefing", chiavi: ["briefing", "riepilogo", "giornata"], strada: .apri(.briefing)),
-        Destinazione(nome: "Serata", chiavi: ["serata", "incassi", "conti", "contidellaserata"], strada: .apri(.serata)),
-        Destinazione(nome: "Bea", chiavi: ["bea", "beatrice"], strada: .apri(.bea)),
-        Destinazione(nome: "Satellite", chiavi: ["satellite", "mappa", "mappe", "intelligence", "travel", "viaggio"], strada: .apri(.satellite)),
         Destinazione(nome: "Ricordi", chiavi: ["ricordi", "traccia", "luoghi"], strada: .apri(.ricordi)),
         Destinazione(nome: "Scanner", chiavi: ["scanner", "codiceabarre", "barcode"], strada: .apri(.scanner), dopoLaVoce: true),
-        Destinazione(nome: "Shazam", chiavi: ["shazam"], strada: .apri(.shazam), dopoLaVoce: true),
         Destinazione(nome: "Occhi", chiavi: ["occhi", "fotocamera", "camera"], strada: .apri(.occhi), dopoLaVoce: true),
         Destinazione(nome: "Cucina", chiavi: ["cucina", "frigo", "dispensa"], strada: .apri(.cucina), dopoLaVoce: true),
-        Destinazione(nome: "Sentinella", chiavi: ["sentinella", "guardia"], strada: .apri(.sentinella), dopoLaVoce: true),
-        Destinazione(nome: "Wiretap", chiavi: ["wiretap", "registrazione", "riunione", "registratore"], strada: .apri(.wiretap), dopoLaVoce: true),
-        Destinazione(nome: "Profiler", chiavi: ["profiler", "profilo"], strada: .apri(.profiler), dopoLaVoce: true),
         Destinazione(nome: "Trainer", chiavi: ["trainer", "allenatore", "personaltrainer", "allenamento"], strada: .apri(.allenatore), dopoLaVoce: true),
-        Destinazione(nome: "LiDAR", chiavi: ["lidar", "scansione", "stanza"], strada: .apri(.lidar), dopoLaVoce: true),
         Destinazione(nome: "Interprete", chiavi: ["interprete", "traduttore", "traduzione"], strada: .apri(.interprete), dopoLaVoce: true),
-        Destinazione(nome: "Browser", chiavi: ["browser", "internet", "web", "google"], strada: .apri(.browser)),
         Destinazione(nome: "EDITH", chiavi: ["edith", "sicurezza"], strada: .apri(.edith)),
-        Destinazione(nome: "Costi", chiavi: ["costi", "spese", "consumi"], strada: .apri(.costi)),
-        Destinazione(nome: "GitHub", chiavi: ["github", "cantiere", "repository"], strada: .apri(.github)),
-        Destinazione(nome: "Supabase", chiavi: ["supabase", "salamacchine", "database"], strada: .apri(.supabase)),
-        Destinazione(nome: "Archivio", chiavi: ["archivio", "file", "documenti"], strada: .apri(.archivio)),
-        Destinazione(nome: "Sistemi", chiavi: ["sistemi"], strada: .apri(.sistemi)),
-        Destinazione(nome: "Impostazioni", chiavi: ["impostazioni", "settaggi", "opzioni"], strada: .apri(.impostazioni)),
         Destinazione(nome: "Vitals", chiavi: ["vitals", "parametri", "salute"], strada: .apri(.vitals)),
         Destinazione(nome: "Confidente", chiavi: ["confidente", "sfogo"], strada: .apri(.confidente), dopoLaVoce: true),
-        Destinazione(nome: "Studio", chiavi: ["studio", "laboratorio", "officina"], strada: .pagina("Studio")),
-        Destinazione(nome: "Social", chiavi: ["social", "instagram"], strada: .pagina("Social")),
     ]
 
     /// Le sezioni che si presentano alla regia (stato e azioni): per le altre JARVIS vede la riga di `Schermo` e non aspetta che
     /// si presentino. Si aggiorna quando una sezione entra nella regia.
-    static let conLaRegia: Set<String> = ["Social", "Spesa", "Email", "Meteo", "Briefing", "Musica", "Messaggi", "Telefono", "Bea", "Diario", "Sonno", "Cuore", "Shazam", "Foto", "Serata", "Ricordi", "Satellite", "GitHub", "Supabase", "Archivio", "Costi", "EDITH", "Vitals"]
+    static let conLaRegia: Set<String> = ["Spesa", "Email", "Musica", "Messaggi", "Telefono", "Diario", "Sonno", "Foto", "Ricordi", "EDITH", "Vitals"]
 
     static func destinazione(_ nome: String) -> Destinazione? {
         let k = chiave(nome)

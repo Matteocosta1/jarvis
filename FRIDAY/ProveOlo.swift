@@ -708,7 +708,6 @@ struct ProveOloVista<Simboli: View>: View {
         crea(i)
         inizio = Date()
         ritocco += 1
-        PonteTelefono.condiviso.invia()                           // il polso segue la scelta
     }
 }
 

@@ -35,23 +35,15 @@ enum Vocabolario {
 enum Pronunce {
     /// (nome giusto, come può arrivare scritto): parole già in minuscolo, senza accenti né punteggiatura; le più lunghe prima.
     nonisolated static let varianti: [(giusto: String, modi: [String])] = [
-        ("lidar", ["lai dar s", "lai dar", "lay dar", "lai der", "lie dar", "laidar", "lai da", "laider", "leader", "l idar", "lidarr", "layder", "raider", "li dar", "laida", "lider", "lyder", "li da", "lida"]),
         ("edith", ["edit h", "e dith", "i dith", "editth", "editte", "editti", "eddith", "hedith", "heidit", "editto", "e dit", "i dit", "editt", "edyth", "edite", "idith", "iditt", "iddit", "edito", "edita", "eddie", "heidi", "edeth", "edit", "edid", "idit", "idid", "eddy", "edi", "idi"]),
         ("vitals", ["vai tel s", "vai tels", "vaitels", "vitels", "vai tal s", "white als", "vai tals", "wait als", "vai tal", "vital s", "vaitals", "vaitols", "waitals", "vitalls", "baitals", "vitaels", "vitali", "vaital", "vaitol", "vaitls", "vitols", "bitals", "fitals", "vital"]),
-        ("briefing", ["bri ffing", "bri fing", "brief in", "briffing", "breefing", "brifing", "briefin", "prifing", "brifin", "brief", "brif"]),
-        ("shazam", ["scia zam", "sha zam", "sha sam", "sha zan", "sciazam", "shazaam", "sciasam", "shazamm", "sciazan", "shazzam", "shazan", "chazam"]),
         ("scanner", ["scanners", "skanner", "scannar", "scaner", "skaner", "scanne", "scan"]),
-        ("profiler", ["pro fai ler", "pro failer", "pro filer", "profailer", "profiller", "profayler", "proviler"]),
-        ("wiretap", ["waiter tap", "uaier tap", "uaier tep", "where tap", "wire tape", "waitertap", "uair tap", "wair tap", "wear tap", "wire tab", "uaia tap", "wire tap", "uaiertep", "uaiertap", "uairtap", "waretap"]),
-        ("github", ["ghit hab", "ghit hub", "git hub", "kit hub", "ghi tab", "ghithub", "git ab", "ghitab", "githab", "gitab"]),
-        ("supabase", ["super base", "supa base", "supa beis", "supa beys", "suba base", "superbase", "supa bas", "supabeis"]),
         ("email", ["i meil", "i mail", "e mail", "imeil", "imail", "emeil"]),
-        ("browser", ["brau ser", "brausser", "brauser", "brouser", "brawser"]),
     ]
 
     /// Storpiature che sono anche parole normali («il leader», «il Lidl», «uno scan»): valgono solo in una frase di comando.
-    nonisolated static let soloConVerbo: Set<String> = ["leader", "raider", "lider", "lida", "li da", "brief", "brif", "scan",
-                                                        "vital", "vitali", "idi", "edi", "eddie", "eddy", "heidi", "edita", "edito", "editto", "e mail"]
+    nonisolated static let soloConVerbo: Set<String> = ["scan", "vital", "vitali", "idi", "edi", "eddie", "eddy", "heidi", "edita", "edito",
+                                                        "editto", "e mail"]
     nonisolated static let verbiComando: Set<String> = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai",
                                                         "entra", "fammi", "portami", "vediamo", "chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"]
 
@@ -101,43 +93,37 @@ enum Seguito {
 
 /// I reparti che si aprono a voce.
 enum Reparto: String, Identifiable, Equatable {
-    // INTELLIGENCE e sensi
-    case sentinella, occhi, giro, profiler, wiretap, cucina, scanner
-    case satellite                       // build 23: SATELLITE, in INTELLIGENCE prima di Bea
+    // i sensi
+    case occhi, giro, cucina, scanner
     // le schede della corona
-    case diario, sonno, cuore, vitals, confidente, allenatore, bea
-    case briefing, meteo, email, spesa
-    case shazam, foto
-    case ricordi, interprete, browser, serata, messaggi, telefono, lidar
-    // SISTEMI
-    case github, supabase, archivio, costi, edith
-    // la schermata principale: il menu SISTEMI, le impostazioni, il cestino
-    case sistemi, impostazioni, pulisci
-    // build 23: MUSICA, l'icona in alto prima di SISTEMI
+    case diario, sonno, vitals, confidente, allenatore
+    case email, spesa
+    case foto
+    case ricordi, interprete, messaggi, telefono
+    case edith
+    // la schermata principale: il cestino
+    case pulisci
+    // build 23: MUSICA, l'icona in alto
     case musica
     var id: String { rawValue }
 
-    /// La frase di JARVIS quando apre il reparto (il Wiretap tace: registrerebbe sé stesso; le schede parlano da sole).
+    /// La frase di JARVIS quando apre il reparto (le schede parlano da sole).
     /// 12.0 (10) (il signore: «tante tante frasi… non le solite»): tante varianti in Battute.swift, mai due volte uguale; la prima
     /// di ogni sezione è quella di sempre.
     var annuncio: String? { Battute.apertura(self) }
 }
 
-/// I comandi vocali di JARVIS: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro», «torna».
+/// I comandi vocali: «apri il diario», «fai un giro», «torna».
 /// Riconosce solo frasi brevi con un verbo di comando, così le domande normali vanno al cervello come sempre.
 enum ComandoVocale: Equatable {
     case apri(Reparto)
     case torna
-    case lidar(AzioneLidar)                 // dentro LiDAR: «fine scansione», «quanto è grande?», «salva»…
-    case sentinella(AzioneSentinella)       // dentro la Sentinella: «Jarvis, chi è passato?», «Jarvis, schermo nero»
     case interprete(String)                 // «traduci in inglese», «interprete spagnolo»: apre l'Interprete già sulla lingua (codice: en, es…)
     case allenatore(AzioneAllenatore)       // dentro l'Allenatore: «Jarvis, fine serie», «Jarvis, quante ripetizioni?»…
     case dentroInterprete(AzioneInterprete) // dentro l'Interprete: «Jarvis, ascolta lui», «Jarvis, passa al francese»…
     case rapido(AzioneRapida)               // dalla schermata principale: apre la sezione e fa già la sua cosa
     case scheda(AzioneScheda)               // dentro una scheda: i suoi tasti a voce («ne parliamo», «incolla», «ti penso»…)
-    case profiler(AzioneProfiler)           // dentro il Profiler: «Jarvis, scatta», «Jarvis, si chiama Marco Rossi»…
     case domanda(String)                    // dentro una scheda: «dimmi», «com'ho dormito?»: chiude la scheda e chiede a JARVIS come il suo tasto
-    case pagina(sezione: String, voce: String?, scheda: String?)   // MARK X: STUDIO («crea una piastra…») e SOCIAL («apri Instagram»)
     // MARK XI (4 nov, approvati dal signore): le sezioni aperte, a voce. Li esegue la schermata principale, anche da dentro un
     // reparto col microfono. Sull'orologio (niente sezioni dietro) la frase va al cervello come prima.
     case chiudiSezioni                      // «Jarvis, chiudi tutto»: tutte le sezioni aperte, anche quelle dietro
@@ -158,40 +144,21 @@ enum ComandoVocale: Equatable {
     /// il nome di una sezione («app», «scheda», «sistemi», «fotocamera»…), e allora si chiude quella davanti.
     static func nomeSezione(_ p: String) -> String? {
         switch p {
-        case "lidar", "laidar", "planimetria": return "LiDAR"
         case "occhi", "cucina": return "Occhi"
-        case "meteo", "tempo": return "Meteo"
-        case "browser", "internet": return "Browser"
-        case "impostazioni": return "Impostazioni"
-        case "costi": return "Costi"
         case "edith", "edit": return "EDITH"
         case "diario": return "Diario"
         case "sonno": return "Sonno"
-        case "cuore": return "Cuore"
         case "vitals": return "Vitals"
-        case "briefing": return "Briefing"
         case "posta", "email", "mail": return "Email"
         case "spesa": return "Spesa"
         case "foto", "galleria": return "Foto"
-        case "serata": return "Serata"
         case "messaggi": return "Messaggi"
         case "telefono", "rubrica": return "Telefono"
-        case "bea": return "Bea"
         case "ricordi": return "Ricordi"
         case "confidente": return "Confidente"
-        case "github": return "GitHub"
-        case "supabase": return "Supabase"
-        case "archivio": return "Archivio"
         case "scanner": return "Scanner"
-        case "profiler": return "Profiler"
-        case "shazam": return "Shazam"
-        case "wiretap": return "Wiretap"
-        case "sentinella": return "Sentinella"
         case "interprete", "traduttore": return "Interprete"
         case "allenatore", "allenamento", "trainer", "treiner", "personal": return "Trainer"
-        case "satellite": return "Satellite"
-        case "studio": return "Studio"
-        case "social", "instagram", "insta": return "Social"      // «apri Instagram» apre Social: «chiudi Instagram» lo chiude
         default: return nil
         }
     }
@@ -225,115 +192,23 @@ enum ComandoVocale: Equatable {
         return nil
     }
 
-    /// 4 nov (il signore: «ok»): la ricerca su Google detta per esteso, da ovunque: «cerca su Google ristoranti a Milano»,
-    /// «cercami su Google…», «googla…», «googlami…», anche «cerca ristoranti a Milano su Google». Cosa cercare; nil se non è una
-    /// ricerca su Google («cerca…» da solo resta a JARVIS, che risponde lui).
-    static func ricercaGoogle(_ t: [String]) -> String? {
-        guard let verbo = t.first else { return nil }
-        var resto = Array(t.dropFirst())
-        if !["googla", "googlami"].contains(verbo) {
-            guard ["cerca", "cercami", "trova", "trovami"].contains(verbo), resto.count > 2 else { return nil }
-            let su: Set<String> = ["su", "in", "con"]
-            if su.contains(resto[0]), resto[1] == "google" { resto.removeFirst(2) }                                   // «cerca su google …»
-            else if resto[resto.count - 1] == "google", su.contains(resto[resto.count - 2]) { resto.removeLast(2) }   // «cerca … su google»
-            else { return nil }
-        }
-        return resto.isEmpty ? nil : resto.joined(separator: " ")
-    }
-
-    /// MARK X · le frasi di STUDIO e SOCIAL (VOCI del mockup). Studio: «apri lo studio», «apri l'archivio dello studio», «fai il plastico
-    /// della stanza», «porta il giardino nello studio», «crea/fammi/progettami» + un oggetto da stampare (o «in 3D», «da stampare»).
-    /// Social: «apri Instagram», «leggimi i messaggi di Instagram», «com'è andata la settimana su Instagram?», «cosa ho in programma su
-    /// Instagram?», «pubblica il pezzo dello Studio su Instagram». «Fammi un profilo», «fai un giro», «crea un promemoria» restano agli altri.
-    static func paginaMarkX(_ t: [String]) -> ComandoVocale? {
-        guard let primo = t.first else { return nil }
-        let s = " " + t.joined(separator: " ") + " "
-        func c(_ x: String) -> Bool { s.contains(x) }
-        let insta = c(" instagram ") || c(" insta ") || c(" social ")
-        if insta, t.count <= 10 {
-            if c(" pubblica ") && c(" studio ") { return .pagina(sezione: "Social", voce: nil, scheda: "STUDIO") }
-            if c(" messaggi ") || c(" commenti ") || c(" direct ") || c(" dm ") || c(" posta ") { return .pagina(sezione: "Social", voce: nil, scheda: "POSTA") }
-            if c(" settimana ") || c(" report ") || c(" statistiche ") || c(" com e andata ") || c(" follower ") || c(" numeri ") {
-                return .pagina(sezione: "Social", voce: nil, scheda: "REPORT")
-            }
-            if c(" in programma ") || c(" calendario ") || c(" programmati ") { return .pagina(sezione: "Social", voce: nil, scheda: "CALENDARIO") }
-            if t.count <= 4, t == ["instagram"] || t == ["social"] || ["apri", "aprimi", "vai", "mostrami", "portami"].contains(primo) {
-                return .pagina(sezione: "Social", voce: nil, scheda: nil)
-            }
-            return nil
-        }
-        let verbi: Set<String> = ["crea", "creami", "fammi", "modella", "modellami", "progetta", "progettami", "stampami", "disegnami"]
-        guard c(" studio ") || c(" plastico ") || verbi.contains(primo) else { return nil }
-        let detta = t.joined(separator: " ")
-        if t == ["studio"] || (t.count <= 4 && ["apri", "aprimi", "mostrami"].contains(primo) && c(" studio ") && !c(" archivio ")) {   // «portami allo studio» è SATELLITE
-            return .pagina(sezione: "Studio", voce: nil, scheda: nil)
-        }
-        if c(" studio ") && c(" archivio ") && t.count <= 7 { return .pagina(sezione: "Studio", voce: detta, scheda: nil) }
-        if c(" plastico ") || (c(" nello studio ") && ["porta", "portami", "manda", "metti"].contains(primo)) { return .pagina(sezione: "Studio", voce: detta, scheda: nil) }
-        // «crea …», «fammi …»: solo per un oggetto da stampare (o detto «in 3D», «da stampare»)
-        let stampa = c(" 3d ") || c(" tre d ") || c(" da stampare ") || c(" stampabile ")
-        guard verbi.contains(primo), t.count >= 3,
-              stampa || ["un", "una", "uno", "il", "la", "lo", "l", "dei", "degli", "delle", "due", "tre", "quattro", "cinque", "sei"].contains(t[1]) else { return nil }
-        let oggetti: Set<String> = ["casa", "casetta", "piastra", "piastrina", "scatola", "scatolina", "supporto", "ingranaggio", "ingranaggi", "vaso", "portapenne",
-            "gancio", "staffa", "cubo", "sfera", "cilindro", "cono", "piramide", "anello", "ruota", "mensola", "tazza", "coperchio", "contenitore", "vassoio",
-            "targa", "targhetta", "portachiavi", "statua", "statuetta", "modellino", "distanziale", "boccola", "perno", "manopola", "maniglia", "cornice",
-            "ciotola", "bicchiere", "lampada", "paralume", "organizer", "stand", "dock", "custodia", "cassetta", "fioriera", "sottobicchiere", "segnalibro",
-            "ciondolo", "robot", "pupazzo", "razzo", "castello", "torre", "tappo", "clip", "fermacavo", "passacavo", "piedino", "adattatore", "raccordo",
-            "alloggiamento", "piedistallo", "trofeo", "medaglia", "pedina", "prototipo", "pezzo", "oggetto", "portacellulare", "portatelefono", "reggilibri"]
-        if stampa || t.contains(where: { oggetti.contains($0) }) {
-            return .pagina(sezione: "Studio", voce: detta, scheda: nil)
-        }
-        return nil
-    }
-
-    /// I comandi di LiDAR (21 ott, chiesti dal signore); `modo`: le frasi del pannello A VOCE di ogni modo (build 23).
-    /// `modo`: il modo di LiDAR (il rawValue di ModoLidar: «Stanza», «Misura»…) e il nome per il gemello digitale («di Marco»).
-    enum AzioneLidar: Equatable { case fine, misure, capienza, salva, tre, modo(String, String?) }
-
-    /// LiDAR 23: le frasi dei modi, come le scrive il pannello A VOCE. Aprono LiDAR già sul modo e la scansione parte;
-    /// dentro LiDAR cambiano modo (o, sul risultato dello stesso modo, JARVIS dice i numeri).
-    static func modoLidar(_ t: [String]) -> (String, String?)? {
-        let s = t.joined(separator: " ")
-        let frasi: [(String, [String])] = [
-            ("Stanza", ["mappa la stanza", "scansione ambientale", "dammi la pianta"]),
-            ("Oggetto", ["digitalizza questo oggetto", "acquisisci l oggetto", "dimensioni dell oggetto", "calcola il volume"]),
-            ("Esterno", ["rilievo del terreno", "mappa il perimetro", "misura il giardino", "rilievo della facciata"]),
-            ("Evento", ["setup della sala", "set up della sala", "allestisci la sala", "metti il palco qui", "controlla le vie di fuga"]),
-            ("Corpo", ["analisi biometrica", "scansione postura", "analisi posturale", "misurami le spalle"]),
-            ("Misura", ["metro laser", "quanto e largo quel muro", "misura questa distanza", "quanto e alto il soffitto"]),
-            ("Statua", ["crea il gemello digitale", "gemello digitale", "digitalizza questa persona"]),
-        ]
-        for (m, l) in frasi where l.contains(s) { return (m, nil) }
-        // «gemello digitale di Marco», «crea il gemello digitale di Marco Rossi»: il nome va sul modello
-        if let k = t.firstIndex(of: "gemello"), k + 3 < t.count, t[k + 1] == "digitale", t[k + 2] == "di", t.count - (k + 3) <= 3,
-           t[..<k].allSatisfy({ ["crea", "il", "fai", "fammi", "un"].contains($0) }) {
-            return ("Statua", t[(k + 3)...].map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " "))
-        }
-        return nil
-    }
-    /// I comandi dentro la Sentinella: gli stessi due tasti in alto.
-    enum AzioneSentinella: Equatable { case registro, schermoNero }
     /// I comandi dentro l'Allenatore: i suoi tasti, più le domande sulla serie e la pausa.
     enum AzioneAllenatore: Equatable { case fineSerie, azzera, ripetizioni, postura, camera, pausa, riprendi, pronto, conta(ParteConteggio) }
     enum ParteConteggio: Equatable { case busto, mani, ginocchia, ologramma }
     /// I comandi dentro l'Interprete: i due tasti, la lingua, i turni, «ripeti».
     enum AzioneInterprete: Equatable { case ascoltaMe, ascoltaAltro, lingua(String), sceltaLingua, ripeti, turniAutomatici(Bool) }
     /// I comandi rapidi: la sezione si apre già al lavoro.
-    enum AzioneRapida: Equatable { case diario, confidente, cucina, riunione }   // «che canzone è?» no: lo fa già il cervello (riconosci_musica)
+    enum AzioneRapida: Equatable { case diario, confidente, cucina }   // «che canzone è?» no: lo fa già il cervello (riconosci_musica)
     /// I tasti delle schede, a voce (21 ott). Niente «cancella», «elimina», «svuota»: a voce sono troppo rischiosi.
     enum AzioneScheda: Equatable {
         case diarioAVoce, diarioNeParliamo
         case confidenteAVoce, confidenteIncolla
         case vitalsCome
-        case cuoreSOS
-        case beaTiPenso, beaChiama, beaMessaggio, beaWhatsApp, bea112
         case apriMail, postaRiassumi
         case spesaLeggi, spesaWhatsApp
         case occhiGiro, occhiGira, occhiZoomAvanti, occhiZoomIndietro, occhiZoomNormale
         case scannerAltro, scannerGiudizio, scannerIngredienti
     }
-    /// I tasti del Profiler, a voce, più la scheda del soggetto dettata.
-    enum AzioneProfiler: Equatable { case scatta, gira, rifai, profila, nome(String), ruolo(String) }
 
     /// Il codice della lingua se la frase finisce con una lingua («… in francese»).
     static func linguaFinale(_ t: [String]) -> String? {
@@ -348,7 +223,7 @@ enum ComandoVocale: Equatable {
     ]
 
     /// `serveJarvis`: dentro un reparto il comando deve cominciare con «Jarvis» (lì intorno parlano anche altri).
-    /// `dentro`: il reparto aperto, per i comandi che valgono solo lì («salva» in LiDAR, «chi è passato?» nella Sentinella).
+    /// `dentro`: il reparto aperto, per i comandi che valgono solo lì (i tasti delle schede, i comandi del Trainer).
     static func riconosci(_ frase: String, serveJarvis: Bool = false, dentro: Reparto? = nil) -> ComandoVocale? {
         var t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
             .lowercased()
@@ -361,37 +236,14 @@ enum ComandoVocale: Equatable {
             t.removeFirst()
         }
         if serveJarvis && !chiamato { return nil }
-        if dentro != .profiler { t = Pronunce.sistema(t) }        // «laidar» → lidar, «idit» → edith… (nel Profiler no: lì si dettano nomi)
+        t = Pronunce.sistema(t)                                   // «idit» → edith, «vai tals» → vitals…
         // MARK XI: «sezioni aperte», «quella di prima», «mettila da parte», «chiudi tutto» (prima di togliere «sezione»)
         if let n = navigazione(t) { return n }
-        #if os(iOS)
-        // 4 nov (il signore: «ok»): «cerca su Google …», «googla …» aprono il Browser da ovunque (anche chiuso o dietro) e cercano
-        // lì; col Browser davanti ci pensa già BrowserVoce, prima di qui. Prima di «sezione», dello Studio e dei video: «su Google» vince
-        if let q = ricercaGoogle(t) {
-            CercaWeb.richiesta = (q, Date())                    // il Browser la prende appena si apre o torna davanti (entro 8 s)
-            return .apri(.browser)
-        }
-        #endif
         // «apri la sezione meteo», «attiva sezione LiDAR»: la parola «sezione» (con l'articolo) non cambia il comando
         if let k = t.firstIndex(where: { $0 == "sezione" || $0 == "sezioni" }), k + 1 < t.count {
             t.remove(at: k)
             if k > 0, ["la", "le", "nella", "alla", "in"].contains(t[k - 1]) { t.remove(at: k - 1) }
         }
-        // MARK X · STUDIO e SOCIAL (le frasi del mockup, anche lunghe: «crea una piastra 80 per 40 per 4 con 4 fori»)
-        if let p = paginaMarkX(t) { return p }
-        #if os(iOS)
-        // MARK X · BROWSER VIDEO: «fammi vedere dei video di Daft Punk dal vivo», «cercami i video del Milan» (anche frasi lunghe)
-        if let k = t.firstIndex(where: { $0 == "video" || $0 == "filmati" }), k + 1 < t.count, t[..<k].contains(where: { ["fammi", "cercami", "cerca", "mostrami", "trovami", "metti", "voglio"].contains($0) }) {
-            var resto = Array(t[(k + 1)...])
-            if let p = resto.first, ["di", "del", "della", "dello", "dei", "degli", "delle", "su", "sul", "sulla", "con"].contains(p) { resto.removeFirst() }
-            if resto.last == "youtube" { resto.removeLast(); if resto.last == "su" { resto.removeLast() } }
-            if !resto.isEmpty, !resto.contains("jarvis") {
-                let q = resto.joined(separator: " ")
-                CercaVideo.richiesta = (q, Date())              // il Browser la prende appena si apre (entro 8 s)
-                return .apri(.browser)
-            }
-        }
-        #endif                                                  // (il Browser è solo dell'iPhone: l'orologio non conosce CercaVideo)
         guard !t.isEmpty, t.count <= 8 else { return nil }
         let s = " " + t.joined(separator: " ") + " "
         func c(_ x: String) -> Bool { s.contains(x) }
@@ -412,12 +264,10 @@ enum ComandoVocale: Equatable {
         if ["chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"].contains(t[0]), t.count <= 4 {
             let resto = Array(t.dropFirst()).filter { !["l", "la", "il", "lo", "le", "i", "gli", "da", "dal", "dalla", "dallo", "questa", "questo"].contains($0) }
             let generiche: Set<String> = ["app", "applicazione", "sezione", "scheda", "schermata", "pagina", "qui", "tutto", "scansione"]
-            let sezioni: Set<String> = ["lidar", "laidar", "planimetria", "occhi", "fotocamera", "camera", "cucina", "meteo", "tempo", "browser", "internet",
-                                        "impostazioni", "sistemi", "costi", "edith", "edit", "diario", "sonno", "cuore", "vitals", "briefing", "posta",
-                                        "email", "mail", "spesa", "foto", "galleria", "serata", "messaggi", "telefono", "rubrica", "bea", "ricordi",
-                                        "confidente", "github", "supabase", "archivio", "scanner", "profiler",
-                                        "shazam", "wiretap", "sentinella", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner", "personal",
-                                        "satellite", "studio", "social", "instagram", "insta"]
+            let sezioni: Set<String> = ["occhi", "fotocamera", "camera", "cucina", "edith", "edit", "diario", "sonno", "vitals", "posta",
+                                        "email", "mail", "spesa", "foto", "galleria", "messaggi", "telefono", "rubrica", "ricordi",
+                                        "confidente", "scanner", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner",
+                                        "personal"]
             if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) {
                 // MARK XI (4 nov, il signore): con il nome si chiude quella sezione, anche se è dietro («chiudi il meteo»);
                 // senza («chiudi la scheda», «chiudi qui», «chiudi la fotocamera») quella davanti, come sempre
@@ -426,29 +276,9 @@ enum ComandoVocale: Equatable {
                 return .torna
             }
         }
-        // «spegni la Sentinella»: come «torna». «Ferma il Wiretap», «ferma la registrazione» (4 nov, MARK XI): il Wiretap per nome,
-        // anche se registra dietro un'altra sezione (con del testo parte il verbale), non la sezione davanti
-        if t.count <= 4, ["spegni", "disattiva", "ferma"].contains(t[0]) {
-            if c(" wiretap ") || c(" wire tap ") || c(" registrazione ") { return .chiudiSezione("Wiretap") }
-            if c(" sentinella ") { return .torna }
-        }
 
         // i comandi che valgono solo dentro un reparto
         switch dentro {
-        case .lidar?:
-            if t.count <= 5 {
-                if c(" quante persone ") || c(" capienza ") || c(" quanta gente ") || c(" ci stanno ") { return .lidar(.capienza) }
-                if c(" quanto e grande ") || c(" quanto misura ") || c(" quanti metri ") || c(" metri quadri ") || c(" superficie ") || c(" misure ") { return .lidar(.misure) }
-                if c(" 3d ") || c(" tre d ") || c(" tre di ") || c(" modello ") || c(" ologramma ") { return .lidar(.tre) }
-                if c(" salva ") || c(" salvala ") || c(" salvalo ") || c(" salvami ") { return .lidar(.salva) }
-                if c(" fine ") || c(" finito ") || c(" ho finito ") || c(" termina ") { return .lidar(.fine) }   // «stop» no: è il «zitto» di sempre
-            }
-        case .sentinella?:
-            if c(" chi e passato ") || c(" chi c e stato ") || c(" registro ") || c(" cosa hai visto ") { return .sentinella(.registro) }
-            if c(" schermo nero ") || c(" oscura ") || c(" spegni lo schermo ") || c(" buio ") { return .sentinella(.schermoNero) }
-        case .wiretap?:
-            // il verbale: il Wiretap per nome (4 nov, MARK XI), così vale anche da dietro; con del testo parte il verbale
-            if t.count <= 4 && (c(" verbale ") || c(" fine riunione ") || c(" riunione finita ")) { return .chiudiSezione("Wiretap") }
         case .allenatore?:
             if c(" fine serie ") || c(" serie finita ") || c(" ho finito ") || c(" serie chiusa ") { return .allenatore(.fineSerie) }
             if c(" azzera ") || c(" ricomincia ") || c(" da capo ") { return .allenatore(.azzera) }
@@ -491,28 +321,11 @@ enum ComandoVocale: Equatable {
             if solo(generiche) || uno([" come sto ", " come sto messo ", " come sto andando ", " come va la salute ", " come mi vedi ", " sto bene ",
                     " che dicono ", " cosa dicono ", " analizzali ", " commentali ", " a che punto sono ", " com e la situazione ", " sto migliorando ",
                     " sto peggiorando ", " va tutto bene ", " come mi sto comportando ", " sto facendo bene "]) { return .scheda(.vitalsCome) }
-        case .cuore?:
-            if t.count <= 6, uno([" sos ", " chiedi aiuto ", " chiama aiuto ", " aiuto ", " sto male ", " mi sento male ", " chiama i soccorsi ", " emergenza "]) { return .scheda(.cuoreSOS) }
-            if solo(generiche + [" e normale ", " va bene ", " come sto "]) || uno([" come va il cuore ", " come sta il cuore ", " com e il battito ", " come e il battito ",
-                    " come batte ", " sono agitato ", " sono in ansia ", " batte forte ", " ho il cuore a mille ", " ho le palpitazioni "]) {
-                return .domanda("Come sta il mio cuore oggi? Guarda battito a riposo e variabilità.")
-            }
         case .sonno?:
             if solo(generiche) || uno([" come ho dormito ", " com ho dormito ", " quanto ho dormito ", " ho dormito bene ", " ho dormito male ", " come va il sonno ",
                     " sono stanco ", " perche sono stanco ", " dormo abbastanza ", " come dormo ", " stanotte ", " com e andata la notte "]) {
                 return .domanda("Come ho dormito stanotte? Dimmi anche come sta andando la settimana.")
             }
-        case .meteo?:
-            if solo(generiche + [" che tempo fa ", " che tempo fara ", " com e fuori ", " com e il tempo ", " ombrello ", " mi serve l ombrello ", " giacca ",
-                                 " mi serve la giacca ", " come mi vesto ", " piove ", " fa freddo ", " fa caldo "]) {
-                return .domanda("Che tempo fa qui nelle prossime ore? Mi serve l'ombrello o la giacca?")
-            }
-        case .briefing?:
-            if solo(generiche + [" briefing ", " il briefing ", " fammi il briefing ", " cosa c e oggi ", " cosa ho oggi ", " com e la giornata ", " la giornata ",
-                                 " buongiorno ", " partiamo ", " vai "]) {
-                return .domanda("Buongiorno Jarvis, il briefing per favore.")
-            }
-            if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri posta ", " vai su mail "]) { return .scheda(.apriMail) }
         case .ricordi?:
             if uno([" ricorda dove sono ", " ricordati questo posto ", " segna questo posto ", " salva questo posto ", " ricorda questo posto ", " segnati dove sono "]) {
                 return .domanda("Ricordati questo posto: dove sono adesso.")
@@ -520,15 +333,6 @@ enum ComandoVocale: Equatable {
             if uno([" com e andata oggi ", " cosa ho fatto oggi ", " la mia giornata "]) { return .domanda("Com'è andata oggi?") }
             if solo(generiche + [" cosa devo ricordare ", " cosa mi devo ricordare ", " cosa c e ", " promemoria ", " cosa ho promesso "]) {
                 return .domanda("Cosa mi devo ricordare? Promesse aperte e oggetti.")
-            }
-        case .bea?:
-            if t.count <= 7 {
-                if uno([" emergenza ", " 112 ", " centododici ", " cento dodici ", " chiama i soccorsi ", " soccorso "]) { return .scheda(.bea112) }
-                if uno([" ti penso ", " pensiero ", " qualcosa di carino ", " qualcosa di dolce ", " qualcosa di romantico ", " un messaggio carino ",
-                        " mandale un pensiero ", " dille che la penso ", " dille che la amo ", " falle una sorpresa ", " scrivile qualcosa "]) { return .scheda(.beaTiPenso) }
-                if solo([" whatsapp ", " su whatsapp ", " scrivile su whatsapp ", " whatsapp a bea ", " mandale un whatsapp "]) { return .scheda(.beaWhatsApp) }
-                if uno([" chiamala ", " chiama bea ", " telefonale ", " telefona a bea ", " fammi parlare con lei ", " voglio sentirla "]) { return .scheda(.beaChiama) }
-                if uno([" scrivile ", " mandale un messaggio ", " mandale un sms ", " scrivi a bea "]) { return .scheda(.beaMessaggio) }
             }
         case .email?:
             if uno([" apri mail ", " apri la mail ", " apri l app mail ", " apri l app della posta ", " apri posta ", " apri la posta ", " vai su mail "]) { return .scheda(.apriMail) }
@@ -559,34 +363,8 @@ enum ComandoVocale: Equatable {
             if uno([" ingredienti ", " cosa c e dentro ", " additivi ", " di cosa e fatto ", " cosa contiene ", " etichetta ", " composizione "]) { return .scheda(.scannerIngredienti) }
             if solo(generiche) || uno([" fa bene ", " fa male ", " e sano ", " e buono ", " lo compro ", " lo prendo ", " conviene ", " e una buona scelta ",
                     " voto ", " alternativa ", " c e di meglio ", " posso mangiarlo ", " lo posso prendere ", " giudizio "]) { return .scheda(.scannerGiudizio) }
-        case .profiler?:
-            // la scheda del soggetto dettata: «si chiama Marco Rossi», «è il fornitore audio», «lavora come gestore del locale»
-            func coda(dopo n: Int) -> String? { let r = t.dropFirst(n).joined(separator: " "); return r.isEmpty ? nil : r }
-            func maiuscole(_ x: String) -> String { x.split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ") }
-            if t.count >= 3, t[0] == "si", t[1] == "chiama", let n = coda(dopo: 2) { return .profiler(.nome(maiuscole(n))) }
-            if t.count >= 4, t[0] == "il", t[1] == "nome", t[2] == "e", let n = coda(dopo: 3) { return .profiler(.nome(maiuscole(n))) }
-            if t.count >= 2, ["nome", "chiamato", "chiamata"].contains(t[0]), let n = coda(dopo: 1) { return .profiler(.nome(maiuscole(n))) }
-            if t.count >= 3, t[0] == "lavora", ["come", "in", "per", "da", "alla", "al", "nel", "nella"].contains(t[1]), let r = coda(dopo: t[1] == "come" ? 2 : 1) { return .profiler(.ruolo(r)) }
-            if t.count >= 3, t[0] == "fa", ["il", "la", "lo", "l"].contains(t[1]), let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
-            if t.count >= 2, t[0] == "ruolo", let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
-            if t.count >= 3, t[0] == "e", ["il", "la", "lo", "l", "un", "una", "uno", "mio", "mia", "un", "nostro", "nostra"].contains(t[1]), let r = coda(dopo: 1) { return .profiler(.ruolo(r)) }
-            if uno([" rifai ", " riprova ", " un altra ", " rifalla ", " non va bene ", " e venuta male ", " venuta male ", " e mossa ", " mossa ", " sfocata ",
-                    " ricomincia ", " da capo "]) { return .profiler(.rifai) }
-            if uno([" girati ", " selfie ", " gira ", " cambia fotocamera ", " fotocamera davanti ", " fotocamera dietro ", " inquadra me ", " guarda me "]) { return .profiler(.gira) }
-            if uno([" profila ", " profilalo ", " profilala ", " dossier ", " fammi il profilo ", " fammi il dossier ", " chi e ", " dimmi chi e ", " che tipo e ",
-                    " cosa ne pensi ", " che ne pensi ", " leggilo ", " leggila ", " analizzalo ", " analizzala ", " procedi ", " vai ", " fatto ", " schedalo ", " schedala "]) {
-                return .profiler(.profila)       // senza la foto ancora: scatta (il Profiler sa a che punto è)
-            }
-            if uno([" scatta ", " foto ", " acquisisci ", " fotografalo ", " fotografala ", " prendilo ", " prendila ", " fai la foto ", " beccato ", " eccolo ", " eccola "]) {
-                return .profiler(.scatta)
-            }
         default: break
         }
-
-        // LiDAR 23: le frasi dei modi («metro laser», «analisi posturale», «gemello digitale di Marco»…), da ovunque (solo iPhone)
-        #if os(iOS)
-        if let m = modoLidar(t) { return .lidar(.modo(m.0, m.1)) }
-        #endif
 
         // Interprete già sulla lingua: «traduci in inglese», «interprete spagnolo», «fammi da interprete in francese».
         // Solo frasi corte: «traduci in inglese buongiorno a tutti» resta una domanda per il cervello.
@@ -597,7 +375,6 @@ enum ComandoVocale: Equatable {
             if c(" scrivi il diario ") || c(" scriviamo il diario ") || c(" facciamo il diario ") || c(" compiliamo il diario ") { return .rapido(.diario) }
             if c(" ho bisogno di parlarti ") || c(" devo parlarti ") || c(" ti devo parlare ") || c(" posso parlarti ") { return .rapido(.confidente) }
             if c(" cosa cucino ") || c(" cosa posso cucinare ") || c(" cosa preparo da mangiare ") { return .rapido(.cucina) }
-            if c(" registra la riunione ") || c(" registra questa riunione ") || c(" registra la conversazione ") { return .rapido(.riunione) }
         }
 
         // build 23, MUSICA: «apri la musica», «mostrami la musica», «fammi vedere la musica», «vai alla musica»: solo così, corto.
@@ -615,63 +392,32 @@ enum ComandoVocale: Equatable {
                      "mostra", "mostrami", "portami", "vediamo"]
         let comanda = t.contains(where: { verbi.contains($0) }) || t.count <= 2
 
-        if c(" sentinella ") && comanda { return .apri(.sentinella) }
-        if (c(" wiretap ") || c(" wire tap ") || c(" waiter tap ") || c(" intercett")) && comanda { return .apri(.wiretap) }
-        if (c(" profiler ") || c(" profilo ") || c(" profila ")) && comanda { return .apri(.profiler) }
         if c(" fai un giro ") || c(" fammi un giro ") || ((c(" giro ") || c(" video ")) && comanda && c(" occhi ")) || c(" modalita video ") {
             return .apri(.giro)
         }
         if c(" occhi ") && comanda { return .apri(.occhi) }
         if c(" cucina ") && comanda { return .apri(.cucina) }
-        // LiDAR: «scansiona la stanza», «misura la stanza», «planimetria»: prima dello Scanner, che prende «scansiona»
-        let verboStanza = c(" scansiona ") || c(" misura ") || c(" scansione ")
-        #if os(iOS)
-        // build 23: la stanza parte già in Interno; «apri LiDAR» apre il menu dei modi
-        if ((c(" planimetria ") || c(" pianta della stanza ")) && (comanda || verboStanza)) || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
-            return .lidar(.modo("Stanza", nil))
-        }
-        if (c(" lidar ") || c(" laidar ") || c(" lai dar ")) && (comanda || verboStanza) {
-            return .apri(.lidar)
-        }
-        #else
-        if ((c(" lidar ") || c(" laidar ") || c(" lai dar ") || c(" planimetria ") || c(" pianta della stanza ")) && (comanda || verboStanza))
-            || ((c(" stanza ") || c(" sala ") || c(" locale ")) && verboStanza) {
-            return .apri(.lidar)
-        }
-        #endif
         if (c(" scanner ") || c(" scansiona ") || c(" codice a barre ") || c(" etichetta ") || c(" yuka ")) && (comanda || c(" scansiona ")) { return .apri(.scanner) }
 
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [
-            (.diario, [" diario "]), (.sonno, [" sonno ", " dormito "]), (.cuore, [" cuore ", " battito "]), (.vitals, [" vitals ", " vitali ", " parametri "]),
-            (.confidente, [" confidente "]), (.bea, [" reparto bea ", " scheda di bea ", " sezione bea "]), (.allenatore, [" allenatore ", " allenamento ", " trainer ", " treiner ", " personal trainer "]), (.briefing, [" briefing ", " brifing "]),
-            (.meteo, [" meteo ", " tempo "]), (.email, [" email ", " mail ", " posta "]), (.spesa, [" spesa "]),
-            (.shazam, [" shazam "]), (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi "]),
-            (.interprete, [" interprete ", " traduttore "]), (.browser, [" browser ", " internet ", " navigatore "]), (.serata, [" serata "]),
+            (.diario, [" diario "]), (.sonno, [" sonno ", " dormito "]), (.vitals, [" vitals ", " vitali ", " parametri "]),
+            (.confidente, [" confidente "]), (.allenatore, [" allenatore ", " allenamento ", " trainer ", " treiner ", " personal trainer "]),
+            (.email, [" email ", " mail ", " posta "]), (.spesa, [" spesa "]),
+            (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi "]),
+            (.interprete, [" interprete ", " traduttore "]),
             (.messaggi, [" messaggi ", " whatsapp ", " imessage "]), (.telefono, [" telefono ", " tastiera ", " rubrica "]),
-            (.github, [" github ", " git hub ", " ghitab ", " repository ", " cantiere "]), (.supabase, [" supabase ", " supa base ", " sala macchine ", " database "]),
-            (.archivio, [" archivio ", " cloud ", " disco rigido "]),
-            (.satellite, [" satellite "]),                        // build 23
         ]
         // le sezioni nuove solo con un verbo: «apri i costi», «mostrami EDITH», «vai alle impostazioni» («che costi?» resta a JARVIS)
         let nuove: [(Reparto, [String])] = [
-            (.costi, [" costi ", " consumi "]),
             (.edith, [" edith ", " editt ", " edit ", " edid ", " edyth ", " editth ", " editte ", " editti ", " eddith ", " edite ",
                       " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
-            (.sistemi, [" sistemi "]), (.impostazioni, [" impostazioni ", " settaggi "]),
         ]
         // tutti i verbi di comando valgono per ogni sezione: «attiva EDITH», «avvia i costi», «lancia le impostazioni» (22 ott)
         // («fai», «passa», «metti», «parti»… no: «fai il punto sui costi» resta una domanda per JARVIS)
         let verbiApri = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai", "entra", "fammi", "portami", "vediamo"]
         let conVerbo = t.contains(where: { verbiApri.contains($0) })
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
-        // «apri Bea», «vai a Bea»: solo così, corto; «chiama Bea» o «scrivi a Bea» restano a JARVIS
-        // solo «apri Bea», «mostrami la scheda di Bea»…: «chiama Bea», «fammi videochiamare Bea», «portami da Bea» restano a JARVIS
-        let paroleBea: Set<String> = ["bea", "beatrice", "vedere", "a", "di", "su", "la", "il", "in", "nella", "alla", "scheda", "sezione"]
-        if (c(" bea ") || c(" beatrice ")) && t.count <= 4 && t.contains(where: { verbiApri.contains($0) })
-            && t.allSatisfy({ verbiApri.contains($0) || paroleBea.contains($0) }) {
-            return .apri(.bea)
-        }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
         // solo frasi esatte: «pulisci il bagno» o «cancella la chat con Bea» restano a JARVIS
         if [" pulisci ", " pulisci la chat ", " pulisci tutto ", " pulisci lo schermo ", " svuota la chat ", " svuota la conversazione ",

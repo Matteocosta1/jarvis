@@ -169,14 +169,8 @@ struct TestataScheda: View {
                     Circle().trim(from: 0, to: 0.3).stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3) / 3 * 360))
                 }
-                if icona == "satellite" {                   // build 23: disegnata come nel mockup
-                    IconaSatellite(lato: 17).font(.system(size: 16, weight: .medium)).foregroundStyle(tinta)
-                } else if icona == "vinile" {               // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
+                if icona == "vinile" {                      // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
                     IconaVinile().frame(width: 17, height: 17).foregroundStyle(tinta)
-                } else if icona == "studio" {               // 7 nov: il caricamento di Studio e Social con le loro icone del dock
-                    IconaStudio(pieno: true).frame(width: 17, height: 17).foregroundStyle(tinta)
-                } else if icona == "social" {
-                    IconaSocial().frame(width: 17, height: 17).foregroundStyle(tinta)
                 } else {
                     Image(systemName: icona)
                         .font(.system(size: 16, weight: .medium))
@@ -784,14 +778,9 @@ struct BordoAlto: Shape {
 enum Tinte {
     static let diario = Color.ciano
     static let sonno = Color.ciano
-    static let cuore = Color.ciano
-    static let meteo = Color.ciano
-    static let briefing = Color.ciano
     static let email = Color.ciano
     static let spesa = Color.ciano
-    static let shazam = Color.ciano
     static let foto = Color.ciano
-    static let serata = Color.ciano
 }
 
 // MARK: - DIARIO: le pagine della sera
@@ -1136,187 +1125,6 @@ struct VistaSonno: View {
     }
 }
 
-// MARK: - CUORE: battito di oggi, a riposo e variabilità
-
-struct VistaCuoreTelefono: View {
-    let chiedi: (String) -> Void
-    private let tinta = Tinte.cuore
-
-    @State private var battiti: [(Date, Double)] = []
-    @State private var riposo: [(Date, Double)] = []
-    @State private var hrv: [(Date, Double)] = []
-    @State private var oggi: SaluteOggi?
-    @State private var caricato = false
-    @State private var confermaSOS = false
-    @State private var esitoSOS: String?
-    @State private var inviando = false
-
-    var body: some View {
-        CorniceScheda(titolo: "Cuore", sottotitolo: ultimo.map { "ultimo battito \(Int($0.1)) bpm · \($0.0.formatted(date: .omitted, time: .shortened))" } ?? "ascolto il polso",
-                      icona: "heart", tinta: tinta, pronto: caricato) {
-            // 11.0 (3), come il mockup approvato: il cuore in ologramma batte al ritmo di adesso; l'anello va da 40 a 180 battiti,
-            // con l'arco di oggi (dal minimo al massimo), adesso e a riposo
-            // 9 nov (build 19, il signore: «un cuore vero alla Tony Stark»): le prove del cuore come il mockup, BATTITO è quello di prima
-            OlogrammaCuoreProve(dati: datiOlo).corniceOlo(tinta)
-            HStack(spacing: 10) {
-                Valore(titolo: "ADESSO", valore: ultimo.map { "\(Int($0.1))" } ?? "—", sotto: "bpm", tinta: tinta)
-                Valore(titolo: "A RIPOSO", valore: oggi?.battito.map { "\($0)" } ?? "—", sotto: oggi?.battitoMedia.map { "media 7 gg \($0)" }, tinta: tinta)
-                Valore(titolo: "HRV", valore: hrv.last.map { "\(Int($0.1))" } ?? "—", sotto: "ms", tinta: tinta)
-            }
-            if !battiti.isEmpty { oggiGrafico }
-            if riposo.count > 1 {
-                Pannello(titolo: "A RIPOSO · 30 GIORNI", tinta: tinta) {
-                    Chart(riposo, id: \.0) { d, v in
-                        LineMark(x: .value("Giorno", d, unit: .day), y: .value("bpm", v)).foregroundStyle(tinta).interpolationMethod(.catmullRom)
-                        PointMark(x: .value("Giorno", d, unit: .day), y: .value("bpm", v)).foregroundStyle(tinta).symbolSize(12)
-                    }
-                    .chartYScale(domain: .automatic(includesZero: false))
-                    .frame(height: 130)
-                    Text("Più basso è, più il cuore è a riposo. Una salita di qualche giorno spesso vuol dire stanchezza o poco sonno.")
-                        .font(.system(size: 11)).foregroundStyle(Color.tenue)
-                }
-            }
-            if hrv.count > 1 {
-                Pannello(titolo: "VARIABILITÀ (HRV) · 30 GIORNI", tinta: tinta) {
-                    Chart(hrv, id: \.0) { d, v in
-                        BarMark(x: .value("Giorno", d, unit: .day), y: .value("ms", v)).foregroundStyle(tinta.opacity(0.7)).cornerRadius(2)
-                    }
-                    .frame(height: 110)
-                    Text("Più alta è, più il corpo ha recuperato.").font(.system(size: 11)).foregroundStyle(Color.tenue)
-                }
-            }
-            TastoJarvis(testo: "Come sta il cuore? Chieda a JARVIS", tinta: tinta) { chiedi("Come sta il mio cuore oggi? Guarda battito a riposo e variabilità.") }
-            // SOS: avvisa il contatto di emergenza con la posizione, subito
-            Button { confermaSOS = true } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "sos.circle.fill").font(.system(size: 24))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("SOS · CHIEDI AIUTO").font(.system(size: 14, weight: .heavy, design: .monospaced)).tracking(1.5)
-                        Text("SMS, WhatsApp e chiamata al contatto di emergenza, con la sua posizione").font(.system(size: 10)).opacity(0.85)
-                    }
-                    Spacer()
-                    if inviando { ProgressView().tint(.white) }
-                }
-                .foregroundStyle(.white)
-                .padding(14)
-                .frame(maxWidth: .infinity)
-                .background(Color(red: 0.85, green: 0.15, blue: 0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color.red.opacity(0.45), radius: 10)
-            }
-            .buttonStyle(StileStark())
-            .disabled(inviando)
-            if let esitoSOS { Text(esitoSOS).font(.footnote).foregroundStyle(esitoSOS.contains("NON") || esitoSOS.contains("non riuscito") ? .orange : Color(red: 0.45, green: 0.92, blue: 0.6)) }
-            Text("L'Apple Watch sorveglia da solo: sopra 130 o sotto 40 battiti a riposo avvisa il contatto, con 5 secondi per annullare.")
-                .font(.system(size: 11)).foregroundStyle(Color.tenue)
-            if caricato && battiti.isEmpty && riposo.isEmpty {
-                Text("Nessun dato del battito: serve l'Apple Watch al polso e il permesso di lettura in Salute.")
-                    .font(.footnote).foregroundStyle(Color.tenue)
-            }
-        }
-        .tastiAVoce { a in if a == .cuoreSOS { confermaSOS = true } }   // a voce si apre solo la domanda: il «sì» resta col dito
-        .confirmationDialog("Chiedo aiuto al contatto di emergenza, con la sua posizione?", isPresented: $confermaSOS, titleVisibility: .visible) {
-            Button("SÌ, CHIEDI AIUTO", role: .destructive) { Task { await sos() } }
-            Button("Annulla", role: .cancel) {}
-        }
-        .task {
-            async let b = Salute.battitiOggi()
-            async let h = Salute.variabilita(giorni: 30)
-            async let g = SaluteStorica.giorni(30)
-            async let o = SaluteOggi.leggi()
-            let (bb, hh, gg, oo) = await (b, h, g, o)
-            withAnimation(.easeOut(duration: 0.3)) {
-                battiti = bb
-                hrv = hh
-                riposo = gg.compactMap { d, v in v.battito.map { (d, $0) } }.sorted { $0.0 < $1.0 }
-                oggi = oo
-                caricato = true
-            }
-        }
-        .regia("Cuore", stato: testoSchermo, azioni: [])                 // 12.0 (10): il cuore, per JARVIS (l'SOS resta col dito)
-    }
-
-    /// 12.0 (10): il cuore a schermo, per JARVIS.
-    private var testoSchermo: String {
-        guard caricato else { return Schermo.unisci("Cuore", ["i battiti si stanno caricando"]) }
-        let adesso: String? = ultimo.map { "adesso \(Int($0.1)) bpm (alle \($0.0.formatted(date: .omitted, time: .shortened)))" }
-        let minmax: String? = battiti.isEmpty ? nil : "oggi da \(Int(battiti.map(\.1).min() ?? 0)) a \(Int(battiti.map(\.1).max() ?? 0)) bpm"
-        return Schermo.unisci("Cuore", [adesso ?? "nessun battito di oggi", oggi?.battito.map { "a riposo \($0) bpm" },
-                                        oggi?.battitoMedia.map { "media a riposo 7 giorni \($0)" }, hrv.last.map { "HRV \(Int($0.1)) ms" }, minmax])
-    }
-
-    private var ultimo: (Date, Double)? { battiti.last }
-
-    /// I dati delle prove: i battiti di oggi in minuti dalla mezzanotte, riposo e HRV dei 30 giorni.
-    private var datiOlo: DatiCuoreOlo {
-        let cal = Calendar.current, mezzanotte = cal.startOfDay(for: Date())
-        var d = DatiCuoreOlo()
-        d.adesso = ultimo?.1 ?? 0
-        d.riposo = oggi?.battito ?? Int(riposo.last?.1 ?? 0)
-        d.minimo = Int(battiti.map(\.1).min() ?? 0)
-        d.massimo = Int(battiti.map(\.1).max() ?? 0)
-        d.hrv = Int(hrv.last?.1 ?? 0)
-        d.oggi = battiti.filter { $0.0 >= mezzanotte }.map { (m: $0.0.timeIntervalSince(mezzanotte) / 60, v: $0.1) }
-        d.riposo30 = riposo.suffix(30).map(\.1)
-        d.hrv30 = hrv.suffix(30).map(\.1)
-        return d
-    }
-
-    /// Il tasto SOS: posizione dell'iPhone e chiamata alla funzione jarvis-allarme, la stessa dell'orologio.
-    private func sos() async {
-        inviando = true
-        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        var posizione: String?
-        if let p = await Posizione.attuale(), let lat = p["lat"] as? Double, let lon = p["lon"] as? Double {
-            posizione = String(format: "%.5f,%.5f", lat, lon)
-        }
-        let base = Impostazioni.indirizzo
-        let indirizzo = base.hasSuffix("/jarvis") ? base + "-allarme" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-allarme")
-        var corpo: [String: Any] = ["bpm": ultimo?.1 ?? 0, "prova": false, "motivo": "manuale"]
-        if let posizione { corpo["posizione"] = posizione }
-        var esito = "Nessuna connessione: allarme NON inviato."
-        if let url = URL(string: indirizzo) {
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.timeoutInterval = 15
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
-            req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
-            if let (d, r) = try? await URLSession.shared.data(for: req) {
-                let codice = (r as? HTTPURLResponse)?.statusCode ?? 0
-                let json = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
-                if codice == 200 {
-                    if json?["ripetuto"] as? Bool == true { esito = "Il contatto era già stato avvisato pochi minuti fa." }
-                    else {
-                        let canali = (json?["canali"] as? [String] ?? []).map { $0 == "whatsapp" ? "WhatsApp" : $0 == "sms" ? "SMS" : $0 == "chiamata" ? "telefonata" : $0 }
-                        esito = "Contatto di emergenza avvisato: \(Array(Set(canali)).sorted().joined(separator: ", ")). Resti dov'è, Sir."
-                    }
-                } else { esito = "Allarme non riuscito: \(json?["errore"] as? String ?? "codice \(codice)")." }
-            }
-        }
-        inviando = false
-        esitoSOS = esito
-        Suoni.fatto()                                 // SOS: il suono resta
-    }
-
-    private var oggiGrafico: some View {
-        let valori = battiti.map(\.1)
-        return Pannello(titolo: "OGGI · MIN \(Int(valori.min() ?? 0)) · MAX \(Int(valori.max() ?? 0))", tinta: tinta) {
-            Chart(battiti, id: \.0) { d, v in
-                LineMark(x: .value("Ora", d), y: .value("bpm", v)).foregroundStyle(tinta).interpolationMethod(.catmullRom)
-                AreaMark(x: .value("Ora", d), yStart: .value("base", (valori.min() ?? 40) - 5), yEnd: .value("bpm", v))
-                    .foregroundStyle(LinearGradient(colors: [tinta.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom))
-                    .interpolationMethod(.catmullRom)
-                // 9 nov (dal video del signore): con una sola misura la linea non si vede; il punto sì
-                if battiti.count == 1 { PointMark(x: .value("Ora", d), y: .value("bpm", v)).foregroundStyle(tinta).symbolSize(60) }
-            }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartXAxis { AxisMarks(values: .stride(by: .hour, count: 3)) { _ in AxisValueLabel(format: .dateTime.hour()) } }
-            .frame(height: 150)
-        }
-    }
-}
-
 // MARK: - Letture da Salute per le schede (solo lettura)
 
 nonisolated enum Salute {
@@ -1481,5 +1289,24 @@ enum TestiCaricamento {
         let s = scritta.lowercased()
         return s == "acquisizione dati" || testi.values.contains(s)
     }
+}
+
+/// Un link si può presentare in un foglio (per condividere un file dell'Archivio).
+extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
+
+/// Un dizionario letto con tolleranza: il cervello risponde in JSON e qui si prende ciò che serve.
+nonisolated struct Voce {
+    let d: [String: Any]
+    init(_ d: [String: Any]) { self.d = d }
+    func s(_ k: String) -> String {
+        if let v = d[k] as? String { return v }
+        if let v = d[k] as? NSNumber { return v.stringValue }
+        return ""
+    }
+    func n(_ k: String) -> Int { (d[k] as? NSNumber)?.intValue ?? Int(s(k)) ?? 0 }
+    func b(_ k: String) -> Bool { (d[k] as? Bool) ?? false }
+    func lista(_ k: String) -> [Voce] { (d[k] as? [[String: Any]] ?? []).map(Voce.init) }
+    func voce(_ k: String) -> Voce? { (d[k] as? [String: Any]).map(Voce.init) }
+    func stringhe(_ k: String) -> [String] { d[k] as? [String] ?? [] }
 }
 #endif

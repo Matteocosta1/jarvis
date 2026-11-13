@@ -144,7 +144,7 @@ final class Orecchio {
     /// L'interruzione con le parole che aveva già detto (il riconoscimento è ripartito e non le ha più): JARVIS tace e lo ascolta; se
     /// continua a parlare si aggiunge il resto, se no la frase si consegna dopo la sua pausa normale.
     private func interrompiConLeSue() {
-        guard !OrologioInUso.attivo, !(AmbienteSonoro.condiviso.affollato && !voceConfermata) else { rilascia("folla"); return }
+        guard !(AmbienteSonoro.condiviso.affollato && !voceConfermata) else { rilascia("folla"); return }
         let parole = ultimeProprie
         let sue = parole.joined(separator: " ")
         inPresa = true
@@ -460,7 +460,7 @@ final class Orecchio {
                 // (non eco, non un «sì»), detta mentre il microfono sente una voce umana sopra quella di JARVIS → JARVIS si ferma subito,
                 // con una sfumatura minima, e lo ascolta. Le parole senza voce umana (eco storpiata, la TV lontana) non bastano, e senza
                 // parole (colpi sul tavolo, il plim della carica, una porta) non succede niente: la voce non cambia
-                if !fermo, segnale == .nessuno, !proprie.isEmpty, !OrologioInUso.attivo,
+                if !fermo, segnale == .nessuno, !proprie.isEmpty,
                    !(AmbienteSonoro.condiviso.affollato && !voceConfermata),
                    SopraLaVoce.condivisa.voceUmana(ultimi: 1.2) >= 0.12 {
                     fermati(proprie)
@@ -475,9 +475,6 @@ final class Orecchio {
                 let dopoFermo = fermo ? Array(proprie.dropFirst(min(paroleAlFermo, proprie.count))) : []
                 let perFermo = !dopoFermo.isEmpty && !Orecchio.soloRiempitivi(dopoFermo)
                 guard perParole || perVoce || perFermo || allaDomanda || forza else { scarto("eco", parole: parole, proprie: proprie); if fine { riavvia() }; return }
-                // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
-                // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
-                if OrologioInUso.attivo { rilascia("orologio"); scarto("orologio", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // 12.0 (11), scelta A (il signore: «risolvi con massima competenza»): l'impronta della sua voce serve solo con folla o TV
                 // intorno, dove le voci degli altri non devono fermarlo. In casa basta la sua voce: sopra la voce di JARVIS il
                 // confronto dell'impronta sbagliava spesso e lo lasciava parlare (idea C del 25 ott: prima valeva sempre)

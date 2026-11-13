@@ -330,9 +330,7 @@ final class Richiamo {
                 soloDopoNome = true
                 vocativo = trovato?.isEmpty == true && !soloNome && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
                 var perIlRecupero = false
-                // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
-                // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)
-                if trovato == nil, !OrologioInUso.attivo, !soloNome {
+                if trovato == nil, !soloNome {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
                     let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
                     let breve = parole.count == 1 && Richiamo.risposteBrevi.contains(String(parole[0]).lowercased())

@@ -881,8 +881,6 @@ struct FoglioWebOcchi: View {
     let esito: CervelloOcchi.Esito?
     /// Decisione 29: una fonte toccata si apre nel browser di JARVIS.
     var apri: (URL) -> Void = { _ in }
-    /// MARK X: MANDA ALLO STUDIO, PUBBLICA SU SOCIAL (sotto le fonti, come il mockup).
-    var manda: ((String) -> Void)? = nil
     let chiudi: () -> Void
     @State private var punti = 1
 
@@ -938,7 +936,6 @@ struct FoglioWebOcchi: View {
                         }
                     }
                 }
-                if let manda { TastiMandaOcchi(studio: { manda("studio") }, social: { manda("social") }) }
             case .persona?:
                 Text("Le persone non le cerco sul web, Sir.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
             case .errore?:
@@ -973,8 +970,6 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     case ologramma(Bool)
     case aggancia
     case cerca
-    case studio                         // MARK X: «manda questo pezzo allo Studio»
-    case social                         // MARK X: «pubblica questa foto su Instagram»
     /// MARK X · AEREO (mockup build 32): `p` è AEREO, AEREO_DA, AEREO_DOVE, AEREO_QUOTA, AEREO_COMP, AEREO_ALTRO o AEREO_OFF;
     /// `frase` è la domanda detta (va in cima al foglio del volo).
     case aereo(String, frase: String)
@@ -986,8 +981,6 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     /// Con gli Occhi chiusi, la frase quando si aprono per mandare la foto (come il mockup).
     var annuncioApertura: String? {
         switch self {
-        case .studio: return "Gli occhi, Sir: inquadri il pezzo."
-        case .social: return "Gli occhi, Sir: inquadri la foto."
         case .aereo(let p, _): return p == "AEREO_OFF" ? nil : "Cerco l'aereo, Sir."
         default: return nil
         }
@@ -1002,7 +995,7 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         case .ologramma(false): return "Ologramma disattivato, Sir."
         case .aggancia: return "Bersaglio agganciato, Sir."
         case .aereo("AEREO", _): return "Cerco l'aereo, Sir."
-        case .cerca, .studio, .social, .aereo: return nil
+        case .cerca, .aereo: return nil
         }
     }
 
@@ -1041,9 +1034,6 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         case "disattiva l ologramma": return .ologramma(false)
         case "aggancia il bersaglio": return .aggancia
         case "cerca questo sul web": return .cerca
-        case "manda questo pezzo allo studio", "manda questo allo studio", "mandalo allo studio", "manda allo studio", "portalo nello studio": return .studio
-        case "pubblica questa foto su instagram", "pubblicala su instagram", "metti questa foto su instagram", "pubblica questa foto sul social",
-             "pubblica questa foto su social": return .social
         default: return nil
         }
     }

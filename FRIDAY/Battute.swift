@@ -128,72 +128,36 @@ enum Battute {
         let m = momento
         var v: [String]
         switch r {
-        case .sentinella: v = ["Sentinella in posizione, Sir.", "Sentinella attiva. Nessuno passa senza che io lo sappia.",
-                              "Faccio io la guardia, Sir. Lei si rilassi.", "Perimetro sotto controllo. Occhio aperto.",
-                              "Sentinella pronta: se si muove una foglia, glielo dico."]
         case .occhi: v = ["Occhi aperti, Sir.", "Vista attiva. Mi mostri pure.", "Ottiche accese: cosa guardiamo?",
                          "Eccomi: vedo quello che vede lei.", "Sensori ottici in linea, Sir."]
         case .giro: v = ["Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare.",
                         "Panoramica: cinque secondi. Giri piano, io registro tutto.", "Giro d'orizzonte, Sir. Lei muova, io guardo.",
                         "Cinque secondi di riprese, Sir. Con calma: ho uno stomaco digitale delicato."]
-        case .profiler: v = ["Profiler pronto. Inquadri il soggetto.", "Profiler acceso: mi faccia vedere di chi parliamo.",
-                            "Pronto a profilare, Sir. Inquadratura frontale, se possibile."]
         case .cucina: v = ["Cucina. Inquadri frigo, dispensa o piatto, Sir.", "Modalità chef: mi mostri cosa abbiamo.",
                           "Apriamo la dispensa, Sir. Lei inquadri, al menù ci penso io."]
         case .scanner: v = ["Scanner pronto. Inquadri il codice a barre, Sir.", "Scanner acceso: avvicini il codice.",
                            "Pronto a leggere etichette, Sir. Le più piccole sono le mie preferite."]
-        case .wiretap: return nil                    // registra: la voce di JARVIS finirebbe nella registrazione
-        case .satellite: v = ["Satellite, Sir.", "Satellite agganciato. Dove andiamo?", "Collegamento orbitale stabilito, Sir.",
-                             "In orbita, Sir. Mi dica il punto.", "Vista dall'alto pronta."]
         case .diario: v = ["Il diario, Sir.", "Il diario è aperto, Sir.", "Pagina bianca pronta, Sir.", "Il suo diario. Prometto discrezione."]
         case .sonno:
             v = ["Il suo sonno, Sir.", "Vediamo come ha dormito.", "Il rapporto della notte, Sir.", "Dati del sonno in arrivo."]
             if m == .notte { v += ["Il sonno, Sir. E a quest'ora, se posso, sarebbe anche il momento di praticarlo."] }
             if m == .mattina { v += ["Vediamo com'è andata la notte, Sir. Il caffè lo lascio a lei."] }
-        case .cuore: v = ["Il suo cuore, Sir.", "Telemetria cardiaca in linea.", "Il motore principale, Sir. Vediamo i giri.",
-                         "Battito sotto controllo, Sir. Ecco i numeri."]
         case .vitals: v = ["Vitals, Sir.", "Parametri vitali in linea.", "Diagnostica completa del pilota, Sir."]
         case .confidente: v = ["Confidente. La ascolto, Sir.", "Sono qui, Sir. Mi racconti.", "Resta tra noi, Sir. La ascolto.",
                               "Con calma, Sir. Ho tutto il tempo del mondo."]
         case .allenatore: v = ["Personal trainer pronto, Sir.", "Allenamento in linea. Si scaldi, io conto.",
                               "Trainer acceso. Oggi niente scuse, Sir.", "Pronto a contare le ripetizioni. Anche quelle che salterà."]
-        case .bea: v = ["Bea, Sir.", "La sezione di Bea, Sir.", "Ecco Bea, Sir."]
-        case .briefing:
-            v = ["Il briefing, Sir.", "Il quadro della giornata, Sir.", "Briefing pronto: la giornata in un colpo d'occhio.",
-                 "Ecco cosa ci aspetta, Sir."]
-            if m == .mattina { v += ["Il briefing del mattino, Sir. Si prenda un caffè: è tutto qui."] }
-        case .meteo:
-            v = ["Il meteo, Sir.", "Vediamo cosa dice il cielo.", "Situazione atmosferica in arrivo.", "Il cielo, aggiornato al minuto."]
-            if m == .mattina { v += ["Il meteo di oggi, Sir. Vediamo come vestirla."] }
-            if m == .sera { v += ["Il cielo di stanotte e di domani, Sir."] }
         case .email: v = ["La posta, Sir.", "La sua posta, Sir. Prometto di non giudicare le newsletter.", "Casella aperta, Sir.",
                          "La posta, Sir: vediamo chi la cerca."]
         case .spesa: v = ["La lista della spesa, Sir.", "La spesa, Sir. Cosa manca in casa?", "Lista aperta. Detti pure, io scrivo.",
                          "La spesa, Sir: il frigo attende istruzioni."]
-        case .shazam: v = ["Shazam. Faccia sentire, Sir.", "Orecchie tese: faccia partire la musica.", "Ascolto, Sir. Alzi pure il volume."]
         case .foto: v = ["Le sue foto, Sir.", "La galleria, Sir.", "I suoi scatti, Sir. Cosa cerchiamo?", "Archivio fotografico aperto, Sir."]
         case .ricordi: v = ["I ricordi, Sir.", "I suoi luoghi, Sir: la mappa di dove è stato.", "Ricordi aperti, Sir."]
         case .interprete: v = ["Interprete. In che lingua, Sir?", "Interprete pronto. Che lingua parliamo?",
                               "Traduzione simultanea, Sir: mi dica la lingua.", "Pronto a tradurre, Sir. In quale lingua?"]
-        case .browser: v = ["Browser, Sir.", "La rete, Sir. Cosa cerchiamo?", "Navigatore aperto, Sir.", "Il web, Sir: tutto a portata di voce."]
-        case .serata: v = ["I conti della serata, Sir.", "La serata, Sir: incassi e spese.", "I numeri della serata, Sir.",
-                          "Contabilità della serata in linea, Sir."]
         case .messaggi: v = ["Messaggi, Sir. A chi scriviamo?", "Messaggi, Sir. Chi sentiamo?", "Pronto a scrivere, Sir. A chi?"]
         case .telefono: v = ["Telefono, Sir.", "Linea pronta, Sir. Chi chiamiamo?", "Centralino in linea, Sir."]
-        case .lidar:
-            #if os(iOS)
-            v = ["LiDAR, Sir.", "LiDAR pronto, Sir. Scegliamo il modo.", "Sensore di profondità acceso, Sir."]
-            #else
-            v = ["LiDAR pronto. Muova l'iPhone lungo le pareti, Sir."]
-            #endif
-        case .github: v = ["Il cantiere su GitHub, Sir.", "Il cantiere, Sir. Vediamo chi ha lavorato.", "GitHub, Sir: il codice in un colpo d'occhio."]
-        case .supabase: v = ["Sala macchine, Sir.", "Sala macchine: motori e serbatoi in vista.", "Supabase, Sir: il motore sotto il cofano."]
-        case .archivio: v = ["L'archivio, Sir.", "Archivio aperto: tutto quello che abbiamo messo da parte.", "Gli schedari, Sir."]
-        case .costi: v = ["I costi, Sir.", "Il conto dei servizi, Sir. Si sieda.", "I costi, Sir: vediamo quanto le costo.",
-                         "La bolletta di casa JARVIS, Sir."]
         case .edith: v = ["EDITH, Sir.", "EDITH in linea, Sir.", "EDITH, Sir: protezione attiva."]
-        case .sistemi: v = ["Sistemi, Sir.", "Diagnostica dei sistemi, Sir.", "Pannello sistemi aperto, Sir."]
-        case .impostazioni: v = ["Impostazioni, Sir.", "Il pannello di controllo, Sir. Mi tratti bene.", "Impostazioni, Sir: ogni mia vite è qui."]
         case .pulisci: return nil                     // parla il cestino: carta appallottolata
         case .musica: v = ["La musica, Sir.", "La musica, Sir. Cosa mettiamo?", "Impianto pronto, Sir.", "La sala d'ascolto, Sir."]
         }

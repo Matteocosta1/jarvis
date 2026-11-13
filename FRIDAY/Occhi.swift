@@ -22,12 +22,6 @@ enum OcchiAperti {
     static var stark: ((ComandoOcchi) -> Bool)?
     /// Build 23: la voce di JARVIS dagli Occhi («Ecco cosa ho trovato, Sir.»): la imposta Jarvis.
     static var parla: ((String) -> Void)?
-    /// 26 ott: aperti dallo Studio (tasto OCCHI): STUDIO già acceso, inquadra e scatta e la foto torna nello Studio.
-    static var studioAcceso = false
-    /// 26 ott sera: aperti da Social (riquadro OCCHI di PUBBLICA): lo scatto torna a Social, pronto da pubblicare.
-    static var socialAcceso = false
-    /// 26 ott sera: la didascalia scritta in Social prima di toccare OCCHI (torna a Social con lo scatto o il video).
-    static var socialDida: String?
 }
 
 struct Occhiata: Identifiable {
@@ -41,8 +35,6 @@ struct Occhiata: Identifiable {
     var olo = false
     var eti = false
     var aggancia = false
-    /// MARK X, aperti a voce: «manda questo pezzo allo Studio» / «pubblica questa foto su Instagram» → a fuoco, poi parte da sola.
-    var manda: String? = nil
     /// MARK X · AEREO, aperti a voce: il comando (AEREO, AEREO_DOVE…) e la frase detta.
     var aereo: (p: String, frase: String)? = nil
 }
@@ -58,8 +50,6 @@ struct Occhi: View {
     var oloIniziale = false
     var etiIniziale = false
     var agganciaIniziale = false
-    /// MARK X: aperti a voce per mandare la foto allo Studio o a Social ("studio" / "social").
-    var mandaIniziale: String? = nil
     /// MARK X · AEREO: aperti a voce con «che aereo è quello?» (o una domanda sull'aereo).
     var aereoIniziale: (p: String, frase: String)? = nil
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
@@ -77,11 +67,6 @@ struct Occhi: View {
     @State private var agganciato = false
     @State private var modoVisto = false            // 27 ott: la scritta di caricamento sotto OCCHI è passata, ora il modo
     @State private var registrando = false
-    /// 26 ott sera: il video per Social (REC con gli Occhi aperti da Social).
-    @State private var filmando = false
-    @State private var inizioFilm = Date()
-    /// La didascalia scritta in Social prima di venire qui: torna a Social con lo scatto.
-    @State private var didaSocial: String?
     @State private var mancano = 5
     @State private var davanti = false          // selfie: fotocamera frontale
     @State private var cambiando = false
@@ -111,10 +96,6 @@ struct Occhi: View {
     @StateObject private var cielo = CieloOcchi()
     @State private var tastoAereo = false
     @State private var campoAereo: Double = 70
-    /// 26 ott: STUDIO acceso (da solo, senza ETICHETTE né OLOGRAMMA): il prossimo scatto va allo Studio.
-    @State private var modoStudio = false
-    /// 26 ott sera: aperti da Social › OCCHI: il prossimo scatto torna a Social.
-    @State private var modoSocial = false
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
     private var manualeStark: Bool { !automatico && !video && !cucina }
     private var occupato: Bool { scattando || registrando }
@@ -161,28 +142,6 @@ struct Occhi: View {
                 MirinoHUD(agganciato: agganciato, scattando: scattando || registrando, tinta: tinta)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-            }
-            if filmando {                                    // il video per Social: il tempo che passa
-                VStack {
-                    HStack(spacing: 8) {
-                        Circle().fill(Color.red).frame(width: 10, height: 10)
-                            .shadow(color: .red, radius: 6)
-                        TimelineView(.periodic(from: inizioFilm, by: 1)) { t in
-                            let s = max(0, Int(t.date.timeIntervalSince(inizioFilm)))
-                            Text("REC · \(s / 60):\(String(format: "%02d", s % 60))")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .tracking(3)
-                                .foregroundStyle(.white)
-                                .monospacedDigit()
-                        }
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 7)
-                    .background(Color.black.opacity(0.5))
-                    .clipShape(Capsule())
-                    .padding(.top, 70)
-                    Spacer()
-                }
-                .allowsHitTesting(false)
             }
             if registrando {
                 VStack {
@@ -300,11 +259,6 @@ struct Occhi: View {
                             guard !occupato else { return }
                             Suoni.tocco(); cerca()
                         }
-                        TastoOcchiStudio(acceso: modoStudio) {   // MARK X: STUDIO si accende; poi lo scatto va sul banco dello Studio
-                            guard !occupato else { return }
-                            Suoni.tocco(); modoStudio.toggle(); modoSocial = false
-                            if modoStudio { avvisa("SCATTI: LA FOTO VA ALLO STUDIO") }
-                        }
                         // MARK X · AEREO: si accende e si spegne; 8 nov (il signore) sempre presente, dopo STUDIO (prima solo chiesto a voce)
                         TastoOcchi(tipo: .aereo, titolo: "AEREO", acceso: cielo.acceso) {
                             guard !occupato else { return }
@@ -331,7 +285,7 @@ struct Occhi: View {
                                 .overlay(Circle().stroke(tinta.opacity(0.6), lineWidth: 1.5))
                         }
                         .buttonStyle(StileStark())
-                        .disabled(!agganciato || scattando || registrando || cambiando || filmando)
+                        .disabled(!agganciato || scattando || registrando || cambiando)
                         .accessibilityLabel(davanti ? "Fotocamera posteriore" : "Selfie")
                         Button { scatta() } label: {
                             ZStack {
@@ -342,11 +296,10 @@ struct Occhi: View {
                             .shadow(color: tinta.opacity(0.7), radius: 10)
                         }
                         .buttonStyle(StileStark())
-                        .disabled(!agganciato || scattando || registrando || filmando)
+                        .disabled(!agganciato || scattando || registrando)
                         .accessibilityLabel("Scatta")
                         // giro di 5 secondi: muova il telefono lungo lo scaffale o la stanza
-                        // 26 ott sera: aperti da Social, REC registra il video per Social (tocco = parte, tocco = stop)
-                        Button { if modoSocial && manualeStark { filma() } else { Task { await giro() } } } label: {
+                        Button { Task { await giro() } } label: {
                             ZStack {
                                 Circle().stroke(Color.red.opacity(0.85), lineWidth: 2).frame(width: 54, height: 54)
                                 Text("REC").font(.system(size: 12, weight: .bold, design: .monospaced)).foregroundStyle(.white)
@@ -355,7 +308,7 @@ struct Occhi: View {
                         }
                         .buttonStyle(StileStark())
                         .disabled(!agganciato || scattando || registrando)
-                        .accessibilityLabel(modoSocial && manualeStark ? (filmando ? "Ferma il video" : "Video per Social") : "Giro di cinque secondi")
+                        .accessibilityLabel("Giro di cinque secondi")
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["tasti"] = $0 }
                 }
@@ -381,8 +334,7 @@ struct Occhi: View {
             if let w = web {
                 VStack {
                     Spacer()
-                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito, apri: { u in Suoni.tocco(); fonte = PaginaWeb(url: u) },
-                                   manda: { k in manda(k) }) {
+                    FoglioWebOcchi(nome: w.nome, cosa: w.cosa, esito: w.esito, apri: { u in Suoni.tocco(); fonte = PaginaWeb(url: u) }) {
                         withAnimation(.easeOut(duration: 0.25)) { web = nil }; riservati["web"] = nil
                     }
                         .frame(maxHeight: stark.schermo.height * 0.56)
@@ -506,104 +458,6 @@ struct Occhi: View {
         }
     }
 
-    /// MARK X · STUDIO e PUBBLICA SU SOCIAL (come il mockup): il bersaglio con un po' di margine (o tutta l'inquadratura, se non
-    /// c'è un bersaglio) va alla pagina dello Studio, che ne fa un ologramma 3D, o a Social, pronto da pubblicare. Gli Occhi si chiudono.
-    /// 26 ott (deciso dal signore): non serve più ETICHETTE né OLOGRAMMA. Con un bersaglio agganciato va il suo ritaglio;
-    /// senza, JARVIS scatta una foto vera (come il tasto di scatto) e manda tutta l'inquadratura.
-    private func manda(_ k: String) {
-        guard agganciato, !chiuso, !scattando else { OcchiAperti.parla?("Un attimo, Sir: la fotocamera sta ancora mettendo a fuoco."); return }
-        let o = (stark.olo || stark.eti) ? stark.obiettivo : nil
-        let nome = o.map { stark.titolo($0) ?? $0.nome.lowercased() } ?? "inquadratura"
-        let visore = stark.visore
-        scattando = true
-        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-        // 8 nov (controllo): acceso e spento nello stesso istante SwiftUI non disegnava il lampo: si spegne quando è acceso
-        withAnimation(.easeOut(duration: 0.06)) { lampo = true } completion: {
-            withAnimation(.easeIn(duration: 0.45)) { lampo = false }
-        }
-        Task {
-            var dati: Data?
-            if let o {
-                let box = o.box
-                dati = await Task.detached(priority: .userInitiated) { visore.ritaglio(box, lato: 1600) }.value
-            }
-            if dati == nil {
-                let foto = await withCheckedContinuation { (c: CheckedContinuation<Data?, Never>) in
-                    motore.scatta(veloce: false) { d in c.resume(returning: d) }
-                }
-                dati = foto.flatMap { Occhi.riduci($0, lato: 1600) }
-            }
-            scattando = false
-            guard !chiuso, let dati, let img = UIImage(data: dati) else {
-                if !chiuso { Suoni.errore(); OcchiAperti.parla?("La foto non è riuscita, Sir: riprovi.") }
-                return
-            }
-            modoStudio = false
-            modoSocial = false
-            Suoni.schedaPronta()
-            OcchiAperti.parla?(k == "studio" ? "\(nome.prefix(1).uppercased() + nome.dropFirst()): lo mando allo Studio, Sir." : "La preparo per Instagram, Sir.")
-            chiudi([])
-            try? await Task.sleep(for: .milliseconds(650))          // il tempo che gli Occhi si chiudano
-            PaginaMarkX.apri(AperturaPagina(sezione: k == "studio" ? "Studio" : "Social", foto: img, nomeFoto: nome,
-                                            didascalia: k == "social" ? didaSocial : nil))
-        }
-    }
-
-    /// 26 ott sera · il video per Social: REC parte, REC ferma (al massimo 60 s). Il video, ricompresso per Instagram, va a Social
-    /// con la copertina e la didascalia scritta prima; lì si sceglie REEL o STORIA.
-    private func filma() {
-        guard agganciato, !scattando, !chiuso, !cambiando else { return }
-        if filmando { Suoni.tocco(); motore.fermaFilm(); return }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("occhi-social-\(UUID().uuidString).mov")
-        filmando = true
-        inizioFilm = Date()
-        stato = "REGISTRO PER SOCIAL"
-        Suoni.tocco()
-        motore.filma(url, massimo: 60, partito: { ok in
-            guard !ok else { return }
-            Task { @MainActor in
-                filmando = false
-                Suoni.errore()
-                OcchiAperti.parla?("Il video non parte, Sir: riprovi.")
-            }
-        }, finito: { u in
-            Task { @MainActor in finitoFilm(u) }
-        })
-    }
-
-    private func finitoFilm(_ u: URL?) {
-        let secondi = max(1, Int(Date().timeIntervalSince(inizioFilm).rounded()))
-        filmando = false
-        guard !chiuso else { if let u { try? FileManager.default.removeItem(at: u) }; return }
-        guard let u else { Suoni.errore(); OcchiAperti.parla?("Il video non è riuscito, Sir: riprovi."); return }
-        guard secondi >= 3 else {
-            try? FileManager.default.removeItem(at: u)
-            OcchiAperti.parla?("Troppo corto, Sir: Instagram vuole almeno tre secondi.")
-            return
-        }
-        scattando = true
-        stato = "PREPARO IL VIDEO"
-        Task {
-            let pronto = try? await VideoSocial.comprimi(u)
-            try? FileManager.default.removeItem(at: u)
-            var copertina: UIImage?
-            if let pronto { copertina = await VideoSocial.copertina(pronto) }
-            scattando = false
-            guard !chiuso, let pronto, let copertina else {
-                if let pronto { try? FileManager.default.removeItem(at: pronto) }
-                if !chiuso { Suoni.errore(); OcchiAperti.parla?("Il video non è riuscito, Sir: riprovi.") }
-                return
-            }
-            modoSocial = false
-            Suoni.schedaPronta()
-            OcchiAperti.parla?("Video di \(secondi) secondi, Sir: lo porto a Social.")
-            chiudi([])
-            try? await Task.sleep(for: .milliseconds(650))          // il tempo che gli Occhi si chiudano
-            PaginaMarkX.apri(AperturaPagina(sezione: "Social", foto: copertina, nomeFoto: "video", didascalia: didaSocial,
-                                            video: pronto, secondiVideo: secondi))
-        }
-    }
-
     /// CERCA: il solo bersaglio (quello col mirino pieno o toccato) va al cervello, che lo cerca sul web e risponde nel foglio,
     /// con il riassunto e tre fonti. Le persone no (niente ricerca di volti).
     private func cerca() {
@@ -715,17 +569,6 @@ struct Occhi: View {
                 stark.olo = oloIniziale
                 stark.eti = etiIniziale
                 stark.aggiorna()
-                if OcchiAperti.studioAcceso {                // dallo Studio: STUDIO già acceso, basta lo scatto
-                    OcchiAperti.studioAcceso = false
-                    modoStudio = true
-                    avvisa("SCATTI: LA FOTO VA ALLO STUDIO")
-                } else if OcchiAperti.socialAcceso {         // da Social › OCCHI: lo scatto torna a Social
-                    OcchiAperti.socialAcceso = false
-                    modoSocial = true
-                    didaSocial = OcchiAperti.socialDida
-                    avvisa("SCATTI: LA FOTO VA A SOCIAL")
-                }
-                OcchiAperti.socialDida = nil
                 OcchiAperti.stark = { c in                 // a voce: «mostra le etichette», «scansione olografica»…
                     guard agganciato, !chiuso else { return false }
                     switch c {
@@ -733,8 +576,6 @@ struct Occhi: View {
                     case .ologramma(let v): mettiOlogramma(v); if v { stark.aggancia() }
                     case .aggancia: mettiOlogramma(true); stark.aggancia()
                     case .cerca: cerca()
-                    case .studio: manda("studio")
-                    case .social: manda("social")
                     case .aereo(let p, let f): comandoAereo(p, f)
                     }
                     return true
@@ -746,10 +587,6 @@ struct Occhi: View {
                 if agganciaIniziale {
                     try? await Task.sleep(for: .milliseconds(900))
                     if !chiuso { stark.aggancia() }
-                }
-                if let k = mandaIniziale {                   // come il mockup: aspetta che la fotocamera sia a fuoco, poi parte
-                    try? await Task.sleep(for: .milliseconds(2700))
-                    if !chiuso { manda(k) }
                 }
             }
         }
@@ -828,8 +665,6 @@ struct Occhi: View {
 
     private func scatta() {
         guard agganciato, !scattando, !chiuso, !cambiando else { return }
-        if modoStudio && manualeStark { manda("studio"); return }   // STUDIO acceso: lo scatto va allo Studio
-        if modoSocial && manualeStark { manda("social"); return }   // aperti da Social: lo scatto torna a Social
         scattando = true
         stato = "ACQUISIZIONE"
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()

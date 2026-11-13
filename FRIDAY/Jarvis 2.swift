@@ -219,7 +219,6 @@ final class Jarvis: NSObject, ObservableObject {
             BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
             aggiornaRichiamo()
-            if dialogoFuori || IsolaJarvis.voceAccesa { aggiornaIsolaVoce() }   // 12 nov: l'isola VOCE segue il dialogo fuori dall'app
             if fase == .ascolto || fase == .parlo { Suoni.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
         }
     }
@@ -234,8 +233,6 @@ final class Jarvis: NSObject, ObservableObject {
     var salvaTraccia = false                     // build 22: Ricordi › TRACCIA salva subito il posto dove si trova («ricorda questo luogo»)
     var richiestaTraccia = false                 // 4 nov (strada B): chiesto TRACCIA a voce («traccia», «portami al», «ricorda questo luogo»):
                                                  // con Ricordi già aperto, si fa sul posto (ContentView.richiestaSulPosto)
-    @Published var azioneLidar: ComandoVocale.AzioneLidar?   // comando vocale dentro LiDAR: lo esegue la sua schermata
-    var lidarAperto = false                      // LiDAR aperto: valgono anche i suoi comandi («salva», «fine scansione»…)
     var sezioneAperta: Reparto?                  // la scheda aperta sopra la schermata principale: valgono anche i suoi tasti a voce
     @Published var diagnosiMac = ""             // Mac: la riga di controllo del microfono in attesa
     private var fraseAVoce = ""            // l'ultima frase detta a voce, in viaggio verso il cervello
@@ -377,8 +374,6 @@ final class Jarvis: NSObject, ObservableObject {
     /// La schermata principale è in primo piano, senza fotocamera, interprete o altre schede aperte (lo decide ContentView).
     /// Qualcosa è aperto sopra la schermata principale (lo dice ContentView): prima di aprire Occhi si chiude.
     var schermataAperta = false
-    /// Il Tocco d'aiuto di Bea (emergenza) è aperto: niente lo copre, nemmeno Occhi.
-    var soccorsoAperto = false
     var richiamoConsentito = false { didSet { if richiamoConsentito != oldValue { aggiornaRichiamo() } } }
     /// Durante la sequenza d'avvio il microfono resta spento: aprirlo cambia l'audio dell'iPhone e la musica uscirebbe bassa.
     /// 13 nov: pubblicato, perché la riga sotto il reattore dice cosa succede durante l'avvio (ContentView, `suggerimento`).
@@ -465,7 +460,6 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.consegna = { [weak self] frase in self?.motivoChiusura = "richiamo"; self?.fraseRichiamo(frase) }
         cloud.iniziaFrase = { [weak self] chiave in self?.suonoIniziato(chiave) }   // 11 nov: il primo suono della risposta (i tempi)
         richiamo.applauso = { [weak self] in self?.applaudito() }
-        IsolaJarvis.fineDialogo = { [weak self] in self?.fineDialogoFuori() }   // 12 nov: «Fine» sull'isola VOCE
         richiamo.inRisposta = { [weak self] in self?.fase == .elaboro && self?.idTurno != nil }   // idea C: una risposta in preparazione
         strumenti.apriOcchi = { [weak self] automatico, video, zoom in
             guard let self else { return [] }
@@ -884,7 +878,7 @@ final class Jarvis: NSObject, ObservableObject {
         // «avanti», «indietro», «play» sono i tasti della musica; per la sua frase restano «dicevi?», «continua»
         let l = LettoreMusica.condiviso
         if l.voce != nil, Regia.eTastoMusica(frase), Regia.condivisa.davantiNome == "Musica" || musicaSuona || l.fermataDaJarvis { return false }
-        guard rispostaInterrotta != nil, !BrowserVoce.aperto, interruzioneValida() != nil,
+        guard rispostaInterrotta != nil, interruzioneValida() != nil,
               FineFrase.chiedeDiContinuare(frase, dopoDomanda: interrottaSuDomanda, libera: fraseLibera) else { return false }
         guard interrottaCompleta, let id = rispostaInterrotta, let i = messaggi.lastIndex(where: { $0.id == id }), i == messaggi.count - 1,
               let resto = FineFrase.restoDaDire(messaggi[i].testo, detto: messaggi[i].detto ?? "") else { return false }
@@ -1324,30 +1318,17 @@ final class Jarvis: NSObject, ObservableObject {
         }
         // build 22: i comandi a frase esatta («protocollo notte», «radar pioggia»…): subito, senza cervello, prima delle storpiature
         if let d = ComandoDedicato.riconosci(frase) {
-            // build 23: dentro LiDAR «mostrami la stanza in 3D» è il 3D di LiDAR (come «mostrami il 3D»), non SATELLITE
-            // che chiude LiDAR e va a cercare un luogo chiamato «Stanza»
-            if lidarAperto, case .satellite(.mostra(_)) = d {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                azioneLidar = .tre
-                return true
-            }
             eseguiDedicato(d)
             return true
         }
         // build 23: gli Occhi alla Stark («mostra le etichette», «scansione olografica», «cerca questo sul web»…), a frase esatta
-        if !lidarAperto, let o = ComandoOcchi.riconosci(frase) { eseguiOcchi(o); return true }   // dentro LiDAR no: lì la fotocamera è sua
+        if let o = ComandoOcchi.riconosci(frase) { eseguiOcchi(o); return true }
         // le storpiature già imparate (Storpiature.swift): «backup daddy» è il rito, «apri il diavolo» è il diario…
         if let imparato = Storpiature.cerca(frase) {
             if imparato == "rito" { fraseDiTony(); return true }
             if let r = Reparto(rawValue: imparato) { apriReparto(r); return true }
         }
-        if BrowserVoce.aperto, BrowserVoce.comando(Jarvis.togliRichiamo(frase).0) { return true }   // nel Browser: «scrivi …», «invia»
-        if LidarAperta.aperta, LidarAperta.eRifai(frase) {                // in LiDAR: «rifai la scansione»
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            NotificationCenter.default.post(name: .jarvisRifaiLidar, object: nil)
-            return true
-        }
-        let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
+        let dentro: Reparto? = occhi != nil ? .occhi : sezioneAperta
         // 12.0 (10): «apri la spesa e aggiungi il latte» va al cervello, che fa i due passi con la regia
         switch FineFrase.comandoComposto(frase) ? nil : ComandoVocale.riconosci(frase, dentro: dentro) {
         case .apri(let reparto)?:
@@ -1359,21 +1340,7 @@ final class Jarvis: NSObject, ObservableObject {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             chiudiChiesto = true
             return true
-        case .lidar(let azione)?:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            if case .modo(let chiave, let nome) = azione, !lidarAperto, let m = ModoLidar(rawValue: chiave) {   // LiDAR 23: «metro laser» da fuori apre LiDAR già sul modo
-                LidarAperta.richiesta = (m, nome, true)
-                // 4 nov (strada B): la frase del modo la dice LiDAR quando il modo parte (VistaLidar.avviaModo): appena aperto, o
-                // già aperto dietro dopo «SALVARE LA SCANSIONE?» se c'è una scansione da salvare
-                apriReparto(.lidar, annuncia: false)
-                return true
-            }
-            azioneLidar = azione
-            return true
-        case .pagina(let sezione, let voce, let scheda)?:     // MARK X: STUDIO e SOCIAL, la pagina del mockup
-            apriPagina(sezione, voce: voce, scheda: scheda)
-            return true
-        case .interprete(let codice)? where !lidarAperto:
+        case .interprete(let codice)?:
             apriInterprete(codice)
             return true
         case .rapido(let azione)?:
@@ -1415,7 +1382,6 @@ final class Jarvis: NSObject, ObservableObject {
         case .traccia: guidaTraccia = false; salvaTraccia = false; richiestaTraccia = true; apriReparto(.ricordi)   // Ricordi su TRACCIA, con la bussola
         case .guida: guidaTraccia = true; salvaTraccia = false; richiestaTraccia = true; apriReparto(.ricordi)      // TRACCIA con la Guida già accesa
         case .salvaLuogo: guidaTraccia = false; salvaTraccia = true; richiestaTraccia = true; apriReparto(.ricordi) // TRACCIA salva il posto dove si trova
-        case .radar: apriReparto(.meteo)          // RADAR è in testa al Meteo
         case .priorita: apriReparto(.email)       // PRIORITÀ è in testa all'Email
         case .organismo: apriReparto(.vitals)
         case .ologramma:                          // build 23: il Trainer già sull'Ologramma (a mano si apre sul Busto)
@@ -1432,14 +1398,6 @@ final class Jarvis: NSObject, ObservableObject {
             }
         case .allenamento:                        // «allenati allo specchio»: il Trainer, come il mockup 23
             apriReparto(.allenatore)
-        case .satellite(let a):                   // build 23: SATELLITE si apre e fa la sua cosa (guida, naviga, ricognizione, 3D)
-            RichiestaSatellite.condivisa.azione = a
-            apriReparto(.satellite)
-        case .fermaGuida:                         // build 23: la GUIDA di SATELLITE si ferma, anche a Satellite chiuso
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            let c_era = MotoreGuida.condiviso.attiva
-            MotoreGuida.condiviso.ferma()
-            annuncia(c_era ? "Guida fermata, Sir." : "Non c'è nessuna guida in corso, Sir.")
         }
     }
 
@@ -1461,13 +1419,11 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// «Traduci in inglese»: l'Interprete si apre già sulla lingua, senza passare dalla scelta.
     func apriInterprete(_ codice: String) {
-        guard !lidarAperto, let l = Lingua.trova(codice) else { return }   // sopra LiDAR non si apre un'altra schermata
+        guard let l = Lingua.trova(codice) else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         interrompi()
         interprete = l
     }
-
-    @Published var riunioneSubito = false     // «registra la riunione»: il Wiretap parte già registrando
 
     /// I comandi rapidi: come toccare la sezione e poi il suo tasto principale.
     /// Un comando (sezione, «chiudi», comando rapido): è un'azione nuova, la domanda interrotta prima non si porta dietro.
@@ -1486,7 +1442,6 @@ final class Jarvis: NSObject, ObservableObject {
         case .diario: chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")            // come «A voce» nel Diario
         case .confidente: chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.")        // come «A voce» nel Confidente
         case .cucina: guardaCucina()
-        case .riunione: riunioneSubito = true; repartoRichiesto = .wiretap
         }
     }
 
@@ -1504,29 +1459,9 @@ final class Jarvis: NSObject, ObservableObject {
     }
     private var seguitoDopoAnnuncio = false
 
-    /// MARK X: STUDIO e SOCIAL, la pagina del mockup («crea una piastra…», «apri Instagram»). `parla`: JARVIS dice la sua frase;
-    /// no quando la frase arriva dal microfono del Wiretap (4 nov: la sua voce finirebbe nella registrazione).
-    func apriPagina(_ sezione: String, voce: String?, scheda: String?, parla: Bool = true) {
-        chiudiInterruzione()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        var a = AperturaPagina(sezione: sezione, voce: voce, scheda: scheda)
-        if sezione == "Studio", let v = voce, v.contains("plastico") || v.contains("nello studio") {   // la sala vera, non quella d'esempio
-            let p = PaginaMarkX.plasticoDaArchivio(PaginaMarkX.tipoPlastico(v))
-            if parla { annuncia(p.frase) }
-            guard let json = p.json else { return }
-            a = AperturaPagina(sezione: "Studio", lidar: json)
-        } else if parla {
-            annuncia(PaginaMarkX.annuncio(a))
-        }
-        // 4 nov · MARK XI: niente più «chiudi» prima (chiudeva la sezione davanti, Occhi compresi): Studio o Social salgono
-        // e quella davanti va dietro da sola, viva, come nel mockup (ContentView, .jarvisApriPagina)
-        PaginaMarkX.apri(a)
-    }
-
     /// Apre un reparto o una scheda; `annuncia`: dice la sua frase (non serve quando l'ha già detto il cervello).
     private func apriReparto(_ reparto: Reparto, annuncia: Bool = true) {
         chiudiInterruzione()
-        if reparto == .scanner && LidarAperta.aperta { return }      // dentro LiDAR «scansione» è la stanza, mai lo Scanner
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         if annuncia, let a = reparto.annuncio {
             flussoFinito = true                     // una frase sola: finita quella, JARVIS torna in attesa
@@ -1549,9 +1484,6 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
     func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil) async -> [Data] {
-        // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
-        if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
-        if soccorsoAperto { return [] }               // il Tocco d'aiuto di Bea è aperto: non si copre mai
         // 4 nov · MARK XI: la sezione davanti non si chiude più prima («cosa vedi?» dal Meteo chiudeva il Meteo): gli Occhi salgono
         // e lei va dietro da sola, viva, come nel mockup. Quello che sta sopra a tutto (la pagina web, il menu SISTEMI) lo chiude
         // la schermata principale (ContentView, liberaSopra).
@@ -1563,8 +1495,6 @@ final class Jarvis: NSObject, ObservableObject {
             case .etichette(true)?: o.eti = true
             case .ologramma(true)?: o.olo = true
             case .aggancia?: o.olo = true; o.aggancia = true
-            case .studio?: o.manda = "studio"          // MARK X: a fuoco e parte da sola verso lo Studio
-            case .social?: o.manda = "social"
             case .aereo(let p, let f)?: o.aereo = (p: p, frase: f)     // MARK X · AEREO: aperti, cercano e agganciano
             default: break
             }
@@ -1648,22 +1578,6 @@ final class Jarvis: NSObject, ObservableObject {
             default: await invia("Cosa cucino stasera con quello che vedi? Proponimi due o tre piatti e dimmi se manca qualcosa da mettere nella lista della spesa.")
             }
         }
-    }
-
-    /// INTELLIGENCE · Wiretap: la trascrizione va al cervello (anche lunga) e JARVIS ne fa il verbale.
-    func verbaleWiretap(_ trascrizione: String, minuti: Int) {
-        let t = trascrizione.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        allegato = t
-        Task { await invia("Wiretap: il verbale della registrazione (\(minuti) min).") }
-    }
-
-    /// INTELLIGENCE · Profiler: la foto di una persona (o i fotogrammi di un giro) e, se il signore lo dice, chi è.
-    func profila(_ dati: [Data], nome: String) {
-        guard !dati.isEmpty else { return }
-        preparaFoto(dati)
-        let n = nome.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task { await invia(n.isEmpty ? "Modalità Profiler: fammi la scheda di questa persona." : "Modalità Profiler: questo è \(n). Fammi la scheda.") }
     }
 
     /// La domanda del diario della sera: JARVIS la dice e subito dopo ascolta la risposta.
@@ -2252,7 +2166,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func partiGiroUnico(_ audio: Data, origine: GiroUnicoMac.Origine, fine: Date, fatto: (() -> Void)?) -> Bool {
         guard Jarvis.giroUnicoMac else { return false }
         guard Jarvis.usaAscoltoCloud, UserDefaults.standard.bool(forKey: "giroUnicoCervello"), !micSpento,
-              foto == nil, fotoGiro.isEmpty, allegato == nil, occhi == nil, !lidarAperto, !LidarAperta.aperta, !BrowserVoce.aperto,
+              foto == nil, fotoGiro.isEmpty, allegato == nil, occhi == nil,
               ConfidenteAperto.domanda == nil, audio.count > 1_000 else { return false }
         if case .stanza = origine { guard fase == .attesa else { return false } } else { guard fase == .elaboro else { return false } }
         // la foto vista poco fa tornerebbe nella cronologia (foto_storia): lì la strada di prima, che la sa rimettere al suo posto
@@ -2345,8 +2259,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func comandoLocale(_ frase: String) -> Bool {
         if Dialogo.volume(frase).cambio != nil || Benvenuto.eFraseDiTony(frase) { return true }
         if ComandoDedicato.riconosci(frase) != nil || ComandoOcchi.riconosci(frase) != nil || Storpiature.cerca(frase) != nil { return true }
-        if BrowserVoce.aperto || LidarAperta.aperta || lidarAperto { return true }
-        let dentro: Reparto? = occhi != nil ? .occhi : (lidarAperto ? .lidar : sezioneAperta)
+        let dentro: Reparto? = occhi != nil ? .occhi : sezioneAperta
         // 12.0 (12) · B1: anche quello che la regia fa da sola (niente risposta anticipata del cervello: sarebbe buttata)
         if Regia.condivisa.forseLocale(frase) { return true }
         let ripensata = FineFrase.ultimaIntenzione(frase)
@@ -3119,7 +3032,6 @@ final class Jarvis: NSObject, ObservableObject {
         }
         // 9 nov sera (il signore: «come Apple Music»): in background (Home, altra app, schermo bloccato) la musica continua; la
         // musica è del lettore dentro JARVIS, quindi chiudendo JARVIS finisce da sola. «Chiudi» sulla sezione la ferma.
-        IsolaJarvis.fineVoce()                         // 12 nov: accesa mentre l'app usciva, ma il dialogo non continua: si spegne
         if richiamo.sveglio { richiamo.ferma() }       // la frase dopo «Jarvis» a metà: buttata (il richiamo si riaccende da solo)
         // difetto 6 (controllo del 25 ott): gli stava parlando sopra e l'orecchio raccoglieva la frase. Anche quella si butta:
         // prima l'orecchio restava acceso e al ritorno (o alla chiusura del riconoscimento) la consegnava al cervello
@@ -3157,7 +3069,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    /// Il dialogo fuori dall'app è finito: microfono spento, audio libero (se non suona musica), isola VOCE chiusa.
+    /// Il dialogo fuori dall'app è finito: microfono spento, audio libero (se non suona musica).
     private func spegniMicFuori() {
         chiusuraFuori?.cancel()
         dialogoFuori = false
@@ -3167,31 +3079,6 @@ final class Jarvis: NSObject, ObservableObject {
         if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
-        IsolaJarvis.fineVoce()
-    }
-
-    /// 12 nov · «Fine» sull'isola VOCE: il dialogo finisce subito (JARVIS tace, l'ascolto si butta) e il microfono si spegne.
-    func fineDialogoFuori() {
-        guard dialogoFuori || IsolaJarvis.voceAccesa else { return }
-        interrompi()
-        if fase == .ascolto { fermaAscolto(invia: false) }
-        if richiamo.sveglio { richiamo.ferma() }
-        richiamo.seguitoFinoA = .distantPast
-        if UIApplication.shared.applicationState == .active { dialogoFuori = false; IsolaJarvis.fineVoce() } else { spegniMicFuori() }
-    }
-
-    /// 12 nov · l'isola VOCE (mockup approvato, build 32): la fase come sotto il reattore e la riga di quello che sente o risponde.
-    /// iOS la lascia accendere solo con l'app ancora davanti: la schermata la chiama mentre l'app esce, poi si aggiorna da sola.
-    func aggiornaIsolaVoce() {
-        guard !Jarvis.usaAscoltoCloud else { return }
-        let riga: String
-        switch fase {
-        case .ascolto: riga = parziale.isEmpty ? "La ascolto, Sir." : "«\(parziale)»"
-        case .elaboro: riga = messaggi.last(where: { $0.ruolo == "user" }).map { "«\($0.testo)»" } ?? "…"
-        case .parlo: riga = messaggi.last(where: { $0.ruolo == "assistant" && !$0.testo.isEmpty })?.testo ?? "…"
-        case .attesa: riga = "Mi dica pure, Sir: la ascolto."
-        }
-        IsolaJarvis.voce(fase: fase.rawValue, riga: String(riga.prefix(160)))
     }
 
     /// 11 nov (#16): c'è un dialogo che può continuare fuori dall'app (JARVIS ascolta, pensa o parla, o ha appena risposto e il
@@ -3206,7 +3093,6 @@ final class Jarvis: NSObject, ObservableObject {
     func tornaDavanti() {
         chiusuraFuori?.cancel()
         dialogoFuori = false
-        IsolaJarvis.fineVoce()                          // 12 nov: dentro JARVIS l'isola VOCE non serve
         if micChiusoFuori { micChiusoFuori = false; aggiornaRichiamo() }
         proponiAbitudine()                              // 12.0 (12) · B6
     }
@@ -4293,8 +4179,7 @@ extension Jarvis {
     private func messaggioAnticipabile(_ t: String) -> Messaggio? {
         let frase = t.trimmingCharacters(in: .whitespacesAndNewlines)
         guard frase.count >= 6, Dialogo.volume(frase).cambio == nil, !Jarvis.eSoloSilenzio(frase), !Seguito.soloAspetta(frase) else { return nil }
-        guard ConfidenteAperto.domanda == nil, occhi == nil, foto == nil, fotoGiro.isEmpty, allegato == nil, !lidarAperto,
-              !LidarAperta.aperta, !BrowserVoce.aperto, !micSpento else { return nil }
+        guard ConfidenteAperto.domanda == nil, occhi == nil, foto == nil, fotoGiro.isEmpty, allegato == nil, !micSpento else { return nil }
         let (_, chiede) = Jarvis.togliRichiamo(frase)
         guard !chiede, !aggiuntaInArrivo, dopoAspetta == .no, interruzioneValida() == nil else { return nil }
         let detta = Jarvis.fraseAnticipabile(frase)

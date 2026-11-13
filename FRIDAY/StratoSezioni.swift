@@ -7,9 +7,8 @@ import Combine
 // sopra JARVIS (`StratoSezioni` in ContentView): fino a 10 vive, in ordine d'apertura; all'undicesima si chiude la più vecchia.
 // Una sola è davanti; le altre restano dietro, vive (con i loro dati, dove le aveva lasciate), come nel mockup. Le sezioni con
 // la fotocamera (o col microfono) dietro vanno in PAUSA (l'ultima immagine resta ferma) e davanti riprendono da dove erano, la
-// fotocamera col suo suono (scelta B del signore, 3 nov; «deve funzionare tutto come il mockup»). Il Wiretap dietro continua a
-// registrare (e intanto JARVIS non ascolta); l'Interprete dietro si ferma e davanti riprende. Studio e Social sono sezioni come le
-// altre (la pagina web resta viva dietro).
+// fotocamera col suo suono (scelta B del signore, 3 nov; «deve funzionare tutto come il mockup»). L'Interprete dietro si ferma e
+// davanti riprende.
 //
 // La regola che tiene tutto in ordine: lo «stato» di sempre di ogni sezione (mostraVitals, scheda, jarvis.occhi…) acceso vuol
 // dire «davanti». Mandata dietro, il suo stato si spegne ma la sezione resta nell'elenco (`dietro`); chiusa davvero, esce.
@@ -24,50 +23,31 @@ extension Notification.Name {
 }
 
 /// MARK XI (4 nov, approvati dal signore): i comandi a voce delle sezioni aperte arrivano da JARVIS o dal microfono di una
-/// sezione (Wiretap, Sentinella, Interprete, Trainer, Profiler, Scanner); li esegue la schermata principale, che ha l'elenco.
+/// sezione (Interprete, Trainer, Scanner); li esegue la schermata principale, che ha l'elenco.
 enum ComandiSezioni {
     static func invia(_ c: ComandoVocale) {
         NotificationCenter.default.post(name: .jarvisComandoSezioni, object: nil, userInfo: ["comando": c])
     }
 }
 
-/// MARK XI (4 nov): il Wiretap aperto, per chiuderlo da fuori come il suo «Chiudi» (pagine olografiche, «chiudi tutto», «chiudi
-/// il Wiretap»): con del testo parte il verbale, niente si perde. Il padrone è il registratore della vista, così una vista
-/// vecchia che se ne va non cancella quella nuova.
-enum WiretapAperto {
-    private(set) static var chiudi: (() -> Void)?
-    private static var padrone: ObjectIdentifier?
-    static func registra(_ id: ObjectIdentifier, chiudi c: @escaping () -> Void) { padrone = id; chiudi = c }
-    static func lascia(_ id: ObjectIdentifier) { if padrone == id { padrone = nil; chiudi = nil } }
-}
-
 /// Una sezione del contenitore.
 enum Sezione: Hashable {
     // 9 nov notte (il signore: «si apre due volte ed è orribile così»): niente più la sezione a parte per scegliere la lingua
     // dell'Interprete: la lingua si sceglie dentro l'Interprete, come nel mockup
-    case impostazioni, browser, occhi, interprete, sentinella, wiretap, profiler, allenatore, lidar, vitals, ricordi, confidente
+    case occhi, interprete, allenatore, vitals, ricordi, confidente
     case scheda(SchedaApp)
-    case pagina(String)                 // MARK X: Studio e Social
 
     /// Il nome, come sulla corona (le pagine olografiche, la scritta APERTA dell'ologramma).
     var nome: String {
         switch self {
-        case .impostazioni: return "Impostazioni"
-        case .browser: return "Browser"
         case .occhi: return "Occhi"
         case .interprete: return "Interprete"
-        case .sentinella: return "Sentinella"
-        case .wiretap: return "Wiretap"
-        case .profiler: return "Profiler"
         case .allenatore: return "Trainer"
-        case .lidar: return "LiDAR"
         case .vitals: return "Vitals"
         case .ricordi: return "Ricordi"
         case .confidente: return "Confidente"
-        case .pagina(let n): return n
         case .scheda(let s):
             switch s {
-            case .github: return "GitHub"
             case .edith: return "EDITH"
             case .email: return "Email"
             default: return s.rawValue.prefix(1).uppercased() + s.rawValue.dropFirst()
@@ -78,24 +58,20 @@ enum Sezione: Hashable {
     /// Fotocamera o microfono: dietro va in pausa (e riprende quando torna davanti).
     var inPausaDietro: Bool {
         switch self {
-        case .occhi, .sentinella, .profiler, .allenatore, .lidar, .interprete: return true
-        case .scheda(let s): return s == .scanner || s == .shazam
+        case .occhi, .allenatore, .interprete: return true
+        case .scheda(let s): return s == .scanner
         default: return false
         }
     }
 
-    /// Studio, Social e Browser: pagine web (WKWebView). Nelle pagine olografiche il ciano se lo mettono dentro (OloWeb).
-    var paginaWeb: Bool {
-        switch self {
-        case .pagina, .browser: return true
-        default: return false
-        }
-    }
+    /// Le pagine web (WKWebView), che nelle pagine olografiche il ciano se lo mettono dentro (OloWeb): in FRIDAY nessuna sezione
+    /// lo è (Studio, Social e Browser erano di JARVIS).
+    var paginaWeb: Bool { false }
 
     /// Le sezioni con la fotocamera: scelte dalle pagine olografiche hanno già il loro suono d'apertura (niente «scelta»).
     var conFotocamera: Bool {
         switch self {
-        case .occhi, .sentinella, .profiler, .allenatore, .lidar: return true
+        case .occhi, .allenatore: return true
         case .scheda(let s): return s == .scanner
         default: return false
         }
@@ -109,11 +85,10 @@ final class PilaSezioni: ObservableObject {
         let sezione: Sezione
         /// Ricordi: la scheda con cui si erano aperti.
         var ricordi: VistaRicordi.Scheda?
-        /// Occhi, Interprete, Studio e Social: con cosa si erano aperti (servono per disegnarli anche dietro, a stato spento).
+        /// Occhi e Interprete: con cosa si erano aperti (servono per disegnarli anche dietro, a stato spento).
         var occhiata: Occhiata?
         var lingua: Lingua?
-        var pagina: AperturaPagina?
-        static func == (a: Voce, b: Voce) -> Bool { a.id == b.id && a.ricordi == b.ricordi && a.pagina?.id == b.pagina?.id }
+        static func == (a: Voce, b: Voce) -> Bool { a.id == b.id && a.ricordi == b.ricordi }
     }
 
     @Published private(set) var voci: [Voce] = []
@@ -131,13 +106,12 @@ final class PilaSezioni: ObservableObject {
     /// La sezione si accende (davanti): nuova in fondo all'elenco, o una che c'era già (torna davanti, sveglia se era spenta).
     /// Restituisce la sezione da chiudere perché sono più di 10 (la più vecchia, mai quella davanti).
     @discardableResult func accesa(_ s: Sezione, ricordi: VistaRicordi.Scheda? = nil, occhiata: Occhiata? = nil,
-                                   lingua: Lingua? = nil, pagina: AperturaPagina? = nil) -> Sezione? {
+                                   lingua: Lingua? = nil) -> Sezione? {
         vannoDietro.remove(s)
         if let i = voci.firstIndex(where: { $0.sezione == s }) {
             if let ricordi { voci[i].ricordi = ricordi }
             if let occhiata { voci[i].occhiata = occhiata }
             if let lingua { voci[i].lingua = lingua }
-            if let pagina { voci[i].pagina = pagina }
             davanti = voci[i].id
             return nil
         }
@@ -145,11 +119,10 @@ final class PilaSezioni: ObservableObject {
         v.ricordi = ricordi
         v.occhiata = occhiata
         v.lingua = lingua
-        v.pagina = pagina
         voci.append(v)
         davanti = v.id
-        // la più vecchia, mai quella davanti né il Wiretap (4 nov, il signore: la registrazione non si chiude mai da sola)
-        if voci.count > PilaSezioni.massimo, let vecchia = voci.first(where: { $0.id != davanti && $0.sezione != .wiretap }) {
+        // la più vecchia, mai quella davanti
+        if voci.count > PilaSezioni.massimo, let vecchia = voci.first(where: { $0.id != davanti }) {
             return vecchia.sezione
         }
         return nil

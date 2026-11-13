@@ -334,4 +334,26 @@ struct DatiRicordi {
         ricordi = (o["ricordi"] as? [[String: Any]] ?? []).compactMap(riga)
     }
 }
+
+/// I tasti delle schede, come i «chip» del mockup (nati con SATELLITE di JARVIS).
+struct ChipSat: View {
+    let testo: String
+    let acceso: Bool
+    let azione: () -> Void
+    var body: some View {
+        Button(action: azione) {
+            Text(testo)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .foregroundStyle(acceso ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                .padding(.vertical, 8).padding(.horizontal, 6)
+                .frame(maxWidth: .infinity)
+                .background(RoundedRectangle(cornerRadius: 8).fill(acceso ? Color.ciano : .clear))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(acceso ? 1 : 0.3), lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(StileStark())
+        .accessibilityAddTraits(acceso ? .isSelected : [])
+    }
+}
 #endif

@@ -45,7 +45,6 @@ final class Insieme {
         case scrivi(a: Destinatario, testo: String, whatsapp: Bool?), scriviCosa(a: Destinatario)
         case manda(cosa: QualeCosa, a: Destinatario?, whatsapp: Bool?)
         case salva(QualeCosa), chiama(Destinatario), congedo(soloGrazie: Bool)
-        case sessione(tema: String), sesSalva, sesLascia, sesIndietro(prima: Bool), pubblica(alle: String?, ora: Bool)
     }
 
     /// La frase (già senza «Jarvis») è sua? Allora la fa e restituisce la battuta ("": ha già parlato). Nil: va avanti la regia,
@@ -86,30 +85,14 @@ final class Insieme {
     /// Senza fare niente: la farebbe l'app? (Per non chiedere al cervello una risposta anticipata che sarebbe buttata.)
     func sua(_ frase: String) -> Bool {
         if attesa != nil, Regia.eAssenso(frase) || Regia.eAnnulla(frase) { return true }
-        guard let i = riconosci(Insieme.norma(frase), nudo: FineFrase.paroleNude(frase).joined(separator: " ")) else { return false }
-        if case .sessione = i { return false }                       // la sessione la propone il cervello
-        return true
+        return riconosci(Insieme.norma(frase), nudo: FineFrase.paroleNude(frase).joined(separator: " ")) != nil
     }
 
     private func riconosci(_ n: String, nudo: String) -> Intento? {
         guard !n.isEmpty || !nudo.isEmpty else { return nil }
         // il congedo («è tutto, grazie», «no grazie»), fuori dal lavoro insieme
-        if !Sessione.condivisa.aperta, Insieme.cerca(#"^(?:si )?(?:e tutto|no (?:e tutto|grazie)|no grazie|basta cosi|a posto cosi|niente grazie|nient altro|niente altro|tutto a posto|va bene cosi|sono a posto|grazie e tutto|grazie)(?: grazie)?(?: sir)?$"#, nudo) != nil {
+        if Insieme.cerca(#"^(?:si )?(?:e tutto|no (?:e tutto|grazie)|no grazie|basta cosi|a posto cosi|niente grazie|nient altro|niente altro|tutto a posto|va bene cosi|sono a posto|grazie e tutto|grazie)(?: grazie)?(?: sir)?$"#, nudo) != nil {
             return .congedo(soloGrazie: nudo == "grazie" || nudo == "grazie sir")
-        }
-        let ses = Sessione.condivisa
-        // il lavoro insieme: le chiusure e il «torna indietro» le fa l'app; le correzioni le riscrive il cervello
-        if ses.aperta {
-            if Insieme.cerca(#"^(?:salval[oa]|salva|salvala cosi|salvalo cosi|tienilo cosi|va bene cosi|ok cosi|perfetto|chiudiamo|fatto|e perfetto|cosi va bene|lascialo cosi|mi piace cosi|approvato|va bene|e tutto|basta cosi|a posto cosi|grazie e tutto)$"#, nudo) != nil || (n.isEmpty && nudo == "perfetto") { return .sesSalva }
-            if Insieme.cerca(#"^(?:lascia stare|lascia perdere|annulla tutto|non lo facciamo|niente post|butta via tutto|lasciamo perdere)$"#, n) != nil { return .sesLascia }
-            if Insieme.cerca(#"^(?:torna (?:alla )?(?:versione )?(?:di )?prima|torna indietro|indietro|la versione di prima|era meglio prima|la prima era meglio|torna alla prima(?: versione)?|annulla l ultima(?: modifica)?|annulla|rimetti com era|com era prima|rimettilo com era)$"#, n) != nil {
-                return .sesIndietro(prima: n.contains("prima era meglio") || n.contains("alla prima"))
-            }
-        }
-        if ses.aperta || ses.bozza != nil {
-            if let m = Insieme.cerca(#"^(?:programmal[oa]|pubblical[oa]|mettil[oa] online|fall[oa] uscire|postal[oa])(?: (?:per|stasera))?(?: (?:alle|all|per le|verso le) (.+))?$"#, n) {
-                return .pubblica(alle: m[1], ora: n.hasPrefix("pubblic") && m[1] == nil)
-            }
         }
         var m: [String?]?
         // i widget FILO: «mostrami…», «fammi vedere…» (niente sezione), «toglilo», «togli tutto»
@@ -172,11 +155,6 @@ final class Insieme {
         // chiamare (col sì)
         if let m = Insieme.cerca(#"^(?:chiamal([oa])|telefonal([oa])|telefonagli)$"#, n) { return .chiama(.genere((m[1] ?? m[2]) == "a" ? "f" : "m")) }
         if let m = Insieme.cerca(#"^(?:chiama|chiamami|telefona a) (\w+)$"#, n), let chi = m[1], !["la", "lo", "lei", "lui"].contains(chi) { return .chiama(.nome(chi)) }
-        // lavorare insieme: «progettiamo il post di stasera», «prepariamo…», «scriviamo…»
-        if let m = Insieme.cerca(#"^(?:progettiamo|prepariamo|scriviamo|organizziamo|pensiamo|lavoriamo|impostiamo|creiamo|costruiamo|studiamo|buttiamo giu|mettiamo giu|facciamo)(?: a| al| alla| allo| ai| un| una| il| la| lo| l)? ?(.+)$"#, n),
-           let tema = m[1], Insieme.cerca(#"\b(post|reel|storia|instagram|didascalia|carosello)\b"#, tema) != nil {
-            return .sessione(tema: tema)
-        }
         return nil
     }
 
@@ -245,9 +223,6 @@ final class Insieme {
                 let e = await LettoreMusica.condiviso.salvaNeiPreferiti()
                 if let errore = e.errore { return errore }
                 return Battute.salvataMusica(e.titolo ?? r.titolo)
-            case "post":
-                if Sessione.condivisa.aperta { return Sessione.condivisa.salva() }
-                return "È già tra le bozze, Sir."
             default:
                 return nil                                           // una risposta, una nota: dove salvarla lo decide il cervello
             }
@@ -255,22 +230,6 @@ final class Insieme {
             guard let chi = await destinatario(a), let numero = chi.numero else { return a.eNome ? nil : "Chi, Sir?" }
             attesa = Attesa(tipo: "chiama", chi: chi.nome, numero: numero, testo: "", whatsapp: false, quando: Date())
             return "Chiamo \(Filo.detto(chi.nome)), Sir?"
-        case .sessione(let tema):
-            await Sessione.condivisa.inizia(tema: tema)
-            return nil                                               // la prima idea la propone il cervello (vede la SESSIONE)
-        case .sesSalva:
-            return Sessione.condivisa.salva()
-        case .sesLascia:
-            Sessione.condivisa.chiudi(salva: false)
-            return "Come vuole, Sir: niente post. La bozza resta lì se cambia idea."
-        case .sesIndietro(let prima):
-            return await Sessione.condivisa.indietro(allaPrima: prima)
-        case .pubblica(let alle, let ora):
-            // pubblicare è mandare: prima il sì («Lo programmo per stasera alle nove, Sir?»)
-            let ses = Sessione.condivisa
-            let q = ora ? "ORA" : (Sessione.quando(detto: alle) ?? ses.bozza?.quando ?? ses.versione?.quando ?? Sessione.stasera(21 * 60))
-            attesa = Attesa(tipo: "pubblica", chi: "", numero: "", testo: q, whatsapp: false, quando: Date())
-            return q == "ORA" ? "Lo pubblico adesso su @kingrusto, Sir?" : "Lo programmo per \(Sessione.detto(q)), Sir?"
         }
     }
 
@@ -306,10 +265,6 @@ final class Insieme {
                 return Battute.ecco()
             }
             mostraCosa(r)
-            return Battute.ecco()
-        }
-        if Insieme.cerca(#"\b(post|didascalia|bozza)\b"#, t) != nil, let v = Sessione.condivisa.versione ?? Sessione.condivisa.bozza {
-            filo.mostra("c:post", titolo: "Post", riga: Filo.primaFrase(v.didascalia), sezione: "Social")
             return Battute.ecco()
         }
         if t.split(separator: " ").count == 1, let v = Insieme.ultimoDi(t) {
@@ -372,11 +327,6 @@ final class Insieme {
     private func conferma() async -> String {
         guard let a = attesa else { return Battute.lampo() }
         attesa = nil
-        if a.tipo == "pubblica" {                                        // il post: esce come dal tasto PUBBLICA › SÌ della pagina
-            let r = await Sessione.condivisa.pubblica(alle: a.testo == "ORA" ? nil : a.testo, ora: a.testo == "ORA")
-            Congedo.condiviso.cosaVera()
-            return r ?? ""
-        }
         if a.tipo == "chiama" {
             Filo.condiviso.persona(a.chi)
             guard let url = URL(string: "tel://\(Strumenti.pulisci(a.numero))") else { return "Non riesco a chiamare, Sir." }
@@ -565,7 +515,7 @@ final class Congedo {
         let da = ultimaFrase?() ?? Date()
         compito = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(9))
-            guard let self, !Task.isCancelled, !Sessione.condivisa.aperta, Battute.umore != .fretta, self.inAttesa?() == true,
+            guard let self, !Task.isCancelled, Battute.umore != .fretta, self.inAttesa?() == true,
                   (self.ultimaFrase?() ?? da) <= da, Date().timeIntervalSince(self.ultimo) > 15 * 60 else { return }
             self.ultimo = Date()
             self.aperto = Date().addingTimeInterval(10)

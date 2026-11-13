@@ -162,70 +162,16 @@ extension EnvironmentValues {
     var chiudiOVia: ChiudiOVia { ChiudiOVia(sezione: isPresented ? nil : sezioneAperta, dismiss: dismiss) }
 }
 
-struct StratoPagina: View {
-    let apertura: AperturaPagina
-    let parla: (String) -> Void
-    /// Fa scendere lo strato e lo toglie (la schermata principale, con la durata della discesa).
-    let chiudi: (Double) -> Void
-    /// Il dito sta tirando giù lo strato e sotto si vede JARVIS (vero), o lo strato è tornato su del tutto (falso): con JARVIS
-    /// in vista le sue animazioni devono girare (jarvisCoperto).
-    let jarvisSiVede: (Bool) -> Void
-    @State private var scesa: CGFloat = 0
-    @State private var chiusa = false                    // già in discesa: un secondo «Chiudi» non fa niente
-
+/// Le curve della salita e della discesa delle sezioni (nate il 26 ott con lo strato di Studio e Social di JARVIS).
+enum StratoPagina {
     /// 26 ott sera (il signore: «Studio e Social uguali alle altre schede»): la salita e la discesa delle altre schede, misurate
-    /// fotogramma per fotogramma sul suo video delle 21:58 (SATELLITE, 60 fotogrammi al secondo): salita ~0,3 s che frena in
-    /// fondo, discesa ~0,35 s che parte piano e si posa piano. Sono le molle di iOS che le ricalcano (scarto sotto l'1%).
-    // 27 ott notte (10.0 16): lo strato scende di tutta l'altezza dello schermo, come le altre schede di iOS: stessi tempi delle
-    // altre schede (misurati sul video di SATELLITE), quindi stessa durata e stessa velocità.
-    // 8 nov sera (il signore: «il mockup adesso è perfetto… timing perfetto, deve sembrare un'unica pagina»): la salita del .foglio
-    // del mockup (transform .35s cubic-bezier(.2,.8,.2,1)), invece della molla di iOS che si posava piano in fondo (la parte alta
-    // arrivava per ultima)
+    /// fotogramma per fotogramma sul suo video delle 21:58 (60 fotogrammi al secondo): salita ~0,3 s che frena in fondo, discesa
+    /// ~0,35 s che parte piano e si posa piano. 8 nov sera (il signore: «il mockup adesso è perfetto… timing perfetto, deve sembrare
+    /// un'unica pagina»): la salita del .foglio del mockup (transform .35s cubic-bezier(.2,.8,.2,1)).
     static let salita: Animation = .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.35)
     /// Dopo il trascinamento col dito: 0,22 s e frena, come le altre schede (PaginaPiena), il dito l'ha già portata giù.
     static func discesa(_ durata: Double = 0.35) -> Animation {
         durata > 0.3 ? .spring(response: 0.33, dampingFraction: 1) : .easeOut(duration: durata)
-    }
-
-    var body: some View {
-        VistaStudio(apertura: apertura, parla: parla, chiudi: { vaGiu(0.35) })
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.fondo)
-            .overlay(alignment: .top) {
-                Color.clear
-                    .frame(height: FasciaAlta.altezza + 8)
-                    .contentShape(Rectangle())
-                    .gesture(trascina)
-            }
-            .offset(y: scesa)
-            .ignoresSafeArea()
-    }
-
-    private func vaGiu(_ durata: Double) {
-        guard !chiusa else { return }
-        chiusa = true
-        chiudi(durata)
-    }
-
-    private var trascina: some Gesture {
-        DragGesture(minimumDistance: 6, coordinateSpace: .global)
-            .onChanged { v in
-                guard !chiusa else { return }
-                if scesa == 0, v.translation.height > 0 { jarvisSiVede(true) }
-                scesa = max(0, v.translation.height)
-            }
-            .onEnded { v in
-                guard !chiusa else { return }
-                if v.translation.height > 140 || v.predictedEndTranslation.height > 420 {
-                    vaGiu(0.22)
-                } else {
-                    withAnimation(.spring(duration: 0.3)) { scesa = 0 }
-                    Task { @MainActor in                         // tornato su del tutto: JARVIS sotto è di nuovo coperto
-                        try? await Task.sleep(for: .milliseconds(350))
-                        if !chiusa, scesa == 0 { jarvisSiVede(false) }
-                    }
-                }
-            }
     }
 }
 /// 27 ott (il signore): la quadrettatura della pagina d'avvio anche sullo sfondo di ogni sezione, più leggera e sfumata verso i bordi:

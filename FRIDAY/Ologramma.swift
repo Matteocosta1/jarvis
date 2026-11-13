@@ -748,4 +748,22 @@ nonisolated final class MappaProfondita: @unchecked Sendable {
         return Double(buoni[buoni.count / 2])
     }
 }
+
+/// Gli angoli olografici del visore (come il mirino delle altre sezioni): quattro L ciano sui bordi della pagina.
+struct AngoliOlo: View {
+    let tinta: Color
+    var body: some View {
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height, l: CGFloat = 18
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: l)); p.addLine(to: .zero); p.addLine(to: CGPoint(x: l, y: 0))
+                p.move(to: CGPoint(x: w - l, y: 0)); p.addLine(to: CGPoint(x: w, y: 0)); p.addLine(to: CGPoint(x: w, y: l))
+                p.move(to: CGPoint(x: 0, y: h - l)); p.addLine(to: CGPoint(x: 0, y: h)); p.addLine(to: CGPoint(x: l, y: h))
+                p.move(to: CGPoint(x: w - l, y: h)); p.addLine(to: CGPoint(x: w, y: h)); p.addLine(to: CGPoint(x: w, y: h - l))
+            }
+            .stroke(tinta, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .shadow(color: tinta.opacity(0.7), radius: 4)
+        }
+    }
+}
 #endif

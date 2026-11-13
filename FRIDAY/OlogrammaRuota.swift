@@ -328,8 +328,7 @@ struct OlogrammaRuota: View {
         // l'icona si disegna dal basso in alto mentre il disco di scansione la percorre (90–380 ms)
         let rivela = creata ? OlogrammaRuota.ease((T - 90) / 290) : 1
         Group {
-            // v266: Profiler grande come le altre (era 20 × 15)
-            if simbolo == "profiler" { IconaProfiler().scaleEffect(2) } else if simbolo == "satellite" { IconaSatellite(lato: 40) } else { Image(systemName: simbolo) }
+            Image(systemName: simbolo)
         }
         .font(.system(size: 40, weight: .light))
         .symbolRenderingMode(.monochrome)
