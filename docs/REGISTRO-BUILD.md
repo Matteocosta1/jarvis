@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 12.0 (17) — MARK XII · 13 nov sera · build chiesta dal signore (19:21: «crea una nuova build con massima competenza che include questo suggerimento su Salute») · numero da confermare · build unica · cervello **v135**
+## 12.0 (17) — MARK XII · 13 nov sera · build chiesta dal signore (19:21: «crea una nuova build con massima competenza che include questo suggerimento su Salute») · numero confermato dal signore (20:56, «confermo»: Build 17 su app, Watch, complicazione e isola) · build unica · cervello **v135**
 
 **Perché** (dialogo del signore 18:57–19:00 sulla 12.0 (16) col cervello v134, log di Supabase): «Buongiorno, come ho dormito» alle sette di sera (appena sveglio da un riposo), poi «Gianni ascolta, prima quando ero a letto» (Jarvis storpiato) e «ti ho detto». JARVIS ha chiesto chi fosse Gianni e cosa gli avesse detto, ha ripetuto «non risulta» in quattro risposte, ha detto che l'orologio registra i pisolini solo con la modalità Sonno (non più vero da watchOS 11) e due volte «lo conto io come riposo» senza segnarlo da nessuna parte. Le domande sulla salute: 8,2 e 6,1 s dalla fine della frase al primo suono (il cervello tornava al telefono a leggere Salute). Il sonno mancava davvero: l'orologio non aveva registrato né la notte né il pisolino (la lettura dell'app funziona: il 7 nov aveva letto 10 h 24 min).
 
@@ -554,7 +554,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Vitals: il grafico del sonno somma il riposo detto a voce al sonno di Salute di quel giorno (`SaluteStorica.swift`).
 - Prove del dialogo: nuova prova delle frasi sulla salute (21 frasi, quelle vere del 13 nov comprese).
 - Mockup invariato: nessun cambiamento visivo (le risposte sulla salute arrivano solo prima).
-- Controllo di compilazione (commit e25ed57, run 43486821354; il giro prima, 43486387791, annullato apposta per metterci la protezione dell'iPhone bloccato): **verde** · 0 errori, 0 warning · prove del dialogo superate (comprese le 21 sulla salute). Manca solo il numero 17 nel progetto, appena il signore conferma.
+- Controllo di compilazione (commit e25ed57, run 43486821354; il giro prima, 43486387791, annullato apposta per metterci la protezione dell'iPhone bloccato): **verde** · 0 errori, 0 warning · prove del dialogo superate (comprese le 21 sulla salute). Numero 17 nel progetto (confermato alle 20:56). **Questa è la 12.0 (17) da caricare** (Pull + Archive + TestFlight).
 
 ## 12.0 (16) — MARK XII · 13 nov sera · confermata dal signore («fallo», 18:46) · build unica · cervello invariato (v134)
 
