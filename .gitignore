@@ -1,0 +1,4 @@
+# file personali di Xcode (cambiano a ogni apertura e bloccano il Pull)
+xcuserdata/
+*.xcuserstate
+.DS_Store

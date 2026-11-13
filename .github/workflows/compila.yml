@@ -1,0 +1,77 @@
+name: Compila
+
+# Compila l'app su un Mac di GitHub con Xcode e fallisce se c'è anche un solo errore o warning.
+# Parte SOLO quando il messaggio del commit contiene [compila] (o a mano dalla scheda Actions),
+# per non consumare i minuti Mac gratuiti (circa 200 al mese) a ogni push.
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: compila-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compila:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[compila]')
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versione di Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E "iOS" || true
+
+      - name: Prove del dialogo
+        # 12 nov (P7): le regole di fine frase, i segnali d'ascolto e l'intonazione (DialogoVivo.swift) provate da sole
+        run: |
+          set -o pipefail
+          esito=0
+          xcrun swiftc -O -parse-as-library FRIDAY/DialogoVivo.swift .github/prove/ProvaDialogo.swift -o prova-dialogo 2>&1 | tee prove.log || esito=1
+          if [ "$esito" = "0" ]; then ./prova-dialogo 2>&1 | tee -a prove.log || esito=1; fi
+          { echo "## Prove del dialogo"; echo '```'; tail -80 prove.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $esito
+
+      - name: Compila
+        if: always()
+        run: |
+          set -o pipefail
+          : > build.log
+          esito=0
+          echo "== FRIDAY (iPhone)" | tee -a build.log
+          xcodebuild -project FRIDAY.xcodeproj -scheme FRIDAY -configuration Release -destination "generic/platform=iOS" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -skipPackagePluginValidation -skipMacroValidation build 2>&1 | tee -a build.log | grep -E "(error|warning): |BUILD (SUCCEEDED|FAILED)" || esito=1
+          exit $esito
+
+      - name: Controlla i warning
+        if: always()
+        run: |
+          grep -E ": (warning|error): " build.log | grep -F "$GITHUB_WORKSPACE" | sed "s#$GITHUB_WORKSPACE/##" | sort -u > problemi.txt || true
+          n_err=$(grep -c ": error: " problemi.txt || true)
+          n_warn=$(grep -c ": warning: " problemi.txt || true)
+          {
+            echo "## Risultato: $n_err errori, $n_warn warning"
+            echo
+            echo "Xcode: $(xcodebuild -version | head -1)"
+            echo
+            echo "Parti compilate:"
+            echo '```'
+            grep -ohE "in target '[^']+'" build.log | sort | uniq -c || true
+            echo '```'
+            echo
+            if [ -s problemi.txt ]; then echo '```'; head -200 problemi.txt; echo '```'; else echo "Compilazione pulita."; fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          cat problemi.txt
+          [ "$n_err" = "0" ] && [ "$n_warn" = "0" ]
+
+      - name: Salva il registro completo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registro-compilazione
+          path: |
+            build.log
+            problemi.txt
+          retention-days: 7
