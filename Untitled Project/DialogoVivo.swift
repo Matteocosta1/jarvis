@@ -22,13 +22,14 @@ nonisolated final class VoceAttiva: @unchecked Sendable {
     private var pezzi = 0
     private var sommaForza: Float = 0       // 12 nov (A3): quanto la voce sta sopra il fondo, sommato sui pezzi di voce
     private var pezziVoce = 0
+    private var rumoreDa: TimeInterval?     // 13 nov: da quando c'è suono «forte» senza una voce viva (rumore costante)
 
     private static var ora: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
     /// Un ascolto nuovo: il fondo si rimisura da capo (la stanza può essere cambiata).
     func azzera() {
         lock.lock()
-        fondo = -60; ultimaVoce = 0; pronta = false; pezzi = 0; sommaForza = 0; pezziVoce = 0
+        fondo = -60; ultimaVoce = 0; pronta = false; pezzi = 0; sommaForza = 0; pezziVoce = 0; rumoreDa = nil
         lock.unlock()
         Intonazione.condivisa.azzera()
     }
@@ -40,6 +41,26 @@ nonisolated final class VoceAttiva: @unchecked Sendable {
         sommaForza = 0; pezziVoce = 0
         lock.unlock()
         Intonazione.condivisa.iniziaFrase(da: VoceAttiva.ora - 2.5)    // dentro c'è anche «Jarvis» e l'inizio della domanda
+    }
+
+    /// 13 nov (punto 3): dopo «Jarvis…» la frase restava aperta 6–7 secondi. Il rumore della stanza (il Bimby che gira, una
+    /// ventola, il fruscio del microfono) superava il fondo di 9 dB e passava per voce: la pausa non arrivava mai e la frase si
+    /// chiudeva solo al tetto dei 6 s senza parole nuove. Ora, per la fine della frase, conta come voce solo quella intonata e
+    /// viva (un'altezza che si muove: le vocali di una persona, non il ronzio fisso di un motore), più un attimo per le consonanti.
+    var silenzioPerFineFrase: Double {
+        let parlata = Intonazione.condivisa.ultimaVoceViva()
+        lock.lock(); defer { lock.unlock() }
+        let t = VoceAttiva.ora
+        let energia = ultimaVoce == 0 ? 999 : t - ultimaVoce
+        // se una voce viva non si è mai sentita (o non da 20 s), l'altezza non si sa misurare qui: vale il suono, come prima
+        let viva = parlata == 0 || t - parlata > 20 ? energia : t - parlata
+        return max(energia, viva - 0.35)
+    }
+
+    /// 13 nov: il rumore di fondo della stanza adesso (dB), per i tempi del turno; nil finché non si è assestato.
+    var fondoDb: Int? {
+        lock.lock(); defer { lock.unlock() }
+        return pronta ? Int(fondo.rounded()) : nil
     }
 
     /// Un pezzo di audio del microfono.
@@ -61,6 +82,16 @@ nonisolated final class VoceAttiva: @unchecked Sendable {
         lock.unlock()
         // 12 nov (P3): l'altezza della voce, solo mentre il signore parla
         Intonazione.condivisa.ascolta(canale, n: n, hz: b.format.sampleRate, voce: voce, tempo: t)
+        // 13 nov (punto 3): un rumore costante sopra il fondo (senza un'altezza viva da più di 1,2 s) non è il signore: il fondo
+        // lo raggiunge in circa un secondo invece che in dieci, e smette di passare per voce
+        guard voce else { lock.lock(); rumoreDa = nil; lock.unlock(); return }
+        let viva = Intonazione.condivisa.ultimaVoceViva()
+        guard viva > 0 else { return }                                    // l'altezza qui non si è mai misurata: niente da decidere
+        lock.lock()
+        if t - viva < 0.4 { rumoreDa = nil }
+        else if let da = rumoreDa { if t - da > 1.2 { fondo += (db - fondo) * 0.05 } }
+        else { rumoreDa = t }
+        lock.unlock()
     }
 
     /// 12 nov (A3): di quanti decibel, in media, la voce di questo ascolto stava sopra il rumore della stanza (nil: troppo poca voce).
@@ -613,6 +644,7 @@ nonisolated final class Intonazione: @unchecked Sendable {
     private let semitoni: UnsafeMutablePointer<Float>
     private var punti = 0, prossimo = 0
     private var daTempo: TimeInterval = 0  // i punti prima di questo istante non contano (frase nuova)
+    private var viva: TimeInterval = 0     // 13 nov: l'ultima misura di una voce viva (altezza che si muove, non un ronzio fisso)
 
     init() {
         ridotto = .allocate(capacity: Intonazione.capienza); ridotto.initialize(repeating: 0, count: Intonazione.capienza)
@@ -629,8 +661,16 @@ nonisolated final class Intonazione: @unchecked Sendable {
     /// Un ascolto nuovo: si dimentica tutto.
     func azzera() {
         lock.lock()
-        quanti = 0; analizzato = 0; punti = 0; prossimo = 0; basso = 0; accumulo = 0; contati = 0; daTempo = 0
+        quanti = 0; analizzato = 0; punti = 0; prossimo = 0; basso = 0; accumulo = 0; contati = 0; daTempo = 0; viva = 0
         lock.unlock()
+    }
+
+    /// 13 nov (punto 3): quando (orologio di sistema) si è sentita l'ultima voce viva; 0 se mai. Una persona che parla muove
+    /// l'altezza della voce (in 12 misure, circa un quarto di secondo di vocali, almeno un quarto di semitono di scarto); un motore,
+    /// una ventola, un frigo che ronzano tengono la stessa nota e non contano.
+    func ultimaVoceViva() -> TimeInterval {
+        lock.lock(); defer { lock.unlock() }
+        return viva
     }
 
     /// Una frase nuova sul microfono sempre acceso: contano solo le misure da `da` in poi.
@@ -681,6 +721,7 @@ nonisolated final class Intonazione: @unchecked Sendable {
             analizzato = 0
             return
         }
+        var nuovi = 0
         while analizzato + serve <= quanti {
             if let f0 = yin(ridotto + analizzato) {
                 let ritardo = Double(quanti - (analizzato + Intonazione.finestra / 2)) / hz
@@ -688,10 +729,23 @@ nonisolated final class Intonazione: @unchecked Sendable {
                 semitoni[prossimo] = Float(12 * log2(Double(f0) / 100))
                 prossimo = (prossimo + 1) % Intonazione.maxPunti
                 punti = min(punti + 1, Intonazione.maxPunti)
+                nuovi += 1
             }
             analizzato += salto
         }
         if analizzato > 0 { scarta(analizzato) }
+        // 13 nov (punto 3): voce viva? Lo scarto delle ultime 12 altezze (un ronzio fisso sta sotto il quarto di semitono)
+        if nuovi > 0, punti >= 12 {
+            var media: Float = 0
+            for k in 0..<12 { media += semitoni[(prossimo - 1 - k + Intonazione.maxPunti) % Intonazione.maxPunti] }
+            media /= 12
+            var varianza: Float = 0
+            for k in 0..<12 {
+                let d = semitoni[(prossimo - 1 - k + Intonazione.maxPunti) % Intonazione.maxPunti] - media
+                varianza += d * d
+            }
+            if (varianza / 12).squareRoot() >= 0.25 { viva = tempo }
+        }
     }
 
     /// La frequenza fondamentale di una finestra (nil: non è voce intonata, o non si capisce). YIN: differenza, media cumulativa

@@ -23,6 +23,10 @@ final class Orecchio {
     var rispostaAllaDomanda: ((String) -> Void)?
     /// Le parole che JARVIS sta dicendo in questo momento: servono a riconoscere la propria eco.
     var testoDetto = ""
+    /// 13 nov (punto 2): la frase che JARVIS sta pronunciando adesso, per il registro dei tentativi.
+    var fraseOra = ""
+    private var tentativoAperto: TentativoSopra?
+    private var tentativiFatti: [TentativoSopra] = []
     private var inPresa = false         // il signore sta parlando: aspetto che finisca la frase
     private var ultimoTesto = ""
     private var precedente = ""         // l'ultima trascrizione ricevuta
@@ -60,10 +64,17 @@ final class Orecchio {
     func avvia() {
         voluto = true
         chiusuraChiesta = false
+        // 13 nov (punto 1): la voce forte del signore sopra quella di JARVIS si misura da capo per ogni risposta; quando scatta
+        // (mezzo secondo), le parole già sentite si rivalutano subito, senza aspettare il prossimo pezzo di trascrizione
+        SopraLaVoce.condivisa.azzera()
+        SopraLaVoce.condivisa.quandoForte = { [weak self] in
+            Task { @MainActor [weak self] in self?.rivalutaForte() }
+        }
         accendi()
     }
 
     func ferma() {
+        chiudiTentativo()                   // 13 nov (punto 2): JARVIS ha finito di parlare, il tentativo in corso si registra
         voluto = false
         chiusuraChiesta = false
         inPresa = false
@@ -138,7 +149,69 @@ final class Orecchio {
     /// 12.0 (11): perché l'ultima voce sentita mentre JARVIS parlava non l'ha fermato («eco», «segnale», «folla», «orologio»,
     /// «riservato»): va nei tempi del turno, per regolare le soglie sui dati veri invece di indovinare.
     private(set) var ultimoScarto: (motivo: String, quando: Date)?
-    private func scarto(_ motivo: String) { ultimoScarto = (motivo, Date()) }
+    private func scarto(_ motivo: String, parole: [String] = [], proprie: [String] = []) {
+        ultimoScarto = (motivo, Date())
+        annota(motivo, parole: parole, proprie: proprie)
+    }
+
+    // MARK: 13 nov (punto 2) · il registro dei tentativi
+
+    /// Un tentativo del signore di parlare sopra JARVIS, com'è andato: fermato (e con quale regola) o no (e perché), con le parole
+    /// sentite. Il signore: «ogni interruzione mancata salvata nei tempi del turno con le parole sentite, così vedo cosa è successo».
+    nonisolated struct TentativoSopra: Sendable {
+        var quando: Date
+        var esito: String          // «fermato·nome», «fermato·parole», «fermato·voce», «risposta», «capito»; o eco, segnale, folla, orologio, riservato
+        var sentite: String        // quello che il microfono ha trascritto in quel pezzo (eco compresa)
+        var sue: String            // le parole riconosciute come sue
+        var forteMs: Int           // per quanto la sua voce è stata forte sopra quella di JARVIS (millisecondi, sugli ultimi 0,8 s)
+        var sopraDb: Int           // di quanto il microfono è salito sopra l'eco tipica di JARVIS
+        var jarvis: String         // le ultime parole della frase che JARVIS stava dicendo
+    }
+
+    private func annota(_ esito: String, parole: [String], proprie: [String]) {
+        let picchi = SopraLaVoce.condivisa.picchi()
+        let fermato = esito.hasPrefix("fermato") || esito == "risposta" || esito == "capito"
+        // solo se c'è traccia di lui (parole sue o la voce forte): la sola eco di JARVIS non è un tentativo
+        guard fermato || !proprie.isEmpty || picchi.forteMs >= 150 else { return }
+        tentativoAperto = TentativoSopra(
+            quando: tentativoAperto?.quando ?? Date(), esito: esito,
+            sentite: String(parole.suffix(14).joined(separator: " ").prefix(120)),
+            sue: String(proprie.suffix(10).joined(separator: " ").prefix(80)),
+            forteMs: max(picchi.forteMs, tentativoAperto?.forteMs ?? 0), sopraDb: max(picchi.sopraDb, tentativoAperto?.sopraDb ?? 0),
+            jarvis: String(Orecchio.parole(fraseOra).suffix(10).joined(separator: " ").prefix(90)))
+        if fermato { chiudiTentativo() }
+    }
+
+    private func chiudiTentativo() {
+        SopraLaVoce.condivisa.azzeraPicchi()
+        guard let t = tentativoAperto else { return }
+        tentativoAperto = nil
+        tentativiFatti.append(t)
+        let limite = Date().addingTimeInterval(-300)
+        tentativiFatti.removeAll { $0.quando < limite }
+        if tentativiFatti.count > 12 { tentativiFatti.removeFirst(tentativiFatti.count - 12) }
+    }
+
+    /// I tentativi degli ultimi 3 minuti, per i tempi del turno (poi si dimenticano: ognuno va al cervello una volta sola).
+    func tentativiPerMisura() -> [[String: Any]] {
+        chiudiTentativo()
+        let adesso = Date(), da = adesso.addingTimeInterval(-180)
+        let out: [[String: Any]] = tentativiFatti.filter { $0.quando >= da }.map { t in
+            ["esito": t.esito, "sentite": t.sentite, "sue": t.sue, "forte_ms": t.forteMs, "sopra_db": t.sopraDb, "jarvis": t.jarvis,
+             "s_fa": Int(adesso.timeIntervalSince(t.quando).rounded())]
+        }
+        tentativiFatti.removeAll()
+        return out
+    }
+
+    /// 13 nov (punto 1): la sua voce è appena diventata forte sopra quella di JARVIS (mezzo secondo): le parole già sentite in
+    /// questo pezzo si rivalutano adesso, senza aspettare il prossimo pezzo di trascrizione.
+    private func rivalutaForte() {
+        guard voluto, acceso, !inPresa else { return }
+        // voce forte ma ancora nessuna parola trascritta: si annota (se non arriva nessuna parola, il registro dice proprio questo)
+        guard !precedente.isEmpty else { annota("senza parole", parole: [], proprie: []); return }
+        valuta(precedente, fine: false, turno: turno, rivaluta: true)
+    }
 
     /// Le parole di una frase, minuscole, senza punteggiatura.
     nonisolated private static func parole(_ t: String) -> [String] {
@@ -160,22 +233,26 @@ final class Orecchio {
         return nil
     }
 
-    private func valuta(_ testo: String?, fine: Bool, turno mio: Int) {
+    /// `rivaluta`: le stesse parole già sentite, di nuovo (la voce forte è appena scattata): niente pezzo nuovo né pause.
+    private func valuta(_ testo: String?, fine: Bool, turno mio: Int, rivaluta: Bool = false) {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
-            // dopo una pausa comincia un pezzo nuovo: valuto solo quello, non tutta la trascrizione dall'inizio
-            // (prima l'eco accumulata «diluiva» le parole del signore e l'interruzione non scattava più)
-            let adesso = Date()
-            let pausa = adesso.timeIntervalSince(ultimoParziale)
-            // il riconoscimento sull'iPhone a volte ricomincia la trascrizione da capo dopo una pausa
-            let ripartito = Richiamo.pezzoNuovo(precedente: precedente, nuovo: testo, pausa: pausa)
-            precedente = testo
-            if ripartito {
-                if inPresa { primaPresa = ultimoTesto }   // tengo quanto ha già detto e continuo ad aggiungere
-                inizioSegmento = 0
-            } else if !inPresa, pausa > 0.7 { inizioSegmento = min(ultimaLunghezza, testo.count) }
-            ultimoParziale = adesso
-            ultimaLunghezza = testo.count
+            if !rivaluta {
+                // dopo una pausa comincia un pezzo nuovo: valuto solo quello, non tutta la trascrizione dall'inizio
+                // (prima l'eco accumulata «diluiva» le parole del signore e l'interruzione non scattava più)
+                let adesso = Date()
+                let pausa = adesso.timeIntervalSince(ultimoParziale)
+                // il riconoscimento sull'iPhone a volte ricomincia la trascrizione da capo dopo una pausa
+                let ripartito = Richiamo.pezzoNuovo(precedente: precedente, nuovo: testo, pausa: pausa)
+                precedente = testo
+                if ripartito {
+                    if inPresa { primaPresa = ultimoTesto }   // tengo quanto ha già detto e continuo ad aggiungere
+                    else { chiudiTentativo() }                 // 13 nov: un pezzo nuovo è un tentativo nuovo
+                    inizioSegmento = 0
+                } else if !inPresa, pausa > 0.7 { chiudiTentativo(); inizioSegmento = min(ultimaLunghezza, testo.count) }
+                ultimoParziale = adesso
+                ultimaLunghezza = testo.count
+            }
             var segmento = String(testo.dropFirst(min(inizioSegmento, testo.count)))
 
             if !inPresa, let parola = paroladOrdine(in: segmento) {
@@ -192,10 +269,15 @@ final class Orecchio {
                 }
                 inPresa = true
                 avviaTetto()
+                annota("fermato·nome", parole: Orecchio.parole(segmento), proprie: [parola])   // 13 nov: col nome o una parola d'ordine
                 zittisci?()
             }
             let parole = Orecchio.parole(segmento)
-            if !inPresa, soloParoleDOrdine { scarto("riservato"); if fine { riavvia() }; return }   // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
+            if !inPresa, soloParoleDOrdine {                // 12 nov: RISERVATO, senza parola d'ordine non è per JARVIS
+                scarto("riservato", parole: parole, proprie: FineFrase.paroleProprie(parole, detto: Orecchio.parole(testoDetto)))
+                if fine { riavvia() }
+                return
+            }
             if !inPresa {
                 // 12 nov (P1, revisione del dialogo): fra persone «sì», «mh», «certo», «esatto», «ah ok» detti mentre l'altro parla sono
                 // segnali d'ascolto: chi parla continua (prima due parole bastavano a zittirlo). «Ho capito», «sì sì sì», «ok grazie»: ha
@@ -208,18 +290,22 @@ final class Orecchio {
                 let segnale = proprie.isEmpty ? FineFrase.SegnaleAscolto.nessuno : FineFrase.segnaleDAscolto(proprie.joined(separator: " "))
                 // mentre JARVIS fa una domanda, «sì» è la risposta (passa gli stessi controlli di una frase vera, qui sotto)
                 let allaDomanda = segnale == .ascolto && domandaInCorso?() == true
-                if segnale == .ascolto && !allaDomanda { scarto("segnale"); if fine { riavvia() }; return }
+                if segnale == .ascolto && !allaDomanda { scarto("segnale", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // 12.0 (11): gli parla sopra? Contano le ultime parole sentite: almeno due sue (prima l'eco accumulata nella
-                // trascrizione «diluiva» le sue parole e solo «Jarvis, ascoltami» lo fermava)
-                guard FineFrase.parlaSopra(parole, detto: dette) || allaDomanda else { scarto("eco"); if fine { riavvia() }; return }
+                // trascrizione «diluiva» le sue parole e solo «Jarvis, ascoltami» lo fermava).
+                // 13 nov (punto 1, il signore: «se il microfono sente la sua voce forte sopra quella di JARVIS per mezzo secondo, più
+                // almeno una parola sua, JARVIS si ferma»): non serve più aspettare la seconda parola riconosciuta
+                let perParole = FineFrase.parlaSopra(parole, detto: dette)
+                let perVoce = !proprie.isEmpty && SopraLaVoce.condivisa.forteSecondi >= 0.5
+                guard perParole || perVoce || allaDomanda else { scarto("eco", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
                 // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
-                if OrologioInUso.attivo { scarto("orologio"); if fine { riavvia() }; return }
+                if OrologioInUso.attivo { scarto("orologio", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // 12.0 (11), scelta A (il signore: «risolvi con massima competenza»): l'impronta della sua voce serve solo con folla o TV
                 // intorno, dove le voci degli altri non devono fermarlo. In casa basta la sua voce: sopra la voce di JARVIS il
                 // confronto dell'impronta sbagliava spesso e lo lasciava parlare (idea C del 25 ott: prima valeva sempre)
                 if AmbienteSonoro.condiviso.affollato && !voceConfermata {
-                    scarto("folla")
+                    scarto("folla", parole: parole, proprie: proprie)
                     // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
                     // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
                     if VoceDelSignore.attiva && !controlloInCorso {
@@ -244,18 +330,20 @@ final class Orecchio {
                 }
                 if allaDomanda {
                     // P1: la risposta alla domanda che JARVIS sta facendo: la finisce e poi la prende come frase del signore
+                    annota("risposta", parole: parole, proprie: proprie)
                     rispostaAllaDomanda?(proprie.joined(separator: " "))
                     if fine { riavvia() }
                     return
                 }
                 if segnale == .chiusura {
                     // P1: ha capito. JARVIS finisce la frase che sta dicendo e si ferma (una volta sola per risposta)
-                    if !chiusuraChiesta { chiusuraChiesta = true; capito?() }
+                    if !chiusuraChiesta { chiusuraChiesta = true; annota("capito", parole: parole, proprie: proprie); capito?() }
                     if fine { riavvia() }
                     return
                 }
                 inPresa = true
                 avviaTetto()
+                annota(perParole ? "fermato·parole" : "fermato·voce", parole: parole, proprie: proprie)
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
             // solo la frase del signore, senza l'eco di prima (più quanto detto prima di un'eventuale ripartenza)
@@ -345,6 +433,7 @@ final class Orecchio {
             richiesta.append(buffer)
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
+            SopraLaVoce.condivisa.misura(buffer)                // 13 nov (punto 1): la sua voce forte sopra quella di JARVIS
         }
     }
 
@@ -353,6 +442,107 @@ final class Orecchio {
         ric.recognitionTask(with: r) { ris, err in
             esito(ris?.bestTranscription.formattedString, (ris?.isFinal ?? false) || err != nil)
         }
+    }
+}
+
+// MARK: - 13 nov (punto 1) · la voce del signore forte sopra quella di JARVIS
+
+/// Il signore: «se il microfono sente la sua voce forte sopra quella di JARVIS per mezzo secondo, più almeno una parola sua,
+/// JARVIS si ferma». Il microfono dell'orecchio ha la cancellazione dell'eco: della voce di JARVIS resta un'eco debole che segue il
+/// volume con cui JARVIS parla. Si misura di quanto il microfono sta sopra la voce che esce (rapporto in dB) e se ne tiene il valore
+/// tipico di questa risposta (75° percentile degli ultimi 6 secondi, senza i pezzi già presi per voce sua): quando il signore gli
+/// parla sopra il microfono sale di colpo, oltre 10 dB sopra il tipico. Nelle pause fra le frasi (nessuna voce in uscita) il
+/// confronto è col fondo della stanza (12 dB sopra). «Forte» = almeno mezzo secondo così negli ultimi 0,8 s (le sillabe hanno
+/// piccoli vuoti). Gira sul thread del microfono: tutto sotto lucchetto.
+nonisolated final class SopraLaVoce: @unchecked Sendable {
+    static let condivisa = SopraLaVoce()
+
+    private let lock = NSLock()
+    private var rapporti: [(t: TimeInterval, d: Float)] = []    // microfono − voce in uscita (dB), mentre JARVIS suona
+    private var tipico: Float?                                   // il 75° percentile dei rapporti (l'eco tipica)
+    private var fondo: Float = -60                               // il microfono nelle pause di JARVIS (dB)
+    private var pezziFondo = 0
+    private var forti: [(t: TimeInterval, durata: Double)] = []  // i pezzi di voce forte dell'ultimo 0,8 s
+    private var ultimoCalcolo: TimeInterval = 0
+    private var eraForte = false
+    private var piccoForte: Double = 0                           // per il registro dei tentativi
+    private var piccoSopra: Float = 0
+    private var avviso: (@Sendable () -> Void)?
+
+    private static var ora: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    /// Chiamato (dal thread del microfono) quando la sua voce diventa forte: mezzo secondo raggiunto.
+    var quandoForte: (@Sendable () -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return avviso }
+        set { lock.lock(); avviso = newValue; lock.unlock() }
+    }
+
+    /// Una risposta nuova: l'eco tipica si rimisura da capo.
+    func azzera() {
+        lock.lock()
+        rapporti.removeAll(); tipico = nil; fondo = -60; pezziFondo = 0; forti.removeAll(); eraForte = false
+        piccoForte = 0; piccoSopra = 0; ultimoCalcolo = 0
+        lock.unlock()
+    }
+
+    /// Un pezzo di audio del microfono dell'orecchio (dopo la cancellazione dell'eco).
+    func misura(_ b: AVAudioPCMBuffer) {
+        guard let c = b.floatChannelData?[0], b.frameLength > 0, b.format.sampleRate > 0 else { return }
+        let n = Int(b.frameLength)
+        var somma: Float = 0
+        for i in stride(from: 0, to: n, by: 2) { somma += c[i] * c[i] }
+        let m = 20 * log10(max((somma / Float((n + 1) / 2)).squareRoot(), 0.000_01))
+        let durata = Double(n) / b.format.sampleRate
+        let uscita = EcoMac.condivisa.riferimento().rif          // la voce di JARVIS che esce adesso (nil nelle pause)
+        let t = SopraLaVoce.ora
+        var chiama: (@Sendable () -> Void)?
+        lock.lock()
+        var forte = false
+        var sopra: Float = 0
+        if let uscita {
+            let d = m - 20 * log10(max(uscita, 0.000_01))
+            if let tip = tipico { sopra = d - tip; forte = sopra > 10 && m > -55 }
+            if !forte { rapporti.append((t, d)) }
+        } else {
+            // pausa fra due frasi di JARVIS: il fondo della stanza (scende subito, sale piano)
+            if pezziFondo < 4 { fondo = pezziFondo == 0 ? m : min(fondo, m) }
+            else if m < fondo { fondo = fondo * 0.6 + m * 0.4 }
+            else if m < fondo + 12 { fondo += (m - fondo) * 0.01 }
+            pezziFondo += 1
+            if pezziFondo >= 4 { sopra = m - fondo; forte = sopra > 12 && m > -55 }
+        }
+        while let p = rapporti.first, t - p.t > 6 { rapporti.removeFirst() }
+        if t - ultimoCalcolo > 0.25, rapporti.count >= 15 {
+            let s = rapporti.map(\.d).sorted()
+            tipico = s[min(s.count - 1, Int(Float(s.count) * 0.75))]
+            ultimoCalcolo = t
+        }
+        if forte { forti.append((t, durata)); piccoSopra = max(piccoSopra, sopra) }
+        while let p = forti.first, t - p.t > 0.8 { forti.removeFirst() }
+        let secondi = forti.reduce(0) { $0 + $1.durata }
+        piccoForte = max(piccoForte, secondi)
+        let adesso = secondi >= 0.5
+        if adesso && !eraForte { chiama = avviso }
+        eraForte = adesso
+        lock.unlock()
+        chiama?()
+    }
+
+    /// Per quanti secondi, nell'ultimo 0,8 s, la sua voce è stata forte sopra quella di JARVIS.
+    var forteSecondi: Double {
+        lock.lock(); defer { lock.unlock() }
+        let t = SopraLaVoce.ora
+        return forti.filter { t - $0.t <= 0.8 }.reduce(0) { $0 + $1.durata }
+    }
+
+    /// Il massimo dall'ultimo azzeramento (per il registro): millisecondi di voce forte e dB sopra l'eco tipica.
+    func picchi() -> (forteMs: Int, sopraDb: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (Int((piccoForte * 1000).rounded()), Int(piccoSopra.rounded()))
+    }
+
+    func azzeraPicchi() {
+        lock.lock(); piccoForte = 0; piccoSopra = 0; lock.unlock()
     }
 }
 #endif

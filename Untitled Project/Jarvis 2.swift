@@ -343,6 +343,9 @@ final class Jarvis: NSObject, ObservableObject {
     private var inizioFinestra: UUID?
     /// 11 nov · i tempi del turno, misurati qui (vanno al cervello con la richiesta dopo)
     private var motivoChiusura = ""
+    /// 13 nov (punto 3): come si è chiusa l'ultima frase: «pausa» (il signore ha taciuto) o «tetto» (niente parole nuove ma il
+    /// microfono sentiva ancora qualcosa); va nei tempi del turno («fine_da»).
+    private var chiusaDa = ""
     private var misura: [String: Any] = [:]
     private var misuraDa: Date?
     private var misuraTurno: UUID?
@@ -878,7 +881,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// L'istante (orologio di sistema) dell'ultima voce sentita dal microfono; adesso se non l'ha mai sentita.
     nonisolated private static func ultimaVoceSentita() -> TimeInterval {
-        let silenzio = VoceAttiva.condivisa.secondiDiSilenzio
+        let silenzio = VoceAttiva.condivisa.silenzioPerFineFrase      // 13 nov: la voce viva, non il rumore della stanza
         return ProcessInfo.processInfo.systemUptime - (silenzio < 30 ? silenzio : 0)
     }
 
@@ -1163,6 +1166,8 @@ final class Jarvis: NSObject, ObservableObject {
     private func fraseRichiamo(_ frase: String) {
         guard fase == .ascolto, !ascoltoCloud else { return }   // sul Mac la frase la sta già registrando l'ascolto in cloud
         fineFraseVoce = richiamo.ultimaVoce                     // idea B: l'ultima parola sentita
+        chiusaDa = richiamo.chiusaDa                            // 13 nov (punto 3): pausa vera o tetto
+        richiamo.chiusaDa = ""
         parziale = ""
         fase = .attesa
         let testo = frase.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2308,7 +2313,7 @@ final class Jarvis: NSObject, ObservableObject {
         if forza {
             let resto = bufferVoce.trimmingCharacters(in: .whitespacesAndNewlines)
             bufferVoce = ""
-            if !resto.isEmpty { dici(resto, di: risposta) }
+            if Jarvis.haParole(resto) { dici(resto, di: risposta) }   // 13 nov (punto 4): un tono rimasto da solo in fondo non si dice
             return
         }
         // taglio all'ultima fine di frase seguita da uno spazio (così «10.500» non si spezza)
@@ -2323,14 +2328,25 @@ final class Jarvis: NSObject, ObservableObject {
             taglio = v + 1
         }
         guard let t = taglio else { return }
-        rispostaIniziata = true
         let frase = String(caratteri[..<t]).trimmingCharacters(in: .whitespacesAndNewlines)
+        // 13 nov (punto 4): solo un tono («[laughs]» su una riga da solo): resta in attesa e parte con la frase che segue
+        // («[laughs] Questa è buona, Sir.»), come una risata vera che porta dentro la frase
+        guard Jarvis.haParole(frase) else { return }
+        rispostaIniziata = true
         bufferVoce = String(caratteri[t...])
-        if !frase.isEmpty { dici(frase, di: risposta) }
+        dici(frase, di: risposta)
+    }
+
+    /// 13 nov (punto 4): nel testo c'è almeno una parola da dire, oltre ai toni della voce e alla punteggiatura.
+    nonisolated static func haParole(_ testo: String) -> Bool {
+        TagVoce.togli(testo).unicodeScalars.contains { CharacterSet.alphanumerics.contains($0) }
     }
 
     private func dici(_ frase: String, di risposta: UUID? = nil) {
         guard fase != .ascolto else { return }   // mai prendersi l'audio mentre il signore parla
+        // 13 nov (punto 4): una frase fatta solo di toni («[laughs]») non si dice da sola: ElevenLabs la rifiuta (testo vuoto) e
+        // la risata si perdeva con un attimo di vuoto. accodaVoce la lega alla frase dopo; qui la rete di sicurezza
+        guard Jarvis.haParole(frase) else { return }
         // sul Mac niente orecchio mentre parla: è un secondo microfono (con il riconoscimento di Apple) che lascia muto quello
         // dell'attesa; lì per fermarlo basta toccare il reattore
         let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud && !musicaSuona   // 9 nov: la canzone lo interromperebbe
@@ -2892,13 +2908,17 @@ final class Jarvis: NSObject, ObservableObject {
                 guard let self, self.turnoAscolto == mio, self.fase == .ascolto else { return }
                 // 11 nov (analisi del dialogo): il silenzio si decideva solo dalle parole trascritte. In una sessione lunga il
                 // riconoscimento le consegna a scatti e una pausa finta chiudeva la frase. Ora conta anche il suono: se il microfono
-                // sente ancora la voce del signore, si aspetta ancora (ma senza parole nuove da 6 s è solo rumore: si chiude)
-                let quieto = VoceAttiva.condivisa.secondiDiSilenzio
+                // sente ancora la voce del signore, si aspetta ancora.
+                // 13 nov (punto 3): la voce è quella viva (non il rumore della stanza), e senza parole nuove il tetto è di 3,5 s (o la
+                // pausa della frase più 2 s), non più 6: oltre, quello che il microfono sente non è lui che parla
+                let quieto = VoceAttiva.condivisa.silenzioPerFineFrase
                 let senzaParole = Date().timeIntervalSince(self.ultimaParolaAscolto)
-                if quieto + 0.05 < secondi, senzaParole < 6 {
-                    self.armaSilenzio(secondi: max(0.25, secondi - quieto))
+                let tetto = max(3.5, secondi + 2)
+                if quieto + 0.05 < secondi, senzaParole < tetto {
+                    self.armaSilenzio(secondi: max(0.25, min(secondi - quieto, tetto - senzaParole)))
                     return
                 }
+                self.chiusaDa = quieto + 0.05 < secondi ? "tetto" : "pausa"
                 self.motivoChiusura = "silenzio"
                 self.fermaAscolto(invia: true)
             }
@@ -3407,7 +3427,9 @@ final class VoceCloud: NSObject {
     nonisolated private static func seguiVolume(_ m: AVAudioEngine) {
         m.mainMixerNode.installTap(onBus: 0, bufferSize: 1024, format: nil) { b, _ in
             Volume.voce.misura(b)                       // il reattore segue la voce
-            if Jarvis.usaAscoltoCloud { EcoMac.condivisa.misura(b) }   // difetto 2: sul Mac quanto forte esce, per riconoscere la sua eco
+            // difetto 2: sul Mac quanto forte esce, per riconoscere la sua eco; 13 nov (punto 1): anche sull'iPhone, per sentire
+            // quando il signore gli parla sopra (la sua voce sopra quella che esce, non sopra un valore fisso)
+            EcoMac.condivisa.misura(b)
         }
     }
 
@@ -3476,7 +3498,7 @@ final class VoceCloud: NSObject {
         p.volume = Jarvis.volumeVoce                   // sottovoce anche per le frasi già pronte
         lettore = p
         Volume.segui(p)
-        if Jarvis.usaAscoltoCloud { EcoMac.segui(p) }  // difetto 2: sul Mac quanto forte esce, per riconoscere la sua eco
+        EcoMac.segui(p)                                 // difetto 2 (Mac) e 13 nov punto 1 (iPhone): quanto forte esce la sua voce
         return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
             attesa = c
             attuale = ObjectIdentifier(p)
@@ -3779,7 +3801,7 @@ extension Jarvis {
     private func provaAnticipo(_ t: String) {
         guard fase == .ascolto, anticipo == nil, anticipiTurno < 3, Jarvis.normaAnticipo(parziale) == Jarvis.normaAnticipo(t) else { return }
         // la voce si sente ancora (le parole trascritte arrivano in ritardo): si riprova fra un attimo
-        if VoceAttiva.condivisa.secondiDiSilenzio < 0.3 {
+        if VoceAttiva.condivisa.silenzioPerFineFrase < 0.3 {     // 13 nov: la voce viva (col rumore l'anticipo non partiva mai)
             timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.provaAnticipo(t) }
             }
@@ -3874,7 +3896,7 @@ extension Jarvis {
         aspettoSu = Jarvis.normaAnticipo(a.messaggio.testo)
         pausaMinimaAscolto = 3
         if richiamo.sveglio { richiamo.riarmaChiusura() }
-        else { armaSilenzio(secondi: pausaAscolto(parziale), giaPassati: min(VoceAttiva.condivisa.secondiDiSilenzio, 3)) }
+        else { armaSilenzio(secondi: pausaAscolto(parziale), giaPassati: min(VoceAttiva.condivisa.silenzioPerFineFrase, 3)) }
         if anticipiTurno < 3, anticipoAcceso { lanciaAnticipo(a.messaggio, dopoAspetto: true) }
     }
 
@@ -4017,6 +4039,13 @@ extension Jarvis {
         ultimaIntonazione = nil
         // 12.0 (11): se nell'ultimo minuto ha parlato sopra JARVIS senza fermarlo, il perché (eco, segnale, folla, orologio, riservato)
         if let sc = orecchio.ultimoScarto, Date().timeIntervalSince(sc.quando) < 60 { misura["orecchio"] = sc.motivo }
+        // 13 nov (punto 2): ogni tentativo di parlargli sopra degli ultimi 3 minuti, fermato o no, con le parole sentite
+        let sopra = orecchio.tentativiPerMisura()
+        if !sopra.isEmpty { misura["sopra"] = sopra }
+        // 13 nov (punto 3): come si è chiusa la frase (pausa vera o tetto senza parole nuove) e il rumore della stanza
+        if !chiusaDa.isEmpty { misura["fine_da"] = chiusaDa }
+        chiusaDa = ""
+        if let f = VoceAttiva.condivisa.fondoDb { misura["fondo_db"] = f }
         anticipiButtati = 0
         motivoChiusura = ""
     }
@@ -4024,6 +4053,7 @@ extension Jarvis {
     /// Una frase di JARVIS comincia a suonare: se è la prima della risposta misurata, il tempo è fatto (va col turno dopo).
     fileprivate func suonoIniziato(_ chiave: ObjectIdentifier) {
         fraseInVoce = frasiRisposta[chiave]?.frase          // 12 nov (P1): se è una domanda, «sì» detto sopra è la risposta
+        orecchio.fraseOra = fraseInVoce ?? ""               // 13 nov (punto 2): per il registro dei tentativi di interromperlo
         guard let da = misuraDa, let t = misuraTurno, frasiRisposta[chiave]?.id == t else { return }
         misura["ms_primo_suono"] = Int(Date().timeIntervalSince(da) * 1000)
         misura["ms_totale"] = Int(Date().timeIntervalSince(ultimoInvio) * 1000)

@@ -28,6 +28,8 @@ enum LidarAperta {
     /// sul posto. `voce`: chiesto a voce, e la frase del modo la dice LiDAR quando il modo parte; no: dal tasto LIDAR dello
     /// Studio (Oggetto), in silenzio come sempre.
     static var richiesta: (modo: ModoLidar, nome: String?, voce: Bool)?
+    /// 13 nov: un modello 3D di uno scanner arrivato da Condividi o «Apri con» (STL, OBJ, PLY, USDZ): LiDAR lo apre come OGGETTO.
+    static var importa: URL?
 
     /// «Jarvis, rifai la scansione», «riprova la scansione», «nuova scansione», «ricomincia».
     static func eRifai(_ frase: String) -> Bool {
@@ -124,9 +126,10 @@ final class ArchivioLidar: ObservableObject {
         scrivi()
         // 11 nov (approvato il 10 nov): la copia nell'Archivio centrale, cartella lidar: la scheda con le misure e il modello 3D
         let nome = "\(s.nome) · \(ArchivioCentrale.quando(s.data))"
-        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioLidar.scheda(s), descrizione: "LiDAR · Interno · \(LidarFormato.m2(s.area))")
+        let gruppo = s.id.uuidString                    // 13 nov: scheda e 3D insieme, per dire a schermo quando sono arrivati
+        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioLidar.scheda(s), descrizione: "LiDAR · Interno · \(LidarFormato.m2(s.area))", gruppo: gruppo)
         if FileManager.default.fileExists(atPath: s.file3D.path) {
-            ArchivioCentrale.copiaFile(s.file3D, nome: nome + " 3D", cartella: "lidar", tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · modello 3D")
+            ArchivioCentrale.copiaFile(s.file3D, nome: nome + " 3D", cartella: "lidar", tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · modello 3D", gruppo: gruppo)
         }
     }
 
@@ -174,11 +177,13 @@ struct VistaLidar: View {
     @State private var acceso = false                         // dopo «ACCENSIONE SENSORE…» (0,7 s)
     @State private var ancora = false                         // «Fine» toccato troppo presto
     @State private var avviso: String?
+    @State private var consiglio: String?                     // 13 nov: «POCA LUCE · TORCIA ACCESA», «VADA PIÙ PIANO»…
     @State private var condivisi: [URL] = []
     @State private var tentativo = 0
     @State private var inizioFine = Date()
     @State private var nomePersona: String?                   // «gemello digitale di Marco»
     @State private var mandando = false                       // MARK X: la scansione sta andando allo Studio
+    @State private var importando = false                     // 13 nov: un modello dello scanner si sta leggendo (niente fotocamera)
     // 4 nov (il signore): «SALVARE LA SCANSIONE?» come lo Studio; ELIMINA › CONFERMA nell'archivio come Studio e Satellite
     @State private var chiediSalva = false
     @State private var nomeSalva = ""
@@ -188,7 +193,7 @@ struct VistaLidar: View {
     @State private var giroElimina = 0
 
     enum Fase { case menu, scansione, elaboro, risultato, risultatoModo }
-    enum DopoSalva: Equatable { case chiudi, menu, modo(ModoLidar, String?, parla: Bool) }   // .modo: chiesto a voce o dallo Studio
+    enum DopoSalva: Equatable { case chiudi, menu, modo(ModoLidar, String?, parla: Bool), importa(URL) }   // .modo: chiesto a voce o dallo Studio; .importa: un modello dello scanner (13 nov)
     enum Vista: String, CaseIterable { case pianta = "PIANTA", pieno = "OLOGRAMMA", foto = "TEXTURE", archivio = "ARCHIVIO" }
 
     /// Il modo vero: in Corpo, Postura (lo scheletro) o Texture (la «Statua»).
@@ -241,7 +246,8 @@ struct VistaLidar: View {
         .statusBarHidden(fase == .scansione || fase == .elaboro)
         .onAppear {
             LidarAperta.aperta = true
-            if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; avviaModo(r.modo, nome: r.nome, parla: r.voce) }   // aperta a voce già su un modo
+            if let u = LidarAperta.importa { LidarAperta.importa = nil; LidarAperta.richiesta = nil; importaModello(u) }       // 13 nov: dallo scanner
+            else if let r = LidarAperta.richiesta { LidarAperta.richiesta = nil; avviaModo(r.modo, nome: r.nome, parla: r.voce) }   // aperta a voce già su un modo
         }
         .onDisappear {
             LidarAperta.aperta = false
@@ -269,7 +275,13 @@ struct VistaLidar: View {
         // 4 nov (il signore, strada B): LiDAR era dietro e gli si chiede un modo («Jarvis, metro laser», o LIDAR dallo Studio): è
         // tornato davanti e lo fa qui, sul posto (prima tornava com'era e il modo si perdeva)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisRichiestaSezione)) { n in
-            guard (n.userInfo?["reparto"] as? String) == Reparto.lidar.rawValue, let r = LidarAperta.richiesta else { return }
+            guard (n.userInfo?["reparto"] as? String) == Reparto.lidar.rawValue else { return }
+            if let u = LidarAperta.importa {                        // 13 nov: un modello dello scanner, con LiDAR già aperta
+                LidarAperta.importa = nil
+                if nomeDaSalvare != nil { chiediPrima(.importa(u)) } else { importaModello(u) }
+                return
+            }
+            guard let r = LidarAperta.richiesta else { return }
             LidarAperta.richiesta = nil
             modoChiesto(r.modo, nome: r.nome, voce: r.voce)
         }
@@ -351,7 +363,7 @@ struct VistaLidar: View {
         pulisciModo()
         risultatoModo = nil
         avviso = SupportoModi.disponibile(vero) ? nil : SupportoModi.avviso(vero)
-        fermaScansione = false; ancora = false; acceso = false
+        fermaScansione = false; ancora = false; acceso = false; consiglio = nil
         dalVivo = MisureDalVivo(); stato = StatoScansione(); allestimentoVivo = nil
         fase = .scansione
         tentativo += 1
@@ -394,10 +406,12 @@ struct VistaLidar: View {
     private var testoStato: String {
         if let avviso { return avviso }
         if fase == .elaboro {
+            if importando { return "IMPORTO IL MODELLO 3D…" }                                          // 13 nov: dallo scanner
             if vero == .statua, let t = stato.testo, t.hasPrefix("ELABORAZIONE") { return t }            // Texture: «ELABORAZIONE… 40%» mentre l'iPhone costruisce il modello
             return vero == .stanza ? "ELABORAZIONE PIANTA…" : "ELABORAZIONE…"
         }
         if !acceso { return "ACCENSIONE SENSORE…" }
+        if fase == .scansione, let consiglio { return consiglio }   // 13 nov: la luce e il passo vengono prima di tutto
         if pronto { return vero == .stanza ? "SALA CHIUSA · TOCCHI FINE" : "FATTO · TOCCHI FINE" }
         if let t = stato.testo { return t }                                    // cosa sta succedendo: «CERCO LA PERSONA…», «INQUADRI ANCHE I PIEDI»…
         if ancora { return vero == .stanza ? "ANCORA UN ATTIMO: MANCANO DELLE PARETI" : "ANCORA UN ATTIMO…" }
@@ -426,7 +440,7 @@ struct VistaLidar: View {
     }
 
     @ViewBuilder private var camera: some View {
-        if !SupportoModi.disponibile(vero) {
+        if importando || !SupportoModi.disponibile(vero) {     // 13 nov: importando un modello la fotocamera non si accende
             Color.clear
         } else {
             switch vero {
@@ -436,7 +450,8 @@ struct VistaLidar: View {
                               aggiorna: { dalVivo = $0 },
                               vivo: vero == .evento ? { s in setupVivo(s) } : nil,
                               finita: { s in finitaStanza(s) },
-                              errore: { e in errore(e) })
+                              errore: { e in errore(e) },
+                              consiglio: { consiglio = $0 })
                 #else
                 Color.clear
                 #endif
@@ -444,7 +459,8 @@ struct VistaLidar: View {
                 CatturaStatua(ferma: $fermaScansione, aggiorna: { stato = $0 }, elaboro: { fase = .elaboro },
                               finita: { mostraModo($0) }, errore: { errore($0) }, nome: nomePersona)
             default:
-                CatturaAR(modo: vero, ferma: $fermaScansione, aggiorna: { stato = $0 }, finita: { mostraModo($0) }, errore: { errore($0) })
+                CatturaAR(modo: vero, ferma: $fermaScansione, aggiorna: { stato = $0 }, finita: { mostraModo($0) }, errore: { errore($0) },
+                          consiglio: { consiglio = $0 })
             }
         }
     }
@@ -481,6 +497,29 @@ struct VistaLidar: View {
         withAnimation(.easeOut(duration: 0.3)) { fase = .risultato }
         Suoni.schedaPronta()
     }
+    /// 13 nov: il modello di uno scanner (ImportaScanner) diventa un OGGETTO, con le sue misure; la lettura (anche qualche secondo
+    /// per un file grande) è fuori dal thread principale, con «IMPORTO IL MODELLO 3D…» nella cornice.
+    private func importaModello(_ u: URL) {
+        pulisciModo()
+        risultatoModo = nil; avviso = nil; consiglio = nil
+        modo = .oggetto
+        importando = true
+        inizioFine = Date()
+        withAnimation(.easeOut(duration: 0.3)) { fase = .elaboro }
+        Task {
+            let esito = await Task.detached(priority: .userInitiated) { ImportaScanner.leggi(u) }.value
+            let resta = 0.8 - Date().timeIntervalSince(inizioFine)          // «IMPORTO…» resta almeno 0,8 s, come l'elaborazione
+            if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+            importando = false
+            switch esito {
+            case .success(let m): mostraModo(RisultatoModo.importato(m))
+            case .failure(let g):
+                withAnimation(.easeOut(duration: 0.3)) { fase = .menu }
+                jarvis.annuncia(g.testo)
+            }
+        }
+    }
+
     private func mostraModo(_ r: RisultatoModo) {
         guard fase == .elaboro || fase == .scansione else { return }
         risultatoModo = r
@@ -495,7 +534,7 @@ struct VistaLidar: View {
     /// Un modello 3D di Texture non salvato non resta a occupare spazio.
     private func pulisciModo() {
         if let r = risultatoModo, !salvati.contains(r.id), let f = r.file { try? FileManager.default.removeItem(at: f) }
-    }
+        if let r = risultatoModo, !salvati.contains(r.id), let o = r.originale { try? FileManager.default.removeItem(at: o) }   // 13 nov
 
     /// MARK X · STUDIO: la scansione vera va sul banco dello Studio (LidarStudio.swift): plastico della sala, terreno, oggetto,
     /// statuina, sagoma. Si legge tutto prima di uscire (uscendo, il modello di Texture non salvato si cancella), poi LiDAR si chiude.
@@ -560,6 +599,9 @@ struct VistaLidar: View {
             // cancella già la scansione nuova)
             if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D); risultato = nil }
             avviaModo(m, nome: nome, parla: parla)
+        case .importa(let u):
+            if let r = risultato, !archivio.contiene(r) { try? FileManager.default.removeItem(at: r.file3D); risultato = nil }
+            importaModello(u)
         }
     }
 
@@ -567,7 +609,7 @@ struct VistaLidar: View {
         ZStack(alignment: .bottom) {
             Color.black.opacity(0.001).ignoresSafeArea()               // sotto il foglio non si tocca niente
             FoglioSalva(titolo: "SALVARE LA SCANSIONE?",
-                        sotto: (dopoSalva == .chiudi ? "Chiudo LiDAR" : "Cambio modalità") + " · la scansione non è salvata", nome: $nomeSalva,
+                        sotto: (dopoSalva == .chiudi ? "Chiudo LiDAR" : "Cambio modalità") + " · la scansione non è salvata", nome: $nomeSalva,   // .importa: si cambia modalità (Oggetto dallo scanner)
                         nota: "NON SALVARE butta la scansione: non è mai stata salvata.",
                         salva: {
                             let n = nomeSalva.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
@@ -723,6 +765,7 @@ struct VistaLidar: View {
                 TastoLidarStudio { alloStudio(.stanza(StanzaScena(s)), modo: .stanza) }     // MARK X: la sala vera diventa un plastico
                 TastoLidar(testo: "Chiedi") { chiedi(s.riassunto) }
             }
+            if archivio.contiene(s) { StatoArchivioLidar(gruppo: s.id.uuidString) }   // 13 nov: arrivata davvero nell'Archivio?
         }
     }
 }
@@ -858,8 +901,9 @@ struct CatturaStanza: UIViewRepresentable {
     let vivo: ((ScansioneLidar) -> Void)?          // Setup: la stanza com'è adesso, per posare l'allestimento mentre si forma
     let finita: (ScansioneLidar) -> Void
     let errore: (String) -> Void
+    var consiglio: (String?) -> Void = { _ in }          // 13 nov: torcia automatica e «vada più piano» nella riga di stato
 
-    func makeCoordinator() -> Regista { Regista(aggiorna: aggiorna, vivo: vivo, finita: finita, errore: errore) }
+    func makeCoordinator() -> Regista { Regista(aggiorna: aggiorna, vivo: vivo, finita: finita, errore: errore, guida: GuidaLuce()) }
 
     func makeUIView(context: Context) -> RoomCaptureView {
         let v = RoomCaptureView(frame: .zero)
@@ -868,6 +912,9 @@ struct CatturaStanza: UIViewRepresentable {
         context.coordinator.vista = v
         v.captureSession.run(configuration: RoomCaptureSession.Configuration())
         OcchiLidar.scatta = { [weak v] in v.flatMap { CatturaStanza.fotogramma($0) } }
+        // 13 nov: la luce e il passo, dal fotogramma di RoomPlan (4 volte al secondo)
+        context.coordinator.guida.cambiato = consiglio
+        context.coordinator.guida.segui { [weak v] in v?.captureSession.arSession.currentFrame }
         return v
     }
     func updateUIView(_ v: RoomCaptureView, context: Context) {
@@ -875,17 +922,19 @@ struct CatturaStanza: UIViewRepresentable {
         let dietro = context.environment.sezioneDietro
         if dietro != context.coordinator.inPausa, !context.coordinator.fermata {
             context.coordinator.inPausa = dietro
-            if dietro { v.captureSession.arSession.pause() }
+            if dietro { v.captureSession.arSession.pause(); context.coordinator.guida.pausa() }
             else if let c = v.captureSession.arSession.configuration { v.captureSession.arSession.run(c, options: []) }
         }
         if ferma && !context.coordinator.fermata {
             context.coordinator.fermata = true
+            context.coordinator.guida.ferma()          // 13 nov: torcia spenta a scansione finita
             OcchiLidar.scatta = nil                    // scansione finita: «guarda» torna a Occhi
             v.captureSession.stop()
         }
     }
     static func dismantleUIView(_ v: RoomCaptureView, coordinator: Regista) {
         coordinator.annullata = true
+        coordinator.guida.ferma()
         OcchiLidar.scatta = nil
         if !coordinator.fermata { v.captureSession.stop() }
         v.captureSession.arSession.pause()             // la fotocamera di RoomPlan si spegne del tutto prima del risultato 3D
@@ -908,10 +957,11 @@ struct CatturaStanza: UIViewRepresentable {
         var fermata = false
         var annullata = false                       // chiusa a metà: niente pianta, niente suono, niente file
         var inPausa = false                         // MARK XI: la sezione è dietro, la fotocamera ferma
+        let guida: GuidaLuce                        // 13 nov: torcia automatica e consigli (buio, troppo veloce)
 
         init(aggiorna: @escaping (MisureDalVivo) -> Void, vivo: ((ScansioneLidar) -> Void)?, finita: @escaping (ScansioneLidar) -> Void,
-             errore: @escaping (String) -> Void) {
-            self.aggiorna = aggiorna; self.vivo = vivo; self.finita = finita; self.errore = errore
+             errore: @escaping (String) -> Void, guida: GuidaLuce) {
+            self.aggiorna = aggiorna; self.vivo = vivo; self.finita = finita; self.errore = errore; self.guida = guida
         }
         required init?(coder: NSCoder) { nil }
         func encode(with coder: NSCoder) {}
@@ -925,6 +975,19 @@ struct CatturaStanza: UIViewRepresentable {
                 self.aggiorna(m)
                 if let adesso { self.vivo?(adesso) }
             }
+        }
+
+        // 13 nov: le istruzioni di RoomPlan sul modo di scansionare (più luce, più piano, pochi dettagli) nella riga di stato
+        nonisolated func captureSession(_ session: RoomCaptureSession, didProvide instruction: RoomCaptureSession.Instruction) {
+            let chiave: String
+            switch instruction {
+            case .turnOnLight: chiave = "luce"
+            case .slowDown: chiave = "piano"
+            case .lowTexture: chiave = "dettagli"
+            default: chiave = ""
+            }
+            let g = guida
+            Task { @MainActor in g.istruzione(chiave) }
         }
 
         // la scansione è finita: niente schermata finale di Apple, il risultato lo costruisce JARVIS

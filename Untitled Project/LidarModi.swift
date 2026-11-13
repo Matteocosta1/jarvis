@@ -1,6 +1,7 @@
 #if os(iOS)
 import Foundation
 import SwiftUI
+import Combine
 import QuickLook
 import UIKit
 import SceneKit
@@ -193,6 +194,9 @@ struct RisultatoModo: Identifiable {
     var capienza: String? = nil       // a voce: «quanta gente ci sta?» (Setup)
     var file: URL? = nil              // il modello 3D già su disco (Texture)
     var nome: String? = nil
+    var nota: String? = nil           // 13 nov: la nota sotto le misure, se non è quella del modo (il modello dallo scanner)
+    var originale: URL? = nil         // 13 nov: il file dello scanner (STL, OBJ, PLY…), copiato intero nell'archivio
+    var tipoOriginale = ""
 
     var sotto: String { (nome?.lowercased() ?? modo.parolaRisultato) + " · " + data.formatted(date: .numeric, time: .shortened) }
 
@@ -224,6 +228,29 @@ struct RisultatoModo: Identifiable {
                              modello: .oggetto(o),
                              domanda: "Ho scansionato un oggetto con il LiDAR: \(l) × \(p) × \(h) cm, volume \(LidarFormato.n(volume, 3)) m³. Quanto costa spedirlo con Messina?",
                              annuncio: "\(l) per \(p) per \(h) centimetri: \(LidarFormato.n(volume, 3)) metri cubi, Sir.")
+    }
+
+    /// 13 nov: il modello di uno scanner (ImportaScanner) come OGGETTO: misure al millimetro, volume se il modello è chiuso.
+    static func importato(_ m: ModelloImportato) -> RisultatoModo {
+        let o = m.oggetto
+        let l = Double(o.largo) * 1000, p = Double(o.profondo) * 1000, h = Double(o.alto) * 1000
+        let misure = "\(LidarFormato.n(l, 0)) × \(LidarFormato.n(p, 0)) × \(LidarFormato.n(h, 0)) mm"
+        let volume: String
+        if let v = m.volume { volume = v < 0.001 ? LidarFormato.n(v * 1_000_000, 0) + " cm³" : LidarFormato.n(v * 1000, 2) + " litri" }
+        else { volume = "— (modello aperto)" }
+        let superficie = m.superficie < 1 ? LidarFormato.n(m.superficie * 10_000, 0) + " cm²" : LidarFormato.n(m.superficie, 2) + " m²"
+        let modello = "\(m.formato) · \(LidarFormato.n(Double(m.triangoli), 0)) triangoli" + (m.mostrati < m.triangoli ? " (a schermo \(LidarFormato.n(Double(m.mostrati), 0)))" : "")
+        var r = RisultatoModo(modo: .oggetto,
+                              righe: [("Misure", misure), ("Volume", volume), ("Superficie esterna", superficie),
+                                      ("Modello 3D", modello), ("Unità del file", m.unita)],
+                              modello: .oggetto(o),
+                              domanda: "Ho importato dallo scanner il modello 3D di «\(m.nome)»: \(misure), volume \(volume). Cosa mi consigli di farci?",
+                              annuncio: "\(Int(l.rounded())) per \(Int(p.rounded())) per \(Int(h.rounded())) millimetri, Sir.")
+        r.nome = m.nome
+        r.nota = "Misure dal file dello scanner, con la sua precisione (non quella del LiDAR). L'unità è dedotta dal file: \(m.unita). Se le misure sembrano mille volte sbagliate, me lo dica."
+        r.originale = m.originale
+        r.tipoOriginale = m.tipo
+        return r
     }
 
     static func misura(larghezza: Float, altezza: Float) -> RisultatoModo {
@@ -281,6 +308,7 @@ nonisolated struct ModoSalvato: Codable, Identifiable, Sendable {
     var sotto: String
     var righe: [[String]]
     var file: String?                 // il modello 3D accanto (USDZ), se c'è
+    var originale: String? = nil      // 13 nov: il file dello scanner accanto (STL, OBJ, PLY…), se è un modello importato
 }
 
 @MainActor
@@ -303,15 +331,22 @@ final class ArchivioModi {
             let url = ArchivioLidar.cartella.appendingPathComponent("oggetto-\(r.id.uuidString).usdz")
             if Self.esporta(o, url) { nomeFile = url.lastPathComponent }
         }
-        let voce = ModoSalvato(id: r.id, modo: r.modo, data: r.data, sotto: r.sotto, righe: r.righe.map { [$0.0, $0.1] }, file: nomeFile)
+        let voce = ModoSalvato(id: r.id, modo: r.modo, data: r.data, sotto: r.sotto, righe: r.righe.map { [$0.0, $0.1] }, file: nomeFile,
+                               originale: r.originale?.lastPathComponent)
         voci.insert(voce, at: 0)
         if let d = try? JSONEncoder().encode(voci) { try? d.write(to: indice, options: .atomic) }
         // 11 nov (approvato il 10 nov): la copia nell'Archivio centrale, cartella lidar: le misure e, se c'è, il modello 3D
         let nome = "\(voce.modo.nome) · \(ArchivioCentrale.quando(voce.data))"
-        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioModi.scheda(voce), descrizione: "LiDAR · \(voce.modo.nome) · \(voce.sotto)")
+        let gruppo = voce.id.uuidString                 // 13 nov: misure e 3D insieme, per dire a schermo quando sono arrivati
+        ArchivioCentrale.copiaTesto(nome: nome, cartella: "lidar", testo: ArchivioModi.scheda(voce), descrizione: "LiDAR · \(voce.modo.nome) · \(voce.sotto)", gruppo: gruppo)
         if let f = nomeFile {
             ArchivioCentrale.copiaFile(ArchivioLidar.cartella.appendingPathComponent(f), nome: nome + " 3D", cartella: "lidar",
-                                       tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · \(voce.modo.nome) · modello 3D")
+                                       tipo: "model/vnd.usdz+zip", descrizione: "LiDAR · \(voce.modo.nome) · modello 3D", gruppo: gruppo)
+        }
+        // 13 nov: il modello dello scanner va nell'archivio anche intero, nel suo formato (il USDZ qui sopra è quello da vedere)
+        if let o = r.originale, FileManager.default.fileExists(atPath: o.path) {
+            ArchivioCentrale.copiaFile(o, nome: nome + " originale", cartella: "lidar", tipo: r.tipoOriginale,
+                                       descrizione: "LiDAR · \(voce.modo.nome) · file dello scanner", gruppo: gruppo)
         }
     }
 
@@ -542,7 +577,7 @@ struct RisultatoModoVista: View {
             }
             Pannello(titolo: r.modo.titoloRisultato, tinta: .ciano) {
                 ForEach(Array(r.righe.enumerated()), id: \.offset) { _, riga in RigaHUD(riga.0, riga.1) }
-                Text(r.modo.nota).font(.system(size: 11)).foregroundStyle(Color.tenue).fixedSize(horizontal: false, vertical: true)
+                Text(r.nota ?? r.modo.nota).font(.system(size: 11)).foregroundStyle(Color.tenue).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 TastoLidar(testo: salvato ? "Salvata" : "Salva", attivo: !salvato, azione: salva)
@@ -550,6 +585,31 @@ struct RisultatoModoVista: View {
                 TastoLidar(testo: "Modalità", azione: altra)
                 TastoLidar(testo: "Chiedi", azione: chiedi)
             }
+            if salvato { StatoArchivioLidar(gruppo: r.id.uuidString) }   // 13 nov: arrivata davvero nell'Archivio?
+        }
+    }
+}
+
+/// 13 nov (il signore: «fai quello che proponi»): dopo «Salva», se la copia è arrivata davvero nell'Archivio centrale
+/// (cartella lidar). Lo dice solo quando l'Archivio l'ha confermata; se non arriva, che riprova da sola.
+struct StatoArchivioLidar: View {
+    let gruppo: String
+    @ObservedObject private var coda = CodaArchivio.condivisa
+
+    var body: some View {
+        if let testo {
+            AvvisoJarvis(etichetta: "JARVIS · ARCHIVIO", testo: testo)
+                .animation(.easeOut(duration: 0.25), value: testo)
+        }
+    }
+
+    private var testo: String? {
+        switch coda.stati[gruppo] {
+        case .inViaggio: return "La copio nell'Archivio, cartella lidar…"
+        case .arrivata: return "Arrivata nell'Archivio, cartella lidar."
+        case .inAttesa: return "Non è ancora arrivata nell'Archivio: niente rete. Riprovo da solo, anche alla prossima apertura."
+        case .rifiutata(let motivo): return motivo
+        case nil: return nil
         }
     }
 }
@@ -566,6 +626,7 @@ extension ArchivioModi {
     /// Elimina un modo salvato e il suo modello 3D dal telefono (la copia nell'Archivio centrale resta: si toglie da lì).
     func cancella(_ v: ModoSalvato) {
         if let u = file3D(v) { try? FileManager.default.removeItem(at: u) }
+        if let o = v.originale { try? FileManager.default.removeItem(at: ArchivioLidar.cartella.appendingPathComponent(o)) }   // 13 nov
         voci.removeAll { $0.id == v.id }
         if let d = try? JSONEncoder().encode(voci) { try? d.write(to: indice, options: .atomic) }
     }

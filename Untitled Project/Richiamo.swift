@@ -48,6 +48,8 @@ final class Richiamo {
     var inRisposta: (() -> Bool)?
     /// L'ultima volta che ha sentito parlare (anche frasi non per lui): JARVIS non attacca il riempitivo sopra il signore.
     private(set) var ultimaVoce = Date.distantPast
+    /// 13 nov (punto 3): come si è chiusa l'ultima frase: «pausa» (ha taciuto) o «tetto» (niente parole nuove, ma si sentiva ancora qualcosa).
+    var chiusaDa = ""
     /// 12 nov (revisione del dialogo, errore 3): la pausa minima che JARVIS chiede per la frase in corso (la risposta anticipata ha
     /// detto «aspetto»: il signore non ha finito, 3 secondi). Prima su questa strada non valeva: dopo «Jarvis, gli ho detto che…» la
     /// frase si chiudeva alla pausa normale e il cervello era costretto a rispondere alla frase a metà.
@@ -444,7 +446,7 @@ final class Richiamo {
     func riarmaChiusura() {
         guard sveglio else { return }
         let attesa = attesaPer(resto)
-        armaChiusura(attesa, giaPassati: min(VoceAttiva.condivisa.secondiDiSilenzio, attesa))
+        armaChiusura(attesa, giaPassati: min(VoceAttiva.condivisa.silenzioPerFineFrase, attesa))
     }
 
     /// Controlla con l'impronta se chi sta parlando è il signore; se sì, lo sveglia con la frase che sta dicendo.
@@ -489,11 +491,16 @@ final class Richiamo {
         timerSilenzio = Timer.scheduledTimer(withTimeInterval: max(0.25, secondi - giaPassati), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.sveglio else { return }
-                let quieto = VoceAttiva.condivisa.secondiDiSilenzio
-                if quieto + 0.05 < secondi, Date().timeIntervalSince(self.ultimoParziale) < 6 {
-                    self.armaChiusura(max(0.25, secondi - quieto))
+                // 13 nov (punto 3, il signore: «dopo Jarvis aspetta 6–7 secondi»): la voce che tiene aperta la frase è quella viva
+                // (il rumore della stanza passava per voce), e senza parole nuove il tetto è 3,5 s (o la pausa più 2 s), non 6
+                let quieto = VoceAttiva.condivisa.silenzioPerFineFrase
+                let senzaParole = Date().timeIntervalSince(self.ultimoParziale)
+                let tetto = max(3.5, secondi + 2)
+                if quieto + 0.05 < secondi, senzaParole < tetto {
+                    self.armaChiusura(max(0.25, min(secondi - quieto, tetto - senzaParole)))
                     return
                 }
+                self.chiusaDa = quieto + 0.05 < secondi ? "tetto" : "pausa"
                 self.chiudi()
             }
         }

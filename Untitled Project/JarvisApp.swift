@@ -19,6 +19,7 @@ struct JarvisApp: App {
         PonteTelefono.condiviso.avvia()        // Apple Watch: gli consegna la parola d'ordine
         TocchiSchermo.prepara()                // 26 ott sera: i tocchi sul vetro non sono battiti di mani
         IsolaJarvis.prepara()                  // 26 ott sera: i tasti della Dynamic Island e l'isola della PIOGGIA ad app chiusa
+        CodaArchivio.condivisa.avvia()         // 13 nov: le copie per l'Archivio rimaste in coda ripartono all'avvio
     }
 
     var body: some Scene {

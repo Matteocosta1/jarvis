@@ -412,6 +412,12 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in                                 // MARK X · i tasti della Dynamic Island (it.discosizer.jarvis://isola/…)
+            // 13 nov: un modello 3D di uno scanner (Condividi › JARVIS, o «Apri con»): LiDAR lo apre come OGGETTO, con le misure
+            if ImportaScanner.accetta(url) {
+                LidarAperta.importa = url
+                apriReparto(.lidar)
+                return
+            }
             guard let c = IsolaJarvis.comando(url) else { return }
             switch c {
             case "percorso":                                 // TRAVEL › Percorso: SATELLITE con TRAVEL aperto
@@ -1784,7 +1790,7 @@ struct ContentView: View {
         switch r {
         case .ricordi: return jarvis.richiestaTraccia
         case .satellite: return RichiestaSatellite.condivisa.azione != nil
-        case .lidar: return LidarAperta.richiesta != nil
+        case .lidar: return LidarAperta.richiesta != nil || LidarAperta.importa != nil   // 13 nov: anche un modello dello scanner
         case .browser: return CercaVideo.richiesta != nil || CercaWeb.richiesta != nil
         case .shazam: return VistaShazam.ascoltaSubito                  // 5 nov: a voce Shazam ascolta subito, anche se è già aperto
         default: return false

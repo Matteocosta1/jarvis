@@ -59,6 +59,114 @@ enum LidarFoto {
     }
 }
 
+// MARK: - 13 nov · La guida della luce (il signore: «torcia accesa da sola con poca luce, avviso troppo buio, vada più piano»)
+// Il LiDAR misura anche al buio; quello che si perde è il tracciamento di ARKit, che si orienta con la fotocamera: con poca luce,
+// piastrelle tutte uguali e cavi sottili la scansione si storce. Con poca luce per più di un secondo la torcia si accende da sola
+// (e resta accesa fino alla fine della scansione); se ARKit fatica a seguire il telefono lo dice nella riga di stato.
+
+@MainActor
+final class GuidaLuce {
+    /// Chiamato quando cambia il consiglio da mostrare (nil: nessuno).
+    var cambiato: ((String?) -> Void)?
+    private(set) var consiglio: String? { didSet { if consiglio != oldValue { cambiato?(consiglio) } } }
+    private var torcia = false
+    private var buioDa: TimeInterval?
+    private var ultimo: TimeInterval = 0
+    private var torciaAvvisoFino: TimeInterval = 0
+    private var motivo: String?                       // quello che dice ARKit adesso
+    private var motivoDa: TimeInterval = 0
+    private var normaleDa: TimeInterval?
+    private var daRoomPlan: String?                   // Interno: l'istruzione di RoomPlan («più luce», «più piano»…)
+    private var fonte: (() -> ARFrame?)?
+    private var timer: Timer?
+
+    /// Interno (RoomPlan): la sessione AR non è nostra, il fotogramma si legge 4 volte al secondo.
+    func segui(_ fonte: @escaping () -> ARFrame?) {
+        self.fonte = fonte
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in if let f = self?.fonte?() { self?.esamina(f) } }
+        }
+    }
+
+    /// Un fotogramma (al massimo 4 volte al secondo): la luce della stanza e come ARKit segue il telefono.
+    func esamina(_ f: ARFrame) {
+        let t = f.timestamp
+        guard t - ultimo >= 0.25 else { return }
+        ultimo = t
+        let luce = f.lightEstimate?.ambientIntensity ?? 1000          // lumen: circa 1000 in una stanza illuminata
+        if !torcia {
+            if luce < 200 {
+                if let da = buioDa { if t - da > 1.0 { accendi(); torciaAvvisoFino = t + 2.5 } } else { buioDa = t }
+            } else { buioDa = nil }
+        }
+        var adesso: String?
+        if case .limited(let r) = f.camera.trackingState {
+            switch r {
+            case .excessiveMotion: adesso = "VADA PIÙ PIANO"
+            case .insufficientFeatures: adesso = luce < 300 ? "TROPPO BUIO · ACCENDA UNA LUCE" : "POCHI DETTAGLI · VADA PIÙ PIANO"
+            default: adesso = nil                                     // avvio e riaggancio: li gestisce ARKit
+            }
+        }
+        // un consiglio dura almeno un attimo: compare dopo 0,75 s di fila e sparisce dopo 1 s di normalità
+        if let adesso {
+            normaleDa = nil
+            if adesso != motivo { motivo = adesso; motivoDa = t }
+        } else if motivo != nil {
+            if let n = normaleDa { if t - n > 1.0 { motivo = nil; normaleDa = nil } } else { normaleDa = t }
+        }
+        let fermo = motivo.flatMap { t - motivoDa >= 0.75 ? $0 : nil }
+        consiglio = daRoomPlan ?? fermo ?? (t < torciaAvvisoFino ? "POCA LUCE · TORCIA ACCESA" : nil)
+    }
+
+    /// Interno: l'istruzione di RoomPlan («luce», «piano», «dettagli»; vuota: niente da dire).
+    func istruzione(_ chiave: String) {
+        switch chiave {
+        case "luce":
+            if !torcia { accendi(); daRoomPlan = "POCA LUCE · TORCIA ACCESA" } else { daRoomPlan = "TROPPO BUIO · ACCENDA UNA LUCE" }
+        case "piano": daRoomPlan = "VADA PIÙ PIANO"
+        case "dettagli": daRoomPlan = "POCHI DETTAGLI · VADA PIÙ PIANO"
+        default: daRoomPlan = nil
+        }
+        consiglio = daRoomPlan ?? consiglio
+    }
+
+    /// La sezione va dietro: la torcia si spegne (si riaccende da sola tornando davanti, se serve).
+    func pausa() {
+        spegniTorcia()
+        buioDa = nil
+        daRoomPlan = nil
+        consiglio = nil
+    }
+
+    /// Scansione finita o chiusa: torcia spenta, niente più controlli.
+    func ferma() {
+        timer?.invalidate(); timer = nil
+        fonte = nil
+        pausa()
+    }
+
+    private func accendi() {
+        guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back), d.hasTorch, d.isTorchAvailable else { return }
+        do {
+            try d.lockForConfiguration()
+            try d.setTorchModeOn(level: min(0.8, AVCaptureDevice.maxAvailableTorchLevel))
+            d.unlockForConfiguration()
+            torcia = true
+        } catch {}
+    }
+
+    private func spegniTorcia() {
+        guard torcia else { return }
+        torcia = false
+        guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back), d.hasTorch else { return }
+        if (try? d.lockForConfiguration()) != nil {
+            d.torchMode = .off
+            d.unlockForConfiguration()
+        }
+    }
+}
+
 // MARK: - La vista AR (Esterno, Oggetto, Misura, Postura)
 
 struct CatturaAR: UIViewRepresentable {
@@ -67,8 +175,13 @@ struct CatturaAR: UIViewRepresentable {
     let aggiorna: (StatoScansione) -> Void
     let finita: (RisultatoModo) -> Void
     let errore: (String) -> Void
+    var consiglio: (String?) -> Void = { _ in }          // 13 nov: torcia e «vada più piano» nella riga di stato
 
-    func makeCoordinator() -> RegistaAR { RegistaAR(modo: modo, aggiorna: aggiorna, finita: finita, errore: errore) }
+    func makeCoordinator() -> RegistaAR {
+        let r = RegistaAR(modo: modo, aggiorna: aggiorna, finita: finita, errore: errore)
+        r.guida.cambiato = consiglio
+        return r
+    }
 
     func makeUIView(context: Context) -> ARSCNView {
         let v = ARSCNView(frame: .zero)
@@ -86,7 +199,7 @@ struct CatturaAR: UIViewRepresentable {
         let dietro = context.environment.sezioneDietro
         if dietro != context.coordinator.inPausa, !context.coordinator.fermata {
             context.coordinator.inPausa = dietro
-            if dietro { v.session.pause() } else if let c = v.session.configuration { v.session.run(c, options: []) }
+            if dietro { v.session.pause(); context.coordinator.guida.pausa() } else if let c = v.session.configuration { v.session.run(c, options: []) }
         }
         if ferma && !context.coordinator.fermata { context.coordinator.concludi() }
     }
@@ -106,6 +219,7 @@ final class RegistaAR: NSObject, ARSessionDelegate {
     weak var vista: ARSCNView?
     var fermata = false
     private var annullata = false
+    let guida = GuidaLuce()                                  // 13 nov: torcia automatica e consigli (buio, troppo veloce)
     private var stato = StatoScansione() { didSet { if stato != oldValue { aggiorna(stato) } } }
 
     // la maglia ciano sopra la fotocamera
@@ -186,7 +300,7 @@ final class RegistaAR: NSObject, ARSessionDelegate {
         }
     }
 
-    func annulla() { annullata = true; fermata = true; calcolo.annulla(); OcchiLidar.scatta = nil }
+    func annulla() { annullata = true; fermata = true; calcolo.annulla(); OcchiLidar.scatta = nil; guida.ferma() }
 
     // MARK: ARSessionDelegate (ARKit consegna sul main: niente delegateQueue)
 
@@ -233,6 +347,7 @@ final class RegistaAR: NSObject, ARSessionDelegate {
 
     private func fotogramma(_ f: ARFrame) {
         guard !fermata else { return }
+        guida.esamina(f)
         let t = f.timestamp
         let cam = f.camera.transform.columns.3
         let posizione = SIMD3<Float>(cam.x, cam.y, cam.z)
@@ -486,6 +601,7 @@ final class RegistaAR: NSObject, ARSessionDelegate {
     func concludi() {
         guard !fermata else { return }
         fermata = true
+        guida.ferma()                                                              // 13 nov: la torcia si spegne a scansione finita
         OcchiLidar.scatta = nil                                                    // scansione finita: «guarda» torna a Occhi
         let inizio = Date()
         func consegna(_ r: RisultatoModo?) {
