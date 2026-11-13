@@ -3359,6 +3359,7 @@ final class VoceCloud: NSObject {
     private var rampa: Task<Void, Never>?
     private var pausa: Task<Void, Never>?              // la pausa vera, a sfumatura finita
     private var ripresa: Task<Void, Never>?            // «Dicevo…», poi la frase
+    private var guardia: Task<Void, Never>?            // se nessuno decide (l'orecchio si è spento), dopo 4 s riprende da solo
     private var lettoreAttacco: AVAudioPlayer?
     private var fermaDa: Date?                 // da quando è fermo ad aspettare
     private var fermoTotale: TimeInterval = 0  // quanto è stato fermo in tutto (la fine di una frase in streaming non si anticipa)
@@ -3379,19 +3380,25 @@ final class VoceCloud: NSObject {
             ripresa?.cancel(); ripresa = nil
             lettoreAttacco?.stop(); lettoreAttacco = nil
             esitazione = .ferma
-            return
-        case .no: break
+        case .no:
+            esitazione = .ferma
+            fermaDa = Date()
+            portaVolume(0, in: VoceCloud.sfumaFerma)
+            if riserva.isSpeaking, !riserva.isPaused { riserva.pauseSpeaking(at: .word) }
+            pausa?.cancel()
+            pausa = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(Int(VoceCloud.sfumaFerma * 1000) + 10))
+                guard !Task.isCancelled, let self, self.esitazione != .no else { return }
+                self.nodo?.pause()
+                self.lettore?.pause()
+            }
         }
-        esitazione = .ferma
-        fermaDa = Date()
-        portaVolume(0, in: VoceCloud.sfumaFerma)
-        if riserva.isSpeaking, !riserva.isPaused { riserva.pauseSpeaking(at: .word) }
-        pausa?.cancel()
-        pausa = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(Int(VoceCloud.sfumaFerma * 1000) + 10))
-            guard !Task.isCancelled, let self, self.esitazione != .no else { return }
-            self.nodo?.pause()
-            self.lettore?.pause()
+        // l'orecchio decide entro 2,8 s (riprende o lo ascolta); se non decide nessuno, JARVIS non resta mai muto a metà frase
+        guardia?.cancel()
+        guardia = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled, let self, self.esitazione == .ferma else { return }
+            self.riprendi()
         }
     }
 
@@ -3425,6 +3432,8 @@ final class VoceCloud: NSObject {
 
     /// La frase riparte: dall'inizio della parola (`lungo`: dall'ultima pausa della frase, dopo «Dicevo…»).
     private func riparti(lungo: Bool) {
+        guardia?.cancel()
+        guardia = nil
         if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
         fermaDa = nil
         esitazione = .no
@@ -3463,6 +3472,8 @@ final class VoceCloud: NSObject {
         pausa = nil
         ripresa?.cancel()
         ripresa = nil
+        guardia?.cancel()
+        guardia = nil
         lettoreAttacco?.stop()
         lettoreAttacco = nil
         riavvolgi = nil

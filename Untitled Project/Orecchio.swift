@@ -84,8 +84,10 @@ final class Orecchio {
         SopraLaVoce.condivisa.quandoForte = { [weak self] in
             Task { @MainActor [weak self] in self?.rivalutaForte() }
         }
-        // 14 nov: si ferma per le sue parole (in `valuta`); quando la sua voce umana tace, si decide se riprendere o ascoltarlo
-        dimenticaEsitazione("nuova risposta")
+        // 14 nov: si ferma per le sue parole (in `valuta`); quando la sua voce umana tace, si decide se riprendere o ascoltarlo.
+        // Se era già fermo per lui (il riconoscimento stava ripartendo quando è arrivata una frase nuova), resta fermo: decide il suo
+        // silenzio, non la frase nuova
+        if fermo { SopraLaVoce.condivisa.trattieni(true) } else { dimenticaEsitazione("nuova risposta") }
         SopraLaVoce.condivisa.quandoTace = { [weak self] in Task { @MainActor [weak self] in self?.haTaciuto() } }
         accendi()
     }
@@ -128,11 +130,34 @@ final class Orecchio {
     /// gli risponde, come fra persone («No.» → si ferma e lo ascolta). Solo riempitivi, o niente: riprende da dov'era.
     private func decidi(_ come: String) {
         guard fermo, !inPresa else { return }
-        if !Orecchio.soloRiempitivi(ultimeProprie), SopraLaVoce.condivisa.voceUmana(ultimi: 3) >= 0.25, acceso {
-            valuta(precedente, fine: false, turno: turno, rivaluta: true, forza: true)
-            if inPresa { return }
+        if !Orecchio.soloRiempitivi(ultimeProprie), SopraLaVoce.condivisa.voceUmana(ultimi: 3) >= 0.25 {
+            if acceso, !precedente.isEmpty {
+                valuta(precedente, fine: false, turno: turno, rivaluta: true, forza: true)   // l'interruzione, come per le parole dette sopra
+            } else {
+                interrompiConLeSue()        // il riconoscimento è ripartito da capo: vale quello che aveva già detto
+            }
+            if inPresa || !fermo { return }  // lo ascolta, oppure è già ripartito (folla, orologio)
         }
         rilascia(come, attacco: Date().timeIntervalSince(fermoDa) >= 0.5)
+    }
+
+    /// L'interruzione con le parole che aveva già detto (il riconoscimento è ripartito e non le ha più): JARVIS tace e lo ascolta; se
+    /// continua a parlare si aggiunge il resto, se no la frase si consegna dopo la sua pausa normale.
+    private func interrompiConLeSue() {
+        guard !OrologioInUso.attivo, !(AmbienteSonoro.condiviso.affollato && !voceConfermata) else { rilascia("folla"); return }
+        let parole = ultimeProprie
+        let sue = parole.joined(separator: " ")
+        inPresa = true
+        avviaTetto()
+        annota("fermato·tace", parole: parole, proprie: parole)
+        dimenticaEsitazione("interrotto")
+        zittisci?()
+        primaPresa = sue
+        ultimoTesto = sue
+        timerSilenzio?.invalidate()
+        timerSilenzio = Timer.scheduledTimer(withTimeInterval: Jarvis.pausaFineFrase(sue), repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.consegna() }
+        }
     }
 
     /// JARVIS riprende da dove si era fermato (dall'inizio della parola). `attacco`: può ripartire con «dicevo…» (si era fermato
