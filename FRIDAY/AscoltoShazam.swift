@@ -89,9 +89,8 @@ final class AscoltoShazam: ObservableObject {
             return
         }
         guard mio == giro else { return }
-        // 3 · YouTube (non dal polso)
-        guard !dalPolso else { errore = "Non la trovo né su Apple Music né fra le anteprime, Sir."; return }
-        await video(titolo: titolo, artista: artista)
+        // FRIDAY: niente YouTube (cercava col Browser di JARVIS)
+        errore = "Non la trovo né su Apple Music né fra le anteprime, Sir."
     }
 
     /// Dal polso (8 nov): l'anteprima riparte o si ferma come chiede l'orologio (non è un interruttore: il polso dice cosa vuole).
