@@ -554,6 +554,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Vitals: il grafico del sonno somma il riposo detto a voce al sonno di Salute di quel giorno (`SaluteStorica.swift`).
 - Prove del dialogo: nuova prova delle frasi sulla salute (21 frasi, quelle vere del 13 nov comprese).
 - Mockup invariato: nessun cambiamento visivo (le risposte sulla salute arrivano solo prima).
+- Controllo di compilazione (commit e25ed57, run 43486821354; il giro prima, 43486387791, annullato apposta per metterci la protezione dell'iPhone bloccato): **verde** · 0 errori, 0 warning · prove del dialogo superate (comprese le 21 sulla salute). Manca solo il numero 17 nel progetto, appena il signore conferma.
 
 ## 12.0 (16) — MARK XII · 13 nov sera · confermata dal signore («fallo», 18:46) · build unica · cervello invariato (v134)
 
