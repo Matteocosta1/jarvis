@@ -104,6 +104,14 @@ enum Battute {
         ])
     }
 
+    /// 14 nov (il signore: «a volte riparte con un "ehm…" o "dicevo…" invece che dalla sillaba esatta: questo va bene ed è umano»):
+    /// dopo un attimo in cui si è fermato per lui (ha detto «ma…» e ha lasciato perdere). Brevi, e non sempre: di solito riparte e basta.
+    static let ripreseBrevi = ["Dicevo…", "Ehm, dicevo…", "Come dicevo…"]
+    static func ripresaBreve() -> String? {
+        guard Double.random(in: 0..<1) < 0.4 else { return nil }
+        return una("ripresaBreve", ripreseBrevi)
+    }
+
     /// Davanti al resto della risposta, dopo una pausa lunga: come una persona che ritrova il filo. Ogni tanto niente: riparte e basta.
     static func dicevo() -> String? {
         guard Double.random(in: 0..<1) < 0.85 else { return nil }

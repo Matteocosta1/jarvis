@@ -29,6 +29,8 @@ final class Richiamo {
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
     private var timerSilenzio: Timer?
+    private var normaChiusura = ""          // 14 nov: le parole su cui corre la pausa che chiude la frase…
+    private var chiusuraArmata = Date.distantPast   // …e da quando
     private var timerTetto: Timer?
     private var turno = 0
     private var voluto = false
@@ -227,6 +229,7 @@ final class Richiamo {
         corrente = ""
         vocativo = nil
         soloDopoNome = true
+        normaChiusura = ""                  // 14 nov: la frase dopo conta da capo
     }
 
     private func spegni() {
@@ -416,7 +419,17 @@ final class Richiamo {
             }
             resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
             self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
-            armaChiusura(attesaPer(resto))
+            // 14 nov (tempi del 13 nov): il riconoscimento ritocca la frase anche dopo che il signore ha smesso (punteggiatura,
+            // maiuscole) e ogni ritocco faceva ripartire da capo la pausa che la chiude. Con le stesse parole la pausa continua a
+            // contare da quando erano arrivate; la chiusura vera la decide comunque il silenzio della sua voce (`armaChiusura`)
+            let norma = Jarvis.normaAnticipo(resto.isEmpty ? (vocativo ?? "") : resto)
+            if norma == normaChiusura, timerSilenzio?.isValid == true {
+                armaChiusura(attesaPer(resto), giaPassati: Date().timeIntervalSince(chiusuraArmata))
+            } else {
+                normaChiusura = norma
+                chiusuraArmata = Date()
+                armaChiusura(attesaPer(resto))
+            }
             // «fine» qui è il riconoscimento che chiude un pezzo: se la frase non è finita, riparto e continuo ad ascoltare
             if fine { continuaDopoFine() }
             return

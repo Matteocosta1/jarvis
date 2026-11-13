@@ -232,8 +232,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var ecoSentita: [Float] = []
     private var fondoPolso: Float = 0                  // il livello più basso sentito in questa risposta: la stanza
     private var colpiVoce = 0
-    // 13 nov (il signore: «abbassa la voce ed esita come una persona»): la voce scesa e la pausa mentre il signore comincia a parlare
-    private var voceAbbassata = false
+    // 14 nov (il signore: «una persona interrotta si zittisce e ascolta; la voce non scende come un computer»): la pausa mentre il
+    // signore comincia a parlare (prima la voce scendeva al 40% al primo segnale)
     private var fermoDa: Date?
     private var fraseInPausa: AVAudioPlayer?          // la frase fermata a metà (solo se stava suonando davvero)
     private var silenziVoce = 0
@@ -1195,7 +1195,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // parola): non era il signore. JARVIS riprende la risposta da dove si era fermato
         if eco != nil, let s = sospesa {
             sospesa = nil
-            if esito.vuoto || (esito.errore == nil && JarvisOrologio.soloRumore(testo ?? "")) { riprendiRisposta(s); return }
+            if esito.vuoto || (esito.errore == nil && JarvisOrologio.soloRumore(testo ?? "")) { riprendiRisposta(s, breve: true); return }
             // 12 nov (P1, come l'iPhone nei limiti del polso: le sue parole arrivano solo a frase finita, quindi la voce si è già
             // fermata): «sì», «certo», «esatto», «ah ok» detti mentre JARVIS parlava sono segnali d'ascolto, JARVIS riprende da dove
             // si era fermato; «ho capito», «ok grazie», «sì sì sì»: ha capito, JARVIS resta fermo lì (il punto è già segnato)
@@ -1204,7 +1204,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 case .ascolto:
                     // ma se stava facendo una domanda («…la chiamo?»), quel «sì» è la risposta: va avanti come frase sua
                     if JarvisOrologio.stavaChiedendo(s) { break }
-                    riprendiRisposta(s)
+                    riprendiRisposta(s, breve: true)
                     return
                 case .chiusura:
                     compito = nil
@@ -1314,7 +1314,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// modello, riparte dal segno d'interruzione). Prima JARVIS scriveva «Non ho capito, Sir.» e la risposta era persa.
     /// 12.0 (10): `chiesta`, il signore ha detto «dicevi?» (se l'aveva già detta tutta, JARVIS lo dice); `attacco`, dopo una pausa
     /// lunga davanti al resto va un «Dicevo…», come farebbe una persona.
-    private func riprendiRisposta(_ s: RispostaSospesa, chiesta: Bool = false, attacco: Bool = false) {
+    /// `breve` (14 nov): era solo un attimo (un rumore, un «sì»): a volte riparte con «Dicevo…» (il signore: «è umano»).
+    private func riprendiRisposta(_ s: RispostaSospesa, chiesta: Bool = false, attacco: Bool = false, breve: Bool = false) {
         compito = nil
         stato = nil
         if let completa = s.completa {
@@ -1337,6 +1338,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 iniziaFlussoVoce()
                 dettoFinora = s.detto                  // se poi lo interrompe davvero, il punto del taglio resta giusto
                 if attacco, let a = Battute.dicevo() { attaccoRipresa = a; accodaFrase(a) }   // 12.0 (10): «Dicevo…»
+                else if breve, let a = Battute.ripresaBreve() { attaccoRipresa = a; accodaFrase(a) }
                 accodaPezzo(r)
                 chiudiFlussoVoce()
                 return
@@ -2179,7 +2181,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if let audio, let p = try? AVAudioPlayer(data: audio) {
                 p.delegate = self
                 lettore = p
-                p.volume = voceAbbassata ? volumeVoce * 0.4 : volumeVoce     // 13 nov: se il signore sta parlando, parte già bassa
+                p.volume = volumeVoce
                 Volume.segui(p)
                 partito = p.play()
             }
@@ -2245,7 +2247,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         ecoSentita = []
         fondoPolso = 0
         colpiVoce = 0
-        dimenticaVoceAbbassata()
+        dimenticaPausaVoce()
         timerMonitor = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.controllaInterruzione() }
         }
@@ -2256,19 +2258,24 @@ final class JarvisOrologio: NSObject, ObservableObject {
         timerMonitor = nil
         monitor?.stop()
         monitor = nil
-        dimenticaVoceAbbassata()
+        dimenticaPausaVoce()
     }
 
     private func controllaInterruzione() {
         guard fase == .parlo, let r = monitor else { fermaMonitor(); return }
         r.updateMeters()
         let livello = r.averagePower(forChannel: 0)
+        // 14 nov (il signore: «ogni rumore lo ferma: si deve fermare solo per una voce umana che dice parole»). Al polso watchOS non ha
+        // il riconoscimento delle parole dal vivo: le parole arrivano solo dalla trascrizione, a frase registrata (e se non ce ne sono
+        // JARVIS riprende da dov'era). Qui si scartano almeno i suoni secchi: in un colpo sul tavolo, una porta, le dita che battono
+        // tutta l'energia sta in un attimo e il picco supera la media di oltre 20 dB; la voce è continua (picco 8–15 dB sopra)
+        let secco = r.peakPower(forChannel: 0) - livello > 20
         fondoPolso = min(fondoPolso, livello)
-        // JARVIS sta suonando adesso a voce piena (non fermo, non abbassato): solo allora il microfono dice quanto forte si sente lui
-        let soloJarvis = fermoDa == nil && !voceAbbassata && (lettore?.isPlaying == true || (sintesi.isSpeaking && !sintesi.isPaused))
+        // JARVIS sta suonando adesso (non fermo per il signore): solo allora il microfono dice quanto forte si sente lui
+        let soloJarvis = fermoDa == nil && (lettore?.isPlaying == true || (sintesi.isSpeaking && !sintesi.isPaused))
         // taratura: nel primo secondo si misura quanto forte l'orologio sente JARVIS (così sento lui, non il signore)
         if Date().timeIntervalSince(inizioParlato) < 1.2 {
-            if soloJarvis { segnaEco(livello) }
+            if soloJarvis && !secco { segnaEco(livello) }      // 14 nov: un colpo non è la sua eco
             return
         }
         // 13 nov (prova dei tre punti, il signore: «fallo»): il riferimento è il più forte degli ultimi 3 secondi della sua voce in cui
@@ -2280,12 +2287,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
             // JARVIS è fermo ad aspettarlo: niente eco da superare, basta la sua voce sopra la stanza (prima doveva superare la voce
             // piena di JARVIS anche a JARVIS zitto, e l'interruzione non arrivava: dopo la pausa riprendeva)
             soglia = max(fondoPolso + 12, -50)
-        } else if voceAbbassata, lettore?.isPlaying == true {
-            soglia = max(eco, -38)                   // voce di JARVIS al 40%: anche la sua eco è 8 dB più bassa
         } else {
             soglia = max(eco + 8, -38)
         }
-        if livello > soglia {
+        if secco {
+            // un colpo: non conta né come voce né come silenzio (se il signore sta parlando, la sua voce continua a contare)
+        } else if livello > soglia {
             colpiVoce += 1
             silenziVoce = 0
         } else {
@@ -2294,10 +2301,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if soloJarvis { segnaEco(livello) }
         }
         if colpiVoce >= 3 { interrottoAVoce(); return }                          // oltre mezzo secondo: è lui
-        // 13 nov (il signore: «abbassa la voce ed esita come una persona», come sull'iPhone): al primo colpo la voce scende, al secondo
-        // JARVIS si ferma a metà frase e aspetta; se il signore tace (0,4 s) o dopo 2,5 s fermo, riprende da dove era, voce di nuovo piena
-        if colpiVoce == 1 { abbassaVoce() }
-        else if colpiVoce == 2 { esitaVoce() }
+        // 14 nov: niente più voce abbassata. Dopo 0,4 s di voce continua JARVIS si ferma (sfumatura minima) e aspetta; se il signore
+        // tace (0,4 s) o dopo 2,5 s fermo, riprende da dove era
+        if colpiVoce == 2 { esitaVoce() }
         else if silenziVoce >= 2 || (fermoDa.map { Date().timeIntervalSince($0) > 2.5 } ?? false) { riprendiVoce() }
     }
 
@@ -2307,37 +2313,40 @@ final class JarvisOrologio: NSObject, ObservableObject {
         if ecoSentita.count > 15 { ecoSentita.removeFirst(ecoSentita.count - 15) }
     }
 
-    private func abbassaVoce() {
-        guard !voceAbbassata else { return }
-        voceAbbassata = true
-        lettore?.setVolume(volumeVoce * 0.4, fadeDuration: 0.12)
-    }
-
+    /// 14 nov: si ferma a metà frase, con una sfumatura minima (60 ms) e non più in dissolvenza.
     private func esitaVoce() {
-        abbassaVoce()
         guard fermoDa == nil else { return }
         fermoDa = Date()
         // prova dei tre punti: si ferma solo la frase che sta suonando. Fra due frasi `lettore` è ancora quella appena finita, e
         // riprendendo ripartiva da capo: JARVIS ripeteva la frase (e la sua fine faceva saltare quella dopo)
-        if let p = lettore, p.isPlaying { p.pause(); fraseInPausa = p }
-        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .immediate) }
-    }
-
-    private func riprendiVoce() {
-        guard voceAbbassata || fermoDa != nil else { return }
-        if fermoDa != nil {
-            fermoDa = nil
-            if let p = fraseInPausa, p === lettore { p.play(); Volume.segui(p) }   // il reattore torna a seguire la voce
-            fraseInPausa = nil
-            if sintesi.isPaused { sintesi.continueSpeaking() }
+        if let p = lettore, p.isPlaying {
+            fraseInPausa = p
+            p.setVolume(0, fadeDuration: 0.06)
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(70))
+                guard let self, self.fermoDa != nil else { return }
+                self.fraseInPausa?.pause()
+            }
         }
-        voceAbbassata = false
-        silenziVoce = 0
-        lettore?.setVolume(volumeVoce, fadeDuration: 0.3)
+        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .word) }
     }
 
-    private func dimenticaVoceAbbassata() {
-        voceAbbassata = false
+    /// 14 nov: riprende da dove era, con la voce piena in 80 ms (prima tornava su in tre decimi di secondo).
+    private func riprendiVoce() {
+        guard fermoDa != nil else { return }
+        fermoDa = nil
+        if let p = fraseInPausa, p === lettore {
+            p.volume = 0
+            p.play()
+            p.setVolume(volumeVoce, fadeDuration: 0.08)
+            Volume.segui(p)                          // il reattore torna a seguire la voce
+        }
+        fraseInPausa = nil
+        if sintesi.isPaused { sintesi.continueSpeaking() }
+        silenziVoce = 0
+    }
+
+    private func dimenticaPausaVoce() {
         fermoDa = nil
         fraseInPausa = nil
         silenziVoce = 0

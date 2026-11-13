@@ -1,4 +1,5 @@
 #if os(iOS)
+import Foundation
 import AVFoundation
 import Speech
 
@@ -21,15 +22,19 @@ final class Orecchio {
     /// d'ascolto. `rispostaAllaDomanda` riceve le sue parole: JARVIS finisce la domanda e poi le prende come frase sua.
     var domandaInCorso: (() -> Bool)?
     var rispostaAllaDomanda: ((String) -> Void)?
-    /// 13 nov (il signore: «abbassa la voce ed esita come una persona»): la sua voce sale sopra quella di JARVIS → `abbassa` (voce al
-    /// 40%); continua → `esita` (JARVIS si ferma a metà frase e aspetta); tace, o era un «sì», un «mh», un rumore → `riprendi` (da dove
-    /// era, voce di nuovo piena). Se invece è un'interruzione vera (punto 1) JARVIS tace come prima (`zittisci`).
-    var abbassa: (() -> Void)?
+    /// 14 nov (il signore: «l'interruzione deve essere una voce umana che dice delle parole… non deve sfumare troppo, non è umano»):
+    /// JARVIS si ferma (sfumatura minima) alla prima parola vera del signore, detta con una voce umana sopra la sua → `esita`. Se il
+    /// signore continua è un'interruzione vera: JARVIS tace e lo ascolta (`zittisci`). Se era un attimo («ma…», «eh…» e poi niente)
+    /// riprende dall'inizio della parola, a volte con «dicevo…» → `riprendi(true)`. Colpi sul tavolo, rumori, il plim della carica: niente
+    /// voce umana né parole, nessun effetto (prima bastava il volume: la voce scendeva e si fermava per ogni colpo).
     var esita: (() -> Void)?
-    var riprendi: (() -> Void)?
-    private var abbassato = false
-    private var trattiene = false
+    var riprendi: ((Bool) -> Void)?
+    private var fermo = false                   // JARVIS è fermo ad aspettare il signore
+    private var fermoDa = Date.distantPast
+    private var paroleAlFermo = 0               // le sue parole già sentite quando si è fermato: quelle dopo arrivano senza eco
+    private var ultimeProprie: [String] = []    // le sue parole del tentativo in corso (per decidere quando tace)
     private var scadenzaAttesa: Task<Void, Never>?
+    private var decisione: Task<Void, Never>?
     /// Le parole che JARVIS sta dicendo in questo momento: servono a riconoscere la propria eco.
     var testoDetto = ""
     /// 13 nov (punto 2): la frase che JARVIS sta pronunciando adesso, per il registro dei tentativi.
@@ -79,61 +84,69 @@ final class Orecchio {
         SopraLaVoce.condivisa.quandoForte = { [weak self] in
             Task { @MainActor [weak self] in self?.rivalutaForte() }
         }
-        // 13 nov: abbassa, esita, riprende (i passi li misura SopraLaVoce sul microfono)
+        // 14 nov: si ferma per le sue parole (in `valuta`); quando la sua voce umana tace, si decide se riprendere o ascoltarlo
         dimenticaEsitazione("nuova risposta")
-        SopraLaVoce.condivisa.quandoSale = { [weak self] in Task { @MainActor [weak self] in self?.passoVoce(.sale) } }
-        SopraLaVoce.condivisa.quandoInsiste = { [weak self] in Task { @MainActor [weak self] in self?.passoVoce(.insiste) } }
-        SopraLaVoce.condivisa.quandoTace = { [weak self] in Task { @MainActor [weak self] in self?.passoVoce(.tace) } }
+        SopraLaVoce.condivisa.quandoTace = { [weak self] in Task { @MainActor [weak self] in self?.haTaciuto() } }
         accendi()
     }
 
-    // MARK: 13 nov · abbassare la voce ed esitare (il signore: «sì, mi piace molto… falla con la massima competenza»)
+    // MARK: 14 nov · fermarsi per la sua voce, come una persona (il signore: «il più reattivo possibile, ma solo per parole vere»)
 
-    private enum PassoVoce { case sale, insiste, tace }
-
-    private func passoVoce(_ p: PassoVoce) {
-        if case .tace = p { rilascia("riprende"); return }   // ha smesso: si riprende sempre (anche a riconoscimento che riparte)
-        guard voluto, acceso, !inPresa else { return }
-        switch p {
-        case .sale:
-            guard !abbassato else { return }
-            abbassato = true
-            abbassa?()
-            segnaPasso("abbassa")
-            scadenza()
-        case .insiste:
-            guard !trattiene else { return }
-            if !abbassato { abbassato = true; abbassa?(); segnaPasso("abbassa") }
-            trattiene = true
-            SopraLaVoce.condivisa.trattieni(true)
-            esita?()
-            segnaPasso("ferma")
-            scadenza()
-        case .tace:
-            break
-        }
-    }
-
-    /// Bassa o ferma al massimo 2,5 s: se in quel tempo non è diventata un'interruzione vera (la regola del punto 1: mezzo secondo di
-    /// voce forte e una sua parola), non era per fermarlo (la TV, qualcuno in stanza): JARVIS riprende con la voce piena.
-    private func scadenza() {
+    /// La prima parola vera del signore sopra la voce di JARVIS: JARVIS si ferma (la sfumatura minima la fa la voce) e ascolta.
+    private func fermati(_ proprie: [String]) {
+        guard !fermo else { return }
+        fermo = true
+        fermoDa = Date()
+        paroleAlFermo = proprie.count
+        SopraLaVoce.condivisa.trattieni(true)
+        esita?()
+        segnaPasso("ferma")
+        // la parola arriva dal riconoscimento un attimo dopo la voce: se la sua voce ha già smesso («ma…» e basta), si decide subito
+        if !SopraLaVoce.condivisa.parlaAdesso { haTaciuto() }
         scadenzaAttesa?.cancel()
         scadenzaAttesa = Task { @MainActor [weak self] in
+            // al massimo 2,5 s fermo: se in quel tempo non è diventata un'interruzione vera, si decide come se avesse taciuto
             try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled, let self, !self.inPresa else { return }
-            self.rilascia("riprende dopo 2,5 s")
+            guard !Task.isCancelled, let self, self.fermo, !self.inPresa else { return }
+            self.decidi("dopo 2,5 s")
         }
     }
 
-    /// JARVIS riprende da dove si era fermato, con la voce di nuovo piena. `come`: per il registro delle esitazioni.
-    private func rilascia(_ come: String) {
+    /// La sua voce umana ha smesso (0,35 s): ancora 0,3 s per le ultime parole del riconoscimento, poi si decide.
+    private func haTaciuto() {
+        guard fermo, !inPresa else { return }
+        decisione?.cancel()
+        decisione = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self, self.fermo, !self.inPresa else { return }
+            guard SopraLaVoce.condivisa.voceUmana(ultimi: 0.3) < 0.05 else { return }   // ha ripreso a parlare: decide il silenzio dopo
+            self.decidi("riprende")
+        }
+    }
+
+    /// Fermo per lui, e lui ha smesso. Una parola vera (non «ma», «eh», «allora») detta con la sua voce è un'interruzione: JARVIS tace e
+    /// gli risponde, come fra persone («No.» → si ferma e lo ascolta). Solo riempitivi, o niente: riprende da dov'era.
+    private func decidi(_ come: String) {
+        guard fermo, !inPresa else { return }
+        if !Orecchio.soloRiempitivi(ultimeProprie), SopraLaVoce.condivisa.voceUmana(ultimi: 3) >= 0.25, acceso {
+            valuta(precedente, fine: false, turno: turno, rivaluta: true, forza: true)
+            if inPresa { return }
+        }
+        rilascia(come, attacco: Date().timeIntervalSince(fermoDa) >= 0.5)
+    }
+
+    /// JARVIS riprende da dove si era fermato (dall'inizio della parola). `attacco`: può ripartire con «dicevo…» (si era fermato
+    /// davvero, almeno mezzo secondo). `come`: per il registro delle esitazioni.
+    private func rilascia(_ come: String, attacco: Bool = false) {
         scadenzaAttesa?.cancel()
         scadenzaAttesa = nil
-        guard abbassato || trattiene else { return }
-        abbassato = false
-        trattiene = false
+        decisione?.cancel()
+        decisione = nil
+        guard fermo else { return }
+        fermo = false
+        ultimeProprie = []
         SopraLaVoce.condivisa.trattieni(false)
-        riprendi?()
+        riprendi?(attacco)
         chiudiEpisodio(come)
     }
 
@@ -141,15 +154,28 @@ final class Orecchio {
     private func dimenticaEsitazione(_ come: String) {
         scadenzaAttesa?.cancel()
         scadenzaAttesa = nil
-        abbassato = false
-        trattiene = false
+        decisione?.cancel()
+        decisione = nil
+        fermo = false
+        paroleAlFermo = 0
+        ultimeProprie = []
         SopraLaVoce.condivisa.trattieni(false)
         chiudiEpisodio(come)
     }
 
+    /// 14 nov: chi comincia a parlare e poi lascia perdere dice «ma…», «eh…», «allora…», «il…»: non sono parole vere. Le parole vere
+    /// sono tutte le altre (anche una sola: «No.», «Domani?»).
+    nonisolated static let riempitivi: Set<String> = ["ma", "e", "eh", "ehm", "ah", "oh", "uh", "uhm", "allora", "cioè", "cioe", "beh",
+                                                      "be", "però", "pero", "quindi", "dunque", "senti", "ascolta", "dai", "insomma",
+                                                      "comunque", "aspe", "un", "uno", "una", "il", "lo", "la", "i", "gli", "le", "che",
+                                                      "di", "a", "in", "per", "con", "se", "o"]
+    nonisolated static func soloRiempitivi(_ p: [String]) -> Bool {
+        p.allSatisfy { riempitivi.contains($0) || FineFrase.eMugugno($0) }
+    }
+
     // MARK: 13 nov (prova dei tre punti) · il registro delle esitazioni
-    // Ogni volta che la voce di JARVIS è scesa per lui: com'è andata («abbassa>ferma>riprende», «abbassa>interrotto»…) e quanto è
-    // durata. Va nei tempi del turno, come i tentativi: dice dal telefono vero se un «sì» la fa scendere, fermare e riprendere.
+    // Ogni volta che JARVIS si è fermato per lui: com'è andata («ferma>riprende», «ferma>interrotto»…) e quanto è durata. Va nei
+    // tempi del turno, come i tentativi: dice dal telefono vero quando si ferma, quando riprende e quando lo ascolta.
 
     private var episodio: (inizio: Date, passi: [String])?
     private var episodi: [(quando: Date, passi: String, ms: Int)] = []
@@ -341,7 +367,8 @@ final class Orecchio {
     }
 
     /// `rivaluta`: le stesse parole già sentite, di nuovo (la voce forte è appena scattata): niente pezzo nuovo né pause.
-    private func valuta(_ testo: String?, fine: Bool, turno mio: Int, rivaluta: Bool = false) {
+    /// `forza` (14 nov): JARVIS era fermo per lui e lui ha smesso dopo una parola vera: è un'interruzione (vedi `decidi`).
+    private func valuta(_ testo: String?, fine: Bool, turno mio: Int, rivaluta: Bool = false, forza: Bool = false) {
         guard acceso, mio == turno else { return }
         if let testo, !testo.isEmpty {
             if !rivaluta {
@@ -398,21 +425,39 @@ final class Orecchio {
                 let segnale = proprie.isEmpty ? FineFrase.SegnaleAscolto.nessuno : FineFrase.segnaleDAscolto(proprie.joined(separator: " "))
                 // mentre JARVIS fa una domanda, «sì» è la risposta (passa gli stessi controlli di una frase vera, qui sotto)
                 let allaDomanda = segnale == .ascolto && domandaInCorso?() == true
-                if segnale == .ascolto && !allaDomanda { scarto("segnale", parole: parole, proprie: proprie); if fine { riavvia() }; return }
+                if !proprie.isEmpty { ultimeProprie = proprie }       // 14 nov: per decidere quando tace (`decidi`)
+                if segnale == .ascolto && !allaDomanda {
+                    // 14 nov: un «sì», un «mh»: chi parla continua; se si era appena fermato su una sua parola, riparte
+                    if fermo { rilascia("segnale", attacco: Date().timeIntervalSince(fermoDa) >= 0.5) }
+                    scarto("segnale", parole: parole, proprie: proprie); if fine { riavvia() }; return
+                }
+                // 14 nov (il signore: «si deve fermare solo per una voce umana che dice parole vere, non per i rumori»): la prima parola sua
+                // (non eco, non un «sì»), detta mentre il microfono sente una voce umana sopra quella di JARVIS → JARVIS si ferma subito,
+                // con una sfumatura minima, e lo ascolta. Le parole senza voce umana (eco storpiata, la TV lontana) non bastano, e senza
+                // parole (colpi sul tavolo, il plim della carica, una porta) non succede niente: la voce non cambia
+                if !fermo, segnale == .nessuno, !proprie.isEmpty, !OrologioInUso.attivo,
+                   !(AmbienteSonoro.condiviso.affollato && !voceConfermata),
+                   SopraLaVoce.condivisa.voceUmana(ultimi: 1.2) >= 0.12 {
+                    fermati(proprie)
+                }
                 // 12.0 (11): gli parla sopra? Contano le ultime parole sentite: almeno due sue (prima l'eco accumulata nella
                 // trascrizione «diluiva» le sue parole e solo «Jarvis, ascoltami» lo fermava).
                 // 13 nov (punto 1, il signore: «se il microfono sente la sua voce forte sopra quella di JARVIS per mezzo secondo, più
                 // almeno una parola sua, JARVIS si ferma»): non serve più aspettare la seconda parola riconosciuta
                 let perParole = FineFrase.parlaSopra(parole, detto: dette)
                 let perVoce = !proprie.isEmpty && SopraLaVoce.condivisa.forteSecondi >= 0.5
-                guard perParole || perVoce || allaDomanda else { scarto("eco", parole: parole, proprie: proprie); if fine { riavvia() }; return }
+                // 14 nov: fermo ad aspettarlo JARVIS è zitto, quindi le parole arrivate dopo non sono eco: ne basta una vera
+                let dopoFermo = fermo ? Array(proprie.dropFirst(min(paroleAlFermo, proprie.count))) : []
+                let perFermo = !dopoFermo.isEmpty && !Orecchio.soloRiempitivi(dopoFermo)
+                guard perParole || perVoce || perFermo || allaDomanda || forza else { scarto("eco", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, una frase senza «Jarvis» non è per l'iPhone
                 // (potrebbe essere la voce dell'orologio): valgono solo le parole d'ordine
-                if OrologioInUso.attivo { scarto("orologio", parole: parole, proprie: proprie); if fine { riavvia() }; return }
+                if OrologioInUso.attivo { rilascia("orologio"); scarto("orologio", parole: parole, proprie: proprie); if fine { riavvia() }; return }
                 // 12.0 (11), scelta A (il signore: «risolvi con massima competenza»): l'impronta della sua voce serve solo con folla o TV
                 // intorno, dove le voci degli altri non devono fermarlo. In casa basta la sua voce: sopra la voce di JARVIS il
                 // confronto dell'impronta sbagliava spesso e lo lasciava parlare (idea C del 25 ott: prima valeva sempre)
                 if AmbienteSonoro.condiviso.affollato && !voceConfermata {
+                    rilascia("folla")                                 // 14 nov: se si era fermato, riparte (non è detto che fosse lui)
                     scarto("folla", parole: parole, proprie: proprie)
                     // in mezzo alla folla le voci degli altri non devono zittirlo: valgono le parole d'ordine
                     // e, se il signore ha registrato la sua voce, le frasi riconosciute come sue
@@ -438,6 +483,7 @@ final class Orecchio {
                 }
                 if allaDomanda {
                     // P1: la risposta alla domanda che JARVIS sta facendo: la finisce e poi la prende come frase del signore
+                    rilascia("risposta")                              // 14 nov: se si era fermato, riparte per finire la domanda
                     annota("risposta", parole: parole, proprie: proprie)
                     rispostaAllaDomanda?(proprie.joined(separator: " "))
                     if fine { riavvia() }
@@ -445,13 +491,15 @@ final class Orecchio {
                 }
                 if segnale == .chiusura {
                     // P1: ha capito. JARVIS finisce la frase che sta dicendo e si ferma (una volta sola per risposta)
+                    rilascia("capito")                                // 14 nov: se si era fermato, riparte per finire la frase
                     if !chiusuraChiesta { chiusuraChiesta = true; annota("capito", parole: parole, proprie: proprie); capito?() }
                     if fine { riavvia() }
                     return
                 }
                 inPresa = true
                 avviaTetto()
-                annota(perParole ? "fermato·parole" : "fermato·voce", parole: parole, proprie: proprie)
+                annota(perParole ? "fermato·parole" : perVoce ? "fermato·voce" : perFermo ? "fermato·dopo" : "fermato·tace",
+                       parole: parole, proprie: proprie)
                 dimenticaEsitazione("interrotto")
                 zittisci?()                               // JARVIS tace; io continuo ad ascoltare la frase
             }
@@ -562,7 +610,9 @@ final class Orecchio {
 /// tipico di questa risposta (75° percentile degli ultimi 6 secondi, senza i pezzi già presi per voce sua): quando il signore gli
 /// parla sopra il microfono sale di colpo, oltre 10 dB sopra il tipico. Nelle pause fra le frasi (nessuna voce in uscita) il
 /// confronto è col fondo della stanza (12 dB sopra). «Forte» = almeno mezzo secondo così negli ultimi 0,8 s (le sillabe hanno
-/// piccoli vuoti). Gira sul thread del microfono: tutto sotto lucchetto.
+/// piccoli vuoti). 14 nov (il signore: «ogni rumore lo ferma»): conta solo una VOCE UMANA (`RilevaVoce`: una nota fra 70 e 450 Hz che
+/// dura almeno 60 ms); colpi sul tavolo, porte, posate, il plim della carica non contano più. Gira sul thread del microfono: tutto sotto
+/// lucchetto (il rilevatore lo usa solo quel thread).
 nonisolated final class SopraLaVoce: @unchecked Sendable {
     static let condivisa = SopraLaVoce()
 
@@ -571,38 +621,23 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
     private var tipico: Float?                                   // il 75° percentile dei rapporti (l'eco tipica)
     private var fondo: Float = -60                               // il microfono nelle pause di JARVIS (dB)
     private var pezziFondo = 0
-    private var forti: [(t: TimeInterval, durata: Double)] = []  // i pezzi di voce forte dell'ultimo 0,8 s
+    private var forti: [(t: TimeInterval, durata: Double)] = []  // i pezzi di voce umana forte degli ultimi 3 s
     private var ultimoCalcolo: TimeInterval = 0
     private var eraForte = false
     private var piccoForte: Double = 0                           // per il registro dei tentativi
     private var piccoSopra: Float = 0
     private var avviso: (@Sendable () -> Void)?
-    // 13 nov (il signore: «abbassa la voce ed esita come una persona»): i passi della sua voce sopra quella di JARVIS.
-    // «sale»: 0,12 s di voce forte nell'ultimo 0,8 s (JARVIS abbassa la voce); «insiste»: 0,3 s (JARVIS si ferma e aspetta);
-    // «tace»: 0,35 s senza voce forte (JARVIS riprende). Il mezzo secondo (`quandoForte`) resta la regola dell'interruzione.
-    nonisolated private enum Passo { case quieto, sale, insiste }
-    private var passo: Passo = .quieto
     private var ultimoForte: TimeInterval = 0
+    private var parla = false                                    // 14 nov: la sua voce umana si sente adesso (per «tace»)
     private var quiete: [(t: TimeInterval, m: Float)] = []      // il microfono mentre JARVIS parla e il signore tace (eco rimasta + stanza)
     private var trattenuta = false                               // JARVIS è fermo ad aspettare: non esce voce, si confronta con la quiete
-    private var inizioPasso: TimeInterval = 0                    // l'ultimo «tace»: i passi contano solo la voce forte venuta dopo
-    private var avvisoSale: (@Sendable () -> Void)?
-    private var avvisoInsiste: (@Sendable () -> Void)?
     private var avvisoTace: (@Sendable () -> Void)?
+    private var ignoraFino: TimeInterval = 0                     // 14 nov: il plim della carica (e simili): per un attimo non conta niente
+    private let rileva = RilevaVoce()                            // 14 nov: c'è una voce umana? (solo dal thread del microfono)
 
     private static var ora: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
-    /// 13 nov: la sua voce comincia a salire sopra quella di JARVIS (0,12 s).
-    var quandoSale: (@Sendable () -> Void)? {
-        get { lock.lock(); defer { lock.unlock() }; return avvisoSale }
-        set { lock.lock(); avvisoSale = newValue; lock.unlock() }
-    }
-    /// 13 nov: continua (0,3 s).
-    var quandoInsiste: (@Sendable () -> Void)? {
-        get { lock.lock(); defer { lock.unlock() }; return avvisoInsiste }
-        set { lock.lock(); avvisoInsiste = newValue; lock.unlock() }
-    }
-    /// 13 nov: ha smesso (0,35 s senza voce forte).
+    /// 14 nov: la sua voce umana ha smesso (0,35 s senza): l'orecchio decide se riprendere o ascoltarlo.
     var quandoTace: (@Sendable () -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return avvisoTace }
         set { lock.lock(); avvisoTace = newValue; lock.unlock() }
@@ -612,6 +647,12 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
     /// microfono di quando taceva (altrimenti, nelle pause, la sua voce finirebbe per diventare il «fondo» della stanza).
     func trattieni(_ si: Bool) {
         lock.lock(); trattenuta = si; lock.unlock()
+    }
+
+    /// 14 nov: per `secondi` il microfono dell'orecchio non conta (il plim della carica, che iOS suona da sé: la cancellazione
+    /// dell'eco non lo conosce).
+    func ignora(per secondi: Double) {
+        lock.lock(); ignoraFino = max(ignoraFino, SopraLaVoce.ora + secondi); lock.unlock()
     }
 
     /// Il microfono tipico mentre JARVIS parla e il signore tace (mediana degli ultimi 3 s); nil se non c'è ancora. Sotto lucchetto.
@@ -632,7 +673,7 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
         lock.lock()
         rapporti.removeAll(); tipico = nil; fondo = -60; pezziFondo = 0; forti.removeAll(); eraForte = false
         piccoForte = 0; piccoSopra = 0; ultimoCalcolo = 0
-        passo = .quieto; ultimoForte = 0; quiete.removeAll(); trattenuta = false; inizioPasso = 0
+        ultimoForte = 0; parla = false; quiete.removeAll(); trattenuta = false
         lock.unlock()
     }
 
@@ -643,11 +684,12 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
         let hz = b.format.sampleRate
         // 13 nov (prova dei tre punti): il livello di tutto il pezzo (eco tipica, quiete e fondo, come prima) e quello di ogni tratto di
         // 20 ms. La voce forte si decide sul pezzo intero, ma la sua durata si conta sui tratti: il microfono può consegnare pezzi da
-        // 20 a 100 ms, e un «sì» di un quarto di secondo deve valere un quarto di secondo (prima, a pezzi da 100 ms, valeva fino a 0,4 s)
+        // 20 a 100 ms, e un «sì» di un quarto di secondo deve valere un quarto di secondo (prima, a pezzi da 100 ms, valeva fino a 0,4 s).
+        // 14 nov: per ogni tratto anche se c'è una voce umana (la nota delle corde vocali): solo quei tratti contano come sua voce
         let lato = max(2, Int(hz * 0.02))
         var somma: Float = 0
         var contati = 0
-        var tratti: [(m: Float, durata: Double)] = []
+        var tratti: [(m: Float, durata: Double, voce: Bool)] = []
         tratti.reserveCapacity(n / lato + 1)
         var da = 0
         while da < n {
@@ -658,14 +700,15 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
             while i < a { s += c[i] * c[i]; k += 1; i += 2 }
             somma += s
             contati += k
-            tratti.append((20 * log10(max((s / Float(max(k, 1))).squareRoot(), 0.000_01)), Double(a - da) / hz))
+            let voce = rileva.tratto(c, da: da, a: a, hz: hz)
+            tratti.append((20 * log10(max((s / Float(max(k, 1))).squareRoot(), 0.000_01)), Double(a - da) / hz, voce))
             da = a
         }
         let m = 20 * log10(max((somma / Float(max(contati, 1))).squareRoot(), 0.000_01))
         let uscita = EcoMac.condivisa.riferimento().rif          // la voce di JARVIS che esce adesso (nil nelle pause)
         let t = SopraLaVoce.ora
         var chiama: (@Sendable () -> Void)?
-        var chiamaPasso: (@Sendable () -> Void)?
+        var chiamaTace: (@Sendable () -> Void)?
         lock.lock()
         var sopra: Float = 0
         var soglia: Float?                                       // sopra questo livello (e sopra -55 dB) il microfono è «forte»
@@ -682,7 +725,7 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
             let forteQui = soglia.map { m > $0 && m > -55 } ?? false
             if !forteQui {
                 rapporti.append((t, d))
-                if case .quieto = passo { quiete.append((t, m)) }    // 13 nov: com'è il microfono quando lui tace
+                if !parla { quiete.append((t, m)) }              // 13 nov: com'è il microfono quando lui tace
             }
         } else {
             // pausa fra due frasi di JARVIS: il fondo della stanza (scende subito, sale piano)
@@ -700,42 +743,42 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
             tipico = s[min(s.count - 1, Int(Float(s.count) * 0.75))]
             ultimoCalcolo = t
         }
-        if forte, let soglia {
-            // quanto è durata davvero la voce forte in questo pezzo: i tratti sopra la stessa soglia (almeno uno c'è sempre: se la
-            // media del pezzo la supera, la supera anche il suo tratto più forte)
-            let durataForte = tratti.reduce(0.0) { $1.m > soglia && $1.m > -55 ? $0 + $1.durata : $0 }
-            forti.append((t, durataForte))
-            piccoSopra = max(piccoSopra, sopra)
-            ultimoForte = t
+        if forte, let soglia, t >= ignoraFino {
+            // quanto è durata davvero la sua voce in questo pezzo: i tratti sopra la stessa soglia e con la nota di una voce umana
+            let durataForte = tratti.reduce(0.0) { $1.voce && $1.m > soglia && $1.m > -55 ? $0 + $1.durata : $0 }
+            if durataForte > 0 {
+                forti.append((t, durataForte))
+                piccoSopra = max(piccoSopra, sopra)
+                ultimoForte = t
+                parla = true
+            }
         }
-        while let p = forti.first, t - p.t > 0.8 { forti.removeFirst() }
-        let secondi = forti.reduce(0) { $0 + $1.durata }
+        while let p = forti.first, t - p.t > 3 { forti.removeFirst() }
+        let secondi = forti.reduce(0.0) { t - $1.t <= 0.8 ? $0 + $1.durata : $0 }
         piccoForte = max(piccoForte, secondi)
         let adesso = secondi >= 0.5
         if adesso && !eraForte { chiama = avviso }
         eraForte = adesso
-        // 13 nov: i passi (sale → insiste → tace). Contano solo la voce forte venuta dopo l'ultimo «tace»: quella di prima è già stata
-        // giudicata. Prima la finestra di 0,8 s la ricontava e dopo un «sì» la voce scendeva e risaliva più volte di fila
-        let secondiPasso = forti.reduce(0.0) { $1.t > inizioPasso ? $0 + $1.durata : $0 }
-        switch passo {
-        case .quieto:
-            if secondiPasso >= 0.12 { passo = .sale; chiamaPasso = avvisoSale }
-        case .sale:
-            if secondiPasso >= 0.3 { passo = .insiste; chiamaPasso = avvisoInsiste }
-            else if t - ultimoForte > 0.35 { passo = .quieto; inizioPasso = t; chiamaPasso = avvisoTace }
-        case .insiste:
-            if t - ultimoForte > 0.35 { passo = .quieto; inizioPasso = t; chiamaPasso = avvisoTace }
-        }
+        if parla && t - ultimoForte > 0.35 { parla = false; chiamaTace = avvisoTace }   // 14 nov: ha smesso di parlare
         lock.unlock()
-        chiamaPasso?()
+        chiamaTace?()
         chiama?()
     }
 
-    /// Per quanti secondi, nell'ultimo 0,8 s, la sua voce è stata forte sopra quella di JARVIS.
-    var forteSecondi: Double {
+    /// Per quanti secondi, nell'ultimo 0,8 s, la sua voce (umana) è stata forte sopra quella di JARVIS.
+    var forteSecondi: Double { voceUmana(ultimi: 0.8) }
+
+    /// 14 nov: la sua voce umana si sente adesso (non ha ancora taciuto per 0,35 s).
+    var parlaAdesso: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return parla
+    }
+
+    /// 14 nov: per quanti secondi, negli ultimi `secondi`, si è sentita la sua voce umana sopra quella di JARVIS (o sopra la stanza).
+    func voceUmana(ultimi secondi: Double) -> Double {
         lock.lock(); defer { lock.unlock() }
         let t = SopraLaVoce.ora
-        return forti.filter { t - $0.t <= 0.8 }.reduce(0) { $0 + $1.durata }
+        return forti.reduce(0.0) { t - $1.t <= secondi ? $0 + $1.durata : $0 }
     }
 
     /// Il massimo dall'ultimo azzeramento (per il registro): millisecondi di voce forte e dB sopra l'eco tipica.
@@ -746,6 +789,116 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
 
     func azzeraPicchi() {
         lock.lock(); piccoForte = 0; piccoSopra = 0; lock.unlock()
+    }
+}
+
+// MARK: - 14 nov · c'è una voce umana?
+
+/// Una persona che parla ha una nota: la vibrazione delle corde vocali, fra 70 e 450 Hz, che dura per tutta la vocale. I colpi sul
+/// tavolo, una porta, le posate sono suoni secchi senza nota; il plim della carica e i fischi hanno una nota troppo alta; un ronzio
+/// ce l'ha troppo bassa. YIN (differenza, media cumulativa normalizzata, prima discesa sotto la soglia) su un segnale ridotto a circa
+/// 8 kHz, come `Intonazione` ma cercando da subito anche le note acute (così il plim non passa per la sua «ottava bassa»). Conta solo
+/// una voce che dura almeno 60 ms di fila. Lo usa un solo thread (quello del microfono dell'orecchio): niente lucchetto.
+nonisolated final class RilevaVoce: @unchecked Sendable {
+    private var hzIngresso: Double = 0
+    private var passo = 6                     // un campione ridotto ogni `passo` del microfono
+    private var hz: Double = 8_000            // la frequenza del segnale ridotto
+    private var aBasso: Float = 0.2           // il filtro che addolcisce sopra i ~1,8 kHz prima di ridurre
+    private var basso: Float = 0
+    private var accumulo: Float = 0
+    private var contati = 0
+    private static let capienza = 1024
+    private let ridotto: UnsafeMutablePointer<Float>
+    private var quanti = 0
+    private static let finestra = 200         // campioni per una misura (25 ms a 8 kHz)
+    private var tauMax = 133                  // fino a 60 Hz
+    private static let tauCapienza = 220
+    private let diff: UnsafeMutablePointer<Float>
+    private let cmnd: UnsafeMutablePointer<Float>
+    private var fila = 0                      // misure con la voce di fila
+
+    init() {
+        ridotto = .allocate(capacity: RilevaVoce.capienza); ridotto.initialize(repeating: 0, count: RilevaVoce.capienza)
+        diff = .allocate(capacity: RilevaVoce.tauCapienza + 1); diff.initialize(repeating: 0, count: RilevaVoce.tauCapienza + 1)
+        cmnd = .allocate(capacity: RilevaVoce.tauCapienza + 1); cmnd.initialize(repeating: 0, count: RilevaVoce.tauCapienza + 1)
+    }
+
+    deinit {
+        ridotto.deallocate(); diff.deallocate(); cmnd.deallocate()
+    }
+
+    private func configura(_ ingresso: Double) {
+        hzIngresso = ingresso
+        passo = max(1, Int((ingresso / 8_000).rounded()))
+        hz = ingresso / Double(passo)
+        aBasso = Float(1 - exp(-2 * Double.pi * 1_800 / ingresso))
+        tauMax = min(RilevaVoce.tauCapienza - 1, Int(hz / 60))
+        quanti = 0; basso = 0; accumulo = 0; contati = 0; fila = 0
+    }
+
+    /// Un tratto (~20 ms) del microfono, campioni da `da` ad `a`: true se adesso si sente una voce umana da almeno 60 ms.
+    func tratto(_ c: UnsafePointer<Float>, da: Int, a: Int, hz ingresso: Double) -> Bool {
+        guard ingresso > 0, a > da else { return false }
+        if ingresso != hzIngresso { configura(ingresso) }
+        let serve = RilevaVoce.finestra + tauMax
+        var i = da
+        while i < a {
+            basso += aBasso * (c[i] - basso)
+            accumulo += basso
+            contati += 1
+            if contati == passo {
+                if quanti == RilevaVoce.capienza {          // si tengono solo gli ultimi `serve` campioni
+                    memmove(ridotto, ridotto + (quanti - serve), serve * MemoryLayout<Float>.stride)
+                    quanti = serve
+                }
+                ridotto[quanti] = accumulo / Float(passo)
+                quanti += 1
+                accumulo = 0; contati = 0
+            }
+            i += 1
+        }
+        guard quanti >= serve else { fila = 0; return false }
+        fila = intonata(ridotto + (quanti - serve)) ? fila + 1 : 0
+        return fila >= 3
+    }
+
+    /// YIN sulla finestra: c'è una nota fra 70 e 450 Hz?
+    private func intonata(_ x: UnsafeMutablePointer<Float>) -> Bool {
+        let w = RilevaVoce.finestra
+        var energia: Float = 0
+        for j in 0..<w { energia += x[j] * x[j] }
+        guard energia > 1e-9 else { return false }
+        for tau in 1...tauMax {
+            var s: Float = 0
+            for j in 0..<w { let d = x[j] - x[j + tau]; s += d * d }
+            diff[tau] = s
+        }
+        var cumulata: Float = 0
+        cmnd[0] = 1
+        for tau in 1...tauMax {
+            cumulata += diff[tau]
+            cmnd[tau] = cumulata > 0 ? diff[tau] * Float(tau) / cumulata : 1
+        }
+        // la prima discesa sotto la soglia, cercando da 2 campioni in su: anche le note alte (il plim, un fischio)
+        var tau = 2
+        var scelto = -1
+        while tau <= tauMax {
+            if cmnd[tau] < 0.3 {
+                while tau + 1 <= tauMax && cmnd[tau + 1] < cmnd[tau] { tau += 1 }
+                scelto = tau
+                break
+            }
+            tau += 1
+        }
+        guard scelto > 0 else { return false }                       // nessuna nota: un colpo, un fruscio, una porta
+        let tauVoceMin = max(2, Int(hz / 450)), tauVoceMax = min(tauMax, Int(hz / 70))
+        if scelto >= tauVoceMin && scelto <= tauVoceMax { return true }
+        guard scelto < tauVoceMin, tauVoceMin <= tauVoceMax else { return false }   // più grave di 70 Hz: un ronzio, non una voce
+        // una nota più alta della voce: un suono acuto, a meno che sia un'armonica di una voce vera. Allora la valle della voce, più in
+        // basso, è nettamente più profonda (in un suono puro le valli sono tutte uguali)
+        var minimo: Float = 1
+        for k in tauVoceMin...tauVoceMax { minimo = min(minimo, cmnd[k]) }
+        return minimo < 0.2 && minimo < cmnd[scelto] - 0.08
     }
 }
 #endif

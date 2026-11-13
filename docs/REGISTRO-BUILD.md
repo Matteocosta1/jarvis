@@ -530,6 +530,31 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 12.0 (15) — MARK XII · 13 nov pomeriggio · numero confermato dal signore («concordo», 14:03, sulla proposta «build 12.0 (15)») · build unica · cervello **v134**
+
+**Perché** (prova del signore 13:45–13:56 sulla 12.0 (14), log di Supabase): mentre JARVIS parlava la voce si abbassava e si fermava per ogni rumore (in un turno sei volte, «senza parole»: i colpi sul tavolo; una volta fermo 2,7 s per un rumore; si è fermato anche col plim della carica). Il signore: «si deve fermare solo per una voce umana che dice parole vere»; «una persona interrotta si zittisce e ascolta, un minimo di sfumatura sì, la dissolvenza no»; «a volte riparte con "ehm…" o "dicevo…": è umano»; niente «sì», «ah», «ok» quando lo si interrompe. In più: tono che cambiava senza motivo, la battuta sul Daytona attaccata al «reattore sul petto», tre domande su «quale presentazione».
+
+**iPhone e Mac · interruzione solo con voce umana e parole vere** (`Orecchio`, `SopraLaVoce`, `RilevaVoce`, `VoceCloud`)
+- JARVIS si ferma alla **prima parola vera** del signore (non la sua eco, non un «sì»/«mh»), detta mentre il microfono sente una **voce umana** sopra la sua: `RilevaVoce` cerca la nota delle corde vocali (70–450 Hz, YIN su ~8 kHz, almeno 60 ms di fila). Colpi, porte, posate, il plim della carica: niente voce umana e niente parole, la voce **non cambia**. Il vecchio passo a solo volume (voce al 40% a 0,12 s, ferma a 0,3 s) è tolto.
+- Il fermo è una **sfumatura di 60 ms** e poi silenzio, come una persona. Se il signore continua → interruzione vera (tace e lo ascolta, come prima). Una parola vera e poi silenzio («No.», «Domani?») → interruzione. Solo riempitivi («ma…», «eh…», «allora…») e poi silenzio (~0,65 s) → **riprende in 80 ms dall'inizio della parola** su cui si era fermato (cerca il silenzio fra due parole nell'audio della frase). A volte (circa 4 volte su 10, se è stato fermo almeno mezzo secondo) prima dice **«Dicevo…», «Ehm, dicevo…» o «Come dicevo…»** (con la sua voce, già pronte in cache) e riparte dall'ultima pausa della frase. Al massimo 2,5 s fermo.
+- **Plim della carica**: attaccando o staccando il cavo, per 1,2 s l'orecchio non conta niente.
+
+**Apple Watch** (limite di Apple: watchOS non ha il riconoscimento delle parole dal vivo, le parole arrivano solo dalla trascrizione)
+- Niente più voce abbassata. I suoni secchi (picco oltre 20 dB sopra la media: colpi, porte, dita che battono) non contano né come voce né come silenzio. Dopo 0,4 s di voce continua si ferma (sfumatura 60 ms), a 0,6 s ascolta la frase; se nella trascrizione non ci sono parole (o era un «sì») riprende la frase da capo, a volte con «Dicevo…». Ripresa in 80 ms (prima 0,3 s).
+
+**Tempi del dialogo** (iPhone)
+- La risposta anticipata partiva **1,2–1,6 s** dopo la fine della sua voce (primo suono a 2,5–3,8 s): ogni ritocco del riconoscimento a frase finita (punteggiatura, maiuscole) faceva ripartire il conto. Ora con le stesse parole il conto non riparte e scatta a 0,35 s (prima 0,45; il silenzio vero lo controlla sempre la voce). Lo stesso per la pausa che chiude la frase (ascolto e «Jarvis…»). Atteso: il primo suono da mezzo secondo a un secondo prima. Da verificare nei tempi del turno.
+
+**Cervello v134** (via del signore: «concordo», 14:03, sulla proposta «cervello coi correttivi»)
+- Sa cos'è **la sua presentazione** (l'avvio dell'app) e non chiede «di cosa si tratta»; se il signore ripete o precisa, ha già risposto: niente domande ripetute; prima di chiedere prova il senso più probabile.
+- **Acutezza**: coglie il punto vero (anche l'implicito: orgoglio, entusiasmo, stanchezza) e collega al volo solo i ricordi che c'entrano.
+- **Ricordi solo se c'entrano**: mai due cose messe insieme per fare una battuta (l'errore del Daytona).
+- **Mai inventare esiti tecnici** che non vede («il filtro regge», «mi sono fermato al primo colpo») né file, funzioni o «issue».
+- **Emozioni calibrate**: registro di base fisso da maggiordomo inglese; cambia solo con un motivo vero (ride, sospira, è giù, è stanco, bella o brutta notizia), enfasi sulla parola che conta; l'umore della giornata resta sotto. **Toni della voce**: al massimo uno per risposta, non di fila senza motivo, [amused] al massimo una risposta su quattro, [laughs] solo se ride lui.
+- **Battute** rare, acute e nel momento giusto (quando scherza, è contento o lo provoca); niente durante test e lavoro; esempi nuovi. Sempre il «lei», mai «padrone».
+
+- Mockup (v. 1794577358-3859): nel simulatore il pannello PARLARGLI SOPRA (colpi sul tavolo, plim della carica, «Ma…», «No.») con la stessa logica dell'app, provato in Chromium.
+
 ## 12.0 (14) — MARK XII · 13 nov · numero confermato dal signore (13:17, «SI»: Build 14 su app, Watch, complicazione e isola) · build unica · cervello invariato
 
 **Avvio nuovo: JARVIS II + click «in evidenza», sfumata** (il signore: «perfetto confermo la sfumata la voglio nella nuova build»; il file JARVIS II l'ha creato lui in un'altra chat)

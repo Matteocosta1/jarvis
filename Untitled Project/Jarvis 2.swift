@@ -277,6 +277,8 @@ final class Jarvis: NSObject, ObservableObject {
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
     private var compito: SFSpeechRecognitionTask?
     private var timerSilenzio: Timer?
+    private var normaSilenzio = ""                  // 14 nov: le parole su cui corre la pausa di fine frase…
+    private var silenzioArmato = Date.distantPast   // …e da quando
     private var timerTetto: Timer?
     private var baseAscolto = ""           // quanto detto prima che il riconoscimento ripartisse da capo
     private var precedenteAscolto = ""
@@ -300,6 +302,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// 11 nov · risposta anticipata: la risposta preparata durante la pausa del signore (nil: nessuna)
     private var anticipo: Anticipo?
     private var timerAnticipo: Timer?
+    private var normaProgrammata = ""        // 14 nov: le parole su cui corre il conto della risposta anticipata
     private var anticipiTurno = 0                  // al massimo 3 per frase (ogni tentativo buttato costa circa un centesimo)
     private var anticipiButtati = 0
     private var anticipoSpentoFino = Date.distantPast   // il cervello ha detto «no_anticipo» (interruttore d'emergenza): 10 minuti senza
@@ -436,16 +439,22 @@ final class Jarvis: NSObject, ObservableObject {
         sintesi.delegate = self
         seguiMusica()                                // 9 nov: con la musica l'orecchio dell'attesa sente solo «Jarvis»
         Task { await Jarvis.riscalda() }                                 // il cervello si sveglia mentre il signore guarda lo schermo
-        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica]) }   // le frasi ponte sono già pronte in cache, a costo zero
+        // le frasi ponte sono già pronte in cache, a costo zero; 14 nov: anche le riprese brevi («Dicevo…»), che devono partire all'istante
+        if Impostazioni.voceCloud { cloud.prepara(Jarvis.ponti + [Dialogo.miDica] + Battute.ripreseBrevi) }
+        // 14 nov (il signore: «si è fermato anche col plim della carica»): il plim lo suona iOS e la cancellazione dell'eco non lo conosce.
+        // Attaccando o staccando il cavo, per un secondo l'orecchio che lo ascolta mentre parla non conta niente
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
+            SopraLaVoce.condivisa.ignora(per: 1.2)
+        }
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
         orecchio.capito = { [weak self] in self?.chiusuraGentile() }               // 12 nov (P1): «ho capito» mentre parla
         orecchio.domandaInCorso = { [weak self] in self?.fraseInVoce?.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?") ?? false }
         orecchio.rispostaAllaDomanda = { [weak self] t in self?.assensoInDomanda = (testo: t, quando: Date()) }
-        orecchio.abbassa = { [weak self] in self?.abbassaVoce() }                  // 13 nov: gli parla sopra → la voce scende
-        orecchio.esita = { [weak self] in self?.esitaVoce() }                      // …continua → si ferma a metà frase e aspetta
-        orecchio.riprendi = { [weak self] in self?.riprendiVoce() }                // …era un attimo → riprende da dove era
+        orecchio.esita = { [weak self] in self?.esitaVoce() }                      // 14 nov: una sua parola vera → si ferma e ascolta
+        orecchio.riprendi = { [weak self] attacco in self?.riprendiVoce(attacco: attacco) }   // …era un attimo → riprende da dov'era
         richiamo.pausaMinima = { [weak self] resto in self?.pausaMinimaPer(resto) ?? 0 }   // 12 nov (errore 3)
         richiamo.recuperoPronto = { [weak self] in                                     // 12.0 (10): «Jarvis?» dopo un silenzio
             guard let t = self?.fraseTaciuta else { return false }
@@ -552,24 +561,22 @@ final class Jarvis: NSObject, ObservableObject {
         return ascoltoDaAvvio
     }
 
-    // MARK: 13 nov · il signore comincia a parlargli sopra (il signore: «abbassa la voce ed esita come una persona»)
+    // MARK: 14 nov · il signore gli parla sopra (il signore: «una persona interrotta si zittisce e ascolta: la voce non scende come un
+    // computer, un minimo di sfumatura sì»)
 
-    /// La sua voce sale sopra quella di JARVIS: la voce scende (come chi si accorge che l'altro sta per parlare).
-    private func abbassaVoce() {
-        guard fase == .parlo else { return }
-        cloud.abbassa()
-    }
-
-    /// Continua: JARVIS si ferma a metà frase e aspetta (la voce dell'iPhone si ferma alla parola).
+    /// Una sua parola vera, detta con la sua voce: JARVIS si ferma a metà frase (sfumatura minima, 60 ms) e lo ascolta.
     private func esitaVoce() {
         guard fase == .parlo else { return }
         cloud.esita()
-        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .immediate) }
+        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .word) }
     }
 
-    /// Era solo un «sì», un «mh» o un rumore: riprende da dove si era fermato e la voce torna su piano piano.
-    private func riprendiVoce() {
-        cloud.riprendi()
+    /// Era un attimo («ma…» e poi niente, un «sì»): riprende dall'inizio della parola su cui si era fermato. `attacco`: si era fermato
+    /// davvero (almeno mezzo secondo), quindi a volte riparte con «Dicevo…» (il signore: «sì, questo va bene ed è umano»).
+    private func riprendiVoce(attacco: Bool = false) {
+        let a = attacco && fase == .parlo && vocePerCloud ? Battute.ripresaBreve() : nil
+        if let a { orecchio.testoDetto += " " + a }       // la sua eco non è il signore
+        cloud.riprendi(attacco: a)
         if sintesi.isPaused { sintesi.continueSpeaking() }
     }
 
@@ -2686,6 +2693,7 @@ final class Jarvis: NSObject, ObservableObject {
             baseAscolto = ""
             precedenteAscolto = ""
             ultimoParzialeAscolto = .distantPast
+            normaSilenzio = ""                         // 14 nov: la pausa di fine frase conta da capo
             fase = .ascolto
             if bip { Suoni.ascolto() } else { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
             turnoAscolto += 1
@@ -2940,7 +2948,16 @@ final class Jarvis: NSObject, ObservableObject {
             if pausaMinimaAscolto > 0, Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(parziale)) != aspettoSu { pausaMinimaAscolto = 0 }
             // 11 nov: «ascoltami», «fammi finire» dentro la frase: da qui aspetta come vuole il signore (3,5 s, fino a 90 s)
             if !ascoltoLungo, Jarvis.chiedeAscoltoLungo(parziale) { ascoltoLungo = true; timerTetto?.invalidate(); timerTetto = nil }
-            armaSilenzio(secondi: pausaAscolto(parziale))
+            // 14 nov: un ritocco del riconoscimento (punteggiatura, maiuscole) non fa ripartire da capo la pausa di fine frase: con le
+            // stesse parole conta da quando erano arrivate (la chiusura vera la decide comunque il silenzio della sua voce)
+            let norma = Jarvis.normaAnticipo(parziale)
+            if norma == normaSilenzio, timerSilenzio?.isValid == true {
+                armaSilenzio(secondi: pausaAscolto(parziale), giaPassati: Date().timeIntervalSince(silenzioArmato))
+            } else {
+                normaSilenzio = norma
+                silenzioArmato = Date()
+                armaSilenzio(secondi: pausaAscolto(parziale))
+            }
             programmaAnticipo(parziale)                // 11 nov: la risposta si prepara durante la pausa
             if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a un minuto (90 s con «ascoltami»)
                 let mio = turnoAscolto
@@ -3333,50 +3350,94 @@ final class VoceCloud: NSObject {
 
     private var prontoDa = Date.distantPast   // prima di allora non parte nessun suono (l'audio si sta riassestando)
 
-    // MARK: 13 nov · il signore gli parla sopra: la voce scende, poi JARVIS si ferma un attimo, poi riprende (o tace del tutto)
-    private enum Esitazione { case no, abbassata, ferma }
+    // MARK: 14 nov · il signore gli parla sopra (il signore: «una persona interrotta si zittisce e ascolta, con un minimo di sfumatura;
+    // farla scendere quasi in dissolvenza non è umano»): JARVIS si ferma in 60 ms e aspetta; se era un attimo riprende dall'inizio della
+    // parola su cui si era fermato, con la voce piena in 80 ms, e a volte con «Dicevo…» prima. Prima la voce scendeva al 40% e poi
+    // risaliva in tre decimi di secondo, ripartendo a metà sillaba
+    private enum Esitazione { case no, ferma, attacco }
     private var esitazione: Esitazione = .no
     private var rampa: Task<Void, Never>?
+    private var pausa: Task<Void, Never>?              // la pausa vera, a sfumatura finita
+    private var ripresa: Task<Void, Never>?            // «Dicevo…», poi la frase
+    private var lettoreAttacco: AVAudioPlayer?
     private var fermaDa: Date?                 // da quando è fermo ad aspettare
     private var fermoTotale: TimeInterval = 0  // quanto è stato fermo in tutto (la fine di una frase in streaming non si anticipa)
-    private static let quotaAbbassata: Float = 0.4
-    private var volumeAdesso: Float { esitazione == .no ? Jarvis.volumeVoce : Jarvis.volumeVoce * VoceCloud.quotaAbbassata }
+    private var datiLettore: Data?             // l'audio della frase già pronta che sta suonando (per ripartire dall'inizio della parola)
+    private var flussoAttivo = false           // una frase in streaming suona nel motore: la ripresa la fa `suonaFlusso`
+    private var riavvolgi: Bool?               // ripresa chiesta a `suonaFlusso` (true: dall'ultima pausa della frase, dopo «Dicevo…»)
+    private static let sfumaFerma = 0.06
+    private static let sfumaRiprende = 0.08
+    private var volumeAdesso: Float { esitazione == .no ? Jarvis.volumeVoce : 0 }
     private var fermoFinora: TimeInterval { fermoTotale + (fermaDa.map { Date().timeIntervalSince($0) } ?? 0) }
 
-    /// La voce scende al 40% in un decimo di secondo.
-    func abbassa() {
-        guard esitazione == .no else { return }
-        esitazione = .abbassata
-        portaVolume(Jarvis.volumeVoce * VoceCloud.quotaAbbassata, in: 0.12)
-    }
-
-    /// Si ferma a metà frase e aspetta (lo streaming continua ad arrivare e resta in fila).
+    /// Si ferma a metà frase: la voce sfuma in 60 ms (niente «click», niente dissolvenza da computer) e si ferma lì. Lo streaming
+    /// continua ad arrivare e resta in fila.
     func esita() {
-        if esitazione == .no { portaVolume(Jarvis.volumeVoce * VoceCloud.quotaAbbassata, in: 0.08) }
-        guard esitazione != .ferma else { return }
+        switch esitazione {
+        case .ferma: return
+        case .attacco:                                       // stava dicendo «Dicevo…»: si ferma anche quello
+            ripresa?.cancel(); ripresa = nil
+            lettoreAttacco?.stop(); lettoreAttacco = nil
+            esitazione = .ferma
+            return
+        case .no: break
+        }
         esitazione = .ferma
         fermaDa = Date()
-        nodo?.pause()
-        lettore?.pause()
-        if riserva.isSpeaking, !riserva.isPaused { riserva.pauseSpeaking(at: .immediate) }
+        portaVolume(0, in: VoceCloud.sfumaFerma)
+        if riserva.isSpeaking, !riserva.isPaused { riserva.pauseSpeaking(at: .word) }
+        pausa?.cancel()
+        pausa = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(Int(VoceCloud.sfumaFerma * 1000) + 10))
+            guard !Task.isCancelled, let self, self.esitazione != .no else { return }
+            self.nodo?.pause()
+            self.lettore?.pause()
+        }
     }
 
-    /// Riprende da dove si era fermato; la voce torna piena in tre decimi di secondo.
-    func riprendi() {
-        guard esitazione != .no else { return }
-        if esitazione == .ferma {
-            if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
-            fermaDa = nil
-            if let n = nodo, motore?.isRunning == true { n.play() }
-            if let p = lettore {
-                p.play()
-                Volume.segui(p)                     // il reattore e la misura della sua voce ripartono con la frase
-                EcoMac.segui(p)
+    /// Riprende dall'inizio della parola su cui si era fermato, con la voce piena in 80 ms. Con `attacco` («Dicevo…», già pronto in
+    /// cache: niente attese) prima quello, poi la frase dall'ultima pausa, come chi ritrova il filo.
+    func riprendi(attacco: String? = nil) {
+        guard esitazione == .ferma else { return }
+        pausa?.cancel()
+        pausa = nil
+        if let attacco, let dati = CacheVoce.leggi(attacco, id: Impostazioni.idVoceCloud), let p = try? AVAudioPlayer(data: dati) {
+            esitazione = .attacco
+            p.volume = Jarvis.volumeVoce
+            lettoreAttacco = p
+            Volume.segui(p)
+            EcoMac.segui(p)
+            if p.play() {
+                let dura = p.duration
+                ripresa?.cancel()
+                ripresa = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(Int(dura * 1000) + 60))
+                    guard !Task.isCancelled, let self, self.esitazione == .attacco else { return }
+                    self.lettoreAttacco = nil
+                    self.riparti(lungo: true)
+                }
+                return
             }
-            if riserva.isPaused { riserva.continueSpeaking() }
+            lettoreAttacco = nil
         }
+        riparti(lungo: false)
+    }
+
+    /// La frase riparte: dall'inizio della parola (`lungo`: dall'ultima pausa della frase, dopo «Dicevo…»).
+    private func riparti(lungo: Bool) {
+        if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
+        fermaDa = nil
         esitazione = .no
-        portaVolume(Jarvis.volumeVoce, in: 0.3)
+        if flussoAttivo { riavvolgi = lungo }                // la frase in streaming la riprende `suonaFlusso`, che sa cosa è già suonato
+        if let p = lettore {
+            if let dati = datiLettore, let da = VoceCloud.puntoDiRipresa(wav: dati, secondi: p.currentTime, lungo: lungo) { p.currentTime = da }
+            p.volume = 0
+            p.play()
+            p.setVolume(Jarvis.volumeVoce, fadeDuration: VoceCloud.sfumaRiprende)
+            Volume.segui(p)                                  // il reattore torna a seguire la voce
+            EcoMac.segui(p)
+        }
+        if riserva.isPaused { riserva.continueSpeaking() }
     }
 
     /// Il volume della voce che sta suonando, a passi di 10 ms (il lettore delle frasi pronte lo fa da sé).
@@ -3394,13 +3455,92 @@ final class VoceCloud: NSObject {
         }
     }
 
-    /// JARVIS tace o ha finito: niente voce abbassata né attesa rimasta in sospeso.
+    /// JARVIS tace o ha finito: niente pausa né ripresa rimaste in sospeso.
     private func dimenticaEsitazione() {
         rampa?.cancel()
         rampa = nil
+        pausa?.cancel()
+        pausa = nil
+        ripresa?.cancel()
+        ripresa = nil
+        lettoreAttacco?.stop()
+        lettoreAttacco = nil
+        riavvolgi = nil
         esitazione = .no
         if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
         fermaDa = nil
+    }
+
+    /// 14 nov: da dove riprendere una frase fermata al campione `campione` (PCM 16 bit, a partire dal byte `da`). Senza «Dicevo…»:
+    /// dall'inizio della parola, cioè il tratto silenzioso più recente dell'ultimo mezzo secondo (fra due parole la voce cala). Con
+    /// «Dicevo…» (`lungo`): dall'ultima pausa vera della frase (una virgola, un respiro: almeno 0,12 s di silenzio negli ultimi 2,5 s),
+    /// o da capo se la frase è appena cominciata.
+    nonisolated static func puntoDiRipresa(pcm: Data, da inizioByte: Int = 0, campione: Int, hz: Double, lungo: Bool) -> Int {
+        let tot = max(0, (pcm.count - inizioByte) / 2)
+        let fino = min(max(0, campione), tot)
+        let passo = max(1, Int(hz * 0.01))                   // tratti da 10 ms
+        guard fino > passo * 6 else { return 0 }
+        let da = max(0, fino - Int(hz * (lungo ? 2.5 : 0.6)))
+        var livelli: [Float] = []
+        livelli.reserveCapacity((fino - da) / passo + 1)
+        pcm.withUnsafeBytes { raw in
+            var k = da
+            while k + passo <= fino {
+                var somma: Float = 0
+                for i in k..<(k + passo) {
+                    let v = Float(Int16(littleEndian: raw.loadUnaligned(fromByteOffset: inizioByte + i * 2, as: Int16.self))) / 32768
+                    somma += v * v
+                }
+                livelli.append(10 * log10(max(somma / Float(passo), 1e-10)))
+                k += passo
+            }
+        }
+        guard livelli.count >= 6 else { return max(0, fino - Int(hz * 0.2)) }
+        let ordinati = livelli.sorted()
+        let voce = ordinati[min(ordinati.count - 1, Int(Float(ordinati.count) * 0.9))]   // il livello della voce in questo tratto
+        let margine = Int(hz * 0.03)
+        if lungo {
+            // l'ultima pausa vera prima del taglio (12 tratti di fila 25 dB sotto la voce): si riparte dove ricomincia la voce
+            var fila = 0
+            var j = livelli.count - 6                        // le ultime parole no: almeno 50 ms prima del taglio
+            while j >= 0 {
+                if livelli[j] < voce - 25 { fila += 1 } else {
+                    if fila >= 12 { return max(0, da + (j + 1 + fila) * passo - margine) }
+                    fila = 0
+                }
+                j -= 1
+            }
+            if fila >= 12 { return max(0, da + fila * passo - margine) }
+            if da == 0 { return 0 }                         // la frase è appena cominciata: da capo
+        }
+        // l'inizio della parola: il tratto più recente fra 0,6 e 0,04 s prima del taglio che sta 18 dB sotto la voce; se la voce non
+        // cala mai abbastanza, il tratto più basso
+        let fine = livelli.count - 4
+        let inizio = max(0, livelli.count - 60)
+        guard fine > inizio else { return max(0, fino - Int(hz * 0.2)) }
+        if let j = stride(from: fine - 1, through: inizio, by: -1).first(where: { livelli[$0] < voce - 18 }) {
+            return da + j * passo
+        }
+        let j = (inizio..<fine).min { livelli[$0] < livelli[$1] } ?? inizio
+        return da + j * passo
+    }
+
+    /// Lo stesso, per una frase già pronta in cache (WAV a 16 bit mono, come la salva `AudioInArrivo`); nil se non è un WAV così.
+    nonisolated static func puntoDiRipresa(wav: Data, secondi: TimeInterval, lungo: Bool) -> TimeInterval? {
+        guard wav.count > 44 else { return nil }
+        let intestazione: (riff: UInt32, wave: UInt32, canali: UInt16, hz: UInt32, bit: UInt16, dati: UInt32) = wav.withUnsafeBytes { r in
+            (riff: r.loadUnaligned(fromByteOffset: 0, as: UInt32.self), wave: r.loadUnaligned(fromByteOffset: 8, as: UInt32.self),
+             canali: UInt16(littleEndian: r.loadUnaligned(fromByteOffset: 22, as: UInt16.self)),
+             hz: UInt32(littleEndian: r.loadUnaligned(fromByteOffset: 24, as: UInt32.self)),
+             bit: UInt16(littleEndian: r.loadUnaligned(fromByteOffset: 34, as: UInt16.self)),
+             dati: r.loadUnaligned(fromByteOffset: 36, as: UInt32.self))
+        }
+        // «RIFF», «WAVE», «data» come byte (little endian: 0x46464952, 0x45564157, 0x61746164)
+        guard intestazione.riff == 0x4646_4952, intestazione.wave == 0x4556_4157, intestazione.dati == 0x6174_6164,
+              intestazione.canali == 1, intestazione.bit == 16, intestazione.hz > 0 else { return nil }
+        let hz = Double(intestazione.hz)
+        let c = puntoDiRipresa(pcm: wav, da: 44, campione: Int(secondi * hz), hz: hz, lungo: lungo)
+        return Double(c) / hz
     }
 
     /// La prossima frase parte non prima di fra `secondi`.
@@ -3500,6 +3640,7 @@ final class VoceCloud: NSObject {
     func ferma() {
         generazione += 1
         dimenticaEsitazione()                        // 13 nov
+        flussoAttivo = false                         // 14 nov: la frase in streaming di prima non c'è più
         coda.forEach { $0.audio.cancel() }
         coda.removeAll()
         flussi.forEach { $0.annulla() }
@@ -3519,7 +3660,7 @@ final class VoceCloud: NSObject {
             let manca = prontoDa.timeIntervalSinceNow
             if manca > 0 { try? await Task.sleep(for: .milliseconds(Int(manca * 1000))) }
             // 13 nov: fermo ad aspettare il signore (fra una frase e l'altra): la frase dopo parte solo quando riprende
-            while g == generazione, esitazione == .ferma { try? await Task.sleep(for: .milliseconds(30)) }
+            while g == generazione, esitazione != .no { try? await Task.sleep(for: .milliseconds(30)) }
             guard g == generazione else { return }
             iniziaFrase?(ObjectIdentifier(p.frase))
             var detta = false
@@ -3567,8 +3708,8 @@ final class VoceCloud: NSObject {
             m.prepare()
             guard (try? m.start()) != nil else { return nil }
         }
-        n.volume = volumeAdesso                        // «sbatti»: sottovoce; 13 nov: più bassa se il signore sta parlando
-        if !n.isPlaying, esitazione != .ferma { n.play() }
+        n.volume = volumeAdesso                        // «sbatti»: sottovoce; 14 nov: zero se è fermo per il signore
+        if !n.isPlaying, esitazione == .no { n.play() }
         return (m, n, formato)
     }
 
@@ -3583,20 +3724,47 @@ final class VoceCloud: NSObject {
         guard g == generazione else { return true }
         guard a.quanti >= 2, let pronto = preparaMotore(frequenza) else { return false }
         let (m, n, formato) = pronto
-        let suonati = Contatore()
+        flussoAttivo = true
+        defer { if g == generazione { flussoAttivo = false } }
+        var suonati = Contatore()
+        var fatti: [Int] = [0]                                // 14 nov: campioni programmati fino a ogni pezzo (quanto è già suonato)
         var letti = 0, programmati = 0
         var campioni = 0
-        let inizio = Date()
-        let fermoPrima = fermoFinora                          // 13 nov: il tempo fermo ad aspettare non conta per la fine della frase
+        var inizio = Date()
+        var fermoPrima = fermoFinora                          // 13 nov: il tempo fermo ad aspettare non conta per la fine della frase
         var ripartenze = 0
+        var riparte = false
         while g == generazione {
+            // 14 nov: si era fermato per il signore e ora riprende. Quello che restava in fila si toglie e la frase si riprogramma
+            // dall'inizio della parola su cui si era fermato (o dall'ultima pausa, dopo «Dicevo…»): la voce torna in 80 ms
+            if let lungo = riavvolgi, esitazione == .no {
+                riavvolgi = nil
+                let suonato = fatti[min(suonati.valore, fatti.count - 1)]
+                let da = VoceCloud.puntoDiRipresa(pcm: a.tutto, campione: suonato, hz: frequenza, lungo: lungo)
+                n.stop()                                       // i pezzi in fila si tolgono (i loro avvisi vanno al contatore vecchio)
+                suonati = Contatore()
+                fatti = [0]
+                programmati = 0
+                campioni = 0
+                letti = da * 2
+                inizio = Date()
+                fermoPrima = fermoFinora
+                riparte = true
+            }
             let (nuovi, finito) = a.leggi(da: letti)
             let utili = nuovi.count & ~1
             if utili > 0, let b = VoceCloud.buffer(nuovi.prefix(utili), formato) {
                 VoceCloud.programma(n, b, suonati)
                 programmati += 1
                 campioni += Int(b.frameLength)
+                fatti.append(campioni)
                 letti += utili
+            }
+            if riparte, m.isRunning {
+                riparte = false
+                n.volume = 0
+                n.play()
+                portaVolume(Jarvis.volumeVoce, in: VoceCloud.sfumaRiprende)
             }
             if !m.isRunning {                                   // l'audio dell'iPhone si è riassestato: riparto
                 // 11 nov (#16, JARVIS muto uscendo dall'app mentre parla): iOS può fermare il motore della voce quando l'audio si
@@ -3605,7 +3773,7 @@ final class VoceCloud: NSObject {
                 // riparte, la frase la dice la voce dell'iPhone (JARVIS non resta mai muto)
                 try? AVAudioSession.sharedInstance().setActive(true)
                 m.prepare()
-                if (try? m.start()) != nil { if esitazione != .ferma { n.play() } } else {
+                if (try? m.start()) != nil { if esitazione == .no { n.play() } } else {
                     ripartenze += 1
                     if ripartenze >= 3 { return false }
                 }
@@ -3691,8 +3859,9 @@ final class VoceCloud: NSObject {
     private func suona(_ dati: Data) async -> Bool {
         guard let p = try? AVAudioPlayer(data: dati) else { return false }
         p.delegate = self
-        p.volume = volumeAdesso                        // sottovoce anche per le frasi già pronte; 13 nov: più bassa se lui parla
+        p.volume = volumeAdesso                        // sottovoce anche per le frasi già pronte
         lettore = p
+        datiLettore = dati                              // 14 nov: per ripartire dall'inizio della parola se lui lo ferma
         Volume.segui(p)
         EcoMac.segui(p)                                 // difetto 2 (Mac) e 13 nov punto 1 (iPhone): quanto forte esce la sua voce
         return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
@@ -3730,6 +3899,7 @@ final class VoceCloud: NSObject {
         attesa = nil
         attuale = nil
         lettore = nil
+        datiLettore = nil
         c?.resume(returning: ok)
     }
 
@@ -3980,16 +4150,23 @@ extension Jarvis {
             && UserDefaults.standard.object(forKey: "rispostaAnticipata") as? Bool ?? true
     }
 
-    /// A ogni parola nuova: fra 0,45 s di silenzio (parole e voce) si prova a preparare la risposta. Se il signore ha ripreso a
+    /// A ogni parola nuova: fra 0,35 s di silenzio (parole e voce) si prova a preparare la risposta. Se il signore ha ripreso a
     /// parlare e la frase è cambiata, la risposta preparata prima si butta.
+    /// 14 nov (tempi del 13 nov: la risposta anticipata partiva 1,2–1,6 s dopo la fine della sua voce, quindi il primo suono arrivava
+    /// dopo 2,5–3,8 s): il riconoscimento ritocca la trascrizione anche quando lui ha già smesso (punteggiatura, maiuscole) e ogni ritocco
+    /// faceva ripartire il conto da capo. Ora, se le parole sono le stesse, il conto non riparte; e il conto è di 0,35 s (prima 0,45):
+    /// il silenzio vero lo controlla comunque `provaAnticipo`.
     fileprivate func programmaAnticipo(_ testo: String) {
+        let norma = Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(testo))
+        if norma == normaProgrammata, timerAnticipo?.isValid == true { return }
+        normaProgrammata = norma
         timerAnticipo?.invalidate()
         guard anticipoAcceso, fase == .ascolto, !(richiamo.sveglio && richiamo.perRecupero) else { return }   // 12.0 (10)
         // 12 nov: il confronto con la frase come la vede il cervello (senza «allora», «senti», «ok» davanti): prima «allora gli ho detto
         // che» non era mai uguale a «gli ho detto che» e la risposta anticipata si buttava a ogni parola, anche quella di riserva
-        if let a = anticipo, !a.adottato, Jarvis.normaAnticipo(a.messaggio.testo) != Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(testo)) { scartaAnticipo() }
+        if let a = anticipo, !a.adottato, Jarvis.normaAnticipo(a.messaggio.testo) != norma { scartaAnticipo() }
         let t = testo
-        timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+        timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.provaAnticipo(t) }
         }
     }
