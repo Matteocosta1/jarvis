@@ -771,7 +771,11 @@ struct VistaSerataOrologio: View {
         }
         .task {
             guard let e = await VistaVitalsOrologio.chiama(["serate": true]), let lista = e["serate"] as? [[String: Any]] else { errore = "Non raggiungo le serate, Sir."; return }
-            let vera = lista.first { !(($0["nome"] as? String ?? "").lowercased().contains("demo")) } ?? lista.first
+            // 13 nov: le serate di prova si saltano come sull'iPhone e nel cervello («demo» o «prova» nel nome)
+            let vera = lista.first { s in
+                let n = (s["nome"] as? String ?? "").lowercased()
+                return !n.contains("demo") && !n.contains("prova")
+            } ?? lista.first
             guard let s = vera else { errore = "Nessuna serata registrata."; return }
             nome = "\(s["nome"] as? String ?? "") · \((s["data"] as? String ?? "").prefix(10))"
             guard let o = await VistaVitalsOrologio.chiama(["serata": ["data": String((s["data"] as? String ?? "").prefix(10)), "nome": s["nome"] as? String ?? ""]]) else { errore = "Non raggiungo i conti, Sir."; return }
