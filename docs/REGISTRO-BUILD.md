@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 12.0 (14) — MARK XII · 13 nov mattina · **numero da confermare col signore** (il progetto resta a 13 finché non dice sì) · build unica · cervello invariato
+## 12.0 (14) — MARK XII · 13 nov · numero confermato dal signore (13:17, «SI»: Build 14 su app, Watch, complicazione e isola) · build unica · cervello invariato
 
 **Avvio nuovo: JARVIS II + click «in evidenza», sfumata** (il signore: «perfetto confermo la sfumata la voglio nella nuova build»; il file JARVIS II l'ha creato lui in un'altra chat)
 - iPhone e Mac: `avvio.m4a` = JARVIS II con i click di caricamento puliti (presi dalla musica di prima togliendo il resto) agli stessi tempi delle icone della corona, accelerazione finale compresa, e la coda che sfuma (16,6 s · −12,6 LUFS · −0,9 dBTP).
@@ -550,6 +550,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Apple Watch · **tocco sul reattore durante l'avvio = «voglio parlare»**: la voce sfuma a icone finite e JARVIS ascolta (prima spegneva il microfono, SPENTO, e la voce andava fino in fondo: a fine avvio niente ascolto). Complicazione ad app chiusa: ascolta a icone finite con la voce sfumata (prima il microfono partiva dopo 0,4 s sopra l'avvio). Tocco su un'icona o su Ricordi/Cronologia: la voce sfuma.
 - Apple Watch · **traccia ad hoc** (`avvioorologio.m4a`, 16,66 s, mono 48 kHz, AAC 203 kbps, −15,8 LUFS, −0,9 dBTP come prima): **24 click di caricamento dentro la traccia, uno per icona del polso, al campione sui colpi del polso** (`AvvioOrologio.colpi` ÷ 1,15; verificato: 24° click a +0,00 ms, correlazione 0,999). Il 24° (l'ultima icona ad accendersi) è il click finale dell'iPhone (quello di Bea), −1,1 dB per restare sotto −1 dBTP; prima era il «tick» suonato dall'app, suono diverso e a tempo di Task. Voce e coda che sfuma invariate (differenza dalla traccia di prima fuori dal click nuovo: −50/−57 dB, solo la ricodifica). `AvvioOrologio.colpiTraccia` = 24.
 - Mockup (v. 1794571352-1b5d, provato in Chromium): iPhone come l'app (ascolto a voce finita; tocco sul reattore = la voce sfuma e ascolta col bip; un tocco su un'icona = sfuma). **Al polso ora c'è l'avvio** (prima nella vista pulita non c'era): «APRI JARVIS» sullo schermo dell'orologio, le 24 icone al contrario con la barra, «SISTEMI IN LINEA», MARK XII col bagliore, la voce; tocco sul reattore = sfuma e ASCOLTO. Scritte del reattore del polso come l'app (JARVIS · ASCOLTO · … · PARLO). RIAVVIA riavvia il dispositivo che si sta guardando. `avvio/polso.wav` = la traccia nuova decodificata.
+- Finale al polso: i 6 suoni di caricamento del finale parlato restano come sono, senza icone che arrivano (il signore, 13:17: «va benissimo com'è»).
 
 ## 12.0 (13) — MARK XII · 13 nov notte · numero chiesto al signore (00:55: «è la 12.0 (13)?» → «continua pure») · build unica · cervello **v130** (archivio, risata, frase ponte: via del signore 00:53 «fai quello che proponi» e 01:11 punto 4 «ok») · controllo di compilazione: vedi l'ultima riga
 
