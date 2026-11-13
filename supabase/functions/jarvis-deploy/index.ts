@@ -149,7 +149,7 @@ async function provaCervello(slug: string) {
   }));
   // 11 nov (#15): due prove del dialogo, oltre alle tre domande; 12 nov (P7): le prove del dialogo umano (le «avvisi» non fermano
   // la pubblicazione: un modello può sbagliare una volta un giudizio; le altre sì)
-  const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug)]);
+  const dialogo = await Promise.all([provaFinestraVecchia(slug), provaAnticipo(slug), provaBriefing(slug)]);
   const umano = await provaDialogo(slug);
   const tutte = [...esiti, ...dialogo, ...umano.filter((e) => e.bloccante)];
   const avvisi = umano.filter((e) => !e.bloccante);
@@ -180,6 +180,27 @@ async function provaFinestraVecchia(slug: string) {
     const ok = !errore && !!testo && !/gualtierin/i.test(testo);
     return { ok, d: `finestra di ieri → ${errore ? `errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` : testo.slice(0, 120) || "nessuna risposta"}` };
   } catch (e) { return { ok: false, d: `finestra di ieri → ${(e as Error).message.slice(0, 120)}` }; }
+}
+
+/// 13 nov (il signore: «A»): il briefing già pronto. Con calendario e salute mandati dal telefono il cervello risponde in un passaggio
+/// solo: niente strumenti, niente ritorno al telefono, e una risposta vera.
+async function provaBriefing(slug: string) {
+  try {
+    const righe = await chiedi(slug, {
+      briefing: true, strumenti_client: ["calendario_leggi", "salute_riepilogo", "meteo_qui"],
+      briefing_telefono: { calendario: JSON.stringify({ eventi: [{ titolo: "Prova generale del briefing", inizio: "oggi 18:30" }] }),
+        salute: JSON.stringify({ notte: { sonno: "7 ore e 10 minuti" }, battito_riposo: 58 }) },
+      messaggi: [{ role: "user", content: "Buongiorno Jarvis, il briefing per favore.", quando: Date.now() }],
+    });
+    const errore = righe.find((x) => x?.t === "errore");
+    if (errore) return { ok: false, d: `briefing pronto → errore: ${String(errore.tecnico ?? errore.d).slice(0, 120)}` };
+    if (righe.some((x) => x?.t === "client")) return { ok: false, d: "briefing pronto → è tornato al telefono per gli strumenti" };
+    const fine = righe.find((x) => x?.t === "fine");
+    const usati: string[] = Array.isArray(fine?.azioni) ? fine.azioni : [];
+    const testo = String(fine?.testo ?? "").trim();
+    if (usati.length) return { ok: false, d: `briefing pronto → ha usato strumenti (${usati.join(", ")}): non è un passaggio solo` };
+    return { ok: !!testo, d: `briefing pronto (un passaggio) → ${testo.slice(0, 120) || "nessuna risposta"}` };
+  } catch (e) { return { ok: false, d: `briefing pronto → ${(e as Error).message.slice(0, 120)}` }; }
 }
 
 /// La risposta anticipata: con uno strumento si ferma («sospeso»), poi l'app la fa ripartire (continua con «esegui») e arriva in fondo.

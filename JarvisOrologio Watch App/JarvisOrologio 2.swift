@@ -227,6 +227,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var inizioParlato = Date()
     private var ecoMassima: Float = -160               // quanto forte si sente JARVIS stesso dall'altoparlante (misurato nel primo secondo)
     private var colpiVoce = 0
+    // 13 nov (il signore: «abbassa la voce ed esita come una persona»): la voce scesa e la pausa mentre il signore comincia a parlare
+    private var voceAbbassata = false
+    private var fermoDa: Date?
+    private var silenziVoce = 0
     // Voce a frasi: la prima frase si dice mentre il resto della risposta sta ancora arrivando
     private var bufferFrase = ""
     private var frasiVoce: [String] = []   // le frasi della risposta già mandate alla voce (punto 4: il «prima» della frase dopo)
@@ -1505,6 +1509,27 @@ final class JarvisOrologio: NSObject, ObservableObject {
         }
     }
 
+    /// 13 nov (briefing già pronto): salute dall'orologio e impegni di oggi dall'iPhone, insieme; quello che non è pronto in 0,8 s
+    /// resta fuori (il cervello non lo nomina).
+    private func datiBriefingPolso() async -> [String: String] {
+        let raccolta = RaccoltaBriefingPolso()
+        raccolta.aggiungi("salute") {
+            let (testo, errore) = await Benessere.riepilogo(giorni: 2)
+            return errore ? nil : testo
+        }
+        raccolta.aggiungi("calendario") {
+            let impegni = await PonteOrologio.condiviso.impegniDiOggi()
+            guard !impegni.isEmpty else { return nil }
+            let eventi: [[String: String]] = impegni.map { i in
+                let minuti = max(0, Int(i.m.rounded()))
+                return ["titolo": i.nome, "inizio": String(format: "%02d:%02d", minuti / 60 % 24, minuti % 60)]
+            }
+            guard let d = try? JSONSerialization.data(withJSONObject: ["eventi": eventi]) else { return nil }
+            return String(data: d, encoding: .utf8)
+        }
+        return await raccolta.attendi(fino: 0.8)
+    }
+
     /// `unico`: idea D, la frase parte come audio in questa stessa richiesta (la trascrizione arriva con «trascritto»).
     private func turno(nuovoTentativo: Bool, unico: (audio: Data, canale: CanaleUnico)? = nil) async {
         // idea D: chi aspetta il testo della frase (l'aggiunta) non resta mai appeso, qualunque cosa succeda qui
@@ -1558,6 +1583,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
             }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
+            // 13 nov (il signore: «A», il briefing già pronto), come sull'iPhone: «Briefing a voce» porta con sé la salute (dall'orologio)
+            // e gli impegni di oggi (dall'iPhone), letti insieme in 0,8 s al massimo; il cervello risponde in un passaggio solo
+            if unico == nil, storia.last?["role"] == "user", storia.last?["content"]?.lowercased().contains("il briefing per favore") == true {
+                corpo["briefing"] = true
+                corpo["briefing_telefono"] = await datiBriefingPolso()
+            }
             if unico == nil { iniziaFlussoVoce() }               // col giro unico la voce si prepara quando la frase è accettata
             for _ in 0..<5 {
                 switch try await flussoConRitentativi(token: token, corpo: corpo, richiesta: UUID().uuidString, canale: unico?.canale) {
@@ -1966,7 +1997,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         orecchioSospeso = false
         fineFrase?.resume()
         fineFrase = nil
-        fermaMonitor()
+        fermaMonitor()                       // 13 nov: toglie anche la voce abbassata e l'attesa
         lettore?.stop()
         lettore = nil
         sintesi.stopSpeaking(at: .immediate)
@@ -2103,12 +2134,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
             defer { if mio == turnoVoce { fraseInVoce = false } }
             let audio = await scarico.value
             guard mio == turnoVoce else { return }
+            // 13 nov: JARVIS è fermo ad aspettare il signore: la frase dopo parte solo quando riprende (o finisce qui se è un'interruzione)
+            while fermoDa != nil, mio == turnoVoce { try? await Task.sleep(for: .milliseconds(50)) }
+            guard mio == turnoVoce else { return }
             if sintesiInciso.isSpeaking { sintesiInciso.stopSpeaking(at: .immediate) }   // arriva la risposta: l'avviso tace
             var partito = false
             if let audio, let p = try? AVAudioPlayer(data: audio) {
                 p.delegate = self
                 lettore = p
-                p.volume = volumeVoce
+                p.volume = voceAbbassata ? volumeVoce * 0.4 : volumeVoce     // 13 nov: se il signore sta parlando, parte già bassa
                 Volume.segui(p)
                 partito = p.play()
             }
@@ -2172,6 +2206,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         inizioParlato = Date()
         ecoMassima = -160
         colpiVoce = 0
+        dimenticaVoceAbbassata()
         timerMonitor = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.controllaInterruzione() }
         }
@@ -2182,6 +2217,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         timerMonitor = nil
         monitor?.stop()
         monitor = nil
+        dimenticaVoceAbbassata()
     }
 
     private func controllaInterruzione() {
@@ -2191,8 +2227,45 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let trascorso = Date().timeIntervalSince(inizioParlato)
         if trascorso < 1.2 { ecoMassima = max(ecoMassima, livello); return }   // taratura: così sento JARVIS, non il signore
         let soglia = max(ecoMassima + 8, -38)
-        if livello > soglia { colpiVoce += 1 } else { colpiVoce = 0 }
-        if colpiVoce >= 3 { interrottoAVoce() }                                  // oltre mezzo secondo: è lui
+        if livello > soglia { colpiVoce += 1; silenziVoce = 0 } else { colpiVoce = 0; silenziVoce += 1 }
+        if colpiVoce >= 3 { interrottoAVoce(); return }                          // oltre mezzo secondo: è lui
+        // 13 nov (il signore: «abbassa la voce ed esita come una persona», come sull'iPhone): al primo colpo la voce scende, al secondo
+        // JARVIS si ferma a metà frase e aspetta; se il signore tace (0,4 s) o dopo 2,5 s fermo, riprende da dove era, voce di nuovo piena
+        if colpiVoce == 1 { abbassaVoce() }
+        else if colpiVoce == 2 { esitaVoce() }
+        else if silenziVoce >= 2 || (fermoDa.map { Date().timeIntervalSince($0) > 2.5 } ?? false) { riprendiVoce() }
+    }
+
+    private func abbassaVoce() {
+        guard !voceAbbassata else { return }
+        voceAbbassata = true
+        lettore?.setVolume(volumeVoce * 0.4, fadeDuration: 0.12)
+    }
+
+    private func esitaVoce() {
+        abbassaVoce()
+        guard fermoDa == nil else { return }
+        fermoDa = Date()
+        lettore?.pause()
+        if sintesi.isSpeaking { sintesi.pauseSpeaking(at: .immediate) }
+    }
+
+    private func riprendiVoce() {
+        guard voceAbbassata || fermoDa != nil else { return }
+        if fermoDa != nil {
+            fermoDa = nil
+            if let p = lettore { p.play(); Volume.segui(p) }                     // il reattore torna a seguire la voce
+            if sintesi.isPaused { sintesi.continueSpeaking() }
+        }
+        voceAbbassata = false
+        silenziVoce = 0
+        lettore?.setVolume(volumeVoce, fadeDuration: 0.3)
+    }
+
+    private func dimenticaVoceAbbassata() {
+        voceAbbassata = false
+        fermoDa = nil
+        silenziVoce = 0
     }
 
     private func interrottoAVoce() {
@@ -2288,4 +2361,26 @@ nonisolated struct FotoOrologio: Identifiable, Hashable, Sendable {
     var dati: Data? = nil
     var pagina: String? = nil
     var titolo: String? = nil
+}
+
+/// 13 nov (briefing già pronto, come RaccoltaBriefing sull'iPhone): lavori in parallelo con un tetto di tempo; allo scadere si tiene
+/// quello che è pronto, il resto finisce per conto suo.
+@MainActor
+final class RaccoltaBriefingPolso {
+    private(set) var dati: [String: String] = [:]
+    private var inCorso = 0
+
+    func aggiungi(_ chiave: String, _ lavoro: @escaping @MainActor () async -> String?) {
+        inCorso += 1
+        Task { @MainActor in
+            if let valore = await lavoro(), !valore.isEmpty { self.dati[chiave] = valore }
+            self.inCorso -= 1
+        }
+    }
+
+    func attendi(fino secondi: Double) async -> [String: String] {
+        let inizio = Date()
+        while inCorso > 0, Date().timeIntervalSince(inizio) < secondi { try? await Task.sleep(for: .milliseconds(30)) }
+        return dati
+    }
 }

@@ -440,6 +440,9 @@ final class Jarvis: NSObject, ObservableObject {
         orecchio.capito = { [weak self] in self?.chiusuraGentile() }               // 12 nov (P1): «ho capito» mentre parla
         orecchio.domandaInCorso = { [weak self] in self?.fraseInVoce?.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?") ?? false }
         orecchio.rispostaAllaDomanda = { [weak self] t in self?.assensoInDomanda = (testo: t, quando: Date()) }
+        orecchio.abbassa = { [weak self] in self?.abbassaVoce() }                  // 13 nov: gli parla sopra → la voce scende
+        orecchio.esita = { [weak self] in self?.esitaVoce() }                      // …continua → si ferma a metà frase e aspetta
+        orecchio.riprendi = { [weak self] in self?.riprendiVoce() }                // …era un attimo → riprende da dove era
         richiamo.pausaMinima = { [weak self] resto in self?.pausaMinimaPer(resto) ?? 0 }   // 12 nov (errore 3)
         richiamo.recuperoPronto = { [weak self] in                                     // 12.0 (10): «Jarvis?» dopo un silenzio
             guard let t = self?.fraseTaciuta else { return false }
@@ -526,6 +529,27 @@ final class Jarvis: NSObject, ObservableObject {
     func ascoltaSubito() {
         guard fase == .attesa else { return }
         Task { await avviaAscolto() }
+    }
+
+    // MARK: 13 nov · il signore comincia a parlargli sopra (il signore: «abbassa la voce ed esita come una persona»)
+
+    /// La sua voce sale sopra quella di JARVIS: la voce scende (come chi si accorge che l'altro sta per parlare).
+    private func abbassaVoce() {
+        guard fase == .parlo else { return }
+        cloud.abbassa()
+    }
+
+    /// Continua: JARVIS si ferma a metà frase e aspetta (la voce dell'iPhone si ferma alla parola).
+    private func esitaVoce() {
+        guard fase == .parlo else { return }
+        cloud.esita()
+        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .immediate) }
+    }
+
+    /// Era solo un «sì», un «mh» o un rumore: riprende da dove si era fermato e la voce torna su piano piano.
+    private func riprendiVoce() {
+        cloud.riprendi()
+        if sintesi.isPaused { sintesi.continueSpeaking() }
     }
 
     /// Il signore ha iniziato a parlare mentre JARVIS parlava: JARVIS tace all'istante e resta in ascolto
@@ -1842,6 +1866,13 @@ final class Jarvis: NSObject, ObservableObject {
         let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
         if misuraTurno == id { misura["ms_gps"] = Int(Date().timeIntervalSince(inizioGps) * 1000) }
         if let posizione { corpo["posizione"] = posizione }
+        // 13 nov (il signore: «A», il briefing già pronto): la richiesta del briefing (notifica delle 9, «Briefing a voce», a voce) porta
+        // con sé il calendario di oggi e la salute, letti adesso e insieme (al massimo 0,8 s): il cervello ha già pronto il resto e
+        // risponde in un passaggio solo, senza tornare qui a chiederli (prima 17–34 secondi prima della prima parola)
+        if Jarvis.eBriefing(storia) {
+            corpo["briefing"] = true
+            corpo["briefing_telefono"] = await datiBriefing()
+        }
         // 11 nov: i tempi del turno di prima (solo se questa richiesta parte davvero: con l'anticipo adottato è già fatta)
         if primo == nil, let t = tempiDaMandare { corpo["tempi_app"] = t; tempiDaMandare = nil }
         // iOS ci lascia finire la risposta anche se lo schermo si spegne o il signore cambia app per un momento
@@ -2335,6 +2366,28 @@ final class Jarvis: NSObject, ObservableObject {
         rispostaIniziata = true
         bufferVoce = String(caratteri[t...])
         dici(frase, di: risposta)
+    }
+
+    /// 13 nov (briefing già pronto): l'ultima domanda è la richiesta del briefing («Buongiorno Jarvis, il briefing per favore.»: la
+    /// mandano la notifica delle 9, il tasto «Briefing a voce» e i comandi a voce del briefing).
+    static func eBriefing(_ storia: [[String: Any]]) -> Bool {
+        guard let ultima = storia.last, ultima["role"] as? String == "user", let testo = ultima["content"] as? String else { return false }
+        return testo.lowercased().contains("il briefing per favore")
+    }
+
+    /// 13 nov: calendario di oggi e salute per il briefing, letti insieme; quello che non è pronto in 0,8 s resta fuori (il cervello
+    /// non lo nomina). Senza permesso o con un errore la voce manca, mai un ritardo.
+    private func datiBriefing() async -> [String: String] {
+        let raccolta = RaccoltaBriefing()
+        raccolta.aggiungi("calendario") {
+            let (testo, errore) = await self.strumenti.esegui("calendario_leggi", [:])
+            return errore ? nil : testo
+        }
+        raccolta.aggiungi("salute") {
+            let (testo, errore) = await Benessere.riepilogo(giorni: 2)
+            return errore ? nil : testo
+        }
+        return await raccolta.attendi(fino: 0.8)
     }
 
     /// 13 nov (punto 4): nel testo c'è almeno una parola da dire, oltre ai toni della voce e alla punteggiatura.
@@ -3212,6 +3265,76 @@ final class VoceCloud: NSObject {
 
     private var prontoDa = Date.distantPast   // prima di allora non parte nessun suono (l'audio si sta riassestando)
 
+    // MARK: 13 nov · il signore gli parla sopra: la voce scende, poi JARVIS si ferma un attimo, poi riprende (o tace del tutto)
+    private enum Esitazione { case no, abbassata, ferma }
+    private var esitazione: Esitazione = .no
+    private var rampa: Task<Void, Never>?
+    private var fermaDa: Date?                 // da quando è fermo ad aspettare
+    private var fermoTotale: TimeInterval = 0  // quanto è stato fermo in tutto (la fine di una frase in streaming non si anticipa)
+    private static let quotaAbbassata: Float = 0.4
+    private var volumeAdesso: Float { esitazione == .no ? Jarvis.volumeVoce : Jarvis.volumeVoce * VoceCloud.quotaAbbassata }
+    private var fermoFinora: TimeInterval { fermoTotale + (fermaDa.map { Date().timeIntervalSince($0) } ?? 0) }
+
+    /// La voce scende al 40% in un decimo di secondo.
+    func abbassa() {
+        guard esitazione == .no else { return }
+        esitazione = .abbassata
+        portaVolume(Jarvis.volumeVoce * VoceCloud.quotaAbbassata, in: 0.12)
+    }
+
+    /// Si ferma a metà frase e aspetta (lo streaming continua ad arrivare e resta in fila).
+    func esita() {
+        if esitazione == .no { portaVolume(Jarvis.volumeVoce * VoceCloud.quotaAbbassata, in: 0.08) }
+        guard esitazione != .ferma else { return }
+        esitazione = .ferma
+        fermaDa = Date()
+        nodo?.pause()
+        lettore?.pause()
+        if riserva.isSpeaking, !riserva.isPaused { riserva.pauseSpeaking(at: .immediate) }
+    }
+
+    /// Riprende da dove si era fermato; la voce torna piena in tre decimi di secondo.
+    func riprendi() {
+        guard esitazione != .no else { return }
+        if esitazione == .ferma {
+            if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
+            fermaDa = nil
+            if let n = nodo, motore?.isRunning == true { n.play() }
+            if let p = lettore {
+                p.play()
+                Volume.segui(p)                     // il reattore e la misura della sua voce ripartono con la frase
+                EcoMac.segui(p)
+            }
+            if riserva.isPaused { riserva.continueSpeaking() }
+        }
+        esitazione = .no
+        portaVolume(Jarvis.volumeVoce, in: 0.3)
+    }
+
+    /// Il volume della voce che sta suonando, a passi di 10 ms (il lettore delle frasi pronte lo fa da sé).
+    private func portaVolume(_ v: Float, in secondi: Double) {
+        rampa?.cancel()
+        lettore?.setVolume(v, fadeDuration: secondi)
+        guard let partenza = nodo?.volume else { return }
+        let passi = max(1, Int((secondi / 0.01).rounded()))
+        rampa = Task { @MainActor [weak self] in
+            for k in 1...passi {
+                guard !Task.isCancelled, let n = self?.nodo else { return }
+                n.volume = partenza + (v - partenza) * Float(k) / Float(passi)
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+        }
+    }
+
+    /// JARVIS tace o ha finito: niente voce abbassata né attesa rimasta in sospeso.
+    private func dimenticaEsitazione() {
+        rampa?.cancel()
+        rampa = nil
+        esitazione = .no
+        if let d = fermaDa { fermoTotale += Date().timeIntervalSince(d) }
+        fermaDa = nil
+    }
+
     /// La prossima frase parte non prima di fra `secondi`.
     func partiDopo(_ secondi: TimeInterval) { prontoDa = Date().addingTimeInterval(secondi) }
 
@@ -3308,6 +3431,7 @@ final class VoceCloud: NSObject {
 
     func ferma() {
         generazione += 1
+        dimenticaEsitazione()                        // 13 nov
         coda.forEach { $0.audio.cancel() }
         coda.removeAll()
         flussi.forEach { $0.annulla() }
@@ -3326,6 +3450,8 @@ final class VoceCloud: NSObject {
             guard g == generazione else { return }
             let manca = prontoDa.timeIntervalSinceNow
             if manca > 0 { try? await Task.sleep(for: .milliseconds(Int(manca * 1000))) }
+            // 13 nov: fermo ad aspettare il signore (fra una frase e l'altra): la frase dopo parte solo quando riprende
+            while g == generazione, esitazione == .ferma { try? await Task.sleep(for: .milliseconds(30)) }
             guard g == generazione else { return }
             iniziaFrase?(ObjectIdentifier(p.frase))
             var detta = false
@@ -3343,6 +3469,7 @@ final class VoceCloud: NSObject {
         }
         if g == generazione {
             inCorso = false
+            dimenticaEsitazione()                    // 13 nov: la prossima risposta parte con la voce piena
             // finito di parlare: fra poco si spegne anche il motore dello streaming (l'audio torna libero)
             spegniMotore?.cancel()
             spegniMotore = Task { @MainActor [weak self] in
@@ -3372,8 +3499,8 @@ final class VoceCloud: NSObject {
             m.prepare()
             guard (try? m.start()) != nil else { return nil }
         }
-        n.volume = Jarvis.volumeVoce                   // «sbatti»: sottovoce
-        if !n.isPlaying { n.play() }
+        n.volume = volumeAdesso                        // «sbatti»: sottovoce; 13 nov: più bassa se il signore sta parlando
+        if !n.isPlaying, esitazione != .ferma { n.play() }
         return (m, n, formato)
     }
 
@@ -3392,6 +3519,7 @@ final class VoceCloud: NSObject {
         var letti = 0, programmati = 0
         var campioni = 0
         let inizio = Date()
+        let fermoPrima = fermoFinora                          // 13 nov: il tempo fermo ad aspettare non conta per la fine della frase
         var ripartenze = 0
         while g == generazione {
             let (nuovi, finito) = a.leggi(da: letti)
@@ -3409,7 +3537,7 @@ final class VoceCloud: NSObject {
                 // riparte, la frase la dice la voce dell'iPhone (JARVIS non resta mai muto)
                 try? AVAudioSession.sharedInstance().setActive(true)
                 m.prepare()
-                if (try? m.start()) != nil { n.play() } else {
+                if (try? m.start()) != nil { if esitazione != .ferma { n.play() } } else {
                     ripartenze += 1
                     if ripartenze >= 3 { return false }
                 }
@@ -3417,7 +3545,7 @@ final class VoceCloud: NSObject {
             if finito && a.quanti - letti < 2 {
                 // tutto programmato: aspetto che finisca di suonare (con un tetto, se l'audio si fosse inceppato)
                 let durata = Double(campioni) / frequenza
-                if suonati.valore >= programmati || Date().timeIntervalSince(inizio) > durata + 1.5 { break }
+                if suonati.valore >= programmati || Date().timeIntervalSince(inizio) - (fermoFinora - fermoPrima) > durata + 1.5 { break }
             }
             try? await Task.sleep(for: .milliseconds(25))
         }
@@ -3495,7 +3623,7 @@ final class VoceCloud: NSObject {
     private func suona(_ dati: Data) async -> Bool {
         guard let p = try? AVAudioPlayer(data: dati) else { return false }
         p.delegate = self
-        p.volume = Jarvis.volumeVoce                   // sottovoce anche per le frasi già pronte
+        p.volume = volumeAdesso                        // sottovoce anche per le frasi già pronte; 13 nov: più bassa se lui parla
         lettore = p
         Volume.segui(p)
         EcoMac.segui(p)                                 // difetto 2 (Mac) e 13 nov punto 1 (iPhone): quanto forte esce la sua voce
@@ -4060,5 +4188,27 @@ extension Jarvis {
         tempiDaMandare = misura
         misuraDa = nil
         misuraTurno = nil
+    }
+}
+
+/// 13 nov (briefing già pronto): lavori in parallelo con un tetto di tempo. Allo scadere si tiene quello che è pronto; il resto finisce
+/// per conto suo e non serve più.
+@MainActor
+final class RaccoltaBriefing {
+    private(set) var dati: [String: String] = [:]
+    private var inCorso = 0
+
+    func aggiungi(_ chiave: String, _ lavoro: @escaping @MainActor () async -> String?) {
+        inCorso += 1
+        Task { @MainActor in
+            if let valore = await lavoro(), !valore.isEmpty { self.dati[chiave] = valore }
+            self.inCorso -= 1
+        }
+    }
+
+    func attendi(fino secondi: Double) async -> [String: String] {
+        let inizio = Date()
+        while inCorso > 0, Date().timeIntervalSince(inizio) < secondi { try? await Task.sleep(for: .milliseconds(30)) }
+        return dati
     }
 }
