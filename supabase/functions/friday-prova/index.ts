@@ -321,7 +321,7 @@ function domandaEstrai(c: { cat: string; descrizione: string }) {
   return [
     "IMAGE 1 is a photo of a woman wearing several items.",
     `Create a professional e-commerce product photo of only this item from IMAGE 1: ${c.descrizione}`,
-    `Show ${come}, complete and neatly presented as in a fashion catalogue, centered and filling most of the frame, on a pure white background with soft, even studio light and a faint natural shadow.`,
+    `Show ${come}, complete and neatly presented as in a fashion catalogue, centered and filling most of the frame, on a seamless pure white background (#FFFFFF), lit flat and even so that the background stays pure white right up to the edges of the item.`,
     "Keep the item identical to IMAGE 1: the same colour and shade, fabric and texture, print or pattern and its scale, logos and lettering, buttons, zips, pockets, seams, cut, fit and length. Reconstruct any part hidden in IMAGE 1 consistently with the visible parts.",
     "The picture contains only the item, with no person, body, hands, phone, text or other objects.",
   ].join("\n");
