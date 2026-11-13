@@ -589,6 +589,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     func toccaReattore() {
         switch fase {
         case .attesa:
+            // 13 nov (avvio SFUMATA): durante la sequenza d'avvio il microfono è chiuso. Il tocco vuol dire «voglio parlare»: la voce
+            // dell'avvio sfuma a icone finite e JARVIS ascolta subito dopo (`ascoltaDopoAvvio`). Prima il tocco spegneva il microfono
+            // (SPENTO) e la voce andava avanti fino in fondo: a fine avvio niente ascolto
+            if !avvioFinito {
+                micSpento = false
+                ascoltoDaAvvio = true
+                SuoniOrologio.sfumaAvvio()
+                return
+            }
             if micSpento { micSpento = false; Task { await self.ascolta() } } else { micSpento = true }
         case .ascolto: fermaEInvia()
         case .elaboro, .parlo:
@@ -603,6 +612,13 @@ final class JarvisOrologio: NSObject, ObservableObject {
     func ascoltaDaComplicazione() {
         guard fase == .attesa else { return }
         micSpento = false                                    // tocco voluto sulla complicazione: il microfono si riaccende
+        // 13 nov: app appena aperta dalla complicazione, la sequenza d'avvio suona ancora: si ascolta a icone finite, con la voce
+        // dell'avvio sfumata (prima il microfono partiva dopo 0,4 s, sopra la musica e la voce dell'avvio)
+        if !avvioFinito {
+            ascoltoDaAvvio = true
+            SuoniOrologio.sfumaAvvio()
+            return
+        }
         Task {
             try? await Task.sleep(for: .milliseconds(400))   // il tempo che l'app sia davvero in primo piano
             if fase == .attesa { await ascolta() }
@@ -612,8 +628,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Fine dell'avvio: JARVIS si mette in ascolto da solo, come col tocco sul reattore.
     func ascoltaDopoAvvio() {
         avvioFinito = true
+        if ascoltoDaAvvio {                                 // 13 nov: toccato durante l'avvio (reattore o complicazione): ascolta adesso
+            ascoltoDaAvvio = false
+            Task { await self.ascolta() }
+            return
+        }
         programmaAttesa()                                   // build 31: in attesa col microfono acceso, come sull'iPhone
     }
+    /// 13 nov: il signore ha toccato il reattore (o la complicazione) durante la sequenza d'avvio: a sequenza finita ascolta.
+    private(set) var ascoltoDaAvvio = false
 
     /// Detta la risposta: riascolta da solo (se il signore tace, il microfono si chiude dopo 2 secondi).
     private func dopoRisposta() {

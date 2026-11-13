@@ -449,6 +449,7 @@ struct ContentView: View {
     /// Sequenza di avvio alla Stark: suono, icone che si accendono in fila, «SISTEMI IN LINEA».
     private func accendi() {
         guard !acceso else { return }
+        Suoni.apriAvvio()                   // 13 nov: da qui il tasto Azione o una notifica (anche nel primo istante) fanno sfumare la voce
         Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano (solo la prima volta)
         withAnimation(.spring(duration: 0.6 / Avvio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
         let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
@@ -523,6 +524,12 @@ struct ContentView: View {
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             Suoni.inLinea()
             withAnimation(.easeOut(duration: 0.3)) { sottotitolo = "SISTEMI IN LINEA" }
+            // 13 nov: il nome della versione (MARK X, deciso dal signore il 26 ott) arriva 2,4 s (÷ velocità) dopo «Sistemi in linea»,
+            // come nel mockup. Con la voce dell'avvio (16,6 s) aspettava la fine della voce: «Sistemi in linea» restava scritto 15 s
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
+                if sottotitolo == "SISTEMI IN LINEA" { withAnimation(.easeOut(duration: 0.6)) { sottotitolo = ContentView.marca } }
+            }
             if !Suoni.avvioSuona {                                        // senza la voce dell'avvio (file mancante): come prima
                 testaArrivate = ContentView.postoTesta.totale             // per sicurezza: a sistemi in linea ci sono tutte
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
@@ -530,6 +537,7 @@ struct ContentView: View {
             await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
             // 12.0 (14): la voce di JARVIS II continua dopo icone e chat (fino a 16,6 s). Il microfono aspetta che finisca: aperto
             // prima sentirebbe la voce dell'avvio. Se il signore chiede qualcosa (tasto Azione, reattore, notifica) sfuma in 0,5 s.
+            if jarvis.ascoltoDaAvvio { Suoni.sfumaAvvio() }              // 13 nov: il tocco sul reattore durante le icone vale adesso
             await Suoni.attendiFineAvvio()
             if testaArrivate < ContentView.postoTesta.totale {            // voce sfumata prima dei suoi bip: le icone arrivano adesso
                 withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = ContentView.postoTesta.totale }
@@ -537,15 +545,15 @@ struct ContentView: View {
             }
             if !Impostazioni.richiamo { await Suoni.fineAvvioAudio() }   // col «Jarvis» acceso l'audio lo prende lui, come nella 12
             jarvis.avvioInCorso = false                            // finito: ora il microfono può accendersi
-            if ascoltaDopoAvvio {                                  // ora che musica e chat hanno finito, in ascolto
+            // 13 nov: il tocco sul reattore durante l'avvio («voglio parlare»): ascolto col bip, come ogni tocco sul reattore
+            let daTocco = jarvis.prendiAscoltoDaAvvio()
+            if ascoltaDopoAvvio || daTocco {                       // ora che musica e chat hanno finito, in ascolto
                 ascoltaDopoAvvio = false
                 // icone e chat caricate: JARVIS si mette in ascolto da solo, come col tocco sul reattore
                 // (finito l'ascolto, il richiamo «Jarvis» e i battiti di mani riprendono come sempre)
                 try? await Task.sleep(for: .milliseconds(300))        // la coda dei suoni si spegne
-                jarvis.ascoltaSubito()
+                jarvis.ascoltaSubito(bip: daTocco)
             }
-            try? await Task.sleep(for: .seconds(2.4 / Avvio.velocita))
-            withAnimation(.easeOut(duration: 0.6)) { sottotitolo = ContentView.marca }   // MARK X (deciso dal signore il 26 ott)
         }
     }
 
@@ -587,6 +595,9 @@ struct ContentView: View {
     private func eseguiComando() {
         guard let r = comandi.richiesta, !Portachiavi.leggi().isEmpty else { return }
         comandi.richiesta = nil
+        // 13 nov: ogni comando che apre JARVIS (tasto Azione, Siri, una notifica: briefing, avviso, pioggia, Bea) è il signore che chiede
+        // qualcosa: la voce dell'avvio sfuma appena icone e chat sono finite, e quello che ha chiesto non le finisce sopra
+        Suoni.sfumaAvvio()
         switch r {
         case .ascolta:
             jarvis.interrompi()

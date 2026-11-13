@@ -31,8 +31,9 @@ enum Suoni {
         try? s.setCategory(.ambient, mode: .default, options: [])
     }
 
-    /// Tocco su un'icona o sul reattore.
-    static func tocco() { Aptica.click(); suona(.tocco) }
+    /// Tocco su un'icona o sul reattore. 13 nov: un tocco durante la voce dell'avvio la fa sfumare (a icone finite): il signore
+    /// sta già facendo altro, la voce di JARVIS II non resta sopra la sezione che si apre.
+    static func tocco() { sfumaAvvio(); Aptica.click(); suona(.tocco) }
     /// JARVIS inizia ad ascoltare.
     static func ascolto() { suona(.ascolto) }
     /// JARVIS ha finito e torna in attesa.
@@ -115,6 +116,7 @@ enum Suoni {
     }
     /// Click delle tre icone in alto (SISTEMI, cestino, impostazioni). File: «clicktesta»; se manca, il tick normale.
     static func clickTesta() {
+        sfumaAvvio()                                                 // 13 nov: come il tocco, la voce dell'avvio sfuma
         Aptica.click()
         guard attivi else { return }
         if let url = file("clicktesta") { riproduci(url, volume: 1.0); return }
@@ -270,13 +272,24 @@ enum Suoni {
 
     private static var lettoreAvvio: AVAudioPlayer?
     private static var chiudiCoda = false
+    /// 13 nov · l'avvio è aperto da quando l'app si accende (`apriAvvio`, prima ancora che parta il file, ~0,4 s dopo) fino a sequenza
+    /// finita. Prima una richiesta arrivata nel primo istante (tasto Azione o notifica toccata ad app chiusa) andava persa: il file
+    /// non c'era ancora, la voce durava tutti i 16,6 s e la lettura della notifica, dopo 8 s, partiva sopra la voce.
+    private static var avvioAperto = false
+
+    /// La sequenza d'avvio comincia: da qui le richieste di sfumare la voce valgono (anche prima che parta il file).
+    static func apriAvvio() {
+        avvioAperto = true
+        chiudiCoda = false
+    }
 
     /// Il file d'avvio sta ancora suonando (le icone e la chat sono già finite: resta la voce).
     static var avvioSuona: Bool { lettoreAvvio?.isPlaying == true }
 
     /// Il signore chiede qualcosa (tasto Azione, reattore, una notifica da leggere): la voce dell'avvio sfuma in mezzo secondo.
     /// Durante le icone non si tocca: la richiesta vale da quando la sequenza è finita (la raccoglie `attendiFineAvvio`).
-    static func sfumaAvvio() { if lettoreAvvio != nil { chiudiCoda = true } }   // solo se l'avvio è in corso: niente richieste vecchie
+    /// Solo ad avvio aperto: fuori dall'avvio una richiesta non resta in sospeso per quello dopo.
+    static func sfumaAvvio() { if avvioAperto || lettoreAvvio != nil { chiudiCoda = true } }
 
     /// Aspetta che il file d'avvio finisca da solo, oppure lo sfuma (0,5 s) appena qualcuno lo chiede.
     static func attendiFineAvvio() async {
@@ -291,6 +304,7 @@ enum Suoni {
         }
         lettoreAvvio = nil
         chiudiCoda = false
+        avvioAperto = false
     }
 
     /// Chiusura della sequenza: «sistemi in linea», un doppio ping discendente, morbido.

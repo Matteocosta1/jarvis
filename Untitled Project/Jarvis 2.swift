@@ -509,6 +509,15 @@ final class Jarvis: NSObject, ObservableObject {
         fermaBenvenuto()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
+        // 13 nov (avvio SFUMATA): durante la sequenza d'avvio il microfono è chiuso (aperto, sentirebbe la voce di JARVIS II). Il tocco
+        // vuol dire «voglio parlare»: la voce sfuma appena icone e chat sono finite (mai sopra i click) e JARVIS ascolta col bip, come
+        // al tocco di sempre (ContentView, fine di `accendi`). Prima il tocco passava a RISERVATO e la voce andava avanti fino in fondo.
+        if avvioInCorso, fase == .attesa {
+            micSpento = false
+            ascoltoDaAvvio = true
+            Suoni.sfumaAvvio()
+            return
+        }
         switch fase {
         case .attesa:
             // 9 nov (logica approvata dal signore): SPENTO → il tocco lo riaccende e ascolta subito; con la musica il tocco ascolta
@@ -528,9 +537,18 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    func ascoltaSubito() {
+    /// `bip`: il «parli adesso» del tocco sul reattore (il tocco durante l'avvio ascolta a sequenza finita, col suo bip).
+    func ascoltaSubito(bip: Bool = false) {
         guard fase == .attesa else { return }
-        Task { await avviaAscolto() }
+        Task { await avviaAscolto(bip: bip) }
+    }
+
+    /// 13 nov: il signore ha toccato il reattore durante la sequenza d'avvio: a sequenza finita JARVIS lo ascolta (ContentView).
+    private(set) var ascoltoDaAvvio = false
+    /// La richiesta del tocco durante l'avvio, una volta sola (ContentView, a sequenza finita).
+    func prendiAscoltoDaAvvio() -> Bool {
+        defer { ascoltoDaAvvio = false }
+        return ascoltoDaAvvio
     }
 
     // MARK: 13 nov · il signore comincia a parlargli sopra (il signore: «abbassa la voce ed esita come una persona»)
@@ -1626,8 +1644,10 @@ final class Jarvis: NSObject, ObservableObject {
         guard avvioInCorso else { leggiAdesso(testo); return }
         Suoni.sfumaAvvio()                  // 12.0 (14): la voce dell'avvio (JARVIS II) sfuma a icone finite, poi la lettura
         Task { @MainActor [weak self] in
+            // 13 nov: la richiesta vale dal primo istante (`Suoni.apriAvvio`): l'avvio finisce a icone e chat finite (~4,5 s).
+            // Il tetto è oltre la voce intera (16,6 s): la lettura non parte mai sopra la voce dell'avvio
             let inizio = Date()
-            while self?.avvioInCorso == true, Date().timeIntervalSince(inizio) < 8 { try? await Task.sleep(for: .milliseconds(50)) }
+            while self?.avvioInCorso == true, Date().timeIntervalSince(inizio) < 20 { try? await Task.sleep(for: .milliseconds(50)) }
             self?.leggiAdesso(testo)
         }
     }
@@ -2066,12 +2086,13 @@ final class Jarvis: NSObject, ObservableObject {
         }
     }
 
-    /// 13 nov: aspetta che finisca la sequenza d'avvio (al massimo 8 s; interrompibile come il resto del turno).
+    /// 13 nov: aspetta che finisca la sequenza d'avvio (interrompibile come il resto del turno). La voce sfuma a icone finite, quindi
+    /// l'attesa è di pochi secondi; il tetto (20 s) è oltre la voce intera: la risposta non parte mai sopra la voce dell'avvio.
     private func attendiFineAvvio(id: UUID) async throws {
         guard avvioInCorso else { return }
         Suoni.sfumaAvvio()                  // 12.0 (14): la voce dell'avvio sfuma a icone finite
         let inizio = Date()
-        while avvioInCorso, Date().timeIntervalSince(inizio) < 8 { try await Task.sleep(for: .milliseconds(30)) }
+        while avvioInCorso, Date().timeIntervalSince(inizio) < 20 { try await Task.sleep(for: .milliseconds(30)) }
         if misuraTurno == id { misura["ms_avvio"] = Int(Date().timeIntervalSince(inizio) * 1000) }
     }
 

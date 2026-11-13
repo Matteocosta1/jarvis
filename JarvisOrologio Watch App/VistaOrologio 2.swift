@@ -40,7 +40,8 @@ enum SuoniOrologio {
     /// MARK XI: lo scatto della barra quando un'icona passa al centro (il click «ruota» dell'iPhone) e il tono dell'ologramma che si crea.
     static func scatto() { suona(file("ruota"), volume: 0.86) }
     static func tonoOlo() { suona(file("olo"), volume: 0.86) }
-    /// Musica d'avvio con una pulsazione per ognuna delle 20 icone del polso (build 23) («avvioorologio»); se manca, quella dell'iPhone.
+    /// Avvio del polso («avvioorologio»; se manca, quello dell'iPhone). 13 nov: JARVIS II ad hoc, un click di caricamento per
+    /// ognuna delle 24 icone del polso, al passo del polso (`AvvioOrologio.colpi` ÷ 1,15), poi la voce e la coda che sfuma.
     /// `fra`: la musica parte fra tanti secondi, al campione esatto (play(atTime:) sull'orologio dell'audio).
     static func avvio(fra: TimeInterval = 0) {                           // 100%
         if let p = lettoreAvvio {
@@ -54,7 +55,11 @@ enum SuoniOrologio {
     // tocca il reattore o JARVIS deve parlare, sfuma in mezzo secondo (come sull'iPhone).
     private static var lettoreVoce: AVAudioPlayer?
     private static var chiudiVoce = false
-    static func sfumaAvvio() { if lettoreVoce != nil { chiudiVoce = true } }   // solo se l'avvio è in corso: niente richieste vecchie
+    /// 13 nov: l'avvio è aperto dall'accensione (`apriAvvio`, prima che parta il file) a sequenza finita: una richiesta nel primo
+    /// istante (la complicazione che apre l'app) non va persa. Fuori dall'avvio non resta niente in sospeso.
+    private static var avvioAperto = false
+    static func apriAvvio() { avvioAperto = true; chiudiVoce = false }
+    static func sfumaAvvio() { if avvioAperto || lettoreVoce != nil { chiudiVoce = true } }
     static func attendiFineAvvio() async {
         try? await Task.sleep(for: .milliseconds(100))                  // play(atTime:) può partire un attimo dopo
         while let p = lettoreVoce, p.isPlaying {
@@ -68,6 +73,7 @@ enum SuoniOrologio {
         }
         lettoreVoce = nil
         chiudiVoce = false
+        avvioAperto = false
     }
     /// L'avvio si carica prima: quando parte, parte all'istante (le icone sono agganciate alla musica).
     static func preparaAvvio() {
@@ -85,7 +91,7 @@ enum SuoniOrologio {
     /// Spunte verdi «Fatto» (promesse, spesa, ricordi): il suono «pronto» resta, 100%.
     static func fatto() { suona(file("pronto"), volume: 1.0) }
     /// Click delle icone in alto (Ricordi, Cronologia): «clicktesta», 50%.
-    static func clickTesta() { suona(file("clicktesta") ?? file("tick"), volume: 1.0) }
+    static func clickTesta() { sfumaAvvio(); suona(file("clicktesta") ?? file("tick"), volume: 1.0) }   // 13 nov: come il tocco, la voce dell'avvio sfuma
     /// La conversazione si svuota: «chatsvuota», 70%.
     static func chatSvuota() { suona(file("chatsvuota"), volume: 1.0) }
     /// La conversazione si ricarica all'avvio: «chatcarica», 70%.
@@ -341,6 +347,7 @@ struct VistaOrologio: View {
 
     private func accendi() {
         guard !acceso else { return }
+        SuoniOrologio.apriAvvio()                                      // 13 nov: da qui un tocco (reattore, complicazione) fa sfumare la voce
         // 5 nov sera (il signore: «all'avvio, con la musica e le icone, si sentono diversi beep simili a quelli del microfono: vanno
         // tolti»): sul polso ogni vibrazione ha anche il suo suono; .start (il bip del microfono), .directionUp e .success suonavano
         // sopra la musica. All'avvio resta solo il tocco leggero (.click), sui colpi di sempre, senza bip.
@@ -421,6 +428,7 @@ struct VistaOrologio: View {
             let ricarica = chatDa != nil
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds((ricarica ? 1.4 : 0.4) / v))   // la coda della musica (o il suono della chat) finisce prima
+                if jarvis.ascoltoDaAvvio { SuoniOrologio.sfumaAvvio() }  // 13 nov: il tocco arrivato durante le icone vale adesso
                 await SuoniOrologio.attendiFineAvvio()                  // 12.0 (14): la voce di JARVIS II finisce (o sfuma) prima del microfono
                 jarvis.ascoltaDopoAvvio()
             }
@@ -635,6 +643,7 @@ struct VistaOrologio: View {
     private func toccaScorciatoia(_ k: Int) {
         guard scorciatoie.indices.contains(k) else { return }
         let s = scorciatoie[k]
+        SuoniOrologio.sfumaAvvio()                                      // 13 nov: toccata durante la voce dell'avvio, la voce sfuma
         vibra(.click); SuoniOrologio.tick()
         if s.frase == "@social" { apriPolso(.social(nil)) }
         else if let f = s.frase, f.hasPrefix("#"), let r = Reparto(rawValue: String(f.dropFirst())) { apri(r) }
@@ -1314,8 +1323,11 @@ enum AvvioOrologio {
     static let colpi: [Double] = [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.499, 1.749, 1.999, 2.249, 2.499, 2.749, 2.999, 3.249,
                                   3.635, 3.740, 3.845, 3.950, 4.054, 4.159, 4.264, 4.369, 4.474,
                                   4.579]   // MARK X: SOCIAL è la 24ª icona: un colpo in più, 105 ms dopo l'ultimo della traccia (stesso passo)
-    /// I colpi che la traccia «avvioorologio» ha già dentro (23): dopo questi il clic lo suona l'app, sullo stesso orologio.
-    static let colpiTraccia = 23
+    /// I colpi che la traccia «avvioorologio» ha già dentro: dopo questi il clic lo suona l'app, sullo stesso orologio.
+    /// 13 nov · JARVIS II al polso, versione ad hoc: tutti e 24 i click di caricamento sono nella traccia, ognuno sul colpo della sua
+    /// icona al campione (anche l'ultima ad accendersi, col click finale che sull'iPhone ha Bea); prima il 24° era il «tick» suonato
+    /// dall'app, con un suono diverso e a tempo di Task, non al campione.
+    static let colpiTraccia = 24
     /// L'ordine d'accensione al polso: dall'ultima icona alla prima (la barra finisce dov'è a riposo).
     static func ordine(_ n: Int) -> [Int] { Array((0..<n).reversed()) }
 
