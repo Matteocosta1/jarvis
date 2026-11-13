@@ -48,19 +48,8 @@ enum ArchivioCentrale {
     }
 }
 
-/// Il tempo in più che iOS concede uscendo dall'app, chiuso una volta sola.
-@MainActor
-final class CompitoSfondo {
-    var id = UIBackgroundTaskIdentifier.invalid
-    func chiudi() {
-        guard id != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(id)
-        id = .invalid
-    }
-}
-
 /// A che punto è la copia di un salvataggio nell'Archivio.
-enum StatoCopiaArchivio: Equatable {
+nonisolated enum StatoCopiaArchivio: Equatable, Sendable {
     case inViaggio                  // in coda o in invio
     case arrivata                   // l'Archivio ha confermato tutto
     case inAttesa                   // non arrivata (rete): riprova da sola
@@ -143,17 +132,15 @@ final class CodaArchivio: ObservableObject {
     }
 
     private func giro() async {
-        // uscendo dall'app iOS concede ancora qualche secondo: la copia in corso li usa per finire
+        // uscendo dall'app iOS concede ancora qualche secondo: la copia in corso li usa per finire (CompitoSfondo: Radar.swift)
         let compito = CompitoSfondo()
-        compito.id = UIApplication.shared.beginBackgroundTask(withName: "Archivio") { [compito] in
-            MainActor.assumeIsolated { compito.chiudi() }
-        }
+        compito.id = UIApplication.shared.beginBackgroundTask(withName: "Archivio") { compito.chiudi() }
         defer { compito.chiudi() }
         let indirizzo = Impostazioni.indirizzo, token = Portachiavi.leggi()
         while let voce = voci.first {
             if let g = voce.gruppo, stati[g] == nil || stati[g] == .inAttesa { stati[g] = .inViaggio }
             let file = Self.cartella.appendingPathComponent(voce.id.uuidString)
-            let esito = await CodaArchivio.invia(voce, file: file, indirizzo: indirizzo, token: token)
+            let esito = await InvioArchivio.invia(voce, file: file, indirizzo: indirizzo, token: token)
             switch esito {
             case .ok:
                 togli(voce, file: file)
@@ -206,13 +193,16 @@ final class CodaArchivio: ObservableObject {
     private func scriviIndice() {
         if let d = try? JSONEncoder().encode(voci) { try? d.write(to: indice, options: .atomic) }
     }
+}
 
-    // MARK: L'invio (fuori dal main)
+// MARK: - L'invio di una copia (fuori dal thread principale: la lettura e la codifica di un file di qualche MB non toccano le animazioni)
 
-    nonisolated enum Esito: Sendable { case ok, rete, rifiutata(String) }
+nonisolated enum InvioArchivio {
+    enum Esito: Sendable { case ok, rete, rifiutata(String) }
 
-    nonisolated private static func invia(_ v: Voce, file: URL, indirizzo: String, token: String) async -> Esito {
-        guard let url = URL(string: indirizzo), let dati = try? Data(contentsOf: file, options: .mappedIfSafe) else { return .rifiutata("file non leggibile") }
+    @concurrent static func invia(_ v: CodaArchivio.Voce, file: URL, indirizzo: String, token: String) async -> Esito {
+        guard let url = URL(string: indirizzo) else { return .rete }                       // indirizzo del cervello non ancora impostato: la copia aspetta
+        guard let dati = try? Data(contentsOf: file, options: .mappedIfSafe) else { return .rifiutata("file non leggibile") }
         if dati.count <= ArchivioCentrale.limitePassaggio {
             var f: [String: Any] = ["nome": v.nome, "cartella": v.cartella, "tipo": v.tipo]
             if v.tipo.hasPrefix("text/"), let t = String(data: dati, encoding: .utf8) { f["testo"] = t } else { f["base64"] = dati.base64EncodedString() }
@@ -238,13 +228,13 @@ final class CodaArchivio: ObservableObject {
         return esito(await cervello(["archivio_registra": registra], url: url, token: token, attesa: 30))
     }
 
-    nonisolated private static func esito(_ o: [String: Any]?) -> Esito {
+    private static func esito(_ o: [String: Any]?) -> Esito {
         guard let o else { return .rete }
         if let e = o["errore"] as? String { return .rifiutata(e) }
         return o["ok"] as? Bool == true ? .ok : .rete
     }
 
-    nonisolated private static func cervello(_ corpo: [String: Any], url: URL, token: String, attesa: TimeInterval) async -> [String: Any]? {
+    private static func cervello(_ corpo: [String: Any], url: URL, token: String, attesa: TimeInterval) async -> [String: Any]? {
         guard let body = try? JSONSerialization.data(withJSONObject: corpo) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"

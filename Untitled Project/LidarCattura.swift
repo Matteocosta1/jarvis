@@ -70,6 +70,7 @@ final class GuidaLuce {
     var cambiato: ((String?) -> Void)?
     private(set) var consiglio: String? { didSet { if consiglio != oldValue { cambiato?(consiglio) } } }
     private var torcia = false
+    private var senzaTorcia = false                  // la torcia non si accende (occupata, troppo calda): non si riprova a ogni fotogramma
     private var buioDa: TimeInterval?
     private var ultimo: TimeInterval = 0
     private var torciaAvvisoFino: TimeInterval = 0
@@ -95,9 +96,9 @@ final class GuidaLuce {
         guard t - ultimo >= 0.25 else { return }
         ultimo = t
         let luce = f.lightEstimate?.ambientIntensity ?? 1000          // lumen: circa 1000 in una stanza illuminata
-        if !torcia {
+        if !torcia, !senzaTorcia {
             if luce < 200 {
-                if let da = buioDa { if t - da > 1.0 { accendi(); torciaAvvisoFino = t + 2.5 } } else { buioDa = t }
+                if let da = buioDa { if t - da > 1.0 { accendi(); if torcia { torciaAvvisoFino = t + 2.5 } } } else { buioDa = t }
             } else { buioDa = nil }
         }
         var adesso: String?
@@ -123,7 +124,9 @@ final class GuidaLuce {
     func istruzione(_ chiave: String) {
         switch chiave {
         case "luce":
-            if !torcia { accendi(); daRoomPlan = "POCA LUCE · TORCIA ACCESA" } else { daRoomPlan = "TROPPO BUIO · ACCENDA UNA LUCE" }
+            let prima = torcia
+            if !torcia, !senzaTorcia { accendi() }
+            daRoomPlan = torcia && !prima ? "POCA LUCE · TORCIA ACCESA" : "TROPPO BUIO · ACCENDA UNA LUCE"
         case "piano": daRoomPlan = "VADA PIÙ PIANO"
         case "dettagli": daRoomPlan = "POCHI DETTAGLI · VADA PIÙ PIANO"
         default: daRoomPlan = nil
@@ -134,6 +137,7 @@ final class GuidaLuce {
     /// La sezione va dietro: la torcia si spegne (si riaccende da sola tornando davanti, se serve).
     func pausa() {
         spegniTorcia()
+        senzaTorcia = false
         buioDa = nil
         daRoomPlan = nil
         consiglio = nil
@@ -147,13 +151,10 @@ final class GuidaLuce {
     }
 
     private func accendi() {
-        guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back), d.hasTorch, d.isTorchAvailable else { return }
-        do {
-            try d.lockForConfiguration()
-            try d.setTorchModeOn(level: min(0.8, AVCaptureDevice.maxAvailableTorchLevel))
-            d.unlockForConfiguration()
-            torcia = true
-        } catch {}
+        guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back), d.hasTorch, d.isTorchAvailable,
+              (try? d.lockForConfiguration()) != nil else { senzaTorcia = true; return }
+        defer { d.unlockForConfiguration() }               // sbloccata sempre, anche se la torcia non si accende
+        if (try? d.setTorchModeOn(level: min(0.8, AVCaptureDevice.maxAvailableTorchLevel))) != nil { torcia = true } else { senzaTorcia = true }
     }
 
     private func spegniTorcia() {

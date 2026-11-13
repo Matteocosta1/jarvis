@@ -30,6 +30,7 @@
 				<string>public.geometry-definition-format</string>
 				<string>public.polygon-file-format</string>
 				<string>com.pixar.universal-scene-description-mobile</string>
+				<string>com.pixar.universal-scene-description</string>
 			</array>
 		</dict>
 	</array>

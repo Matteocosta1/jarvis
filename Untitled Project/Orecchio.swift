@@ -513,7 +513,7 @@ nonisolated final class SopraLaVoce: @unchecked Sendable {
         }
         while let p = rapporti.first, t - p.t > 6 { rapporti.removeFirst() }
         if t - ultimoCalcolo > 0.25, rapporti.count >= 15 {
-            let s = rapporti.map(\.d).sorted()
+            let s = rapporti.map { $0.d }.sorted()
             tipico = s[min(s.count - 1, Int(Float(s.count) * 0.75))]
             ultimoCalcolo = t
         }

@@ -551,6 +551,9 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 **Da verificare sul telefono**: la torcia con poca luce e i consigli nella riga di stato; «Salva» → avviso «Arrivata»; un file STL/OBJ/PLY da Condividi; interromperlo parlandogli sopra (e il registro `sopra` nei tempi del turno); la fine frase dopo «Jarvis» con rumore in stanza.
 
+**Controllo di compilazione**
+- 1° giro (commit bb1cbc3, run 43340253085): **rosso**, 17 errori tutti in Lidar.swift: mancava la graffa di chiusura di `pulisciModo()` (il resto del file finiva dentro la funzione). Con quell'errore Xcode non ha controllato gli altri file, quindi prima del 2° giro: controllo della sintassi di tutti i file toccati (stesso analizzatore che ritrova esattamente i 17 errori) e rilettura di ogni modifica. Trovato e corretto anche: `CompitoSfondo` dichiarato due volte (esisteva già in Radar.swift: ora si usa quello); l'invio delle copie dell'Archivio fuori dal thread principale (`InvioArchivio`, `@concurrent`, come FotoLocali); i triangoli dei modelli importati letti come in Lidar3DWeb (sempre 32 bit, mai oltre la fine del blocco) e la posizione nel mondo calcolata come `matriceMondo` di Lidar3DWeb; torcia: sbloccata sempre, «TORCIA ACCESA» solo se si è accesa davvero, niente tentativi a ogni fotogramma se non si accende; indirizzo del cervello non impostato → la copia aspetta (prima si buttava dopo 3 tentativi); Info.plist anche `.usd/.usda/.usdc`.
+
 ## 12.0 (12) — MARK XII · 12 nov · il signore: «in una sola build fai tutti i miglioramenti tranne C1 e C3… la build deve essere la 12.12» · build unica · cervello **v129** (pubblicato col suo via il 12 nov alle 13:45: REGIA estesa con SA FARE, scrivi_campo, APPENA, HAI APPENA PROPOSTO, e il paragrafo EMOZIONI; impronta 19751330…, prova superata) · controllo di compilazione: vedi l'ultima riga
 
 **Errori corretti**

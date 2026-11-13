@@ -535,6 +535,7 @@ struct VistaLidar: View {
     private func pulisciModo() {
         if let r = risultatoModo, !salvati.contains(r.id), let f = r.file { try? FileManager.default.removeItem(at: f) }
         if let r = risultatoModo, !salvati.contains(r.id), let o = r.originale { try? FileManager.default.removeItem(at: o) }   // 13 nov
+    }
 
     /// MARK X · STUDIO: la scansione vera va sul banco dello Studio (LidarStudio.swift): plastico della sala, terreno, oggetto,
     /// statuina, sagoma. Si legge tutto prima di uscire (uscendo, il modello di Texture non salvato si cancella), poi LiDAR si chiude.

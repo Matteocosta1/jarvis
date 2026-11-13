@@ -69,42 +69,45 @@ nonisolated enum ImportaScanner {
         var colorati = false
         var indici: [UInt32] = []
         for oggetto in asset.childObjects(of: MDLMesh.self) {
-            guard let maglia = oggetto as? MDLMesh,
-                  let pos = maglia.vertexAttributeData(forAttributeNamed: MDLVertexAttributePosition, as: .float3) else { continue }
+            guard let maglia = oggetto as? MDLMesh, maglia.vertexCount > 0,
+                  let pos = maglia.vertexAttributeData(forAttributeNamed: MDLVertexAttributePosition, as: .float3), pos.stride >= 12 else { continue }
             let base = UInt32(punti.count)
-            let matrice = MDLTransform.globalTransform(with: maglia, atTime: 0)
+            // la posizione nel mondo: le trasformazioni del pezzo e dei suoi genitori (come Lidar3DWeb.matriceMondo)
+            var matrice = matrix_identity_float4x4
+            var su: MDLObject? = maglia
+            while let c = su {
+                if let t = c.transform { matrice = t.matrix * matrice }
+                su = c.parent
+            }
             let quanti = maglia.vertexCount
             punti.reserveCapacity(punti.count + quanti)
             for i in 0..<quanti {
-                let p = pos.dataStart.advanced(by: i * pos.stride)
-                let v = matrice * SIMD4<Float>(p.loadUnaligned(as: Float.self), p.loadUnaligned(fromByteOffset: 4, as: Float.self),
-                                               p.loadUnaligned(fromByteOffset: 8, as: Float.self), 1)
+                let o = i * pos.stride
+                let v = matrice * SIMD4<Float>(pos.dataStart.loadUnaligned(fromByteOffset: o, as: Float.self),
+                                               pos.dataStart.loadUnaligned(fromByteOffset: o + 4, as: Float.self),
+                                               pos.dataStart.loadUnaligned(fromByteOffset: o + 8, as: Float.self), 1)
                 // un vertice rotto nel file (non un numero) non deve bloccare tutto: va nell'origine
-                punti.append(v.x.isFinite && v.y.isFinite && v.z.isFinite ? SIMD3(v.x, v.y, v.z) : .zero)
+                punti.append(v.x.isFinite && v.y.isFinite && v.z.isFinite ? SIMD3<Float>(v.x, v.y, v.z) : .zero)
             }
-            if let col = maglia.vertexAttributeData(forAttributeNamed: MDLVertexAttributeColor, as: .float3) {
+            if let col = maglia.vertexAttributeData(forAttributeNamed: MDLVertexAttributeColor, as: .float3), col.stride >= 12 {
                 colorati = true
                 for i in 0..<quanti {
-                    let p = col.dataStart.advanced(by: i * col.stride)
-                    colori.append(SIMD3(p.loadUnaligned(as: Float.self), p.loadUnaligned(fromByteOffset: 4, as: Float.self),
-                                        p.loadUnaligned(fromByteOffset: 8, as: Float.self)))
+                    let o = i * col.stride
+                    colori.append(SIMD3<Float>(col.dataStart.loadUnaligned(fromByteOffset: o, as: Float.self),
+                                               col.dataStart.loadUnaligned(fromByteOffset: o + 4, as: Float.self),
+                                               col.dataStart.loadUnaligned(fromByteOffset: o + 8, as: Float.self)))
                 }
             } else {
                 colori.append(contentsOf: repeatElement(SIMD3<Float>(0.62, 0.66, 0.68), count: quanti))
             }
-            for sotto in (maglia.submeshes as? [MDLSubmesh]) ?? [] where sotto.geometryType == .triangles {
-                let mappa = sotto.indexBuffer.map()
-                let b = UnsafeRawPointer(mappa.bytes)
-                indici.reserveCapacity(indici.count + sotto.indexCount)
-                for k in 0..<sotto.indexCount {
-                    let v: UInt32
-                    switch sotto.indexType {
-                    case .uInt8: v = UInt32(b.load(fromByteOffset: k, as: UInt8.self))
-                    case .uInt16: v = UInt32(b.loadUnaligned(fromByteOffset: k * 2, as: UInt16.self))
-                    default: v = b.loadUnaligned(fromByteOffset: k * 4, as: UInt32.self)
-                    }
-                    indici.append(base + v)
-                }
+            // i triangoli, sempre come numeri a 32 bit (ModelIO converte da 8 e 16), mai oltre la fine del blocco
+            guard let sotto = maglia.submeshes else { continue }
+            for case let sm as MDLSubmesh in sotto where sm.geometryType == .triangles {
+                let buf = sm.indexBuffer(asIndexType: .uInt32)
+                let mappa = buf.map()
+                let n = min(sm.indexCount, buf.length / 4)
+                indici.reserveCapacity(indici.count + n)
+                for k in 0..<n { indici.append(base &+ mappa.bytes.loadUnaligned(fromByteOffset: k * 4, as: UInt32.self)) }
             }
         }
         guard !punti.isEmpty else { try? FileManager.default.removeItem(at: copia); return .failure(.vuoto) }
