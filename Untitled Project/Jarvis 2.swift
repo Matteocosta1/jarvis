@@ -1618,6 +1618,19 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Una notifica di JARVIS (briefing, avviso) da mettere in chat e dire ad alta voce, senza passare dal cervello.
     func leggi(_ testo: String) {
+        // 13 nov (prova dei tre punti): una notifica toccata ad app chiusa arriva mentre suona la sequenza d'avvio. Come la risposta del
+        // briefing, la lettura parte a sequenza finita (al massimo 8 s): prima andava sopra la musica e, col «Jarvis» spento, la fine
+        // dell'avvio le spegneva l'audio a metà frase. Vale per gli avvisi, la domanda del diario della sera e il Tocco d'aiuto di Bea
+        // (la sua schermata d'allarme si apre subito: aspetta solo la voce)
+        guard avvioInCorso else { leggiAdesso(testo); return }
+        Task { @MainActor [weak self] in
+            let inizio = Date()
+            while self?.avvioInCorso == true, Date().timeIntervalSince(inizio) < 8 { try? await Task.sleep(for: .milliseconds(50)) }
+            self?.leggiAdesso(testo)
+        }
+    }
+
+    private func leggiAdesso(_ testo: String) {
         let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
         idTurno = nil                            // una lettura (notifiche, briefing) non è la risposta a una domanda
@@ -3120,7 +3133,8 @@ final class Jarvis: NSObject, ObservableObject {
     private func proponiAbitudine() {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2.5))
-            guard let self, self.fase == .attesa, !self.inBenvenuto, !self.musicaSuona, !self.riservato, !self.micSpento, !Impostazioni.muto,
+            // 13 nov (prova dei tre punti): non durante la sequenza d'avvio (app appena aperta): finirebbe sopra la musica
+            guard let self, self.fase == .attesa, !self.avvioInCorso, !self.inBenvenuto, !self.musicaSuona, !self.riservato, !self.micSpento, !Impostazioni.muto,
                   UIApplication.shared.applicationState == .active, Regia.condivisa.davantiNome == nil, Regia.condivisa.proposta == nil,
                   let p = Abitudini.previsione() else { return }
             let frase: String

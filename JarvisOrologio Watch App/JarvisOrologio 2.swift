@@ -225,7 +225,11 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private var monitor: AVAudioRecorder?
     private var timerMonitor: Timer?
     private var inizioParlato = Date()
-    private var ecoMassima: Float = -160               // quanto forte si sente JARVIS stesso dall'altoparlante (misurato nel primo secondo)
+    // quanto forte si sente JARVIS stesso dall'altoparlante: il microfono negli ultimi 15 controlli (3 secondi della sua voce) in cui
+    // JARVIS parlava a voce piena e si sentiva solo lui. 13 nov, prova dei tre punti: prima era il più forte del primo secondo, fisso
+    // per tutta la risposta. Si contano i controlli, non i secondi: una pausa lunga fra due frasi non svuota il riferimento
+    private var ecoSentita: [Float] = []
+    private var fondoPolso: Float = 0                  // il livello più basso sentito in questa risposta: la stanza
     private var colpiVoce = 0
     // 13 nov (il signore: «abbassa la voce ed esita come una persona»): la voce scesa e la pausa mentre il signore comincia a parlare
     private var voceAbbassata = false
@@ -2198,8 +2202,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
 
     // MARK: Orecchio mentre parla: se il signore inizia a parlare, JARVIS tace e si mette in ascolto
 
-    /// Il primo secondo serve a misurare quanto forte l'orologio sente sé stesso; da lì in poi, un volume nettamente
-    /// più alto per oltre mezzo secondo è la voce del signore (l'orologio al polso è più vicino alla bocca che all'altoparlante).
+    /// Il primo secondo serve a misurare quanto forte l'orologio sente sé stesso (poi il riferimento segue gli ultimi 3 secondi della
+    /// sua voce); da lì in poi, un volume nettamente più alto per oltre mezzo secondo è la voce del signore. L'altoparlante è a un paio
+    /// di centimetri dal microfono e l'orologio non cancella l'eco: al polso la sua voce deve essere più forte di quella di JARVIS.
     private func avviaMonitor() {
         guard conOrecchio, fase == .parlo, monitor == nil, !orecchioSospeso else { return }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("orecchio.m4a")
@@ -2213,7 +2218,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
         monitor = r
         ecoMonitor = ""
         inizioParlato = Date()
-        ecoMassima = -160
+        ecoSentita = []
+        fondoPolso = 0
         colpiVoce = 0
         dimenticaVoceAbbassata()
         timerMonitor = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
@@ -2233,16 +2239,48 @@ final class JarvisOrologio: NSObject, ObservableObject {
         guard fase == .parlo, let r = monitor else { fermaMonitor(); return }
         r.updateMeters()
         let livello = r.averagePower(forChannel: 0)
-        let trascorso = Date().timeIntervalSince(inizioParlato)
-        if trascorso < 1.2 { ecoMassima = max(ecoMassima, livello); return }   // taratura: così sento JARVIS, non il signore
-        let soglia = max(ecoMassima + 8, -38)
-        if livello > soglia { colpiVoce += 1; silenziVoce = 0 } else { colpiVoce = 0; silenziVoce += 1 }
+        fondoPolso = min(fondoPolso, livello)
+        // JARVIS sta suonando adesso a voce piena (non fermo, non abbassato): solo allora il microfono dice quanto forte si sente lui
+        let soloJarvis = fermoDa == nil && !voceAbbassata && (lettore?.isPlaying == true || (sintesi.isSpeaking && !sintesi.isPaused))
+        // taratura: nel primo secondo si misura quanto forte l'orologio sente JARVIS (così sento lui, non il signore)
+        if Date().timeIntervalSince(inizioParlato) < 1.2 {
+            if soloJarvis { segnaEco(livello) }
+            return
+        }
+        // 13 nov (prova dei tre punti, il signore: «fallo»): il riferimento è il più forte degli ultimi 3 secondi della sua voce in cui
+        // si sentiva solo lui. Prima era il più forte del primo secondo, fisso: se il signore parlava proprio lì, la soglia restava alta
+        // fino in fondo alla risposta e non lo si fermava più con la voce. Ora quel secondo esce dal conto dopo 3 secondi di JARVIS
+        let eco = ecoSentita.max() ?? -160
+        let soglia: Float
+        if fermoDa != nil {
+            // JARVIS è fermo ad aspettarlo: niente eco da superare, basta la sua voce sopra la stanza (prima doveva superare la voce
+            // piena di JARVIS anche a JARVIS zitto, e l'interruzione non arrivava: dopo la pausa riprendeva)
+            soglia = max(fondoPolso + 12, -50)
+        } else if voceAbbassata, lettore?.isPlaying == true {
+            soglia = max(eco, -38)                   // voce di JARVIS al 40%: anche la sua eco è 8 dB più bassa
+        } else {
+            soglia = max(eco + 8, -38)
+        }
+        if livello > soglia {
+            colpiVoce += 1
+            silenziVoce = 0
+        } else {
+            colpiVoce = 0
+            silenziVoce += 1
+            if soloJarvis { segnaEco(livello) }
+        }
         if colpiVoce >= 3 { interrottoAVoce(); return }                          // oltre mezzo secondo: è lui
         // 13 nov (il signore: «abbassa la voce ed esita come una persona», come sull'iPhone): al primo colpo la voce scende, al secondo
         // JARVIS si ferma a metà frase e aspetta; se il signore tace (0,4 s) o dopo 2,5 s fermo, riprende da dove era, voce di nuovo piena
         if colpiVoce == 1 { abbassaVoce() }
         else if colpiVoce == 2 { esitaVoce() }
         else if silenziVoce >= 2 || (fermoDa.map { Date().timeIntervalSince($0) > 2.5 } ?? false) { riprendiVoce() }
+    }
+
+    /// 13 nov: un controllo in cui si sentiva solo JARVIS a voce piena; se ne tengono gli ultimi 15 (3 secondi della sua voce).
+    private func segnaEco(_ livello: Float) {
+        ecoSentita.append(livello)
+        if ecoSentita.count > 15 { ecoSentita.removeFirst(ecoSentita.count - 15) }
     }
 
     private func abbassaVoce() {

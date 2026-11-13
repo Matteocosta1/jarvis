@@ -210,7 +210,7 @@ Il reparto tecnico: GitHub, Supabase e Archivio.
 - Archivio: il disco rigido del signore nel cloud. «salva questa foto in denim», «archivia il verbale», «metti nell'archivio» → archivio_salva (con ultima_foto per una foto appena vista, con testo per un verbale o un appunto; se non dice la cartella scegli tu la più sensata: denim, serate, contratti, profiler, verbali, foto, varie). «Trovami il contratto», «cosa c'è in archivio?» → archivio_cerca; per aprirlo → archivio_apri e poi apri_pagina se il dispositivo lo offre. archivio_elimina solo su richiesta esplicita.
 
 BRIEFING
-Se il signore chiede il briefing o dice «buongiorno Jarvis», prepara in poche frasi: meteo di oggi, impegni di oggi dal calendario (se disponibile), come ha dormito e il battito a riposo rispetto alla sua media in una sola frase (salute_riepilogo, se disponibile; gli allenamenti solo se ce ne sono stati ieri), email importanti arrivate dalla sera prima (email_leggi, se disponibile: solo quelle che contano, una frase ciascuna, niente pubblicità o newsletter), note aperte o in scadenza, e la prossima serata se nota. Se in bea_scheda c'è una data di Bea entro sette giorni o una promessa a lei in scadenza, una frase anche per quella. Tono da maggiordomo al mattino. Se nel messaggio c'è [Briefing pronto], i dati sono già tutti lì (righe «Briefing · …»): usa solo quelli, senza strumenti, nello stesso ordine (meteo, impegni, sonno, posta, note, serata, Bea), e quello che manca non nominarlo.`;
+Se il signore chiede il briefing o dice «buongiorno Jarvis», prepara in poche frasi: meteo di oggi, impegni di oggi dal calendario (se disponibile), come ha dormito e il battito a riposo rispetto alla sua media in una sola frase (salute_riepilogo, se disponibile; gli allenamenti solo se ce ne sono stati ieri), email importanti arrivate dalla sera prima (email_leggi, se disponibile: solo quelle che contano, una frase ciascuna, niente pubblicità o newsletter), note aperte o in scadenza, la prossima serata se è in calendario oppure, se c'è stata negli ultimi tre giorni, com'è andata. Se in bea_scheda c'è una data di Bea entro sette giorni o una promessa a lei in scadenza, una frase anche per quella. Tono da maggiordomo al mattino. Se nel messaggio c'è [Briefing pronto], i dati sono già tutti lì (righe «Briefing · …»): usa solo quelli, senza strumenti, nello stesso ordine (meteo, impegni, sonno, posta, note, serata, Bea), e quello che manca non nominarlo.`;
 
 // ───────────────────────── Strumenti eseguiti qui nel cervello ─────────────────────────
 const TABELLE = ["serate", "ingressi", "bar", "sumup_totali", "voci_spesa", "conteggi_biglietti", "chiusure_cassa", "andamento_serata", "registro",
@@ -1052,6 +1052,11 @@ async function riepilogoSerata(i: Record<string, any>) {
   let q = db.from("serate").select("*").order("data", { ascending: false }).limit(1);
   if (i.nome) q = q.ilike("nome", `%${i.nome}%`);
   if (i.data) q = q.eq("data", i.data);
+  // 13 nov (prova dei tre punti): «l'ultima serata» senza nome né data è la più recente vera, fino a oggi. Prima era «Demo Apple
+  // Review» del 31 dicembre (la serata finta per la revisione di Apple): il briefing la chiamava «prossima serata» e «com'è andata
+  // l'ultima serata?» rispondeva con quella, vuota. Le serate di prova si riconoscono come nella scheda Serata dell'app: «demo» o
+  // «prova» nel nome
+  if (!i.nome && !i.data) q = q.lte("data", oggiRoma()).not("nome", "ilike", "%demo%").not("nome", "ilike", "%prova%");
   const { data: serate, error } = await q;
   if (error) throw error;
   if (!serate?.length) return { errore: "nessuna serata trovata con questi criteri" };
@@ -1990,8 +1995,19 @@ async function briefingRaccogli(o: { attendi: boolean; prova: boolean }) {
     return (data ?? []).map((n: any) => ({ testo: String(n.testo ?? "").slice(0, 300), progetto: n.progetto || undefined, scadenza: n.scadenza || undefined }));
   };
   const serata = async () => {
+    // 13 nov (prova dei tre punti): la prossima serata in calendario (da oggi in poi, la più vicina; senza quelle di prova, come nella
+    // scheda Serata dell'app). Prima qui andava «l'ultima in archivio», che era la serata finta per Apple del 31 dicembre: il briefing
+    // la chiamava «prossima» e la confondeva con quella del 31 ottobre («anche se risulta già passata»)
+    const oggi = oggiRoma();
+    const { data: prossime, error } = await db.from("serate").select("nome, data").gte("data", oggi)
+      .not("nome", "ilike", "%demo%").not("nome", "ilike", "%prova%").order("data", { ascending: true }).limit(1);
+    if (error) throw error;
+    if (prossime?.length) return { prossima: { nome: prossime[0].nome, data: prossime[0].data } };
+    // in calendario non c'è: l'ultima vera, solo se è di questi giorni (fino a 3 giorni fa), con i suoi conti
     const r: any = await riepilogoSerata({});
-    return r?.serata ? { serata: r.serata, totali: r.totali } : null;
+    if (!r?.serata?.data) return null;
+    const giorni = Math.round((Date.parse(`${oggi}T00:00:00Z`) - Date.parse(`${String(r.serata.data).slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+    return giorni >= 1 && giorni <= 3 ? { passata: r.serata, totali: r.totali, giorni_fa: giorni } : null;
   };
   const bea = async () => {
     const { data, error } = await db.from("jarvis_bea").select("tipo, testo, giorno, annuale").eq("fatto", false).limit(400);
@@ -1999,7 +2015,10 @@ async function briefingRaccogli(o: { attendi: boolean; prova: boolean }) {
     const righe: any[] = data ?? [];
     const date = righe.filter((r) => r.tipo === "data" && r.giorno).map((r) => ({ testo: r.testo, ...prossimaVolta(r.giorno, !!r.annuale) }))
       .filter((r) => r.tra_giorni >= 0 && r.tra_giorni <= 7).sort((a, b) => a.tra_giorni - b.tra_giorni);
-    const promesse = righe.filter((r) => r.tipo === "promessa").map((r) => ({ testo: r.testo, giorno: r.giorno || undefined }));
+    // 13 nov (prova dei tre punti): solo le promesse in scadenza (con una data, da 3 giorni fa a fra 7), come dice il paragrafo
+    // BRIEFING. Prima andavano tutte, anche quelle senza data, e il briefing diceva «per Bea nulla in scadenza, resta solo la promessa…»
+    const promesse = righe.filter((r) => r.tipo === "promessa" && r.giorno).map((r) => ({ testo: r.testo, ...prossimaVolta(r.giorno, false) }))
+      .filter((r) => r.tra_giorni >= -3 && r.tra_giorni <= 7).sort((a, b) => a.tra_giorni - b.tra_giorni);
     return { date, promesse };
   };
   const [p, n, s, b, m] = await Promise.all([salvo(posta(), "posta"), salvo(note(), "note"), salvo(serata(), "serata"), salvo(bea(), "bea"),
@@ -2038,8 +2057,11 @@ function briefingBlocco(d: any, telefono: any): { testo: string; conPosta: boole
   const posta = d.posta ? { importanti: (d.posta.importanti ?? []).map((x: any) => ({ mittente: x.mittente, oggetto: x.oggetto, quando: x.quando, riassunto: x.riassunto, serve_risposta: x.serve_risposta })), altre: d.posta.altre } : null;
   if (posta) r.push(`[Briefing · posta importante, smistata alle ${oraBreve(d.posta.aggiornata ?? d.pronto)}] ${riga(posta, 4000)}`);
   if (Array.isArray(d.note) && d.note.length) r.push(`[Briefing · note aperte] ${riga(d.note, 3000)}`);
-  if (d.serata) r.push(`[Briefing · ultima serata in archivio] ${riga(d.serata, 1500)}`);
-  if (d.bea && (d.bea.date?.length || d.bea.promesse?.length)) r.push(`[Briefing · Bea: date entro 7 giorni e promesse aperte] ${riga(d.bea, 1500)}`);
+  // 13 nov (prova dei tre punti): la serata è la prossima in calendario o quella appena passata (fino a 3 giorni fa), con la sua
+  // etichetta; mai più una vecchia data da chiamare «prossima». I dati raccolti prima di questa versione non hanno né l'una né l'altra
+  if (d.serata?.prossima) r.push(`[Briefing · prossima serata in calendario] ${riga(d.serata.prossima, 300)}`);
+  else if (d.serata?.passata) r.push(`[Briefing · serata appena passata (${d.serata.giorni_fa === 1 ? "ieri" : `${d.serata.giorni_fa} giorni fa`}): com'è andata] ${riga({ serata: d.serata.passata, totali: d.serata.totali }, 1500)}`);
+  if (d.bea && (d.bea.date?.length || d.bea.promesse?.length)) r.push(`[Briefing · Bea: date entro 7 giorni e promesse in scadenza] ${riga(d.bea, 1500)}`);
   return { testo: "\n" + r.join("\n"), conPosta: !!posta };
 }
 
