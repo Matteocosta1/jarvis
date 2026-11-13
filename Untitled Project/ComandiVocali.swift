@@ -196,6 +196,23 @@ enum ComandoVocale: Equatable {
         }
     }
 
+    #if os(iOS)
+    /// 13.1 (il signore, 13 nov 20:58: «comandi tipo mostrami… si apre FILO… senza dover aprire le sezioni… parole chiave precise
+    /// che non aprono le sezioni»): sull'iPhone e sul Mac «mostra/mostrami…», «fammi vedere…», «vediamo…» mettono il dato in FILO
+    /// (Insieme, o il cervello con la regia «mostra») e non aprono più le sezioni; solo «apri…» (e gli altri verbi d'apertura) apre.
+    /// Restano come prima: le sezioni aperte («mostrami le sezioni»), «quella di prima», i video, i comandi dentro una sezione e le
+    /// frasi dedicate (Satellite: «mostrami la strada per…»). Sull'orologio FILO non c'è: lì aprono come sempre.
+    nonisolated static func soloFilo(_ t: [String]) -> Bool {
+        let apre: Set<String> = ["apri", "aprimi", "aprire", "attiva", "avvia", "accendi", "lancia", "vai", "entra", "portami", "inizia"]
+        if t.contains(where: { apre.contains($0) }) { return false }
+        let mostra: Set<String> = ["mostra", "mostrami", "mostramelo", "mostramela", "mostrameli", "mostramele", "vediamo"]
+        if t.contains(where: { mostra.contains($0) }) { return true }
+        let fai: Set<String> = ["fammi", "fai", "fammelo", "fammela", "fammeli", "fammele", "facci"]
+        if let k = t.firstIndex(of: "vedere"), k > 0, t[max(0, k - 3)..<k].contains(where: { fai.contains($0) }) { return true }
+        return false
+    }
+    #endif
+
     /// MARK XI · le sezioni aperte a voce (4 nov, approvati dal signore), a frase esatta: «sezioni aperte», «quella di prima»,
     /// «mettila da parte», «chiudi tutto». Si guardano prima di togliere la parola «sezione» dalla frase.
     static func navigazione(_ t: [String]) -> ComandoVocale? {
@@ -377,8 +394,13 @@ enum ComandoVocale: Equatable {
             t.remove(at: k)
             if k > 0, ["la", "le", "nella", "alla", "in"].contains(t[k - 1]) { t.remove(at: k - 1) }
         }
+        #if os(iOS)
+        let filo = soloFilo(t)                                  // 13.1: «mostrami…», «fammi vedere…» sono di FILO, non aprono
+        #else
+        let filo = false
+        #endif
         // MARK X · STUDIO e SOCIAL (le frasi del mockup, anche lunghe: «crea una piastra 80 per 40 per 4 con 4 fori»)
-        if let p = paginaMarkX(t) { return p }
+        if !filo, let p = paginaMarkX(t) { return p }
         #if os(iOS)
         // MARK X · BROWSER VIDEO: «fammi vedere dei video di Daft Punk dal vivo», «cercami i video del Milan» (anche frasi lunghe)
         if let k = t.firstIndex(where: { $0 == "video" || $0 == "filmati" }), k + 1 < t.count, t[..<k].contains(where: { ["fammi", "cercami", "cerca", "mostrami", "trovami", "metti", "voglio"].contains($0) }) {
@@ -599,6 +621,9 @@ enum ComandoVocale: Equatable {
             if c(" cosa cucino ") || c(" cosa posso cucinare ") || c(" cosa preparo da mangiare ") { return .rapido(.cucina) }
             if c(" registra la riunione ") || c(" registra questa riunione ") || c(" registra la conversazione ") { return .rapido(.riunione) }
         }
+
+        // 13.1: da qui in giù si aprono le sezioni: con «mostrami…», «fammi vedere…», «vediamo…» no (sull'iPhone è FILO)
+        if filo { return nil }
 
         // build 23, MUSICA: «apri la musica», «mostrami la musica», «fammi vedere la musica», «vai alla musica»: solo così, corto.
         // «metti la musica», «accendi la musica», «fammi sentire la musica», «chiudi la musica», «apri la musica dei Daft Punk»

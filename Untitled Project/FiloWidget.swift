@@ -13,6 +13,8 @@ import UIKit
 /// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la striscia del bordo destro che lo richiama.
 struct StratoFilo: View {
     @ObservedObject private var filo = Filo.condiviso
+    /// 13.1: il menu SISTEMI o la tendina PROTOCOLLI sono aperti (stanno nello stesso angolo): FILO si fa da parte finché si chiudono.
+    var daParte = false
 
     var body: some View {
         let visti = filo.visti
@@ -40,6 +42,9 @@ struct StratoFilo: View {
             }
         }
         .ignoresSafeArea()
+        .opacity(daParte ? 0 : 1)
+        .allowsHitTesting(!daParte)
+        .animation(.easeOut(duration: 0.2), value: daParte)
         .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3), value: visti.isEmpty)
     }
 }
@@ -70,6 +75,7 @@ private struct SchedaFilo: View {
     @State private var sotto = false        // c'è altro sotto
     @State private var dx: CGFloat = 0
     @State private var fase: Double = 0     // la nascita (0 → 1)
+    @GestureState private var trascina = false   // il dito trascina sulla scheda (torna falso da solo anche se il gesto si interrompe)
 
     static let larghezza: CGFloat = 212
     static let altezzaMassima: CGFloat = 200
@@ -112,7 +118,8 @@ private struct SchedaFilo: View {
             .mask { Sfuma(sopra: sopra, sotto: sotto) }
             .modifier(ScorreFilo(sopra: $sopra, sotto: $sotto))           // iOS 18: la sfumatura e «scorre: le notifiche aspettano»
             .padding(.top, 6)
-            .padding(.horizontal, 12)
+            .padding(.leading, 12)
+            .padding(.trailing, 10)                                        // come il mockup (12 a sinistra, 10 a destra)
             .padding(.bottom, 8)
             .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25), value: argomenti.map(\.id))
         }
@@ -132,8 +139,8 @@ private struct SchedaFilo: View {
         // via con lo swipe a destra: solo un gesto chiaramente orizzontale (su e giù è per scorrere)
         .simultaneousGesture(
             DragGesture(minimumDistance: 20)
+                .updating($trascina) { _, stato, _ in stato = true }
                 .onChanged { v in
-                    Filo.condiviso.toccato(true)
                     if v.translation.width > 0, v.translation.width > abs(v.translation.height) * 2.5 { dx = v.translation.width }
                 }
                 .onEnded { v in
@@ -145,9 +152,12 @@ private struct SchedaFilo: View {
                         return
                     }
                     withAnimation(.easeOut(duration: 0.2)) { dx = 0 }
-                    Filo.condiviso.toccato(false)
                 }
         )
+        .onChange(of: trascina) { _, v in
+            Filo.condiviso.toccato(v)                                      // finito (o interrotto): altri 2,8 secondi
+            if !v, dx != 0 { withAnimation(.easeOut(duration: 0.2)) { dx = 0 } }
+        }
         .modifier(NascitaFilo(fase: fase))
         .onAppear { withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)) { fase = 1 } }
         .accessibilityElement(children: .contain)
@@ -231,12 +241,15 @@ private struct ArgomentoVista: View {
                 .accessibilityHint(r.sezione == nil ? "" : "Apre \(r.sezione ?? "")")
             }
         }
-        // appena arrivato (o aggiornato) si accende un attimo
+        // appena arrivato (o aggiornato) si accende un attimo; richiamato col dito dal bordo no (come il mockup)
         .brightness(accesa ? 0.35 : 0)
-        .onChange(of: a.giro, initial: true) {
-            accesa = true
-            withAnimation(.easeOut(duration: 0.5)) { accesa = false }
-        }
+        .onAppear { if Date().timeIntervalSince(a.aggiornato) < 0.6 { accendi() } }
+        .onChange(of: a.giro) { accendi() }
+    }
+
+    private func accendi() {
+        accesa = true
+        withAnimation(.easeOut(duration: 0.5)) { accesa = false }
     }
 
     /// L'agenda un impegno per riga («11:30 dentista», «18:00 palestra»), senza l'ora di quando è stata mostrata; le altre una riga
@@ -245,11 +258,13 @@ private struct ArgomentoVista: View {
         var v: [RigaVista] = []
         for r in a.righe {
             if a.nome == "Agenda" {
-                for (k, pezzo) in r.riga.components(separatedBy: " · ").enumerated() {
-                    v.append(RigaVista(id: r.id + "#\(k)", testo: pezzo, sezione: r.sezione, ora: nil))
+                let pezzi = r.riga.components(separatedBy: " · ")
+                let titolo = Filo.testo(di: RigaFilo(id: r.id, titolo: r.titolo, riga: "", sezione: nil, alle: r.alle), in: a.nome)
+                for (k, pezzo) in pezzi.enumerated() {
+                    v.append(RigaVista(id: r.id + "#\(k)", testo: (k == 0 && !titolo.isEmpty ? titolo : "") + pezzo, sezione: r.sezione, ora: nil))
                 }
             } else {
-                v.append(RigaVista(id: r.id, testo: r.riga, sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle)))
+                v.append(RigaVista(id: r.id, testo: Filo.testo(di: r, in: a.nome), sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle)))
             }
         }
         return v

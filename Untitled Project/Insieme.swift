@@ -2,6 +2,7 @@
 import Foundation
 import UIKit
 import MusicKit           // il brano che suona (LettoreMusica.voce) entra nel filo
+import EventKit           // 13.1: l'agenda in FILO (il permesso del Calendario)
 
 // MARK: - 12.0 (16) · FA MENTRE PARLA: le frasi del dialogo che l'app fa da sola
 // Il signore (13 nov sera): «ogni frase, in qualsiasi forma la dica, diventa un'azione su qualsiasi sezione. Le cose semplici le fa
@@ -72,6 +73,12 @@ final class Insieme {
                 return Battute.chiediMessaggio(x.chi, x.testo, whatsapp: x.whatsapp)
             }
         }
+        // 13.1: il congedo appena chiesto e lui risponde secco: «sì» a «Sarà tutto?» chiude, «sì» a «Le serve altro?» vuol dire che
+        // c'è altro («Mi dica, Sir»); «no» al contrario (prima un «sì» secco andava al cervello, che non sapeva della domanda)
+        if attesa == nil, let chiude = Congedo.condiviso.rispostaSecca(nudo) {
+            Congedo.condiviso.chiuso()
+            return chiude ? Battute.congedoOk() : "Mi dica, Sir."
+        }
         // «Rispondile» → «Cosa le scrivo?» → la frase dopo è il testo
         if let t = attesaTesto {
             attesaTesto = nil
@@ -86,9 +93,22 @@ final class Insieme {
     /// Senza fare niente: la farebbe l'app? (Per non chiedere al cervello una risposta anticipata che sarebbe buttata.)
     func sua(_ frase: String) -> Bool {
         if attesa != nil, Regia.eAssenso(frase) || Regia.eAnnulla(frase) { return true }
-        guard let i = riconosci(Insieme.norma(frase), nudo: FineFrase.paroleNude(frase).joined(separator: " ")) else { return false }
-        if case .sessione = i { return false }                       // la sessione la propone il cervello
-        return true
+        let nudo = FineFrase.paroleNude(frase).joined(separator: " ")
+        if attesa == nil, Congedo.condiviso.rispostaSecca(nudo) != nil { return true }
+        guard let i = riconosci(Insieme.norma(frase), nudo: nudo) else { return false }
+        let filo = Filo.condiviso
+        switch i {
+        case .sessione: return false                                  // la sessione la propone il cervello
+        case .mostra(let cosa, let pron): return mostraLocale(cosa, pron: pron, frase: frase)
+        case .togli, .togliTutti: return !filo.argomenti.isEmpty      // FILO vuoto: «toglilo» è forse della sezione davanti
+        case .salva(let q):
+            let r = q.nome != nil ? filo.cosa(nome: q.nome) : filo.cosa(genere: q.genere, plurale: q.plurale)
+            return r?.tipo == "brano" || r?.tipo == "post"
+        case .manda(let q, _, _):
+            let r = q.nome != nil ? filo.cosa(nome: q.nome, di: q.di, prima: q.prima) : filo.cosa(genere: q.genere, plurale: q.plurale)
+            return r?.daMandare != nil
+        default: return true
+        }
     }
 
     private func riconosci(_ n: String, nudo: String) -> Intento? {
@@ -113,7 +133,7 @@ final class Insieme {
         }
         var m: [String?]?
         // i widget FILO: «mostrami…», «fammi vedere…» (niente sezione), «toglilo», «togli tutto»
-        if let m = Insieme.cerca(#"^(?:mostrami|fammi vedere|fai vedere|vediamo|fammel([oaie]) vedere|mostramel([oaie])|fammi un po vedere)(?: (.+))?$"#, n) {
+        if let m = Insieme.cerca(#"^(?:mostrami|mostra|fammi vedere|fai vedere|vediamo|fammel([oaie]) vedere|mostramel([oaie])|fammi un po vedere)(?: (.+))?$"#, n) {
             return .mostra(cosa: (m[3] ?? "").trimmingCharacters(in: .whitespaces), pron: (m[1] ?? m[2]).flatMap { Insieme.pron($0).genere })
         }
         if Insieme.cerca(#"^(?:togli tutto|togli tutti|via tutto|via tutti|togli i widget|pulisci tutto)$"#, n) != nil { return .togliTutti }
@@ -191,11 +211,12 @@ final class Insieme {
         case .mostra(let cosa, let pron):
             return await mostra(cosa, pron: pron, frase: frase)
         case .togli:
+            guard !filo.argomenti.isEmpty else { return nil }                // FILO vuoto: forse è della sezione davanti
             guard filo.togli() else { return "Non c'è niente in vista, Sir." }
             Suoni.filoVia()
             return Battute.staccato()
         case .togliTutti:
-            guard filo.togliTutti() > 0 else { return "Non c'è niente in vista, Sir." }
+            guard filo.togliTutti() > 0 else { return nil }                  // FILO vuoto: forse «togli tutto» della sezione davanti
             Suoni.filoVia()
             return Battute.angoloLibero()
         case .fissa(let q):
@@ -239,7 +260,7 @@ final class Insieme {
             return await preparaMessaggio(chi.nome, numero: chi.numero, testo: testo, whatsapp: wa)
         case .salva(let q):
             aggiornaBrano()
-            guard let r = q.nome != nil ? filo.cosa(nome: q.nome) : filo.cosa(genere: q.genere, plurale: q.plurale) else { return Battute.nienteDaMostrare() }
+            guard let r = q.nome != nil ? filo.cosa(nome: q.nome) : filo.cosa(genere: q.genere, plurale: q.plurale) else { return nil }   // niente: decide la sezione o il cervello
             switch r.tipo {
             case "brano":
                 let e = await LettoreMusica.condiviso.salvaNeiPreferiti()
@@ -277,9 +298,7 @@ final class Insieme {
     /// «Mostrami…»: il dato giusto in un widget FILO, senza aprire niente. Nil: non ce l'ho qui, decide il cervello.
     private func mostra(_ cosaDetta: String, pron: Character?, frase: String) async -> String? {
         let filo = Filo.condiviso
-        var t = cosaDetta
-        for a in ["un po ", "anche "] where t.hasPrefix(a) { t.removeFirst(a.count) }
-        if let r = t.range(of: #"^(?:il|lo|la|l|i|gli|le) "#, options: .regularExpression) { t.removeSubrange(r) }
+        let t = Insieme.cosaMostrata(cosaDetta)
         aggiornaBrano()
         if t.isEmpty || pron != nil || ["questo", "questa", "quello", "quella"].contains(t) {
             let g: Character? = pron ?? (["questa", "quella"].contains(t) ? "f" : nil)
@@ -292,6 +311,30 @@ final class Insieme {
             for v in arr.reversed() { filo.persona(v.nome); filo.metti(Insieme.cosaMessaggio(v)) }
             filo.mostra("messaggi", titolo: "Messaggi", riga: arr.isEmpty ? "niente di nuovo oggi" : "\(arr.count) nuovi · " + arr.map { Filo.detto($0.nome) }.joined(separator: ", "), sezione: "Messaggi")
             return arr.isEmpty ? "Niente di nuovo, Sir." : "\(Battute.numero(arr.count).capitalizzata) nuovi, Sir."
+        }
+        // 13.1: il meteo e l'agenda li mostra l'app (come il mockup), senza aspettare il cervello
+        if Insieme.cerca(Insieme.schemaMeteo, t) != nil {
+            let giorno = Insieme.giornoMeteo(t)
+            guard let m = await MeteoQui.rigaFilo(giorno) else { return nil }          // Apple Meteo non risponde: il cervello
+            let r = filo.metti(CosaFilo(chiave: "meteo:" + giorno, tipo: "risposta", nomi: ["meteo", "tempo", "previsione"], titolo: "Meteo",
+                                        riga: m.riga, detto: "il meteo di " + giorno, testo: m.daMandare, daMandare: m.daMandare, sezione: "Meteo"))
+            filo.mostra("c:" + r.chiave, titolo: "Meteo", riga: m.riga, sezione: "Meteo")
+            return Battute.ecco()
+        }
+        if Insieme.cerca(Insieme.schemaAgenda, t) != nil {
+            guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return nil }   // senza permesso: il cervello
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm"
+            let oggi = Calendar.current.startOfDay(for: Date())
+            let impegni: [String] = PonteTelefono.impegniDiOggi().map { e in
+                let minuti = (e["m"] as? Double) ?? 0
+                return f.string(from: oggi.addingTimeInterval(minuti * 60)) + " " + ((e["nome"] as? String) ?? "")
+            }
+            let riga = impegni.isEmpty ? "nessun impegno oggi" : impegni.joined(separator: " · ")
+            filo.metti(CosaFilo(chiave: "agenda", tipo: "impegno", nomi: ["agenda", "impegni", "appuntamento"], titolo: "Agenda", riga: riga,
+                                detto: "l'agenda di oggi", testo: riga, sezione: "Briefing"))
+            filo.mostra("agenda", titolo: "Agenda", riga: riga, sezione: "Briefing")
+            return impegni.isEmpty ? "Oggi niente in agenda, Sir." : Battute.ecco()
         }
         if let m = Insieme.cerca(#"^(?:quello|quella|il messaggio|l ultimo(?: messaggio)?) (?:di|da) (\w+)$"#, t), let di = m[1] {
             guard let v = Insieme.ultimoDi(di) else { return "Oggi \(di.capitalizzata) non ha scritto, Sir." }
@@ -312,14 +355,46 @@ final class Insieme {
             filo.mostra("c:post", titolo: "Post", riga: Filo.primaFrase(v.didascalia), sezione: "Social")
             return Battute.ecco()
         }
-        if t.split(separator: " ").count == 1, let v = Insieme.ultimoDi(t) {
+        // un nome secco («mostrami Bea»): l'ultimo messaggio di quella persona, se la sezione davanti non ha una sua frase per questo
+        // («mostrami Milano» col Satellite davanti vola su Milano)
+        if t.split(separator: " ").count == 1, !Regia.condivisa.davantiCapisce(frase), let v = Insieme.ultimoDi(t) {
             let r = filo.metti(Insieme.cosaMessaggio(v))
             filo.persona(v.nome)
             filo.mostra("c:" + r.chiave, titolo: "Da " + v.nome, riga: "«\(r.testo ?? "")»", sezione: "Messaggi")
             return Battute.ecco()
         }
-        // il meteo, l'agenda, tutto il resto: il cervello risponde e mette il widget con la regia («mostra»)
+        // tutto il resto: il cervello risponde e lo mette in FILO con la regia («mostra»)
         return nil
+    }
+
+    /// Senza fare niente: «mostrami…» lo fa l'app (gli stessi casi di `mostra`)? No: va al cervello, che può partire in anticipo.
+    private func mostraLocale(_ cosaDetta: String, pron: Character?, frase: String) -> Bool {
+        let t = Insieme.cosaMostrata(cosaDetta)
+        if t.isEmpty || pron != nil || ["questo", "questa", "quello", "quella"].contains(t) { return true }
+        if Insieme.cerca(#"^(?:(?:nuovi |ultimi )?messaggi(?: nuovi| arrivati| di oggi)?|chi mi ha scritto)$"#, t) != nil { return true }
+        if Insieme.cerca(Insieme.schemaMeteo, t) != nil { return true }
+        if Insieme.cerca(Insieme.schemaAgenda, t) != nil { return EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+        if Insieme.cerca(#"^(?:quello|quella|il messaggio|l ultimo(?: messaggio)?) (?:di|da) (\w+)$"#, t) != nil { return true }
+        if Insieme.cerca(#"\b(canzone|brano|pezzo|musica|cosa suona|che canzone)\b"#, t) != nil { return true }
+        if Insieme.cerca(#"\b(post|didascalia|bozza)\b"#, t) != nil, Sessione.condivisa.versione ?? Sessione.condivisa.bozza != nil { return true }
+        return t.split(separator: " ").count == 1 && !Regia.condivisa.davantiCapisce(frase) && Insieme.ultimoDi(t) != nil
+    }
+
+    /// La cosa detta dopo «mostrami»: senza «un po'», «anche» e l'articolo.
+    private static func cosaMostrata(_ cosaDetta: String) -> String {
+        var t = cosaDetta
+        for a in ["un po ", "anche "] where t.hasPrefix(a) { t.removeFirst(a.count) }
+        if let r = t.range(of: #"^(?:il|lo|la|l|i|gli|le) "#, options: .regularExpression) { t.removeSubrange(r) }
+        return t
+    }
+    /// «tempo» solo come meteo («il tempo», «che tempo fa»): «quanto tempo manca» no
+    private static let schemaMeteo = #"\b(meteo|previsioni|previsione|cielo)\b|(?:^|che )tempo\b"#
+    private static let schemaAgenda = #"\b(agenda|impegni|impegno|appuntamenti|calendario|giornata)\b"#
+    /// «il meteo di domani», «com'è stasera»: di quale giorno.
+    private static func giornoMeteo(_ t: String) -> String {
+        if t.contains("domani") { return "domani" }
+        if t.contains("stasera") || t.contains("sera") || t.contains("stanotte") { return "stasera" }
+        return "oggi"
     }
 
     /// Una cosa del discorso in FILO come notifica («mostrami…»: sparisce da sola; «fissalo» la tiene).
@@ -558,6 +633,8 @@ final class Congedo {
     private var ultimo = Date.distantPast
     private var compito: Task<Void, Never>?
     private(set) var aperto = Date.distantPast
+    /// La domanda fatta: «Sarà tutto, Sir?» (un sì chiude) o «Le serve altro, Sir?» (un no chiude).
+    private var domanda = ""
 
     func cosaVera() {
         compito?.cancel()
@@ -569,12 +646,30 @@ final class Congedo {
                   (self.ultimaFrase?() ?? da) <= da, Date().timeIntervalSince(self.ultimo) > 15 * 60 else { return }
             self.ultimo = Date()
             self.aperto = Date().addingTimeInterval(10)
-            self.chiedi?(Battute.congedo())
+            let frase = Battute.congedo()
+            self.domanda = frase
+            self.chiedi?(frase)
         }
     }
 
     /// Il signore ha parlato: niente congedo in arrivo.
     func zitto() { compito?.cancel() }
+
+    /// 13.1: la risposta secca al congedo appena chiesto (entro 10 secondi): vero = ha finito, falso = c'è altro; nil = non è una
+    /// risposta secca (o non c'è un congedo aperto). «Sarà tutto?», «Will that be all?»: «sì» chiude; «Le serve altro?», «Altro per
+    /// lei?», «Posso fare altro?», «C'è altro?»: «no» chiude; «Nient'altro?»: chiudono tutti e due.
+    func rispostaSecca(_ nudo: String) -> Bool? {
+        guard aperto > Date() else { return nil }
+        if ["ok", "okay", "va bene", "a posto", "perfetto", "basta"].contains(nudo) { return true }     // chiudono con qualsiasi domanda
+        let si: Set<String> = ["si", "si si", "si sir", "si grazie", "certo", "esatto", "sì"]
+        let no: Set<String> = ["no", "no sir", "niente", "nulla", "no no"]
+        let risposta: Bool
+        if si.contains(nudo) { risposta = true } else if no.contains(nudo) { risposta = false } else { return nil }
+        let d = Regia.chiave(domanda)
+        if d.contains("niente") || d.contains("nient") { return true }
+        let siChiude = d.contains("saratutto") || d.contains("willthatbeall")
+        return risposta == siChiude
+    }
     func chiuso() { aperto = .distantPast; compito?.cancel() }
 }
 

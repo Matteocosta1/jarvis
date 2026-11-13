@@ -452,6 +452,15 @@ final class Regia {
         return .fatto("\(d.nome) davanti")
     }
 
+    /// 13.1: la sezione davanti ha una sua frase per questo? («mostrami Milano» col Satellite, «mostrami tutte» con la Posta): allora
+    /// è sua, non del dialogo.
+    func davantiCapisce(_ frase: String) -> Bool {
+        guard let d = nomeDavanti else { return false }
+        let parole = Regia.paroleComando(frase)
+        guard !parole.isEmpty else { return false }
+        return azioni(di: d).contains { a in !a.conferma && a.frasi.contains { Regia.combaciaDove(parole, $0) != nil } }
+    }
+
     /// 12.0 (16): un tocco su un widget FILO apre (o riporta davanti) la sua sezione.
     func porta(_ nome: String) {
         Task { _ = await apri(nome) }

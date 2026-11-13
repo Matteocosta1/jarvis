@@ -355,7 +355,7 @@ struct ContentView: View {
                 strato
                     .zIndex(25)
                 // 12.0 (16): i widget FILO («mostrami…», «fissalo»), in alto a destra sopra le sezioni
-                StratoFilo()
+                StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0)   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
                     .zIndex(26)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }

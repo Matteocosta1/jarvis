@@ -41,9 +41,13 @@ struct CosaFilo {
 /// Una riga di FILO: un dato mostrato («Oggi nuvoloso · 14°», «11:30 dentista · 18:00 palestra»), con la sezione che si apre al tocco.
 struct RigaFilo: Identifiable, Equatable {
     let id: String
+    /// Il titolo del dato («A Bea», «Da Bea», «Post»): si legge davanti alla riga quando non è il nome dell'argomento.
+    var titolo: String
     var riga: String
     var sezione: String?
     var alle: Date
+    /// Aspetta una risposta (il messaggio che parte col sì): finché c'è, il suo argomento non sparisce.
+    var resta = false
 }
 
 /// Un argomento di FILO (METEO, AGENDA, MESSAGGI…): la sua testata, le sue righe, fissato o no.
@@ -57,8 +61,10 @@ struct ArgomentoFilo: Identifiable, Equatable {
     var scade: Date?
     /// Sparita: non si vede, ma torna con lo swipe dal bordo destro.
     var nascosto = false
-    /// Appena arrivato (si accende entrando).
+    /// Appena arrivato o aggiornato (si accende entrando).
     var giro = 0
+    /// Quando è stato mostrato l'ultima volta: si accende solo se è appena successo (non quando FILO viene richiamato).
+    var aggiornato = Date()
 }
 
 @MainActor
@@ -152,7 +158,7 @@ final class Filo: ObservableObject {
         var riga = "FILO (le cose di cui si parla, dalla più recente: «questo», «lo», «la», «quello di prima», «lei», «gli», «le» si risolvono qui guardando genere e numero; se è davvero ambiguo chiedi in quattro parole): " + righe.joined(separator: " · ")
         if !visti.isEmpty {
             let schede: [String] = visti.map { (a: ArgomentoFilo) -> String in
-                let dati: String = a.righe.map(\.riga).joined(separator: " / ")
+                let dati: String = a.righe.map { Filo.testo(di: $0, in: a.nome) }.joined(separator: " / ")
                 return a.nome + (a.fisso ? " (fissato)" : "") + ": " + dati
             }
             riga += " ‖ FILO sullo schermo: " + schede.joined(separator: "; ")
@@ -201,7 +207,7 @@ final class Filo: ObservableObject {
     func mostra(_ chiave: String, titolo: String, riga: String, sezione: String?, dura: TimeInterval? = nil, suono: Bool = true,
                 resta: Bool = false, fisso: Bool = false) {
         let nome = Filo.argomento(sezione: sezione, titolo: titolo)
-        let nuova = RigaFilo(id: chiave, riga: riga, sezione: sezione, alle: Date())
+        let nuova = RigaFilo(id: chiave, titolo: titolo, riga: riga, sezione: sezione, alle: Date(), resta: resta)
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
             a = argomenti.remove(at: i)
@@ -217,9 +223,11 @@ final class Filo: ObservableObject {
         a.righe.insert(nuova, at: 0)
         if a.righe.count > 4 { a.righe.removeLast(a.righe.count - 4) }
         if fisso { a.fisso = true }
-        a.scade = a.fisso || resta ? nil : Date().addingTimeInterval(dura ?? Filo.durataNotifica)
+        // una notifica scade; un argomento fissato, o con dentro qualcosa che aspetta il sì, resta
+        a.scade = a.fisso || a.righe.contains(where: \.resta) ? nil : Date().addingTimeInterval(dura ?? Filo.durataNotifica)
         a.nascosto = false
         a.giro += 1
+        a.aggiornato = Date()
         for k in argomenti.indices where argomenti[k].fisso { argomenti[k].nascosto = false }   // i fissati tornano con lui
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
@@ -232,7 +240,7 @@ final class Filo: ObservableObject {
         let nome = Filo.argomento(sezione: c.sezione, titolo: c.titolo)
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
             var a = argomenti.remove(at: i)
-            a.fisso = true; a.scade = nil; a.nascosto = false; a.giro += 1
+            a.fisso = true; a.scade = nil; a.nascosto = false; a.giro += 1; a.aggiornato = Date()
             argomenti.insert(a, at: 0)
             programma()
             Suoni.filo()
@@ -249,12 +257,22 @@ final class Filo: ObservableObject {
             guard let i = argomenti.firstIndex(where: { $0.righe.contains { $0.id == chiave } }) else { return false }
             argomenti[i].righe.removeAll { $0.id == chiave }
             if argomenti[i].righe.isEmpty { argomenti.remove(at: i) }
+            else if !argomenti[i].fisso, !argomenti[i].righe.contains(where: \.resta), argomenti[i].scade == nil {
+                argomenti[i].scade = Date().addingTimeInterval(Filo.durataNotifica)   // non aspetta più niente: torna una notifica
+            }
             fineSeVuoto()
             return true
         }
         let delDiscorso = questo.map { Filo.argomento(sezione: $0.sezione, titolo: $0.titolo) }
         guard let nome = argomenti.first(where: { $0.nome == delDiscorso })?.nome ?? visti.first?.nome ?? argomenti.first?.nome else { return false }
         return togliArgomento(nome)
+    }
+
+    /// Come si legge una riga: col suo titolo davanti quando non è il nome dell'argomento («A Bea: «Arrivo alle otto.»»).
+    static func testo(di r: RigaFilo, in argomento: String) -> String {
+        let t = r.titolo.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, t.lowercased() != argomento.lowercased() else { return r.riga }
+        return t + ": " + r.riga
     }
 
     /// La X sulla testata: chiude solo quell'argomento.
@@ -336,7 +354,7 @@ final class Filo: ObservableObject {
         "traccia": "f", "musica": "f", "post": "m", "bozza": "f", "didascalia": "f", "foto": "f", "giornata": "f", "briefing": "m",
         "impegno": "m", "impegni": "mp", "appuntamento": "m", "dentista": "m", "palestra": "f", "cena": "f", "lista": "f", "spesa": "f",
         "profilo": "m", "instagram": "m", "progetto": "m", "piano": "m", "promemoria": "m", "nota": "f", "risposta": "f", "notizia": "f",
-        "risultato": "m", "sezione": "f", "mail": "f", "email": "f", "riunione": "f",
+        "risultato": "m", "sezione": "f", "mail": "f", "email": "f", "riunione": "f", "agenda": "f",
     ]
     static let sinonimi: [String: String] = ["canzone": "brano", "pezzo": "brano", "traccia": "brano", "musica": "brano", "tempo": "meteo",
                                              "previsione": "meteo", "bozza": "post", "didascalia": "post", "appuntamento": "impegno", "email": "mail"]
