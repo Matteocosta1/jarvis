@@ -57,6 +57,9 @@ struct ProvaDialogo {
             ("sì", .ascolto), ("sì sì", .ascolto), ("mh", .ascolto), ("ah ok", .ascolto), ("va bene", .ascolto), ("certo certo", .ascolto),
             ("esatto", .ascolto), ("sì sì sì", .chiusura), ("ho capito", .chiusura), ("ok grazie", .chiusura), ("va bene va bene", .chiusura),
             ("sì ma domani", .nessuno), ("no", .nessuno), ("aspetta", .nessuno), ("Jarvis", .nessuno),
+            // 13 nov (prova dei tre punti): il mugugno scritto in tanti modi è sempre «mh»
+            ("Mmm", .ascolto), ("Hmm", .ascolto), ("hm", .ascolto), ("mhmm", .ascolto), ("mmh, sì", .ascolto), ("hmm no", .nessuno),
+            ("ehm", .nessuno), ("h", .nessuno), ("mmm mmm mmm", .chiusura),
         ]
         for (frase, atteso) in casi {
             let s = FineFrase.segnaleDAscolto(frase)

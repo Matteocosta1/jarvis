@@ -230,6 +230,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     // 13 nov (il signore: «abbassa la voce ed esita come una persona»): la voce scesa e la pausa mentre il signore comincia a parlare
     private var voceAbbassata = false
     private var fermoDa: Date?
+    private var fraseInPausa: AVAudioPlayer?          // la frase fermata a metà (solo se stava suonando davvero)
     private var silenziVoce = 0
     // Voce a frasi: la prima frase si dice mentre il resto della risposta sta ancora arrivando
     private var bufferFrase = ""
@@ -1581,13 +1582,20 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 if let r = recuperoTurno { corpo["recupero"] = r }   // 12.0 (10): recupero dopo un silenzio sbagliato
                 corpo["arbitro"] = ["id": ImpostazioniOrologio.idDispositivo, "fine": Int64(fineVoce.timeIntervalSince1970 * 1000)] as [String: Any]
             }
+            // 13 nov (il signore: «A», il briefing già pronto), come sull'iPhone: «Briefing a voce» porta con sé la salute (dall'orologio)
+            // e gli impegni di oggi (dall'iPhone), letti insieme in 0,8 s al massimo mentre l'orologio cerca la posizione (prova dei tre
+            // punti: prima dopo); il cervello risponde in un passaggio solo
+            let raccoltaBriefing: Task<[String: String], Never>?
+            if unico == nil, storia.last?["role"] == "user", storia.last?["content"]?.lowercased().contains("il briefing per favore") == true {
+                raccoltaBriefing = Task { await self.datiBriefingPolso() }
+            } else {
+                raccoltaBriefing = nil
+            }
             let posizione = await PosizioneOrologio.attuale()      // dove si trova il signore: serve alla seconda memoria
             if let posizione { corpo["posizione"] = posizione }
-            // 13 nov (il signore: «A», il briefing già pronto), come sull'iPhone: «Briefing a voce» porta con sé la salute (dall'orologio)
-            // e gli impegni di oggi (dall'iPhone), letti insieme in 0,8 s al massimo; il cervello risponde in un passaggio solo
-            if unico == nil, storia.last?["role"] == "user", storia.last?["content"]?.lowercased().contains("il briefing per favore") == true {
+            if let raccoltaBriefing {
                 corpo["briefing"] = true
-                corpo["briefing_telefono"] = await datiBriefingPolso()
+                corpo["briefing_telefono"] = await raccoltaBriefing.value
             }
             if unico == nil { iniziaFlussoVoce() }               // col giro unico la voce si prepara quando la frase è accettata
             for _ in 0..<5 {
@@ -2114,6 +2122,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func aspettaFineVoce() async {
         diciPrimaDelloStrumento(tutto: true)
         orecchioSospeso = true
+        riprendiVoce()                       // 13 nov: se si era fermato per lui («sì»), riparte: la frase deve finire, non restare sospesa
         fermaMonitor()
         for _ in 0..<80 where fraseInVoce || !codaVoce.isEmpty {        // al massimo 8 secondi
             try? await Task.sleep(for: .milliseconds(100))
@@ -2246,15 +2255,18 @@ final class JarvisOrologio: NSObject, ObservableObject {
         abbassaVoce()
         guard fermoDa == nil else { return }
         fermoDa = Date()
-        lettore?.pause()
-        if sintesi.isSpeaking { sintesi.pauseSpeaking(at: .immediate) }
+        // prova dei tre punti: si ferma solo la frase che sta suonando. Fra due frasi `lettore` è ancora quella appena finita, e
+        // riprendendo ripartiva da capo: JARVIS ripeteva la frase (e la sua fine faceva saltare quella dopo)
+        if let p = lettore, p.isPlaying { p.pause(); fraseInPausa = p }
+        if sintesi.isSpeaking, !sintesi.isPaused { sintesi.pauseSpeaking(at: .immediate) }
     }
 
     private func riprendiVoce() {
         guard voceAbbassata || fermoDa != nil else { return }
         if fermoDa != nil {
             fermoDa = nil
-            if let p = lettore { p.play(); Volume.segui(p) }                     // il reattore torna a seguire la voce
+            if let p = fraseInPausa, p === lettore { p.play(); Volume.segui(p) }   // il reattore torna a seguire la voce
+            fraseInPausa = nil
             if sintesi.isPaused { sintesi.continueSpeaking() }
         }
         voceAbbassata = false
@@ -2265,6 +2277,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     private func dimenticaVoceAbbassata() {
         voceAbbassata = false
         fermoDa = nil
+        fraseInPausa = nil
         silenziVoce = 0
     }
 

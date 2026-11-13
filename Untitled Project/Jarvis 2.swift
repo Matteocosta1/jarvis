@@ -347,6 +347,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// microfono sentiva ancora qualcosa); va nei tempi del turno («fine_da»).
     private var chiusaDa = ""
     private var misura: [String: Any] = [:]
+    private let creatoIl = Date()          // 13 nov: quando si è aperta l'app (i tempi del briefing dalla notifica, ad app chiusa)
     private var misuraDa: Date?
     private var misuraTurno: UUID?
     private var tempiDaMandare: [String: Any]?
@@ -1732,6 +1733,8 @@ final class Jarvis: NSObject, ObservableObject {
         idTurno = risposta.id
         salva()
         iniziaMisura(id: risposta.id, fineVoce: fineVoce, anticipo: "nessuno")
+        // 13 nov (prova del briefing): anche il briefing chiesto senza voce (notifica delle 9, «Briefing a voce») ha i suoi tempi
+        if fineVoce == nil, testo.lowercased().contains("il briefing per favore") { misuraBriefing(id: risposta.id) }
 
         ultimoInvio = Date()
         rispostaIniziata = false
@@ -1765,6 +1768,11 @@ final class Jarvis: NSObject, ObservableObject {
         compitoPonte = Task { @MainActor [weak self] in
             // niente «mh» o mezze parole (suonano come un balbettio): solo frasi intere, e solo se serve davvero
             try? await Task.sleep(for: .milliseconds(Int(finestra * 1000) + 100))
+            // 13 nov: l'app si è appena aperta (notifica delle 9) e la sequenza d'avvio riempie già l'attesa: la frase ponte ci finirebbe
+            // sopra. A sequenza finita la risposta, se è arrivata, parte subito; la frase d'attesa solo se dopo un secondo non c'è ancora
+            var dopoAvvio = false
+            while !Task.isCancelled, self?.avvioInCorso == true { dopoAvvio = true; try? await Task.sleep(for: .milliseconds(100)) }
+            if dopoAvvio { try? await Task.sleep(for: .seconds(1)) }
             // il signore sta parlando proprio adesso (l'ascolto lo sente, anche se non è per me): non gli parlo sopra
             var giri = 0
             while giri < 10, !Task.isCancelled, Date().timeIntervalSince(self?.richiamo.ultimaVoce ?? .distantPast) < 0.6 {
@@ -1773,6 +1781,7 @@ final class Jarvis: NSObject, ObservableObject {
             }
             guard let self, !Task.isCancelled, self.attesaVuota(id) else { return }
             self.ultimoPonte = Date()
+            if self.misuraTurno == id, let da = self.misuraDa { self.misura["ms_ponte"] = Int(Date().timeIntervalSince(da) * 1000) }   // 13 nov
             // 12 nov (B4): la frase del cervello che riprende la richiesta, se è arrivata; se no, una di riserva
             let frase = self.ponteDelCervello ?? Jarvis.ponteCasuale()
             self.ponteDelCervello = nil
@@ -1862,16 +1871,20 @@ final class Jarvis: NSObject, ObservableObject {
         // 8 nov notte: la sezione aperta e cosa mostra (campi scritti, voce aperta, risultati): JARVIS vede quello che vede lui.
         // 12.0 (10): il catalogo della regia (davanti, dietro, azioni, cosa si apre, cosa è appena successo)
         corpo["schermo"] = Regia.condivisa.catalogo(rigaVecchia: Schermo.perCervello(sezione: sezioneAperta))
+        // 13 nov (il signore: «A», il briefing già pronto): la richiesta del briefing (notifica delle 9, «Briefing a voce», a voce) porta
+        // con sé il calendario di oggi e la salute, letti adesso e insieme (al massimo 0,8 s) mentre il GPS cerca la posizione: il
+        // cervello ha già pronto il resto e risponde in un passaggio solo, senza tornare qui a chiederli (prima 17–34 secondi prima
+        // della prima parola). Prova dei tre punti: prima si leggevano dopo il GPS, fino a 0,8 s in più prima di partire
+        let raccoltaBriefing: Task<[String: String], Never>?
+        if Jarvis.eBriefing(storia) { raccoltaBriefing = Task { await self.datiBriefing() } } else { raccoltaBriefing = nil }
         let inizioGps = Date()
         let posizione = await Posizione.attuale()          // dove si trova il signore: serve alla seconda memoria
         if misuraTurno == id { misura["ms_gps"] = Int(Date().timeIntervalSince(inizioGps) * 1000) }
         if let posizione { corpo["posizione"] = posizione }
-        // 13 nov (il signore: «A», il briefing già pronto): la richiesta del briefing (notifica delle 9, «Briefing a voce», a voce) porta
-        // con sé il calendario di oggi e la salute, letti adesso e insieme (al massimo 0,8 s): il cervello ha già pronto il resto e
-        // risponde in un passaggio solo, senza tornare qui a chiederli (prima 17–34 secondi prima della prima parola)
-        if Jarvis.eBriefing(storia) {
+        if let raccoltaBriefing {
             corpo["briefing"] = true
-            corpo["briefing_telefono"] = await datiBriefing()
+            corpo["briefing_telefono"] = await raccoltaBriefing.value
+            if misuraTurno == id { misura["ms_dati"] = Int(Date().timeIntervalSince(inizioGps) * 1000) }
         }
         // 11 nov: i tempi del turno di prima (solo se questa richiesta parte davvero: con l'anticipo adottato è già fatta)
         if primo == nil, let t = tempiDaMandare { corpo["tempi_app"] = t; tempiDaMandare = nil }
@@ -2026,13 +2039,23 @@ final class Jarvis: NSObject, ObservableObject {
                 case 1: stato = "Connessione persa, riprovo…"
                 case 2:
                     stato = "La linea fa i capricci, insisto…"
-                    accodaVoce("Un attimo, Sir: la linea fa i capricci. Insisto.")
-                    accodaVoce("", forza: true)
+                    if !avvioInCorso {                // 13 nov: non sopra la sequenza d'avvio (app appena aperta): lì basta la scritta
+                        accodaVoce("Un attimo, Sir: la linea fa i capricci. Insisto.")
+                        accodaVoce("", forza: true)
+                    }
                 default: stato = "Ultimo tentativo…"
                 }
                 try await Task.sleep(for: .seconds(Double(1 << (tentativo - 1))))   // 1, 2, 4 secondi
             }
         }
+    }
+
+    /// 13 nov: aspetta che finisca la sequenza d'avvio (al massimo 8 s; interrompibile come il resto del turno).
+    private func attendiFineAvvio(id: UUID) async throws {
+        guard avvioInCorso else { return }
+        let inizio = Date()
+        while avvioInCorso, Date().timeIntervalSince(inizio) < 8 { try await Task.sleep(for: .milliseconds(30)) }
+        if misuraTurno == id { misura["ms_avvio"] = Int(Date().timeIntervalSince(inizio) * 1000) }
     }
 
     private func azzeraTesto(_ id: UUID) {
@@ -2052,6 +2075,10 @@ final class Jarvis: NSObject, ObservableObject {
         req.httpBody = try JSONSerialization.data(withJSONObject: corpo)
 
         let (righe, resp) = try await URLSession.shared.bytes(for: req, delegate: unico?.presa)
+        // 13 nov (prova del briefing dalla notifica delle 9): con l'app appena aperta la sequenza d'avvio suona ancora (musica, chat che
+        // si stampa). La richiesta è già partita e il cervello intanto risponde; la risposta si legge, e si dice, a sequenza finita.
+        // Prima la voce partiva sopra la musica e, col «Jarvis» spento, la fine dell'avvio le spegneva l'audio a metà frase
+        if deposito == nil { try await attendiFineAvvio(id: id) }
         let codice = (resp as? HTTPURLResponse)?.statusCode ?? 0
         if let unico, !unico.gestito, codice != 200 { unico.presa.chiudi(); return .ripiega }   // idea D: la strada di prima
         if codice == 401 { return .errore("La parola d'ordine non coincide, Sir. La controlli nelle impostazioni.") }
@@ -2286,6 +2313,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Prima di ascoltare la musica: finisce di dire la frase in corso («Ascolto.») e poi tace.
     private func aspettaFineVoce() async {
+        riprendiVoce()                      // 13 nov: se si era fermato per lui («sì»), riparte: la frase deve finire, non restare sospesa
         orecchio.ferma()
         accodaVoce("", forza: true)
         for _ in 0..<80 where !inCoda.isEmpty {
@@ -4170,12 +4198,25 @@ extension Jarvis {
         // 13 nov (punto 2): ogni tentativo di parlargli sopra degli ultimi 3 minuti, fermato o no, con le parole sentite
         let sopra = orecchio.tentativiPerMisura()
         if !sopra.isEmpty { misura["sopra"] = sopra }
+        // 13 nov (prova dei tre punti): le volte che la voce di JARVIS è scesa o si è fermata per lui, e com'è finita
+        let esitazioni = orecchio.esitazioniPerMisura()
+        if !esitazioni.isEmpty { misura["esitazioni"] = esitazioni }
         // 13 nov (punto 3): come si è chiusa la frase (pausa vera o tetto senza parole nuove) e il rumore della stanza
         if !chiusaDa.isEmpty { misura["fine_da"] = chiusaDa }
         chiusaDa = ""
         if let f = VoceAttiva.condivisa.fondoDb { misura["fondo_db"] = f }
         anticipiButtati = 0
         motivoChiusura = ""
+    }
+
+    /// 13 nov (prova del briefing): i tempi del briefing chiesto senza voce (notifica delle 9, «Briefing a voce»): dal tocco al primo
+    /// suono della risposta; se l'app si è appena aperta, dall'apertura (c'è di mezzo la sequenza d'avvio). Vanno al cervello col
+    /// turno dopo, come quelli delle frasi dette (esito «briefing»).
+    fileprivate func misuraBriefing(id: UUID) {
+        let freddo = avvioInCorso
+        misuraDa = freddo ? creatoIl : Date()
+        misuraTurno = id
+        misura = ["esito": "briefing", "freddo": freddo]
     }
 
     /// Una frase di JARVIS comincia a suonare: se è la prima della risposta misurata, il tempo è fatto (va col turno dopo).

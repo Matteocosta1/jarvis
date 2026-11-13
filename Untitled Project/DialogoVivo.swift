@@ -291,7 +291,9 @@ nonisolated enum FineFrase {
     enum SegnaleAscolto: Sendable { case nessuno, ascolto, chiusura }
 
     static func segnaleDAscolto(_ testo: String) -> SegnaleAscolto {
-        let p = parole(testo)
+        // 13 nov (prova dei tre punti): il riconoscimento scrive il mugugno in tanti modi («mmm», «hmm», «hm», «mhmm»): sono tutti «mh».
+        // Prima «mmm» non era un segnale d'ascolto e, detto lungo sopra la sua voce, fermava JARVIS come un'interruzione vera
+        let p = parole(testo).map { eMugugno($0) ? "mh" : $0 }
         guard !p.isEmpty, p.count <= 5 else { return .nessuno }
         let assensi: Set<String> = ["sì", "si", "ok", "okay", "certo", "certamente", "esatto", "esattamente", "giusto", "vero", "già", "appunto",
                                     "infatti", "chiaro", "ovvio", "sicuro", "perfetto", "bene", "benissimo", "ottimo", "d'accordo", "capito",
@@ -301,6 +303,11 @@ nonisolated enum FineFrase {
         let ripetuta = p.count >= 3 && Set(p).count == 1                         // «sì sì sì», «ok ok ok»
         let chiude = p.contains("capito") || p.contains("grazie") || ripetuta || p.filter({ $0 == "bene" }).count >= 2
         return chiude ? .chiusura : .ascolto
+    }
+
+    /// 13 nov: un mugugno d'assenso come lo scrive il riconoscimento: solo «m» e «h», almeno una «m» («mh», «mmm», «hmm», «mhmm»).
+    static func eMugugno(_ parola: String) -> Bool {
+        parola.count >= 2 && parola.contains("m") && parola.allSatisfy { $0 == "m" || $0 == "h" }
     }
 
     /// La pausa finale: le parole (`lessicale`, da `pausa`), il ritmo del signore, le esitazioni (A2) e come è finita la voce (P3).
