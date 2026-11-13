@@ -555,7 +555,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 - Mockup (v. 1794577358-3859): nel simulatore il pannello PARLARGLI SOPRA (colpi sul tavolo, plim della carica, «Ma…», «No.») con la stessa logica dell'app, provato in Chromium.
 - Ricontrollo dopo il 1° giro di compilazione (commit b05dfbc, run 43436435999: verde, 0 errori, 0 warning, prove del dialogo superate), tre casi limite corretti: (1) «No.» detto e poi silenzio mentre il riconoscimento ripartiva da capo: prima riprendeva a parlare, ora è un'interruzione con le parole già sentite; (2) una frase nuova della risposta arrivata proprio mentre il riconoscimento ripartiva azzerava il fermo: ora resta fermo e decide il suo silenzio; (3) guardia: se per qualsiasi motivo nessuno decide entro 4 s, la voce riparte da sola (mai muto a metà frase).
-- Controllo di compilazione, 2° giro (commit 4662b45, run 43437932650): **verde** · 0 errori, 0 warning · prove del dialogo superate. **Questa è la 12.0 (15) da caricare** (Pull + Archive + TestFlight). Cervello v134 (commit 4662b45, impronta c214eed8…): da pubblicare appena il connettore di Supabase risponde (oggi 502 dal ponte dei connettori); l'app funziona anche col cervello v133.
+- Controllo di compilazione, 2° giro (commit 4662b45, run 43437932650): **verde** · 0 errori, 0 warning · prove del dialogo superate. **Questa è la 12.0 (15) da caricare** (Pull + Archive + TestFlight). Cervello **v134 pubblicato** alle 16:42 (commit 4662b45, impronta c214eed8…, prova generale superata), dopo circa due ore di server dei connettori di Supabase irraggiungibile.
 
 ## 12.0 (14) — MARK XII · 13 nov · numero confermato dal signore (13:17, «SI»: Build 14 su app, Watch, complicazione e isola) · build unica · cervello invariato
 
