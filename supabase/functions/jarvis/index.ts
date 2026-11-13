@@ -3674,6 +3674,7 @@ function langfuse(modello: string, inizio: Date, primaParola: Date | null, uso: 
 // Si spegne da solo con SFORZO=off, oppure solo per Opus con OPUS_VOCE_SFORZO=off.
 const senzaSforzo = new Set<string>();
 const senzaScelta = new Set<string>();   // 13 nov: i modelli che non accettano tool_choice «none» (si ricorda, come lo sforzo)
+const pensieroObbligato = new Set<string>();   // 13 nov: i modelli che non accettano thinking «disabled» (si ricorda)
 const sforzo = (modello: string, voceRapida = false) =>
   Deno.env.get("SFORZO") === "off" || senzaSforzo.has(modello) ? null
     : /haiku|sonnet/i.test(modello) ? "low"
@@ -3713,13 +3714,17 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   };
   riarma();
   // 13 nov (briefing già pronto): i dati sono già nel messaggio, un passaggio solo. Gli strumenti restano nella richiesta (la cache di
-  // istruzioni e strumenti non cambia), ma il modello non li usa: tool_choice «none»
+  // istruzioni e strumenti non cambia), ma il modello non li usa: tool_choice «none». E Haiku 5.5 non ragiona prima di parlare
+  // (thinking «disabled», accettato solo da Haiku): la prova del 13 nov alle 02:55 con il ragionamento acceso dava 1.700 token e la
+  // prima parola dopo 8,6 s; il briefing è un riassunto di dati già pronti, il ragionamento non serve
   let nessunoStrumento = senzaStrumenti && !senzaScelta.has(modello);
+  let senzaPensiero = senzaStrumenti && /haiku/i.test(modello) && !pensieroObbligato.has(modello);
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: conCacheStoria(pulisci(messages)),
     system: [{ type: "text", text: SISTEMA + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],   // istruzioni + strumenti in cache per 1 ora (il massimo): le pause dei test non le fanno ricaricare
     ...(conSforzo && sforzo(modello, voceRapida) ? { output_config: { effort: sforzo(modello, voceRapida) } } : {}),
     ...(nessunoStrumento ? { tool_choice: { type: "none" } } : {}),
+    ...(senzaPensiero ? { thinking: { type: "disabled" } } : {}),
   });
   const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -3728,10 +3733,12 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   });
   let r: Response;
   try { r = await conFreno(manda(true)); } catch (e) { fineAttese(); throw e; }
-  if (r.status === 400 && nessunoStrumento) {                       // se un giorno «none» non fosse accettato: si riprova con gli strumenti
+  if (r.status === 400 && (nessunoStrumento || senzaPensiero)) {   // se un giorno «none» o «disabled» non fossero accettati: si riprova senza
     const testo = await r.text().catch(() => "");
-    if (/tool_choice/i.test(testo)) {
-      senzaScelta.add(modello); nessunoStrumento = false; console.log(`tool_choice none rifiutato da ${modello}: ${testo.slice(0, 160)}`);
+    if (/tool_choice|thinking/i.test(testo)) {
+      if (senzaPensiero && /thinking/i.test(testo)) { pensieroObbligato.add(modello); senzaPensiero = false; }
+      if (nessunoStrumento && /tool_choice/i.test(testo)) { senzaScelta.add(modello); nessunoStrumento = false; }
+      console.log(`briefing in un passaggio: ${modello} rifiuta un parametro (${testo.slice(0, 160)}): riprovo senza`);
       riarma();
       try { r = await conFreno(manda(true)); } catch (e) { fineAttese(); throw e; }
     }
