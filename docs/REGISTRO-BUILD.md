@@ -532,7 +532,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 
 ## 13.0 (1) — MARK XIII · 13 nov sera · numero deciso dal signore (21:55, «perfetto tutto nella 13.0»: Version 13.0, Build 1 su app, Watch, complicazione e isola) · build unica · cervello invariato (v135)
 
-**Contiene tutto**: la 12.0 (17) (Salute letta mentre parla, iPhone bloccato, Vitals col riposo detto a voce; la 17 non va caricata a parte) + il dialogo qui sotto + **MARK XIII**: la scritta sotto il titolo su iPhone e Mac («MARK XIII»), l'avvio del polso («J.A.R.V.I.S. · MARK XIII», tenuta su una riga sugli schermi piccoli) e il mockup (versione «MARK XIII · 13.0 (1)», titolo «JARVIS Mark XIII»). Stessa grafica, stesso posto, stesso bagliore: cambia solo il numero.
+**Contiene tutto**: la 12.0 (17) (Salute letta mentre parla, iPhone bloccato, Vitals col riposo detto a voce; la 17 non va caricata a parte) + il dialogo qui sotto + **MARK XIII**: la scritta sotto il titolo su iPhone e Mac («MARK XIII»), l'avvio del polso («J.A.R.V.I.S. · MARK XIII», tenuta su una riga sugli schermi piccoli) e il mockup (versione «MARK XIII · 13.0 (1)», titolo «JARVIS Mark XIII»). Stessa grafica, stesso posto, stesso bagliore: cambia solo il numero. Controllo di compilazione (run 43506171948): **verde** · 0 errori, 0 warning · prove del dialogo superate. **Questa è la 13.0 (1) da caricare** (Pull + Archive + TestFlight).
 
 ### Il dialogo
 
