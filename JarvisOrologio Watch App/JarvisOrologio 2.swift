@@ -676,7 +676,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
                   (self.inizioUltimaFrase ?? .distantPast) <= da, Date().timeIntervalSince(self.ultimoCongedo) > 15 * 60 else { return }
             self.ultimoCongedo = Date()
             let frase = Battute.congedo()
-            self.storia.append(JarvisOrologio.battuta("assistant", frase))   // il cervello lo vede: «no, è tutto» si capisce
+            // il cervello lo vede: «no, è tutto» si capisce (in coda alla sua ultima risposta: la cronologia resta alternata)
+            if let ultima = self.storia.last, ultima["role"] == "assistant", let testo = ultima["content"] {
+                self.storia[self.storia.count - 1] = JarvisOrologio.battuta("assistant", testo + " " + frase)
+            } else {
+                self.storia.append(JarvisOrologio.battuta("assistant", frase))
+            }
             self.risposta = frase
             self.riascolta = true
             self.parla(frase)

@@ -280,7 +280,7 @@ final class Insieme {
         if t.isEmpty || pron != nil || ["questo", "questa", "quello", "quella"].contains(t) {
             let g: Character? = pron ?? (["questa", "quella"].contains(t) ? "f" : nil)
             guard let r = g == nil ? filo.questo : filo.cosa(genere: g) else { return Battute.nienteDaMostrare() }
-            filo.fissa(r)
+            mostraCosa(r)                                            // «mostramelo»: una notifica, non fissato (come il mockup)
             return Battute.ecco()
         }
         if Insieme.cerca(#"^(?:(?:nuovi |ultimi )?messaggi(?: nuovi| arrivati| di oggi)?|chi mi ha scritto)$"#, t) != nil {
@@ -301,7 +301,7 @@ final class Insieme {
                 filo.mostra("brano", titolo: "Musica", riga: "niente in riproduzione", sezione: "Musica")
                 return Battute.ecco()
             }
-            filo.fissa(r)
+            mostraCosa(r)
             return Battute.ecco()
         }
         if Insieme.cerca(#"\b(post|didascalia|bozza)\b"#, t) != nil, let v = Sessione.condivisa.versione ?? Sessione.condivisa.bozza {
@@ -316,6 +316,11 @@ final class Insieme {
         }
         // il meteo, l'agenda, tutto il resto: il cervello risponde e mette il widget con la regia («mostra»)
         return nil
+    }
+
+    /// Una cosa del discorso in FILO come notifica («mostrami…»: sparisce da sola; «fissalo» la tiene).
+    private func mostraCosa(_ r: CosaFilo) {
+        Filo.condiviso.mostra("c:" + r.chiave, titolo: r.titolo, riga: r.riga.isEmpty ? r.detto : r.riga, sezione: r.sezione)
     }
 
     /// Il brano che suona nel filo: se nel filo c'è un altro brano (è cambiato) prende il suo posto; se non c'è, entra in fondo
