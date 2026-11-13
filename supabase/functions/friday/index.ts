@@ -3093,10 +3093,11 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
       throw new Error(`timeout: Anthropic (${modello}) in silenzio da ${SILENZIO_ANTHROPIC_MS / 1000} s`);
     }
   };
+  const sistemaTesto = await sistemaFriday();
   riarma();
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: conCacheStoria(pulisci(messages)),
-    system: [{ type: "text", text: (await sistemaFriday()) + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],
+    system: [{ type: "text", text: sistemaTesto + SISTEMA_TONI, cache_control: { type: "ephemeral", ttl: "1h" } }],
     ...(conSforzo && sforzo(modello, voceRapida) ? { output_config: { effort: sforzo(modello, voceRapida) } } : {}),
   });
   const manda = (conSforzo: boolean) => fetch("https://api.anthropic.com/v1/messages", {
