@@ -4,9 +4,11 @@ import UIKit
 
 // MARK: - 14 nov · MANI SU TUTTO JARVIS
 // Il signore (14 nov, 03:23: «ogni tasto di ogni sezione diventa un'azione che il cervello può fare a voce, in automatico… così
-// smettono di esistere cose che lei vede ma che lui non sa fare»). JARVIS legge i tasti che sono davvero sullo schermo dalla
-// stessa descrizione che iOS prepara per l'accessibilità (nome, tipo, se è selezionato, dove sta) e li preme come li preme
-// VoiceOver: nessun tasto da scrivere a mano, quelli nuovi arrivano da soli.
+// smettono di esistere cose che lei vede ma che lui non sa fare»). Da solo, senza scrivere niente sezione per sezione: scorre la
+// pagina davanti e scrive in ogni campo di testo che si vede (SwiftUI li costruisce su UIScrollView e UITextField, che l'app può
+// toccare). I tasti di SwiftUI invece iOS li descrive solo alle tecnologie d'accessibilità: provato nel simulatore il 14 nov
+// (VoiceOver spento: 0 tasti letti), quindi «tocca» vale solo quando la descrizione c'è (VoiceOver acceso); i tasti a voce li fa la
+// regia, sezione per sezione.
 
 @MainActor
 enum ManiJarvis {
@@ -101,7 +103,7 @@ enum ManiJarvis {
     /// Lo strumento «mano» com'è descritto al cervello (`strumenti_client_def`, senza ripubblicare il cervello).
     static let definizione: [String: Any] = [
         "name": "mano",
-        "description": "Le mani di JARVIS sull'app: preme qualsiasi tasto che si vede sullo schermo (TASTI nella riga [Schermo]: T1, T2… col nome), scorre la pagina o scrive in un campo, quando la regia non ha l'azione. azione: tocca (tasto = nome o T-numero), scorri (verso: su, giu, cima, fondo), scrivi (testo, campo facoltativo, invia=true per mandarlo). I tasti rischiosi (invia, elimina, pubblica, chiama, paga…) aspettano il sì: chiedilo e richiama con confermato=true. Ti torna com'è lo schermo dopo: controlla che sia andata.",
+        "description": "Le mani di JARVIS sull'app, quando la regia non ha l'azione: scorre la pagina davanti (scorri: verso su, giu, cima, fondo), scrive in qualsiasi campo di testo che si vede (scrivi: testo, campo facoltativo, invia=true per mandarlo) e, solo se nella riga [Schermo] c'è TASTI, preme un tasto (tocca: tasto = nome o T-numero). Mandare, eliminare, pubblicare, chiamare, pagare aspettano il sì: chiedilo e richiama con confermato=true. Ti torna com'è andata: controlla.",
         "input_schema": [
             "type": "object",
             "properties": [
@@ -201,6 +203,8 @@ enum ManiJarvis {
 
     /// La riga TASTI per [Schermo] (vuota sulla schermata di JARVIS: lì ci sono la corona e la regia).
     static func perCervello() -> String? {
+        // senza una tecnologia d'accessibilità accesa iOS non descrive i tasti di SwiftUI (prova del 14 nov): niente giro a vuoto
+        guard UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning else { return nil }
         let tasti = leggi()
         guard !tasti.isEmpty else { return nil }
         return "TASTI (strumento mano; * = serve il sì): " + elenco(tasti, massimo: 45)
@@ -285,38 +289,5 @@ enum ManiJarvis {
         Regia.condivisa.evento("mandato «\(nome)»")
         return (Regia.json(["fatto": "scritto «\(testo.prefix(60))» in «\(nome)» e mandato"]), false)
     }
-
-    #if DEBUG
-    /// Solo nella versione di prova (simulatore, -provaMani): scrive i tasti letti e prova a premerne uno, per vedere se iOS
-    /// descrive i tasti di SwiftUI anche senza VoiceOver acceso.
-    static func prova(tocca etichetta: String?) async {
-        let cartella = FileManager.default.temporaryDirectory
-        func intero(_ x: CGFloat) -> Int { x.isFinite ? Int(max(-99_999, min(99_999, x))) : -1 }
-        print("MANI: prova partita, finestra \(finestra != nil), voiceover \(UIAccessibility.isVoiceOverRunning)")
-        func scrivi(_ nome: String, _ tasti: [Tasto], extra: [String: Any] = [:]) {
-            var d: [String: Any] = extra
-            d["quanti"] = tasti.count
-            d["tasti"] = tasti.map { t -> [String: Any] in
-                ["id": t.id, "etichetta": t.etichetta, "valore": t.valore ?? "", "tipo": t.tipo, "sel": t.selezionato,
-                 "x": intero(t.cornice.minX), "y": intero(t.cornice.minY), "w": intero(t.cornice.width), "h": intero(t.cornice.height),
-                 "classe": String(describing: type(of: t.oggetto))]
-            }
-            print("MANI: \(nome) quanti \(tasti.count) \(extra)")
-            for t in tasti.prefix(60) { print("MANI: \(t.id) «\(t.etichetta)» \(t.tipo) sel=\(t.selezionato) \(intero(t.cornice.minX)),\(intero(t.cornice.minY)) \(intero(t.cornice.width))x\(intero(t.cornice.height)) \(type(of: t.oggetto))") }
-            if JSONSerialization.isValidJSONObject(d), let j = try? JSONSerialization.data(withJSONObject: d, options: [.prettyPrinted]) {
-                try? j.write(to: cartella.appendingPathComponent(nome))
-            }
-        }
-        let prima = leggi()
-        var esito: [String: Any] = ["voiceover": UIAccessibility.isVoiceOverRunning]
-        if let etichetta, let t = prima.first(where: { $0.etichetta.localizedCaseInsensitiveCompare(etichetta) == .orderedSame }) {
-            esito["toccato"] = t.etichetta
-            esito["attivato"] = t.oggetto.accessibilityActivate()
-        }
-        scrivi("mani1.json", prima, extra: esito)
-        try? await Task.sleep(for: .seconds(2))
-        scrivi("mani2.json", leggi())
-    }
-    #endif
 }
 #endif
