@@ -103,12 +103,16 @@ final class Regia {
 
     func metti(_ chiave: UUID, nome: String, stato: String, azioni: [AzioneRegia], davanti: Bool) {
         var ordine = scene[chiave]?.ordine ?? 0
+        let arrivata = davanti && scene[chiave]?.davanti != true
         if scene[chiave]?.davanti != davanti || ordine == 0 {      // appena arrivata davanti: diventa la più recente
             contatore += 1
             ordine = contatore
         }
         scene[chiave] = Scena(nome: nome, stato: stato, azioni: azioni, davanti: davanti, ordine: ordine)
         impara(nome, azioni)
+        // 14 nov: ogni sezione che arriva davanti (col dito, a voce o dal cervello) entra nel filo del discorso: dopo, «fissalo»,
+        // «mandalo a Bea» sanno di cosa si parla, in una frase sola o in due (come il mockup, segnaSezione)
+        if arrivata, let d = Regia.destinazione(nome) { metteNelFilo(d) }
     }
 
     // MARK: Cosa sanno fare anche da chiuse (12.0 (11))
@@ -900,7 +904,9 @@ final class Regia {
 
     /// Scorre la pagina davanti (ManiJarvis) e restituisce la battuta.
     private func scorriDetto(_ verso: String) -> String {
-        guard let dove = ManiJarvis.scorriSubito(verso) else { return Battute.una("scorri.niente", ["Qui c'è tutto, Sir.", "Non c'è altro da vedere, Sir."]) }
+        guard let dove = ManiJarvis.scorriSubito(verso), dove != "tutta visibile" else {      // niente da scorrere, o si vede già tutta
+            return Battute.una("scorri.niente", ["Qui c'è tutto, Sir.", "Non c'è altro da vedere, Sir."])
+        }
         evento("pagina \(dove)")
         return Battute.scorri(verso, dove: dove)
     }

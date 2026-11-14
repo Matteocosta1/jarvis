@@ -359,9 +359,10 @@ private struct ArgomentoVista: View {
             }
             .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
             if !compatta {
-                // la riga che JARVIS sta dicendo si accende (si guarda solo mentre parla)
+                // la riga che JARVIS sta dicendo si accende (si guarda solo mentre parla): una sola in tutta la tab, quella detta per ultima
                 TimelineView(.animation(minimumInterval: 0.1, paused: filo.voceOra == nil)) { tl in
-                    let detta = Filo.rigaDetta(tutte.map { r -> (id: String, testo: String) in (id: r.id, testo: r.testo) }, voce: filo.voceOra, ora: tl.date)
+                    let tab: [RigaVista] = filo.visti.flatMap { ArgomentoVista.righeDi($0) }
+                    let detta = Filo.rigaDetta(tab.map { r -> (id: String, testo: String) in (id: r.id, testo: r.testo) }, voce: filo.voceOra, ora: tl.date)
                     VStack(alignment: .leading, spacing: 1) {
                         ForEach(tutte) { r in riga(r, detta: r.id == detta) }
                     }
@@ -424,9 +425,11 @@ private struct ArgomentoVista: View {
         withAnimation(.easeOut(duration: 0.5)) { accesa = false }
     }
 
+    private var righe: [RigaVista] { ArgomentoVista.righeDi(a) }
+
     /// L'agenda un impegno per riga («11:30 dentista», «18:00 palestra»), senza l'ora di quando è stata mostrata; le altre una riga
     /// per dato, con l'ora.
-    private var righe: [RigaVista] {
+    private static func righeDi(_ a: ArgomentoFilo) -> [RigaVista] {
         var v: [RigaVista] = []
         for r in a.righe {
             if a.nome == "Piano" {                                         // 14 nov: i passi del piano, senza l'ora
