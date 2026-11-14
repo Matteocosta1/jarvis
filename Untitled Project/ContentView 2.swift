@@ -366,9 +366,6 @@ struct ContentView: View {
                 StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0,   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
                            suSezione: pila.davanti != nil)                                 // 13.1: sopra una sezione, vetro con la trasparenza dinamica
                     .zIndex(26)
-                // 14 nov: il mirino delle mani di JARVIS (il tasto che preme da solo), sopra tutto
-                StratoMirino()
-                    .zIndex(28)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
             .environment(\.jarvisCoperto, pilaCopre)

@@ -10,6 +10,8 @@ import UIKit
 @MainActor
 enum TocchiSchermo {
     private static var osservatore: NSObjectProtocol?
+    /// 14 nov: l'ultima volta che il dito ha toccato lo schermo (l'iniziativa non parla mentre lui sta lavorando col dito).
+    static var ultimoTocco = Date.distantPast
 
     /// All'avvio dell'app: ogni finestra che diventa principale riceve l'osservatore (una volta sola).
     static func prepara() {
@@ -41,12 +43,14 @@ private final class OsservaTocchi: UIGestureRecognizer, UIGestureRecognizerDeleg
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         BattitoMani.ignora(per: Self.silenzio)
+        TocchiSchermo.ultimoTocco = Date()
         // 13.1: FILO sa dove si appoggia il dito (su di lui: a fuoco e fermo; fuori: in secondo piano)
         if let t = touches.first { Filo.condiviso.toccoSchermo(t.location(in: nil)) }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
         BattitoMani.ignora(per: Self.silenzio)
+        TocchiSchermo.ultimoTocco = Date()
         if numberOfTouches <= touches.count {
             Filo.condiviso.ditoAlzato()
             state = .failed

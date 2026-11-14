@@ -640,6 +640,9 @@ struct ProveOloVista<Simboli: View>: View {
     @State private var ritocco = 0
     @Environment(\.accessibilityReduceMotion) private var riduci
     @Environment(\.sezioneDietro) private var dietro
+    /// 14 nov: di quale sezione sono queste viste per la regia (la dice `.regia(...)`; se no, dal nome della prova).
+    @Environment(\.sezioneRegia) private var sezioneRegia
+    @State private var chiaveRegia = UUID()
 
     /// 10 nov (Musica): le viste che la tela disegna dentro di sé (le copertine vere), lette dalle prove con `resolveSymbol`.
     let simboli: Simboli
@@ -668,7 +671,14 @@ struct ProveOloVista<Simboli: View>: View {
             }
             .padding(margini)
         }
-        .onAppear { crea(k) }
+        .onAppear {
+            crea(k)
+            // 14 nov (le mani di JARVIS su tutta l'app): le viste si presentano alla regia, così «passa al globo», «vista atomo»,
+            // «fammi le torri» cambiano la chip come il dito, anche senza VoiceOver (iOS non descrive i tasti di SwiftUI)
+            let s = sezione
+            Regia.condivisa.mettiViste(chiaveRegia, sezione: sezioneRegia ?? Regia.nomeDi(s), nomi: s.nomi, scelta: { s.scelta }, scegli: { i in scegli(i) })
+        }
+        .onDisappear { Regia.condivisa.togliViste(chiaveRegia) }
     }
 
     private var tela: some View {

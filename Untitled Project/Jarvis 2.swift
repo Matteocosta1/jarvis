@@ -495,6 +495,7 @@ final class Jarvis: NSObject, ObservableObject {
         // 14 nov · L'INIZIATIVA (Iniziativa.swift): gli impegni e i messaggi detti prima che li chieda, solo quando non disturba
         Iniziativa.condivisa.parla = { [weak self] frase in self?.annunciaConSeguito(frase) }
         Iniziativa.condivisa.libero = { [weak self] urgente in self?.puoDireDaSolo(urgente: urgente) ?? false }
+        Iniziativa.condivisa.aspettaSi = { Insieme.condiviso.aspettaIlSi || Regia.condivisa.aspettaIlSi || ManiJarvis.aspettaIlSi }   // 14 nov
         Iniziativa.condivisa.inConversazione = { [weak self] in
             guard let self else { return false }
             return self.fase != .attesa || !self.inCoda.isEmpty || self.richiamo.sveglio || Date() < self.richiamo.seguitoFinoA
@@ -1240,16 +1241,20 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     /// 14 nov · L'INIZIATIVA: JARVIS può dire una cosa da sé adesso, senza disturbare: app davanti, in attesa e zitto, nessuna voce
-    /// intorno da 4 secondi, niente avvio né rito, niente sezioni col microfono o la fotocamera, microfono acceso, voce accesa.
-    /// Non urgente: anche niente musica, niente RISERVATO, nessuna sezione davanti (lavora), seguito chiuso e la sua ultima
-    /// risposta finita da almeno 5 secondi.
+    /// intorno da 4 secondi, niente avvio né rito, niente sezioni col microfono o la fotocamera, microfono acceso, voce accesa, nessuna
+    /// missione in corso. Non urgente: anche niente RISERVATO, seguito chiuso, la sua ultima risposta finita da almeno 5 secondi e il
+    /// dito lontano dallo schermo da 6 (con una sezione davanti e con la musica sì: il signore, 14 nov).
     private func puoDireDaSolo(urgente: Bool) -> Bool {
         guard UIApplication.shared.applicationState == .active, fase == .attesa, !avvioInCorso, !inBenvenuto, inCoda.isEmpty,
               !richiamo.sveglio, !micSpento, !micOccupato, !Impostazioni.muto, richiamoConsentito, occhi == nil,
               Date().timeIntervalSince(richiamo.ultimaVoce) > 4 else { return false }
+        // 14 nov (il signore: «deve parlare anche quando l'app è aperta e non sto facendo niente… vabbè, ci sta durante la missione»):
+        // mai durante la missione; per il resto anche con una sezione davanti e con la musica, se lui non parla e non tocca lo schermo
+        guard !Piano.condiviso.inCorso else { return false }
         if urgente { return true }
-        return !riservato && !musicaSuona && Regia.condivisa.davantiNome == nil && Date() >= richiamo.seguitoFinoA
+        return !riservato && Date() >= richiamo.seguitoFinoA
             && Date().timeIntervalSince(fineUltimaRisposta ?? .distantPast) > 5
+            && Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 6
     }
 
     /// Il rito si ferma subito (tocco sul reattore, una domanda, un avviso): musica spenta, niente saluto.
@@ -4540,6 +4545,8 @@ extension Jarvis {
     fileprivate func suonoIniziato(_ chiave: ObjectIdentifier) {
         fraseInVoce = frasiRisposta[chiave]?.frase          // 12 nov (P1): se è una domanda, «sì» detto sopra è la risposta
         orecchio.fraseOra = fraseInVoce ?? ""               // 13 nov (punto 2): per il registro dei tentativi di interromperlo
+        // 14 nov (scelta del signore: «si accende la riga che dice»): la frase che comincia adesso, per la tab
+        Filo.condiviso.voceIniziata(frasiVive[chiave]?.speechString ?? fraseInVoce ?? "")
         guard let da = misuraDa, let t = misuraTurno, frasiRisposta[chiave]?.id == t else { return }
         misura["ms_primo_suono"] = Int(Date().timeIntervalSince(da) * 1000)
         misura["ms_totale"] = Int(Date().timeIntervalSince(ultimoInvio) * 1000)

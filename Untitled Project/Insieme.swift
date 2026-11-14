@@ -30,6 +30,8 @@ final class Insieme {
         var quando: Date
     }
     private var attesa: Attesa?
+    /// 14 nov: un messaggio (o una chiamata, un post) preparato aspetta il sì (l'iniziativa non ci parla sopra con una domanda).
+    var aspettaIlSi: Bool { attesa.map { Date().timeIntervalSince($0.quando) < 180 } ?? false }
     /// «Rispondile» senza il testo: la frase dopo è il testo (entro un minuto).
     private var attesaTesto: (chi: String, numero: String?, quando: Date)?
 
@@ -86,6 +88,9 @@ final class Insieme {
                 return await preparaMessaggio(t.chi, numero: t.numero, testo: Insieme.diretto(frase), whatsapp: nil)
             }
         }
+        // 14 nov: una frase con più pezzi («mostrami il meteo e fissalo») intera non è sua: la regia la taglia e gli passa i suoi
+        // pezzi uno alla volta (se un pezzo non lo sa fare nessuno, la frase va tutta al cervello)
+        if Insieme.composta(frase) { return nil }
         guard let i = riconosci(Insieme.norma(frase), nudo: nudo) else { return nil }
         return await fai(i, frase: frase)
     }
@@ -95,6 +100,7 @@ final class Insieme {
         if attesa != nil, Regia.eAssenso(frase) || Regia.eAnnulla(frase) { return true }
         let nudo = FineFrase.paroleNude(frase).joined(separator: " ")
         if attesa == nil, Congedo.condiviso.rispostaSecca(nudo) != nil { return true }
+        if Insieme.composta(frase) { return false }                     // 14 nov: i pezzi uno alla volta (prova)
         guard let i = riconosci(Insieme.norma(frase), nudo: nudo) else { return false }
         let filo = Filo.condiviso
         switch i {
@@ -108,6 +114,21 @@ final class Insieme {
             let r = q.nome != nil ? filo.cosa(nome: q.nome, di: q.di, prima: q.prima) : filo.cosa(genere: q.genere, plurale: q.plurale)
             return r?.daMandare != nil
         default: return true
+        }
+    }
+
+    /// 14 nov: più comandi in una frase, che la regia taglia in pezzi («apri il meteo e fissalo», «scendi, poi rispondile»).
+    private static func composta(_ frase: String) -> Bool {
+        FineFrase.comandoComposto(frase) && Regia.pezzi(frase).count >= 2
+    }
+
+    /// 14 nov: la frase prepara qualcosa che aspetta il sì (un messaggio, una chiamata, un post)? In una frase con più pezzi può
+    /// essere solo l'ultimo (Regia): due cose in attesa dello stesso sì si confonderebbero.
+    func chiedeSi(_ frase: String) -> Bool {
+        let nudo = FineFrase.paroleNude(frase).joined(separator: " ")
+        switch riconosci(Insieme.norma(frase), nudo: nudo) {
+        case .scrivi?, .scriviCosa?, .manda?, .chiama?, .pubblica?: return true
+        default: return false
         }
     }
 

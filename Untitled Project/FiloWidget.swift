@@ -70,12 +70,59 @@ private struct FasciaFilo: View {
                         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
                     }
             )
+            // 14 nov (come il mockup): sul Mac e con il trackpad dell'iPad, due dita verso sinistra sulla fascia la richiamano
+            .modifier(DueDitaFilo { dx in
+                guard dx < -40 else { return }
+                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
+            })
             .accessibilityElement()
             .accessibilityLabel("FILO")
             .accessibilityHint("Riporta quello che è sparito")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { _ = Filo.condiviso.richiama() }
     }
+}
+
+/// 14 nov · lo swipe a due dita del trackpad (Mac, iPad con la tastiera), come le rotelle del mockup: non è un trascinamento, iOS
+/// lo dà solo a un riconoscitore che accetta lo scorrimento. Le dita sullo schermo non le prende (restano agli altri gesti) e lavora
+/// insieme a tutti gli altri (la lista della tab scorre su e giù come sempre). `fine`: lo spostamento orizzontale a gesto finito.
+/// Prima di iOS 18 (iPhone senza trackpad) non serve: non c'è.
+private struct DueDitaFilo: ViewModifier {
+    let fine: (CGFloat) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.gesture(GestoDueDita(fine: fine))
+        } else {
+            content
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct GestoDueDita: UIGestureRecognizerRepresentable {
+    let fine: (CGFloat) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let g = UIPanGestureRecognizer()
+        g.allowedScrollTypesMask = .continuous
+        g.allowedTouchTypes = []
+        g.delegate = InsiemeAgliAltri.condiviso
+        return g
+    }
+
+    func handleUIGestureRecognizerAction(_ g: UIPanGestureRecognizer, context: Context) {
+        guard g.state == .ended else { return }
+        let t = g.translation(in: g.view)
+        guard abs(t.x) > abs(t.y) * 1.5 else { return }
+        fine(t.x)
+    }
+}
+
+/// Il trackpad della tab lavora insieme agli altri gesti (lo scorrimento della lista, i tocchi).
+private final class InsiemeAgliAltri: NSObject, UIGestureRecognizerDelegate {
+    static let condiviso = InsiemeAgliAltri()
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith altro: UIGestureRecognizer) -> Bool { true }
 }
 
 /// La nascita di FILO: si apre in largo su una riga sottile, poi in alto (scale .2,.04 → 1,.04 → 1,1), l'angolo in alto a destra fermo.
@@ -129,11 +176,13 @@ private struct SchedaFilo: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
-                        ArgomentoVista(a: a, primo: i == 0)
+                        // 14 nov (scelta del signore): in secondo piano compatta, una riga per argomento
+                        ArgomentoVista(a: a, primo: i == 0, compatta: !filo.fuoco)
                             .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -6)),
                                                     removal: .opacity.combined(with: .offset(x: 24))))
                     }
                 }
+                .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26), value: filo.fuoco)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
                     contenuto = h
                     if #unavailable(iOS 18.0) { sotto = h > Self.altezzaMassima + 4 }   // iOS 17: c'è altro sotto
@@ -142,6 +191,7 @@ private struct SchedaFilo: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .frame(height: altezza)
+            .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26), value: altezza)   // si stringe e si riapre col contenuto
             .mask { Sfuma(sopra: sopra, sotto: sotto) }
             .modifier(ScorreFilo(sopra: $sopra, sotto: $sotto))           // iOS 18: la sfumatura e «scorre: le notifiche aspettano»
             .padding(.top, 6)
@@ -199,7 +249,9 @@ private struct SchedaFilo: View {
                     if v.translation.width > 0, v.translation.width > abs(v.translation.height) * 2.5 { dx = v.translation.width }
                 }
                 .onEnded { v in
-                    if v.translation.width > 80, v.translation.width > abs(v.translation.height) * 2.5 {
+                    // 14 nov: basta anche un colpo veloce verso destra (corto ma lanciato), come le notifiche di iOS
+                    let lanciata = v.translation.width > 30 && v.predictedEndTranslation.width > 170
+                    if v.translation.width > 80 || lanciata, v.translation.width > abs(v.translation.height) * 2.5 {
                         Suoni.filoVia()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
@@ -209,6 +261,12 @@ private struct SchedaFilo: View {
                     withAnimation(.easeOut(duration: 0.2)) { dx = 0 }
                 }
         )
+        // 14 nov (come il mockup): sul Mac e con il trackpad dell'iPad, due dita verso destra sulla tab la mandano via
+        .modifier(DueDitaFilo { dx in
+            guard dx > 60 else { return }
+            Suoni.filoVia()
+            withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
+        })
         .onChange(of: trascina) { _, v in
             Filo.condiviso.toccato(v, da: "trascina")                     // finito (o interrotto): altri 2,8 secondi
             if !v, dx != 0 { withAnimation(.easeOut(duration: 0.2)) { dx = 0 } }
@@ -222,19 +280,24 @@ private struct SchedaFilo: View {
 }
 
 /// Un argomento: la testata (il nome, la linea che corre, la X in fondo a destra) e le sue righe.
+/// 14 nov (scelta del signore, 09:08): `compatta` (la tab in secondo piano) è una riga sola, il nome e il dato che conta (il primo
+/// impegno, il meteo…); toccata torna intera. E mentre JARVIS parla si accende la riga che sta dicendo. Come il mockup.
 private struct ArgomentoVista: View {
     let a: ArgomentoFilo
     let primo: Bool
+    let compatta: Bool
+    @ObservedObject private var filo = Filo.condiviso
     @State private var accesa = false
 
     var body: some View {
+        let tutte = righe
         VStack(alignment: .leading, spacing: 1) {
             if !primo {
                 // tra un argomento e l'altro una linea di luce
                 LinearGradient(colors: [Olo.azzurro.opacity(0), Olo.azzurro.opacity(0.45), Olo.azzurro.opacity(0)], startPoint: .leading, endPoint: .trailing)
                     .frame(height: 1)
-                    .padding(.bottom, 8)
-                    .padding(.top, 10)
+                    .padding(.bottom, compatta ? 3 : 8)
+                    .padding(.top, compatta ? 2 : 10)
             }
             HStack(spacing: 6) {
                 Text((a.etichetta ?? a.nome).uppercased())
@@ -252,25 +315,40 @@ private struct ArgomentoVista: View {
                         .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
                         .accessibilityLabel("fissato")
                 }
-                LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
-                    .frame(height: 1)
-                Button {
-                    Suoni.filoVia()
-                    withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 6.5, weight: .bold))
-                        .foregroundStyle(Olo.bianco)
-                        .frame(width: 15, height: 15)
-                        .background(Circle().fill(Olo.azzurro.opacity(0.08)))
-                        .overlay(Circle().stroke(Olo.ciano.opacity(0.55), lineWidth: 1))
-                        .shadow(color: Olo.azzurro.opacity(0.35), radius: 3)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
+                if compatta {
+                    // compatta: al posto della linea e della X, il dato che conta
+                    Text(tutte.first?.testo ?? "")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.96))
+                        .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                } else {
+                    LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
+                        .frame(height: 1)
+                        .transition(.opacity)
+                    Button {
+                        guard !Filo.condiviso.consumaSveglia() else { return }   // era compatta: il tocco l'ha solo riaperta
+                        Suoni.filoVia()
+                        withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 6.5, weight: .bold))
+                            .foregroundStyle(Olo.bianco)
+                            .frame(width: 15, height: 15)
+                            .background(Circle().fill(Olo.azzurro.opacity(0.08)))
+                            .overlay(Circle().stroke(Olo.ciano.opacity(0.55), lineWidth: 1))
+                            .shadow(color: Olo.azzurro.opacity(0.35), radius: 3)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle().inset(by: -8))           // 14 nov: si prende col dito (44 punti), il disegno è quello
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, -6)
+                    .accessibilityLabel("Chiudi \(a.nome)")
+                    .transition(.opacity)
                 }
-                .buttonStyle(.plain)
-                .padding(.trailing, -6)
-                .accessibilityLabel("Chiudi \(a.nome)")
             }
             .frame(minHeight: 24)
             // 14 nov: tenuto premuto sul nome, si fissa (◆) come con «fissalo»; ancora, si sgancia
@@ -280,42 +358,65 @@ private struct ArgomentoVista: View {
                 withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
             }
             .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
-            ForEach(righe) { r in
-                Button {
-                    if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        if let icona = r.icona {
-                            Image(systemName: icona)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Olo.ciano)
-                                .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
-                                .accessibilityHidden(true)
-                        }
-                        Text(r.testo)
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
-                            .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if let ora = r.ora {
-                            Text(ora)
-                                .font(.system(size: 7.5, weight: .medium, design: .monospaced))
-                                .foregroundStyle(Olo.ciano.opacity(0.6))
-                        }
+            if !compatta {
+                // la riga che JARVIS sta dicendo si accende (si guarda solo mentre parla)
+                TimelineView(.animation(minimumInterval: 0.1, paused: filo.voceOra == nil)) { tl in
+                    let detta = Filo.rigaDetta(tutte.map { r -> (id: String, testo: String) in (id: r.id, testo: r.testo) }, voce: filo.voceOra, ora: tl.date)
+                    VStack(alignment: .leading, spacing: 1) {
+                        ForEach(tutte) { r in riga(r, detta: r.id == detta) }
                     }
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint(r.sezione == nil ? "" : "Apre \(r.sezione ?? "")")
+                .transition(.opacity)
             }
         }
         // appena arrivato (o aggiornato) si accende un attimo; richiamato col dito dal bordo no (come il mockup)
         .brightness(accesa ? 0.35 : 0)
         .onAppear { if Date().timeIntervalSince(a.aggiornato) < 0.6 { accendi() } }
         .onChange(of: a.giro) { accendi() }
+    }
+
+    /// Una riga: toccata apre la sua sezione; mentre JARVIS la dice è accesa (come `.f2-r.detta` del mockup).
+    private func riga(_ r: RigaVista, detta: Bool) -> some View {
+        Button {
+            guard !Filo.condiviso.consumaSveglia() else { return }       // era compatta: il tocco l'ha solo riaperta
+            if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let icona = r.icona {
+                    Image(systemName: icona)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Olo.ciano)
+                        .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                        .accessibilityHidden(true)
+                }
+                Text(r.testo)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
+                    .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let ora = r.ora {
+                    Text(ora)
+                        .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Olo.ciano.opacity(0.6))
+                }
+            }
+            .padding(.vertical, 3)
+            .background {
+                if detta {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Olo.azzurro.opacity(0.16))
+                        .overlay(alignment: .leading) { Rectangle().fill(Olo.ciano).frame(width: 2) }
+                        .shadow(color: Olo.azzurro.opacity(0.25), radius: 5)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: detta)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(r.sezione == nil ? "" : "Apre \(r.sezione ?? "")")
     }
 
     private func accendi() {

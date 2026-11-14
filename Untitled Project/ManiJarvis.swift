@@ -129,6 +129,8 @@ enum ManiJarvis {
 
     /// Il tasto rischioso premuto in attesa del sì, e quando l'ha chiesto.
     private static var inSospeso: (chiave: String, quando: Date)?
+    /// 14 nov: un tasto rischioso aspetta il sì.
+    static var aspettaIlSi: Bool { inSospeso.map { Date().timeIntervalSince($0.quando) < 180 } ?? false }
 
     /// I tasti che vogliono il sì del signore: inviare, eliminare, pubblicare, chiamare, pagare, uscire da un account.
     static func rischioso(_ etichetta: String) -> Bool {
@@ -170,9 +172,7 @@ enum ManiJarvis {
                 return (Regia.json(["aspetta_il_si": "«\(t.etichetta)»", "nota": "chiedi conferma al signore con una domanda breve; se dice sì richiama mano con lo stesso tasto e confermato=true"]), false)
             }
         }
-        Mirino.condiviso.punta(t.cornice)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        try? await Task.sleep(for: .milliseconds(220))                 // il mirino si posa sul tasto, poi il tocco
         var fatto = t.oggetto.accessibilityActivate()
         if !fatto, let c = t.oggetto as? UIControl { c.sendActions(for: .touchUpInside); fatto = true }
         guard fatto else { return (Regia.json(["errore": "il tasto «\(t.etichetta)» non si lascia premere da qui"]), true) }
@@ -213,7 +213,14 @@ enum ManiJarvis {
     // MARK: Scorrere e scrivere (le viste di UIKit sotto SwiftUI)
 
     private static func scorri(_ verso: String) -> (String, Bool) {
-        guard let w = finestra, let sv = pagina(in: w) else { return (Regia.json(["errore": "qui non c'è niente da scorrere"]), true) }
+        guard let dove = scorriSubito(verso) else { return (Regia.json(["errore": "qui non c'è niente da scorrere"]), true) }
+        return (Regia.json(["fatto": "pagina \(dove)"]), false)
+    }
+
+    /// 14 nov · le mani subito («scendi», «torna su», «in fondo»: la regia, senza cervello): scorre la pagina davanti e dice dove è
+    /// arrivata («in cima», «in fondo», «a metà (40%)», «tutta visibile»). Nil: qui non c'è niente da scorrere.
+    static func scorriSubito(_ verso: String) -> String? {
+        guard let w = finestra, let sv = pagina(in: w) else { return nil }
         let alto = sv.bounds.height - sv.adjustedContentInset.top - sv.adjustedContentInset.bottom
         let minimo = -sv.adjustedContentInset.top
         let massimo = max(minimo, sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom)
@@ -226,8 +233,7 @@ enum ManiJarvis {
         }
         y = min(massimo, max(minimo, y))
         sv.setContentOffset(CGPoint(x: sv.contentOffset.x, y: y), animated: true)
-        let dove = massimo <= minimo ? "tutta visibile" : y <= minimo + 2 ? "in cima" : y >= massimo - 2 ? "in fondo" : "a metà (\(Int((y - minimo) / (massimo - minimo) * 100))%)"
-        return (Regia.json(["fatto": "pagina \(dove)"]), false)
+        return massimo <= minimo ? "tutta visibile" : y <= minimo + 2 ? "in cima" : y >= massimo - 2 ? "in fondo" : "a metà (\(Int((y - minimo) / (massimo - minimo) * 100))%)"
     }
 
     /// La pagina da scorrere: la vista che scorre più grande che si vede (non quelle piccole, come la lista di FILO).
@@ -262,8 +268,6 @@ enum ManiJarvis {
         let detto = Regia.chiave(i["campo"] as? String ?? "")
         let campo = campi.first { f in !detto.isEmpty && (Regia.chiave(f.placeholder ?? "").contains(detto) || Regia.chiave(f.accessibilityLabel ?? "").contains(detto)) }
             ?? campi.first { $0.isFirstResponder } ?? campi.last!
-        Mirino.condiviso.punta(campo.convert(campo.bounds, to: nil))
-        try? await Task.sleep(for: .milliseconds(200))
         _ = campo.becomeFirstResponder()
         if let tutto = campo.textRange(from: campo.beginningOfDocument, to: campo.endOfDocument) { campo.replace(tutto, withText: testo) }
         else { campo.insertText(testo) }

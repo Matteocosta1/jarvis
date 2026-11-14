@@ -349,24 +349,48 @@ nonisolated enum FineFrase {
     /// strumento «regia». Basta un legame («e», «poi», «quindi», «dopo») seguito da un verbo di comando.
     static func comandoComposto(_ testo: String) -> Bool {
         let p = paroleNude(testo)
-        guard p.count >= 4 else { return false }
+        // 14 nov: se la frase comincia con un verbo basta una parola prima del legame («scendi e fissalo», «scendi, poi rispondile»)
+        let primoVerbo = p.first.map { verbiComposti.contains($0) } ?? false
+        guard p.count >= (primoVerbo ? 3 : 4) else { return false }
         let legami: Set<String> = ["e", "ed", "poi", "quindi", "dopo"]
         let ponte: Set<String> = ["poi", "anche", "intanto", "dopo", "pure", "subito"]
-        for (i, w) in p.enumerated() where i >= 2 && legami.contains(w) {
+        for (i, w) in p.enumerated() where (i >= 2 || (primoVerbo && i >= 1)) && legami.contains(w) {
             var j = i + 1
             while j < p.count, ponte.contains(p[j]) { j += 1 }               // «e poi», «e intanto», «e anche»
             if j < p.count, verbiComposti.contains(p[j]) { return true }
         }
-        return false
+        // 14 nov: anche con la virgola, come la scrive la dettatura («apri il meteo, fissalo e torna su»)
+        return dopoVirgola(testo).contains { $0 >= (primoVerbo ? 1 : 2) }
     }
 
-    private static let verbiComposti: Set<String> = [
+    /// 14 nov: dove la frase si taglia a una virgola seguita da un verbo di comando (gli indici delle parole dette, quelle col verbo).
+    static func dopoVirgola(_ testo: String) -> [Int] {
+        let parole = testo.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        var tagli: [Int] = []
+        for i in 1..<max(1, parole.count) where parole[i - 1].hasSuffix(",") {
+            let w = parole[i].folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+                .filter { $0.isLetter }
+            if verbiComposti.contains(w) { tagli.append(i) }
+        }
+        return tagli
+    }
+
+    /// 14 nov (il signore: «frasi, non comandi… dico quello che mi viene in mente, lui lo fa»): anche i verbi della tab, del dialogo e
+    /// delle mani tagliano la frase in pezzi («apri il meteo e fissalo», «mettilo dietro e leggimi quello di Bea», «scendi, poi
+    /// rispondile che arrivo»).
+    static let verbiComposti: Set<String> = [
         "aggiungi", "aggiungimi", "togli", "toglimi", "leva", "levami", "metti", "mettimi", "segna", "segnami", "scrivi", "scrivimi",
         "manda", "mandami", "mandagli", "mandale", "invia", "chiama", "chiamami", "cerca", "cercami", "leggi", "leggimi", "dimmi",
         "apri", "aprimi", "chiudi", "chiudila", "chiudilo", "fammi", "suona", "avvia", "accendi", "spegni", "prendi", "compra",
         "mostra", "mostrami", "porta", "portami", "controlla", "aggiorna", "cambia", "imposta", "ricordami", "spunta", "svuota",
         "rispondi", "inoltra", "salva", "salvami", "elimina", "cancella", "dammi", "trova", "trovami", "guarda", "mettila",
         "mettilo", "riproduci", "fai", "torna", "vai",
+        // 14 nov: la tab, il dialogo coi pronomi, le mani, le sezioni aperte
+        "fissa", "fissalo", "fissala", "fissali", "fissale", "toglilo", "toglila", "levalo", "levala", "nascondila", "nascondilo",
+        "rifammi", "rifammelo", "rifammela", "riportami", "riportamelo", "riportamela", "riapri", "rimetti", "rispondile", "rispondigli",
+        "scrivile", "scrivigli", "dille", "digli", "leggimelo", "leggimela", "leggilo", "leggila", "mandalo", "mandala", "mandali",
+        "mandaglielo", "mandagliela", "giraglielo", "giralo", "girala", "chiamala", "chiamalo", "salvala", "salvalo", "scorri", "scendi",
+        "sali", "risali", "passa", "mettili", "mettile",
     ]
 
     /// 12.0 (12) · errore 1: la frase riprende il discorso di prima solo se è ellittica, come fra persone («e sabato?», «anche a

@@ -72,6 +72,16 @@ enum MeteoQui {
         }
     }
 
+    /// 14 nov · l'iniziativa «pioggia prima di uscire»: la probabilità di pioggia (in %) all'ora più vicina a `ora` (entro un'ora e
+    /// mezza da un'ora delle previsioni), qui dov'è il signore. Nil: Apple Meteo non risponde.
+    static func pioggia(alle ora: Date) async -> Int? {
+        let dove = await luogoAttuale(recente: 1800, entro: 3) ?? CLLocation(latitude: 45.4642, longitude: 9.19)   // senza posizione: Milano
+        guard let orario = try? await WeatherService.shared.weather(for: dove, including: .hourly),
+              let h = orario.forecast.min(by: { abs($0.date.timeIntervalSince(ora)) < abs($1.date.timeIntervalSince(ora)) }),
+              abs(h.date.timeIntervalSince(ora)) < 5400 else { return nil }
+        return Int((h.precipitationChance * 100).rounded())
+    }
+
     /// Una posizione recente, entro 8 secondi al massimo. `recente`: quanto può essere vecchia quella già nota; `entro`: quanto
     /// aspettarne una nuova (13.1: FILO non aspetta più di 3 secondi).
     private static func luogoAttuale(recente: TimeInterval = 600, entro: Double = 8) async -> CLLocation? {

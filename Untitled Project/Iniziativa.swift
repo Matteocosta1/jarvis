@@ -20,6 +20,9 @@ import UIKit
 //   (una sezione davanti o la tastiera aperta), con la musica, in RISERVATO o di notte (23–7): lì solo FILO, tranne quello che non
 //   può aspettare (è ora di uscire). Col microfono spento o col muto mai la voce. Gli impegni al massimo uno ogni 4 minuti.
 //   FILO lo mostra sempre, subito. «Non ora»: zitto per un'ora; «basta iniziative»: spente finché non dice «riprendi le iniziative».
+// - 14 nov (il signore: «deve parlare anche quando l'app è aperta e non sto facendo niente… ci sta durante la missione»): parla
+//   anche con una sezione davanti e con la musica, quando lui non parla e non tocca lo schermo da qualche secondo; zitto durante la
+//   missione. Nuove: PIOGGIA PRIMA DI USCIRE, BATTERIA E USCITA, DOMANI MATTINA (la sera, il primo impegno di domani).
 
 @MainActor
 final class Iniziativa {
@@ -31,8 +34,11 @@ final class Iniziativa {
     var libero: ((_ urgente: Bool) -> Bool)?
     /// Il signore sta parlando con JARVIS (ascolta, pensa, parla, o il seguito è ancora aperto).
     var inConversazione: (() -> Bool)?
+    /// 14 nov: qualcosa aspetta il suo sì (un messaggio preparato, un invio, un tasto): i messaggi, che possono chiedere «Glielo
+    /// leggo?», aspettano; le altre iniziative (che non chiedono niente) no.
+    var aspettaSi: (() -> Bool)?
 
-    private enum Tipo { case impegno, messaggio, batteria }
+    private enum Tipo { case impegno, messaggio, batteria, pioggia, uscita, domani }
     private struct Avviso {
         let chiave: String
         let tipo: Tipo
@@ -101,6 +107,7 @@ final class Iniziativa {
                         self.ultimoControllo = Date()
                         self.controllaBatteria()
                         await self.controllaImpegni()
+                        await self.controllaDomani()                      // 14 nov: la sera, il primo impegno di domani mattina
                     }
                     self.consegna()
                 }
@@ -143,6 +150,7 @@ final class Iniziativa {
         let eventi = calendario.events(matching: calendario.predicateForEvents(withStart: ora, end: ora.addingTimeInterval(7200), calendars: nil))
             .filter { !$0.isAllDay && $0.startDate > ora.addingTimeInterval(240) }
             .sorted { $0.startDate < $1.startDate }
+        await controllaUscite(Array(eventi.prefix(3)))                   // 14 nov: pioggia e batteria prima di uscire
         for e in eventi.prefix(3) {
             let chiave = Iniziativa.chiave(e)
             guard dette[chiave] == nil, !coda.contains(where: { $0.chiave == chiave }) else { continue }
@@ -171,6 +179,89 @@ final class Iniziativa {
                                           daMandare: "\(titolo) alle \(Iniziativa.orario(e.startDate)).", sezione: "Briefing"))
             Regia.condivisa.evento("iniziativa: \(riga)")
         }
+    }
+
+    // MARK: 14 nov · le iniziative nuove (il signore: «trova iniziative intelligenti ed utili»; «deve parlare anche quando l'app è
+    // aperta e non sto facendo niente»). Ognuna una volta sola, nella tab subito e a voce appena è libero.
+
+    /// PIOGGIA PRIMA DI USCIRE e BATTERIA E USCITA: per gli impegni con un luogo, quando all'ora di uscire mancano fra 20 e 90 minuti.
+    /// «Sir, per il dentista esce verso le 11: a quell'ora è prevista pioggia, l'ombrello.» · «Sir, esce fra un'ora col 25 per cento:
+    /// lo metterei in carica adesso.»
+    private func controllaUscite(_ eventi: [EKEvent]) async {
+        for e in eventi {
+            let chiave = Iniziativa.chiave(e)
+            guard let v = await viaggio(verso: e, chiave: chiave) else { continue }      // senza luogo non si esce
+            let uscita = e.startDate.addingTimeInterval(-max(v.secondi, 0) - 300)
+            let fra = uscita.timeIntervalSinceNow
+            guard fra >= 1200, fra <= 5400 else { continue }
+            let titolo = Iniziativa.titolo(e)
+            if dette["pioggia:" + chiave] == nil, !coda.contains(where: { $0.chiave == "pioggia:" + chiave }),
+               let p = await MeteoQui.pioggia(alle: uscita), p >= 50 {
+                let frase = Battute.una("in.pioggia", [
+                    "Sir, \(Iniziativa.per(titolo)) esce verso le \(Iniziativa.orario(uscita)): a quell'ora è prevista pioggia. L'ombrello.",
+                    "Sir, quando esce \(Iniziativa.per(titolo)), verso le \(Iniziativa.orario(uscita)), piove: \(Battute.numero(p)) per cento. Prenda l'ombrello.",
+                ])
+                coda.append(Avviso(chiave: "pioggia:" + chiave, tipo: .pioggia, frase: frase, urgente: false, scade: uscita))
+                Filo.condiviso.mostra("iniz:pioggia:" + chiave, titolo: "Meteo", riga: "Pioggia \(p)% alle \(Iniziativa.orario(uscita)) · ombrello",
+                                      sezione: "Meteo", dura: 6)
+                Regia.condivisa.evento("iniziativa: pioggia \(p)% all'uscita per \(titolo)")
+            }
+            let d = UIDevice.current
+            // una volta ogni due ore al massimo, anche con più impegni vicini
+            let gia = coda.contains(where: { $0.tipo == .uscita }) || dette.contains { $0.key.hasPrefix("uscita:") && Date().timeIntervalSince($0.value) < 7200 }
+            if !gia, d.isBatteryMonitoringEnabled,
+               d.batteryLevel >= 0, d.batteryState != .charging, d.batteryState != .full {
+                let b = Int((d.batteryLevel * 100).rounded())
+                guard b <= 30, b > 10 else { continue }                    // al 10% ci pensa già l'avviso della batteria
+                let frase = Battute.una("in.uscita", [
+                    "Sir, esce fra \(Iniziativa.minutiDetti(fra)) col \(Battute.numero(b)) per cento: lo metterei in carica adesso.",
+                    "Sir, fra \(Iniziativa.minutiDetti(fra)) esce \(Iniziativa.per(titolo)) e la batteria è al \(Battute.numero(b)) per cento. Meglio caricarlo.",
+                ])
+                coda.append(Avviso(chiave: "uscita:" + chiave, tipo: .uscita, frase: frase, urgente: false, scade: uscita))
+                Filo.condiviso.mostra("iniz:uscita:" + chiave, titolo: "Batteria", riga: "\(b)% · esce alle \(Iniziativa.orario(uscita))",
+                                      sezione: "Batteria", dura: 6, icona: "battery.25percent")
+            }
+        }
+    }
+
+    /// DOMANI MATTINA: la sera (fra le 21 e le 22:30), se domani c'è un impegno prima delle 10:30, una volta: «Sir, domani alle 9 ha
+    /// la riunione: per esserci deve uscire verso le 8:20.» (col viaggio di adesso, se l'impegno ha un luogo).
+    private func controllaDomani() async {
+        let cal = Calendar.current
+        let ora = Date()
+        let h = cal.component(.hour, from: ora), m = cal.component(.minute, from: ora)
+        guard h == 21 || (h == 22 && m <= 30), EKEventStore.authorizationStatus(for: .event) == .fullAccess,
+              let domani = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: ora)),
+              let fino = cal.date(bySettingHour: 10, minute: 30, second: 0, of: domani) else { return }
+        let chiave = "domani:" + Iniziativa.giorno(domani)
+        guard dette[chiave] == nil, !coda.contains(where: { $0.chiave == chiave }) else { return }
+        let eventi = calendario.events(matching: calendario.predicateForEvents(withStart: domani, end: fino, calendars: nil))
+            .filter { !$0.isAllDay }.sorted { $0.startDate < $1.startDate }
+        guard let e = eventi.first else { return }
+        let titolo = Iniziativa.titolo(e)
+        var frase = "Sir, domani alle \(Iniziativa.orario(e.startDate)) ha \(Iniziativa.articolato(titolo))"
+        var riga = "Domani \(Iniziativa.orario(e.startDate)) \(titolo)"
+        if let v = await viaggio(verso: e, chiave: Iniziativa.chiave(e)), v.secondi >= 180 {
+            let uscita = e.startDate.addingTimeInterval(-v.secondi - 300)
+            frase += ": per esserci deve uscire verso le \(Iniziativa.orario(uscita))."
+            riga += " — uscire alle \(Iniziativa.orario(uscita))"
+        } else {
+            frase += "."
+        }
+        coda.append(Avviso(chiave: chiave, tipo: .domani, frase: frase, urgente: false, scade: ora.addingTimeInterval(5400)))
+        Filo.condiviso.mostra("iniz:domani", titolo: "Agenda", riga: String(riga.prefix(90)), sezione: "Briefing", dura: 6)
+    }
+
+    /// «per il dentista», «per la riunione»; un titolo che non è un nome comune fra le virgolette («per «Marco»»).
+    private static func per(_ titolo: String) -> String {
+        let a = articolato(titolo)
+        return a.hasPrefix("in agenda") ? "per «\(titolo)»" : "per " + a
+    }
+
+    private static func giorno(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: d)
     }
 
     // MARK: La batteria (come nel mockup: «Batteria al 18 per cento, Sir: la metterei in carica.»)
@@ -293,6 +384,7 @@ final class Iniziativa {
         // prima quello che non può aspettare
         guard let k = coda.firstIndex(where: \.urgente) ?? coda.indices.first else { return false }
         let a = coda[k]
+        if a.tipo == .messaggio, aspettaSi?() == true { return false }   // 14 nov: un «sì» detto dopo sarebbe di chi?
         if a.urgente {
             guard libero?(true) == true else { return false }
         } else {

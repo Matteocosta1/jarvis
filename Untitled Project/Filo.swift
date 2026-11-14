@@ -96,7 +96,19 @@ final class Filo: ObservableObject {
     /// 13.1 (il signore, 14 nov: «se copre una sezione aperta usa la trasparenza dinamica della navigazione olografica»): FILO è
     /// a fuoco quando arriva, si aggiorna, viene richiamato o toccato; 2,8 s dopo (o appena il dito tocca fuori, sulla sezione)
     /// va in secondo piano e sopra una sezione diventa vetro trasparente (come le pagine dietro della PILA). Toccato torna a fuoco.
+    /// 14 nov (scelta del signore, 09:08): in secondo piano la tab è COMPATTA, una riga per argomento (il nome e il dato); toccata
+    /// torna intera (il primo tocco la riapre e basta, come il Dock). Come il mockup.
     @Published private(set) var fuoco = true
+    /// Quando il dito l'ha appena svegliata (era compatta): quel tocco la riapre e basta, non apre e non chiude niente.
+    private var svegliataAlle: Date?
+    /// 14 nov (scelta del signore: «si accende la riga che dice»): la frase che JARVIS sta dicendo adesso, piegata (minuscole, senza
+    /// accenti), da quando e per quanto (stimato): nella tab si accende la riga di cui sta parlando.
+    struct VoceOra: Equatable {
+        let testo: String
+        let inizio: Date
+        let durata: TimeInterval
+    }
+    @Published private(set) var voceOra: VoceOra?
     private var riposa: Task<Void, Never>?
     /// Dove sta la scheda sullo schermo (coordinate della finestra): un tocco fuori la manda in secondo piano.
     var rettScheda: CGRect = .zero
@@ -400,14 +412,19 @@ final class Filo: ObservableObject {
         svegli()
     }
 
-    /// FILO a fuoco adesso; in secondo piano 2,8 s dopo, se nessuno lo tocca.
+    /// FILO a fuoco adesso; in secondo piano (compatta) 2,8 s dopo, se nessuno lo tocca.
+    /// 14 nov: mai mentre JARVIS parla (riparte da quando ha finito, `jarvisParla`); e se sullo schermo c'è solo roba che sta per
+    /// sparire, non si stringe: sparisce e basta.
     private func svegli() {
         fuoco = true
         riposa?.cancel()
         guard !tocco else { return }
         riposa = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Filo.durataNotifica))
-            guard let self, !Task.isCancelled, !self.tocco else { return }
+            guard let self, !Task.isCancelled, !self.tocco, !self.voce else { return }
+            let tra = Date().addingTimeInterval(0.6)
+            let resta = self.richiamato || self.visti.contains { $0.fisso || ($0.scade ?? .distantFuture) > tra }
+            guard resta else { return }
             self.fuoco = false
         }
     }
@@ -418,6 +435,7 @@ final class Filo: ObservableObject {
     func toccoSchermo(_ p: CGPoint) {
         guard !visti.isEmpty, !daParte, rettScheda.width > 0 else { return }
         if rettScheda.contains(p) {
+            svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta
             toccato(true, da: "appoggiato")
         } else if fuoco, !tocco {
             riposa?.cancel()
@@ -425,8 +443,58 @@ final class Filo: ObservableObject {
         }
     }
 
+    /// Il tocco che l'ha appena riaperta (era compatta): vero una volta sola, e chi lo riceve non fa niente (come il Dock).
+    func consumaSveglia() -> Bool {
+        guard let s = svegliataAlle else { return false }
+        svegliataAlle = nil
+        return Date().timeIntervalSince(s) < 1.2
+    }
+
+    /// 14 nov: una frase di JARVIS comincia a suonare (Jarvis.suonoIniziato): la riga della tab di cui parla si accende.
+    func voceIniziata(_ frase: String) {
+        let t = Filo.piega(TagVoce.togli(frase))
+        guard t.contains(where: { $0.isLetter }) else { voceOra = nil; return }
+        // la durata stimata: circa 68 ms a lettera (la voce di JARVIS), almeno un secondo
+        voceOra = VoceOra(testo: t, inizio: Date(), durata: max(1, Double(t.count) * 0.068))
+    }
+
+    /// Minuscole, senza accenti: per confrontare quello che dice JARVIS con le righe della tab.
+    static func piega(_ s: String) -> String {
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+    }
+
+    /// Le parole di una riga che JARVIS potrebbe dire («11:30 dentista» → dentista), senza quelle che dice sempre.
+    private static let paroleVuote: Set<String> = ["oggi", "domani", "ieri", "stasera", "alle", "dalle", "sono", "anche", "della", "delle",
+                                                    "dello", "degli", "nella", "nelle", "questo", "questa", "quello", "quella", "tutto",
+                                                    "tutti", "molto", "ancora", "dopo", "prima", "adesso", "sempre", "niente", "nuovi",
+                                                    "nuovo", "fra", "minuti", "inviato", "pronto"]
+
+    /// La riga accesa adesso: fra le righe (id, testo), quella la cui parola JARVIS ha appena detto (l'ultima già arrivata).
+    static func rigaDetta(_ righe: [(id: String, testo: String)], voce: VoceOra?, ora: Date) -> String? {
+        guard let v = voce else { return nil }
+        let frase = v.testo as NSString
+        let dove = min(1, max(0, ora.timeIntervalSince(v.inizio) / v.durata)) * Double(frase.length)
+        var scelta: String?
+        var ultima = -1
+        for r in righe {
+            let parole = piega(r.testo).split(whereSeparator: { !$0.isLetter }).map(String.init).filter { $0.count >= 4 && !paroleVuote.contains($0) }
+            let dette = parole.map { frase.range(of: $0).location }.filter { $0 != NSNotFound }
+            guard let k = dette.min(), Double(k) <= dove, k > ultima else { continue }
+            ultima = k
+            scelta = r.id
+        }
+        return scelta
+    }
+
     /// Il dito si alza (o il tocco finisce in un altro modo).
     func ditoAlzato() {
+        // il tocco che l'ha riaperta vale solo per quel tocco: se non è finito su un tasto, poco dopo non conta più
+        if svegliataAlle != nil {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                self?.svegliataAlle = nil
+            }
+        }
         if fonti.contains("appoggiato") { toccato(false, da: "appoggiato") }
     }
 
@@ -448,8 +516,27 @@ final class Filo: ObservableObject {
             for k in argomenti.indices where !argomenti[k].fisso && !argomenti[k].nascosto {
                 if let s = argomenti[k].scade, s < fine { argomenti[k].scade = fine }
             }
+            voceOra = nil                                                // ha finito: nessuna riga accesa
+            if fuoco, !visti.isEmpty { svegli() }                        // 14 nov: compatta 2,8 s dopo la sua ultima parola
         }
         programma()
+    }
+
+    /// 14 nov: il cervello fissa o sgancia un argomento per nome (la regia, «tab_fissa» / «tab_sgancia»). Falso se non c'è.
+    @discardableResult
+    func fissa(argomento nome: String, si: Bool) -> Bool {
+        guard let i = argomenti.firstIndex(where: { Regia.chiave($0.nome) == Regia.chiave(nome) }) else { return false }
+        if argomenti[i].fisso != si { fissaArgomento(argomenti[i].nome) }
+        if si, argomenti[i].nascosto { argomenti[i].nascosto = false; argomenti[i].nascostoAlle = nil; svegli() }
+        return true
+    }
+
+    /// Il nome dell'argomento com'è nella tab, detto dal cervello o da lui («il meteo», «agenda», «Briefing»).
+    func nomeArgomento(_ detto: String) -> String? {
+        let k = Regia.chiave(detto)
+        guard !k.isEmpty else { return nil }
+        let nome = Regia.destinazione(detto).map { Filo.argomento(sezione: $0.nome, titolo: $0.nome) }
+        return argomenti.first { Regia.chiave($0.nome) == k || ($0.etichetta.map { Regia.chiave($0) == k } ?? false) || $0.nome == nome }?.nome
     }
 
     /// 14 nov: tenuto premuto col dito, l'argomento si fissa (come «fissalo»); di nuovo, si sgancia.

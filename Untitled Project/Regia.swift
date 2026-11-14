@@ -96,6 +96,8 @@ final class Regia {
     }
     /// I passi fermi in attesa del sì del signore (inviare, eliminare, pubblicare, chiamare) e quando li ha chiesti.
     private var inSospeso: (passi: [Passo], quando: Date)?
+    /// 14 nov: un invio, un'eliminazione, una chiamata aspettano il sì.
+    var aspettaIlSi: Bool { inSospeso.map { Date().timeIntervalSince($0.quando) < 180 } ?? false }
 
     // MARK: Le sezioni si presentano
 
@@ -176,6 +178,7 @@ final class Regia {
         var tutte: [AzioneRegia] = []
         for s in scene(di: nome) { for a in s.azioni where viste.insert(Regia.chiave(a.nome)).inserted { tutte.append(a) } }
         if let scrivi = azioneScrivi(nome) { tutte.append(scrivi) }      // 12.0 (12) · B2: i campi di testo della sezione
+        if self.viste(di: nome) != nil, let vista = azioneVista(nome) { tutte.append(vista) }   // 14 nov: le viste dell'ologramma (`viste` qui sopra è il Set)
         return tutte
     }
 
@@ -295,7 +298,7 @@ final class Regia {
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
         // 14 nov (il signore: «come Iron Man: attivo, sveglio, reattivo»): la tab mostra da sola i dati che servono per decidere
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine. LA TAB A VOCE (sezione vuota): tab_fissa(titolo) e tab_sgancia(titolo) (titolo = l'argomento: Meteo, Agenda, Messaggi…; vuoto = quello di cui si parla), tab_togli(titolo), tab_vuota, tab_nascondi (va via, si richiama), tab_richiama. Le viste dell'ologramma della sezione davanti: vista(nome), coi nomi delle sue chip. Scorrere la pagina: mano scorri")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -332,7 +335,7 @@ final class Regia {
                         "type": "object",
                         "properties": [
                             "sezione": ["type": "string", "description": "Il nome della sezione (Spesa, Meteo, Musica…); vuoto per da_parte, di_prima, sfoglia, chiudi_tutto"],
-                            "azione": ["type": "string", "description": "apri, chiudi, da_parte, di_prima, sfoglia, chiudi_tutto, oppure un'azione della sezione"],
+                            "azione": ["type": "string", "description": "apri, chiudi, da_parte, di_prima, sfoglia, chiudi_tutto, mostra, tab_fissa, tab_sgancia, tab_togli, tab_vuota, tab_nascondi, tab_richiama, oppure un'azione della sezione"],
                             "valori": ["type": "object", "description": "I valori dell'azione, come testo (es. {\"cosa\": \"latte, uova\"})",
                                        "additionalProperties": ["type": "string"]],
                         ] as [String: Any],
@@ -421,6 +424,32 @@ final class Regia {
             Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: String(titolo.prefix(14)),
                                           riga: riga, detto: "il dato di " + titolo, testo: riga, sezione: Regia.destinazione(p.sezione)?.nome))
             return .fatto("widget FILO: \(titolo) · \(riga)")
+        // 14 nov (il signore: «apri il meteo e fissalo» faceva metà): la tab a voce anche per il cervello
+        case "tabfissa", "tabsgancia":
+            let si = Regia.chiave(p.azione) == "tabfissa"
+            let detto = (p.valori["titolo"] ?? p.sezione).trimmingCharacters(in: .whitespacesAndNewlines)
+            let filo = Filo.condiviso
+            if let nome = filo.nomeArgomento(detto) ?? (detto.isEmpty ? filo.visti.first?.nome : nil), filo.fissa(argomento: nome, si: si) {
+                return .fatto("tab: \(nome) " + (si ? "fissata" : "sganciata"))
+            }
+            if si, let c = filo.questo { filo.fissa(c); return .fatto("tab: fissata «\(c.titolo)»") }
+            return .no("nella tab non c'è «\(detto)»: " + filo.argomenti.map(\.nome).joined(separator: ", "))
+        case "tabtogli":
+            let detto = (p.valori["titolo"] ?? p.sezione).trimmingCharacters(in: .whitespacesAndNewlines)
+            if let nome = Filo.condiviso.nomeArgomento(detto), Filo.condiviso.togliArgomento(nome) { Suoni.filoVia(); return .fatto("tab: tolto \(nome)") }
+            if detto.isEmpty, Filo.condiviso.togli() { Suoni.filoVia(); return .fatto("tab: tolto l'argomento di cui si parlava") }
+            return .no("nella tab non c'è «\(detto)»")
+        case "tabvuota":
+            let n = Filo.condiviso.togliTutti()
+            if n > 0 { Suoni.filoVia() }
+            return .fatto(n > 0 ? "tab vuota (tolti \(n) argomenti)" : "la tab era già vuota")
+        case "tabnascondi":
+            guard !Filo.condiviso.visti.isEmpty else { return .fatto("la tab non si vede già") }
+            Suoni.filoVia()
+            Filo.condiviso.rimandaVia()
+            return .fatto("tab nascosta (si richiama)")
+        case "tabrichiama":
+            return Filo.condiviso.richiama() ? .fatto("tab richiamata: " + Filo.condiviso.visti.map(\.nome).joined(separator: ", ")) : .no("niente da richiamare")
         default:
             break
         }
@@ -456,6 +485,7 @@ final class Regia {
             return .fatto("\(d.nome) si apre appena hai finito la frase: dilla breve")
         }
         vai?(d.strada)
+        metteNelFilo(d)                                                  // 14 nov: «apri il meteo e fissalo», «…e mandalo a Bea»
         evento(eraDietro ? "\(d.nome) tornata davanti" : "aperta \(d.nome)")
         if let s = await attendi(d.nome, conAzioni: false) { return .fatto("\(d.nome) davanti: " + Regia.taglia(s, 600)) }
         return .fatto("\(d.nome) davanti")
@@ -535,6 +565,14 @@ final class Regia {
     private func subitoUno(_ frase: String) async -> String? {
         let parole = Regia.paroleComando(frase)
         guard !parole.isEmpty else { return nil }
+        // 14 nov (le mani subito, senza cervello): «scendi», «torna su», «in fondo»; «passa al globo», «vista atomo», «le torri»
+        if !davantiCapisce(frase) {
+            if let v = Regia.versoScorri(parole) { return scorriDetto(v) }
+            if let d = nomeDavanti, let n = Regia.vistaDetta(parole, sezione: d) {
+                let e = await vista(sezione: d, detto: n)
+                if e.ok { return e.battuta?() ?? "" }
+            }
+        }
         // prima la sezione davanti, poi le azioni che valgono ovunque (i tasti della musica, se c'è qualcosa in coda)
         let d = nomeDavanti ?? "JARVIS"
         let davanti = nomeDavanti.map { azioni(di: $0) } ?? []
@@ -649,43 +687,133 @@ final class Regia {
 
     /// «Apri la spesa e aggiungi il latte», «chiudi tutto e dimmi il meteo», «apri la musica e metti Sfera»: se l'app sa fare
     /// ogni pezzo li fa uno dopo l'altro, subito; se anche uno solo non lo sa fare, nessuno parte e la frase va al cervello
-    /// (che li fa in fila con la regia). La battuta è quella dell'ultimo pezzo.
+    /// (che li fa in fila con la regia).
+    /// 14 nov (il signore: «frasi, non comandi… dico quello che mi viene in mente, lui lo fa»): i pezzi possono essere anche le sezioni
+    /// aperte («mettilo dietro», «quella di prima», «chiudi il meteo»), lo scorrere («scendi», «torna su»), le viste degli ologrammi
+    /// («passa al globo»), la tab e il dialogo coi pronomi («fissalo», «leggimi quello di Bea», «rispondile che…»), i tasti della
+    /// musica. Quello che chiede il sì (un messaggio, una chiamata) può essere solo l'ultimo pezzo. JARVIS dice le cose vere (quello
+    /// che legge, il messaggio che prepara); se i pezzi sono solo movimenti, la battuta dell'ultimo.
+    /// Se l'app non sa fare tutto, i primi pezzi che aprono o chiudono partono subito (si vede subito) e la frase intera va al cervello,
+    /// che trova la sezione già davanti.
     private func subitoComposto(_ frase: String) async -> String? {
         let pezzi = Regia.pezzi(frase)
-        guard pezzi.count >= 2, pezzi.count <= 4 else { return nil }
+        guard pezzi.count >= 2, pezzi.count <= 5 else { return nil }
         // prima si controlla che si sappiano fare tutti (senza fare niente), con la sezione che sarà davanti a ogni passo
-        var davanti = nomeDavanti
-        var piano: [(pezzo: String, tipo: Pezzo)] = []
-        for p in pezzi {
-            guard let t = riconosci(p, davanti: davanti) else { return nil }
-            if case .apri(let n) = t { davanti = n }
-            if case .chiudiTutto = t { davanti = nil }
-            if case .intenzione(let n) = t { davanti = n }
-            piano.append((p, t))
+        guard let piano = pianoDi(pezzi) else {
+            avviaPrimi(pezzi)
+            return nil
         }
-        var battuta: String?
+        var dette: [String] = []
+        var ultima: String?
         for (k, voce) in piano.enumerated() {
-            switch voce.tipo {
-            case .apri(let n):
-                let e = await apri(n)
-                guard e.ok else { return k == 0 ? nil : (e.battuta?() ?? "") }
-                battuta = Regia.aperturaDi(n)
-            case .chiudiTutto:
-                vai?(.chiudiTutto)
-                evento("chiuse tutte le sezioni")
-                try? await Task.sleep(for: .milliseconds(350))
-                battuta = Battute.chiusoTutto()
-            case .intenzione(let n):
-                battuta = await intenzione(voce.pezzo, dentro: n)
-            case .musica:
-                battuta = await musicaDetta(voce.pezzo)
-            }
+            let (battuta, vera) = await fai(voce.tipo, pezzo: voce.pezzo, primo: k == 0)
+            guard let battuta else { if k == 0 { return nil } else { continue } }
+            if vera, !battuta.isEmpty { dette.append(battuta) }
+            if !battuta.isEmpty { ultima = battuta }
         }
         evento("in fila: " + pezzi.joined(separator: " → "))
-        return battuta ?? ""
+        return dette.isEmpty ? (ultima ?? "") : dette.joined(separator: " ")
     }
 
-    private enum Pezzo { case apri(String), chiudiTutto, intenzione(String), musica }
+    /// I pezzi riconosciuti in ordine, con la sezione che sarà davanti a ogni passo. Nil: almeno uno non lo sa fare l'app, oppure
+    /// chiede il sì e non è l'ultimo (due messaggi in fila aspetterebbero lo stesso sì).
+    private func pianoDi(_ pezzi: [String]) -> [(pezzo: String, tipo: Pezzo)]? {
+        var davanti = nomeDavanti
+        var piano: [(pezzo: String, tipo: Pezzo)] = []
+        for (k, p) in pezzi.enumerated() {
+            guard let t = riconosci(p, davanti: davanti) else { return nil }
+            if case .dialogo = t, Insieme.condiviso.chiedeSi(p), k < pezzi.count - 1 { return nil }
+            switch t {
+            case .apri(let n), .intenzione(let n): davanti = n
+            case .chiudiTutto: davanti = nil
+            case .strada(let s, let n):
+                switch s {
+                case .daParte: davanti = nil
+                case .chiudi: if n == davanti { davanti = nil }
+                default: davanti = nil                                     // quella di prima, le sezioni aperte: non si sa quale
+                }
+            default: break
+            }
+            piano.append((p, t))
+        }
+        return piano
+    }
+
+    /// La frase intera va al cervello, ma i primi pezzi che aprono o chiudono partono subito: lui vede subito la sezione, il cervello
+    /// la trova già davanti (aprirla di nuovo non fa niente).
+    private func avviaPrimi(_ pezzi: [String]) {
+        var davanti = nomeDavanti
+        for p in pezzi {
+            guard let t = riconosci(p, davanti: davanti) else { return }
+            switch t {
+            case .apri(let n):
+                guard let d = Regia.destinazione(n), nomeDavanti != d.nome else { return }
+                vai?(d.strada)
+                metteNelFilo(d)
+                evento("aperta \(d.nome) (dall'app, subito; il resto della frase al cervello)")
+                davanti = d.nome
+            case .chiudiTutto:
+                vai?(.chiudiTutto)
+                evento("chiuse tutte le sezioni (dall'app, subito)")
+                davanti = nil
+            default:
+                return
+            }
+        }
+    }
+
+    /// Fa un pezzo. La battuta (nil: non è andato e la fila si ferma lì) e se è una cosa vera da dire (quello che legge, il
+    /// messaggio che prepara) o solo un movimento (aperta, più giù, globo).
+    private func fai(_ tipo: Pezzo, pezzo: String, primo: Bool) async -> (String?, Bool) {
+        switch tipo {
+        case .apri(let n):
+            let e = await apri(n)
+            let fallita: String? = primo ? nil : (e.battuta?() ?? "")
+            guard e.ok else { return (fallita, false) }
+            return (Regia.aperturaDi(n), false)
+        case .chiudiTutto:
+            vai?(.chiudiTutto)
+            evento("chiuse tutte le sezioni")
+            try? await Task.sleep(for: .milliseconds(350))
+            return (Battute.chiusoTutto(), false)
+        case .strada(let s, let n):
+            let davanti = nomeDavanti
+            vai?(s)
+            try? await Task.sleep(for: .milliseconds(500))                  // la sezione vola dietro o torna davanti
+            switch s {
+            case .daParte:
+                evento("\(davanti ?? "JARVIS") messa da parte")
+                return (davanti.map { Battute.messaDaParte($0) } ?? "", false)
+            case .diPrima:
+                evento("torna davanti la sezione di prima")
+                return (nomeDavanti.map { Battute.diPrima($0) } ?? "", false)
+            case .chiudi:
+                evento("chiusa \(n ?? "la sezione")")
+                return (Battute.una("chiusa", ["Chiusa, Sir.", "Fatto.", "Via.", "Chiusa."]), false)
+            default:
+                evento("le sezioni aperte si sfogliano")
+                return ("", false)
+            }
+        case .scorri(let verso):
+            return (scorriDetto(verso), false)
+        case .vista(let nome):
+            let e = await vista(sezione: nomeDavanti ?? "", detto: nome)
+            let detta: String? = e.ok ? (e.battuta?() ?? "") : (primo ? nil : "")
+            return (detta, false)
+        case .intenzione(let n):
+            return (await intenzione(pezzo, dentro: n), true)
+        case .musica:
+            return (await musicaDetta(pezzo), false)
+        case .tasto(let t):
+            guard let a = Regia.tastiMusica.first(where: { $0.nome == t }) else { return (nil, false) }
+            let e = await a.esegui([:])
+            return (e.battuta?() ?? "", false)
+        case .dialogo:
+            return (await Insieme.condiviso.prova(pezzo), true)
+        }
+    }
+
+    private enum Pezzo { case apri(String), chiudiTutto, intenzione(String), musica, strada(Strada, String?), scorri(String), vista(String), tasto(String), dialogo }
 
     /// 12.0 (12): la frase la farebbe la regia da sola? (Senza fare niente: serve per non chiedere al cervello una risposta
     /// anticipata che sarebbe buttata.)
@@ -696,16 +824,8 @@ final class Regia {
         if inSospeso != nil, Regia.eAnnulla(f) { return true }
         if let p = proposta, Date().timeIntervalSince(p.quando) < 45, Regia.eAssenso(f) { return true }
         let pezzi = FineFrase.comandoComposto(f) ? Regia.pezzi(f) : [f]
-        var davanti = nomeDavanti
-        for pezzo in pezzi {
-            guard let t = riconosci(pezzo, davanti: davanti) else { return false }
-            switch t {
-            case .apri(let n), .intenzione(let n): davanti = n
-            case .chiudiTutto: davanti = nil
-            case .musica: break
-            }
-        }
-        return true
+        if pezzi.count >= 2 { return pianoDi(pezzi) != nil }
+        return riconosci(f, davanti: nomeDavanti) != nil || davantiCapisce(f)
     }
 
     /// Cosa sarebbe un pezzo di frase per l'app, con `davanti` come sezione davanti in quel momento. Nil: non lo sa fare da sola.
@@ -714,9 +834,24 @@ final class Regia {
         guard !parole.isEmpty else { return nil }
         let j = parole.joined(separator: " ")
         if ["chiudi tutto", "chiudi tutte le sezioni", "chiudile tutte"].contains(j) { return .chiudiTutto }
-        for schema in ["apri *", "aprimi *", "vai alla *", "vai al *", "vai in *", "portami alla *", "portami al *", "porta davanti *"] {   // 12.0 (16): «mostrami» è il widget FILO
+        // 14 nov: le sezioni aperte, come da sole («mettilo dietro», «quella di prima», «cosa ho aperto»)
+        if let c = ComandoVocale.navigazione(parole) {
+            switch c {
+            case .daParte: return .strada(.daParte, nil)
+            case .sezionePrima: return .strada(.diPrima, nil)
+            case .sezioniAperte: return .strada(.sfoglia, nil)
+            case .chiudiSezioni: return .chiudiTutto
+            default: break
+            }
+        }
+        if let n = chiudiDetto(parole, davanti: davanti) { return .strada(.chiudi(n), n) }
+        for schema in ["apri *", "aprimi *", "riapri *", "vai alla *", "vai al *", "vai in *", "portami alla *", "portami al *", "porta davanti *",
+                       "riportami il *", "riportami la *", "riportami *"] {   // 12.0 (16): «mostrami» è il widget FILO
             if let v = Regia.combacia(parole, schema, altro: []), let d = Regia.destinazione(v), !d.dopoLaVoce { return .apri(d.nome) }
         }
+        if let v = Regia.versoScorri(parole) { return .scorri(v) }                         // 14 nov: le mani, subito
+        if let d = davanti, let n = Regia.vistaDetta(parole, sezione: d) { return .vista(n) }   // 14 nov: le viste degli ologrammi
+        if Insieme.condiviso.sua(pezzo) { return .dialogo }                                 // 14 nov: la tab e il dialogo coi pronomi
         for i in Regia.intenzioni {
             let schemi = i.frasi + (davanti == i.sezione ? i.frasiDentro : [])
             if schemi.contains(where: { Regia.combacia(parole, $0) != nil }) { return .intenzione(i.sezione) }
@@ -724,7 +859,186 @@ final class Regia {
         if Regia.musicaGenerica.contains(j) || Regia.frasiMetti.contains(where: { Regia.combacia(parole, $0, altro: Regia.nonMusica) != nil }) {
             return .musica
         }
+        if LettoreMusica.condiviso.voce != nil, let t = Regia.tastiMusica.first(where: { a in a.frasi.contains { Regia.combacia(parole, $0) != nil } }) {
+            return .tasto(t.nome)
+        }
         return nil
+    }
+
+    /// «Chiudi il meteo», «chiudila», «chiudi questa»: quale sezione (aperta). Nil: non è una chiusura di una sezione aperta.
+    private func chiudiDetto(_ parole: [String], davanti: String?) -> String? {
+        guard let primo = parole.first else { return nil }
+        if ["chiudila", "chiudilo"].contains(primo), parole.count == 1 { return davanti }
+        guard ["chiudi", "chiudimi"].contains(primo), parole.count >= 2, parole.count <= 4 else { return nil }
+        let resto = parole.dropFirst().filter { !["il", "lo", "la", "l", "i", "gli", "le", "sezione", "anche"].contains($0) }
+        if resto == ["questa"] || resto == ["questo"] { return davanti }
+        guard resto.count == 1, let w = resto.first, let n = ComandoVocale.nomeSezione(w) ?? Regia.destinazione(w)?.nome else { return nil }
+        return pila?.voci.contains(where: { $0.sezione.nome == n }) == true || n == davanti ? n : nil
+    }
+
+    // MARK: 14 nov · le mani subito: scorrere e le viste degli ologrammi
+
+    /// Le frasi dello scorrere (già senza cortesie): verso giu, su, cima, fondo. Nil: non è uno scorrere.
+    static func versoScorri(_ parole: [String]) -> String? {
+        let j = parole.joined(separator: " ")
+        let giu: Set<String> = ["scorri", "scorri giu", "scorri in giu", "scendi", "scendi giu", "scendi un po", "scendi ancora", "vai giu", "piu giu",
+                                "un po piu giu", "ancora giu", "ancora un po giu", "giu", "sotto", "vai sotto", "fammi vedere sotto", "scorri ancora",
+                                "pagina giu", "scorri la pagina", "fammi vedere il resto", "vai avanti con la pagina"]
+        let su: Set<String> = ["torna su", "su", "sali", "risali", "vai su", "piu su", "un po piu su", "scorri su", "scorri in su", "sopra",
+                               "torna sopra", "pagina su", "sali un po", "torna un po su"]
+        // («torna all'inizio» no: da sola chiude la sezione e torna a JARVIS, ComandoVocale)
+        let cima: Set<String> = ["torna in cima", "in cima", "vai in cima", "su in cima", "all inizio", "dall inizio", "vai all inizio", "inizio",
+                                 "torna su in cima", "riportami in cima"]
+        let fondo: Set<String> = ["vai in fondo", "in fondo", "fino in fondo", "alla fine", "vai alla fine", "fino alla fine", "fondo", "giu in fondo",
+                                  "scendi in fondo", "scorri fino in fondo", "vai giu in fondo", "scendi fino in fondo"]
+        if giu.contains(j) { return "giu" }
+        if su.contains(j) { return "su" }
+        if cima.contains(j) { return "cima" }
+        if fondo.contains(j) { return "fondo" }
+        return nil
+    }
+
+    /// Scorre la pagina davanti (ManiJarvis) e restituisce la battuta.
+    private func scorriDetto(_ verso: String) -> String {
+        guard let dove = ManiJarvis.scorriSubito(verso) else { return Battute.una("scorri.niente", ["Qui c'è tutto, Sir.", "Non c'è altro da vedere, Sir."]) }
+        evento("pagina \(dove)")
+        return Battute.scorri(verso, dove: dove)
+    }
+
+    /// Le viste degli ologrammi di una sezione: quelle che si vedono adesso (la sezione si è presentata) o, da chiusa, quelle che
+    /// avrà (le stesse di SezioneOlo), così «apri il meteo e passa al globo» si riconosce prima di aprire.
+    private func nomiViste(_ sezione: String) -> [String]? {
+        if let v = viste(di: sezione) { return v.nomi }
+        return Regia.sezioneOlo(sezione)?.nomi
+    }
+
+    /// La sezione degli ologrammi di una sezione della regia («Email» → .posta, «Ricordi» → .traccia).
+    static func sezioneOlo(_ nome: String) -> SezioneOlo? {
+        switch Regia.chiave(Regia.destinazione(nome)?.nome ?? nome) {
+        case "diario": return .diario
+        case "sonno": return .sonno
+        case "briefing": return .briefing
+        case "spesa": return .spesa
+        case "serata": return .serata
+        case "bea": return .bea
+        case "cuore": return .cuore
+        case "telefono": return .telefono
+        case "meteo": return .meteo
+        case "edith": return .edith
+        case "email": return .posta
+        case "messaggi": return .messaggi
+        case "confidente": return .confidente
+        case "interprete": return .interprete
+        case "ricordi": return .traccia
+        case "vitals": return .vitals
+        case "github": return .github
+        case "supabase": return .supabase
+        case "archivio": return .archivio
+        case "costi": return .costi
+        case "musica": return .musica
+        default: return nil
+        }
+    }
+
+    /// Il nome della sezione della regia di una prova degli ologrammi (.posta → «Email», .traccia → «Ricordi»).
+    static func nomeDi(_ s: SezioneOlo) -> String {
+        switch s {
+        case .diario: return "Diario"
+        case .sonno: return "Sonno"
+        case .briefing: return "Briefing"
+        case .spesa: return "Spesa"
+        case .serata: return "Serata"
+        case .bea: return "Bea"
+        case .cuore: return "Cuore"
+        case .telefono: return "Telefono"
+        case .meteo: return "Meteo"
+        case .edith: return "EDITH"
+        case .posta: return "Email"
+        case .messaggi: return "Messaggi"
+        case .confidente: return "Confidente"
+        case .interprete: return "Interprete"
+        case .traccia: return "Ricordi"
+        case .vitals: return "Vitals"
+        case .github: return "GitHub"
+        case .supabase: return "Supabase"
+        case .archivio: return "Archivio"
+        case .costi: return "Costi"
+        case .musica: return "Musica"
+        }
+    }
+
+    /// «Passa al globo», «vista atomo», «fammi le torri», «il vento»: il nome della vista detta (com'è scritto sulla chip). Nil: non
+    /// è una vista di quella sezione.
+    static func vistaDetta(_ parole: [String], sezione: String) -> String? {
+        guard let nomi = condivisa.nomiViste(sezione), !nomi.isEmpty else { return nil }
+        let attacchi: [[String]] = [["vista"], ["passa", "a"], ["passa", "al"], ["passa", "alla"], ["passa", "allo"], ["passa", "all"], ["passa", "ai"],
+                                    ["passa", "alle"], ["fammi", "vedere"], ["mostrami"], ["fammi"], ["torna", "al"], ["torna", "alla"], ["torna", "allo"],
+                                    ["torna", "all"], ["metti", "la", "vista"], ["vista", "a"], ["cambia", "in"], []]
+        for a in attacchi where parole.count > a.count && Array(parole.prefix(a.count)) == a {
+            var resto = Array(parole.dropFirst(a.count))
+            while let f = resto.first, ["il", "lo", "la", "l", "i", "gli", "le", "vista", "a", "ad"].contains(f) { resto.removeFirst() }
+            guard !resto.isEmpty, resto.count <= 3 else { continue }
+            let k = Regia.chiave(resto.joined())
+            if let n = nomi.first(where: { Regia.chiave($0) == k }) { return n }
+        }
+        return nil
+    }
+
+    /// Cambia la vista dell'ologramma della sezione (come la chip toccata col dito). Se la sezione si è appena aperta e le sue viste
+    /// non ci sono ancora, aspetta un attimo; se non arrivano, la scelta resta e la sezione la usa appena compare.
+    private func vista(sezione: String, detto: String) async -> EsitoRegia {
+        let parole = FineFrase.paroleNude(detto)
+        guard let nome = Regia.vistaDetta(parole, sezione: sezione) ?? Regia.vistaDetta(["vista"] + parole, sezione: sezione) else {
+            return .no("viste di \(sezione): " + (nomiViste(sezione) ?? []).joined(separator: ", "))
+        }
+        for _ in 0..<30 where viste(di: sezione) == nil { try? await Task.sleep(for: .milliseconds(50)) }
+        if let v = viste(di: sezione), let i = v.nomi.firstIndex(of: nome) {
+            if v.scelta() == i { return .fatto("\(sezione): vista \(nome) (era già questa)", battuta: { Battute.vista(nome, gia: true) }) }
+            v.scegli(i)
+        } else if let s = Regia.sezioneOlo(sezione), let i = s.nomi.firstIndex(of: nome) {
+            UserDefaults.standard.set(i, forKey: s.chiave)
+            PonteTelefono.condiviso.invia()                               // il polso segue la scelta
+        } else {
+            return .no("\(sezione) non ha la vista \(nome)")
+        }
+        evento("\(sezione): vista \(nome)")
+        return .fatto("\(sezione): vista \(nome)", battuta: { Battute.vista(nome, gia: false) })
+    }
+
+    /// Le viste degli ologrammi che si vedono (ProveOloVista si presenta): sezione, nomi delle chip, la scelta e come cambiarla.
+    private struct Viste {
+        let sezione: String
+        let nomi: [String]
+        let scelta: () -> Int
+        let scegli: (Int) -> Void
+    }
+    private var tutteLeViste: [UUID: Viste] = [:]
+
+    func mettiViste(_ chiave: UUID, sezione: String, nomi: [String], scelta: @escaping () -> Int, scegli: @escaping (Int) -> Void) {
+        tutteLeViste[chiave] = Viste(sezione: sezione, nomi: nomi, scelta: scelta, scegli: scegli)
+    }
+
+    func togliViste(_ chiave: UUID) { tutteLeViste[chiave] = nil }
+
+    private func viste(di nome: String) -> Viste? {
+        let k = Regia.chiave(Regia.destinazione(nome)?.nome ?? nome)
+        return tutteLeViste.values.first { Regia.chiave(Regia.destinazione($0.sezione)?.nome ?? $0.sezione) == k }
+    }
+
+    /// L'azione «vista» della sezione, per il cervello e per le frasi brevi (le stesse di `vistaDetta`).
+    private func azioneVista(_ nome: String) -> AzioneRegia? {
+        guard let nomi = nomiViste(nome), !nomi.isEmpty else { return nil }
+        let ora = viste(di: nome).map { v in v.nomi.indices.contains(v.scelta()) ? v.nomi[v.scelta()] : "" } ?? ""
+        return AzioneRegia("vista", "cambia la vista dell'ologramma (\(nomi.joined(separator: ", "))\(ora.isEmpty ? "" : "; ora \(ora)"))", valore: "nome") { [weak self] v in
+            guard let self else { return .no("regia non pronta") }
+            return await self.vista(sezione: nome, detto: v["nome"] ?? "")
+        }
+    }
+
+    /// Una sezione appena aperta entra nel filo del discorso: dopo «apri il meteo», «fissalo» e «mandalo a Bea» sanno di cosa si parla.
+    private func metteNelFilo(_ d: Destinazione) {
+        Filo.condiviso.metti(CosaFilo(chiave: "sez:" + d.nome, tipo: "sezione", nomi: Array(d.chiavi.prefix(3)) + ["sezione"], titolo: d.nome,
+                                      riga: statoDi(d.nome) ?? "", detto: d.nome, sezione: d.nome))
     }
 
     /// I pezzi di una frase con più comandi: «apri la spesa e poi aggiungi il latte» → «apri la spesa» · «aggiungi il latte».
@@ -740,13 +1054,17 @@ final class Regia {
             if legami.contains(w), !(pezzi.last ?? []).isEmpty {
                 var j = i + 1
                 while j < parole.count, ponte.contains(Regia.chiave(parole[j])) { j += 1 }
-                if j < parole.count, FineFrase.comandoComposto("x y " + w + " " + parole[j...].joined(separator: " ")) {
+                // si taglia solo se subito dopo il legame c'è un verbo di comando (14 nov: guardato direttamente, non più con
+                // `comandoComposto` sul resto della frase, che vedeva anche le virgole più avanti)
+                if j < parole.count, FineFrase.verbiComposti.contains(Regia.chiave(parole[j])) {
                     pezzi.append([])
                     i = j
                     continue
                 }
             }
             pezzi[pezzi.count - 1].append(parole[i])
+            // 14 nov: anche alla virgola seguita da un verbo («apri il meteo, fissalo»)
+            if parole[i].hasSuffix(","), i + 1 < parole.count, FineFrase.verbiComposti.contains(Regia.chiave(parole[i + 1])) { pezzi.append([]) }
             i += 1
         }
         return pezzi.map { $0.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,;.")) }.filter { !$0.isEmpty }

@@ -217,16 +217,27 @@ import WatchKit
         "indietro": ["indietro", "precedente", "torna indietro", "brano precedente", "canzone precedente", "da capo"],
     ]
 
-    /// Con la MUSICA davanti sul polso, la frase è un suo tasto («pausa», «avanti»)? Il comando, se sì.
+    /// 14 nov: da qualsiasi schermata del polso, le frasi che parlano chiaro della musica dell'iPhone (come sull'iPhone, dove i tasti
+    /// della musica valgono ovunque): «metti in pausa», «cambia canzone». «Avanti», «indietro», «salta» da soli restano della
+    /// MUSICA davanti (altrove vogliono dire altro).
+    private static let frasiOvunque: [String: [String]] = [
+        "play": ["play", "riprendi la musica", "rimetti la musica", "fai partire la musica", "fai ripartire la musica"],
+        "pausa": ["pausa", "metti in pausa", "metti in pausa la musica", "ferma la musica", "stoppa la musica"],
+        "avanti": ["brano successivo", "canzone successiva", "prossima canzone", "la prossima canzone", "cambia brano", "cambia canzone", "skip"],
+        "indietro": ["brano precedente", "canzone precedente", "la canzone di prima"],
+    ]
+
+    /// La frase è un tasto della musica? Con la MUSICA davanti sul polso tutti i suoi tasti («pausa», «avanti»); altrove quelli che
+    /// parlano chiaro (`frasiOvunque`). Il comando, se sì.
     func tastoDetto(_ testo: String) -> String? {
-        guard davanti == "Musica" else { return nil }
         var p = FineFrase.paroleNude(testo)
         let cortesie: Set<String> = ["ok", "okay", "dai", "allora", "ehi", "hey", "per", "favore", "senti", "grazie", "sir", "subito", "adesso", "ora", "pure"]
         while let f = p.first, cortesie.contains(f) { p.removeFirst() }
         while let l = p.last, cortesie.contains(l) { p.removeLast() }
         guard !p.isEmpty else { return nil }
         let detta = p.joined(separator: " ")
-        for (comando, frasi) in Self.frasiTasti where frasi.contains(where: { FineFrase.paroleNude($0).joined(separator: " ") == detta }) { return comando }
+        let tasti = davanti == "Musica" ? Self.frasiTasti : Self.frasiOvunque
+        for (comando, frasi) in tasti where frasi.contains(where: { FineFrase.paroleNude($0).joined(separator: " ") == detta }) { return comando }
         return nil
     }
 
