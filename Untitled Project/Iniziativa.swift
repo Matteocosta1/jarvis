@@ -175,16 +175,22 @@ final class Iniziativa {
 
     // MARK: La batteria (come nel mockup: «Batteria al 18 per cento, Sir: la metterei in carica.»)
 
-    /// Sotto il 20% e staccato dalla corrente: una volta sola, finché non torna in carica.
+    /// Sotto il 20% e staccato dalla corrente: una volta sola, e di nuovo al 10%, finché non torna in carica. 14 nov (il signore:
+    /// «la batteria si vedesse nella tab, con un'icona»): anche nella tab, col simbolo della batteria, subito.
     private func controllaBatteria() {
         let d = UIDevice.current
         guard d.isBatteryMonitoringEnabled, d.batteryLevel >= 0 else { return }
-        if d.batteryState == .charging || d.batteryState == .full { dette["batteria"] = nil; return }
+        if d.batteryState == .charging || d.batteryState == .full { dette["batteria20"] = nil; dette["batteria10"] = nil; return }
         let p = Int((d.batteryLevel * 100).rounded())
-        guard p <= 20, dette["batteria"] == nil, !coda.contains(where: { $0.tipo == .batteria }) else { return }
-        let frase = Battute.una("in.batt", ["Batteria al \(Battute.numero(p)) per cento, Sir: la metterei in carica.",
-                                            "Sir, siamo al \(Battute.numero(p)) per cento. Meglio caricarlo adesso."])
-        coda.append(Avviso(chiave: "batteria", tipo: .batteria, frase: frase, urgente: false, scade: Date().addingTimeInterval(1800)))
+        let soglia = p <= 10 ? "batteria10" : p <= 20 ? "batteria20" : nil
+        guard let soglia, dette[soglia] == nil, !coda.contains(where: { $0.chiave == soglia }) else { return }
+        if soglia == "batteria10" { dette["batteria20"] = Date() }               // al 10% la frase del 20% non serve più
+        Filo.condiviso.mostra("iniz:batteria", titolo: "Batteria", riga: "\(p)% · " + (p <= 10 ? "da caricare subito" : "da caricare"),
+                              sezione: "Batteria", dura: 6, icona: p <= 10 ? "battery.0percent" : "battery.25percent")
+        let frase = p <= 10
+            ? Battute.una("in.batt10", ["Sir, siamo al \(Battute.numero(p)) per cento: lo metterei in carica adesso.", "Batteria al \(Battute.numero(p)) per cento, Sir. Ormai è urgente."])
+            : Battute.una("in.batt", ["Batteria al \(Battute.numero(p)) per cento, Sir: la metterei in carica.", "Sir, siamo al \(Battute.numero(p)) per cento. Meglio caricarlo adesso."])
+        coda.append(Avviso(chiave: soglia, tipo: .batteria, frase: frase, urgente: false, scade: Date().addingTimeInterval(1800)))
     }
 
     private static func chiave(_ e: EKEvent) -> String {

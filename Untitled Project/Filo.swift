@@ -48,6 +48,8 @@ struct RigaFilo: Identifiable, Equatable {
     var alle: Date
     /// Aspetta una risposta (il messaggio che parte col sì): finché c'è, il suo argomento non sparisce.
     var resta = false
+    /// 14 nov: un simbolo davanti alla riga (la batteria): le informazioni dell'iniziativa si vedono, non solo si sentono.
+    var icona: String? = nil
 }
 
 /// Un argomento di FILO (METEO, AGENDA, MESSAGGI…): la sua testata, le sue righe, fissato o no.
@@ -223,9 +225,9 @@ final class Filo: ObservableObject {
     /// Mostra (o aggiorna) un dato nel suo argomento, che passa davanti. `resta`: non è una notifica (il messaggio che aspetta il
     /// sì); `dura`: notifica di un'altra durata; `fisso`: «fissalo».
     func mostra(_ chiave: String, titolo: String, riga: String, sezione: String?, dura: TimeInterval? = nil, suono: Bool = true,
-                resta: Bool = false, fisso: Bool = false) {
+                resta: Bool = false, fisso: Bool = false, icona: String? = nil) {
         let nome = Filo.argomento(sezione: sezione, titolo: titolo)
-        let nuova = RigaFilo(id: chiave, titolo: titolo, riga: riga, sezione: sezione, alle: Date(), resta: resta)
+        let nuova = RigaFilo(id: chiave, titolo: titolo, riga: riga, sezione: sezione, alle: Date(), resta: resta, icona: icona)
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
             a = argomenti.remove(at: i)

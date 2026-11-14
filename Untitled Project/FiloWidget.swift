@@ -285,6 +285,13 @@ private struct ArgomentoVista: View {
                     if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if let icona = r.icona {
+                            Image(systemName: icona)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Olo.ciano)
+                                .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                                .accessibilityHidden(true)
+                        }
                         Text(r.testo)
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
@@ -330,7 +337,7 @@ private struct ArgomentoVista: View {
                     v.append(RigaVista(id: r.id + "#\(k)", testo: (k == 0 && !titolo.isEmpty ? titolo : "") + pezzo, sezione: r.sezione, ora: nil))
                 }
             } else {
-                v.append(RigaVista(id: r.id, testo: Filo.testo(di: r, in: a.nome), sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle)))
+                v.append(RigaVista(id: r.id, testo: Filo.testo(di: r, in: a.nome), sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle), icona: r.icona))
             }
         }
         return v
@@ -372,6 +379,7 @@ private struct RigaVista: Identifiable {
     let testo: String
     let sezione: String?
     let ora: String?
+    var icona: String? = nil
 }
 
 /// La sfumatura in alto e in basso quando c'è altro da scorrere.
