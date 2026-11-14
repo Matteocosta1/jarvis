@@ -559,13 +559,15 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Il dito appoggiato fermo su FILO ora ferma il conto delle notifiche come nel mockup (prima solo trascinando).
 - **«Togli tutto» e «pulisci tutto»** con qualcosa in FILO: prima li prendevano i comandi delle sezioni (chiudevano la sezione davanti / cancellavano la chat); ora sono di FILO come nel mockup.
 - Icona Browser della corona: chiude la tastiera come le altre. Cestino e Impostazioni in alto: si tocca tutto il riquadro come le altre icone.
-- **Polso**: tutte le schermate si aprono come nel mockup (griglia + stampa dall'alto 0,32 s): prima PROTOCOLLI, TRACCIA, RADAR, PRIORITÀ, SATELLITE, SOCIAL, TRAVEL comparivano in dissolvenza senza griglia, Vitals, Cuore, Spesa, Ricordi, Bea e Sentinella con la copertura che sfumava. Ricordi dall'icona in alto ora si apre col caricamento; l'icona Cronologia in ciano. «LiDAR», «EDITH», «Occhi» (giro), «Trainer» scritti e detti come sull'iPhone quando una sezione vive solo lì.
+- **Polso**: (aperture delle schermate cambiate e poi tolte su richiesta del signore, vedi sotto); l'icona Cronologia in ciano. «LiDAR», «EDITH», «Occhi» (giro), «Trainer» scritti e detti come sull'iPhone quando una sezione vive solo lì.
 - Mockup «JARVIS Mark XIII» pubblicato (v. 1794619635-5955): punto di luce e vetro dinamico, prove superate.
 - Controllo di compilazione (241cb4c, run 43540716643): **verde · 0 errori, 0 warning**.
 - 02:40 (il signore: «il punto luce va tolto»): FILO si richiama con lo **swipe invisibile in alto**, verso sinistra dal bordo destro solo nella fascia di FILO (24×64, sotto le icone di sistema, sopra l'anello). Compilato verde (run 43542383757).
 - Mockup: col trackpad la lista di FILO non scorre più di lato (tagliava la prima lettera); al polso il suono del caricamento finisce con il caricamento (prima andava avanti 2,6 s a sezione aperta). Solo mockup: l'orologio vero era già giusto.
 - **iPhone**: svegliata in sottofondo dall'orologio (parola d'ordine, MUSICA) l'app faceva la sequenza d'avvio con la musica anche chiusa; ora l'avvio parte solo quando la si apre.
 - **Polso**: aperta dalla complicazione, la voce dell'avvio sfumava appena finite le icone e partiva il microfono; ora l'avvio è intero (come dall'icona e dal tasto Azione dell'iPhone), poi il bip e l'ascolto. Solo il tocco sul reattore la accorcia.
+- **Polso, avvio** (il signore, 02:54, sulla 12.0 (15) installata: «carica le icone in timing, quando inizia a parlare parte il microfono e interrompe; deve finire di parlare, sfumare come l'iPhone; se voglio prima tocco il reattore»): il microfono ora aspetta la fine vera della traccia d'avvio (il suo orario, non solo «sta suonando»); oltre alla complicazione, niente lo fa partire prima se non il tocco sul reattore.
+- **Polso, sezioni** (il signore: «le sezioni devono essere come nella 12.0 (15), il caricamento è perfetto»): tolte le modifiche di stanotte alle aperture (griglia e stampa in SchermoPolso e AperturaOrologio, apertura di Ricordi dall'icona in alto): restano come nella 12.0 (15).
 
 ## 13.0 (1) — MARK XIII · 13 nov sera · numero deciso dal signore (21:55, «perfetto tutto nella 13.0»: Version 13.0, Build 1 su app, Watch, complicazione e isola) · build unica · cervello invariato (v135)
 

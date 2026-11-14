@@ -47,6 +47,7 @@ enum SuoniOrologio {
         if let p = lettoreAvvio {
             lettoreAvvio = nil
             if fra > 0 { p.play(atTime: p.deviceCurrentTime + fra) } else { p.play() }
+            fineVoce = Date().addingTimeInterval(max(0, fra) + p.duration)    // 14 nov: quando finisce davvero la voce dell'avvio
             lettori.append(p); lettoreVoce = p; return
         }
         suona(file("avvioorologio") ?? file("avvio"), volume: 1.0)
@@ -54,6 +55,7 @@ enum SuoniOrologio {
     // 12.0 (14) · l'avvio è JARVIS II (16,6 s): la voce continua dopo le icone. Il microfono aspetta che finisca; se il signore
     // tocca il reattore o JARVIS deve parlare, sfuma in mezzo secondo (come sull'iPhone).
     private static var lettoreVoce: AVAudioPlayer?
+    private static var fineVoce: Date?
     private static var chiudiVoce = false
     /// 13 nov: l'avvio è aperto dall'accensione (`apriAvvio`, prima che parta il file) a sequenza finita: una richiesta nel primo
     /// istante (la complicazione che apre l'app) non va persa. Fuori dall'avvio non resta niente in sospeso.
@@ -62,7 +64,10 @@ enum SuoniOrologio {
     static func sfumaAvvio() { if avvioAperto || lettoreVoce != nil { chiudiVoce = true } }
     static func attendiFineAvvio() async {
         try? await Task.sleep(for: .milliseconds(100))                  // play(atTime:) può partire un attimo dopo
-        while let p = lettoreVoce, p.isPlaying {
+        // 14 nov (il signore: «quando inizia a parlare parte il microfono e lo interrompe; deve finire di parlare»): si aspetta la
+        // fine vera della traccia (il suo orario), non solo «isPlaying», che al polso può risultare falso un attimo: il microfono
+        // (che cambia la sessione audio) partiva sopra la voce e la tagliava. Solo il tocco sul reattore la accorcia (chiudiVoce).
+        while let p = lettoreVoce, p.isPlaying || (fineVoce.map { Date() < $0 } ?? false) {
             if chiudiVoce {
                 p.setVolume(0, fadeDuration: 0.5)
                 try? await Task.sleep(for: .milliseconds(520))
@@ -72,6 +77,7 @@ enum SuoniOrologio {
             try? await Task.sleep(for: .milliseconds(50))
         }
         lettoreVoce = nil
+        fineVoce = nil
         chiudiVoce = false
         avvioAperto = false
     }
@@ -169,8 +175,7 @@ struct VistaOrologio: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         // Ricordi: la seconda memoria (luoghi, spesa, promesse, ultime cose segnate)
-                        // 13.1: si apre come dalla barra delle icone (caricamento e stampa): prima da qui arrivava senza apertura
-                        NavigationLink { VistaRicordiOrologio().aperturaOrologio("Ricordi") } label: {
+                        NavigationLink { VistaRicordiOrologio() } label: {
                             Image(systemName: "brain.head.profile").foregroundStyle(ciano)
                         }
                         .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
