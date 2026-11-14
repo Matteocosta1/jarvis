@@ -250,12 +250,14 @@ private struct ArgomentoVista: View {
                     .padding(.top, 10)
             }
             HStack(spacing: 6) {
-                Text(a.nome.uppercased())
+                Text((a.etichetta ?? a.nome).uppercased())
                     .font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1.8)
                     .foregroundStyle(Olo.bianco)
                     .shadow(color: Olo.azzurro.opacity(0.95), radius: 3.5)
                     .lineLimit(1)
-                    .fixedSize()
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: a.etichetta == nil, vertical: false)   // 14 nov: il titolo lungo del piano si accorcia, la X resta
+                    .layoutPriority(1)
                 if a.fisso {
                     Text("◆")
                         .font(.system(size: 7, weight: .bold, design: .monospaced))
@@ -325,7 +327,9 @@ private struct ArgomentoVista: View {
     private var righe: [RigaVista] {
         var v: [RigaVista] = []
         for r in a.righe {
-            if a.nome == "Agenda" {
+            if a.nome == "Piano" {                                         // 14 nov: i passi del piano, senza l'ora
+                v.append(RigaVista(id: r.id, testo: r.riga, sezione: nil, ora: nil))
+            } else if a.nome == "Agenda" {
                 let pezzi = r.riga.components(separatedBy: " · ")
                 let titolo = Filo.testo(di: RigaFilo(id: r.id, titolo: r.titolo, riga: "", sezione: nil, alle: r.alle), in: a.nome)
                 for (k, pezzo) in pezzi.enumerated() {

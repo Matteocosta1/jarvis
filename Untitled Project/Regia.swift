@@ -69,6 +69,11 @@ final class Regia {
     weak var pila: PilaSezioni?
     /// L'ultima frase del signore e quando l'ha detta (Jarvis): serve per il sì delle conferme.
     var ultimaFrase: (() -> (testo: String, quando: Date)?)?
+    /// 14 nov: quello che mostra la sezione davanti se non è ancora nella regia (la riga di `Schermo`, da Jarvis): serve agli strumenti
+    /// «schermo» e «mano» per dire al cervello com'è lo schermo dopo un passo.
+    var rigaVecchia: (() -> String?)?
+    /// 14 nov: gli strumenti che l'app descrive al cervello da sé (senza ripubblicarlo): la regia, il piano, le mani, lo schermo.
+    static var definizioni: [[String: Any]] { [definizione, Piano.definizione, ManiJarvis.definizione, ManiJarvis.definizioneSchermo] }
     /// Un lavoro da fare quando JARVIS ha finito di parlare (Jarvis): le sezioni col microfono o la fotocamera si aprono dopo la
     /// voce, come sempre (Shazam, l'Interprete, la Sentinella non devono sentire JARVIS).
     var dopoLaVoce: ((@escaping @MainActor () -> Void) -> Void)?
@@ -273,6 +278,9 @@ final class Regia {
         } else {
             pezzi.append("DAVANTI JARVIS (la schermata principale)")
         }
+        // 14 nov: i tasti che si vedono (le mani di JARVIS) e il piano in corso, subito dopo davanti
+        if nomeDavanti != nil, let t = ManiJarvis.perCervello() { pezzi.append(t) }
+        if let p = Piano.condiviso.perCervello { pezzi.append(p) }
         // 12.0 (16): il filo del discorso, il lavoro insieme, la fretta (subito dopo davanti: se la riga è lunga si accorcia altro)
         if let f = Filo.condiviso.perCervello() { pezzi.append(f) }
         if let ses = Sessione.condivisa.perCervello() { pezzi.append(ses) }
@@ -499,6 +507,12 @@ final class Regia {
         if inSospeso != nil, Regia.eAnnulla(fraseDetta) {
             inSospeso = nil
             evento("annullato")
+            return Battute.annullato()
+        }
+        // 14 nov (più passi senza guida): «lascia stare», «annulla», «ferma tutto» con un piano in corso: il piano si ferma lì
+        if Piano.condiviso.inCorso, Regia.eAnnulla(fraseDetta) || ["fermati", "basta cosi", "ferma il piano", "annulla il piano"].contains(Regia.paroleComando(fraseDetta).joined(separator: " ")) {
+            Piano.condiviso.ferma()
+            evento("piano fermato dal signore")
             return Battute.annullato()
         }
         // 12.0 (12) · B3: vale l'ultima intenzione («metti Sfera… no anzi, i Daft Punk»); vuota: ha cambiato idea, niente da fare

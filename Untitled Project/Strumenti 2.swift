@@ -47,6 +47,9 @@ final class Strumenti {
         case "comando_app": return "subito"
         case "mac_comando": return "comando il Mac"
         case "regia": return "all'opera"                            // 12.0 (10)
+        case "piano": return "seguo il piano"                       // 14 nov
+        case "mano": return "all'opera"
+        case "schermo": return "controllo"
         default: return "un attimo"
         }
     }
@@ -144,6 +147,9 @@ final class Strumenti {
             case "telefono_comando": return (try comandoTelefono(i), false)
             case "mac_comando": return (try comandoMac(i), false)
             case "regia": return await Regia.condivisa.esegui(i)        // 12.0 (10): la regia dell'app (Regia.swift)
+            case "piano": return Piano.condiviso.esegui(i)              // 14 nov: più passi senza guida (Piano.swift)
+            case "mano": return await ManiJarvis.esegui(i)              // 14 nov: le mani su tutto JARVIS (ManiJarvis.swift)
+            case "schermo": return (Regia.condivisa.catalogo(rigaVecchia: Regia.condivisa.rigaVecchia?()), false)
             case "comando_app":
                 let c = i["comando"] as? String ?? ""
                 guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }

@@ -165,6 +165,7 @@ struct ContentView: View {
             }
             .task {                                             // 14 nov: -provaMani GLOBO: legge i tasti dello schermo e ne preme uno
                 guard UserDefaults.standard.object(forKey: "provaMani") != nil else { return }
+                print("MANI: in attesa (14 s)")
                 try? await Task.sleep(for: .seconds(14))
                 await ManiJarvis.prova(tocca: UserDefaults.standard.string(forKey: "provaMani"))
             }
@@ -309,6 +310,9 @@ struct ContentView: View {
                         registro
                         barraTesto
                     }
+                    // 14 nov: con una sezione davanti del tutto, JARVIS sotto non è più «sullo schermo» per l'accessibilità (VoiceOver e
+                    // le mani di JARVIS leggono solo quello che si vede)
+                    .accessibilityHidden(pilaCopre)
                     // 27 ott (video del signore 01:34, misurato fotogramma per fotogramma): aprendo la tastiera titolo e icone salivano di
                     // ~10 punti e ridiscendevano in 0,2 s. Lo spazio si accorcia subito (sale la tastiera) ma il reattore grande lascia
                     // il posto un attimo dopo: per quell'attimo il contenuto è più alto dello spazio e iOS lo centrava, spingendo su la
@@ -368,6 +372,9 @@ struct ContentView: View {
                 StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0,   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
                            suSezione: pila.davanti != nil)                                 // 13.1: sopra una sezione, vetro con la trasparenza dinamica
                     .zIndex(26)
+                // 14 nov: il mirino delle mani di JARVIS (il tasto che preme da solo), sopra tutto
+                StratoMirino()
+                    .zIndex(28)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
             .environment(\.jarvisCoperto, pilaCopre)

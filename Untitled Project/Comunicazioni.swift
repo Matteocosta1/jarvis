@@ -107,8 +107,10 @@ enum RegistroMessaggi {
         let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !m.isEmpty || !t.isEmpty else { return }
         let nome = await nome(di: m)
-        Registro.aggiungi(VoceRegistro(nome: nome, numero: m, quando: Date(), tipo: "imessage", testo: t), a: ricevuti)
+        let voce = VoceRegistro(nome: nome, numero: m, quando: Date(), tipo: "imessage", testo: t)
+        Registro.aggiungi(voce, a: ricevuti)
         NotificationCenter.default.post(name: .messaggiCambiati, object: nil)
+        Iniziativa.condivisa.messaggio(voce)          // 14 nov: con JARVIS davanti lo dice lui («Bea le ha scritto mentre parlavamo»)
     }
 
     /// Un messaggio mandato da JARVIS fuori dalla sezione Messaggi (a voce, Bea): il nome dalla rubrica, se c'è.

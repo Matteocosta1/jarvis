@@ -68,6 +68,8 @@ struct ArgomentoFilo: Identifiable, Equatable {
     /// 13.1: quando è sparito (scaduto o mandato via). Se non è fissato, dopo mezz'ora non si richiama più (come il filo del
     /// discorso): il dato è vecchio.
     var nascostoAlle: Date?
+    /// 14 nov: il nome mostrato nella testata quando è diverso dal nome dell'argomento («PIANO · SERATA DI SABATO»).
+    var etichetta: String?
 }
 
 @MainActor
@@ -254,6 +256,25 @@ final class Filo: ObservableObject {
         programma()
         svegli()
         if suono { Suoni.filo() }
+    }
+
+    /// 14 nov · il PIANO in FILO (Piano.swift): un argomento suo, i passi nel loro ordine (fino a 8). Mentre il cervello lavora resta e
+    /// torna davanti a ogni passo; finito, è una notifica di 5 secondi (poi si richiama come gli altri).
+    func mostraPiano(titolo: String, righe: [RigaFilo], finito: Bool) {
+        let nome = "Piano"
+        var a: ArgomentoFilo
+        if let i = argomenti.firstIndex(where: { $0.nome == nome }) { a = argomenti.remove(at: i) } else { a = ArgomentoFilo(nome: nome, righe: []) }
+        a.righe = Array(righe.prefix(8))
+        a.etichetta = titolo.isEmpty ? nil : "Piano · " + titolo
+        a.scade = finito ? Date().addingTimeInterval(5) : nil
+        a.nascosto = false
+        a.nascostoAlle = nil
+        a.giro += 1
+        a.aggiornato = Date()
+        argomenti.insert(a, at: 0)
+        if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
+        programma()
+        svegli()
     }
 
     /// «Fissalo»: l'argomento di quella cosa resta (se c'è già non si duplica).
