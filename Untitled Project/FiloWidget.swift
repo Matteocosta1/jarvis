@@ -125,7 +125,7 @@ private struct SchedaFilo: View {
         VStack(alignment: .leading, spacing: 0) {
             // 14 nov (il signore: «in alto FILO, ma che c'entra? mostri solo l'headline con scritto meteo»): niente testata FILO,
             // si vedono solo gli argomenti (METEO, AGENDA…) col loro nome
-            Color.clear.frame(height: 6)
+            Color.clear.frame(height: 22)                                        // lo spazio della testata resta (come prima)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
