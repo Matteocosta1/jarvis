@@ -34,6 +34,7 @@ struct ContentView: View {
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
+    @State private var avvioRimandato = false        // 14 nov: l'app svegliata dietro (dal polso, da una notifica): l'avvio aspetta che lei la apra
     @State private var ascoltaDopoAvvio = false      // l'ascolto all'apertura parte a sequenza finita: col microfono aperto l'iPhone abbassa l'altoparlante (e il Mac registrerebbe la musica)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
@@ -215,7 +216,11 @@ struct ContentView: View {
                 MotoreGuida.condiviso.parla = { [jarvis] frase in jarvis.annuncia(frase) }   // build 23: la GUIDA di SATELLITE parla
                 Regia.condivisa.pila = pila                                                 // 12.0 (10): la regia vede le sezioni aperte
                 Regia.condivisa.vai = { strada in regiaVai(strada) }                        // e le muove
-                accendi()
+                // 14 nov (il signore: «avvio l'Apple Watch e l'iPhone appoggiato, con JARVIS chiuso, fa il suono di avvio; a volte
+                // anche mentre ascolto le canzoni»): l'orologio, parlando con l'iPhone (parola d'ordine, MUSICA), sveglia l'app in
+                // sottofondo e iOS ne costruisce la schermata: partiva la sequenza d'avvio con la sua musica. Dietro, l'avvio aspetta:
+                // parte solo quando lui apre davvero JARVIS.
+                if UIApplication.shared.applicationState == .background { avvioRimandato = true } else { accendi() }
                 if Portachiavi.leggi().isEmpty { mostraImpostazioni = true; return }
                 if primaApertura {
                     primaApertura = false
@@ -377,6 +382,7 @@ struct ContentView: View {
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
             if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
             if fase == .active { jarvis.tornaDavanti() }            // 11 nov (#16): il dialogo fuori dall'app finisce qui
+            if fase == .active, avvioRimandato { avvioRimandato = false; accendi() }   // 14 nov: svegliata dietro, l'avvio parte adesso
             // 12 nov: l'app sta uscendo con un dialogo in corso: l'isola VOCE si accende adesso (iOS la permette solo da davanti)
             if fase == .inactive, jarvis.dialogoPuoContinuareFuori { jarvis.aggiornaIsolaVoce() }
         }
