@@ -1240,13 +1240,14 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 14 nov · L'INIZIATIVA: JARVIS può dire una cosa da sé adesso, senza disturbare: app davanti, in attesa e zitto, nessuna voce
     /// intorno da 4 secondi, niente avvio né rito, niente sezioni col microfono o la fotocamera, microfono acceso, voce accesa.
-    /// Non urgente: anche niente musica, niente RISERVATO, seguito chiuso e la sua ultima risposta finita da almeno 5 secondi.
+    /// Non urgente: anche niente musica, niente RISERVATO, nessuna sezione davanti (lavora), seguito chiuso e la sua ultima
+    /// risposta finita da almeno 5 secondi.
     private func puoDireDaSolo(urgente: Bool) -> Bool {
         guard UIApplication.shared.applicationState == .active, fase == .attesa, !avvioInCorso, !inBenvenuto, inCoda.isEmpty,
               !richiamo.sveglio, !micSpento, !micOccupato, !Impostazioni.muto, richiamoConsentito, occhi == nil,
               Date().timeIntervalSince(richiamo.ultimaVoce) > 4 else { return false }
         if urgente { return true }
-        return !riservato && !musicaSuona && Date() >= richiamo.seguitoFinoA
+        return !riservato && !musicaSuona && Regia.condivisa.davantiNome == nil && Date() >= richiamo.seguitoFinoA
             && Date().timeIntervalSince(fineUltimaRisposta ?? .distantPast) > 5
     }
 
@@ -3248,6 +3249,7 @@ final class Jarvis: NSObject, ObservableObject {
             try? await Task.sleep(for: .seconds(2.5))
             // 13 nov (prova dei tre punti): non durante la sequenza d'avvio (app appena aperta): finirebbe sopra la musica
             guard let self, self.fase == .attesa, !self.avvioInCorso, !self.inBenvenuto, !self.musicaSuona, !self.riservato, !self.micSpento, !Impostazioni.muto,
+                  !Iniziativa.condivisa.tace,                   // 14 nov: «non ora», «basta iniziative» valgono anche per le proposte
                   UIApplication.shared.applicationState == .active, Regia.condivisa.davantiNome == nil, Regia.condivisa.proposta == nil,
                   let p = Abitudini.previsione() else { return }
             let frase: String

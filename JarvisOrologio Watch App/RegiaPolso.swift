@@ -113,6 +113,7 @@ import WatchKit
         pezzi.append("SI APRONO SUL POLSO: " + Self.mete.map(\.nome).joined(separator: ", "))
         pezzi.append("SEMPRE: apri(sezione), chiudi (torna alla schermata principale); Musica: play, pausa, avanti, indietro (la musica dell'iPhone, anche a sezione chiusa)")
         pezzi.append("Occhi, LiDAR, Messaggi, Telefono, Studio e le altre vivono sull'iPhone")
+        if let p = PianoPolso.condiviso.perCervello { pezzi.append(p) }                // 14 nov: il piano in corso
         if Battute.umore == .fretta { pezzi.append("RITMO: il signore ha fretta: rispondi in una riga sola (se poi dice «dimmi meglio», la versione intera)") }   // 13.0
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {

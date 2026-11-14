@@ -509,6 +509,11 @@ final class Regia {
             evento("annullato")
             return Battute.annullato()
         }
+        // 14 nov (l'iniziativa): «non ora», «basta iniziative», «riprendi le iniziative»
+        if let b = Iniziativa.condivisa.comando(fraseDetta) {
+            evento("iniziative: \(fraseDetta)")
+            return b
+        }
         // 14 nov (più passi senza guida): «lascia stare», «annulla», «ferma tutto» con un piano in corso: il piano si ferma lì
         if Piano.condiviso.inCorso, Regia.eAnnulla(fraseDetta) || ["fermati", "basta cosi", "ferma il piano", "annulla il piano"].contains(Regia.paroleComando(fraseDetta).joined(separator: " ")) {
             Piano.condiviso.ferma()

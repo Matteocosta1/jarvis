@@ -1605,6 +1605,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
         case "regia":                                             // 12.0 (10): la regia al polso (sezioni e musica)
             stato = "all'opera"
             return await RegiaPolso.condivisa.esegui(input)
+        case "piano":                                             // 14 nov: più passi senza guida (PianoPolso.swift)
+            let esito = PianoPolso.condiviso.esegui(input)
+            stato = esito.riga
+            return (esito.testo, esito.errore)
         default:
             return ("{\"errore\": \"strumento \(nome) non disponibile sull'orologio: va fatto dall'iPhone\"}", true)
         }
@@ -1649,7 +1653,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         // e Int(...) chiudeva l'app appena preparata la domanda. Per «fine» si usa Int64.
         do {
             var corpo: [String: Any] = ["messaggi": storia, "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti,
-                                        "strumenti_client_def": [RegiaPolso.definizione],          // 12.0 (10): la regia al polso
+                                        "strumenti_client_def": [RegiaPolso.definizione, PianoPolso.definizione],          // 12.0 (10): la regia al polso
                                         "schermo": RegiaPolso.condivisa.catalogo()]
             if let u = unico {
                 // idea D: la cronologia come la preparerebbe `chiedi`, senza la domanda nuova (la aggiunge il cervello con la nota)
@@ -1701,7 +1705,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 corpo["briefing_telefono"] = await raccoltaBriefing.value
             }
             if unico == nil { iniziaFlussoVoce() }               // col giro unico la voce si prepara quando la frase è accettata
-            for _ in 0..<5 {
+            // 14 nov (più passi senza guida): un piano fa più giri col cervello (era 5, come sull'iPhone ora 12)
+            for _ in 0..<12 {
                 switch try await flussoConRitentativi(token: token, corpo: corpo, richiesta: UUID().uuidString, canale: unico?.canale) {
                 case .fine(let testo):
                     guard !Task.isCancelled else { return }
@@ -1787,7 +1792,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     let continua: [String: Any] = ["lavoro": lavoro, "risultati": risultati,
                                                    "modello": modello, "azioni": azioniFatte, "detto": detto]
                     corpo = ["messaggi": [Any](), "dispositivo": "orologio", "strumenti_client": JarvisOrologio.strumenti,
-                             "strumenti_client_def": [RegiaPolso.definizione], "continua": continua]
+                             "strumenti_client_def": [RegiaPolso.definizione, PianoPolso.definizione], "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
                     if let salute = await SalutePronta.perDomanda(attesa: 0) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 }

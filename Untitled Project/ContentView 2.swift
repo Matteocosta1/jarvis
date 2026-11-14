@@ -166,7 +166,10 @@ struct ContentView: View {
             .task {                                             // 14 nov: -provaMani GLOBO: legge i tasti dello schermo e ne preme uno
                 guard UserDefaults.standard.object(forKey: "provaMani") != nil else { return }
                 print("MANI: in attesa (14 s)")
-                try? await Task.sleep(for: .seconds(14))
+                for k in 1...7 {                                    // il battito: se il thread principale è fermo, qui si vede
+                    try? await Task.sleep(for: .seconds(2))
+                    print("MANI: battito \(k * 2) s, cancellato \(Task.isCancelled)")
+                }
                 await ManiJarvis.prova(tocca: UserDefaults.standard.string(forKey: "provaMani"))
             }
             .overlay {                                          // -provaBanco costi: il banco degli ologrammi coi dati del mockup
