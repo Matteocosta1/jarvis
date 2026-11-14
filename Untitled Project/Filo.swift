@@ -253,6 +253,9 @@ final class Filo: ObservableObject {
         }
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
+        // 14 nov (il signore: «le cose non spariscono dopo 2,8 secondi»): richiamato dal bordo restava fermo per sempre, anche coi
+        // dati nuovi; un dato nuovo riporta le regole di sempre (notifica 2,8 s, fissato resta)
+        richiamato = false
         programma()
         svegli()
         if suono { Suoni.filo() }
@@ -273,6 +276,7 @@ final class Filo: ObservableObject {
         a.aggiornato = Date()
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
+        richiamato = false
         programma()
         svegli()
     }
