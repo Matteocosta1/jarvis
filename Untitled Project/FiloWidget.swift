@@ -273,6 +273,13 @@ private struct ArgomentoVista: View {
                 .accessibilityLabel("Chiudi \(a.nome)")
             }
             .frame(minHeight: 24)
+            // 14 nov: tenuto premuto sul nome, si fissa (◆) come con «fissalo»; ancora, si sgancia
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.45) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
+            }
+            .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
             ForEach(righe) { r in
                 Button {
                     if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }

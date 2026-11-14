@@ -268,7 +268,7 @@ final class Filo: ObservableObject {
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) { a = argomenti.remove(at: i) } else { a = ArgomentoFilo(nome: nome, righe: []) }
         a.righe = Array(righe.prefix(8))
-        a.etichetta = titolo.isEmpty ? nil : "Piano · " + titolo
+        a.etichetta = "\u{00A0}"                                          // 14 nov (il signore): nessuna scritta, solo i passi
         a.scade = finito ? Date().addingTimeInterval(5) : nil
         a.nascosto = false
         a.nascostoAlle = nil
@@ -432,9 +432,34 @@ final class Filo: ObservableObject {
     }
 
     /// Le notifiche scadute spariscono (restano da richiamare).
+    /// 14 nov (il signore: «resta finché ne state parlando»): mentre JARVIS parla le notifiche non scadono; quando ha finito,
+    /// ripartono da lì (2,8 s dopo la sua ultima parola), così il dato non sparisce mentre lo sta ancora dicendo.
+    private(set) var voce = false
+    func jarvisParla(_ si: Bool) {
+        guard si != voce else { return }
+        voce = si
+        if !si {
+            let fine = Date().addingTimeInterval(Filo.durataNotifica)
+            for k in argomenti.indices where !argomenti[k].fisso && !argomenti[k].nascosto {
+                if let s = argomenti[k].scade, s < fine { argomenti[k].scade = fine }
+            }
+        }
+        programma()
+    }
+
+    /// 14 nov: tenuto premuto col dito, l'argomento si fissa (come «fissalo»); di nuovo, si sgancia.
+    func fissaArgomento(_ nome: String) {
+        guard let i = argomenti.firstIndex(where: { $0.nome == nome }) else { return }
+        argomenti[i].fisso.toggle()
+        argomenti[i].scade = argomenti[i].fisso ? nil : Date().addingTimeInterval(Filo.durataNotifica)
+        argomenti[i].giro += 1
+        programma()
+        svegli()
+    }
+
     private func programma() {
         controllo?.cancel()
-        guard !tocco, !richiamato else { return }
+        guard !tocco, !richiamato, !voce else { return }
         let prossima = visti.filter { !$0.fisso }.compactMap(\.scade).min()
         guard let prossima else { return }
         controllo = Task { @MainActor [weak self] in

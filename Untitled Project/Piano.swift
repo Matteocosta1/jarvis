@@ -34,7 +34,7 @@ final class Piano {
 
     static let definizione: [String: Any] = [
         "name": "piano",
-        "description": "Per un obiettivo con 3 o più passi (o che tocca più sezioni e app): prima piano(titolo, passi) coi passi in poche parole, e dillo al signore in una frase; poi un passo alla volta coi tuoi strumenti, e dopo ognuno piano(passo, stato, nota) controllando l'esito (dati, schermo). Se un passo non va prova un'altra strada, o dillo. Un passo da confermare: stato=aspetta e chiedi il sì. Alla fine piano(fine=true) e una frase sola col risultato. Il piano si vede in FILO.",
+        "description": "Quando il signore ti affida un lavoro con più passi («fallo tu», «pensaci tu», «vedi tu», «occupatene tu»): piano(titolo, passi) coi passi in poche parole, poi un passo alla volta coi tuoi strumenti e dopo ognuno piano(passo, stato, nota) controllando l'esito. Parla come JARVIS con Tony: «Ci penso io», poi solo i dati che contano mentre lavori, mai l'elenco dei passi (si vede da solo nella tab). Un passo da confermare: stato=aspetta e chiedi il sì in una domanda breve. Alla fine piano(fine=true) e una frase col risultato.",
         "input_schema": [
             "type": "object",
             "properties": [

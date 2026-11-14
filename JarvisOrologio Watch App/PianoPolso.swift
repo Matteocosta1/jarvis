@@ -22,7 +22,7 @@ final class PianoPolso {
 
     static let definizione: [String: Any] = [
         "name": "piano",
-        "description": "Per un obiettivo con 3 o più passi: prima piano(titolo, passi) coi passi in poche parole, e dillo al signore in una frase; poi un passo alla volta coi tuoi strumenti, e dopo ognuno piano(passo, stato, nota) controllando l'esito. Se un passo non va prova un'altra strada, o dillo. Un passo da confermare: stato=aspetta e chiedi il sì. Alla fine piano(fine=true) e una frase sola col risultato. Sull'orologio si vede il passo in corso sotto il reattore.",
+        "description": "Quando il signore ti affida un lavoro con più passi («fallo tu», «pensaci tu», «vedi tu»): prima piano(titolo, passi) coi passi in poche parole, e digli solo «Ci penso io»; poi un passo alla volta coi tuoi strumenti, e dopo ognuno piano(passo, stato, nota) controllando l'esito. Se un passo non va prova un'altra strada, o dillo. Un passo da confermare: stato=aspetta e chiedi il sì. Alla fine piano(fine=true) e una frase sola col risultato. Sull'orologio si vede il passo in corso sotto il reattore.",
         "input_schema": [
             "type": "object",
             "properties": [
@@ -78,7 +78,7 @@ final class PianoPolso {
     private var riga: String {
         let fatti = passi.filter { $0.stato == "fatto" }.count
         let ora = passi.first { $0.stato == "in corso" || $0.stato == "aspetta il sì" }
-        return "PIANO \(min(fatti + 1, passi.count))/\(passi.count)" + (ora.map { " · " + $0.testo } ?? "")
+        return "\(min(fatti + 1, passi.count))/\(passi.count)" + (ora.map { " · " + $0.testo } ?? "")
     }
 
     /// La riga per il cervello (dentro [Schermo]).

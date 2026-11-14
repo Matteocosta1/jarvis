@@ -41,7 +41,7 @@ final class Insieme {
     }
     private struct QualeCosa { var genere: Character? = nil; var plurale = false; var nome: String? = nil; var di: String? = nil; var prima = false }
     private enum Intento {
-        case mostra(cosa: String, pron: Character?), togli, togliTutti, fissa(QualeCosa)
+        case mostra(cosa: String, pron: Character?), togli, togliTutti, fissa(QualeCosa), richiama
         case messaggi, leggi(di: String?, quale: QualeCosa)
         case scrivi(a: Destinatario, testo: String, whatsapp: Bool?), scriviCosa(a: Destinatario)
         case manda(cosa: QualeCosa, a: Destinatario?, whatsapp: Bool?)
@@ -100,7 +100,7 @@ final class Insieme {
         switch i {
         case .sessione: return false                                  // la sessione la propone il cervello
         case .mostra(let cosa, let pron): return mostraLocale(cosa, pron: pron, frase: frase)
-        case .togli, .togliTutti: return !filo.argomenti.isEmpty      // FILO vuoto: «toglilo» è forse della sezione davanti
+        case .togli, .togliTutti, .richiama: return !filo.argomenti.isEmpty   // FILO vuoto: «toglilo» è forse della sezione davanti
         case .salva(let q):
             let r = q.nome != nil ? filo.cosa(nome: q.nome) : filo.cosa(genere: q.genere, plurale: q.plurale)
             return r?.tipo == "brano" || r?.tipo == "post"
@@ -136,6 +136,8 @@ final class Insieme {
         if let m = Insieme.cerca(#"^(?:mostrami|mostra|fammi vedere|fai vedere|vediamo|fammel([oaie]) vedere|mostramel([oaie])|fammi un po vedere)(?: (.+))?$"#, n) {
             return .mostra(cosa: (m[3] ?? "").trimmingCharacters(in: .whitespaces), pron: (m[1] ?? m[2]).flatMap { Insieme.pron($0).genere })
         }
+        // 14 nov: la tab torna a voce, come con lo swipe dal bordo
+        if Insieme.cerca(#"^(?:rifammi vedere|fammi rivedere|fammel[oaie] rivedere|riportami la tab|ridammi la tab|cosa mi hai mostrato|rimetti in vista|rimettimel[oaie] in vista|riportamel[oaie])$"#, n) != nil { return .richiama }
         if Insieme.cerca(#"^(?:togli tutto|togli tutti|via tutto|via tutti|togli i widget|pulisci tutto)$"#, n) != nil { return .togliTutti }
         if Insieme.cerca(#"^(?:toglil[oaie]|togli questo|togli quello|via questo|togli il widget|staccal[oa]|stacca)$"#, n) != nil || n == "via" { return .togli }
         if let m = Insieme.cerca(#"^(?:fissal([oaie])|fissa(?: quest([oa]))?|tienil([oa]) in vista|appuntal([oa]))$"#, n) {
@@ -219,6 +221,9 @@ final class Insieme {
             guard filo.togliTutti() > 0 else { return nil }                  // FILO vuoto: forse «togli tutto» della sezione davanti
             Suoni.filoVia()
             return Battute.angoloLibero()
+        case .richiama:
+            guard filo.richiama() else { return nil }                       // niente da riportare: la frase va avanti
+            return Battute.una("richiamaTab", ["Ecco, Sir.", "Di nuovo in vista.", "Eccolo qui."])
         case .fissa(let q):
             aggiornaBrano()
             guard let r = q.genere == nil ? filo.questo : filo.cosa(genere: q.genere, plurale: q.plurale) else { return Battute.nienteDaMostrare() }
@@ -229,6 +234,8 @@ final class Insieme {
             guard !arr.isEmpty else { return "Oggi non è arrivato niente, Sir." }
             for v in arr.reversed() { filo.persona(v.nome); filo.metti(Insieme.cosaMessaggio(v)) }
             let nomi = arr.map { Filo.detto($0.nome) }
+            // 14 nov: il dato utile va nella tab da solo, mentre lo dice
+            filo.mostra("messaggi", titolo: "Messaggi", riga: "\(arr.count) nuovi · " + nomi.joined(separator: ", "), sezione: "Messaggi")
             return "\(Battute.numero(arr.count).capitalizzata) nuovi, Sir: \(Insieme.elenco(nomi))."
         case .leggi(let di, let q):
             var r: CosaFilo?
@@ -241,6 +248,7 @@ final class Insieme {
             guard let r, let testo = r.testo else { return Battute.nienteDaMostrare() }
             if let p = r.persona { filo.persona(p) }
             filo.metti(r)
+            mostraCosa(r)                                                // 14 nov: quello che legge compare nella tab mentre lo legge
             if r.tipo == "messaggio", let p = r.persona { return "\(Filo.detto(p).capitalizzata), \(Insieme.quandoDetto(r.quando)): «\(testo)»" }
             return testo
         case .scrivi(let a, let testo, let wa):

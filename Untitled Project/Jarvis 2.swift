@@ -222,6 +222,7 @@ final class Jarvis: NSObject, ObservableObject {
             if dialogoFuori || IsolaJarvis.voceAccesa { aggiornaIsolaVoce() }   // 12 nov: l'isola VOCE segue il dialogo fuori dall'app
             if fase == .ascolto || fase == .parlo { Suoni.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
             if fase == .attesa { Iniziativa.condivisa.pausa() }            // 14 nov: una pausa nel dialogo: l'iniziativa può parlare
+            Filo.condiviso.jarvisParla(fase == .parlo)                     // 14 nov: la tab non sparisce mentre JARVIS parla
         }
     }
     @Published var parziale = ""
