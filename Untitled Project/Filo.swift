@@ -288,8 +288,8 @@ final class Filo: ObservableObject {
         a.scade = finito ? Date().addingTimeInterval(5) : nil
         a.nascosto = false
         a.nascostoAlle = nil
-        a.giro += 1
-        a.aggiornato = Date()
+        // 14 nov (il signore: «non voglio né che saltelli né che si accenda, solo che si spunti»): un passo fatto cambia solo il suo
+        // segno (e il tocco di Aptica); niente lampo. Si accende solo il piano appena arrivato (ArgomentoFilo nuovo: aggiornato adesso)
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
         richiamato = false
