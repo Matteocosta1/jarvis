@@ -902,7 +902,8 @@ final class Regia {
         while let f = resto.first, ["il", "lo", "la", "l", "i", "gli", "le", "sezione"].contains(f) { resto.removeFirst() }
         guard !resto.isEmpty, resto.count <= 2 else { return nil }
         let detto = Pronunce.sistema(["apri"] + resto).dropFirst().joined(separator: " ")
-        guard let d = destinazione(detto), d.nome != "Bea", !Rubrica.chiamatoCosi(detto) else { return nil }
+        // «mandalo su WhatsApp», «mandalo per mail»: è il canale del messaggio, non una sezione (Messaggi ed Email restano del dialogo)
+        guard let d = destinazione(detto), !["Bea", "Messaggi", "Email"].contains(d.nome), !Rubrica.chiamatoCosi(detto) else { return nil }
         return d.nome
     }
 
