@@ -302,7 +302,7 @@ final class Regia {
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
         // 14 nov (il signore: «come Iron Man: attivo, sveglio, reattivo»): la tab mostra da sola i dati che servono per decidere
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine. LA TAB A VOCE (sezione vuota): tab_fissa(titolo) e tab_sgancia(titolo) (titolo = l'argomento: Meteo, Agenda, Messaggi…; vuoto = quello di cui si parla), tab_togli(titolo), tab_vuota, tab_nascondi (va via, si richiama), tab_richiama. Le viste dell'ologramma della sezione davanti: vista(nome), coi nomi delle sue chip. Scorrere la pagina: mano scorri")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine. LA TAB A VOCE (sezione vuota): tab_fissa(titolo) e tab_sgancia(titolo) (titolo = l'argomento: Meteo, Agenda, Messaggi…; vuoto = quello di cui si parla), tab_togli(titolo), tab_vuota, tab_nascondi (va via, si richiama), tab_richiama. Le viste dell'ologramma della sezione davanti: vista(nome), coi nomi delle sue chip. Scorrere la pagina: mano scorri. «Mandalo a Foto», «portalo in Musica», «mandalo a LiDAR»: se il nome è di una sezione e non di una persona della rubrica è andare in quella sezione (apri), non un messaggio")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -571,6 +571,11 @@ final class Regia {
         guard !parole.isEmpty else { return nil }
         // 14 nov (le mani subito, senza cervello): «scendi», «torna su», «in fondo»; «passa al globo», «vista atomo», «le torri»
         if !davantiCapisce(frase) {
+            // 14 nov (il signore: «mandalo non lo dico solo per il messaggio, anche per spostarmi da una sezione all'altra»)
+            if let n = Regia.mandaA(parole) {
+                let e = await apri(n)
+                return e.ok ? Regia.aperturaDi(n) : nil
+            }
             if let v = Regia.versoScorri(parole) { return scorriDetto(v) }
             if let d = nomeDavanti, let n = Regia.vistaDetta(parole, sezione: d) {
                 let e = await vista(sezione: d, detto: n)
@@ -829,7 +834,7 @@ final class Regia {
         if let p = proposta, Date().timeIntervalSince(p.quando) < 45, Regia.eAssenso(f) { return true }
         let pezzi = FineFrase.comandoComposto(f) ? Regia.pezzi(f) : [f]
         if pezzi.count >= 2 { return pianoDi(pezzi) != nil }
-        return riconosci(f, davanti: nomeDavanti) != nil || davantiCapisce(f)
+        return riconosci(f, davanti: nomeDavanti) != nil || davantiCapisce(f) || Regia.mandaA(Regia.paroleComando(f)) != nil
     }
 
     /// Cosa sarebbe un pezzo di frase per l'app, con `davanti` come sezione davanti in quel momento. Nil: non lo sa fare da sola.
@@ -853,6 +858,7 @@ final class Regia {
                        "riportami il *", "riportami la *", "riportami *"] {   // 12.0 (16): «mostrami» è il widget FILO
             if let v = Regia.combacia(parole, schema, altro: []), let d = Regia.destinazione(v), !d.dopoLaVoce { return .apri(d.nome) }
         }
+        if let n = Regia.mandaA(parole), Regia.destinazione(n)?.dopoLaVoce == false { return .apri(n) }   // 14 nov: «e mandalo a Foto»
         if let v = Regia.versoScorri(parole) { return .scorri(v) }                         // 14 nov: le mani, subito
         if let d = davanti, let n = Regia.vistaDetta(parole, sezione: d) { return .vista(n) }   // 14 nov: le viste degli ologrammi
         if Insieme.condiviso.sua(pezzo) { return .dialogo }                                 // 14 nov: la tab e il dialogo coi pronomi
@@ -878,6 +884,26 @@ final class Regia {
         if resto == ["questa"] || resto == ["questo"] { return davanti }
         guard resto.count == 1, let w = resto.first, let n = ComandoVocale.nomeSezione(w) ?? Regia.destinazione(w)?.nome else { return nil }
         return pila?.voci.contains(where: { $0.sezione.nome == n }) == true || n == davanti ? n : nil
+    }
+
+    /// 14 nov (il signore: «fai questo e mandalo a LiDAR, mandalo a Foto: mandalo non lo dico solo per il messaggio, anche per
+    /// spostarmi da una sezione all'altra»): «mandalo a / portalo in / passalo su» + una sezione è andare in quella sezione, se il nome
+    /// non è di una persona in rubrica (Bea resta Bea: un messaggio a lei). Le storpiature valgono come negli altri comandi («leader»
+    /// è LiDAR). Il nome della sezione; nil: non è questo.
+    static func mandaA(_ parole: [String]) -> String? {
+        let verbi: Set<String> = ["mandalo", "mandala", "mandali", "mandale", "portalo", "portala", "portali", "portale", "passalo", "passala",
+                                  "passali", "passale"]
+        guard parole.count >= 3, parole.count <= 7, let v = parole.first, verbi.contains(v) else { return nil }
+        var resto = Array(parole.dropFirst())
+        if resto.first == "anche" { resto.removeFirst() }
+        let verso: Set<String> = ["a", "al", "alla", "allo", "all", "ai", "alle", "in", "nel", "nella", "nello", "su", "sul", "sulla", "sullo", "dentro"]
+        guard let a = resto.first, verso.contains(a) else { return nil }
+        resto.removeFirst()
+        while let f = resto.first, ["il", "lo", "la", "l", "i", "gli", "le", "sezione"].contains(f) { resto.removeFirst() }
+        guard !resto.isEmpty, resto.count <= 2 else { return nil }
+        let detto = Pronunce.sistema(["apri"] + resto).dropFirst().joined(separator: " ")
+        guard let d = destinazione(detto), d.nome != "Bea", !Rubrica.chiamatoCosi(detto) else { return nil }
+        return d.nome
     }
 
     // MARK: 14 nov · le mani subito: scorrere e le viste degli ologrammi

@@ -59,16 +59,18 @@ final class PianoPolso {
             passi[n - 1].stato = stato
             if let nota = (i["nota"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !nota.isEmpty { passi[n - 1].nota = String(nota.prefix(70)) }
             if stato == "fatto" {
-                WKInterfaceDevice.current().play(.click)                 // un passo fatto: un tocco al polso
+                if i["fine"] as? Bool != true { ApticaPolso.suona(.click) }   // un passo fatto: un tocco al polso (finito: «fatto», sotto)
                 if passi.indices.contains(n), passi[n].stato == "da fare" { passi[n].stato = "in corso" }
             } else if stato == "errore" {
-                WKInterfaceDevice.current().play(.retry)
+                ApticaPolso.suona(.failure)                                // 14 nov: come l'errore dell'iPhone
+            } else if stato == "aspetta il sì" {
+                ApticaPolso.suona(.notification)                           // 14 nov: aspetta il sì, bussa (come l'iPhone)
             }
         }
         if i["fine"] as? Bool == true {
             finito = true
             for k in passi.indices where passi[k].stato == "in corso" { passi[k].stato = "da fare" }
-            WKInterfaceDevice.current().play(passi.allSatisfy { $0.stato == "fatto" } ? .success : .stop)
+            ApticaPolso.suona(passi.allSatisfy { $0.stato == "fatto" } ? .success : .stop)
         }
         return (RegiaPolso.json(["piano": perCervello ?? "", "nota": finito ? "piano chiuso: di' il risultato in una frase" : "vai avanti col passo in corso"]),
                 false, finito ? nil : riga)
@@ -86,5 +88,17 @@ final class PianoPolso {
         guard !passi.isEmpty, let iniziato, Date().timeIntervalSince(iniziato) < 1200 else { return nil }
         let righe = passi.enumerated().map { k, p in "\(k + 1) \(p.stato): \(p.testo)" + (p.nota.map { " (\($0))" } ?? "") }
         return (finito ? "PIANO FINITO" : "PIANO IN CORSO") + (titolo.isEmpty ? "" : " «\(titolo)»") + ": " + righe.joined(separator: "; ")
+    }
+}
+
+/// 14 nov (il signore: «anche sull'orologio ci devono essere i feedback aptici»): la stessa logica dell'iPhone (Aptica), coi tocchi
+/// dell'orologio. Un comando fatto: click; un passo della missione fatto: click; il passo che aspetta il sì: notification; un errore:
+/// failure; la missione finita bene: success, chiusa a metà: stop. Mai per decorazione (non quando JARVIS comincia o finisce di
+/// parlare: il signore, 26 ott). Spenti con «Vibrazioni» nelle impostazioni dell'orologio.
+@MainActor
+enum ApticaPolso {
+    static func suona(_ tipo: WKHapticType) {
+        guard UserDefaults.standard.object(forKey: "vibrazioni") as? Bool ?? true else { return }
+        WKInterfaceDevice.current().play(tipo)
     }
 }

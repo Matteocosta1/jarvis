@@ -29,6 +29,14 @@ enum Rubrica {
         }
     }
 
+    /// 14 nov: in rubrica c'è qualcuno che si chiama proprio così (il nome, o nome e cognome)? Solo coi contatti già letti (la
+    /// regia lo chiede senza aspettare: «mandalo a Foto» è la sezione, a meno che Foto non sia una persona).
+    static func chiamatoCosi(_ detto: String) -> Bool {
+        let k = Regia.chiave(detto)
+        guard !k.isEmpty else { return false }
+        return cache.contains { c in Regia.chiave(c.nome) == k || Regia.chiave(String(c.nome.split(separator: " ").first ?? "")) == k }
+    }
+
     /// Tutti i contatti con almeno un numero, in ordine alfabetico (letti una volta, poi dalla cache).
     static func tutti() async -> [Contatto] {
         if !cache.isEmpty { return cache }

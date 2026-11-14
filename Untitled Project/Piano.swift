@@ -64,6 +64,7 @@ final class Piano {
             Regia.condivisa.evento("piano: \(titolo.isEmpty ? "senza titolo" : titolo), \(passi.count) passi")
         }
         guard !passi.isEmpty else { return (Regia.json(["errore": "nessun piano: prima piano(titolo, passi)"]), true) }
+        var esito: Stato?                                                    // 14 nov: per l'aptica del passo (Aptica)
         if let n = (i["passo"] as? NSNumber)?.intValue ?? (i["passo"] as? String).flatMap({ Int($0) }) {
             guard passi.indices.contains(n - 1) else { return (Regia.json(["errore": "il piano ha \(passi.count) passi"]), true) }
             let stato: Stato
@@ -74,17 +75,31 @@ final class Piano {
             default: stato = .fatto
             }
             passi[n - 1].stato = stato
+            esito = stato
             if let nota = (i["nota"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !nota.isEmpty { passi[n - 1].nota = String(nota.prefix(70)) }
             // il passo dopo, se ancora da fare, è quello in corso
             if stato == .fatto, passi.indices.contains(n), passi[n].stato == .daFare { passi[n].stato = .inCorso }
         }
-        if i["fine"] as? Bool == true {
+        let fine = i["fine"] as? Bool == true
+        if fine {
             finito = true
             for k in passi.indices where passi[k].stato == .inCorso { passi[k].stato = .daFare }
             if passi.allSatisfy({ $0.stato == .fatto }) { Congedo.condiviso.cosaVera() }
             Regia.condivisa.evento("piano finito: \(riassunto)")
         }
         mostra()
+        // 14 nov (il signore: «i feedback aptici… che seguano una logica»; come al polso): finita tutta bene «fatto», chiusa a metà un
+        // tocco morbido; un passo fatto un tocco secco, il passo che aspetta il sì bussa due volte, un errore l'errore di Apple
+        if fine {
+            if passi.allSatisfy({ $0.stato == .fatto }) { Aptica.pronto() } else { Aptica.tabVia() }
+        } else if let esito {
+            switch esito {
+            case .fatto: Aptica.passoFatto()
+            case .aspetta: Aptica.passoAspetta()
+            case .errore: Aptica.passoErrore()
+            default: break
+            }
+        }
         return (Regia.json(["piano": perCervello ?? "", "nota": finito ? "piano chiuso: di' il risultato in una frase" : "vai avanti col passo in corso"]), false)
     }
 

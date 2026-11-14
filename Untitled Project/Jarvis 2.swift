@@ -677,7 +677,7 @@ final class Jarvis: NSObject, ObservableObject {
             Congedo.condiviso.zitto()
             messaggi.append(Messaggio(ruolo: "user", testo: scritta))
             salva()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Aptica.comandoFatto()                                        // 14 nov: dal motore, mai sopra il tocco della tab
             if !battuta.isEmpty { annunciaConSeguito(battuta) }
             return
         }
@@ -1018,7 +1018,7 @@ final class Jarvis: NSObject, ObservableObject {
         if !pulito.isEmpty, let battuta = await Regia.condivisa.subito(pulito) {
             chiudiInterruzione()
             fraseAVoce = ""
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Aptica.comandoFatto()                                        // 14 nov: dal motore, mai sopra il tocco della tab
             // 12.0 (16): anche dopo una frase dell'app il seguito vale senza «Jarvis» (il dialogo continua)
             if !battuta.isEmpty { annunciaConSeguito(battuta) } else { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
             return

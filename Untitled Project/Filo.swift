@@ -421,7 +421,9 @@ final class Filo: ObservableObject {
         guard !tocco else { return }
         riposa = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Filo.durataNotifica))
-            guard let self, !Task.isCancelled, !self.tocco, !self.voce else { return }
+            // 14 nov (il signore: «il saltello tra un'azione e l'altra, no»): durante la missione non si stringe, se no a ogni passo
+            // si riaprirebbe (a missione finita riparte il conto)
+            guard let self, !Task.isCancelled, !self.tocco, !self.voce, !Piano.condiviso.inCorso else { return }
             let tra = Date().addingTimeInterval(0.6)
             let resta = self.richiamato || self.visti.contains { $0.fisso || ($0.scade ?? .distantFuture) > tra }
             guard resta else { return }
@@ -435,6 +437,7 @@ final class Filo: ObservableObject {
     func toccoSchermo(_ p: CGPoint) {
         guard !visti.isEmpty, !daParte, rettScheda.width > 0 else { return }
         if rettScheda.contains(p) {
+            if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
             svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta
             toccato(true, da: "appoggiato")
         } else if fuoco, !tocco {
@@ -484,6 +487,21 @@ final class Filo: ObservableObject {
             scelta = r.id
         }
         return scelta
+    }
+
+    /// 14 nov: gli istanti in cui la riga accesa cambia (la voce arriva alla parola di una riga): la tab si ridisegna proprio allora,
+    /// al fotogramma giusto, senza controlli a intervalli.
+    static func cambiDetta(_ righe: [(id: String, testo: String)], voce: VoceOra?) -> [Date] {
+        guard let v = voce else { return [] }
+        let frase = v.testo as NSString
+        guard frase.length > 0 else { return [] }
+        var istanti: [Date] = []
+        for r in righe {
+            let parole = piega(r.testo).split(whereSeparator: { !$0.isLetter }).map(String.init).filter { $0.count >= 4 && !paroleVuote.contains($0) }
+            guard let k = parole.map({ frase.range(of: $0).location }).filter({ $0 != NSNotFound }).min() else { continue }
+            istanti.append(v.inizio.addingTimeInterval(v.durata * Double(k) / Double(frase.length) + 0.001))
+        }
+        return istanti.sorted()
     }
 
     /// Il dito si alza (o il tocco finisce in un altro modo).

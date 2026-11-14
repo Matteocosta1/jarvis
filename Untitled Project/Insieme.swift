@@ -187,6 +187,8 @@ final class Insieme {
         if ["rispondile", "rispondigli", "scrivile", "scrivigli", "rispondi"].contains(n) {
             return .scriviCosa(a: n.hasSuffix("le") ? .genere("f") : n.hasSuffix("gli") ? .genere("m") : .ultimo)
         }
+        // 14 nov (il signore): «mandalo a Foto», «mandalo a LiDAR» è andare in quella sezione (la regia), non un messaggio
+        if Regia.mandaA(n.split(separator: " ").map(String.init)) != nil { return nil }
         // mandare: «mandalo anche a lei», «giraglielo», «manda a Bea il messaggio di Marco»
         if let m = Insieme.cerca(#"^(?:mandal|invial|giral|passal|condividil)([oaie])(?: anche)?(?: a (\w+))?(?: anche)?(?: su (whatsapp|imessage))?$"#, n) {
             let p = Insieme.pron(m[1] ?? "o")

@@ -66,7 +66,7 @@ private struct FasciaFilo: View {
                 DragGesture(minimumDistance: 10)
                     .onEnded { v in
                         guard v.translation.width < -30, abs(v.translation.height) < 40 else { return }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        // la vibrazione la dà il suono della tab (Suoni.filo → Aptica.tabArriva), nello stesso istante
                         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
                     }
             )
@@ -252,8 +252,7 @@ private struct SchedaFilo: View {
                     // 14 nov: basta anche un colpo veloce verso destra (corto ma lanciato), come le notifiche di iOS
                     let lanciata = v.translation.width > 30 && v.predictedEndTranslation.width > 170
                     if v.translation.width > 80 || lanciata, v.translation.width > abs(v.translation.height) * 2.5 {
-                        Suoni.filoVia()
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Suoni.filoVia()                                            // suono e tocco insieme (Aptica.tabVia)
                         withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
                         dx = 0
                         return
@@ -317,7 +316,7 @@ private struct ArgomentoVista: View {
                 }
                 if compatta {
                     // compatta: al posto della linea e della X, il dato che conta
-                    Text(tutte.first?.testo ?? "")
+                    Text(tutte.first.map { r in (r.segno.map { $0 + " " } ?? "") + r.testo } ?? "")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.96))
                         .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
@@ -354,15 +353,17 @@ private struct ArgomentoVista: View {
             // 14 nov: tenuto premuto sul nome, si fissa (◆) come con «fissalo»; ancora, si sgancia
             .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: 0.45) {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                Aptica.tabFissa(!a.fisso)                                       // 14 nov: fissata un colpo pieno, sganciata la selezione
                 withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
             }
             .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
             if !compatta {
-                // la riga che JARVIS sta dicendo si accende (si guarda solo mentre parla): una sola in tutta la tab, quella detta per ultima
-                TimelineView(.animation(minimumInterval: 0.1, paused: filo.voceOra == nil)) { tl in
-                    let tab: [RigaVista] = filo.visti.flatMap { ArgomentoVista.righeDi($0) }
-                    let detta = Filo.rigaDetta(tab.map { r -> (id: String, testo: String) in (id: r.id, testo: r.testo) }, voce: filo.voceOra, ora: tl.date)
+                // la riga che JARVIS sta dicendo si accende: una sola in tutta la tab, quella detta per ultima. La tab si ridisegna proprio
+                // negli istanti in cui la voce arriva a una riga (niente controlli a intervalli), l'accensione corre a 120 Hz
+                let tab: [RigaVista] = filo.visti.flatMap { ArgomentoVista.righeDi($0) }
+                let coppie: [(id: String, testo: String)] = tab.map { r -> (id: String, testo: String) in (id: r.id, testo: r.testo) }
+                TimelineView(.explicit(Filo.cambiDetta(coppie, voce: filo.voceOra))) { tl in
+                    let detta = Filo.rigaDetta(coppie, voce: filo.voceOra, ora: tl.date)
                     VStack(alignment: .leading, spacing: 1) {
                         ForEach(tutte) { r in riga(r, detta: r.id == detta) }
                     }
@@ -390,13 +391,21 @@ private struct ArgomentoVista: View {
                         .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
                         .accessibilityHidden(true)
                 }
-                Text(r.testo)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
-                    .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    // 14 nov (il signore: «il testo si muove quando fa la spunta»): il segno del piano (○ ▸ ✓ ◇ ✕) sta in uno spazio
+                    // fisso, così quando cambia il testo resta fermo
+                    if let segno = r.segno {
+                        Text(segno)
+                            .frame(width: 10, alignment: .leading)
+                    }
+                    Text(r.testo)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
+                .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if let ora = r.ora {
                     Text(ora)
                         .font(.system(size: 7.5, weight: .medium, design: .monospaced))
@@ -432,8 +441,10 @@ private struct ArgomentoVista: View {
     private static func righeDi(_ a: ArgomentoFilo) -> [RigaVista] {
         var v: [RigaVista] = []
         for r in a.righe {
-            if a.nome == "Piano" {                                         // 14 nov: i passi del piano, senza l'ora
-                v.append(RigaVista(id: r.id, testo: r.riga, sezione: nil, ora: nil))
+            if a.nome == "Piano" {                                         // 14 nov: i passi del piano, senza l'ora; il segno a parte
+                let pezzi = r.riga.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
+                let segno: String? = pezzi.count == 2 && pezzi[0].count == 1 ? String(pezzi[0]) : nil
+                v.append(RigaVista(id: r.id, testo: segno == nil ? r.riga : String(pezzi[1]), sezione: nil, ora: nil, segno: segno))
             } else if a.nome == "Agenda" {
                 let pezzi = r.riga.components(separatedBy: " · ")
                 let titolo = Filo.testo(di: RigaFilo(id: r.id, titolo: r.titolo, riga: "", sezione: nil, alle: r.alle), in: a.nome)
@@ -484,6 +495,8 @@ private struct RigaVista: Identifiable {
     let sezione: String?
     let ora: String?
     var icona: String? = nil
+    /// 14 nov: il segno del passo del piano (○ ▸ ✓ ◇ ✕), disegnato in uno spazio fisso davanti al testo.
+    var segno: String? = nil
 }
 
 /// La sfumatura in alto e in basso quando c'è altro da scorrere.

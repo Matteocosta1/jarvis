@@ -244,7 +244,7 @@ import WatchKit
     /// Esegue il tasto detto e restituisce la frase di JARVIS: la battuta, o perché non è andata («l'iPhone non risponde»).
     func subito(_ comando: String) async -> String {
         let (ok, esito) = await tasto(comando)
-        WKInterfaceDevice.current().play(.click)
+        ApticaPolso.suona(ok ? .click : .failure)                           // 14 nov: fatto un tocco, non riuscito l'errore (Aptica)
         return ok ? Battute.musica(comando) : String(esito.prefix(1)).uppercased() + String(esito.dropFirst()) + ", Sir."
     }
 

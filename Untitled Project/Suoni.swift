@@ -211,12 +211,14 @@ enum Suoni {
 
     /// 12.0 (16): compare un widget di FILO («mostrami…», «fissalo»). File: «filo» (il signore, «chisper ui pop-up open»).
     static func filo() {
+        Aptica.tabArriva()                                             // 14 nov: la tab suona e vibra nello stesso istante
         _ = suonaPronto("filo", volume: 1.0)
     }
 
     /// 13.1: FILO va via (lo swipe a destra, la X di un argomento, «toglilo», «togli tutto»). File: «filovia» (il signore, 13 nov
     /// 23:24, rescopicsound «modern interface swoosh whoosh small 02»).
     static func filoVia() {
+        Aptica.tabVia()                                                // 14 nov: la tab suona e vibra nello stesso istante
         _ = suonaPronto("filovia", volume: 1.0)
     }
 

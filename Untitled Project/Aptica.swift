@@ -209,6 +209,64 @@ enum Aptica {
         ultimoTransitorio = Date().addingTimeInterval(tempi.last ?? 0)                 // per tutta la sequenza niente altri tocchi sopra
     }
 
+    // MARK: 14 nov · la tab e la missione (il signore: «i feedback aptici nella tab, e che seguano una logica»)
+    // La logica è quella di sempre: la tab vibra quando suona, nello stesso istante (Suoni.filo e Suoni.filoVia), mai da sola e
+    // mai per decorazione (le righe che si accendono mentre JARVIS parla non vibrano: basta la voce). La missione: ogni passo fatto
+    // è un tocco secco, il passo che aspetta il sì bussa due volte, un errore è l'errore di Apple, finita bene è «fatto».
+
+    /// Arriva qualcosa nella tab (un dato, il richiamo dal bordo, «fissalo»): un tocco pieno e morbido.
+    static func tabArriva() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.7, nitidezza: 0.4)
+    }
+
+    /// Va via dalla tab (lo swipe, la X, «toglilo»), o la missione chiusa a metà: un tocco leggero e morbido.
+    static func tabVia() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.5, nitidezza: 0.2)
+    }
+
+    /// Tenuta premuta: fissata è un colpo medio con un filo di corpo («resta lì»); sganciata, la selezione fine.
+    static func tabFissa(_ fissata: Bool) {
+        guard fissata else { click(); return }
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.85, nitidezza: 0.55, corpo: 0.04)
+    }
+
+    /// Un passo della missione fatto (✓): un tocco secco e leggero.
+    static func passoFatto() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.6, nitidezza: 0.85)
+    }
+
+    /// Un passo aspetta il sì (◇): bussa due volte.
+    static func passoAspetta() {
+        guard disponibile, libero() else { return }
+        BattitoMani.ignora(per: 0.6)
+        permettiColMicrofono()
+        if let m = accendi(), let p = try? m.makePlayer(with: pattern(transitori: [(0, 0.65, 0.7), (0.13, 0.65, 0.7)])) {
+            try? p.start(atTime: CHHapticTimeImmediate)
+        } else {
+            medio.impactOccurred()
+        }
+    }
+
+    /// Un passo non riuscito (✕): l'errore di Apple.
+    static func passoErrore() {
+        guard disponibile, libero() else { return }
+        BattitoMani.ignora(per: 0.8)
+        permettiColMicrofono()
+        notifica.notificationOccurred(.error)
+        notifica.prepare()
+    }
+
+    /// Un comando a voce fatto dall'app, senza il cervello: il tocco leggero di sempre, ma dal motore (col microfono aperto quello
+    /// di iOS si perde) e mai sopra un altro tocco (se la tab ha appena vibrato, basta quello).
+    static func comandoFatto() {
+        guard disponibile, libero() else { return }
+        suona(intensita: 0.55, nitidezza: 0.5)
+    }
+
     private static func pattern(transitori: [(Double, Float, Float)]) -> CHHapticPattern {
         let eventi = transitori.map { (t, intensita, nitidezza) in
             CHHapticEvent(eventType: .hapticTransient,
