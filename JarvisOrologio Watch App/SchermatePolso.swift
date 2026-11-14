@@ -34,6 +34,7 @@ struct SchermoPolso<Contenuto: View>: View {
     var pronto = true
     @ViewBuilder let contenuto: () -> Contenuto
     @State private var mostrato = false
+    @State private var stampa: CGFloat = 0           // 13.1: quanto della schermata è già «stampato» (0 → 1), come CorniceOrologio
     @State private var apertaDa = Date()
 
     /// Il nome nella barra: la prima parola, con la maiuscola (RADAR → Radar, PRIORITÀ · 3 → Priorità).
@@ -43,6 +44,10 @@ struct SchermoPolso<Contenuto: View>: View {
 
     var body: some View {
         ZStack {
+            // 13.1 (debug del polso, 14 nov): come nel mockup ogni schermata del polso ha la griglia (.wz::before) e, finito il
+            // caricamento, si stampa dall'alto in 0,32 s (entra). Qui prima mancava la griglia e il contenuto compariva in
+            // dissolvenza: PROTOCOLLI, TRACCIA, RADAR, PRIORITÀ, SATELLITE, SOCIAL e TRAVEL ora si aprono come tutte le altre.
+            GrigliaPolso()
             if mostrato {
                 ScrollView {
                     VStack(spacing: 5) {
@@ -50,13 +55,15 @@ struct SchermoPolso<Contenuto: View>: View {
                             Text(titolo)
                                 .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.5)
                                 .foregroundStyle(ColoriPolso.ciano)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         contenuto()
                     }
                     .padding(.horizontal, 4)
+                    .clipShape(TaglioPolso(progresso: stampa))
                 }
-                .transition(.opacity)
             } else {
                 CaricamentoOrologio(titolo: nomeBarra)
             }
@@ -65,13 +72,17 @@ struct SchermoPolso<Contenuto: View>: View {
         // già caricata (si torna indietro da una schermata aperta da qui): niente caricamento né suoni da capo
         .onAppear { guard !mostrato else { return }; apertaDa = Date(); WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() }
         .task(id: pronto) {
-            guard pronto, !mostrato else { return }
+            guard pronto else { return }
+            if mostrato { if stampa < 1 { stampa = 1 }; return }   // già aperta: mai una schermata rimasta tagliata
             let resta = AperturaPolso.caricamento - Date().timeIntervalSince(apertaDa)
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
             guard !Task.isCancelled else { return }       // uscito prima della fine: niente «pronta» a schermata chiusa
             WKInterfaceDevice.current().play(.success)
             SuoniOrologio.schedaPronta()
-            withAnimation(.easeOut(duration: 0.3)) { mostrato = true }
+            mostrato = true                               // il contenuto entra già tagliato a zero…
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            withAnimation(.timingCurve(0.2, 0.7, 0.3, 1, duration: AperturaPolso.stampa)) { stampa = 1 }   // …e si stampa dall'alto
         }
     }
 }

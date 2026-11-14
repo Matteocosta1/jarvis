@@ -355,7 +355,8 @@ struct ContentView: View {
                 strato
                     .zIndex(25)
                 // 12.0 (16): i widget FILO («mostrami…», «fissalo»), in alto a destra sopra le sezioni
-                StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0)   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
+                StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0,   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
+                           suSezione: pila.davanti != nil)                                 // 13.1: sopra una sezione, vetro con la trasparenza dinamica
                     .zIndex(26)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
@@ -812,6 +813,7 @@ struct ContentView: View {
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
+                    .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
@@ -832,6 +834,7 @@ struct ContentView: View {
                     // la rotella gira di un quarto aprendo Impostazioni e torna chiudendo, ora anche nel mockup
                     .rotationEffect(.degrees(mostraImpostazioni ? 90 : 0))
                     .animation(.spring(duration: 0.5), value: mostraImpostazioni)
+                    .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
             .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
@@ -886,7 +889,7 @@ struct ContentView: View {
 
             ("ENGINEERING", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
             ("ENGINEERING", "globe.europe.africa", "Interprete", { tastiera = false; apriInterprete() }),
-            ("ENGINEERING", "globe", "Browser", { mostraBrowser = true }),
+            ("ENGINEERING", "globe", "Browser", { tastiera = false; mostraBrowser = true }),   // 13.1: la tastiera di JARVIS si chiude, come per le altre icone
             ("ENGINEERING", "music.note.list", "Serata", { tastiera = false; scheda = .serata }),
             ("ENGINEERING", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
             ("ENGINEERING", "cube.transparent", "LiDAR", { tastiera = false; jarvis.interrompi(); mostraLidar = true }),

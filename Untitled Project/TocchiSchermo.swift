@@ -41,15 +41,21 @@ private final class OsservaTocchi: UIGestureRecognizer, UIGestureRecognizerDeleg
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         BattitoMani.ignora(per: Self.silenzio)
+        // 13.1: FILO sa dove si appoggia il dito (su di lui: a fuoco e fermo; fuori: in secondo piano)
+        if let t = touches.first { Filo.condiviso.toccoSchermo(t.location(in: nil)) }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
         BattitoMani.ignora(per: Self.silenzio)
-        if numberOfTouches <= touches.count { state = .failed }
+        if numberOfTouches <= touches.count {
+            Filo.condiviso.ditoAlzato()
+            state = .failed
+        }
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
         BattitoMani.ignora(per: Self.silenzio)
+        Filo.condiviso.ditoAlzato()
         state = .failed
     }
 

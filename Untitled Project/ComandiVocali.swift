@@ -382,6 +382,12 @@ enum ComandoVocale: Equatable {
         // MARK XI: «sezioni aperte», «quella di prima», «mettila da parte», «chiudi tutto» (prima di togliere «sezione»)
         if let n = navigazione(t) { return n }
         #if os(iOS)
+        // 13.1 (debug 14 nov): con qualcosa in FILO, «togli tutto» e «pulisci tutto» sono di FILO (il dialogo, Insieme), come nel
+        // mockup. Prima li prendeva questo elenco, che gira prima del dialogo: «togli tutto» chiudeva la sezione davanti e «pulisci
+        // tutto» cancellava la chat. Con FILO vuoto restano quelli di sempre.
+        if ["togli tutto", "pulisci tutto"].contains(t.joined(separator: " ")), !Filo.condiviso.argomenti.isEmpty { return nil }
+        #endif
+        #if os(iOS)
         // 4 nov (il signore: «ok»): «cerca su Google …», «googla …» aprono il Browser da ovunque (anche chiuso o dietro) e cercano
         // lì; col Browser davanti ci pensa già BrowserVoce, prima di qui. Prima di «sezione», dello Studio e dei video: «su Google» vince
         if let q = ricercaGoogle(t) {

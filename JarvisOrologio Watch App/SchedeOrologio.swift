@@ -158,18 +158,25 @@ struct CaricamentoOrologio: View {
 struct AperturaOrologio: ViewModifier {
     let titolo: String
     @State private var coperto = true
+    @State private var stampa: CGFloat = 0           // 13.1: quanto della pagina è già «stampato» (0 → 1), come CorniceOrologio
     func body(content: Content) -> some View {
+        // 13.1 (debug del polso, 14 nov): come nel mockup (entra) e come le schede in CorniceOrologio: sotto la griglia del polso,
+        // finito il caricamento la pagina si stampa dall'alto in 0,32 s. Prima la copertura nera sfumava e la pagina era già tutta
+        // lì: Vitals, Cuore, Spesa, Ricordi, Bea e Sentinella si aprivano diverse dalle altre.
         content
-            .overlay { if coperto { ZStack { Color.black.ignoresSafeArea(); CaricamentoOrologio(titolo: titolo) }.transition(.opacity) } }
+            .clipShape(TaglioPolso(progresso: stampa))
+            .background { GrigliaPolso() }
+            .overlay { if coperto { ZStack { Color.black.ignoresSafeArea(); CaricamentoOrologio(titolo: titolo) } } }
             // già scoperta (si torna indietro da Organismo, Traccia o Cuore, aperti da qui): niente caricamento né suoni da capo
             .onAppear { if coperto { WKInterfaceDevice.current().play(.start); SuoniOrologio.schedaApre() } }
             .task {
-                guard coperto else { return }
+                guard coperto else { if stampa < 1 { stampa = 1 }; return }
                 try? await Task.sleep(for: .seconds(AperturaPolso.caricamento))
                 guard !Task.isCancelled else { return }   // uscito prima della fine: niente «pronta» a pagina chiusa
                 WKInterfaceDevice.current().play(.success)
                 SuoniOrologio.schedaPronta()
-                withAnimation(.easeOut(duration: AperturaPolso.dissolvenza)) { coperto = false }
+                coperto = false
+                withAnimation(.timingCurve(0.2, 0.7, 0.3, 1, duration: AperturaPolso.stampa)) { stampa = 1 }   // la curva del mockup
             }
     }
 }

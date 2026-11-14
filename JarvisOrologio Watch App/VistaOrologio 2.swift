@@ -169,14 +169,15 @@ struct VistaOrologio: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         // Ricordi: la seconda memoria (luoghi, spesa, promesse, ultime cose segnate)
-                        NavigationLink { VistaRicordiOrologio() } label: {
+                        // 13.1: si apre come dalla barra delle icone (caricamento e stampa): prima da qui arrivava senza apertura
+                        NavigationLink { VistaRicordiOrologio().aperturaOrologio("Ricordi") } label: {
                             Image(systemName: "brain.head.profile").foregroundStyle(ciano)
                         }
                         .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink { VistaCronologia() } label: {
-                            Image(systemName: "text.bubble")
+                            Image(systemName: "text.bubble").foregroundStyle(ciano)   // 13.1: ciano come l'icona accanto (prima il colore di sistema)
                         }
                         .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
                     }
@@ -265,9 +266,8 @@ struct VistaOrologio: View {
                  .musica,                                    // build 23: MUSICA, la musica dell'iPhone comandata dal polso
                  .sistemi, .impostazioni, .costi: scheda = r  // build 30: SISTEMI, IMPOSTAZIONI e COSTI anche al polso
             case .pulisci: svuotaChat()                        // «Jarvis, pulisci»: come il cestino
-            case .allenatore: jarvis.stato = "Trainer: questa sezione vive sull'iPhone, Sir."   // build 22: il nome nuovo, non «Allenatore»
             case .satellite: polso = .satellite(nil)             // build 23: SATELLITE, i luoghi con la distanza
-            default: jarvis.stato = "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir."
+            default: jarvis.stato = "\(JarvisOrologio.nomeIPhone(r)): questa sezione vive sull'iPhone, Sir."   // 13.1: «LiDAR», «EDITH», «Trainer»
             }
         }
     }

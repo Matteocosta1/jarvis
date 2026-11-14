@@ -6,15 +6,18 @@ import UIKit
 // Il signore (13 nov, 22:33): «come FILO ma tutto raggruppato in un'unica tab, anziché aprirne varie per ogni argomento»; sotto le
 // icone di sistema in alto a destra, olografico, interattivo e navigabile. «Mostrami…» sparisce in 2,8 s come una notifica,
 // «fissalo» lo tiene, toccato resta finché lui non ha finito di scorrere. Ogni argomento ha la sua testata col nome e, in fondo a
-// destra sulla stessa linea, la X che chiude solo quello. Le cose sparite tornano con lo swipe dal bordo destro dello schermo
-// verso sinistra; lo swipe verso destra su FILO le rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro, giù e su.
-// Misure, colori e tempi come il mockup (v1216/q16-9.js, q16-9.css).
+// destra sulla stessa linea, la X che chiude solo quello. Le cose sparite tornano dal punto di luce di FILO (tocco o swipe verso
+// sinistra, 13.1: prima una striscia invisibile lungo il bordo che copriva l'anello delle icone); lo swipe verso destra su FILO le
+// rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro, giù e su. Sopra una sezione FILO è vetro con la
+// trasparenza dinamica della PILA (13.1). Misure, colori e tempi come il mockup (v1216/q16-9.js, q16-9.css).
 
-/// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la striscia del bordo destro che lo richiama.
+/// Lo strato di FILO sopra la schermata e le sezioni (ContentView), col punto di luce che lo richiama quando è via.
 struct StratoFilo: View {
     @ObservedObject private var filo = Filo.condiviso
     /// 13.1: il menu SISTEMI o la tendina PROTOCOLLI sono aperti (stanno nello stesso angolo): FILO si fa da parte finché si chiudono.
     var daParte = false
+    /// 13.1: una sezione è davanti: sopra di lei FILO è vetro olografico con la trasparenza dinamica della PILA.
+    var suSezione = false
 
     var body: some View {
         let visti = filo.visti
@@ -22,23 +25,19 @@ struct StratoFilo: View {
         ZStack(alignment: .topTrailing) {
             Color.clear
             if !visti.isEmpty {
-                SchedaFilo(argomenti: visti)
+                SchedaFilo(argomenti: visti, vetro: suSezione)
                     .padding(.top, alto)
                     .padding(.trailing, 10)
                     .transition(.asymmetric(insertion: .identity, removal: .offset(x: 240).combined(with: .opacity)))   // la nascita la fa la scheda
             }
-            // il bordo destro: con FILO via e qualcosa da richiamare, uno swipe verso sinistra lo riporta
+            // 13.1 (il signore, 14 nov: «per richiamarlo il modo migliore per non dare noia alle icone dell'anello»): con FILO via
+            // e qualcosa da richiamare resta acceso solo il suo punto di luce, dove era l'angolo della scheda (sotto le icone di
+            // sistema, sopra la corona). Il tocco o lo swipe verso sinistra che parte da lì lo riportano. Prima era una striscia
+            // invisibile lungo il bordo (280 punti) che copriva l'anello delle icone a destra e la sua rotazione.
             if visti.isEmpty && !filo.argomenti.isEmpty {
-                Color.clear
-                    .frame(width: 16, height: 280)
-                    .contentShape(Rectangle())
-                    .gesture(DragGesture(minimumDistance: 10).onEnded { v in
-                        guard v.translation.width < -36, abs(v.translation.height) < 60 else { return }
-                        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = filo.richiama() }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    })
-                    .padding(.top, alto)
-                    .accessibilityHidden(true)
+                PuntoFilo()
+                    .padding(.top, alto - PuntoFilo.sopra)
+                    .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
             }
         }
         .ignoresSafeArea()
@@ -46,6 +45,48 @@ struct StratoFilo: View {
         .allowsHitTesting(!daParte)
         .animation(.easeOut(duration: 0.2), value: daParte)
         .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3), value: visti.isEmpty)
+        .onChange(of: daParte, initial: true) { _, v in filo.daParte = v }
+    }
+}
+
+/// 13.1 · Il punto di luce di FILO (il suo angolo, da dove scende il filo) quando la scheda è via: fermo, senza animazioni che
+/// girano. Tocco o swipe verso sinistra: FILO torna. Il bersaglio è 40×40 attaccato al bordo destro, sotto le icone di sistema:
+/// non arriva mai all'anello delle icone (che col suo margine finisce più in basso anche sugli iPhone da 375 punti).
+private struct PuntoFilo: View {
+    static let lato: CGFloat = 40
+    /// Quanto il bersaglio sale sopra la cima di FILO (il punto sta a 6 punti dalla cima della scheda).
+    static let sopra: CGFloat = 4
+    @State private var spinto: CGFloat = 0
+
+    var body: some View {
+        Canvas { gc, size in
+            // dove sta il punto nella scheda: 16 punti dal bordo destro (10 di margine + 6), 6 sotto la cima
+            let c = CGPoint(x: size.width - 16, y: PuntoFilo.sopra + 6)
+            gc.blendMode = .plusLighter
+            gc.stroke(Path(ellipseIn: CGRect(x: c.x - 6, y: c.y - 6, width: 12, height: 12)), with: .color(Olo.ciano.opacity(0.45)), lineWidth: 1)
+            Olo.alone(&gc, c, 10, 0.5)
+            gc.fill(Path(ellipseIn: CGRect(x: c.x - 2.4, y: c.y - 2.4, width: 4.8, height: 4.8)), with: .color(Olo.bianco))
+        }
+        .frame(width: PuntoFilo.lato, height: PuntoFilo.lato)
+        .offset(x: spinto)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { v in spinto = min(0, max(-24, v.translation.width * 0.5)) }
+                .onEnded { v in
+                    let tocco = abs(v.translation.width) < 8 && abs(v.translation.height) < 8
+                    let swipe = v.translation.width < -20 && abs(v.translation.height) < 40
+                    withAnimation(.easeOut(duration: 0.18)) { spinto = 0 }
+                    guard tocco || swipe else { return }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
+                }
+        )
+        .accessibilityElement()
+        .accessibilityLabel("FILO")
+        .accessibilityHint("Riporta quello che è sparito")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { _ = Filo.condiviso.richiama() }
     }
 }
 
@@ -69,6 +110,13 @@ private struct NascitaFilo: ViewModifier, Animatable {
 /// La scheda: la cornice olografica, la testata FILO, gli argomenti uno sotto l'altro che scorrono.
 private struct SchedaFilo: View {
     let argomenti: [ArgomentoFilo]
+    /// 13.1: sopra una sezione (vetro olografico che segue il fuoco); sulla schermata di JARVIS resta il fondo scuro di sempre.
+    let vetro: Bool
+    @ObservedObject private var filo = Filo.condiviso
+    /// Il fondo scuro: da quanto a quanto sta andando, e da quando (lo legge la cornice a ogni fotogramma, 120 Hz).
+    @State private var scuro: (da: Double, a: Double, t0: Date) = (da: 0.93, a: 0.93, t0: .distantPast)
+    /// Il vetro (sfocatura) entra a nascita finita, come il fondo che si apre.
+    @State private var vetroPronto = false
     @State private var nata = Date()
     @State private var contenuto: CGFloat = 0
     @State private var sopra = false        // c'è altro sopra (scorso giù)
@@ -79,6 +127,10 @@ private struct SchedaFilo: View {
 
     static let larghezza: CGFloat = 212
     static let altezzaMassima: CGFloat = 200
+
+    /// Quanto è pieno il fondo scuro: sulla schermata di JARVIS 0,93 come sempre; sopra una sezione come il vetro della PILA
+    /// (0,5 + 0,38 × fuoco): 0,88 a fuoco, 0,5 in secondo piano.
+    private var fondoVoluto: Double { vetro ? (filo.fuoco ? 0.88 : 0.5) : 0.93 }
 
     var body: some View {
         let altezza = min(Self.altezzaMassima, max(30, contenuto))
@@ -125,14 +177,42 @@ private struct SchedaFilo: View {
         }
         .frame(width: Self.larghezza, alignment: .leading)
         .background {
-            // meno trasparente: il fondo scuro dentro la cornice, poi la cornice olografica (luce, filo, angoli, scansione)
-            TimelineView(.animation) { tl in
-                let t = tl.date.timeIntervalSince(nata)
-                Canvas(rendersAsynchronously: false) { gc, size in
-                    CorniceFilo.disegna(&gc, size, t: t)
+            // meno trasparente: il fondo scuro dentro la cornice, poi la cornice olografica (luce, filo, angoli, scansione).
+            // 13.1: sopra una sezione, sotto il fondo c'è il vetro della PILA (VetroOlo): a fuoco pieno e sfocato, in secondo
+            // piano trasparente (la sezione si vede attraverso), con gli stessi valori delle pagine olografiche.
+            ZStack {
+                if vetro {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                        .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
+                        .opacity(vetroPronto ? 0.3 + 0.7 * (filo.fuoco ? 1 : 0) : 0)
+                        .animation(.easeInOut(duration: 0.35), value: filo.fuoco)
+                        .animation(.easeOut(duration: 0.2), value: vetroPronto)
+                        .transition(.opacity)
+                }
+                TimelineView(.animation) { tl in
+                    let t = tl.date.timeIntervalSince(nata)
+                    let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
+                    let fondo = scuro.da + (scuro.a - scuro.da) * Olo.liscia(p)
+                    Canvas(rendersAsynchronously: false) { gc, size in
+                        CorniceFilo.disegna(&gc, size, t: t, fondo: fondo)
+                    }
                 }
             }
+            .animation(.easeInOut(duration: 0.35), value: vetro)
             .allowsHitTesting(false)
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { filo.rettScheda = $0 }
+        .onChange(of: fondoVoluto, initial: true) { _, nuovo in
+            // il fondo riparte da dove si trova adesso verso il nuovo valore (anche a metà di un cambio)
+            let p = min(1, max(0, Date().timeIntervalSince(scuro.t0) / 0.35))
+            let ora = scuro.da + (scuro.a - scuro.da) * Olo.liscia(p)
+            scuro = (da: scuro.t0 == .distantPast ? nuovo : ora, a: nuovo, t0: Date())
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(450))
+            vetroPronto = true
         }
         .offset(x: dx)
         .opacity(1 - min(0.8, Double(dx) / 200))
@@ -155,7 +235,7 @@ private struct SchedaFilo: View {
                 }
         )
         .onChange(of: trascina) { _, v in
-            Filo.condiviso.toccato(v)                                      // finito (o interrotto): altri 2,8 secondi
+            Filo.condiviso.toccato(v, da: "trascina")                     // finito (o interrotto): altri 2,8 secondi
             if !v, dx != 0 { withAnimation(.easeOut(duration: 0.2)) { dx = 0 } }
         }
         .modifier(NascitaFilo(fase: fase))
@@ -293,7 +373,7 @@ private struct ScorreFilo: ViewModifier {
                     sopra = v[0]
                     sotto = v[1]
                 }
-                .onScrollPhaseChange { _, fase in Filo.condiviso.toccato(fase != .idle) }
+                .onScrollPhaseChange { _, fase in Filo.condiviso.toccato(fase != .idle, da: "scorre") }
         } else {
             content
         }
@@ -324,13 +404,13 @@ private struct Sfuma: View {
 /// La cornice olografica di FILO (corniceFilo del mockup): il punto di luce in alto a destra che pulsa, il filo che scende e
 /// corre sotto la testata, il fondo scuro, gli angoli, la riga di scansione che scende lenta.
 private enum CorniceFilo {
-    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double) {
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93) {
         let W = Double(size.width), H = Double(size.height)
         let u0 = min(1, t / 0.5)
         gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1          // si accende sfarfallando
         let ax = W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
-        // il fondo (meno trasparente: la corona dietro si intuisce appena)
-        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.93)))
+        // il fondo (meno trasparente: la corona dietro si intuisce appena); 13.1: sopra una sezione segue il fuoco (vetro della PILA)
+        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(fondo)))
         gc.blendMode = .plusLighter
         let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
         gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(Olo.ciano.opacity(0.7 * (1 - pul))), lineWidth: 1)

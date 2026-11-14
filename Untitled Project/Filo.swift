@@ -59,12 +59,15 @@ struct ArgomentoFilo: Identifiable, Equatable {
     var fisso = false
     /// Una notifica («mostrami…»): quando sparisce. Nil: resta.
     var scade: Date?
-    /// Sparita: non si vede, ma torna con lo swipe dal bordo destro.
+    /// Sparita: non si vede, ma torna dal punto di luce di FILO (tocco o swipe verso sinistra).
     var nascosto = false
     /// Appena arrivato o aggiornato (si accende entrando).
     var giro = 0
     /// Quando è stato mostrato l'ultima volta: si accende solo se è appena successo (non quando FILO viene richiamato).
     var aggiornato = Date()
+    /// 13.1: quando è sparito (scaduto o mandato via). Se non è fissato, dopo mezz'ora non si richiama più (come il filo del
+    /// discorso): il dato è vecchio e il punto di luce non resta acceso per sempre.
+    var nascostoAlle: Date?
 }
 
 @MainActor
@@ -74,15 +77,28 @@ final class Filo: ObservableObject {
     private var cose: [CosaFilo] = []
     /// Gli argomenti di FILO, il più recente per primo (anche quelli spariti, da richiamare).
     @Published private(set) var argomenti: [ArgomentoFilo] = []
-    /// Richiamato col dito dal bordo destro: resta finché lui non lo rimanda via.
+    /// Richiamato col dito dal punto di luce: resta finché lui non lo rimanda via.
     @Published private(set) var richiamato = false
     /// Il dito è su FILO (scorre, tocca): le notifiche aspettano.
     private var tocco = false
+    private var fonti: Set<String> = []
     private var controllo: Task<Void, Never>?
+    /// Il menu SISTEMI o la tendina PROTOCOLLI sono aperti (FILO si è fatto da parte): i tocchi lì non sono per FILO.
+    var daParte = false
     /// Dove finiscono le icone di sistema in alto (in punti, sullo schermo): FILO sta subito sotto.
     @Published var sottoIcone: CGFloat = 0
     /// Quello che si vede adesso.
     var visti: [ArgomentoFilo] { argomenti.filter { !$0.nascosto } }
+    /// 13.1 (il signore, 14 nov: «se copre una sezione aperta usa la trasparenza dinamica della navigazione olografica»): FILO è
+    /// a fuoco quando arriva, si aggiorna, viene richiamato o toccato; 2,8 s dopo (o appena il dito tocca fuori, sulla sezione)
+    /// va in secondo piano e sopra una sezione diventa vetro trasparente (come le pagine dietro della PILA). Toccato torna a fuoco.
+    @Published private(set) var fuoco = true
+    private var riposa: Task<Void, Never>?
+    /// Dove sta la scheda sullo schermo (coordinate della finestra): un tocco fuori la manda in secondo piano.
+    var rettScheda: CGRect = .zero
+    private var pulizia: Task<Void, Never>?
+    /// Dopo quanto un argomento sparito (non fissato) non si richiama più.
+    static let vitaNascosti: TimeInterval = 1800
 
     // MARK: Il filo
 
@@ -187,7 +203,7 @@ final class Filo: ObservableObject {
     // MARK: FILO, una scheda sola (13 nov, 22:33–23:02)
     // Il signore: «come FILO ma tutto raggruppato in un'unica tab», sotto le icone di sistema in alto a destra. «Mostrami…» è una
     // notifica: sparisce da sola in 2,8 s; «fissalo» la tiene; toccato resta finché lui non ha finito di scorrere. Ogni argomento
-    // ha la sua testata e la X che chiude solo quello. Le cose sparite tornano con lo swipe dal bordo destro; lo swipe a destra su
+    // ha la sua testata e la X che chiude solo quello. Le cose sparite tornano dal punto di luce (13.1); lo swipe a destra su
     // FILO le rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro. Come il mockup (v1216/q16-9.js).
 
     static let durataNotifica: TimeInterval = 2.8
@@ -226,12 +242,17 @@ final class Filo: ObservableObject {
         // una notifica scade; un argomento fissato, o con dentro qualcosa che aspetta il sì, resta
         a.scade = a.fisso || a.righe.contains(where: \.resta) ? nil : Date().addingTimeInterval(dura ?? Filo.durataNotifica)
         a.nascosto = false
+        a.nascostoAlle = nil
         a.giro += 1
         a.aggiornato = Date()
-        for k in argomenti.indices where argomenti[k].fisso { argomenti[k].nascosto = false }   // i fissati tornano con lui
+        for k in argomenti.indices where argomenti[k].fisso {                                    // i fissati tornano con lui
+            argomenti[k].nascosto = false
+            argomenti[k].nascostoAlle = nil
+        }
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
         programma()
+        svegli()
         if suono { Suoni.filo() }
     }
 
@@ -240,9 +261,10 @@ final class Filo: ObservableObject {
         let nome = Filo.argomento(sezione: c.sezione, titolo: c.titolo)
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
             var a = argomenti.remove(at: i)
-            a.fisso = true; a.scade = nil; a.nascosto = false; a.giro += 1; a.aggiornato = Date()
+            a.fisso = true; a.scade = nil; a.nascosto = false; a.nascostoAlle = nil; a.giro += 1; a.aggiornato = Date()
             argomenti.insert(a, at: 0)
             programma()
+            svegli()
             Suoni.filo()
             return
         }
@@ -291,42 +313,97 @@ final class Filo: ObservableObject {
         argomenti.removeAll()
         richiamato = false
         controllo?.cancel()
+        pulizia?.cancel()
+        riposa?.cancel()
+        fuoco = true
         return n
     }
 
-    /// Lo swipe dal bordo destro verso sinistra: tutto quello che c'era torna, e resta.
+    /// Il punto di luce (o lo swipe verso sinistra che parte da lui): tutto quello che c'era torna, e resta.
     @discardableResult
     func richiama() -> Bool {
         guard !argomenti.isEmpty else { return false }
-        for k in argomenti.indices { argomenti[k].nascosto = false }
+        for k in argomenti.indices {
+            argomenti[k].nascosto = false
+            argomenti[k].nascostoAlle = nil
+        }
         richiamato = true
         controllo?.cancel()
+        svegli()
         Suoni.filo()
         return true
     }
 
-    /// Lo swipe a destra su FILO: tutto via (resta da richiamare; per cancellare c'è la X).
+    /// Lo swipe a destra su FILO: tutto via (resta da richiamare col punto di luce; per cancellare c'è la X).
     func rimandaVia() {
-        for k in argomenti.indices { argomenti[k].nascosto = true }
+        let ora = Date()
+        for k in argomenti.indices where !argomenti[k].nascosto {
+            argomenti[k].nascosto = true
+            argomenti[k].nascostoAlle = ora
+        }
         richiamato = false
         controllo?.cancel()
+        riposa?.cancel()
+        fuoco = true
+        programmaPulizia()
     }
 
-    /// Il dito su FILO: le notifiche aspettano; finito (anche lo scorrimento), altri 2,8 secondi.
-    func toccato(_ sopra: Bool) {
-        guard sopra != tocco else { return }
-        tocco = sopra
-        if sopra { controllo?.cancel(); return }
+    /// Il dito su FILO: le notifiche aspettano e FILO resta a fuoco; finito (anche lo scorrimento), altri 2,8 secondi.
+    /// Le fonti sono tre e si sommano: il dito appoggiato (TocchiSchermo, anche fermo, come il pointerdown del mockup), il
+    /// trascinamento della scheda e lo scorrimento della lista (che continua anche dopo il dito).
+    func toccato(_ sopra: Bool, da fonte: String = "dito") {
+        if sopra { fonti.insert(fonte) } else { fonti.remove(fonte) }
+        let ora = !fonti.isEmpty
+        guard ora != tocco else { return }
+        tocco = ora
+        if ora {
+            controllo?.cancel()
+            riposa?.cancel()
+            fuoco = true
+            return
+        }
         let t = Date().addingTimeInterval(Filo.durataNotifica)
         for k in argomenti.indices where !argomenti[k].fisso && argomenti[k].scade != nil {
             argomenti[k].scade = max(argomenti[k].scade ?? t, t)
         }
         programma()
+        svegli()
+    }
+
+    /// FILO a fuoco adesso; in secondo piano 2,8 s dopo, se nessuno lo tocca.
+    private func svegli() {
+        fuoco = true
+        riposa?.cancel()
+        guard !tocco else { return }
+        riposa = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Filo.durataNotifica))
+            guard let self, !Task.isCancelled, !self.tocco else { return }
+            self.fuoco = false
+        }
+    }
+
+    /// Un dito si appoggia sullo schermo (TocchiSchermo, coordinate della finestra). Su FILO: FILO a fuoco e il conto delle
+    /// notifiche fermo finché il dito non si alza. Fuori: lui lavora su quello che c'è sotto (la sezione, la corona), FILO va
+    /// subito in secondo piano.
+    func toccoSchermo(_ p: CGPoint) {
+        guard !visti.isEmpty, !daParte, rettScheda.width > 0 else { return }
+        if rettScheda.contains(p) {
+            toccato(true, da: "appoggiato")
+        } else if fuoco, !tocco {
+            riposa?.cancel()
+            fuoco = false
+        }
+    }
+
+    /// Il dito si alza (o il tocco finisce in un altro modo).
+    func ditoAlzato() {
+        if fonti.contains("appoggiato") { toccato(false, da: "appoggiato") }
     }
 
     private func fineSeVuoto() {
         if visti.isEmpty { richiamato = false }
         programma()
+        programmaPulizia()
     }
 
     /// Le notifiche scadute spariscono (restano da richiamare).
@@ -340,9 +417,28 @@ final class Filo: ObservableObject {
             guard let self, !Task.isCancelled, !self.tocco, !self.richiamato else { return }
             let ora = Date().addingTimeInterval(0.03)
             for k in self.argomenti.indices where !self.argomenti[k].fisso && !self.argomenti[k].nascosto {
-                if let s = self.argomenti[k].scade, s <= ora { self.argomenti[k].nascosto = true }
+                if let s = self.argomenti[k].scade, s <= ora {
+                    self.argomenti[k].nascosto = true
+                    self.argomenti[k].nascostoAlle = Date()
+                }
             }
             self.programma()
+            self.programmaPulizia()
+        }
+    }
+
+    /// Gli argomenti spariti da mezz'ora (non fissati) escono da FILO: il dato è vecchio («mostrami…» lo porta nuovo) e il
+    /// punto di luce si spegne quando non resta niente da richiamare.
+    private func programmaPulizia() {
+        pulizia?.cancel()
+        let prossima = argomenti.filter { $0.nascosto && !$0.fisso }.compactMap(\.nascostoAlle).min()
+        guard let prossima else { return }
+        pulizia = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(max(1, prossima.addingTimeInterval(Filo.vitaNascosti).timeIntervalSinceNow)))
+            guard let self, !Task.isCancelled else { return }
+            let limite = Date().addingTimeInterval(-Filo.vitaNascosti + 1)
+            self.argomenti.removeAll { $0.nascosto && !$0.fisso && ($0.nascostoAlle ?? Date()) <= limite }
+            self.programmaPulizia()
         }
     }
 

@@ -1425,8 +1425,19 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Solo se JARVIS è libero: non parla sopra un ascolto o un'altra risposta.
     func diciSeSoloIPhone(_ r: Reparto) {
         guard JarvisOrologio.soloIPhone(r), fase == .attesa else { return }
-        parla(r == .allenatore ? "Trainer: questa sezione vive sull'iPhone, Sir."
-                               : "\(r.rawValue.capitalized): questa sezione vive sull'iPhone, Sir.")
+        parla("\(JarvisOrologio.nomeIPhone(r)): questa sezione vive sull'iPhone, Sir.")
+    }
+
+    /// 13.1 (debug del polso): il nome della sezione come si legge sull'iPhone («LiDAR», «EDITH», «Trainer»; il giro è degli
+    /// Occhi). Prima si leggeva il nome interno con la maiuscola: «Lidar», «Edith», «Giro».
+    static func nomeIPhone(_ r: Reparto) -> String {
+        switch r {
+        case .lidar: return "LiDAR"
+        case .edith: return "EDITH"
+        case .giro: return "Occhi"
+        case .allenatore: return "Trainer"
+        default: return r.rawValue.capitalized
+        }
     }
 
     /// Decisione 37 (24 ott): JARVIS sta usando l'audio per parlare o ascoltare, quindi la sessione è sua (.playAndRecord o
