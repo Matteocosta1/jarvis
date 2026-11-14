@@ -227,6 +227,7 @@ final class Filo: ObservableObject {
     func mostra(_ chiave: String, titolo: String, riga: String, sezione: String?, dura: TimeInterval? = nil, suono: Bool = true,
                 resta: Bool = false, fisso: Bool = false, icona: String? = nil) {
         let nome = Filo.argomento(sezione: sezione, titolo: titolo)
+        let appare = visti.isEmpty                                          // 14 nov (il signore): ogni volta che la tab compare, il suo suono
         let nuova = RigaFilo(id: chiave, titolo: titolo, riga: riga, sezione: sezione, alle: Date(), resta: resta, icona: icona)
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
@@ -260,13 +261,14 @@ final class Filo: ObservableObject {
         richiamato = false
         programma()
         svegli()
-        if suono { Suoni.filo() }
+        if suono || appare { Suoni.filo() }
     }
 
     /// 14 nov · il PIANO in FILO (Piano.swift): un argomento suo, i passi nel loro ordine (fino a 8). Mentre il cervello lavora resta e
     /// torna davanti a ogni passo; finito, è una notifica di 5 secondi (poi si richiama come gli altri).
     func mostraPiano(titolo: String, righe: [RigaFilo], finito: Bool) {
         let nome = "Piano"
+        let appare = visti.isEmpty
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) { a = argomenti.remove(at: i) } else { a = ArgomentoFilo(nome: nome, righe: []) }
         a.righe = Array(righe.prefix(8))
@@ -281,6 +283,7 @@ final class Filo: ObservableObject {
         richiamato = false
         programma()
         svegli()
+        if appare { Suoni.filo() }
     }
 
     /// «Fissalo»: l'argomento di quella cosa resta (se c'è già non si duplica).
