@@ -48,8 +48,12 @@ final class Piano {
         ] as [String: Any],
     ]
 
+    /// Quante risposte del cervello sono finite senza che il piano andasse avanti.
+    private var giriFermo = 0
+
     /// Esegue una chiamata dello strumento «piano» e dice al cervello com'è il piano adesso.
     func esegui(_ i: [String: Any]) -> (String, Bool) {
+        giriFermo = 0
         if let nuovi = i["passi"] as? [Any], !nuovi.isEmpty {
             let testi = nuovi.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(8)
             guard !testi.isEmpty else { return (Regia.json(["errore": "passi vuoti"]), true) }
@@ -82,6 +86,15 @@ final class Piano {
         }
         mostra()
         return (Regia.json(["piano": perCervello ?? "", "nota": finito ? "piano chiuso: di' il risultato in una frase" : "vai avanti col passo in corso"]), false)
+    }
+
+    /// 14 nov (il signore: «il messaggio non parte e le tab non spariscono da sole»): una risposta del cervello è finita (detta,
+    /// interrotta, andata male). Se il piano non aspetta il sì, si chiude lì e sparisce in 5 secondi; se aspetta il sì, resta per la
+    /// risposta dopo: se anche quella non lo manda avanti (ha detto altro), si chiude. Prima un piano interrotto restava sullo schermo.
+    func turnoFinito() {
+        guard inCorso else { return }
+        giriFermo += 1
+        if !passi.contains(where: { $0.stato == .aspetta }) || giriFermo >= 2 { ferma() }
     }
 
     /// Il signore cambia argomento o chiude tutto: il piano si ferma (resta in FILO da richiamare).

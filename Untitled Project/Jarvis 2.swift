@@ -1936,6 +1936,7 @@ final class Jarvis: NSObject, ObservableObject {
                        primo: Esito? = nil, dopoAspetto: Bool = false, comeParla: String? = nil, libera: Bool = false,
                        recupero: String? = nil, inizioFrase: Date? = nil) async {
         defer { unico?.libera() }          // idea D: l'attesa del Mac può mandare la frase dopo, qualunque cosa succeda qui
+        defer { Piano.condiviso.turnoFinito() }   // 14 nov: un piano interrotto o fermo non resta sullo schermo
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                                     "strumenti_client_def": Regia.definizioni]     // 12.0 (10): la regia
         if let unico {
