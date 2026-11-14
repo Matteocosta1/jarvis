@@ -123,22 +123,9 @@ private struct SchedaFilo: View {
     var body: some View {
         let altezza = min(Self.altezzaMassima, max(30, contenuto))
         VStack(alignment: .leading, spacing: 0) {
-            // la testata: FILO e quanti argomenti
-            HStack(spacing: 7) {
-                Text("FILO")
-                    .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1.6)
-                    .foregroundStyle(Olo.ciano.opacity(0.95))
-                    .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
-                if argomenti.count > 1 {
-                    Text("\(argomenti.count) ARGOMENTI")
-                        .font(.system(size: 7, weight: .semibold, design: .monospaced)).tracking(1.2)
-                        .foregroundStyle(Olo.ciano.opacity(0.62))
-                        .contentTransition(.numericText())
-                }
-            }
-            .frame(height: 20)
-            .padding(.leading, 10)
-            .padding(.top, 2)
+            // 14 nov (il signore: «in alto FILO, ma che c'entra? mostri solo l'headline con scritto meteo»): niente testata FILO,
+            // si vedono solo gli argomenti (METEO, AGENDA…) col loro nome
+            Color.clear.frame(height: 6)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
