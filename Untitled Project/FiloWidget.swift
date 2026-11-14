@@ -6,12 +6,12 @@ import UIKit
 // Il signore (13 nov, 22:33): «come FILO ma tutto raggruppato in un'unica tab, anziché aprirne varie per ogni argomento»; sotto le
 // icone di sistema in alto a destra, olografico, interattivo e navigabile. «Mostrami…» sparisce in 2,8 s come una notifica,
 // «fissalo» lo tiene, toccato resta finché lui non ha finito di scorrere. Ogni argomento ha la sua testata col nome e, in fondo a
-// destra sulla stessa linea, la X che chiude solo quello. Le cose sparite tornano dal punto di luce di FILO (tocco o swipe verso
-// sinistra, 13.1: prima una striscia invisibile lungo il bordo che copriva l'anello delle icone); lo swipe verso destra su FILO le
+// destra sulla stessa linea, la X che chiude solo quello. Le cose sparite tornano con lo swipe verso sinistra dal bordo destro, nella
+// fascia di FILO (13.1: prima la striscia era lunga 280 punti e copriva l'anello delle icone); lo swipe verso destra su FILO le
 // rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro, giù e su. Sopra una sezione FILO è vetro con la
 // trasparenza dinamica della PILA (13.1). Misure, colori e tempi come il mockup (v1216/q16-9.js, q16-9.css).
 
-/// Lo strato di FILO sopra la schermata e le sezioni (ContentView), col punto di luce che lo richiama quando è via.
+/// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la fascia invisibile del bordo destro che lo richiama quando è via.
 struct StratoFilo: View {
     @ObservedObject private var filo = Filo.condiviso
     /// 13.1: il menu SISTEMI o la tendina PROTOCOLLI sono aperti (stanno nello stesso angolo): FILO si fa da parte finché si chiudono.
@@ -30,14 +30,13 @@ struct StratoFilo: View {
                     .padding(.trailing, 10)
                     .transition(.asymmetric(insertion: .identity, removal: .offset(x: 240).combined(with: .opacity)))   // la nascita la fa la scheda
             }
-            // 13.1 (il signore, 14 nov: «per richiamarlo il modo migliore per non dare noia alle icone dell'anello»): con FILO via
-            // e qualcosa da richiamare resta acceso solo il suo punto di luce, dove era l'angolo della scheda (sotto le icone di
-            // sistema, sopra la corona). Il tocco o lo swipe verso sinistra che parte da lì lo riportano. Prima era una striscia
-            // invisibile lungo il bordo (280 punti) che copriva l'anello delle icone a destra e la sua rotazione.
+            // 13.1 (il signore, 14 nov: «per richiamarlo il modo migliore per non dare noia alle icone dell'anello»; 02:40: niente
+            // punto di luce, «swipe invisibile in alto»): con FILO via e qualcosa da richiamare, lo swipe verso sinistra dal bordo
+            // destro nella fascia di FILO (sotto le icone di sistema, sopra la corona) lo riporta. Prima la striscia era lunga
+            // 280 punti e copriva l'anello delle icone a destra e la sua rotazione.
             if visti.isEmpty && !filo.argomenti.isEmpty {
-                PuntoFilo()
-                    .padding(.top, alto - PuntoFilo.sopra)
-                    .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
+                FasciaFilo()
+                    .padding(.top, alto - FasciaFilo.sopra)
             }
         }
         .ignoresSafeArea()
@@ -49,44 +48,33 @@ struct StratoFilo: View {
     }
 }
 
-/// 13.1 · Il punto di luce di FILO (il suo angolo, da dove scende il filo) quando la scheda è via: fermo, senza animazioni che
-/// girano. Tocco o swipe verso sinistra: FILO torna. Il bersaglio è 40×40 attaccato al bordo destro, sotto le icone di sistema:
-/// non arriva mai all'anello delle icone (che col suo margine finisce più in basso anche sugli iPhone da 375 punti).
-private struct PuntoFilo: View {
-    static let lato: CGFloat = 40
-    /// Quanto il bersaglio sale sopra la cima di FILO (il punto sta a 6 punti dalla cima della scheda).
+/// 13.1 · Il richiamo di FILO quando la scheda è via (il signore, 14 nov 02:40: il punto di luce no; «swipe invisibile in alto»):
+/// una fascia invisibile lungo il bordo destro, solo dove sta FILO (sotto le icone di sistema, sopra la corona): lo swipe verso
+/// sinistra che parte da lì lo riporta. 24×64 punti: non arriva mai all'anello delle icone (che col suo margine finisce più in
+/// basso anche sugli iPhone da 375 punti), come prima faceva la striscia di 280 punti.
+private struct FasciaFilo: View {
+    static let largo: CGFloat = 24
+    static let alto: CGFloat = 64
+    /// Quanto la fascia sale sopra la cima di FILO.
     static let sopra: CGFloat = 4
-    @State private var spinto: CGFloat = 0
 
     var body: some View {
-        Canvas { gc, size in
-            // dove sta il punto nella scheda: 16 punti dal bordo destro (10 di margine + 6), 6 sotto la cima
-            let c = CGPoint(x: size.width - 16, y: PuntoFilo.sopra + 6)
-            gc.blendMode = .plusLighter
-            gc.stroke(Path(ellipseIn: CGRect(x: c.x - 6, y: c.y - 6, width: 12, height: 12)), with: .color(Olo.ciano.opacity(0.45)), lineWidth: 1)
-            Olo.alone(&gc, c, 10, 0.5)
-            gc.fill(Path(ellipseIn: CGRect(x: c.x - 2.4, y: c.y - 2.4, width: 4.8, height: 4.8)), with: .color(Olo.bianco))
-        }
-        .frame(width: PuntoFilo.lato, height: PuntoFilo.lato)
-        .offset(x: spinto)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { v in spinto = min(0, max(-24, v.translation.width * 0.5)) }
-                .onEnded { v in
-                    let tocco = abs(v.translation.width) < 8 && abs(v.translation.height) < 8
-                    let swipe = v.translation.width < -20 && abs(v.translation.height) < 40
-                    withAnimation(.easeOut(duration: 0.18)) { spinto = 0 }
-                    guard tocco || swipe else { return }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
-                }
-        )
-        .accessibilityElement()
-        .accessibilityLabel("FILO")
-        .accessibilityHint("Riporta quello che è sparito")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { _ = Filo.condiviso.richiama() }
+        Color.clear
+            .frame(width: FasciaFilo.largo, height: FasciaFilo.alto)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 10)
+                    .onEnded { v in
+                        guard v.translation.width < -30, abs(v.translation.height) < 40 else { return }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.richiama() }
+                    }
+            )
+            .accessibilityElement()
+            .accessibilityLabel("FILO")
+            .accessibilityHint("Riporta quello che è sparito")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { _ = Filo.condiviso.richiama() }
     }
 }
 

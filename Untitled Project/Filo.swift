@@ -59,14 +59,14 @@ struct ArgomentoFilo: Identifiable, Equatable {
     var fisso = false
     /// Una notifica («mostrami…»): quando sparisce. Nil: resta.
     var scade: Date?
-    /// Sparita: non si vede, ma torna dal punto di luce di FILO (tocco o swipe verso sinistra).
+    /// Sparita: non si vede, ma torna con lo swipe verso sinistra dal bordo destro, nella fascia di FILO.
     var nascosto = false
     /// Appena arrivato o aggiornato (si accende entrando).
     var giro = 0
     /// Quando è stato mostrato l'ultima volta: si accende solo se è appena successo (non quando FILO viene richiamato).
     var aggiornato = Date()
     /// 13.1: quando è sparito (scaduto o mandato via). Se non è fissato, dopo mezz'ora non si richiama più (come il filo del
-    /// discorso): il dato è vecchio e il punto di luce non resta acceso per sempre.
+    /// discorso): il dato è vecchio.
     var nascostoAlle: Date?
 }
 
@@ -77,7 +77,7 @@ final class Filo: ObservableObject {
     private var cose: [CosaFilo] = []
     /// Gli argomenti di FILO, il più recente per primo (anche quelli spariti, da richiamare).
     @Published private(set) var argomenti: [ArgomentoFilo] = []
-    /// Richiamato col dito dal punto di luce: resta finché lui non lo rimanda via.
+    /// Richiamato con lo swipe dal bordo destro: resta finché lui non lo rimanda via.
     @Published private(set) var richiamato = false
     /// Il dito è su FILO (scorre, tocca): le notifiche aspettano.
     private var tocco = false
@@ -203,7 +203,7 @@ final class Filo: ObservableObject {
     // MARK: FILO, una scheda sola (13 nov, 22:33–23:02)
     // Il signore: «come FILO ma tutto raggruppato in un'unica tab», sotto le icone di sistema in alto a destra. «Mostrami…» è una
     // notifica: sparisce da sola in 2,8 s; «fissalo» la tiene; toccato resta finché lui non ha finito di scorrere. Ogni argomento
-    // ha la sua testata e la X che chiude solo quello. Le cose sparite tornano dal punto di luce (13.1); lo swipe a destra su
+    // ha la sua testata e la X che chiude solo quello. Le cose sparite tornano con lo swipe dal bordo destro, nella fascia di FILO (13.1); lo swipe a destra su
     // FILO le rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro. Come il mockup (v1216/q16-9.js).
 
     static let durataNotifica: TimeInterval = 2.8
@@ -319,7 +319,7 @@ final class Filo: ObservableObject {
         return n
     }
 
-    /// Il punto di luce (o lo swipe verso sinistra che parte da lui): tutto quello che c'era torna, e resta.
+    /// Lo swipe verso sinistra dal bordo destro, nella fascia di FILO: tutto quello che c'era torna, e resta.
     @discardableResult
     func richiama() -> Bool {
         guard !argomenti.isEmpty else { return false }
@@ -334,7 +334,7 @@ final class Filo: ObservableObject {
         return true
     }
 
-    /// Lo swipe a destra su FILO: tutto via (resta da richiamare col punto di luce; per cancellare c'è la X).
+    /// Lo swipe a destra su FILO: tutto via (resta da richiamare con lo swipe dal bordo; per cancellare c'è la X).
     func rimandaVia() {
         let ora = Date()
         for k in argomenti.indices where !argomenti[k].nascosto {
@@ -427,8 +427,7 @@ final class Filo: ObservableObject {
         }
     }
 
-    /// Gli argomenti spariti da mezz'ora (non fissati) escono da FILO: il dato è vecchio («mostrami…» lo porta nuovo) e il
-    /// punto di luce si spegne quando non resta niente da richiamare.
+    /// Gli argomenti spariti da mezz'ora (non fissati) escono da FILO: il dato è vecchio («mostrami…» lo porta nuovo).
     private func programmaPulizia() {
         pulizia?.cancel()
         let prossima = argomenti.filter { $0.nascosto && !$0.fisso }.compactMap(\.nascostoAlle).min()
