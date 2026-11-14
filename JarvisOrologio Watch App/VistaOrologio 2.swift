@@ -428,7 +428,7 @@ struct VistaOrologio: View {
             let ricarica = chatDa != nil
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds((ricarica ? 1.4 : 0.4) / v))   // la coda della musica (o il suono della chat) finisce prima
-                if jarvis.ascoltoDaAvvio { SuoniOrologio.sfumaAvvio() }  // 13 nov: il tocco arrivato durante le icone vale adesso
+                if jarvis.toccoDuranteAvvio { SuoniOrologio.sfumaAvvio() }  // il tocco sul reattore durante le icone vale adesso (la complicazione no: voce intera)
                 await SuoniOrologio.attendiFineAvvio()                  // 12.0 (14): la voce di JARVIS II finisce (o sfuma) prima del microfono
                 jarvis.ascoltaDopoAvvio()
             }

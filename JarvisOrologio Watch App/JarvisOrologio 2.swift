@@ -596,6 +596,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
             if !avvioFinito {
                 micSpento = false
                 ascoltoDaAvvio = true
+                toccoDuranteAvvio = true                     // 14 nov: solo il tocco sul reattore accorcia la voce dell'avvio
                 SuoniOrologio.sfumaAvvio()
                 return
             }
@@ -613,11 +614,12 @@ final class JarvisOrologio: NSObject, ObservableObject {
     func ascoltaDaComplicazione() {
         guard fase == .attesa else { return }
         micSpento = false                                    // tocco voluto sulla complicazione: il microfono si riaccende
-        // 13 nov: app appena aperta dalla complicazione, la sequenza d'avvio suona ancora: si ascolta a icone finite, con la voce
-        // dell'avvio sfumata (prima il microfono partiva dopo 0,4 s, sopra la musica e la voce dell'avvio)
+        // 14 nov (il signore: «appena parte la voce di JARVIS finisce e parte il microfono: è sbagliato, deve finire la voce e poi
+        // parte il microfono; se voglio prima, tocco il reattore»): aperta dalla complicazione l'app fa l'avvio intero, come
+        // dall'icona e come il tasto Azione dell'iPhone; finita la voce, il bip e JARVIS ascolta. Prima la complicazione faceva
+        // sfumare la voce appena finite le icone. Ad accorciarla resta solo il tocco sul reattore.
         if !avvioFinito {
             ascoltoDaAvvio = true
-            SuoniOrologio.sfumaAvvio()
             return
         }
         Task {
@@ -629,6 +631,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// Fine dell'avvio: JARVIS si mette in ascolto da solo, come col tocco sul reattore.
     func ascoltaDopoAvvio() {
         avvioFinito = true
+        toccoDuranteAvvio = false
         if ascoltoDaAvvio {                                 // 13 nov: toccato durante l'avvio (reattore o complicazione): ascolta adesso
             ascoltoDaAvvio = false
             Task { await self.ascolta() }
@@ -638,6 +641,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     }
     /// 13 nov: il signore ha toccato il reattore (o la complicazione) durante la sequenza d'avvio: a sequenza finita ascolta.
     private(set) var ascoltoDaAvvio = false
+    /// 14 nov: il reattore toccato durante l'avvio (lui ha fretta): la voce dell'avvio sfuma. La complicazione no.
+    private(set) var toccoDuranteAvvio = false
 
     // MARK: 13.0 · il congedo e la fretta al polso (come l'iPhone, nei limiti dell'orologio)
     // Il signore (13 nov): «adatta quello che puoi a Apple Watch e fai sì che funzioni bene». Al polso la frase arriva al cervello
