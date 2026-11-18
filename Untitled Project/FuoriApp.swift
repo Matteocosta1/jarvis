@@ -27,10 +27,11 @@ nonisolated struct InAttesa: Equatable, Sendable {
     var quando: Date
 
     /// Per l'orologio (WatchConnectivity vuole solo tipi semplici).
-    func perPolso(inMano: Bool) -> [String: Any] {
+    /// `zitta`: notifiche spente fino a domattina, o di notte: l'orologio mostra la scheda ma non bussa (13.4).
+    func perPolso(inMano: Bool, zitta: Bool = false) -> [String: Any] {
         // «t»: quando parte (l'orologio scarta le schede arrivate in coda dopo 3 minuti). Non l'inizio del piano: un piano cominciato
         // da più di 3 minuti mandava una scheda già «vecchia» e l'orologio non la mostrava
-        ["si_scheda": ["k": chiave, "tipo": tipo, "d": domanda, "r": riga, "t": Date().timeIntervalSince1970, "mano": inMano] as [String: Any]]
+        ["si_scheda": ["k": chiave, "tipo": tipo, "d": domanda, "r": riga, "t": Date().timeIntervalSince1970, "mano": inMano, "zitta": zitta] as [String: Any]]
     }
 }
 
@@ -74,7 +75,9 @@ enum SiInAttesa {
         if let passo = Piano.condiviso.passoInAttesa, let inizio = Piano.condiviso.inizio {
             let basso = passo.lowercased()
             let manda = ["messaggio", "scriv", "invia", "manda"].contains { basso.contains($0) }
-            return InAttesa(chiave: "p:\(Int(inizio.timeIntervalSince1970))", tipo: "piano", domanda: manda ? "LO MANDO?" : "LO FACCIO?",
+            // 13.4: con il numero del passo: se il cervello passa da un sì all'altro nello stesso istante, è comunque una scheda nuova
+            let k = "p:\(Int(inizio.timeIntervalSince1970)):\(Piano.condiviso.indiceInAttesa ?? 0)"
+            return InAttesa(chiave: k, tipo: "piano", domanda: manda ? "LO MANDO?" : "LO FACCIO?",
                             riga: domanda ?? passo, quando: inizio)
         }
         if Regia.condivisa.aspettaIlSi || ManiJarvis.aspettaIlSi, let domanda {
@@ -204,24 +207,32 @@ final class SiPolso {
         inManoInviato = inMano
         FiloCondiviso.condiviso.cambiato()                         // il sì in attesa va anche all'altro dispositivo
         guard !mac else { return }
+        // 13.4 (il signore: «ESEGUI»): con JARVIS dietro quello che aspettava il sì è cambiato (sì o no dal polso, dalla notifica, dal
+        // tasto Azione): la ripresa salvata andando dietro si rifà su com'è adesso, così riaprendo non richiede una cosa già fatta
+        if cambiata, !AperturaFuori.davanti { Ripresa.aggiorna(domanda: ultimaDomanda?()) }
         guard let ora else {
             if let prima { PonteTelefono.condiviso.inviaAlPolso(["si_via": prima.chiave]) }
             togliNotifica()
             return
         }
-        PonteTelefono.condiviso.inviaAlPolso(ora.perPolso(inMano: inMano))
+        // 13.4 (il signore: «OK»): le regole degli avvisi valgono anche qui. Con «niente notifiche fino a domattina» niente notifica e
+        // l'orologio non bussa; di notte (23–7) la notifica arriva senza suono e l'orologio non bussa
+        let spente = AvvisiVoce.spenteFino != nil
+        let zitta = spente || !AvvisiVoce.permesso(Date())
+        PonteTelefono.condiviso.inviaAlPolso(ora.perPolso(inMano: inMano, zitta: zitta))
         // in tasca e senza l'app dell'orologio aperta: la scheda è una notifica coi tasti Sì e No
-        if inMano { togliNotifica() } else if !PonteTelefono.condiviso.polsoRaggiungibile, dialogoFuori?() != true, notificata != ora.chiave { notifica(ora) }
+        if inMano || spente { togliNotifica() }
+        else if !PonteTelefono.condiviso.polsoRaggiungibile, dialogoFuori?() != true, notificata != ora.chiave { notifica(ora, suono: !zitta) }
     }
 
-    private func notifica(_ a: InAttesa) {
+    private func notifica(_ a: InAttesa, suono: Bool) {
         togliNotifica()
         notificata = a.chiave
         let c = UNMutableNotificationContent()
         c.title = "JARVIS"
         c.subtitle = String(a.domanda.prefix(1)) + a.domanda.dropFirst().lowercased()
         c.body = a.riga
-        c.sound = .default
+        c.sound = suono ? .default : nil
         c.categoryIdentifier = SiPolso.categoria
         c.userInfo = ["chiave": a.chiave]
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "jarvis.si", content: c, trigger: nil))
@@ -243,6 +254,9 @@ final class SiPolso {
         togliNotifica()
         Regia.condivisa.evento("dal polso: \(si ? "sì" : "no") a «\(a.riga.prefix(60))»")
         let battuta = await esegui(si, a)
+        // 13.4: la risposta è data: la ripresa salvata andando dietro non vale più (se il cervello lascia un altro sì in attesa, la
+        // rifanno `controlla` qui sotto o la fine del turno)
+        if !AperturaFuori.davanti { Ripresa.dimentica() }
         controlla()
         return ["ok": true, "testo": battuta ?? ""]
     }
@@ -295,8 +309,8 @@ enum Ripresa {
     static let massimo: TimeInterval = 12 * 3600
 
     /// JARVIS va dietro: quello che aspetta il sì si salva (anche se iOS poi chiude l'app). Niente in attesa: niente da salvare.
-    static func salva(domanda: String?) {
-        var s = Salvata(uscito: Date(), piano: Piano.condiviso.ultimoInAttesa, attesa: nil, domanda: domanda)
+    static func salva(domanda: String?, uscito: Date = Date()) {
+        var s = Salvata(uscito: uscito, piano: Piano.condiviso.ultimoInAttesa, attesa: nil, domanda: domanda)
         if let a = Insieme.condiviso.ultimaInAttesa, a.tipo == "messaggio" || a.tipo == "chiama" {
             s.attesa = AttesaSalvata(tipo: a.tipo, chi: a.chi, numero: a.numero, testo: a.testo, whatsapp: a.whatsapp)
         }
@@ -305,6 +319,14 @@ enum Ripresa {
             return
         }
         UserDefaults.standard.set(d, forKey: chiave)
+    }
+
+    /// 13.4: con JARVIS dietro quello che aspettava il sì è cambiato: la ripresa si rifà su com'è adesso (niente più in attesa: si
+    /// cancella). L'ora di uscita resta quella vera (i 3 minuti contano da quando è andato dietro).
+    static func aggiorna(domanda: String?) {
+        var uscito = Date()
+        if let d = UserDefaults.standard.data(forKey: chiave), let s = try? JSONDecoder().decode(Salvata.self, from: d) { uscito = s.uscito }
+        salva(domanda: domanda, uscito: uscito)
     }
 
     /// Riaprendo: quello che era rimasto, se vale (una volta sola: si cancella qui).

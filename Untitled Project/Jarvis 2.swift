@@ -4651,6 +4651,7 @@ extension Jarvis {
             guard let self, self.attesaPolso else { return }
             self.attesaPolso = false
             self.tacePerPolso = false
+            if !AperturaFuori.davanti { Ripresa.aggiorna(domanda: SiInAttesa.domanda(in: self.messaggi)) }   // 13.4: com'è rimasto
         }
         await invia(frase)
         return nil
@@ -4659,6 +4660,9 @@ extension Jarvis {
     /// A fine turno: la risposta a un sì dato dal polso va all'orologio; il filo col Mac si aggiorna.
     func fineTurnoFuori(id: UUID) {
         FiloCondiviso.condiviso.cambiato()
+        // 13.4: un turno finito con JARVIS dietro (il sì dal polso, il tasto Azione) può aver chiuso o cambiato quello che aspettava il
+        // sì: la ripresa salvata si rifà su com'è adesso
+        if !AperturaFuori.davanti { Ripresa.aggiorna(domanda: SiInAttesa.domanda(in: messaggi)) }
         guard attesaPolso else { return }
         attesaPolso = false
         tacePerPolso = false
@@ -4703,7 +4707,11 @@ extension Jarvis {
             guard qui != nil || la != nil else { return }
             giri = 0
             while !Task.isCancelled, giri < 50, !(self.fase == .attesa && self.inCoda.isEmpty) { try? await Task.sleep(for: .milliseconds(200)); giri += 1 }
-            guard !Task.isCancelled, self.fase == .attesa, self.inCoda.isEmpty, UIApplication.shared.applicationState == .active else {
+            // 13.4 (il signore: «ESEGUI», con qualsiasi sezione aperta; dopo «non ora» la dice lo stesso): non sopra la musica, non in
+            // RISERVATO («niente frasi»), non con una sezione davanti né col Wiretap che registra dietro (la voce finirebbe nel verbale).
+            // In quei casi aspetta: la dice alla prossima apertura
+            let calmo = !self.musicaSuona && !self.riservato && Regia.condivisa.davantiNome == nil && WiretapAperto.chiudi == nil
+            guard !Task.isCancelled, calmo, self.fase == .attesa, self.inCoda.isEmpty, UIApplication.shared.applicationState == .active else {
                 if let qui, !Task.isCancelled { Ripresa.rimetti(qui) }   // occupato (gli sta già parlando): la dice la prossima volta
                 return
             }

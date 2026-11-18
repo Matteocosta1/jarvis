@@ -166,6 +166,9 @@ final class Piano {
     /// Il passo che aspetta il sì, in poche parole («Messaggio a Cristina»).
     var passoInAttesa: String? { inCorso ? passi.first(where: { $0.stato == .aspetta })?.testo : nil }
 
+    /// 13.4: il numero del passo che aspetta il sì (nella chiave della scheda: due passi dello stesso piano sono due schede).
+    var indiceInAttesa: Int? { inCorso ? passi.firstIndex(where: { $0.stato == .aspetta }) : nil }
+
     /// Quando è cominciato il piano vivo (la chiave della scheda del sì sull'orologio).
     var inizio: Date? { inCorso ? iniziato : nil }
 

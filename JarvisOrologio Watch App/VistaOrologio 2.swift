@@ -189,14 +189,15 @@ struct VistaOrologio: View {
                     }
                 }
         }
-        .overlay { if cuore.conto != nil { allarme } }
-        // 13.1 (2): il sì dal polso (mockup FUORI): la scheda Sì / No sopra tutto, ovunque si trovi nell'app
+        // 13.1 (2): il sì dal polso (mockup FUORI): la scheda Sì / No sopra l'app, ovunque si trovi
         .overlay {
             if let s = schedaSi.scheda {
                 VistaSchedaSi(scheda: s).transition(.opacity.combined(with: .offset(y: 8)))
             }
         }
         .animation(.easeOut(duration: 0.26), value: schedaSi.scheda)
+        // 13.4: l'allarme del cuore sta sopra anche alla scheda del sì (il tasto ANNULLA resta sempre libero)
+        .overlay { if cuore.conto != nil { allarme } }
         // Sentinella: «Perimetro violato, Sir» a tutto schermo, ovunque si trovi nell'app
         .fullScreenCover(item: $sentinella.allarme) { a in VistaAllarmeOrologio(allarme: a) }
         .confirmationDialog("Pulire la conversazione? Memoria e note restano.", isPresented: $chiediPulizia) {

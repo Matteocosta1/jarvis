@@ -3,7 +3,7 @@
 App di Alessandro: iPhone, Apple Watch (con complicazione) e Mac (la stessa app iPhone installata da TestFlight). Il cervello è su Supabase (progetto "Discosizer Serate"). Le scelte su JARVIS le approva **solo Alessandro**.
 
 - **Ramo di Xcode:** quello dell'ultima build in corso (oggi `claude/build-23`). Se non è chiaro, chiederlo prima di fare push.
-- **Version** e **Build** li decide il signore a ogni carico (18 nov: 13.3 (1)); senza sue indicazioni la versione resta e sale la build, uguale su iPhone, Watch e complicazione (sempre dopo averglielo chiesto).
+- **Version** e **Build** li decide il signore a ogni carico (18 nov: 13.4 (1)); senza sue indicazioni la versione resta e sale la build, uguale su iPhone, Watch e complicazione (sempre dopo averglielo chiesto).
 - Ogni novità va fatta insieme su iPhone e Apple Watch (stessa build), tranne ciò che l'orologio non può fare (es. fotocamera).
 - Regola fissa: nelle sezioni che aprono la fotocamera si chiude con l'icona **X nel cerchio**; nelle sezioni senza fotocamera c'è la scritta **«Chiudi»**.
 - Il cervello (Edge Function su Supabase) si pubblica solo col suo via.

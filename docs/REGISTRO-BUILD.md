@@ -530,6 +530,18 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 13.4 (1) — controllo completo · 18 nov sera · numero deciso dal signore (20:58, «build 13.4»: Version 13.4, Build 1 su tutti i target) · contiene tutta la 13.3 (1) · cervello invariato (v135)
+Il signore (20:47): «controllo completo… fallo con massima competenza»; correzioni approvate una per una (20:58).
+- **Orologio, la scheda del sì come nel mockup** («orologio: si fa come nel mock up»): al tocco la scheda sparisce subito (niente rotellina, niente «Ci penso io»); dopo un Sì arriva «FATTO» con la risposta di JARVIS, dopo un No niente.
+1. **Doppio invio evitato**: la ripresa salvata andando dietro si rifà quando quello che aspettava il sì cambia con JARVIS dietro (Sì o No dall'orologio, dalla notifica, dal tasto Azione, fine del turno). Prima riaprendo richiedeva una cosa già fatta. La scheda di un piano ha anche il numero del passo (due sì di fila nello stesso piano sono due schede).
+2. **La ripresa aspetta**: non sopra la musica, non in RISERVATO, non con una sezione aperta, non col Wiretap che registra dietro; la dice alla prossima apertura. Dopo «non ora» la dice lo stesso (scelte del signore).
+3. **Notifica del sì con le regole degli avvisi**: con «niente notifiche fino a domattina» niente notifica e l'orologio non bussa; di notte (23–7) notifica senza suono e nessun colpo al polso.
+4. **Orologio**: l'allarme del cuore resta sopra la scheda del sì (ANNULLA sempre libero).
+5. **Orologio**: un «FATTO» non copre più una scheda Sì/No arrivata nel frattempo.
+6. **Orologio e complicazione**: ciano come colore dell'app (freccia indietro, rotelline, scelta a rotella, tasti delle conferme, link).
+7. **Mockup** FUORI › SÌ allineato all'app: col telefono in tasca il piano va avanti da sé mentre l'orologio apre Messaggi; «Tocco Invia» mostra Messaggi di Apple («Consegnato») e, tornando in JARVIS, «FATTO» con la risposta del telefono (senza «»). Anche nel mockup la ripresa aspetta (musica, RISERVATO, sezione aperta) e l'orologio non bussa di notte o con le notifiche spente. Mockup Novità versione 25.
+- Controllato e in ordine: X nel cerchio nelle sezioni con fotocamera (Scanner, Occhi, Cucina, Profiler, LiDAR, Sentinella, Trainer) e «Chiudi» nelle altre; stesso caricamento ovunque; niente blu di iOS sull'iPhone; 120 Hz su tutti i CADisplayLink; gli avvisi a voce non suonano con JARVIS aperto.
+
 ## 13.3 (1) — debug di FUORI · 18 nov pomeriggio · numero deciso dal signore (20:31, «13.3»: Version 13.3, Build 1 su tutti i target) · commit 13be2fb · controllo di compilazione VERDE (0 errori, 0 warning, run 44329978400)
 Il signore (15:52): «debug di tutte le funzioni nuove e delle interazioni… e risolvere». Trovati e corretti:
 1. **Scheda del piano scartata dall'orologio**: l'ora della scheda era l'inizio del piano; con un piano cominciato da più di 3 minuti l'orologio la buttava come vecchia. Ora è l'ora d'invio.

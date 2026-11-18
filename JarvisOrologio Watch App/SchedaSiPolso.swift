@@ -33,8 +33,8 @@ final class SchedaSi: ObservableObject {
     nonisolated static func ricevi(_ m: [String: Any]) -> Bool {
         if let d = m["si_scheda"] as? [String: Any] {
             let k = d["k"] as? String ?? "", domanda = d["d"] as? String ?? "", riga = d["r"] as? String ?? ""
-            let quando = (d["t"] as? NSNumber)?.doubleValue ?? 0, mano = d["mano"] as? Bool ?? true
-            Task { @MainActor in SchedaSi.condivisa.arriva(k, domanda: domanda, riga: riga, quando: quando, inMano: mano) }
+            let quando = (d["t"] as? NSNumber)?.doubleValue ?? 0, mano = d["mano"] as? Bool ?? true, zitta = d["zitta"] as? Bool ?? false
+            Task { @MainActor in SchedaSi.condivisa.arriva(k, domanda: domanda, riga: riga, quando: quando, inMano: mano, zitta: zitta) }
             return true
         }
         if let k = m["si_via"] as? String {
@@ -60,13 +60,14 @@ final class SchedaSi: ObservableObject {
         return false
     }
 
-    private func arriva(_ k: String, domanda: String, riga: String, quando: Double, inMano: Bool) {
+    /// `zitta` (13.4): notifiche spente fino a domattina, o di notte (23–7): la scheda arriva ma non bussa.
+    private func arriva(_ k: String, domanda: String, riga: String, quando: Double, inMano: Bool, zitta: Bool) {
         guard !k.isEmpty, Date().timeIntervalSince1970 - quando < 180 else { return }   // arrivata in coda e ormai scaduta
         let nuova = scheda?.chiave != k || scheda?.tipo != .si
         chiusura?.cancel()
         scheda = Scheda(chiave: k, tipo: .si, titolo: domanda, riga: riga)
         // bussa solo col telefono in tasca: quando arriva, o quando il telefono ci va mentre la scheda è qui
-        if !inMano && (nuova || manoUltima) { bussa() }
+        if !inMano && !zitta && (nuova || manoUltima) { bussa() }
         manoUltima = inMano
     }
 
@@ -78,6 +79,7 @@ final class SchedaSi: ObservableObject {
     /// La risposta di JARVIS a un sì dato da qui (o arrivata dopo, dal cervello).
     private func fatto(_ testo: String) {
         if let n = noAlle, Date().timeIntervalSince(n) < 90 { return }
+        guard scheda?.tipo != .si else { return }       // 13.4: una domanda nuova sul polso non la copre nessun «FATTO»
         mostra(Scheda(chiave: "fatto", tipo: .fatto, titolo: "FATTO", riga: testo), per: 5)
         ApticaPolso.suona(.success)
     }
