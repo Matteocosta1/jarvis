@@ -42,6 +42,8 @@ nonisolated struct AttivitaJarvis: ActivityAttributes {
 @MainActor
 enum ComandiIsola {
     static var esegui: ((String) -> Void)?
+    /// 13.1 (2): il tasto Azione da bloccato (AscoltaDaBloccato): JARVIS ascolta senza aprirsi. Falso: non può (lo imposta Jarvis).
+    static var ascoltaFuori: (() -> Bool)?
 }
 
 // niente «nonisolated» sul tipo: il @Parameter è una proprietà che cambia, e Swift 6 non lo permette (avviso di Xcode, 26 ott)
@@ -76,4 +78,33 @@ struct ParlaDalControllo: AppIntent {
         await MainActor.run { ComandiIsola.esegui?("ascolta") }
         return .result()
     }
+}
+
+/// 18 nov · 13.1 (2) · IL TASTO AZIONE DA BLOCCATO (mockup FUORI approvato dal signore). Il controllo «JARVIS · Ascolto» (iOS 18):
+/// col telefono bloccato JARVIS ascolta senza sbloccare, risponde a voce e mostra l'isola VOCE già approvata (Apri e Fine); quello
+/// che va guardato lo apre e lo trova aperto allo sblocco. È un intent di registrazione audio: iOS lo lascia partire da bloccato
+/// solo con l'attività accesa (Jarvis.ascoltaDaFuori la accende subito). Il controllo «JARVIS» di prima resta com'era.
+@available(iOS 18.0, *)
+struct AscoltaDaBloccato: AudioRecordingIntent {
+    nonisolated static var title: LocalizedStringResource { "JARVIS ascolta" }
+    nonisolated static var description: IntentDescription { IntentDescription("JARVIS ascolta anche col telefono bloccato e risponde a voce.") }
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        // JARVIS appena svegliato da iOS (era chiuso): gli si lasciano al massimo 3 secondi per esserci
+        var partito = false
+        for _ in 0..<15 {
+            partito = await MainActor.run { ComandiIsola.ascoltaFuori?() ?? false }
+            if partito { break }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard partito else { throw ErroreAscoltoFuori() }
+        return .result()
+    }
+}
+
+/// Quello che iOS mostra se JARVIS non riesce ad ascoltare da bloccato.
+nonisolated struct ErroreAscoltoFuori: Error, CustomLocalizedStringResourceConvertible {
+    var localizedStringResource: LocalizedStringResource { "Apra JARVIS una volta, Sir: poi la ascolto anche da bloccato." }
 }

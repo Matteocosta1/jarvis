@@ -141,6 +141,7 @@ struct VistaOrologio: View {
     @Environment(\.scenePhase) private var scena
     @ObservedObject private var cuore = Cuore.condiviso
     @ObservedObject private var sentinella = SentinellaOrologio.condiviso
+    @ObservedObject private var schedaSi = SchedaSi.condivisa       // 13.1 (2): il sì dal polso
     @State private var mostraSentinella = false
     @State private var scheda: Reparto?                  // la sezione aperta (Diario, Sonno, Meteo…)
     @State private var polso: SchermataPolso?            // build 22: PROTOCOLLI, TRACCIA, RADAR, PRIORITÀ
@@ -189,6 +190,13 @@ struct VistaOrologio: View {
                 }
         }
         .overlay { if cuore.conto != nil { allarme } }
+        // 13.1 (2): il sì dal polso (mockup FUORI): la scheda Sì / No sopra tutto, ovunque si trovi nell'app
+        .overlay {
+            if let s = schedaSi.scheda {
+                VistaSchedaSi(scheda: s).transition(.opacity.combined(with: .offset(y: 8)))
+            }
+        }
+        .animation(.easeOut(duration: 0.26), value: schedaSi.scheda)
         // Sentinella: «Perimetro violato, Sir» a tutto schermo, ovunque si trovi nell'app
         .fullScreenCover(item: $sentinella.allarme) { a in VistaAllarmeOrologio(allarme: a) }
         .confirmationDialog("Pulire la conversazione? Memoria e note restano.", isPresented: $chiediPulizia) {

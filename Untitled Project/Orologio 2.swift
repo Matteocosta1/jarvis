@@ -58,6 +58,28 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         }
     }
 
+    // MARK: 13.1 (2) · il sì dal polso (FuoriApp.swift)
+
+    /// L'app di JARVIS è aperta sull'orologio adesso (un messaggio arriva subito).
+    nonisolated var polsoRaggiungibile: Bool {
+        guard WCSession.isSupported() else { return false }
+        let s = WCSession.default
+        return s.activationState == .activated && s.isPaired && s.isWatchAppInstalled && s.isReachable
+    }
+
+    /// La scheda del sì (o la sua fine, il messaggio da inviare, la risposta): subito se l'orologio è raggiungibile, se no in coda
+    /// (arriva appena l'app dell'orologio si apre; lì le schede vecchie di oltre 3 minuti non si mostrano).
+    nonisolated func inviaAlPolso(_ messaggio: [String: Any]) {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled else { return }
+        if s.isReachable {
+            s.sendMessage(messaggio, replyHandler: nil) { _ in s.transferUserInfo(messaggio) }
+        } else {
+            s.transferUserInfo(messaggio)
+        }
+    }
+
     // MARK: Build 23: la GUIDA di SATELLITE al polso
 
     private let chiaveGuida = NSLock()
@@ -176,6 +198,13 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
         // l'orologio parla con la Sentinella: «guarda ora», «disattiva», «a che punto sei»
         if let comando = message["sentinella"] as? String {
             PonteSentinella.ricevi(comando, rispondi: replyHandler)
+            return
+        }
+        // 13.1 (2): Sì o No toccato sulla scheda dell'orologio (FuoriApp.swift)
+        if let r = message["si_risposta"] as? String {
+            nonisolated(unsafe) let rispondi = replyHandler
+            let chiave = message["chiave"] as? String ?? ""
+            Task { @MainActor in rispondi(await SiPolso.condiviso.dalPolso(si: r == "si", chiave: chiave)) }
             return
         }
         // build 23: l'orologio avvia, ferma o chiede la GUIDA di SATELLITE

@@ -19,3 +19,19 @@ struct ControlloJarvis: ControlWidget {
         .description("Apre JARVIS già in ascolto.")
     }
 }
+
+/// 13.1 (2) · il controllo «JARVIS · Ascolto» (FUORI, mockup approvato): sul tasto Azione JARVIS ascolta anche col telefono bloccato,
+/// senza aprirsi (AscoltaDaBloccato, in AttivitaJarvis.swift). Il ciano di JARVIS, l'onda come icona.
+@available(iOS 18.0, *)
+struct ControlloAscolto: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "it.discosizer.jarvis.ascolto") {
+            ControlWidgetButton(action: AscoltaDaBloccato()) {
+                Label("JARVIS", systemImage: "waveform")
+            }
+            .tint(Color(red: 79 / 255, green: 227 / 255, blue: 1))
+        }
+        .displayName("JARVIS · Ascolto")
+        .description("JARVIS ascolta anche col telefono bloccato.")
+    }
+}

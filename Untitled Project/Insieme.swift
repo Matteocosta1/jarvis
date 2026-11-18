@@ -32,6 +32,32 @@ final class Insieme {
     private var attesa: Attesa?
     /// 14 nov: un messaggio (o una chiamata, un post) preparato aspetta il sì (l'iniziativa non ci parla sopra con una domanda).
     var aspettaIlSi: Bool { attesa.map { Date().timeIntervalSince($0.quando) < 180 } ?? false }
+
+    /// 13.1 (2) (FuoriApp.swift): il messaggio, la chiamata o il post che aspetta il sì, per la scheda dell'orologio, la ripresa e
+    /// il filo col Mac. Nil: niente in attesa (o scaduto).
+    var inAttesa: (tipo: String, chi: String, numero: String, testo: String, whatsapp: Bool, quando: Date)? {
+        guard let a = attesa, Date().timeIntervalSince(a.quando) < 180 else { return nil }
+        return (a.tipo, a.chi, a.numero, a.testo, a.whatsapp, a.quando)
+    }
+
+    /// 13.1 (2): come `inAttesa`, anche dopo i 3 minuti (entro 12 ore) finché lui non dice altro: per la ripresa e il filo col Mac,
+    /// dove il sì si chiede di nuovo.
+    var ultimaInAttesa: (tipo: String, chi: String, numero: String, testo: String, whatsapp: Bool, quando: Date)? {
+        guard let a = attesa, Date().timeIntervalSince(a.quando) < 12 * 3600 else { return nil }
+        return (a.tipo, a.chi, a.numero, a.testo, a.whatsapp, a.quando)
+    }
+
+    /// 13.1 (2): la ripresa (o il Mac) rimette in attesa del sì un messaggio o una chiamata, da adesso. Restituisce la domanda.
+    func riprendi(tipo: String, chi: String, numero: String, testo: String, whatsapp: Bool) -> String? {
+        guard !chi.isEmpty, !numero.isEmpty, tipo == "messaggio" || tipo == "chiama" else { return nil }
+        guard tipo == "chiama" || !testo.isEmpty else { return nil }
+        attesa = Attesa(tipo: tipo, chi: chi, numero: numero, testo: testo, whatsapp: whatsapp, quando: Date())
+        Filo.condiviso.persona(chi)
+        guard tipo == "messaggio" else { return "Chiamo \(Filo.detto(chi)), Sir?" }
+        Filo.condiviso.mostra("bozza", titolo: Filo.a(chi).capitalizzata, riga: "«\(testo)»", sezione: "Messaggi", resta: true)
+        return Battute.chiediMessaggio(chi, testo, whatsapp: whatsapp)
+    }
+
     /// «Rispondile» senza il testo: la frase dopo è il testo (entro un minuto).
     private var attesaTesto: (chi: String, numero: String?, quando: Date)?
 
@@ -486,8 +512,15 @@ final class Insieme {
         if a.tipo == "chiama" {
             Filo.condiviso.persona(a.chi)
             guard let url = URL(string: "tel://\(Strumenti.pulisci(a.numero))") else { return "Non riesco a chiamare, Sir." }
-            Insieme.dopoLaVoce { UIApplication.shared.open(url) }
-            return "Chiamo \(Filo.detto(a.chi))."
+            // 13.1 (2): col telefono in tasca la chiamata la fa l'orologio (o parte appena sblocca): FuoriApp.swift
+            let via = AperturaFuori.via(url)
+            let chi = a.chi
+            Insieme.dopoLaVoce { AperturaFuori.apri(url, chi: chi) }
+            switch via {
+            case .subito: return "Chiamo \(Filo.detto(a.chi))."
+            case .polso: return "Sull'orologio, Sir: tocchi Chiama."
+            case .allaSblocco: return "La chiamo appena sblocca, Sir."
+            }
         }
         let url: URL?
         if a.whatsapp {
@@ -497,7 +530,11 @@ final class Insieme {
             url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica(Strumenti.comandoInvio))&input=text&text=\(Strumenti.codifica(String(decoding: dati, as: UTF8.self)))")
         }
         guard let url else { return "Non riesco a preparare il messaggio, Sir." }
-        Insieme.dopoLaVoce { UIApplication.shared.open(url) }
+        // 13.1 (2): col telefono in tasca iOS non lascia partire il Comando rapido: il messaggio lo apre l'orologio, col testo
+        // già scritto (o parte appena sblocca). FuoriApp.swift
+        let via = AperturaFuori.via(url)
+        let destinatario = a.chi
+        Insieme.dopoLaVoce { AperturaFuori.apri(url, chi: destinatario) }
         let (numero, testo, wa, chi) = (a.numero, a.testo, a.whatsapp, a.chi)
         Task { await RegistroMessaggi.mandato(a: numero, testo: testo, whatsapp: wa) }
         Suoni.pronto()
@@ -508,7 +545,11 @@ final class Insieme {
                                       testo: testo, daMandare: testo, numero: numero, sezione: "Messaggi"))
         Filo.condiviso.persona(chi)
         Congedo.condiviso.cosaVera()                                    // un messaggio mandato è una cosa vera
-        return wa ? "Pronto per \(Filo.detto(chi)) su WhatsApp, Sir: l'ultimo tocco su Invia è suo." : Battute.mandato(chi)
+        switch via {
+        case .subito: return wa ? "Pronto per \(Filo.detto(chi)) su WhatsApp, Sir: l'ultimo tocco su Invia è suo." : Battute.mandato(chi)
+        case .polso: return "Pronto sull'orologio, Sir: tocchi Invia."
+        case .allaSblocco: return wa ? "Pronto su WhatsApp appena sblocca, Sir." : "Lo mando appena sblocca, Sir."
+        }
     }
 
     /// Un lavoro da fare quando JARVIS ha finito di parlare (aprire Comandi, WhatsApp, il telefono).

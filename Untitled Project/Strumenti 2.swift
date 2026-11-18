@@ -89,7 +89,16 @@ final class Strumenti {
     func apriInSospeso() {
         guard let url = daAprire.first else { return }
         daAprire.removeAll()
-        UIApplication.shared.open(url)
+        AperturaFuori.apri(url, chi: nil)       // 13.1 (2): col telefono in tasca ci pensa l'orologio, o parte appena sblocca
+    }
+
+    /// 13.1 (2): la nota per il cervello quando il telefono è in tasca (JARVIS dietro): così non dice «mandato» a vuoto.
+    private func notaFuori(_ url: URL, _ normale: String) -> String {
+        switch AperturaFuori.via(url) {
+        case .subito: return normale
+        case .polso: return "il telefono è in tasca: è pronto sull'orologio del signore, che lo conferma con un tocco. Diglielo in breve"
+        case .allaSblocco: return "il telefono è bloccato: parte appena il signore lo sblocca. Diglielo in breve"
+        }
     }
 
     func annullaInSospeso() { daAprire.removeAll(); comandoDaEseguire = nil }
@@ -237,7 +246,7 @@ final class Strumenti {
         let numero = Strumenti.pulisci(i["numero"] as? String ?? "")
         guard !numero.isEmpty, let url = URL(string: "tel://\(numero)") else { throw Problema("Numero non valido.") }
         daAprire.append(url)
-        return json(["ok": true, "nota": "la chiamata parte quando hai finito di parlare; l'iPhone chiede conferma"])
+        return json(["ok": true, "nota": notaFuori(url, "la chiamata parte quando hai finito di parlare; l'iPhone chiede conferma")])
     }
 
     private func messaggio(_ i: [String: Any]) throws -> String {
@@ -252,7 +261,7 @@ final class Strumenti {
         daAprire.append(url)
         let testoVero = i["testo"] as? String ?? ""                        // 7 nov: anche questo nell'ologramma di Messaggi
         Task { await RegistroMessaggi.mandato(a: numero, testo: testoVero, whatsapp: whatsapp) }
-        return json(["ok": true, "nota": "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia il signore"])
+        return json(["ok": true, "nota": notaFuori(url, "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia il signore")])
     }
 
     private func naviga(_ i: [String: Any]) throws -> String {
@@ -277,7 +286,7 @@ final class Strumenti {
         }
         daAprire.append(url)
         Task { await RegistroMessaggi.mandato(a: numero, testo: testo, whatsapp: false) }   // 7 nov: anche questo nell'ologramma di Messaggi
-        return json(["ok": true, "nota": "il Comando rapido «\(Strumenti.comandoInvio)» lo invia appena hai finito di parlare, senza conferma"])
+        return json(["ok": true, "nota": notaFuori(url, "il Comando rapido «\(Strumenti.comandoInvio)» lo invia appena hai finito di parlare, senza conferma")])
     }
 
     // MARK: Telefono: torcia, schermo, batteria e i comandi che passano dai Comandi rapidi

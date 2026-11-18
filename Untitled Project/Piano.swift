@@ -137,6 +137,51 @@ final class Piano {
         }
     }
 
+    // MARK: 18 nov · 13.1 (2) · «Dove eravamo rimasti» (FuoriApp.swift)
+
+    /// Il piano com'è adesso, da salvare quando JARVIS va dietro (la ripresa) o da passare all'altro dispositivo (il Mac).
+    nonisolated struct Istantanea: Codable, Equatable, Sendable {
+        nonisolated struct PassoSalvato: Codable, Equatable, Sendable {
+            var testo: String
+            var stato: String
+            var nota: String?
+        }
+        var titolo: String
+        var passi: [PassoSalvato]
+    }
+
+    /// Il piano vivo con un passo che aspetta il sì (nil: niente in attesa).
+    var inAttesa: Istantanea? {
+        guard inCorso, passi.contains(where: { $0.stato == .aspetta }) else { return nil }
+        return Istantanea(titolo: titolo, passi: passi.map { Istantanea.PassoSalvato(testo: $0.testo, stato: $0.stato.rawValue, nota: $0.nota) })
+    }
+
+    /// Come `inAttesa`, anche oltre i 20 minuti (entro 12 ore) se nessuno l'ha chiuso: per la ripresa e il filo col Mac, dove
+    /// il sì si chiede di nuovo.
+    var ultimoInAttesa: Istantanea? {
+        guard let iniziato, !finito, Date().timeIntervalSince(iniziato) < 12 * 3600, passi.contains(where: { $0.stato == .aspetta }) else { return nil }
+        return Istantanea(titolo: titolo, passi: passi.map { Istantanea.PassoSalvato(testo: $0.testo, stato: $0.stato.rawValue, nota: $0.nota) })
+    }
+
+    /// Il passo che aspetta il sì, in poche parole («Messaggio a Cristina»).
+    var passoInAttesa: String? { inCorso ? passi.first(where: { $0.stato == .aspetta })?.testo : nil }
+
+    /// Quando è cominciato il piano vivo (la chiave della scheda del sì sull'orologio).
+    var inizio: Date? { inCorso ? iniziato : nil }
+
+    /// La ripresa (o il Mac) rimette il piano dov'era: vale da adesso (20 minuti, come uno nuovo) e torna nella tab.
+    func ripristina(_ i: Istantanea) {
+        let nuovi = i.passi.prefix(8).map { Passo(testo: $0.testo, stato: Stato(rawValue: $0.stato) ?? .daFare, nota: $0.nota) }
+        guard !nuovi.isEmpty else { return }
+        titolo = i.titolo
+        passi = Array(nuovi)
+        iniziato = Date()
+        finito = false
+        giriFermo = 0
+        Regia.condivisa.evento("piano ripreso: \(titolo.isEmpty ? "senza titolo" : titolo)")
+        mostra()
+    }
+
     /// La riga per il cervello (dentro [Schermo]).
     var perCervello: String? {
         guard !passi.isEmpty, let iniziato, Date().timeIntervalSince(iniziato) < 1200 else { return nil }

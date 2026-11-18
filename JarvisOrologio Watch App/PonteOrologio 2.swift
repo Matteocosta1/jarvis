@@ -206,6 +206,23 @@ final class PonteOrologio: NSObject {
         }
     }
 
+    /// 13.1 (2): Sì o No toccato sulla scheda del sì (SchedaSiPolso.swift): all'iPhone, che lo fa come detto a voce. Il testo è la
+    /// battuta di JARVIS (vuoto: risponde il cervello, arriva dopo da solo); l'errore se l'iPhone non può.
+    func rispondiSi(_ si: Bool, chiave: String) async -> (testo: String, errore: String?) {
+        guard WCSession.isSupported() else { return (testo: "", errore: "Orologio senza collegamento all'iPhone, Sir.") }
+        await attendiAttivazione()
+        let s = WCSession.default
+        guard s.isReachable else { return (testo: "", errore: "L'iPhone non risponde, Sir: lo tenga vicino.") }
+        return await withCheckedContinuation { (c: CheckedContinuation<(testo: String, errore: String?), Never>) in
+            // @Sendable: le risposte arrivano su una coda in background, non sul main actor
+            s.sendMessage(["si_risposta": si ? "si" : "no", "chiave": chiave], replyHandler: { @Sendable r in
+                c.resume(returning: (testo: r["testo"] as? String ?? "", errore: r["errore"] as? String))
+            }, errorHandler: { @Sendable _ in
+                c.resume(returning: (testo: "", errore: "L'iPhone non risponde, Sir."))
+            })
+        }
+    }
+
     /// Un messaggio della Sentinella arrivato dall'iPhone (allarme o cambio di stato).
     nonisolated static func smistaSentinella(_ d: [String: Any]) {
         guard let tipo = d["sentinella"] as? String else { return }
@@ -271,12 +288,14 @@ extension PonteOrologio: WCSessionDelegate {
 
     // la Sentinella sull'iPhone: allarmi (subito, oppure in coda se l'app dormiva) e cambi di stato
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if SchedaSi.ricevi(message) { return }      // 13.1 (2): il sì dal polso (SchedaSiPolso.swift)
         if FotoBeaPolso.ricevi(message) { return }  // 11.0 (6): una foto nuova di Bea, già in ologramma
         PonteOrologio.smistaSentinella(message)
         GuidaPolso.ricevi(message)                  // build 23: la GUIDA di SATELLITE in corso sull'iPhone
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        if SchedaSi.ricevi(message) { replyHandler([:]); return }   // 13.1 (2)
         if FotoBeaPolso.ricevi(message) { replyHandler([:]); return }
         PonteOrologio.smistaSentinella(message)
         GuidaPolso.ricevi(message)
@@ -284,6 +303,7 @@ extension PonteOrologio: WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        if SchedaSi.ricevi(userInfo) { return }      // 13.1 (2): il sì dal polso arrivato in coda (le schede scadute non si mostrano)
         if FotoBeaPolso.ricevi(userInfo) { return }  // 11.0 (6): Bea in ologramma, arrivata in coda
         // un allarme in coda vecchio di oltre 10 minuti non suona più: resta solo come «ultimo allarme»
         if let t = userInfo["quando"] as? Double, Date().timeIntervalSince1970 - t > 600 {

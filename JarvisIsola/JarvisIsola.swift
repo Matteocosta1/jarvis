@@ -15,6 +15,7 @@ struct IsolaJarvisBundle: WidgetBundle {
     var body: some Widget {
         IsolaJarvisWidget()
         if #available(iOS 18.0, *) { ControlloJarvis() }        // 12.0 (12) · B4: il controllo JARVIS
+        if #available(iOS 18.0, *) { ControlloAscolto() }       // 13.1 (2): JARVIS ascolta anche da bloccato
     }
 }
 

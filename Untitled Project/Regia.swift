@@ -477,10 +477,15 @@ final class Regia {
         return e
     }
 
+    /// 13.1 (2): l'ultima volta che una sezione si è aperta (o è tornata davanti). Col telefono bloccato JARVIS lo dice: «La trova
+    /// aperta appena sblocca» (Jarvis), invece di «Ecco le foto» che lui non vede.
+    private(set) var apertaAlle = Date.distantPast
+
     /// Apre una sezione (o la riporta davanti se era dietro) e aspetta che sia pronta.
     private func apri(_ nome: String) async -> EsitoRegia {
         guard let d = Regia.destinazione(nome) else { return .no("sezione «\(nome)» sconosciuta") }
         if nomeDavanti == d.nome { return .fatto("\(d.nome) è già davanti" + (statoDi(d.nome).map { ": " + Regia.taglia($0, 600) } ?? "")) }
+        apertaAlle = Date()
         let eraDietro = pila?.voci.contains { $0.sezione.nome == d.nome } == true
         if d.dopoLaVoce, let dopo = dopoLaVoce {
             // microfono o fotocamera: si apre appena JARVIS ha finito la sua frase (non deve sentire la sua voce)
