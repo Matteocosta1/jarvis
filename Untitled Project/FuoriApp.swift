@@ -125,7 +125,7 @@ enum AperturaFuori {
         let url = r.url
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(900))       // prima l'app torna davanti del tutto
-            UIApplication.shared.open(url)
+            _ = await UIApplication.shared.open(url)
         }
     }
 
