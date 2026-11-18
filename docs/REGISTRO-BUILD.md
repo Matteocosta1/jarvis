@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 13.2 (2?) — debug di FUORI · 18 nov pomeriggio · numero da confermare col signore · commit 13be2fb · controllo di compilazione VERDE (0 errori, 0 warning, run 44329978400)
+## 13.3 (1) — debug di FUORI · 18 nov pomeriggio · numero deciso dal signore (20:31, «13.3»: Version 13.3, Build 1 su tutti i target) · commit 13be2fb · controllo di compilazione VERDE (0 errori, 0 warning, run 44329978400)
 Il signore (15:52): «debug di tutte le funzioni nuove e delle interazioni… e risolvere». Trovati e corretti:
 1. **Scheda del piano scartata dall'orologio**: l'ora della scheda era l'inizio del piano; con un piano cominciato da più di 3 minuti l'orologio la buttava come vecchia. Ora è l'ora d'invio.
 2. **Ripresa ripetuta a ogni apertura**: riaprendo e richiudendo senza rispondere, JARVIS ripeteva la stessa frase. Ora una volta sola per la stessa cosa.

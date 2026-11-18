@@ -634,7 +634,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -696,7 +696,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -738,7 +738,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -780,7 +780,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -816,7 +816,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp.JarvisComplicazione;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -850,7 +850,7 @@
 					"@executable_path/../../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.watchkitapp.JarvisComplicazione;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -883,7 +883,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.JarvisIsola;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -916,7 +916,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 13.2;
+				MARKETING_VERSION = 13.3;
 				PRODUCT_BUNDLE_IDENTIFIER = it.discosizer.jarvis.JarvisIsola;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
