@@ -93,18 +93,25 @@ struct AscoltaDaBloccato: AudioRecordingIntent {
 
     func perform() async throws -> some IntentResult {
         // JARVIS appena svegliato da iOS (era chiuso): gli si lasciano al massimo 3 secondi per esserci
-        var partito = false
+        var partito: Bool?
         for _ in 0..<15 {
-            partito = await MainActor.run { ComandiIsola.ascoltaFuori?() ?? false }
-            if partito { break }
+            partito = await MainActor.run { ComandiIsola.ascoltaFuori?() }
+            if partito != nil { break }
             try? await Task.sleep(for: .milliseconds(200))
         }
-        guard partito else { throw ErroreAscoltoFuori() }
+        guard let partito else { throw ErroreAscoltoFuori.chiuso }
+        guard partito else { throw ErroreAscoltoFuori.microfono }     // 13.2 (debug): il microfono spento a mano non è «JARVIS chiuso»
         return .result()
     }
 }
 
 /// Quello che iOS mostra se JARVIS non riesce ad ascoltare da bloccato.
-nonisolated struct ErroreAscoltoFuori: Error, CustomLocalizedStringResourceConvertible {
-    var localizedStringResource: LocalizedStringResource { "Apra JARVIS una volta, Sir: poi la ascolto anche da bloccato." }
+nonisolated enum ErroreAscoltoFuori: Error, CustomLocalizedStringResourceConvertible {
+    case chiuso, microfono
+    var localizedStringResource: LocalizedStringResource {
+        switch self {
+        case .chiuso: return "Apra JARVIS una volta, Sir: poi la ascolto anche da bloccato."
+        case .microfono: return "Il microfono di JARVIS è spento, Sir: lo riaccenda toccando il reattore."
+        }
+    }
 }

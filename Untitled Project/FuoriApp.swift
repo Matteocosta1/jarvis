@@ -28,7 +28,9 @@ nonisolated struct InAttesa: Equatable, Sendable {
 
     /// Per l'orologio (WatchConnectivity vuole solo tipi semplici).
     func perPolso(inMano: Bool) -> [String: Any] {
-        ["si_scheda": ["k": chiave, "tipo": tipo, "d": domanda, "r": riga, "t": quando.timeIntervalSince1970, "mano": inMano] as [String: Any]]
+        // «t»: quando parte (l'orologio scarta le schede arrivate in coda dopo 3 minuti). Non l'inizio del piano: un piano cominciato
+        // da più di 3 minuti mandava una scheda già «vecchia» e l'orologio non la mostrava
+        ["si_scheda": ["k": chiave, "tipo": tipo, "d": domanda, "r": riga, "t": Date().timeIntervalSince1970, "mano": inMano] as [String: Any]]
     }
 }
 
@@ -91,7 +93,8 @@ enum AperturaFuori {
     /// Le app da aprire rimaste in sospeso (WhatsApp, Mappe…): si aprono appena il signore torna in JARVIS.
     private static var rimandata: (url: URL, quando: Date)?
 
-    private static var davanti: Bool { UIApplication.shared.applicationState == .active }
+    /// Il telefono è in mano: JARVIS davanti o appena coperto (Centro di Controllo, una chiamata in arrivo). Sul Mac sempre.
+    static var davanti: Bool { ProcessInfo.processInfo.isiOSAppOnMac || UIApplication.shared.applicationState != .background }
 
     /// Come andrà: subito (JARVIS davanti), dall'orologio (iMessage e chiamate, con l'app dell'orologio aperta), allo sblocco.
     static func via(_ url: URL) -> Via {
@@ -246,7 +249,18 @@ final class SiPolso {
 
     /// Sì o No toccato sulla notifica del sì (sul telefono o, con lo specchio acceso, sull'orologio).
     func dallaNotifica(si: Bool, chiave: String) async {
+        // tasto toccato con JARVIS chiuso da iOS: l'app si sveglia adesso, si aspetta che ci sia (al massimo 3 secondi)
+        for _ in 0..<15 where esegui == nil { try? await Task.sleep(for: .milliseconds(200)) }
         let r = await dalPolso(si: si, chiave: chiave)
+        if let errore = r["errore"] as? String {
+            // non è partito niente: lui deve saperlo (prima il tocco andava a vuoto in silenzio)
+            let c = UNMutableNotificationContent()
+            c.title = "JARVIS"
+            c.body = errore == "Non c'è più niente da confermare, Sir." ? "Sir, non è partito niente: la richiesta era scaduta. Me la ripeta in JARVIS." : errore
+            c.sound = .default
+            try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "jarvis.si.esito", content: c, trigger: nil))
+            return
+        }
         if let testo = r["testo"] as? String, !testo.isEmpty { fatto(testo) }
     }
 
@@ -254,7 +268,7 @@ final class SiPolso {
     func fatto(_ testo: String) {
         let t = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        PonteTelefono.condiviso.inviaAlPolso(["si_fatto": String(t.prefix(240))])
+        PonteTelefono.condiviso.inviaAlPolso(["si_fatto": ["testo": String(t.prefix(240)), "t": Date().timeIntervalSince1970] as [String: Any]])
     }
 }
 
@@ -300,7 +314,25 @@ enum Ripresa {
         // appena uscito e rientrato: il sì vale ancora com'era (e la tab c'è); si cancella solo se è passato troppo
         if via < minimo, Piano.condiviso.inAttesa != nil || Insieme.condiviso.inAttesa != nil { return nil }
         UserDefaults.standard.removeObject(forKey: chiave)
-        return via <= massimo ? s : nil
+        guard via <= massimo else { return nil }
+        // la stessa cosa già ripresa una volta (riaperto, non ha risposto, richiuso): non si ripete a ogni apertura
+        let impronta = Ripresa.impronta(s)
+        if UserDefaults.standard.string(forKey: "ripresa.detta") == impronta { return nil }
+        UserDefaults.standard.set(impronta, forKey: "ripresa.detta")
+        return s
+    }
+
+    /// Rimette quello che era rimasto (JARVIS era occupato e non l'ha potuto dire): lo dirà alla prossima apertura.
+    static func rimetti(_ s: Salvata) {
+        UserDefaults.standard.removeObject(forKey: "ripresa.detta")
+        if let d = try? JSONEncoder().encode(s) { UserDefaults.standard.set(d, forKey: chiave) }
+    }
+
+    /// Cosa aspettava il sì, in una riga (il piano col passo, o il messaggio): per non riprendere due volte la stessa cosa.
+    private static func impronta(_ s: Salvata) -> String {
+        if let p = s.piano { return "p|" + p.titolo + "|" + (p.passi.first(where: { $0.stato == Piano.Stato.aspetta.rawValue })?.testo ?? "") }
+        if let a = s.attesa { return "m|" + a.chi + "|" + a.testo }
+        return ""
     }
 
     static func dimentica() { UserDefaults.standard.removeObject(forKey: chiave) }
@@ -366,9 +398,14 @@ final class FiloCondiviso {
         let tutte = (battute?() ?? []).filter { !$0.testo.isEmpty }.suffix(16)
         var tenute: [Battuta] = []
         var scarta = false
+        var jarvisRiservato = false          // l'ultima frase di JARVIS apriva una modalità riservata (Confidente «A voce»)
         for m in tutte {
-            if m.ruolo == "user" { scarta = FiloCondiviso.riservata(m.testo) }
-            else if FiloCondiviso.riservata(m.testo) { scarta = true }
+            if m.ruolo == "user" {
+                scarta = FiloCondiviso.riservata(m.testo) || jarvisRiservato
+            } else {
+                jarvisRiservato = FiloCondiviso.riservata(m.testo)
+                if jarvisRiservato { scarta = true }
+            }
             if !scarta { tenute.append(Battuta(r: m.ruolo, t: String(m.testo.prefix(1500)), d: m.data)) }
         }
         var stato = Stato(battute: Array(tenute.suffix(12)), piano: Piano.condiviso.ultimoInAttesa, attesa: nil, domanda: nil)

@@ -47,6 +47,14 @@ final class Insieme {
         return (a.tipo, a.chi, a.numero, a.testo, a.whatsapp, a.quando)
     }
 
+    /// 13.2 (debug): il discorso è andato avanti sull'altro dispositivo: quello che qui aspettava il sì non vale più (un «sì» detto
+    /// qui dopo non deve mandare due volte lo stesso messaggio).
+    func dimenticaAttesa() {
+        guard attesa != nil else { return }
+        attesa = nil
+        Filo.condiviso.togli("bozza")
+    }
+
     /// 13.1 (2): la ripresa (o il Mac) rimette in attesa del sì un messaggio o una chiamata, da adesso. Restituisce la domanda.
     func riprendi(tipo: String, chi: String, numero: String, testo: String, whatsapp: Bool) -> String? {
         guard !chi.isEmpty, !numero.isEmpty, tipo == "messaggio" || tipo == "chiama" else { return nil }

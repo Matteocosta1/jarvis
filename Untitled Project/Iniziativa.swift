@@ -115,7 +115,11 @@ final class Iniziativa {
                     }
                     if Date().timeIntervalSince(self.ultimaPreparazione) >= 300 {   // 13.1 (2): la voce delle notifiche, pronta prima
                         self.ultimaPreparazione = Date()
-                        await AvvisiVoce.prepara(await self.avvisiFuori(perPreparare: true).map(\.testo))
+                        // 13.2 (debug): a parte, così lo scaricamento della voce non fa aspettare le iniziative di questo giro
+                        Task { @MainActor [weak self] in
+                            guard let self else { return }
+                            await AvvisiVoce.prepara(await self.avvisiFuori(perPreparare: true).map(\.testo))
+                        }
                     }
                     self.consegna()
                 }
@@ -487,12 +491,15 @@ final class Iniziativa {
     /// Arrivano anche all'Apple Watch (se lo specchio è acceso: lì scritte, senza voce).
     private func programmaNotificheImpegni() async {
         let centro = UNUserNotificationCenter.current()
+        let inizio = Date()
         for a in await avvisiFuori(perPreparare: false) {
             guard AvvisiVoce.permesso(a.quando), AvvisiVoce.posto(a.quando, id: a.id), a.quando > Date().addingTimeInterval(30) else { continue }
             let c = UNMutableNotificationContent()
             c.title = "JARVIS"
             c.body = a.testo
-            c.sound = await AvvisiVoce.suono(per: a.testo, rete: true)
+            // 13.2 (debug): iOS concede circa 30 secondi andando dietro: la voce si scarica adesso solo nei primi 12 (di solito è
+            // già pronta da prima); dopo, quella dell'iPhone
+            c.sound = await AvvisiVoce.suono(per: a.testo, rete: Date().timeIntervalSince(inizio) < 12)
             c.interruptionLevel = a.urgente ? .timeSensitive : .active
             c.userInfo = ["jarvis_azione": "avviso"]                    // toccata: si apre JARVIS, che non la ripete
             let scatto = UNTimeIntervalNotificationTrigger(timeInterval: max(a.quando.timeIntervalSinceNow, 1), repeats: false)

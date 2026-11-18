@@ -38,8 +38,10 @@ final class SchedaSi: ObservableObject {
             Task { @MainActor in SchedaSi.condivisa.via(k) }
             return true
         }
-        if let t = m["si_fatto"] as? String {
-            Task { @MainActor in SchedaSi.condivisa.fatto(t) }
+        if let d = m["si_fatto"] as? [String: Any] {
+            // 13.2 (debug): arrivata in coda dopo un minuto (l'app dell'orologio era chiusa) non si mostra più: è già passata
+            let t = d["testo"] as? String ?? "", quando = (d["t"] as? NSNumber)?.doubleValue ?? 0
+            if !t.isEmpty, Date().timeIntervalSince1970 - quando < 60 { Task { @MainActor in SchedaSi.condivisa.fatto(t) } }
             return true
         }
         if let d = m["si_messaggio"] as? [String: Any] {
