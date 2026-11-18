@@ -14,7 +14,7 @@ import WatchKit
 final class SchedaSi: ObservableObject {
     static let condivisa = SchedaSi()
 
-    nonisolated enum Tipo: Equatable, Sendable { case si, attesa, fatto, errore }
+    nonisolated enum Tipo: Equatable, Sendable { case si, fatto, errore }
     nonisolated struct Scheda: Equatable, Sendable {
         var chiave: String
         var tipo: Tipo
@@ -25,6 +25,9 @@ final class SchedaSi: ObservableObject {
     @Published private(set) var scheda: Scheda?
     private var chiusura: Task<Void, Never>?
     private var manoUltima = true
+    /// Quando è stato toccato «No» l'ultima volta: come nel mockup, dopo un No al polso non arriva nessun «FATTO» (neanche quello
+    /// che il cervello manda a fine turno per «Lascia stare»).
+    private var noAlle: Date?
 
     /// Un messaggio dall'iPhone per la scheda. Vero se era suo.
     nonisolated static func ricevi(_ m: [String: Any]) -> Bool {
@@ -74,6 +77,7 @@ final class SchedaSi: ObservableObject {
 
     /// La risposta di JARVIS a un sì dato da qui (o arrivata dopo, dal cervello).
     private func fatto(_ testo: String) {
+        if let n = noAlle, Date().timeIntervalSince(n) < 90 { return }
         mostra(Scheda(chiave: "fatto", tipo: .fatto, titolo: "FATTO", riga: testo), per: 5)
         ApticaPolso.suona(.success)
     }
@@ -106,18 +110,19 @@ final class SchedaSi: ObservableObject {
         guard let s = scheda, s.tipo == .si else { return }
         ApticaPolso.suona(.click)
         chiusura?.cancel()
-        scheda = Scheda(chiave: s.chiave, tipo: .attesa, titolo: si ? "SÌ" : "NO", riga: s.riga)
+        // come nel mockup FUORI (scelta del signore, 18 nov): la scheda se ne va subito; dopo un Sì arriva «FATTO» con la risposta di
+        // JARVIS, dopo un No niente (risponde il telefono)
+        scheda = nil
+        noAlle = si ? nil : Date()
         Task { @MainActor in
             let r = await PonteOrologio.condiviso.rispondiSi(si, chiave: s.chiave)
             if let e = r.errore {
                 mostra(Scheda(chiave: "errore", tipo: .errore, titolo: "JARVIS", riga: e), per: 4)
                 ApticaPolso.suona(.failure)
-            } else if !r.testo.isEmpty {
+            } else if si, !r.testo.isEmpty {
                 fatto(r.testo)
-            } else if scheda?.tipo == .attesa {
-                // risponde il cervello: la risposta arriva da sola («si_fatto»); se non arriva, la scheda si chiude fra un minuto
-                mostra(Scheda(chiave: s.chiave, tipo: .attesa, titolo: si ? "SÌ" : "NO", riga: "Ci penso io, Sir."), per: 60)
             }
+            // testo vuoto: risponde il cervello, «FATTO» arriva da solo («si_fatto») a fine turno
         }
     }
 
@@ -170,8 +175,6 @@ struct VistaSchedaSi: View {
                     tasto("No", colore: rosso, sfondo: Color(red: 1, green: 90 / 255, blue: 90 / 255).opacity(0.18)) { SchedaSi.condivisa.tocca(si: false) }
                 }
                 .padding(.top, 4)
-            } else if scheda.tipo == .attesa {
-                ProgressView().tint(ciano).padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
