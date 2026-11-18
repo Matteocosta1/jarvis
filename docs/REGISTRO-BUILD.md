@@ -530,7 +530,7 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
-## 13.4 (1) — controllo completo · 18 nov sera · numero deciso dal signore (20:58, «build 13.4»: Version 13.4, Build 1 su tutti i target) · contiene tutta la 13.3 (1) · cervello invariato (v135)
+## 13.4 (1) — controllo completo · 18 nov sera · numero deciso dal signore (20:58, «build 13.4»: Version 13.4, Build 1 su tutti i target) · commit d742a12 · controllo di compilazione VERDE (0 errori, 0 warning, run 44390875700) · contiene tutta la 13.3 (1) · cervello invariato (v135)
 Il signore (20:47): «controllo completo… fallo con massima competenza»; correzioni approvate una per una (20:58).
 - **Orologio, la scheda del sì come nel mockup** («orologio: si fa come nel mock up»): al tocco la scheda sparisce subito (niente rotellina, niente «Ci penso io»); dopo un Sì arriva «FATTO» con la risposta di JARVIS, dopo un No niente.
 1. **Doppio invio evitato**: la ripresa salvata andando dietro si rifà quando quello che aspettava il sì cambia con JARVIS dietro (Sì o No dall'orologio, dalla notifica, dal tasto Azione, fine del turno). Prima riaprendo richiedeva una cosa già fatta. La scheda di un piano ha anche il numero del passo (due sì di fila nello stesso piano sono due schede).
