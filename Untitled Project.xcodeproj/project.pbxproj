@@ -604,6 +604,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -665,6 +666,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "Untitled-Project-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -723,6 +725,7 @@
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "JarvisOrologio-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Per leggere i battiti e avvisare il contatto di emergenza, Sir.";
@@ -764,6 +767,7 @@
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = "JarvisOrologio-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Per leggere i battiti e avvisare il contatto di emergenza, Sir.";
@@ -802,6 +806,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = JarvisComplicazione/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = JarvisComplicazione;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -835,6 +840,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = JarvisComplicazione/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = JarvisComplicazione;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -867,6 +873,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = JarvisIsola/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -899,6 +906,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CKHH4HMH7R;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_FILE = JarvisIsola/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Jarvis;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
