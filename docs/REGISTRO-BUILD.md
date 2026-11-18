@@ -530,6 +530,20 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## 13.2 (2?) — debug di FUORI · 18 nov pomeriggio · numero da confermare col signore · commit 13be2fb · controllo di compilazione VERDE (0 errori, 0 warning, run 44329978400)
+Il signore (15:52): «debug di tutte le funzioni nuove e delle interazioni… e risolvere». Trovati e corretti:
+1. **Scheda del piano scartata dall'orologio**: l'ora della scheda era l'inizio del piano; con un piano cominciato da più di 3 minuti l'orologio la buttava come vecchia. Ora è l'ora d'invio.
+2. **Ripresa ripetuta a ogni apertura**: riaprendo e richiudendo senza rispondere, JARVIS ripeteva la stessa frase. Ora una volta sola per la stessa cosa.
+3. **Ripresa persa**: se all'apertura JARVIS stava già ascoltando o parlando (es. tasto Azione), la ripresa si consumava senza essere detta. Ora resta per l'apertura dopo.
+4. **Due frasi di fila all'apertura**: la proposta delle abitudini («la solita playlist?») poteva arrivare insieme alla ripresa, e il «sì» poteva finire alla proposta sbagliata. Ora parla prima la ripresa; se ha parlato, la proposta quella volta tace, e il «sì» è della ripresa.
+5. **Il sì del piano rubato da un'iniziativa**: con un passo del piano in attesa, un messaggio in arrivo poteva chiedere «Glielo leggo?» e il «sì» leggeva il messaggio. Ora l'iniziativa aspetta anche il piano.
+6. **Mac e telefono, doppio invio**: un messaggio preparato su un dispositivo e confermato sull'altro restava in attesa sul primo. Ora, quando il discorso è andato avanti di là, qui non vale più.
+7. **Privacy del filo**: la risposta del signore a una frase riservata di JARVIS (Confidente «A voce») poteva salire su Supabase. Ora no.
+8. **Sul Mac (e col telefono in mano ma coperto, es. Centro di Controllo)** le app da aprire non vanno più «allo sblocco», e «La trova aperta appena sblocca» si dice solo col telefono davvero bloccato.
+9. **Notifiche**: lo scaricamento della voce non fa più aspettare le iniziative; andando dietro la voce si scarica solo nei primi 12 secondi (iOS ne concede circa 30). Sì/No toccati sulla notifica con JARVIS chiuso da iOS: si aspetta che JARVIS si svegli; se non parte niente, una notifica lo dice (prima andava a vuoto in silenzio). La risposta al polso arrivata in coda dopo un minuto non si mostra più.
+10. **Tasto Azione**: col microfono spento a mano dice «Il microfono di JARVIS è spento» (prima «Apra JARVIS una volta»); il silenzio del sì dal polso non resta acceso (si spegne a fine turno, al massimo dopo 90 s, e appena lui parla col tasto Azione); una domanda rimasta a metà sull'altro dispositivo si riprende solo se è dell'ultimo quarto d'ora.
+- Mockup FUORI: nota della scheda MAC aggiornata.
+
 ## 13.2 (1) — MARK XIII · 18 nov · numero deciso dal signore (14:50, «13.2»: Version 13.2, Build 1 su app, Watch, complicazione e isola; prima era la 13.1 (2), mai caricata) · FUORI DALL'APP · cervello invariato (v135)
 
 Il signore (18 nov, 11:24): «migliorare ancora l'interattività e la fluidità delle funzioni e dei comandi… senza incongruenze, bug o sovrapposizioni». Mockup FUORI (Novità, cinque schede) approvato; scelte del signore (12:01): filo su **Supabase**, **voce dal telefono** (specchio delle notifiche di JARVIS spento nell'app Watch), l'orologio **bussa solo col telefono in tasca**, **iMessage dall'orologio** col tasto Invia.
