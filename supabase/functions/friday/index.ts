@@ -1,6 +1,7 @@
-// FRIDAY — cervello di Bea, adattato da JARVIS (versione 130 del 12 nov 2026). Header: x-friday-token.
+// FRIDAY — cervello di Bea, adattato da JARVIS (versione 130 del 12 nov 2026; 20 nov: sezioni nuove in bea.ts). Header: x-friday-token.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { richiesteBea } from "./bea.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -14,8 +15,13 @@ const NOME = Deno.env.get("NOME_UTENTE") || "Bea";
 const DISCOGS = Deno.env.get("DISCOGS_TOKEN") || "";
 const BRAVE = Deno.env.get("BRAVE_API_KEY") || "";
 const SERPER = Deno.env.get("SERPER_API_KEY") || "";
-const ICLOUD_EMAIL = Deno.env.get("ICLOUD_EMAIL") || "";
-const ICLOUD_PASS = Deno.env.get("ICLOUD_APP_PASSWORD") || "";
+// 20 nov: la posta la collega Bea dall'app (Account › Mail): sta nella cassaforte del database; i segreti, se ci sono, vincono
+const POSTA_BEA: { email?: string; password?: string } = await (async () => {
+  try { const { data } = await db.rpc("friday_segreto_leggi", { p_nome: "posta_icloud" }); return data ? JSON.parse(String(data)) : {}; }
+  catch { return {}; }
+})();
+const ICLOUD_EMAIL = Deno.env.get("ICLOUD_EMAIL") || POSTA_BEA.email || "";
+const ICLOUD_PASS = Deno.env.get("ICLOUD_APP_PASSWORD") || POSTA_BEA.password || "";
 let sistemaMemo: { t: number; v: string } | null = null;
 async function sistemaFriday() {
   if (sistemaMemo && Date.now() - sistemaMemo.t < 10 * 60_000) return sistemaMemo.v;
@@ -3877,6 +3883,7 @@ Deno.serve(async (req) => {
   const ipChiamante = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   let corpo: any;
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
+  { const r = await richiesteBea(corpo, db); if (r) return r; }                         // 20 nov: le sezioni nuove dell'app
   if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true, corpo.prima);
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);
   if (typeof corpo?.edith === "string") {
