@@ -40,6 +40,8 @@ struct ContentView: View {
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
     @State private var sottotitolo = "AVVIO SISTEMI"
     @State private var testaArrivate = 0         // MARK X: quante icone in alto sono già arrivate (da destra, una alla volta, a tempo con l'avvio)
+    /// 20 nov · avvio SINGOLO: quando è partita la voce d'avvio (lo zero dell'avvio olografico delle icone in alto); nil = scena spenta.
+    @State private var avvioOlo: Date? = nil
     @State private var bagliore = false          // MARK X: a «SISTEMI IN LINEA» il titolo prende un leggero bagliore bianco, poi resta fermo
     @State private var iconaAttiva: Int?         // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var scegliLingua = false       // icona Interprete: scelta della lingua
@@ -369,6 +371,16 @@ struct ContentView: View {
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
             .environment(\.jarvisCoperto, pilaCopre)
+            // 20 nov · avvio SINGOLO: gli ologrammi delle icone in alto, sopra tutto, nello spazio della schermata
+            .overlayPreferenceValue(PostiTesta.self) { posti in
+                if let inizio = avvioOlo {
+                    GeometryReader { geo in
+                        AvvioOlografico(inizio: inizio,
+                                        posti: (0..<ContentView.postoTesta.totale).compactMap { j in posti[j].map { posto in geo[posto] } },
+                                        arrivate: testaArrivate)
+                    }
+                }
+            }
 
             .frame(width: g.size.width, height: g.size.height)
             // 26 ott notte (foto del signore 23:29, «menu a tendina inutile»): tolto il blocco dello swipe di iOS dall'alto: con il
@@ -492,6 +504,11 @@ struct ContentView: View {
             let ritardoAudio = AVAudioSession.sharedInstance().outputLatency   // il suono arriva all'altoparlante un attimo dopo
             let zero = CACurrentMediaTime() + ritardoAudio
             Aptica.avvio(tempi: tempiAptica.map { $0 + ritardoAudio })
+            // 20 nov · avvio SINGOLO (scelto dal signore sul mockup): le icone in alto nascono come ologrammi grandi in alto a destra,
+            // una alla volta dentro l'anello della percentuale, e sul loro suono si stringono al loro posto (AvvioOlografico.swift).
+            // Con «Riduci movimento» resta l'arrivo di prima (solo dissolvenza).
+            let olo = !UIAccessibility.isReduceMotionEnabled
+            if olo { avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
             // da Social a Impostazioni; il bagliore del titolo con l'ultima. Se la voce dell'avvio viene sfumata prima (il signore
@@ -500,13 +517,25 @@ struct ContentView: View {
             Task { @MainActor in
                 for j in 0..<nTesta {
                     let posa = Avvio.testaVoce[min(j, Avvio.testaVoce.count - 1)]
-                    let manca = zero + posa - 0.110 - CACurrentMediaTime()
+                    // SINGOLO: l'icona vera prende il posto dell'ologramma esattamente sul suo suono (di prima: arrivo da destra in 0,2 s, 110 ms prima)
+                    let manca = zero + posa - (olo ? 0 : 0.110) - CACurrentMediaTime()
                     if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
                     guard testaArrivate < nTesta else { return }               // sono già arrivate tutte (voce sfumata prima)
-                    withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = max(testaArrivate, j + 1) }
+                    if olo {
+                        var senza = Transaction()
+                        senza.disablesAnimations = true                        // c'è di colpo, col lampo (ArrivoTesta)
+                        withTransaction(senza) { testaArrivate = max(testaArrivate, j + 1) }
+                    } else {
+                        withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = max(testaArrivate, j + 1) }
+                    }
                 }
-                try? await Task.sleep(for: .milliseconds(110))                 // l'ultima si posa sul suo bip: lì il bagliore
+                if !olo { try? await Task.sleep(for: .milliseconds(110)) }     // l'ultima si posa sul suo bip: lì il bagliore
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
+                guard olo else { return }
+                // la scena olografica si spegne da sola (OPERATIVI, poi il tremolio): finita, si toglie
+                let resta = zero + AvvioOlo.fine + 0.05 - CACurrentMediaTime()
+                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+                avvioOlo = nil
             }
             // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
             let inLinea = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v)
@@ -547,6 +576,7 @@ struct ContentView: View {
             }
             if !Suoni.avvioSuona {                                        // senza la voce dell'avvio (file mancante): come prima
                 testaArrivate = ContentView.postoTesta.totale             // per sicurezza: a sistemi in linea ci sono tutte
+                avvioOlo = nil                                            // senza la voce niente scena olografica
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
             }
             await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
@@ -555,6 +585,7 @@ struct ContentView: View {
             if jarvis.ascoltoDaAvvio { Suoni.sfumaAvvio() }              // 13 nov: il tocco sul reattore durante le icone vale adesso
             await Suoni.attendiFineAvvio()
             if testaArrivate < ContentView.postoTesta.totale {            // voce sfumata prima dei suoi bip: le icone arrivano adesso
+                avvioOlo = nil                                            // e la scena olografica si toglie
                 withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = ContentView.postoTesta.totale }
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
             }
@@ -774,7 +805,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.social: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.social))
             .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
@@ -787,7 +819,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
@@ -802,7 +835,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.studio: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.studio))
             .accessibilityLabel("Studio")
             Button { toccaDock(ContentView.postoTesta.sistemi) } label: {
@@ -813,7 +847,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sistemi: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sistemi))
             .accessibilityLabel("Sistemi")
             Button { toccaDock(ContentView.postoTesta.cestino) } label: {
@@ -825,7 +860,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.cestino))
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
@@ -846,7 +882,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.impostazioni: $0] }   // 20 nov: qui si posa l'ologramma
+            .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate, olo: avvioOlo != nil)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.impostazioni))
             .accessibilityLabel("Impostazioni")
         }
@@ -2657,15 +2694,27 @@ extension VerticalAlignment {
 // MARK: - MARK X · arrivo delle icone in alto
 private struct ArrivoTesta: ViewModifier {
     let posto: Int, arrivate: Int
+    /// 20 nov · avvio SINGOLO: l'icona non arriva da destra, prende il posto del suo ologramma con un lampo (come «icoCarica» del mockup).
+    let olo: Bool
     func body(content: Content) -> some View {
         let dentro = posto < arrivate
+        let attivo = olo, alone = Color.ciano                  // copiati qui: la chiusura del lampo gira fuori dal main actor
         content
             .opacity(dentro ? 1 : 0)
-            .offset(x: dentro || UIAccessibility.isReduceMotionEnabled ? 0 : 28)   // da destra; con «Riduci movimento» solo dissolvenza
+            .offset(x: dentro || olo || UIAccessibility.isReduceMotionEnabled ? 0 : 28)   // da destra; con «Riduci movimento» solo dissolvenza
+            // il lampo parte quando l'icona entra; conta solo nell'avvio SINGOLO (a scena finita `olo` torna falso senza rifarlo)
+            .keyframeAnimator(initialValue: 0.0, trigger: dentro) { vista, lampo in
+                vista
+                    .brightness(0.35 * (attivo ? lampo : 0))
+                    .shadow(color: alone.opacity(0.95 * (attivo ? lampo : 0)), radius: 6 * (attivo ? lampo : 0))
+            } keyframes: { _ in
+                CubicKeyframe(1.0, duration: 0.15)
+                CubicKeyframe(0.0, duration: 0.35)
+            }
             .allowsHitTesting(dentro)
     }
 }
 extension View {
-    /// L'icona in alto arriva da destra quando tocca a lei (vedi `accendi()`).
-    func arrivoTesta(_ posto: Int, arrivate: Int) -> some View { modifier(ArrivoTesta(posto: posto, arrivate: arrivate)) }
+    /// L'icona in alto arriva quando tocca a lei (vedi `accendi()`): da destra, o (avvio SINGOLO) al posto del suo ologramma.
+    func arrivoTesta(_ posto: Int, arrivate: Int, olo: Bool = false) -> some View { modifier(ArrivoTesta(posto: posto, arrivate: arrivate, olo: olo)) }
 }
