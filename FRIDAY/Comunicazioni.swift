@@ -436,7 +436,7 @@ struct VistaMessaggi: View {
 
     /// Dettatura: tocchi il microfono, parli, il testo compare; si può correggere a mano.
     private var dettatore: some View {
-        Pannello(titolo: dettatura.attivo ? "LA ASCOLTO…" : "IL MESSAGGIO", tinta: tinta) {
+        Pannello(titolo: dettatura.attivo ? "TI ASCOLTO…" : "IL MESSAGGIO", tinta: tinta) {
             TextEditor(text: $testo)
                 .campoRegia("messaggio", testo: $testo)                // 12.0 (12) · B2 (l'invio resta «invia», col sì)
                 .scrollContentBackground(.hidden)

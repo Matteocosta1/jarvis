@@ -438,7 +438,7 @@ final class MotoreInterprete: NSObject, ObservableObject {
             try motore.start()
             parziale = ""
             fase = .ascolto
-            stato = chi == .io ? "LA ASCOLTO, SIR" : "ASCOLTO IN \(lingua.nome.uppercased())"
+            stato = chi == .io ? "TI ASCOLTO" : "ASCOLTO IN \(lingua.nome.uppercased())"
             Suoni.ascolto()
             turno += 1
             let mio = turno

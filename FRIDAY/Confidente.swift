@@ -84,7 +84,7 @@ struct VistaConfidente: View {
 
                     ZStack(alignment: .topLeading) {
                         if testo.isEmpty {
-                            Text("Su WhatsApp: tenga premuto un messaggio › Inoltra o Copia, poi incolli qui. Oppure scriva cosa è successo.")
+                            Text("Su WhatsApp: tieni premuto un messaggio › Inoltra o Copia, poi incolla qui. Oppure scrivi cosa è successo.")
                                 .font(.system(size: 14)).foregroundStyle(Color.tenue)
                                 .padding(.horizontal, 5).padding(.vertical, 8)
                         }

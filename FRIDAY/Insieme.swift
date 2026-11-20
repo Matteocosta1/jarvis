@@ -169,11 +169,11 @@ final class Insieme {
         case .mostra(let cosa, let pron):
             return await mostra(cosa, pron: pron, frase: frase)
         case .togli:
-            guard filo.togli() else { return "Non c'è niente in vista, Sir." }
+            guard filo.togli() else { return "Non c'è niente in vista." }
             Suoni.filoVia()
             return Battute.staccato()
         case .togliTutti:
-            guard filo.togliTutti() > 0 else { return "Non c'è niente in vista, Sir." }
+            guard filo.togliTutti() > 0 else { return "Non c'è niente in vista." }
             Suoni.filoVia()
             return Battute.angoloLibero()
         case .fissa(let q):
@@ -183,15 +183,15 @@ final class Insieme {
             return Battute.fissato()
         case .messaggi:
             let arr = Insieme.arrivatiOggi()
-            guard !arr.isEmpty else { return "Oggi non è arrivato niente, Sir." }
+            guard !arr.isEmpty else { return "Oggi non è arrivato niente." }
             for v in arr.reversed() { filo.persona(v.nome); filo.metti(Insieme.cosaMessaggio(v)) }
             let nomi = arr.map { Filo.detto($0.nome) }
-            return "\(Battute.numero(arr.count).capitalizzata) nuovi, Sir: \(Insieme.elenco(nomi))."
+            return "\(Battute.numero(arr.count).capitalizzata) nuovi: \(Insieme.elenco(nomi))."
         case .leggi(let di, let q):
             var r: CosaFilo?
             if let di {
                 r = filo.cosa(di: Insieme.nomeDetto(di) ?? di, tipi: ["messaggio"]) ?? Insieme.ultimoDi(di).map(Insieme.cosaMessaggio)
-                guard r != nil else { return "Oggi \(di.capitalizzata) non ha scritto, Sir." }
+                guard r != nil else { return "Oggi \(di.capitalizzata) non ha scritto." }
             } else {
                 r = filo.cosa(genere: q.genere, prima: q.prima, tipi: ["messaggio", "risposta", "post"]) ?? filo.cosa(genere: q.genere, prima: q.prima)
             }
@@ -207,7 +207,7 @@ final class Insieme {
         case .scriviCosa(let a):
             guard let chi = await destinatario(a) else { return Battute.aChi() }
             attesaTesto = (chi.nome, chi.numero, Date())
-            return "Cosa \(Filo.genere(di: chi.nome) == "f" ? "le" : "gli") scrivo, Sir?"
+            return "Cosa \(Filo.genere(di: chi.nome) == "f" ? "le" : "gli") scrivo?"
         case .manda(let q, let a, let wa):
             aggiornaBrano()
             let r = q.nome != nil ? filo.cosa(nome: q.nome, di: q.di, prima: q.prima) : filo.cosa(genere: q.genere, plurale: q.plurale)
@@ -227,9 +227,9 @@ final class Insieme {
                 return nil                                           // una risposta, una nota: dove salvarla lo decide il cervello
             }
         case .chiama(let a):
-            guard let chi = await destinatario(a), let numero = chi.numero else { return a.eNome ? nil : "Chi, Sir?" }
+            guard let chi = await destinatario(a), let numero = chi.numero else { return a.eNome ? nil : "Chi?" }
             attesa = Attesa(tipo: "chiama", chi: chi.nome, numero: numero, testo: "", whatsapp: false, quando: Date())
-            return "Chiamo \(Filo.detto(chi.nome)), Sir?"
+            return "Chiamo \(Filo.detto(chi.nome))?"
         }
     }
 
@@ -250,10 +250,10 @@ final class Insieme {
             let arr = Insieme.arrivatiOggi()
             for v in arr.reversed() { filo.persona(v.nome); filo.metti(Insieme.cosaMessaggio(v)) }
             filo.mostra("messaggi", titolo: "Messaggi", riga: arr.isEmpty ? "niente di nuovo oggi" : "\(arr.count) nuovi · " + arr.map { Filo.detto($0.nome) }.joined(separator: ", "), sezione: "Messaggi")
-            return arr.isEmpty ? "Niente di nuovo, Sir." : "\(Battute.numero(arr.count).capitalizzata) nuovi, Sir."
+            return arr.isEmpty ? "Niente di nuovo." : "\(Battute.numero(arr.count).capitalizzata) nuovi."
         }
         if let m = Insieme.cerca(#"^(?:quello|quella|il messaggio|l ultimo(?: messaggio)?) (?:di|da) (\w+)$"#, t), let di = m[1] {
-            guard let v = Insieme.ultimoDi(di) else { return "Oggi \(di.capitalizzata) non ha scritto, Sir." }
+            guard let v = Insieme.ultimoDi(di) else { return "Oggi \(di.capitalizzata) non ha scritto." }
             let r = filo.metti(Insieme.cosaMessaggio(v))
             filo.persona(v.nome)
             filo.mostra("c:" + r.chiave, titolo: "Da " + v.nome, riga: "«\(r.testo ?? "")»", sezione: "Messaggi")
@@ -314,7 +314,7 @@ final class Insieme {
         guard !t.isEmpty else { return nil }
         var num = numero
         if num == nil { num = await Insieme.numero(di: chi) }
-        guard let num else { return "Non trovo il numero di \(Filo.detto(chi)), Sir." }
+        guard let num else { return "Non trovo il numero di \(Filo.detto(chi))." }
         let wa = whatsapp ?? false
         attesa = Attesa(tipo: "messaggio", chi: chi, numero: num, testo: t, whatsapp: wa, quando: Date())
         Filo.condiviso.persona(chi)
@@ -329,7 +329,7 @@ final class Insieme {
         attesa = nil
         if a.tipo == "chiama" {
             Filo.condiviso.persona(a.chi)
-            guard let url = URL(string: "tel://\(Strumenti.pulisci(a.numero))") else { return "Non riesco a chiamare, Sir." }
+            guard let url = URL(string: "tel://\(Strumenti.pulisci(a.numero))") else { return "Non riesco a chiamare." }
             Insieme.dopoLaVoce { UIApplication.shared.open(url) }
             return "Chiamo \(Filo.detto(a.chi))."
         }
@@ -491,7 +491,7 @@ final class Insieme {
     }
 }
 
-// MARK: - Il congedo: «Will that be all, Sir?» solo alla fine di una cosa vera
+// MARK: - Il congedo: «Will that be all?» solo alla fine di una cosa vera
 
 /// Il signore (13 nov): «solo alla fine di una cosa vera, sempre variata, mai insistente». Dopo una cosa vera (un messaggio
 /// mandato, un lavoro salvato, più comandi in fila) e 9 secondi di silenzio, JARVIS chiede una volta; al massimo una ogni 15

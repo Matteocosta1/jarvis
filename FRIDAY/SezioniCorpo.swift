@@ -164,9 +164,10 @@ struct CicloCalcolo {
         self.inizi = inizi
         let d = zip(inizi, inizi.dropFirst()).compactMap { cal.dateComponents([.day], from: $0, to: $1).day }.filter { (18...45).contains($0) }
         durate = d
-        durata = d.isEmpty ? 28 : Int((Double(d.suffix(6).reduce(0, +)) / Double(d.suffix(6).count)).rounded())
+        let media = d.isEmpty ? 28 : Int((Double(d.suffix(6).reduce(0, +)) / Double(d.suffix(6).count)).rounded())
+        durata = media
         giorniFlusso = lunghezze.isEmpty ? 5 : max(1, lunghezze.suffix(6).reduce(0, +) / lunghezze.suffix(6).count)
-        scarto = d.count < 2 ? 0 : (d.suffix(6).map { abs($0 - durata) }.max() ?? 0)
+        scarto = d.count < 2 ? 0 : (d.suffix(6).map { abs($0 - media) }.max() ?? 0)
     }
 
     func giornoDi(_ data: Date) -> Int? {

@@ -44,7 +44,7 @@ struct Messaggio: Identifiable, Codable, Equatable {
 
 enum Fase: String {
     case attesa = "IN ATTESA"
-    case ascolto = "LA ASCOLTO"
+    case ascolto = "TI ASCOLTO"
     case elaboro = "ELABORO"
     case parlo = "PARLO"
 }

@@ -1926,7 +1926,7 @@ struct RigaMessaggio: View {
                 .fill(jarvis ? Color.ciano : Color(red: 64 / 255, green: 41 / 255, blue: 28 / 255))
                 .frame(width: 2)
             VStack(alignment: .leading, spacing: 4) {
-                Text(Glifi.rimescola("\(jarvis ? "FRIDAY" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
+                Text(Glifi.rimescola("\(jarvis ? "FRIDAY" : "BEA") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(jarvis ? Color.ciano : Color.tenue)

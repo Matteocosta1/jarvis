@@ -427,7 +427,7 @@ final class CieloOcchi: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let p0 = a.posizione(Date())
                 let km = Rotta.metri(lat: p0.lat, lon: p0.lon, versoLat: la, versoLon: lo) / 1000
                 let min = Int((km / a.velocita * 60).rounded())
-                return "Va a \(r.a): \(sale == false ? "atterra" : "arriva") fra circa \(max(min, 1)) minuti, dalla sua velocità."
+                return "Va a \(r.a): \(sale == false ? "atterra" : "arriva") fra circa \(max(min, 1)) minuti, dalla velocità dell'aereo."
             }
             return "Va a \(r.a)."
         case "AEREO_QUOTA":

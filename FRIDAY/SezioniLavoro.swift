@@ -950,7 +950,7 @@ struct VistaArmadio: View {
             NotaF(testo: "Una foto a figura intera, con qualsiasi sfondo: FRIDAY ti veste con i capi scelti. La foto resta nel tuo database privato.")
         }
         Pannello(titolo: "DOPPIONI", tinta: tinta) {
-            NotaF(testo: "Inquadri un capo in negozio o su Vinted e FRIDAY ti dice se hai già qualcosa di simile.")
+            NotaF(testo: "Inquadra un capo in negozio o su Vinted e FRIDAY ti dice se hai già qualcosa di simile.")
             if let doppione { RigaF(etichetta: "Ultimo controllo", valore: doppione) }
             TastoF(testo: "Ce l'ho già?", icona: "camera", pieno: false) { foto = .doppione }
         }

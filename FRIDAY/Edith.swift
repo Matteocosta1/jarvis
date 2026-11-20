@@ -109,7 +109,7 @@ struct VistaEdith: View {
             }
             // RETE
             Pannello(titolo: "RETE", tinta: tinta) {
-                Text("Chi è collegato al suo Wi-Fi: serve un permesso Apple in più, arriva con un prossimo aggiornamento. Intanto PORTE controlla cosa vede internet della sua rete.")
+                Text("Chi è collegato al tuo Wi-Fi: serve un permesso Apple in più, arriva con un prossimo aggiornamento. Intanto PORTE controlla cosa vede internet della tua rete.")
                     .font(.footnote).foregroundStyle(Color.tenue)
             }
             HStack(spacing: 10) {

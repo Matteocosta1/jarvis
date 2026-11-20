@@ -491,7 +491,7 @@ struct VistaSpesa: View {
                     progresso.listRowBackground(Color.clear)
                     HStack(spacing: 8) {
                         Image(systemName: "plus").foregroundStyle(tinta)
-                        TextField("Aggiunga: latte, pane, detersivo…", text: $nuovo)
+                        TextField("Aggiungi: latte, pane, detersivo…", text: $nuovo)
                             .campoRegia("aggiungi", testo: $nuovo, cerca: true) { Task { await aggiungi(nuovo) } }   // 12.0 (12) · B2
                             .focused($scrivendo)
                             .foregroundStyle(.white)
