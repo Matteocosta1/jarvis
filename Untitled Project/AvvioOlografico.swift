@@ -85,11 +85,19 @@ enum AvvioOlo {
     }
 }
 
-/// La scena olografica dell'avvio, sopra la schermata (non si tocca: i tocchi passano sotto).
+/// La scena olografica dell'avvio, sopra titolo e reattore (non si tocca: i tocchi passano sotto). Identica al mockup Novità
+/// (versione A3 «SINGOLO», `olo3Avvia`): stesse misure, stessi tempi, stesse curve.
 struct AvvioOlografico: View {
+    /// La chiave del riquadro della testata in `PostiTesta` (le icone sono 0…5).
+    static let testata = -1
+
     /// L'istante in cui parte la voce d'avvio (il tempo 0 di `AvvioOlo` e di `Avvio.testaVoce`).
     let inizio: Date
-    /// I riquadri delle 6 icone in alto, nello spazio di questa vista.
+    /// Avvio interrotto (voce sfumata prima): da qui si spegne tremolando come alla fine.
+    let spegniDa: Date?
+    /// La testata (titolo e icone), nello spazio di questa vista: sotto di lei, a destra, nasce la tab e lì nasce l'anello.
+    let testata: CGRect?
+    /// I disegni delle 6 icone in alto, nello spazio di questa vista: lì si posa l'ologramma.
     let posti: [CGRect]
     /// Quante icone vere sono già al loro posto: l'ologramma resta finché la sua icona non c'è (nessun fotogramma vuoto).
     let arrivate: Int
@@ -98,70 +106,76 @@ struct AvvioOlografico: View {
     // (#8FF0FF, lo stesso dell'ologramma della ruota), con gli aloni nel ciano pieno; prima era quasi bianco (#B4F7FF)
     private static let chiaro = Color(red: 143 / 255, green: 240 / 255, blue: 1)     // #8ff0ff
     private static let buio = Color(red: 2 / 255, green: 9 / 255, blue: 12 / 255)
+    /// Il riquadro dell'anello (raggio 58 + le tacche), come `S` del mockup.
+    private static let latoAnello: CGFloat = AvvioOlo.raggio * 2 + 8
 
     var body: some View {
         TimelineView(.animation) { ctx in
-            scena(ctx.date.timeIntervalSince(inizio))
+            scena(ctx.date.timeIntervalSince(inizio), spento: spegniDa.map { ctx.date.timeIntervalSince($0) })
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
     @ViewBuilder
-    private func scena(_ t: Double) -> some View {
-        if t >= AvvioOlo.importing, t < AvvioOlo.fine, posti.count == ContentView.postoTesta.totale {
-            // il centro dove nasce la tab: 100 punti a sinistra del bordo destro delle icone (sull'iPhone W − 116, come il mockup),
-            // 94 punti sotto le icone
-            let cx = (posti.map(\.maxX).max() ?? 0) - 100
-            let cy = (posti.map(\.maxY).max() ?? 0) + 94
+    private func scena(_ t: Double, spento: Double?) -> some View {
+        if t >= AvvioOlo.importing, t < AvvioOlo.fine, let testata, posti.count == ContentView.postoTesta.totale {
+            // come il mockup: il centro della zona dove nasce la tab (a 10 punti dal bordo, larga 212: W − 116) e 86 punti sotto
+            // l'inizio della tab (6 punti sotto la testata, come FiloWidget)
+            let cx: CGFloat = testata.maxX - 116
+            let cy: CGFloat = testata.maxY + 6 + 86
             let p = AvvioOlo.percento(t)
             let acceso = AvvioOlo.accendi((t - AvvioOlo.importing) / AvvioOlo.accensioneAnello)
             let entra = AvvioOlo.bezier(0.2, 0.8, 0.2, 1, (t - AvvioOlo.importing) / AvvioOlo.accensioneAnello)
             let lampo = t > AvvioOlo.operational
                 ? AvvioOlo.spezzata(min(1, (t - AvvioOlo.operational) / 0.56), [(0, 0), (0.3, 1), (1, 0)]) : 0
+            // lo spegnimento: alla fine (14,78 s) o, se l'avvio è stato interrotto, da quel momento (stesso tremolio, 0,34 s)
+            let visibile = min(AvvioOlo.spento(t), spento.map { AvvioOlo.spento(AvvioOlo.spegni + $0) } ?? 1)
             ZStack {
                 // il campo di proiezione: un buio morbido senza bordi, perché la luce si legga sopra la corona (06:06: più trasparente,
-                // la corona si intravede)
+                // la corona si intravede). Nel mockup è un cerchio da 250 col gradiente «circle» (che arriva all'angolo del riquadro:
+                // 125 × √2), quindi le stesse percentuali qui sono su quel raggio
                 Circle()
                     .fill(RadialGradient(stops: [.init(color: Self.buio.opacity(0.68), location: 0), .init(color: Self.buio.opacity(0.68), location: 0.40),
                                                  .init(color: Self.buio.opacity(0.38), location: 0.58), .init(color: Self.buio.opacity(0), location: 0.72)],
-                                         center: .center, startRadius: 0, endRadius: 125))
+                                         center: .center, startRadius: 0, endRadius: 176.78))   // 125 × √2
                     .frame(width: 250, height: 250)
-                    .position(x: cx, y: cy + 14)
                     .opacity(min(1, max(0, (t - AvvioOlo.importing) / 0.36)))
+                    .position(x: cx, y: cy + 14)
                 // l'anello con le tacche, che si riempie con la percentuale
                 Anello(percento: p)
-                    .frame(width: AvvioOlo.raggio * 2 + 8, height: AvvioOlo.raggio * 2 + 8)
-                    .shadow(color: Color.ciano.opacity(0.8), radius: 4 + 6 * lampo)
-                    .brightness(0.3 * (acceso.luce - 1) + 0.25 * lampo)
-                    .mask(alignment: .top) { Rectangle().frame(height: (AvvioOlo.raggio * 2 + 8) * CGFloat(acceso.rivela)) }
+                    .frame(width: Self.latoAnello, height: Self.latoAnello)
+                    .shadow(color: Color.ciano.opacity(0.8), radius: 2 + 5 * lampo)
+                    .brightness(0.3 * (acceso.luce - 1) + 0.18 * lampo)
+                    .mask { Rectangle().scaleEffect(x: 1, y: CGFloat(acceso.rivela), anchor: .top) }   // si rivela dall'alto
+                    .opacity(acceso.opacita)
                     .scaleEffect(CGFloat(0.6 + 0.4 * entra))
                     .rotationEffect(.degrees(-40 * (1 - entra)))
-                    .opacity(acceso.opacita)
                     .position(x: cx, y: cy)
-                // la percentuale grande e la scritta
+                // la percentuale grande e la scritta, 12 punti sotto l'anello
                 VStack(spacing: 0) {
                     Text("\(Int(p))%")
                         .font(.system(size: 22, weight: .regular, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundStyle(Self.chiaro)
                     Text(t >= AvvioOlo.operational ? "OPERATIVI" : "PREFERENZE")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .tracking(2)
-                        .foregroundStyle(Self.chiaro)
                 }
+                .foregroundStyle(Self.chiaro)
                 .shadow(color: Color.ciano.opacity(0.95), radius: 3)
                 .shadow(color: Color.ciano.opacity(0.5), radius: 8)
                 .brightness(0.3 * (acceso.luce - 1))
+                .mask { Rectangle().scaleEffect(x: 1, y: CGFloat(acceso.rivela), anchor: .top) }
                 .opacity(acceso.opacita)
                 .fixedSize()
-                .position(x: cx, y: cy + AvvioOlo.raggio + 12 + 20)
+                .frame(width: 160, alignment: .top)
+                .position(x: cx, y: cy + AvvioOlo.raggio + 12 + 19)
                 // l'ologramma di turno (al cambio due per un attimo: uno vola via, l'altro si accende)
                 ForEach(0..<posti.count, id: \.self) { j in
                     ologramma(j, t: t, cx: cx, cy: cy)
                 }
             }
-            .opacity(AvvioOlo.spento(t))
+            .opacity(visibile)
         }
     }
 
@@ -175,7 +189,7 @@ struct AvvioOlografico: View {
             let m: CGFloat = AvvioOlo.lato / 18                               // l'icona vera è in un riquadro da 18 punti
             let acceso = AvvioOlo.accendi((t - nasce) / AvvioOlo.accensione)
             // il volo: si stringe fino alla misura dell'icona vera e arriva al suo posto esattamente sul suo suono (come il mockup:
-            // a metà strada un terzo in orizzontale e metà in verticale, più luminoso)
+            // a metà strada un terzo in orizzontale e metà in verticale, un filo più luminoso)
             let e = CGFloat(AvvioOlo.bezier(0.6, 0, 0.25, 1, (t - parte) / AvvioOlo.volo))
             let f: CGFloat = 1 / m, dx: CGFloat = posti[j].midX - cx, dy: CGFloat = posti[j].midY - cy
             let meta: CGFloat = (1 + f) / 2
@@ -183,17 +197,19 @@ struct AvvioOlografico: View {
             let sx: CGFloat = e < 0.5 ? 1 + (meta - 1) * a : meta + (f - meta) * b
             let ox: CGFloat = dx * 0.3 * a + dx * 0.7 * b
             let oy: CGFloat = dy * 0.55 * a + dy * 0.45 * b
-            let luce: Double = e < 0.5 ? 1 + 0.25 * Double(a) : 1.25 - 0.15 * Double(b)
+            // come nel mockup la luce del volo prende il posto di quella dell'accensione (non si sommano)
+            let luce: Double = t >= parte ? (e < 0.5 ? 1 + 0.25 * Double(a) : 1.25 - 0.15 * Double(b)) : acceso.luce
             AvvioOlografico.glifo(j, m: m)
                 .frame(width: AvvioOlo.lato, height: AvvioOlo.lato)
                 .foregroundStyle(Self.chiaro)
-                .mask { RigheScansione() }                                     // le righe di luce dell'ologramma
+                .mask { RigheScansione() }                                     // le righe di scansione dell'ologramma
                 .shadow(color: Color.ciano.opacity(0.9), radius: 1)
                 .shadow(color: Color.ciano.opacity(0.6), radius: 5)
                 .shadow(color: Color.ciano.opacity(0.3), radius: 11)
-                .brightness(0.3 * (acceso.luce - 1) + 0.3 * (luce - 1))
-                .mask(alignment: .top) { Rectangle().frame(height: (AvvioOlo.lato + 24) * CGFloat(acceso.rivela)) }
+                .brightness(0.3 * (luce - 1))
+                .mask { Rectangle().scaleEffect(x: 1, y: CGFloat(acceso.rivela), anchor: .top) }   // si rivela dall'alto
                 .opacity(acceso.opacita)
+                .blendMode(.screen)                                            // luce: si somma a quello che c'è sotto
                 .scaleEffect(sx)
                 .offset(x: ox, y: oy)
                 .position(x: cx, y: cy)
@@ -245,15 +261,15 @@ private struct Anello: View {
     }
 }
 
-/// Le righe di scansione di un ologramma: due righe piene e una più tenue, ogni 3 punti.
+/// Le righe di scansione di un ologramma, come il mockup: ogni 3 punti una riga di 1 punto che resta al 45 % (dal basso).
 private struct RigheScansione: View {
     var body: some View {
         Canvas { c, size in
-            var y: CGFloat = 0
-            while y < size.height {
-                c.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 2)), with: .color(.black))
-                c.fill(Path(CGRect(x: 0, y: y + 2, width: size.width, height: 1)), with: .color(.black.opacity(0.55)))
-                y += 3
+            var y: CGFloat = size.height
+            while y > 0 {
+                c.fill(Path(CGRect(x: 0, y: y - 1, width: size.width, height: 1)), with: .color(.black.opacity(0.45)))
+                c.fill(Path(CGRect(x: 0, y: y - 3, width: size.width, height: 2)), with: .color(.black))
+                y -= 3
             }
         }
     }

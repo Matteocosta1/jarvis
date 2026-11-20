@@ -42,6 +42,10 @@ struct ContentView: View {
     @State private var testaArrivate = 0         // MARK X: quante icone in alto sono già arrivate (da destra, una alla volta, a tempo con l'avvio)
     /// 20 nov · avvio SINGOLO: quando è partita la voce d'avvio (lo zero dell'avvio olografico delle icone in alto); nil = scena spenta.
     @State private var avvioOlo: Date? = nil
+    /// Avvio SINGOLO interrotto (voce sfumata prima della fine): da qui la scena si spegne tremolando invece di sparire di colpo.
+    @State private var oloSpegni: Date? = nil
+    /// Le icone in alto entrano al posto dell'ologramma (di colpo, col lampo), anche quelle che arrivano tutte insieme a voce sfumata.
+    @State private var oloStile = false
     @State private var bagliore = false          // MARK X: a «SISTEMI IN LINEA» il titolo prende un leggero bagliore bianco, poi resta fermo
     @State private var iconaAttiva: Int?         // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var scegliLingua = false       // icona Interprete: scelta della lingua
@@ -278,6 +282,7 @@ struct ContentView: View {
                             Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
                         }
                         .ignoresSafeArea(.keyboard, edges: .bottom)                // il reattore resta fermo
+                        .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO
                         VStack(spacing: 0) {
                             registro
                             barraTesto
@@ -316,6 +321,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
                     .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
+                    .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO, sopra il reattore
                     .onChange(of: tastiera) { _, aperta in
                         guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
                         if aperta {
@@ -371,16 +377,6 @@ struct ContentView: View {
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
             .environment(\.jarvisCoperto, pilaCopre)
-            // 20 nov · avvio SINGOLO: gli ologrammi delle icone in alto, sopra tutto, nello spazio della schermata
-            .overlayPreferenceValue(PostiTesta.self) { posti in
-                if let inizio = avvioOlo {
-                    GeometryReader { geo in
-                        AvvioOlografico(inizio: inizio,
-                                        posti: (0..<ContentView.postoTesta.totale).compactMap { j in posti[j].map { posto in geo[posto] } },
-                                        arrivate: testaArrivate)
-                    }
-                }
-            }
 
             .frame(width: g.size.width, height: g.size.height)
             // 26 ott notte (foto del signore 23:29, «menu a tendina inutile»): tolto il blocco dello swipe di iOS dall'alto: con il
@@ -508,7 +504,7 @@ struct ContentView: View {
             // una alla volta dentro l'anello della percentuale, e sul loro suono si stringono al loro posto (AvvioOlografico.swift).
             // Con «Riduci movimento» resta l'arrivo di prima (solo dissolvenza).
             let olo = !UIAccessibility.isReduceMotionEnabled
-            if olo { avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
+            if olo { oloStile = true; oloSpegni = nil; avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
             // da Social a Impostazioni; il bagliore del titolo con l'ultima. Se la voce dell'avvio viene sfumata prima (il signore
@@ -576,7 +572,7 @@ struct ContentView: View {
             }
             if !Suoni.avvioSuona {                                        // senza la voce dell'avvio (file mancante): come prima
                 testaArrivate = ContentView.postoTesta.totale             // per sicurezza: a sistemi in linea ci sono tutte
-                avvioOlo = nil                                            // senza la voce niente scena olografica
+                avvioOlo = nil                                            // senza la voce niente scena olografica (a 2,7 s non è ancora comparsa)
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
             }
             await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
@@ -585,7 +581,7 @@ struct ContentView: View {
             if jarvis.ascoltoDaAvvio { Suoni.sfumaAvvio() }              // 13 nov: il tocco sul reattore durante le icone vale adesso
             await Suoni.attendiFineAvvio()
             if testaArrivate < ContentView.postoTesta.totale {            // voce sfumata prima dei suoi bip: le icone arrivano adesso
-                avvioOlo = nil                                            // e la scena olografica si toglie
+                spegniOlo()                                               // e la scena olografica si spegne tremolando (0,34 s)
                 withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = ContentView.postoTesta.totale }
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
             }
@@ -599,6 +595,32 @@ struct ContentView: View {
                 // (finito l'ascolto, il richiamo «Jarvis» e i battiti di mani riprendono come sempre)
                 try? await Task.sleep(for: .milliseconds(300))        // la coda dei suoni si spegne
                 jarvis.ascoltaSubito(bip: daTocco)
+            }
+        }
+    }
+
+    /// Avvio SINGOLO interrotto: la scena olografica si spegne tremolando (come alla fine), poi si toglie.
+    private func spegniOlo() {
+        guard avvioOlo != nil, oloSpegni == nil else { return }
+        oloSpegni = Date()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(AvvioOlo.fine - AvvioOlo.spegni + 0.05))
+            avvioOlo = nil
+            oloSpegni = nil
+        }
+    }
+
+    /// Avvio SINGOLO: gli ologrammi delle icone in alto, sopra titolo e reattore ma sotto sezioni, tendina, menu SISTEMI e tab
+    /// (che li coprono se si aprono durante l'avvio). Con la tastiera aperta (testata stretta, reattore piccolo) non c'è.
+    @ViewBuilder
+    private func ologrammiAvvio(_ posti: [Int: Anchor<CGRect>]) -> some View {
+        if let inizio = avvioOlo, !tastiera {
+            GeometryReader { geo in
+                AvvioOlografico(inizio: inizio,
+                                spegniDa: oloSpegni,
+                                testata: posti[AvvioOlografico.testata].map { a in geo[a] },
+                                posti: (0..<ContentView.postoTesta.totale).compactMap { j in posti[j].map { a in geo[a] } },
+                                arrivate: testaArrivate)
             }
         }
     }
@@ -800,33 +822,34 @@ struct ContentView: View {
             // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
             Button { toccaDock(ContentView.postoTesta.social) } label: {
                 IconaSocial()
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.social: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.social: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.social))
             .accessibilityLabel("Social")
             // build 23: MUSICA, prima di SISTEMI (il vinile olografico del mockup)
             Button { toccaDock(ContentView.postoTesta.musica) } label: {
                 VinileDock()                                        // 9 nov notte: gira mentre la musica suona
                     .frame(width: 18, height: 18)
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott notte (il signore): il disco un poco più a destra, verso Studio
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.6).padding(.trailing, (mini ? 1 : ContentView.margineDock) - 0.6)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
             // MARK X: STUDIO, subito dopo MUSICA (ordine deciso dal signore: Social, Musica, Studio, Sistemi, Cestino, Impostazioni)
             Button { toccaDock(ContentView.postoTesta.studio) } label: {
                 IconaStudio(pieno: true)                            // 27 ott: alta 15 punti come le altre 5 (misurate sulla foto), cubo più grande
                     .frame(width: 18, height: 18)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.studio: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
@@ -835,33 +858,32 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.studio: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.studio))
             .accessibilityLabel("Studio")
             Button { toccaDock(ContentView.postoTesta.sistemi) } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 11.8, weight: .semibold))   // 27 ott notte (il signore): linee spesse come Social (1,33 pt, misurate sulla foto)                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sistemi: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sistemi: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sistemi))
             .accessibilityLabel("Sistemi")
             Button { toccaDock(ContentView.postoTesta.cestino) } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13.9, weight: .semibold))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.cestino))
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
@@ -873,6 +895,7 @@ struct ContentView: View {
             Button { toccaDock(ContentView.postoTesta.impostazioni) } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
+                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.impostazioni: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.35).padding(.trailing, mini ? 1 : ContentView.margineDock)   // foto 02:49: spazio 7
                     // 9 nov notte (il signore: «l'icona di impostazioni mi piace che si animi all'avvio e alla chiusura… aggiungiamola»):
@@ -882,8 +905,7 @@ struct ContentView: View {
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.impostazioni: $0] }   // 20 nov: qui si posa l'ologramma
-            .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate, olo: avvioOlo != nil)
+            .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.impostazioni))
             .accessibilityLabel("Impostazioni")
         }
@@ -898,6 +920,8 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
+        // 20 nov · avvio SINGOLO: la testata misurata (sotto di lei, a destra, nasce la tab e lì nasce l'anello degli ologrammi)
+        .anchorPreference(key: PostiTesta.self, value: .bounds) { [AvvioOlografico.testata: $0] }
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
         // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
         // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
