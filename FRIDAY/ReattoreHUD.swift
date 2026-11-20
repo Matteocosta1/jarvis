@@ -295,7 +295,7 @@ struct SfondoHUD: View {
         TimelineView(.animation(minimumInterval: nil, paused: coperto)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             let caldo = fase == .elaboro || fase == .parlo
-            let base = caldo ? Color(red: 0.20, green: 0.08, blue: 0.02) : Color(red: 0.02, green: 0.13, blue: 0.13)
+            let base = caldo ? Color(red: 0.20, green: 0.08, blue: 0.02) : Color(red: 33 / 255, green: 15 / 255, blue: 5 / 255)
             ZStack {
                 Color.fondo
                 RadialGradient(colors: [base.opacity(0.9 + 0.1 * sin(t * 0.7)), .clear],
@@ -308,7 +308,7 @@ struct SfondoHUD: View {
                     while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
                     var y: CGFloat = (CGFloat(t * 6).truncatingRemainder(dividingBy: passo))
                     while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
-                    gc.stroke(g, with: .color((caldo ? Color.orange : Color.ciano).opacity(0.035)), lineWidth: 0.5)
+                    gc.stroke(g, with: .color((caldo ? Color.rossoF : Color.ciano).opacity(0.035)), lineWidth: 0.5)
                 }
             }
             .animation(.easeInOut(duration: 0.9), value: caldo)

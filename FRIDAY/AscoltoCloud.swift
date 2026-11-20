@@ -137,19 +137,19 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
     /// Manda l'audio alle orecchie in cloud e restituisce il testo (o un messaggio d'errore da mostrare).
     static func trascrivi(_ audio: Data, token: String, indirizzo: String) async -> (testo: String?, errore: String?) {
         // dritto al cervello (già sveglio) che la passa a ElevenLabs: mezzo secondo invece di 7-8
-        guard !token.isEmpty, let u = URL(string: indirizzo) else { return (nil, "Manca la parola d'ordine nelle impostazioni, Sir.") }
+        guard !token.isEmpty, let u = URL(string: indirizzo) else { return (nil, "Manca la parola d'ordine nelle impostazioni.") }
         var req = URLRequest(url: u)
         req.httpMethod = "POST"
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "x-friday-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["trascrivi": audio.base64EncodedString()])
-        guard let (d, r) = try? await URLSession.shared.data(for: req) else { return (nil, "Non raggiungo le mie orecchie in cloud, Sir.") }
+        guard let (d, r) = try? await URLSession.shared.data(for: req) else { return (nil, "Non raggiungo le mie orecchie in cloud.") }
         let codice = (r as? HTTPURLResponse)?.statusCode ?? 0
         let json = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
         if codice == 200 { return ((json?["testo"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), nil) }
-        if codice == 401 { return (nil, "La parola d'ordine non coincide, Sir.") }
-        return (nil, "Non ho capito, Sir. Riprovi.")
+        if codice == 401 { return (nil, "La parola d'ordine non coincide.") }
+        return (nil, "Non ho capito. Riprova.")
     }
 }
 
@@ -588,7 +588,7 @@ final class AttesaMac {
         let input = motore.inputNode
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
-            throw NSError(domain: "Jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
+            throw NSError(domain: "FRIDAY", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio valido."])
         }
         input.removeTap(onBus: 0)
         // niente «modalità chiamata»: con l'elaborazione vocale accesa il Mac abbassa l'audio di tutte le altre app

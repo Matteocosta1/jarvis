@@ -19,7 +19,7 @@ enum ConfidenteAperto {
 /// Nota (22 ott): al momento nessun ascolto usa questa lista (gli ascolti hanno le loro, dalla build 12); le storpiature le corregge `Pronunce`.
 enum Vocabolario {
     nonisolated static let parole: [String] = [
-        "Jarvis", "EDITH", "apri EDITH", "EDITH controllo completo", "controllo completo", "mi ricevi", "mi ricevi Jarvis", "ricevi", "ricevuto",
+        "FRIDAY", "Difesa", "apri la Difesa", "controllo completo", "Pilates", "Reformer", "Makeup", "Gestionale", "Armadio", "Nando", "Frigo", "Vinted", "mi ricevi", "mi ricevi FRIDAY", "ricevi", "ricevuto",
         "LiDAR", "Wiretap", "Sentinella", "Profiler", "Vitals", "Briefing", "Shazam", "Scanner", "Supabase", "GitHub", "Discosizer", "Discogs",
         "Resident Advisor", "SumUp", "Spotify", "WhatsApp", "Apple Music", "Interprete", "Allenatore", "Trainer", "Personal Trainer", "apri il Trainer", "Confidente", "Diario", "Occhi", "Cucina",
         "Ricordi", "Bea", "Beatrice", "Matteo", "Pier", "Cristina", "fai un giro", "in video", "girati", "grandangolo", "sottovoce", "sussurra", "voce normale",
@@ -105,6 +105,8 @@ enum Reparto: String, Identifiable, Equatable {
     case pulisci
     // build 23: MUSICA, l'icona in alto
     case musica
+    // FRIDAY: le sezioni di Bea
+    case frigo, pilates, makeup, ciclo, testa, gestionale, armadio, nando, account, sos
     var id: String { rawValue }
 
     /// La frase di JARVIS quando apre il reparto (le schede parlano da sole).
@@ -145,20 +147,29 @@ enum ComandoVocale: Equatable {
     static func nomeSezione(_ p: String) -> String? {
         switch p {
         case "occhi", "cucina": return "Occhi"
-        case "edith", "edit": return "EDITH"
+        case "edith", "edit", "difesa": return "Difesa"
+        case "frigo", "frigorifero": return "Frigo"
+        case "pilates": return "Pilates"
+        case "makeup", "trucco": return "Makeup"
+        case "ciclo": return "Ciclo"
+        case "testa", "emicrania": return "Testa"
+        case "gestionale", "agenda": return "Gestionale"
+        case "armadio": return "Armadio"
+        case "nando": return "Nando"
+        case "account": return "Account"
         case "diario": return "Diario"
         case "sonno": return "Sonno"
         case "vitals": return "Vitals"
-        case "posta", "email", "mail": return "Email"
+        case "posta", "email", "mail": return "Mail"
         case "spesa": return "Spesa"
         case "foto", "galleria": return "Foto"
         case "messaggi": return "Messaggi"
         case "telefono", "rubrica": return "Telefono"
-        case "ricordi": return "Ricordi"
+        case "ricordi", "memoria": return "Memoria"
         case "confidente": return "Confidente"
         case "scanner": return "Scanner"
         case "interprete", "traduttore": return "Interprete"
-        case "allenatore", "allenamento", "trainer", "treiner", "personal": return "Trainer"
+        case "allenatore", "specchio", "trainer", "treiner", "personal": return "Specchio"
         default: return nil
         }
     }
@@ -267,7 +278,8 @@ enum ComandoVocale: Equatable {
             let sezioni: Set<String> = ["occhi", "fotocamera", "camera", "cucina", "edith", "edit", "diario", "sonno", "vitals", "posta",
                                         "email", "mail", "spesa", "foto", "galleria", "messaggi", "telefono", "rubrica", "ricordi",
                                         "confidente", "scanner", "interprete", "traduttore", "allenatore", "allenamento", "trainer", "treiner",
-                                        "personal"]
+                                        "personal", "specchio", "difesa", "frigo", "frigorifero", "pilates", "makeup", "trucco", "ciclo", "testa",
+                                        "emicrania", "gestionale", "agenda", "armadio", "nando", "account", "memoria"]
             if !resto.isEmpty, resto.allSatisfy({ generiche.contains($0) || sezioni.contains($0) }) {
                 // MARK XI (4 nov, il signore): con il nome si chiude quella sezione, anche se è dietro («chiudi il meteo»);
                 // senza («chiudi la scheda», «chiudi qui», «chiudi la fotocamera») quella davanti, come sempre
@@ -402,15 +414,19 @@ enum ComandoVocale: Equatable {
         // le schede: «apri il diario», «fammi vedere il sonno», «vai al meteo», «mostra la posta», «lista della spesa»
         let schede: [(Reparto, [String])] = [
             (.diario, [" diario "]), (.sonno, [" sonno ", " dormito "]), (.vitals, [" vitals ", " vitali ", " parametri "]),
-            (.confidente, [" confidente "]), (.allenatore, [" allenatore ", " allenamento ", " trainer ", " treiner ", " personal trainer "]),
+            (.confidente, [" confidente "]), (.allenatore, [" specchio ", " allenatore ", " trainer ", " treiner ", " personal trainer "]),
+            (.pilates, [" pilates ", " allenamento ", " reformer "]),
             (.email, [" email ", " mail ", " posta "]), (.spesa, [" spesa "]),
-            (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi "]),
+            (.foto, [" foto ", " galleria "]), (.ricordi, [" ricordi ", " memoria "]),
+            (.frigo, [" frigo ", " frigorifero "]), (.makeup, [" makeup ", " make up ", " trucco "]), (.ciclo, [" ciclo "]),
+            (.testa, [" testa ", " emicrania "]), (.gestionale, [" gestionale ", " agenda "]), (.armadio, [" armadio "]),
+            (.nando, [" nando "]), (.account, [" account "]),
             (.interprete, [" interprete ", " traduttore "]),
             (.messaggi, [" messaggi ", " whatsapp ", " imessage "]), (.telefono, [" telefono ", " tastiera ", " rubrica "]),
         ]
         // le sezioni nuove solo con un verbo: «apri i costi», «mostrami EDITH», «vai alle impostazioni» («che costi?» resta a JARVIS)
         let nuove: [(Reparto, [String])] = [
-            (.edith, [" edith ", " editt ", " edit ", " edid ", " edyth ", " editth ", " editte ", " editti ", " eddith ", " edite ",
+            (.edith, [" difesa ", " edith ", " editt ", " edit ", " edid ", " edyth ", " editth ", " editte ", " editti ", " eddith ", " edite ",
                       " e dit ", " e dith ", " idit ", " idith ", " hedith ", " heidit ", " edit h "]),
         ]
         // tutti i verbi di comando valgono per ogni sezione: «attiva EDITH», «avvia i costi», «lancia le impostazioni» (22 ott)
@@ -420,6 +436,8 @@ enum ComandoVocale: Equatable {
         if conVerbo { for (reparto, chiavi) in nuove where chiavi.contains(where: c) { return .apri(reparto) } }
         // il cestino: «pulisci», «svuota la chat», «cancella la conversazione»
         // solo frasi esatte: «pulisci il bagno» o «cancella la chat con Bea» restano a JARVIS
+        // FRIDAY · SOS: solo la richiesta d'aiuto secca («FRIDAY, aiuto», «SOS»): apre l'SOS, che parte dopo 5 secondi (annullabile)
+        if [" aiuto ", " aiuto aiuto ", " sos ", " aiutami ", " chiama aiuto ", " ho bisogno di aiuto "].contains(where: { s == $0 }) { return .apri(.sos) }
         if [" pulisci ", " pulisci la chat ", " pulisci tutto ", " pulisci lo schermo ", " svuota la chat ", " svuota la conversazione ",
             " cancella la chat ", " cancella la conversazione ", " cestino ", " svuota il cestino "].contains(where: { s == $0 }) { return .apri(.pulisci) }
         // Revisione del dialogo (24 ott): una scheda si apre solo se la frase è davvero un ordine di aprirla, non se la parola

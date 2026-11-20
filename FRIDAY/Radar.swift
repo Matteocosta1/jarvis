@@ -117,7 +117,7 @@ struct PannelloRadar: View {
             Pannello(titolo: "RADAR", tinta: tinta) {
                 if let r = radar {
                     if let e = r.errore {
-                        Text(e).font(.system(size: 14)).foregroundStyle(.orange)
+                        Text(e).font(.system(size: 14)).foregroundStyle(Color.rossoF)
                     } else if r.piove {
                         RigaHUD("Inizia", r.inizia)
                         RigaHUD("Quanta", "\(r.millimetri) mm in mezz'ora")
@@ -126,9 +126,9 @@ struct PannelloRadar: View {
                         Text("Nessuna pioggia in arrivo").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                     }
                 } else {
-                    Text(finito ? "Il radar non risponde, Sir." : "Controllo il radar…").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                    Text(finito ? "Il radar non risponde." : "Controllo il radar…").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
-                Text("JARVIS avvisa una volta sola, solo quando sta per piovere dove si trova lei.")
+                Text("FRIDAY avvisa una volta sola, solo quando sta per piovere dove si trova lei.")
                     .font(.system(size: 11)).foregroundStyle(Color.tenue)
                 if !posizione.sempre {
                     // il permesso «Sempre» si chiede solo a questo tocco, mai da solo all'apertura del Meteo
@@ -141,14 +141,14 @@ struct PannelloRadar: View {
                         Button {
                             if let u = URL(string: UIApplication.openSettingsURLString) { apriLink(u) }
                         } label: {
-                            Text("iOS non ha dato la posizione «Sempre», Sir: la attivi in Impostazioni › Jarvis › Posizione › Sempre.")
-                                .font(.system(size: 11)).foregroundStyle(.orange).multilineTextAlignment(.leading)
+                            Text("iOS non ha dato la posizione «Sempre»: la attivi in Impostazioni › FRIDAY › Posizione › Sempre.")
+                                .font(.system(size: 11)).foregroundStyle(Color.rossoF).multilineTextAlignment(.leading)
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
-            PannelloAVoce(frasi: ["«Jarvis, radar pioggia»", "«Jarvis, pioverà?»", "«Jarvis, mi serve l'ombrello?»"])
+            PannelloAVoce(frasi: ["«FRIDAY, radar pioggia»", "«FRIDAY, pioverà?»", "«FRIDAY, mi serve l'ombrello?»"])
         }
     }
 }

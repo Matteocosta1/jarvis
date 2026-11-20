@@ -607,9 +607,9 @@ nonisolated enum FineFrase {
     }
 }
 
-// MARK: - 13 nov · Di cosa parla la frase: la salute (12.0 (17), la Salute letta mentre il signore parla)
+// MARK: - 13 nov · Di cosa parla la frase: la salute (12.0 (17), la Salute letta mentre Bea parla)
 
-/// La frase parla di sonno, riposo, cuore, passi o allenamenti? Serve all'iPhone per leggere Salute mentre il signore parla e mandarla
+/// La frase parla di sonno, riposo, cuore, passi o allenamenti? Serve all'iPhone per leggere Salute mentre Bea parla e mandarla
 /// insieme alla domanda: il cervello risponde in un passaggio solo, senza tornare al telefono a chiederla (13 nov: «come ho dormito?»
 /// faceva 8,2 e 6,1 secondi dalla fine della frase al primo suono). Larga di proposito: leggere Salute costa poco, e il cervello usa i
 /// dati solo se la domanda è davvero sulla salute.
@@ -628,9 +628,9 @@ nonisolated enum ArgomentoSalute {
     }
 }
 
-// MARK: - 12 nov · L'intonazione (P3, revisione del dialogo approvata dal signore: «provala già adesso»)
+// MARK: - 12 nov · L'intonazione (P3, revisione del dialogo approvata da Bea: «provala già adesso»)
 
-/// L'altezza della voce, misurata sul telefono mentre il signore parla. Chi ha finito di parlare abbassa la voce in fondo alla frase;
+/// L'altezza della voce, misurata sul telefono mentre Bea parla. Chi ha finito di parlare abbassa la voce in fondo alla frase;
 /// chi vuole continuare la lascia sospesa. Ogni 20 ms di voce si misura la frequenza fondamentale (metodo YIN, su un segnale ridotto a
 /// circa 12 kHz e addolcito sotto i 1000 Hz); a fine frase si guarda l'ultimo mezzo secondo di voce rispetto alla sua altezza degli
 /// ultimi secondi. Gira sul thread del microfono: nessuna allocazione, tutto sotto lucchetto, memoria preparata all'inizio.
@@ -727,7 +727,7 @@ nonisolated final class Intonazione: @unchecked Sendable {
         analizzato = max(0, analizzato - k)
     }
 
-    /// Un pezzo di audio del microfono. `voce`: in questo pezzo il signore parla (lo decide VoceAttiva); `tempo`: quando è arrivato.
+    /// Un pezzo di audio del microfono. `voce`: in questo pezzo Bea parla (lo decide VoceAttiva); `tempo`: quando è arrivato.
     func ascolta(_ campioni: UnsafePointer<Float>, n: Int, hz ingresso: Double, voce: Bool, tempo: TimeInterval) {
         guard n > 0, ingresso > 0 else { return }
         lock.lock(); defer { lock.unlock() }

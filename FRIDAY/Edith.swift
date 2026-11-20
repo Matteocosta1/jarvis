@@ -26,22 +26,25 @@ struct VistaEdith: View {
     /// 12 nov (CampoInAlto): il campo che ha la tastiera. Toccato un campo, la pagina lo porta in cima con sotto il suo tasto;
     /// toccato il tasto, la tastiera scende e si vede il risultato (NUMERO e IP hanno tastiere senza «Invio»).
     @FocusState private var campoAttivo: String?
+    @State private var parte = 0          // FRIDAY: Strada · Rete, come il mockup
 
     var body: some View {
-        CorniceScheda(titolo: "EDITH", sottotitolo: "Sistema di Difesa e Riconoscimento", icona: "eyeglasses", tinta: tinta) {
+        CorniceScheda(titolo: "Difesa", sottotitolo: parte == 0 ? "Scudi attivi" : "Rete · solo difesa", icona: "f:difesa", tinta: tinta) {
+            LinguetteF(voci: ["Strada", "Rete"], scelta: $parte)
+            if parte == 0 { StradaDifesa(tinta: tinta) } else {
             // 9 nov (build 19, il signore: «falli tutti J»): in testa l'ologramma con le prove OCCHIALI, DRONI, SCUDO (i nove controlli;
             // toccato due volte, un controllo col campo scritto parte, come il suo tasto)
             OlogrammaEdithProve(dati: DatiEdithOlo(controlli: controlliOlo, avvia: { esegui($0) })).corniceOlo(tinta)
             // PORTE
             Pannello(titolo: "PORTE", tinta: tinta) {
-                Text("Cosa si vede da internet della sua rete: router, DVR, NAS, PC.").font(.footnote).foregroundStyle(Color.tenue)
+                Text("Cosa si vede da internet della tua rete: router, telecamere, PC.").font(.footnote).foregroundStyle(Color.tenue)
                 campo("IP pubblico (vuoto = la rete di adesso)", testo: $ip, tastiera: .numbersAndPunctuation)
                 tasto("Controlla", chiave: "porte") { ["edith": "porte", "ip": ip] }
                 if let e = esiti["porte"] { risultatoPorte(e) }
             }
             // FUGHE
             Pannello(titolo: "FUGHE", tinta: tinta) {
-                Text("La sua mail è finita in un furto di dati?").font(.footnote).foregroundStyle(Color.tenue)
+                Text("La tua mail è finita in un furto di dati?").font(.footnote).foregroundStyle(Color.tenue)
                 campo("mail", testo: $email, tastiera: .emailAddress)
                 tasto("Controlla", chiave: "fughe") { ["edith": "fughe", "email": email] }
                 if let e = esiti["fughe"] { risultatoFughe(e) }
@@ -102,7 +105,7 @@ struct VistaEdith: View {
                     .id("edith-password")
                 Button { Suoni.tocco(); campoAttivo = nil; Task { await controllaPassword() } } label: { etichetta("Controlla", attivo: inCorso.contains("password")) }
                     .buttonStyle(StileStark()).disabled(password.isEmpty || inCorso.contains("password"))
-                if let esitoPassword { Text(esitoPassword).font(.system(size: 13)).foregroundStyle(esitoPassword.hasPrefix("⚠️") ? .orange : .green) }
+                if let esitoPassword { Text(esitoPassword).font(.system(size: 13)).foregroundStyle(esitoPassword.hasPrefix("⚠️") ? Color.rossoF : .green) }
             }
             // RETE
             Pannello(titolo: "RETE", tinta: tinta) {
@@ -114,9 +117,10 @@ struct VistaEdith: View {
                     chiedi("EDITH, controllo completo: guarda cosa si vede da internet della mia rete di adesso e dimmi in poche frasi se c'è qualcosa da sistemare.")
                 }
             }
-            Text("Solo difesa: le sue cose, e dati pubblici prima di fidarsi di qualcuno.").font(.system(size: 9)).foregroundStyle(Color.tenue)
+            Text("Solo difesa: le tue cose, e dati pubblici prima di fidarti di qualcuno.").font(.system(size: 9)).foregroundStyle(Color.tenue)
+            }
         }
-        .regia("EDITH", stato: testoSchermo, azioni: [                   // 12.0 (10): la regia (la password solo a mano)
+        .regia("Difesa", stato: testoSchermo, azioni: [                   // 12.0 (10): la regia (la password solo a mano)
             AzioneRegia("controlla", "scrive il dato nel suo campo e fa partire il controllo. tipo: porte (dato = IP; vuoto = la rete di adesso), fughe (mail), link (testo o link), dominio, azienda (partita IVA), iban, numero, reputazione (nome, azienda o sito). La password solo a mano: non esce dal telefono",
                         valore: "tipo, dato") { v in
                 let dato = (v["dato"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -279,7 +283,7 @@ struct VistaEdith: View {
     }
 
     @ViewBuilder private func errore(_ e: Voce) -> some View {
-        if !e.s("errore").isEmpty { Text(e.s("errore")).font(.footnote).foregroundStyle(.orange) }
+        if !e.s("errore").isEmpty { Text(e.s("errore")).font(.footnote).foregroundStyle(Color.rossoF) }
     }
 
     @ViewBuilder private func risultatoPorte(_ e: Voce) -> some View {
@@ -288,7 +292,7 @@ struct VistaEdith: View {
             HStack { Text(e.s("ip")).font(.system(size: 13, design: .monospaced)).foregroundStyle(.white); Spacer(); stato(e.s("esito")) }
             let porte = (e.d["porte_aperte"] as? [NSNumber] ?? []).map { $0.stringValue }
             if !porte.isEmpty { Text("Porte aperte: \(porte.joined(separator: ", "))").font(.system(size: 12, design: .monospaced)).foregroundStyle(Color.tenue) }
-            ForEach(e.stringhe("porte_a_rischio"), id: \.self) { Text("⚠️ \($0)").font(.system(size: 12)).foregroundStyle(.orange) }
+            ForEach(e.stringhe("porte_a_rischio"), id: \.self) { Text("⚠️ \($0)").font(.system(size: 12)).foregroundStyle(Color.rossoF) }
             ForEach(e.stringhe("vulnerabilita_note"), id: \.self) { Text("🛑 \($0)").font(.system(size: 12, design: .monospaced)).foregroundStyle(.red) }
             if !e.s("nota").isEmpty { Text(e.s("nota")).font(.system(size: 12)).foregroundStyle(Color.tenue) }
         }
@@ -299,7 +303,7 @@ struct VistaEdith: View {
         if !e.s("email").isEmpty {
             HStack { Text(e.s("email")).font(.system(size: 13)).foregroundStyle(.white); Spacer(); stato(e.s("esito")) }
             let furti = e.stringhe("furti")
-            if !furti.isEmpty { Text("Trovata in: \(furti.joined(separator: ", "))").font(.system(size: 12)).foregroundStyle(.orange) }
+            if !furti.isEmpty { Text("Trovata in: \(furti.joined(separator: ", "))").font(.system(size: 12)).foregroundStyle(Color.rossoF) }
             if !e.s("consiglio").isEmpty { Text(e.s("consiglio")).font(.system(size: 12)).foregroundStyle(Color.tenue) }
         }
     }
@@ -324,7 +328,7 @@ struct VistaEdith: View {
             }
             let simili = e.stringhe("simili_registrati")
             if simili.isEmpty { Text("Nessun dominio simile registrato.").font(.system(size: 12)).foregroundStyle(.green) }
-            else { Text("Simili già registrati: \(simili.joined(separator: ", "))").font(.system(size: 12)).foregroundStyle(.orange) }
+            else { Text("Simili già registrati: \(simili.joined(separator: ", "))").font(.system(size: 12)).foregroundStyle(Color.rossoF) }
         }
     }
 
@@ -334,7 +338,7 @@ struct VistaEdith: View {
             HStack { Text(e.s("partita_iva")).font(.system(size: 13, design: .monospaced)).foregroundStyle(.white); Spacer(); stato(e.s("esito") == "valida" ? "valida" : "non valida") }
             if !e.s("nome").isEmpty { Text(e.s("nome")).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white) }
             if !e.s("indirizzo").isEmpty { Text(e.s("indirizzo")).font(.system(size: 12)).foregroundStyle(Color.tenue) }
-            if !e.s("nota").isEmpty { Text(e.s("nota")).font(.system(size: 12)).foregroundStyle(.orange) }
+            if !e.s("nota").isEmpty { Text(e.s("nota")).font(.system(size: 12)).foregroundStyle(Color.rossoF) }
         }
     }
 

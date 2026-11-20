@@ -3,11 +3,11 @@ import SwiftUI
 
 /// I pezzi dei pannelli della build 22 (Telefono, Ricordi, Meteo, Email), con le misure e i colori del mockup.
 enum ColoriHUD {
-    static let testo = Color(red: 0.812, green: 0.886, blue: 0.910)     // #cfe2e8: righe e frasi
-    static let chiaro = Color(red: 0.902, green: 0.957, blue: 0.973)    // #e6f4f8: passi spuntati, avvisi
-    static let spento = Color(red: 0.624, green: 0.718, blue: 0.745)    // #9fb7be: passi da fare
+    static let testo = Color(red: 232 / 255, green: 216 / 255, blue: 207 / 255)     // #cfe2e8: righe e frasi
+    static let chiaro = Color(red: 246 / 255, green: 236 / 255, blue: 230 / 255)    // #e6f4f8: passi spuntati, avvisi
+    static let spento = Color(red: 190 / 255, green: 170 / 255, blue: 159 / 255)    // #9fb7be: passi da fare
     static let verde = Color(red: 0.373, green: 0.890, blue: 0.631)     // #5fe3a1: spunta
-    static let filo = Color(red: 0.114, green: 0.165, blue: 0.180)      // #1d2a2e: linea tra le mail
+    static let filo = Color(red: 46 / 255, green: 35 / 255, blue: 29 / 255)      // #1d2a2e: linea tra le mail
 }
 
 /// Una riga del pannello: il nome a sinistra, il valore a destra in carattere da terminale.
@@ -89,7 +89,7 @@ struct TastoComando: View {
 
 /// L'avviso di JARVIS in testa a un pannello («JARVIS · AVVISO»).
 struct AvvisoJarvis: View {
-    var etichetta = "JARVIS · AVVISO"
+    var etichetta = "FRIDAY · AVVISO"
     let testo: String
 
     var body: some View {

@@ -108,7 +108,7 @@ nonisolated enum Dialogo {
     static let validitaInterruzione: TimeInterval = 120
     /// «Aspetta» e poi silenzio: dopo 5 secondi JARVIS dice «Mi dica, Sir» e lo ascolta (deciso dal signore, 24 ott).
     static let silenzioDopoAspetta: TimeInterval = 5
-    static let miDica = "Mi dica, Sir."
+    static let miDica = "Dimmi."
     /// Subito dopo una domanda JARVIS ascolta ancora per 2 secondi un'aggiunta («…e anche domani»), senza «Jarvis»;
     /// il riempitivo («Un attimo, Sir») parte solo dopo (deciso dal signore, 24 ott).
     static let finestraAggiunta: TimeInterval = 2
@@ -125,10 +125,10 @@ nonisolated enum Dialogo {
         let tutto = testo.trimmingCharacters(in: .whitespacesAndNewlines)
         let sentito = TagVoce.togli(detto).trimmingCharacters(in: .whitespacesAndNewlines)
         if sentito.isEmpty {
-            let nota = "(il signore mi ha interrotto prima che cominciassi a parlare: non ha sentito nulla)"
+            let nota = "(Bea mi ha interrotto prima che cominciassi a parlare: non ha sentito nulla)"
             return tutto.isEmpty ? nota : "\(nota) \(tutto)"
         }
-        let nota = "(qui il signore mi ha interrotto: il resto non l'ho detto)"
+        let nota = "(qui Bea mi ha interrotto: il resto non l'ho detto)"
         guard let k = taglio(tutto, dopo: sentito) else { return "\(sentito) \(nota)" }
         let prima = tutto[..<k].trimmingCharacters(in: .whitespacesAndNewlines)
         let resto = tutto[k...].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -556,13 +556,13 @@ nonisolated struct DatiRadar: Equatable, Sendable {
 
     /// L'avviso in testa al pannello RADAR dell'iPhone.
     var avviso: String {
-        let quando = iniziaMin <= 0 ? "Sir, piove già dove si trova" : "Sir, pioggia \(inizia) dove si trova"
+        let quando = iniziaMin <= 0 ? "piove già dove si trova" : "pioggia \(inizia) dove si trova"
         return "\(quando): \(millimetri) mm nella prossima mezz'ora. Prenda l'ombrello."
     }
 
     /// L'avviso sul polso, più corto.
     var avvisoBreve: String {
-        iniziaMin <= 0 ? "Sir, piove già dove si trova. Prenda l'ombrello." : "Sir, pioggia \(inizia) dove si trova. Prenda l'ombrello."
+        iniziaMin <= 0 ? "piove già dove si trova. Prenda l'ombrello." : "pioggia \(inizia) dove si trova. Prenda l'ombrello."
     }
 }
 

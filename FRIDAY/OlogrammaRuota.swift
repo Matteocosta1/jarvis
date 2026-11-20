@@ -123,8 +123,8 @@ struct GhieraRuota: View {
         let testo = String(format: "%02d / %d · %03d°", k + 1, n, gradi)
         return Text(testo)
             .font(.system(size: 7, weight: .bold, design: .monospaced))
-            .foregroundStyle(Color(red: 191 / 255, green: 246 / 255, blue: 1))
-            .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.7), radius: 2)
+            .foregroundStyle(Color(red: 1, green: 214 / 255, blue: 191 / 255))
+            .shadow(color: Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(0.7), radius: 2)
             .fixedSize()
     }
 }
@@ -139,7 +139,7 @@ struct MagliaDisegno: View {
     var body: some View {
         Canvas { gc, size in
             let c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1), chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)
+            let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255), chiaro = Color(red: 1, green: 214 / 255, blue: 191 / 255)
             var g = gc
             g.addFilter(.shadow(color: ciano.opacity(0.6), radius: 1.5))
             var celle = Path()
@@ -273,8 +273,8 @@ struct OlogrammaRuota: View {
     @State private var cambiataDa = Date.distantPast
 
     private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
-    private static let chiaro = Color(red: 0.56, green: 0.94, blue: 1.0)      // #8ff0ff
-    private static let bianco = Color(red: 0.75, green: 0.96, blue: 1.0)      // #bff6ff
+    private static let chiaro = Color(red: 1, green: 154 / 255, blue: 92 / 255)      // #8ff0ff
+    private static let bianco = Color(red: 1, green: 215 / 255, blue: 191 / 255)      // #bff6ff
 
     var body: some View {
         let k = ruota.scelta
@@ -328,7 +328,7 @@ struct OlogrammaRuota: View {
         // l'icona si disegna dal basso in alto mentre il disco di scansione la percorre (90–380 ms)
         let rivela = creata ? OlogrammaRuota.ease((T - 90) / 290) : 1
         Group {
-            Image(systemName: simbolo)
+            SimboloFriday(nome: simbolo, lato: 40)
         }
         .font(.system(size: 40, weight: .light))
         .symbolRenderingMode(.monochrome)

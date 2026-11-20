@@ -998,7 +998,7 @@ enum NascitaGriglia {
     private static let davanti: [(x: Double, y: Double)] = [(-36, 18), (36, 18), (36, -54), (-36, -54)]
     private static let dietro: [(x: Double, y: Double)] = [(-36 * 0.86 + 4, 12), (36 * 0.86 + 4, 12), (36 * 0.86 + 4, -60), (-36 * 0.86 + 4, -60)]
     private static let basi: [(x: Double, y: Double)] = [(-26, 73), (26, 73), (18, 66), (-18, 66)]
-    private static let bianco = Color(red: 223 / 255, green: 250 / 255, blue: 1)
+    private static let bianco = Color(red: 1, green: 235 / 255, blue: 223 / 255)
 
     /// La nascita al tempo `T` (ms dalla creazione), nel contesto già spostato al centro.
     static func disegna(_ g: GraphicsContext, _ T: Double) {

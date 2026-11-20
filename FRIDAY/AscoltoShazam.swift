@@ -90,7 +90,7 @@ final class AscoltoShazam: ObservableObject {
         }
         guard mio == giro else { return }
         // FRIDAY: niente YouTube (cercava col Browser di JARVIS)
-        errore = "Non la trovo né su Apple Music né fra le anteprime, Sir."
+        errore = "Non la trovo né su Apple Music né fra le anteprime."
     }
 
     /// Dal polso (8 nov): l'anteprima riparte o si ferma come chiede l'orologio (non è un interruttore: il polso dice cosa vuole).
@@ -108,7 +108,7 @@ final class AscoltoShazam: ObservableObject {
             videoID = videoRiserva.removeFirst()
         } else {
             videoID = nil
-            errore = "Nessun video di questa canzone si può guardare qui, Sir (YouTube \(codice)). Provi APPLE."
+            errore = "Nessun video di questa canzone si può guardare qui (YouTube \(codice)). Prova APPLE."
         }
     }
 

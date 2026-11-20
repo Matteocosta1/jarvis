@@ -275,10 +275,10 @@ private struct SenzaMargini<Contenuto: View>: UIViewControllerRepresentable {
 /// Una scansione: 2 punti di luce ciano-bianca, sfumata ai lati, con l'alone (come .lmo-riga del mockup).
 private struct LineaScansione: View {
     var body: some View {
-        LinearGradient(stops: [.init(color: Color(red: 0.75, green: 0.96, blue: 1).opacity(0), location: 0),
-                               .init(color: Color(red: 0.75, green: 0.96, blue: 1).opacity(0.95), location: 0.1),
-                               .init(color: Color(red: 0.75, green: 0.96, blue: 1).opacity(0.95), location: 0.9),
-                               .init(color: Color(red: 0.75, green: 0.96, blue: 1).opacity(0), location: 1)],
+        LinearGradient(stops: [.init(color: Color(red: 1, green: 215 / 255, blue: 191 / 255).opacity(0), location: 0),
+                               .init(color: Color(red: 1, green: 215 / 255, blue: 191 / 255).opacity(0.95), location: 0.1),
+                               .init(color: Color(red: 1, green: 215 / 255, blue: 191 / 255).opacity(0.95), location: 0.9),
+                               .init(color: Color(red: 1, green: 215 / 255, blue: 191 / 255).opacity(0), location: 1)],
                        startPoint: .leading, endPoint: .trailing)
             .frame(height: 2)
             .shadow(color: Color.ciano.opacity(0.75), radius: 6)
@@ -311,7 +311,7 @@ struct PelleLuce: View {
             ZStack(alignment: .topLeading) {
                 // il vetro: il più leggero di iOS (nel mockup blur 5 e saturazione 1,4) e il fondo al 34 %
                 Rectangle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark)
-                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.34)
+                Color(red: 18 / 255, green: 8 / 255, blue: 2 / 255).opacity(0.34)
                 // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
                 EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
                     .frame(width: W * 2.6, height: 760)
@@ -353,7 +353,7 @@ private struct AngoliLuce: View {
             p.addRect(CGRect(x: W - 12 - l, y: 52, width: l, height: s)); p.addRect(CGRect(x: W - 12 - s, y: 52, width: s, height: l))
             p.addRect(CGRect(x: 12, y: H - 96 - s, width: l, height: s)); p.addRect(CGRect(x: 12, y: H - 96 - l, width: s, height: l))
             p.addRect(CGRect(x: W - 12 - l, y: H - 96 - s, width: l, height: s)); p.addRect(CGRect(x: W - 12 - s, y: H - 96 - l, width: s, height: l))
-            gc.fill(p, with: .color(Color(red: 120 / 255, green: 236 / 255, blue: 1).opacity(0.9)))
+            gc.fill(p, with: .color(Color(red: 1, green: 170 / 255, blue: 120 / 255).opacity(0.9)))
         }
     }
 }
@@ -371,7 +371,7 @@ private struct ScansioneLuce: View {
             let bordo = 2 * alta * CGFloat(p)
             LinearGradient(stops: [.init(color: tinta.opacity(0), location: 0),
                                    .init(color: tinta.opacity(0.10), location: 80 / 110),
-                                   .init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.40), location: 109 / 110),
+                                   .init(color: Color(red: 1, green: 214 / 255, blue: 190 / 255).opacity(0.40), location: 109 / 110),
                                    .init(color: tinta.opacity(0), location: 1)],
                            startPoint: .top, endPoint: .bottom)
                 .frame(height: 110)
@@ -399,7 +399,7 @@ private struct BordoLuce: View {
     var body: some View {
         ZStack {
             Bordo().stroke(tinta.opacity(0.14), lineWidth: 60).blur(radius: 30)
-            Bordo().stroke(LinearGradient(stops: [.init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.95), location: 0),
+            Bordo().stroke(LinearGradient(stops: [.init(color: Color(red: 1, green: 214 / 255, blue: 190 / 255).opacity(0.95), location: 0),
                                                   .init(color: tinta.opacity(0.5), location: 0.06)],
                                           startPoint: .top, endPoint: .bottom), lineWidth: 2.5)
         }

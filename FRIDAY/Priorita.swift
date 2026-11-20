@@ -15,15 +15,15 @@ struct PannelloPriorita: View {
             Pannello(titolo: "PRIORITÀ", tinta: tinta) {
                 if let posta {
                     if posta.importanti.isEmpty {
-                        Text("Niente di importante, Sir.").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                        Text("Niente di importante.").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                     }
                     ForEach(Array(posta.importanti.enumerated()), id: \.element.id) { k, m in
                         MailPriorita(mail: m, prima: k == 0)
                     }
                 } else if let errore {
-                    Text(errore).font(.system(size: 13)).foregroundStyle(.orange)
+                    Text(errore).font(.system(size: 13)).foregroundStyle(Color.rossoF)
                 } else {
-                    Text("JARVIS legge la posta…").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                    Text("FRIDAY legge la posta…").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
             }
             if let posta {
@@ -31,7 +31,7 @@ struct PannelloPriorita: View {
                     RigaHUD("Newsletter e notifiche", posta.altreNota.isEmpty ? "\(posta.altreConteggio)" : "\(posta.altreConteggio) · \(posta.altreNota)")
                 }
             }
-            PannelloAVoce(frasi: ["«Jarvis, rapporto posta»", "«Jarvis, cosa c'è di importante?»", "«Jarvis, rispondi tu al commercialista»"])
+            PannelloAVoce(frasi: ["«FRIDAY, rapporto posta»", "«FRIDAY, cosa c'è di importante?»", "«FRIDAY, rispondi tu a Giulia»"])
         }
     }
 
@@ -42,10 +42,10 @@ struct PannelloPriorita: View {
         // la posta non si raggiunge, come dice l'elenco qui sotto (prima diceva «sto ancora leggendo» anche senza rete)
         let inizio = Date()
         guard let o = await VistaVitals.chiama(["posta_priorita": true], attesa: 60) else {
-            return (nil, Date().timeIntervalSince(inizio) >= 55 ? "Sto ancora leggendo la posta, Sir: riapra tra un minuto." : "Non raggiungo la posta, Sir.")
+            return (nil, Date().timeIntervalSince(inizio) >= 55 ? "Sto ancora leggendo la posta: riapra tra un minuto." : "Non raggiungo la posta.")
         }
         if let e = o["errore"] as? String { return (nil, e) }
-        guard let p = PostaPriorita(o) else { return (nil, "La posta non è arrivata come mi aspettavo, Sir.") }
+        guard let p = PostaPriorita(o) else { return (nil, "La posta non è arrivata come mi aspettavo.") }
         return (p, nil)
     }
 }
@@ -105,7 +105,7 @@ private struct MailPriorita: View {
                         }
                     }
                     if case .errore(let e) = stato {
-                        Text(e).font(.system(size: 12)).foregroundStyle(.orange)
+                        Text(e).font(.system(size: 12)).foregroundStyle(Color.rossoF)
                     }
                 }
             }
@@ -138,8 +138,8 @@ private struct MailPriorita: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } else {
             // nessuna risposta in tempo: la mail potrebbe essere partita lo stesso. Riprovare è sicuro: il cervello non la rimanda
-            stato = .errore(o == nil ? "Non so se è partita, Sir: controlli in Inviata. Se riprova, JARVIS non la manda due volte."
-                                     : (o?["errore"] as? String) ?? "Non sono riuscito a inviarla, Sir. Riprovi.")
+            stato = .errore(o == nil ? "Non so se è partita: controlla in Inviata. Se riprovi, FRIDAY non la manda due volte."
+                                     : (o?["errore"] as? String) ?? "Non sono riuscita a inviarla. Riprova.")
         }
     }
 }

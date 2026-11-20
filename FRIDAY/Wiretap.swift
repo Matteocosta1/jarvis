@@ -76,7 +76,7 @@ final class Wiretap: ObservableObject {
             SFSpeechRecognizer.requestAuthorization { @Sendable s in c.resume(returning: s == .authorized) }
         }
         guard parlato, await AVAudioApplication.requestRecordPermission() else {
-            problema = "Servono microfono e riconoscimento vocale: Impostazioni › Jarvis."
+            problema = "Servono microfono e riconoscimento vocale: Impostazioni › FRIDAY."
             return
         }
         guard let riconoscitore, riconoscitore.isAvailable else {

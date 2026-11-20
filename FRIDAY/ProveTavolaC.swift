@@ -123,7 +123,7 @@ final class ProveVitals {
         return V[V.count - 1]
     }
     private static func stato(_ p: Int?) -> Color {
-        guard let p else { return Color(red: 150 / 255, green: 170 / 255, blue: 180 / 255) }
+        guard let p else { return Color(red: 180 / 255, green: 161 / 255, blue: 150 / 255) }
         return p >= 75 ? Tav.verde : p >= 50 ? Tav.oro : Tav.rosa
     }
     private static func quota(_ z: Double) -> String { z > 1.62 ? "TESTA" : z > 1.2 ? "TORACE" : z > 0.88 ? "ADDOME" : z > 0.5 ? "COSCE" : "GAMBE" }
@@ -229,7 +229,7 @@ final class ProveVitals {
             let tw: Double = max(OP.larghezza(gc, zz.nome, 6.5, 700), OP.larghezza(gc, zz.valore, 7, 600)) + 10
             let bx: Double = dx > 0 ? lx : lx - tw, by: Double = ly - 9
             let box = CGRect(x: bx, y: by, width: tw, height: 21)
-            gc.fill(Path(box), with: .color(Color(red: 4 / 255, green: 16 / 255, blue: 22 / 255).opacity(0.82)))
+            gc.fill(Path(box), with: .color(Color(red: 22 / 255, green: 11 / 255, blue: 4 / 255).opacity(0.82)))
             gc.stroke(Path(box.insetBy(dx: 0.5, dy: 0.5)), with: .color(c.opacity(0.85)), lineWidth: 1)
             OP.scritta(&gc, zz.nome, bx + 5, by + 8, 6.5, 800, c.opacity(0.95), .leading)
             OP.scritta(&gc, zz.valore, bx + 5, by + 17, 7, 600, OP.b(0.92), .leading)

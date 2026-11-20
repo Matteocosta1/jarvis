@@ -52,7 +52,7 @@ nonisolated enum DatiAerei {
     static func intorno(lat: Double, lon: Double) async -> [AereoInCielo]? {
         guard let u = URL(string: String(format: "https://api.adsb.lol/v2/point/%.4f/%.4f/40", lat, lon)) else { return nil }
         var r = URLRequest(url: u, timeoutInterval: 8)
-        r.setValue("JARVIS (iPhone)", forHTTPHeaderField: "User-Agent")
+        r.setValue("FRIDAY (iPhone)", forHTTPHeaderField: "User-Agent")
         guard let (d, risp) = try? await URLSession.shared.data(for: r), (risp as? HTTPURLResponse)?.statusCode == 200,
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let ac = o["ac"] as? [[String: Any]] else { return nil }
         let adesso = Date()
@@ -388,12 +388,12 @@ final class CieloOcchi: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// «Un Airbus A320neo di ITA Airways, Sir: viene da Roma Fiumicino e sta scendendo verso Linate. È a 3.350 metri, a circa 7 km da lei.»
     func testo() -> String {
-        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno, Sir." }
+        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno." }
         let chi = DatiAerei.nome(a.tipo)
         let q = Self.metri(a.posizione(Date()).quota).replacingOccurrences(of: " m", with: " metri")
-        let lontano = dove(a).map { "a circa \(Self.km($0.km)) da lei" } ?? ""
+        let lontano = dove(a).map { "a circa \(Self.km($0.km)) da te" } ?? ""
         guard let r = rottaScelta else {
-            return "Un \(chi), Sir: la rotta non la trovo. È a \(q)\(lontano.isEmpty ? "" : ", \(lontano)")."
+            return "Un \(chi): la rotta non la trovo. È a \(q)\(lontano.isEmpty ? "" : ", \(lontano)")."
         }
         let moto: String
         switch sale {
@@ -401,42 +401,42 @@ final class CieloOcchi: NSObject, ObservableObject, CLLocationManagerDelegate {
         case false?: moto = "sta scendendo verso \(r.a)"
         case nil: moto = "va a \(r.a)"
         }
-        return "Un \(chi) di \(r.compagnia), Sir: viene da \(r.da) e \(moto). È a \(q)\(lontano.isEmpty ? "" : ", \(lontano)")."
+        return "Un \(chi) di \(r.compagnia): viene da \(r.da) e \(moto). È a \(q)\(lontano.isEmpty ? "" : ", \(lontano)")."
     }
 
     /// La frase breve detta a voce: «Un Airbus di ITA, Sir: da Fiumicino, scende su Linate.»
     func breve() -> String {
-        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno, Sir." }
+        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno." }
         let marca = DatiAerei.nome(a.tipo).split(separator: " ").first.map(String.init) ?? "Aereo"
-        guard let r = rottaScelta else { return "Un \(marca), Sir: la rotta di questo volo non la trovo." }
+        guard let r = rottaScelta else { return "Un \(marca): la rotta di questo volo non la trovo." }
         let comp = r.compagnia.split(separator: " ").first.map(String.init) ?? r.compagnia
         let verbo = sale == false ? "scende su" : "va a"
-        return "Un \(marca) di \(comp), Sir: da \(r.da), \(verbo) \(r.a)."
+        return "Un \(marca) di \(comp): da \(r.da), \(verbo) \(r.a)."
     }
 
     /// Le domande sull'aereo agganciato.
     func risposta(_ p: String) -> String {
-        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno, Sir." }
+        guard let a = agganciato else { return "Non vedo aerei in cielo qui intorno." }
         let r = rottaScelta
         switch p {
         case "AEREO_DA":
-            return r.map { "Viene da \($0.da), Sir." } ?? "Da dove viene non lo trovo, Sir."
+            return r.map { "Viene da \($0.da)." } ?? "Da dove viene non lo trovo."
         case "AEREO_DOVE":
-            guard let r else { return "Dove va non lo trovo, Sir." }
+            guard let r else { return "Dove va non lo trovo." }
             if let la = r.aLat, let lo = r.aLon, a.velocita > 100 {
                 let p0 = a.posizione(Date())
                 let km = Rotta.metri(lat: p0.lat, lon: p0.lon, versoLat: la, versoLon: lo) / 1000
                 let min = Int((km / a.velocita * 60).rounded())
-                return "Va a \(r.a), Sir: \(sale == false ? "atterra" : "arriva") fra circa \(max(min, 1)) minuti, dalla sua velocità."
+                return "Va a \(r.a): \(sale == false ? "atterra" : "arriva") fra circa \(max(min, 1)) minuti, dalla sua velocità."
             }
-            return "Va a \(r.a), Sir."
+            return "Va a \(r.a)."
         case "AEREO_QUOTA":
             let q = Self.metri(a.posizione(Date()).quota).replacingOccurrences(of: " m", with: " metri")
             let moto = sale == true ? " e sta salendo" : sale == false ? " e sta scendendo" : ""
-            return "È a \(q)\(moto), Sir: \(Int(a.velocita.rounded())) chilometri all'ora."
+            return "È a \(q)\(moto): \(Int(a.velocita.rounded())) chilometri all'ora."
         case "AEREO_COMP":
-            guard let r, !r.compagnia.isEmpty else { return "La compagnia non la trovo, Sir: il nominativo è \(a.nominativo)." }
-            return "È un volo \(r.compagnia), Sir: il \(r.volo)."
+            guard let r, !r.compagnia.isEmpty else { return "La compagnia non la trovo: il nominativo è \(a.nominativo)." }
+            return "È un volo \(r.compagnia): il \(r.volo)."
         default:
             return breve()
         }
@@ -528,7 +528,7 @@ private struct MirinoAereo: View {
             } else {
                 Text(etichetta).font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.white)
                     .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.7))
+                    .background(Color(red: 16 / 255, green: 8 / 255, blue: 3 / 255).opacity(0.7))
                     .overlay(alignment: .leading) { Rectangle().fill(Color.ciano).frame(width: 2) }
                     .fixedSize()
                     .offset(x: larghezza / 2 + 6, y: h / 2 - 9)
@@ -619,7 +619,7 @@ private struct SchedaAereo: View {
                 Spacer(minLength: 0)
             }
             .frame(width: 150, height: 186, alignment: .topLeading)
-            .background(Color(red: 3 / 255, green: 9 / 255, blue: 11 / 255).opacity(0.8))
+            .background(Color(red: 11 / 255, green: 6 / 255, blue: 3 / 255).opacity(0.8))
             .overlay(alignment: .leading) { Rectangle().fill(Color.ciano).frame(width: 2.5).padding(.vertical, 8) }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ciano.opacity(0.75), lineWidth: 1.2))
@@ -630,7 +630,7 @@ private struct SchedaAereo: View {
 
     private func riga(_ k: String, _ v: String) -> some View {
         HStack {
-            Text(k).foregroundStyle(Color(red: 200 / 255, green: 240 / 255, blue: 250 / 255).opacity(0.65))
+            Text(k).foregroundStyle(Color(red: 250 / 255, green: 218 / 255, blue: 200 / 255).opacity(0.65))
             Spacer()
             Text(v).foregroundStyle(.white)
         }
@@ -675,7 +675,7 @@ struct FoglioVoloOcchi: View {
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 16)
         .frame(maxWidth: 520, alignment: .leading)
-        .background(Color(red: 3 / 255, green: 9 / 255, blue: 11 / 255).opacity(0.92))
+        .background(Color(red: 11 / 255, green: 6 / 255, blue: 3 / 255).opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.ciano.opacity(0.45), lineWidth: 1))
         .shadow(color: Color.ciano.opacity(0.2), radius: 12)

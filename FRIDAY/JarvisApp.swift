@@ -44,8 +44,8 @@ extension Color {
     static let tenue = Color(red: 154 / 255, green: 125 / 255, blue: 111 / 255) // #9a7d6f
     static let testo = Color(red: 246 / 255, green: 236 / 255, blue: 230 / 255) // #f6ece6
     static let rossoF = Color(red: 1, green: 90 / 255, blue: 90 / 255)          // #ff5a5a: quando pensa, allarmi
-    static let verdeF = Color(red: 79 / 255, green: 209 / 255, blue: 180 / 255) // #4fd1b4: ok
-    static let petrolio = Color(red: 31 / 255, green: 143 / 255, blue: 122 / 255) // #1f8f7a accento
+    static let verdeF = Color(red: 209 / 255, green: 127 / 255, blue: 79 / 255) // #4fd1b4: ok
+    static let petrolio = Color(red: 143 / 255, green: 72 / 255, blue: 31 / 255) // #1f8f7a accento
     static let fondo2 = Color(red: 36 / 255, green: 21 / 255, blue: 16 / 255)   // #241510
     static let pagina = Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255)     // #0b0705
 }

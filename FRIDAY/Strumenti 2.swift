@@ -17,7 +17,7 @@ final class Strumenti {
                        "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando", "comando_app"]
 
     /// Nome del Comando rapido che invia SMS e iMessage senza conferma.
-    static let comandoInvio = "JARVIS invia"
+    static let comandoInvio = "FRIDAY invia"
 
     static func descrizione(_ nome: String) -> String {
         switch nome {
@@ -31,7 +31,7 @@ final class Strumenti {
         case "invia_messaggio": return "invio il messaggio"
         case "riconosci_musica": return "ascolto la musica"
         case "apri_apple_music": return "preparo Apple Music"
-        case "foto_cerca": return "cerco tra le sue foto"
+        case "foto_cerca": return "cerco tra le tue foto"
         case "apri_pagina": return "apro la pagina"
         case "musica_riproduci": return "metto la musica"
         case "musica_controllo": return "un attimo"
@@ -149,7 +149,7 @@ final class Strumenti {
                 guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }
                 comandoDaEseguire = c
                 return (json(["ok": true, "nota": c == "rito"
-                    ? "il rito parte appena hai finito di parlare (i Clash e poi il saluto): rispondi soltanto «Subito, Sir.»"
+                    ? "il rito parte appena hai finito di parlare (i Clash e poi il saluto): rispondi soltanto «Subito.»"
                     : "la sezione si apre appena hai finito di parlare: rispondi con una frase brevissima"]), false)
             default: return (json(["errore": "strumento \(nome) non disponibile sull'iPhone"]), true)
             }
@@ -161,7 +161,7 @@ final class Strumenti {
     // MARK: Calendario e promemoria
 
     private func calendarioCrea(_ i: [String: Any]) async throws -> String {
-        guard await accessoEventi(promemoria: false) else { throw Problema("Il signore non ha dato accesso al calendario.") }
+        guard await accessoEventi(promemoria: false) else { throw Problema("Bea non ha dato accesso al calendario.") }
         guard let titolo = i["titolo"] as? String, let inizio = Strumenti.data(i["inizio"]) else { throw Problema("Mancano titolo o data di inizio.") }
         let e = EKEvent(eventStore: eventi)
         e.title = titolo
@@ -176,7 +176,7 @@ final class Strumenti {
     }
 
     private func calendarioLeggi(_ i: [String: Any]) async throws -> String {
-        guard await accessoEventi(promemoria: false) else { throw Problema("Il signore non ha dato accesso al calendario.") }
+        guard await accessoEventi(promemoria: false) else { throw Problema("Bea non ha dato accesso al calendario.") }
         let da = Strumenti.data(i["da"]) ?? Calendar.current.startOfDay(for: Date())
         let a = Strumenti.data(i["a"]) ?? da.addingTimeInterval(86_400)
         let trovati = eventi.events(matching: eventi.predicateForEvents(withStart: da, end: a, calendars: nil))
@@ -190,7 +190,7 @@ final class Strumenti {
     }
 
     private func promemoriaCrea(_ i: [String: Any]) async throws -> String {
-        guard await accessoEventi(promemoria: true) else { throw Problema("Il signore non ha dato accesso ai Promemoria.") }
+        guard await accessoEventi(promemoria: true) else { throw Problema("Bea non ha dato accesso ai Promemoria.") }
         guard let titolo = i["titolo"] as? String else { throw Problema("Manca il titolo.") }
         let r = EKReminder(eventStore: eventi)
         r.title = titolo
@@ -210,7 +210,7 @@ final class Strumenti {
     // MARK: Rubrica, chiamate, messaggi, mappe
 
     private func contattiCerca(_ i: [String: Any]) async throws -> String {
-        guard await accessoRubrica() else { throw Problema("Il signore non ha dato accesso alla rubrica.") }
+        guard await accessoRubrica() else { throw Problema("Bea non ha dato accesso alla rubrica.") }
         guard let nome = i["nome"] as? String, !nome.isEmpty else { throw Problema("Manca il nome da cercare.") }
         let chiavi = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactNicknameKey, CNContactPhoneNumbersKey] as [CNKeyDescriptor]
         let trovati = try rubrica.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: nome), keysToFetch: chiavi)
@@ -246,7 +246,7 @@ final class Strumenti {
         daAprire.append(url)
         let testoVero = i["testo"] as? String ?? ""                        // 7 nov: anche questo nell'ologramma di Messaggi
         Task { await RegistroMessaggi.mandato(a: numero, testo: testoVero, whatsapp: whatsapp) }
-        return json(["ok": true, "nota": "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia il signore"])
+        return json(["ok": true, "nota": "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia Bea"])
     }
 
     private func naviga(_ i: [String: Any]) throws -> String {
@@ -319,19 +319,19 @@ final class Strumenti {
         var url: URL?
         switch comando {
         case "timer", "sveglia":
-            nome = "JARVIS \(comando)"
+            nome = "FRIDAY \(comando)"
             guard !valore.isEmpty else { throw Problema("Manca il valore (\(comando == "timer" ? "minuti" : "ora HH:mm")).") }
             url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica(nome))&input=text&text=\(Strumenti.codifica(valore))")
         case "non_disturbare", "wifi", "bluetooth":
             let acceso = ["on", "si", "sì", "attiva", "acceso", "true", "1"].contains(valore)
-            nome = "JARVIS \(comando == "non_disturbare" ? "non disturbare" : comando) \(acceso ? "on" : "off")"
+            nome = "FRIDAY \(comando == "non_disturbare" ? "non disturbare" : comando) \(acceso ? "on" : "off")"
             url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica(nome))")
         default:
             throw Problema("Comando sconosciuto: \(comando). Scegli tra timer, sveglia, non_disturbare, wifi, bluetooth.")
         }
         guard let url else { throw Problema("Non riesco a preparare il comando.") }
         daAprire.append(url)
-        return json(["ok": true, "nota": "il Comando rapido «\(nome)» parte appena hai finito di parlare; se il signore non l'ha ancora creato, iOS glielo dirà"])
+        return json(["ok": true, "nota": "il Comando rapido «\(nome)» parte appena hai finito di parlare; se Bea non l'ha ancora creato, iOS glielo dirà"])
     }
 
     /// Sul Mac: il Comando rapido «JARVIS Mac» (uno solo, con uno script che conosce solo questi comandi).
@@ -345,11 +345,11 @@ final class Strumenti {
         let grezzo = String(describing: i["valore"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let valore = String(grezzo.filter { $0.isLetter || $0.isNumber || " .-_".contains($0) }.prefix(40))
         let testo = valore.isEmpty ? comando : "\(comando) \(valore)"
-        guard let url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica("JARVIS Mac"))&input=text&text=\(Strumenti.codifica(testo))") else {
+        guard let url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica("FRIDAY Mac"))&input=text&text=\(Strumenti.codifica(testo))") else {
             throw Problema("Non riesco a preparare il comando.")
         }
         daAprire.append(url)
-        return json(["ok": true, "nota": "il Comando rapido «JARVIS Mac» (\(testo)) parte appena hai finito di parlare: rispondi con una frase brevissima"])
+        return json(["ok": true, "nota": "il Comando rapido «FRIDAY Mac» (\(testo)) parte appena hai finito di parlare: rispondi con una frase brevissima"])
     }
 
     // MARK: Musica (ShazamKit)
@@ -384,7 +384,7 @@ final class Strumenti {
     // MARK: Foto della galleria
 
     private func fotoCerca(_ i: [String: Any]) async throws -> String {
-        guard await FotoLocali.autorizza() else { throw Problema("Il signore non ha dato accesso alle foto: Impostazioni › Jarvis › Foto.") }
+        guard await FotoLocali.autorizza() else { throw Problema("Bea non ha dato accesso alle foto: Impostazioni › FRIDAY › Foto.") }
         var luogo: CLLocation?
         if let nome = i["luogo"] as? String, !nome.isEmpty {
             let trovati = try? await CLGeocoder().geocodeAddressString(nome)
@@ -395,9 +395,9 @@ final class Strumenti {
         let quante = (i["quante"] as? Int) ?? (i["quante"] as? Double).map { Int($0) } ?? 12
         let esito = await FotoLocali.cerca(cosa: cosa, da: Strumenti.data(i["da"]), a: Strumenti.data(i["a"]), luogo: luogo,
                                            raggioKm: 5, album: i["album"] as? String, quante: quante)
-        immaginiNuove.append(contentsOf: esito.trovate.map { Immagine(fonte: "Le sue foto", locale: $0) })
+        immaginiNuove.append(contentsOf: esito.trovate.map { Immagine(fonte: "Le tue foto", locale: $0) })
         var out: [String: Any] = ["trovate": esito.trovate.count, "foto": esito.righe, "esaminate": esito.esaminate,
-                                  "nota_per_te": "le foto trovate sono già sullo schermo del signore"]
+                                  "nota_per_te": "le foto trovate sono già sullo schermo di Bea"]
         if let n = esito.nota { out["nota"] = n }
         return json(out)
     }
@@ -408,18 +408,18 @@ final class Strumenti {
         guard let apri = apriOcchi else { return (json(["errore": "fotocamera non disponibile"]), true) }
         let foto = await apri(true, video, min(max(zoom, 0.5), 15))
         guard !foto.isEmpty else {
-            return (json(["visto": false, "nota": "il signore ha chiuso la fotocamera o non ha dato il permesso: nessuna foto"]), false)
+            return (json(["visto": false, "nota": "Bea ha chiuso la fotocamera o non ha dato il permesso: nessuna foto"]), false)
         }
         fotoOcchi = foto
         if let detta = domandaOcchi?() {
             return (json(["visto": true, "il_signore_ha_detto": detta,
-                          "nota": "la foto appena scattata è allegata qui: il signore l'ha scattata a voce dicendo la frase in il_signore_ha_detto; rispondi a quella"]), false)
+                          "nota": "la foto appena scattata è allegata qui: Bea l'ha scattata a voce dicendo la frase in il_signore_ha_detto; rispondi a quella"]), false)
         }
         if foto.count > 1 {
             return (json(["visto": true, "fotogrammi": foto.count,
-                          "nota": "qui sono allegati \(foto.count) fotogrammi in ordine di tempo, presi durante un giro di 5 secondi mentre il signore muoveva il telefono: è una sola scena, mettili insieme e rispondi"]), false)
+                          "nota": "qui sono allegati \(foto.count) fotogrammi in ordine di tempo, presi durante un giro di 5 secondi mentre Bea muoveva il telefono: è una sola scena, mettili insieme e rispondi"]), false)
         }
-        return (json(["visto": true, "nota": "la foto appena scattata dalla fotocamera posteriore è allegata qui: guardala e rispondi al signore"]), false)
+        return (json(["visto": true, "nota": "la foto appena scattata dalla fotocamera posteriore è allegata qui: guardala e rispondi a Bea"]), false)
     }
 
     // MARK: Browser interno

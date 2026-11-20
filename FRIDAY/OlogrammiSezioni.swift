@@ -12,9 +12,9 @@ import WeatherKit
 
 /// I colori e gli attrezzi comuni degli ologrammi (OLO_C, OLO_B, OLO_S del mockup).
 enum Olo {
-    static let ciano = Color(red: 143 / 255, green: 240 / 255, blue: 1)
-    static let bianco = Color(red: 240 / 255, green: 253 / 255, blue: 1)
-    static let azzurro = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+    static let ciano = Color(red: 1, green: 154 / 255, blue: 92 / 255)
+    static let bianco = Color(red: 1, green: 244 / 255, blue: 236 / 255)
+    static let azzurro = Color(red: 1, green: 106 / 255, blue: 19 / 255)
     static let caldo = Color(red: 1, green: 236 / 255, blue: 190 / 255)
 
     /// Smoothstep: 0…1 morbido ai due capi.

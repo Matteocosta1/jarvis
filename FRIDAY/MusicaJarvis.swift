@@ -71,18 +71,18 @@ final class LettoreMusica: ObservableObject {
     /// Restituisce il titolo, o la frase da dire se non si è potuto.
     func salvaNeiPreferiti() async -> (titolo: String?, errore: String?) {
         aggiorna()
-        guard let e = voce, let item = e.item, case .song(let brano) = item else { return (nil, "Non sta suonando niente da salvare, Sir.") }
+        guard let e = voce, let item = e.item, case .song(let brano) = item else { return (nil, "Non sta suonando niente da salvare.") }
         guard await CatalogoMusica.autorizzato() else { return (nil, CatalogoMusica.senzaPermesso) }
         do {
             try await MusicLibrary.shared.add(brano)
             if let preferiti = await CatalogoMusica.playlistLibreria().first(where: { $0.name.localizedCaseInsensitiveCompare("Preferiti") == .orderedSame }) {
                 _ = try await MusicLibrary.shared.add(brano, to: preferiti)
             } else {
-                _ = try await MusicLibrary.shared.createPlaylist(name: "Preferiti", description: "Salvati da JARVIS", items: [brano])
+                _ = try await MusicLibrary.shared.createPlaylist(name: "Preferiti", description: "Salvati da FRIDAY", items: [brano])
             }
             return (brano.title, nil)
         } catch {
-            return (nil, "Apple Music non me l'ha lasciato salvare, Sir.")
+            return (nil, "Apple Music non me l'ha lasciato salvare.")
         }
     }
 
@@ -212,7 +212,7 @@ final class LettoreMusica: ObservableObject {
             var r = MusicRecentlyPlayedRequest<Song>()
             r.limit = 25
             guard let brani = try? await r.response().items, !brani.isEmpty else {
-                errore = "Niente in coda, Sir: scelga un brano da Oggi, Radio, Libreria o Cerca."
+                errore = "Niente in coda: scegli un brano da Oggi, Radio, Libreria o Cerca."
                 aggiorna()
                 return
             }
@@ -339,9 +339,9 @@ final class LettoreMusica: ObservableObject {
 
 /// Le richieste di MusicKit per le quattro schede: OGGI (ascoltati di recente, «Per lei», brani del momento), RADIO, LIBRERIA, CERCA.
 nonisolated enum CatalogoMusica {
-    static let senzaPermesso = "Per la musica serve il permesso ad Apple Music: Impostazioni › Jarvis › Contenuti multimediali e Apple Music."
+    static let senzaPermesso = "Per la musica serve il permesso ad Apple Music: Impostazioni › FRIDAY › Contenuti multimediali e Apple Music."
     /// Decisione 34: Apple Music non ha dato niente (senza rete, o MusicKit non attivo per l'app): OGGI non resta vuoto in silenzio.
-    static let nonRisponde = "Apple Music non risponde, Sir: riprovi tra poco."
+    static let nonRisponde = "Apple Music non risponde: riprova tra poco."
 
     static func autorizzato() async -> Bool {
         if MusicAuthorization.currentStatus == .authorized { return true }
@@ -369,7 +369,7 @@ nonisolated enum CatalogoMusica {
         for rec in risposta.recommendations {
             p += Array(rec.playlists)
             a += Array(rec.albums)
-            s += rec.stations.map { StazioneMusica(stazione: $0, sotto: rec.title ?? "Per lei") }
+            s += rec.stations.map { StazioneMusica(stazione: $0, sotto: rec.title ?? "Per te") }
         }
         return (Array(p.prefix(12)), Array(a.prefix(12)), s)
     }
@@ -403,7 +403,7 @@ nonisolated enum CatalogoMusica {
         var ascoltate: [Station] = []
         if let c = try? await MusicRecentlyPlayedRequest<Station>().response().items { ascoltate = Array(c) }
         var out = dirette.map { StazioneMusica(stazione: $0, sotto: "In diretta") }
-        out += sua.map { StazioneMusica(stazione: $0, sotto: "La sua stazione") }
+        out += sua.map { StazioneMusica(stazione: $0, sotto: "La tua stazione") }
         out += ascoltate.map { StazioneMusica(stazione: $0, sotto: "Ascoltata di recente") }
         out += suggerite
         var visti = Set<String>()
@@ -504,6 +504,7 @@ struct VistaMusica: View {
     }
 
     @ObservedObject private var lettore = LettoreMusica.condiviso
+    @ObservedObject private var spotify = SpotifyF.condiviso          // FRIDAY: lo Spotify di Bea, se l'ha collegato da Account
     @State private var scheda: Scheda = .oggi
     @State private var aperta: RaccoltaMusica?
     @State private var braniAperta: [Track]?
@@ -528,16 +529,17 @@ struct VistaMusica: View {
     @State private var conti: [String: Int] = [:]        // quanti brani ha ogni playlist / album (id → numero)
 
     var body: some View {
-        CorniceScheda(titolo: "Musica", sottotitolo: "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
+        CorniceScheda(titolo: "Musica", sottotitolo: spotify.collegato ? "spotify · apple music" : "sound · apple music", icona: "vinile", tinta: .ciano, pronto: pronto) {   // 7 nov sera: come tutte le sezioni (prima col marchio J.A.R.V.I.S.)   // 26 ott notte: JARVIS Sound (Studio · Sound · Social), testata di Studio e Social
             // 10 nov (il signore: «fai come le altre, 3 diversi ologrammi»): in testa l'ologramma con VINILE, ONDA, CODA, come il mockup
             OlogrammaMusicaProve(lettore: lettore)
                 .corniceOlo(Color.ciano)
+            if spotify.collegato { PannelliSpotify(tinta: .ciano) }
             PannelloOraMusica(lettore: lettore)
             // 12 nov (il signore: «il messaggio d'errore arancione puoi toglierlo del tutto, mi infastidisce»): gli errori del lettore
             // non si scrivono più nella pagina (come il mockup, che non li ha). Resta solo l'avviso quando manca il permesso o
             // l'abbonamento ad Apple Music, senza il quale la sezione non può funzionare
             if let avviso {
-                Pannello(tinta: .ciano) { Text(avviso).font(.footnote).foregroundStyle(.orange) }
+                Pannello(tinta: .ciano) { Text(avviso).font(.footnote).foregroundStyle(Color.rossoF) }
             }
             schede
             VStack(alignment: .leading, spacing: 14) { pagina }
@@ -730,7 +732,7 @@ struct VistaMusica: View {
                              ora: lettore.titolo == r.stazione.name) {
                             Task {
                                 await lettore.metti(r.stazione)
-                                await PannelliTraccia.notifica("\(r.stazione.name), Sir.")   // come nel mockup: l'avviso in alto
+                                await PannelliTraccia.notifica("\(r.stazione.name).")   // come nel mockup: l'avviso in alto
                             }
                         }
                     }
@@ -926,7 +928,7 @@ struct VistaMusica: View {
         }
         defer { riserva.cancel(); pronto = true }
         if let abbonamento = try? await MusicSubscription.current, !abbonamento.canPlayCatalogContent {
-            avviso = "Per far suonare Apple Music serve l'abbonamento attivo su questo iPhone, Sir."
+            avviso = "Per far suonare Apple Music serve l'abbonamento attivo su questo iPhone."
         }
         async let r = CatalogoMusica.recenti()
         async let p = CatalogoMusica.perLei()
@@ -992,9 +994,9 @@ private struct TesseraMusica: Identifiable {
 
 /// I colori del mockup che la sezione usa in più.
 enum ColoriMusica {
-    static let scuro = Color(red: 0.0, green: 0.094, blue: 0.125)       // #001820: la scritta della scheda accesa
-    static let copertinaA = Color(red: 0.012, green: 0.086, blue: 0.106) // #03161b
-    static let copertinaB = Color(red: 0.02, green: 0.16, blue: 0.19)
+    static let scuro = Color(red: 32 / 255, green: 12 / 255, blue: 0)       // #001820: la scritta della scheda accesa
+    static let copertinaA = Color(red: 27 / 255, green: 12 / 255, blue: 3 / 255) // #03161b
+    static let copertinaB = Color(red: 48 / 255, green: 21 / 255, blue: 5 / 255)
 }
 
 /// La copertina vera di Apple Music (ArtworkImage); se manca, il fondo scuro con le iniziali come le copertine del mockup.
@@ -1339,7 +1341,7 @@ enum PonteMusica {
         // arriva come «shazam:play» / «shazam:pausa» (la MUSICA del polso resta sul lettore di Apple Music, qui sotto).
         if comando.hasPrefix("brano:") || comando.hasPrefix("shazam:") { return await shazamDalPolso(comando) }
         guard MusicAuthorization.currentStatus == .authorized else {
-            return ["errore": "Apra MUSICA sull'iPhone e dia il permesso ad Apple Music, Sir."]
+            return ["errore": "Apri MUSICA sull'iPhone e dai il permesso ad Apple Music."]
         }
         switch comando {
         case "play": await l.play()

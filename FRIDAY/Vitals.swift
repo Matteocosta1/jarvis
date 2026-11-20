@@ -28,7 +28,7 @@ struct VistaVitals: View {
                         .corniceOlo(Color.ciano)
                     // BUILD 22 · B — ORGANISMO e A VOCE, come nel mockup (Organismo.swift)
                     PannelloOrganismo(oggi: oggi, diario: dati)
-                    PannelloAVoce(frasi: ["«Jarvis, scansione organismo»", "«Jarvis, stato dell'organismo»", "«Jarvis, come sto oggi?»"])
+                    PannelloAVoce(frasi: ["«FRIDAY, scansione organismo»", "«FRIDAY, stato dell'organismo»", "«FRIDAY, come sto oggi?»"])
                     sezioneOggi
 
                     Picker("Periodo", selection: $giorni) {
@@ -44,8 +44,8 @@ struct VistaVitals: View {
                         if !d.battiti.isEmpty { graficoBattito(d) }
                         if !d.passiGiorni.isEmpty { graficoPassi(d) }
                         lettura(d)
-                        Button { chiedi("Jarvis, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") } label: {
-                            Label("Chieda a JARVIS come sta", systemImage: "waveform")
+                        Button { chiedi("FRIDAY, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") } label: {
+                            Label("Chiedi a FRIDAY come stai", systemImage: "waveform")
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                 .frame(maxWidth: .infinity).frame(height: 48)
                                 .foregroundStyle(Color.fondo).background(Color.ciano2)
@@ -54,14 +54,14 @@ struct VistaVitals: View {
                         .buttonStyle(StileStark())
                         diario(d)
                     } else if let errore {
-                        Text(errore).foregroundStyle(.orange).font(.footnote)
+                        Text(errore).foregroundStyle(Color.rossoF).font(.footnote)
                     } else {
                         AttesaAnello().frame(maxWidth: .infinity).padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
                     }
                 }
                 .padding(16)
             }
-            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Vitals", sottotitolo: "parametri vitali", icona: "waveform.path.ecg")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Vitals", sottotitolo: "parametri vitali", icona: "f:vitals")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -72,7 +72,7 @@ struct VistaVitals: View {
             Button("Annulla", role: .cancel) {}
         }
         .preferredColorScheme(.dark)
-        .aperturaHUD("Vitals", icona: "waveform.path.ecg")
+        .aperturaHUD("Vitals", icona: "f:vitals")
         .regia("Vitals", stato: testoSchermo, azioni: [                  // 12.0 (10): la regia
             AzioneRegia("periodo", "il periodo dei grafici: 7, 30 o 90 giorni", valore: "giorni", frasi: ["ultimi *", "periodo *", "mostrami gli ultimi *"]) { v in
                 guard let g = Self.periodo(v["giorni"] ?? "") else { return .no("periodo non valido: 7, 30 o 90 giorni") }
@@ -128,7 +128,7 @@ struct VistaVitals: View {
                 if let p = o.pisolini { Text("Pisolino: \(p)\(o.riposoTotale.map { " · riposo totale \($0)" } ?? "")").font(.footnote).foregroundStyle(Color.ciano) }
                 if let n = o.notaSonno { Text(n.prefix(1).uppercased() + n.dropFirst()).font(.footnote).foregroundStyle(Color.tenue) }
                 ForEach(o.allenamenti, id: \.self) { a in
-                    Label(a, systemImage: "figure.run").font(.footnote).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                    Label(a, systemImage: "figure.run").font(.footnote).foregroundStyle(Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
                 }
                 HStack(spacing: 10) {
                     domanda("bed.double", "Come ho dormito?") { chiedi("Come ho dormito stanotte?") }
@@ -140,7 +140,7 @@ struct VistaVitals: View {
         }
         .task { oggi = await SaluteOggi.leggi() }
         .tastiAVoce { a in
-            if a == .vitalsCome { chiedi("Jarvis, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") }
+            if a == .vitalsCome { chiedi("FRIDAY, come sto ultimamente? Guarda i miei Vitals degli ultimi \(giorni) giorni.") }
         }
     }
 
@@ -195,7 +195,7 @@ struct VistaVitals: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("UMORE E SONNO").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
             if d.giorni.isEmpty {
-                Text("Ancora nessun dato nel periodo. Stasera alle 23:30 JARVIS le fa la prima domanda del diario.")
+                Text("Ancora nessun dato nel periodo. Stasera alle 22:30 FRIDAY ti fa la prima domanda del diario.")
                     .font(.footnote).foregroundStyle(Color.tenue)
             } else {
                 Chart {
@@ -216,7 +216,7 @@ struct VistaVitals: View {
                             .symbolSize(28)
                     }
                 }
-                .chartForegroundStyleScale(["Umore (1-10)": Color.ciano, "Sonno (ore)": Color.orange])
+                .chartForegroundStyleScale(["Umore (1-10)": Color.ciano, "Sonno (ore)": Color.rossoF])
                 .chartYScale(domain: 0...10)
                 .chartLegend(position: .bottom)
                 .frame(height: 200)
@@ -247,7 +247,7 @@ struct VistaVitals: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("LETTURA").font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(Color.ciano)
             ForEach(d.frasi, id: \.self) { f in
-                Text("▸ \(f)").font(.system(size: 13)).foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                Text("▸ \(f)").font(.system(size: 13)).foregroundStyle(Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
             }
         }
     }
@@ -290,7 +290,7 @@ struct VistaVitals: View {
         let o = await VistaVitals.chiama(["vitals": true, "giorni": giorni])
         let s = await salute
         if let e = o?["errore"] as? String { errore = e }
-        else if o == nil && s.isEmpty { errore = "Non riesco a leggere i Vitals, Sir. Riprovi tra poco."; return }
+        else if o == nil && s.isEmpty { errore = "Non riesco a leggere i Vitals. Riprova tra poco."; return }
         withAnimation(.easeOut(duration: 0.4)) { dati = DatiVitals(o ?? [:], salute: s, giorni: giorni) }
     }
 

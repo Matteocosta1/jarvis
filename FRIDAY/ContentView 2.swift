@@ -10,6 +10,7 @@ enum SchedaApp: String, Identifiable {
     case edith
     case scanner
     case musica                 // build 23: MUSICA, dall'icona in alto
+    case frigo, pilates, makeup, ciclo, testa, gestionale, armadio, nando, account, sos   // FRIDAY: le sezioni di Bea
     var id: String { rawValue }
 }
 
@@ -386,7 +387,7 @@ struct ContentView: View {
             for k in 0..<elenco.count {
                 if k > 0 && elenco[k - 1].gruppo != elenco[k].gruppo { t += 0.110 }
                 colpi.append(t / v)
-                t += elenco[k].gruppo == "INTELLIGENCE" ? 0.120 : 0.150
+                t += elenco[k].gruppo == "MENTE" ? 0.120 : 0.150
             }
             // la partitura vera (quella della traccia): STRUMENTI e INTELLIGENCE su tutto lo scarico della musica
             if Avvio.colpi.count == elenco.count { colpi = Avvio.colpi.map { $0 / v } }
@@ -531,7 +532,7 @@ struct ContentView: View {
             // 12.0 (14): la voce dell'avvio (JARVIS II) sfuma appena icone e chat sono finite: il signore vuole parlare
             if jarvis.avvioInCorso { ascoltaDopoAvvio = true } else { jarvis.ascoltaSubito() }
         case .briefing:
-            Task { await jarvis.invia("Buongiorno Jarvis, il briefing per favore.") }
+            Task { await jarvis.invia("Buongiorno FRIDAY, il briefing per favore.") }
         case .leggi(let testo):
             jarvis.leggi(testo)
         case .diario(let domanda):
@@ -539,6 +540,10 @@ struct ContentView: View {
         case .guarda:
             jarvis.interrompi()
             jarvis.guardaAutomatico()
+        case .sos:
+            jarvis.interrompi()
+            if telefono { tastiera = false }
+            scheda = .sos
         }
     }
 
@@ -557,7 +562,7 @@ struct ContentView: View {
             if let avviso = jarvis.avviso {
                 Text(avviso)
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.rossoF)
                     .lineLimit(1)
             } else if !frase.isEmpty {
                 Text(frase)
@@ -577,16 +582,16 @@ struct ContentView: View {
         switch jarvis.fase {
         case .attesa:
             // 9 nov (logica approvata dal signore): la riga dice cosa sente in ciascuno dei tre stati
-            if jarvis.micSpento { return "Non ascolto nulla · tocchi il reattore per parlare" }
+            if jarvis.micSpento { return "Non ascolto nulla · tocca il reattore per parlare" }
             // 13 nov: durante la voce dell'avvio il microfono è chiuso e un tocco fa parlare (la voce sfuma, poi ascolta): «Mi parli · un
             // tocco: solo «Jarvis»» qui sarebbe falso. Le parole sono quelle di SPENTO, approvate il 9 nov
-            if jarvis.avvioInCorso { return "Tocchi il reattore per parlare" }
-            if jarvis.musicaSuona { return "Dica «Jarvis»: abbasso la musica" }
-            if jarvis.riservato { return "Sento solo «Jarvis» · un tocco per tutto" }
-            return "Mi parli · un tocco: solo «Jarvis»"
-        case .ascolto: return "La ascolto, signore…"
+            if jarvis.avvioInCorso { return "Tocca il reattore per parlare" }
+            if jarvis.musicaSuona { return "Di' «FRIDAY»: abbasso la musica" }
+            if jarvis.riservato { return "Sento solo «FRIDAY» · un tocco per tutto" }
+            return "Parlami · un tocco: solo «FRIDAY»"
+        case .ascolto: return "Ti ascolto…"
         case .elaboro: return "Un momento…"
-        case .parlo: return "Tocchi il reattore per interrompermi"
+        case .parlo: return "Tocca il reattore per interrompermi"
         }
     }
 
@@ -597,7 +602,7 @@ struct ContentView: View {
     /// MARK X (26 ott): il nome della versione sotto il titolo.
     static let marca = "MARK XIII"                       // 13 nov: MARK XIII, Version 13.0 build 1 (il signore: «perfetto tutto nella 13.0»)
     /// MARK X: il posto di ogni icona in alto nell'arrivo da destra (da sinistra a destra).
-    enum postoTesta { static let musica = 0, cestino = 1, totale = 2 }
+    enum postoTesta { static let musica = 0, cestino = 1, difesa = 2, account = 3, sos = 4, totale = 5 }
     /// 5 nov (il signore: «vanno distanziate un minimo»): il margine per lato di ogni icona in alto, 3,5 punti (era 2): fra due
     /// icone 3 punti in più, e un tocco più largo. Con la tastiera aperta resta 1 (lì c'è il reattore piccolo).
     static let margineDock: CGFloat = 3.5
@@ -610,7 +615,7 @@ struct ContentView: View {
     /// Il titolo su una riga, a misura fissa (20 punti, spaziatura 5 come il mockup): l'ultimo punto attaccato alla S.
     ///
     private func titoloJarvis(spazio: CGFloat, misura: CGFloat) -> some View {
-        (Text("J.A.R.V.I.").tracking(spazio) + Text("S."))
+        (Text("F.R.I.D.A.").tracking(spazio) + Text("Y."))
             .font(.system(size: misura, weight: .bold, design: .monospaced))
             .lineLimit(1)
             .fixedSize()
@@ -692,8 +697,47 @@ struct ContentView: View {
                 Button("Pulisci", role: .destructive) { svuotaChat() }
                 Button("Annulla", role: .cancel) {}
             } message: {
-                Text("Memoria e note di JARVIS restano: si cancella solo la chat sullo schermo.")
+                Text("Memoria e note di FRIDAY restano: si cancella solo la chat sullo schermo.")
             }
+            // FRIDAY (mockup): Difesa e Account; con la tastiera aperta restano Musica, cestino e SOS (c'è il reattore piccolo)
+            if !mini {
+                Button { toccaDock(ContentView.postoTesta.difesa) } label: {
+                    SimboloFriday(nome: "f:difesa", lato: 14.4)
+                        .foregroundStyle(Color.ciano)
+                        .padding(.vertical, 8).padding(.horizontal, ContentView.margineDock)
+                        .contentShape(Rectangle())
+                }
+                .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+                .arrivoTesta(ContentView.postoTesta.difesa, arrivate: testaArrivate)
+                .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.difesa))
+                .accessibilityLabel("Difesa")
+                Button { toccaDock(ContentView.postoTesta.account) } label: {
+                    SimboloFriday(nome: "f:account", lato: 14.4)
+                        .foregroundStyle(Color.ciano)
+                        .padding(.vertical, 8).padding(.horizontal, ContentView.margineDock)
+                        .contentShape(Rectangle())
+                }
+                .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+                .arrivoTesta(ContentView.postoTesta.account, arrivate: testaArrivate)
+                .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.account))
+                .accessibilityLabel("Account")
+            }
+            // SOS: il tondo rosso del mockup; si apre al primo tocco (dentro c'è il conto alla rovescia per annullare)
+            Button { toccaDock(ContentView.postoTesta.sos) } label: {
+                Text("SOS")
+                    .font(.system(size: 8.5, weight: .bold, design: .monospaced)).tracking(0.8)
+                    .foregroundStyle(Color.rossoF)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.rossoF.opacity(0.14)))
+                    .overlay(Circle().stroke(Color.rossoF, lineWidth: 1.4))
+                    .shadow(color: Color.rossoF.opacity(0.35), radius: 7)
+                    .padding(.vertical, 2).padding(.leading, mini ? 2 : 5).padding(.trailing, mini ? 1 : ContentView.margineDock)
+                    .contentShape(Rectangle())
+            }
+            .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .arrivoTesta(ContentView.postoTesta.sos, arrivate: testaArrivate)
+            .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sos))
+            .accessibilityLabel("SOS, chiedi aiuto ad Ale")
         }
         .buttonStyle(StileStark())
         // MARK XI: sul Mac il puntatore sopra le icone le ingrandisce (senza premere), con il click per icona
@@ -722,24 +766,29 @@ struct ContentView: View {
     /// inglese, scelta del signore; prima SIGNORE · DAILY · SENSI · STRUMENTI).
     private var scorciatoie: [(gruppo: String, icona: String, nome: String, azione: () -> Void)] {
         [
-            ("BIOMETRICS", "book.closed", "Diario", { tastiera = false; scheda = .diario }),
-            ("BIOMETRICS", "person.2.wave.2", "Confidente", { tastiera = false; mostraConfidente = true }),
-            ("BIOMETRICS", "waveform.path.ecg", "Vitals", { tastiera = false; mostraVitals = true }),
-            ("BIOMETRICS", "bed.double", "Sonno", { tastiera = false; scheda = .sonno }),
-            ("BIOMETRICS", "figure.pilates", "Trainer", { tastiera = false; jarvis.interrompi(); jarvis.allenatore = true }),
+            ("SENSI", "f:occhi", "Occhi", { tastiera = false; jarvis.guardaManuale() }),
+            ("SENSI", "f:foto", "Foto", { tastiera = false; scheda = .foto }),
+            ("SENSI", "f:frigo", "Frigo", { tastiera = false; scheda = .frigo }),
+            ("SENSI", "f:cucina", "Cucina", { tastiera = false; jarvis.guardaCucina() }),
+            ("SENSI", "f:scanner", "Scanner", { tastiera = false; scheda = .scanner }),
 
-            ("OPERATIONS", "envelope.badge", "Email", { tastiera = false; scheda = .email }),
-            ("OPERATIONS", "envelope", "Messaggi", { tastiera = false; scheda = .messaggi }),
-            ("OPERATIONS", "cart", "Spesa", { tastiera = false; scheda = .spesa }),
+            ("CORPO", "f:allenatore", "Pilates", { tastiera = false; scheda = .pilates }),
+            ("CORPO", "f:makeup", "Makeup", { tastiera = false; scheda = .makeup }),
+            ("CORPO", "f:vitals", "Vitals", { tastiera = false; mostraVitals = true }),
+            ("CORPO", "f:sonno", "Sonno", { tastiera = false; scheda = .sonno }),
+            ("CORPO", "f:ciclo", "Ciclo", { tastiera = false; scheda = .ciclo }),
+            ("CORPO", "f:testa", "Testa", { tastiera = false; scheda = .testa }),
 
-            ("PERCEPTION", "eye", "Occhi", { tastiera = false; jarvis.guardaManuale() }),
-            ("PERCEPTION", "fork.knife", "Cucina", { tastiera = false; jarvis.guardaCucina() }),
-            ("PERCEPTION", "barcode.viewfinder", "Scanner", { tastiera = false; scheda = .scanner }),
-            ("PERCEPTION", "photo.on.rectangle", "Foto", { tastiera = false; scheda = .foto }),
+            ("CONTATTI", "f:mail", "Mail", { tastiera = false; scheda = .email }),
+            ("CONTATTI", "f:messaggi", "Messaggi", { tastiera = false; scheda = .messaggi }),
+            ("CONTATTI", "f:telefono", "Telefono", { tastiera = false; scheda = .telefono }),
+            ("CONTATTI", "f:interprete", "Interprete", { tastiera = false; apriInterprete() }),
 
-            ("ENGINEERING", "brain.head.profile", "Ricordi", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),   // build 22: si apre su TRACCIA, come nel mockup
-            ("ENGINEERING", "globe.europe.africa", "Interprete", { tastiera = false; apriInterprete() }),
-            ("ENGINEERING", "phone", "Telefono", { tastiera = false; scheda = .telefono }),
+            ("STRUMENTI", "f:gestionale", "Gestionale", { tastiera = false; scheda = .gestionale }),
+            ("STRUMENTI", "f:armadio", "Armadio", { tastiera = false; scheda = .armadio }),
+            ("STRUMENTI", "f:nando", "Nando", { tastiera = false; scheda = .nando }),
+            ("STRUMENTI", "f:spesa", "Spesa", { tastiera = false; scheda = .spesa }),
+            ("STRUMENTI", "f:musica", "Musica", { tastiera = false; scheda = .musica }),
         ]
     }
 
@@ -780,7 +829,7 @@ struct ContentView: View {
 
     /// La corona più INTELLIGENCE, nell'ordine di accensione.
     private var tutteLeIcone: [(gruppo: String, icona: String, nome: String, azione: () -> Void)] {
-        scorciatoie + intelligence.map { (gruppo: "INTELLIGENCE", icona: $0.icona, nome: $0.nome, azione: $0.azione) }
+        scorciatoie + intelligence.map { (gruppo: "MENTE", icona: $0.icona, nome: $0.nome, azione: $0.azione) }
     }
 
     /// Il centro del HUD: la corona col reattore, lo stato, la telemetria, la frase in corso e gli avvisi.
@@ -826,7 +875,7 @@ struct ContentView: View {
             if let avviso = jarvis.avviso {
                 Text(avviso)
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.rossoF)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
@@ -865,7 +914,7 @@ struct ContentView: View {
                     .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono() })
                     .scaleEffect(acceso ? 1 : 0.7)
                     .opacity(acceso ? 1 : 0)
-                    .accessibilityLabel("Parla con Jarvis")
+                    .accessibilityLabel("Parla con FRIDAY")
                     .modifier(VeloRuota(ruota: ruota))
                 ologramma
             }
@@ -881,7 +930,7 @@ struct ContentView: View {
                     s.azione()
                 } label: {
                     Group {
-                        Image(systemName: s.icona)
+                        SimboloFriday(nome: s.icona, lato: 15)
                     }
                         .font(.system(size: 15))
                         .symbolRenderingMode(.monochrome)                 // tutte dello stesso colore (Serata e Shazam compresi)
@@ -946,7 +995,7 @@ struct ContentView: View {
                 .opacity(acceso ? 1 : 0)
                 .position(x: r.midX, y: r.midY)
                 .highPriorityGesture(tiraGiuTendina)                    // giù col dito dal reattore: la tendina PROTOCOLLI, come prima
-                .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con Jarvis")
+                .accessibilityLabel(piccolo ? "Chiudi la tastiera" : "Parla con FRIDAY")
                 .modifier(VeloRuota(ruota: ruota))
                 if !piccolo {
                     ologramma.position(x: r.midX, y: r.midY)            // MARK XI: l'ologramma dell'icona in alto, al posto del reattore
@@ -971,7 +1020,9 @@ struct ContentView: View {
     /// con lo stesso «plim», lo stesso ingresso (grande e trasparente → piccola e nitida) e lo stesso tocco.
     private var intelligence: [(icona: String, nome: String, azione: () -> Void)] {
         [
-            // FRIDAY: qui andrà MENTE (fase 2)
+            ("f:diario", "Diario", { tastiera = false; scheda = .diario }),
+            ("f:confidente", "Confidente", { tastiera = false; mostraConfidente = true }),
+            ("f:memoria", "Memoria", { tastiera = false; guidaRicordi = false; salvaRicordi = false; mostraRicordi = .traccia }),
         ]
     }
 
@@ -1027,7 +1078,7 @@ struct ContentView: View {
     /// scorre o un primo tocco): altrimenti le ingrandisce attorno all'icona toccata, e il tocco dopo apre quella giusta.
     private func toccaDock(_ i: Int) {
         guard testaArrivate >= ContentView.postoTesta.totale else { return }          // durante l'arrivo delle icone non si apre niente
-        if ProcessInfo.processInfo.isiOSAppOnMac || dock.trattenuta || UIAccessibility.isVoiceOverRunning {   // VoiceOver: apre subito
+        if i == ContentView.postoTesta.sos || ProcessInfo.processInfo.isiOSAppOnMac || dock.trattenuta || UIAccessibility.isVoiceOverRunning {   // VoiceOver e SOS: apre subito
             Suoni.clickDock()
             azioneDock(i)
         } else {
@@ -1061,6 +1112,12 @@ struct ContentView: View {
             Suoni.tocco(); if telefono { tastiera = false }; scheda = .musica
         case ContentView.postoTesta.cestino:
             chiediPulizia = true
+        case ContentView.postoTesta.difesa:
+            Suoni.tocco(); if telefono { tastiera = false }; scheda = .edith
+        case ContentView.postoTesta.account:
+            Suoni.tocco(); if telefono { tastiera = false }; scheda = .account
+        case ContentView.postoTesta.sos:
+            if telefono { tastiera = false }; scheda = .sos
         default: break
         }
     }
@@ -1270,19 +1327,19 @@ struct ContentView: View {
             chiudiTutteLeSezioni()
             if parla && cerano { jarvis.annuncia(Battute.chiusoTutto()) }      // 12.0 (10): «Fatto, Sir. Tavolo sgombro.»
         case .chiudiSezione(let nome):
-            guard let v = pila.voci.first(where: { $0.sezione.nome == nome }) else { dici("La sezione \(nome) non è aperta, Sir."); return }
+            guard let v = pila.voci.first(where: { $0.sezione.nome == nome }) else { dici("La sezione \(nome) non è aperta."); return }
             fatto()
             let dietro = pila.davanti != v.id
             chiudiDietro(v.id)
-            if dietro && parla { jarvis.annuncia("Sezione \(nome) chiusa, Sir.") }      // non si vede: lo dice
+            if dietro && parla { jarvis.annuncia("Sezione \(nome) chiusa.") }      // non si vede: lo dice
         case .sezioniAperte:
-            guard !pila.voci.isEmpty else { dici("Nessuna sezione aperta, Sir."); return }
+            guard !pila.voci.isEmpty else { dici("Nessuna sezione aperta."); return }
             fatto()
             liberaSopra()
             naviga.chiesta = .sfoglio
         case .sezionePrima:
             guard let id = sezioneDiPrima() else {
-                dici(pila.voci.isEmpty ? "Nessuna sezione aperta, Sir." : "Non c'è un'altra sezione aperta, Sir.")
+                dici(pila.voci.isEmpty ? "Nessuna sezione aperta." : "Non c'è un'altra sezione aperta.")
                 return
             }
             fatto()
@@ -1291,7 +1348,7 @@ struct ContentView: View {
             if parla, let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { jarvis.annuncia(Battute.diPrima(nome)) }   // 12.0 (10)
         case .daParte:
             guard pila.voceDavanti != nil || naviga.modo == .sfoglio else {
-                dici(pila.voci.isEmpty ? "Nessuna sezione aperta, Sir." : "Nessuna sezione davanti, Sir.")
+                dici(pila.voci.isEmpty ? "Nessuna sezione aperta." : "Nessuna sezione davanti.")
                 return
             }
             fatto()
@@ -1306,7 +1363,7 @@ struct ContentView: View {
     /// È cambiata la sezione davanti: a salita finita (la molla si posa in ~0,5 s) JARVIS sotto si ferma; e si ricorda l'ordine
     /// in cui sono state davanti (le chiuse escono), per «Jarvis, quella di prima».
     private func davantiCambiata(_ d: UUID?) {
-        Regia.condivisa.evento(pila.voci.first { $0.id == d }.map { "davanti \($0.sezione.nome)" } ?? "davanti JARVIS")   // 12.0 (10)
+        Regia.condivisa.evento(pila.voci.first { $0.id == d }.map { "davanti \($0.sezione.nome)" } ?? "davanti FRIDAY")   // 12.0 (10)
         if let v = pila.voci.first(where: { $0.id == d }) { Abitudini.segna("sezione", v.sezione.nome) }   // 12.0 (12) · B6: le sue abitudini
         if let d {
             giroDavanti.removeAll { id in id == d || !pila.voci.contains { $0.id == id } }
@@ -1334,7 +1391,7 @@ struct ContentView: View {
             if let o = v.occhiata {
                 Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
                       oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
-                    .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "fork.knife" : "eye", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
+                    .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "f:cucina" : "f:occhi", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
             // 9 nov notte (il signore: «si apre due volte ed è orribile così»): una sezione sola, come il mockup. Dall'icona si apre
@@ -1351,7 +1408,7 @@ struct ContentView: View {
             VistaRicordi(iniziale: v.ricordi ?? .ricordi, guida: guidaRicordi, salva: salvaRicordi) { frase in mostraRicordi = nil; chiedi(frase) }.paginaPiena()
         case .confidente:
             VistaConfidente(invia: { testo, nascosto in mostraConfidente = false; chiedi(testo, nascosto: nascosto) },
-                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Modalità confidente. Mi racconti pure, Sir: la ascolto.") }).paginaPiena()
+                            aVoce: { mostraConfidente = false; jarvis.chiediDiario("Confidente. Raccontami pure: ti ascolto.") }).paginaPiena()
         case .scheda(let sc):
             vistaScheda(sc).paginaPiena()
         }
@@ -1364,7 +1421,7 @@ struct ContentView: View {
             scheda = nil
             Task {
                 try? await Task.sleep(for: .milliseconds(450))
-                jarvis.chiediDiario("Diario, Sir. Mi racconti com'è andata oggi: la ascolto.")
+                jarvis.chiediDiario("Diario. Raccontami com'è andata oggi: ti ascolto.")
             }
         }
         case .sonno: VistaSonno(chiedi: daScheda)
@@ -1376,6 +1433,16 @@ struct ContentView: View {
         case .edith: VistaEdith(chiedi: daScheda)
         case .scanner: VistaScanner(chiedi: daScheda)
         case .musica: VistaMusica()
+        case .frigo: VistaFrigo(chiedi: daScheda)
+        case .pilates: VistaPilates(chiedi: daScheda) { jarvis.interrompi(); jarvis.allenatore = true }   // lo Specchio sale, Pilates resta dietro
+        case .makeup: VistaMakeup(chiedi: daScheda)
+        case .ciclo: VistaCiclo(chiedi: daScheda)
+        case .testa: VistaTesta(chiedi: daScheda)
+        case .gestionale: VistaGestionale(chiedi: daScheda)
+        case .armadio: VistaArmadio(chiedi: daScheda)
+        case .nando: VistaNando(chiedi: daScheda)
+        case .account: VistaAccount()
+        case .sos: VistaSOS()
         }
     }
 
@@ -1494,6 +1561,16 @@ struct ContentView: View {
         case .telefono: return .scheda(.telefono)
         case .edith: return .scheda(.edith)
         case .musica: return .scheda(.musica)
+        case .frigo: return .scheda(.frigo)
+        case .pilates: return .scheda(.pilates)
+        case .makeup: return .scheda(.makeup)
+        case .ciclo: return .scheda(.ciclo)
+        case .testa: return .scheda(.testa)
+        case .gestionale: return .scheda(.gestionale)
+        case .armadio: return .scheda(.armadio)
+        case .nando: return .scheda(.nando)
+        case .account: return .scheda(.account)
+        case .sos: return .scheda(.sos)
         }
     }
 
@@ -1563,6 +1640,16 @@ struct ContentView: View {
             case .edith: scheda = .edith
             case .pulisci: svuotaChat()
             case .musica: scheda = .musica
+            case .frigo: scheda = .frigo
+            case .pilates: scheda = .pilates
+            case .makeup: scheda = .makeup
+            case .ciclo: scheda = .ciclo
+            case .testa: scheda = .testa
+            case .gestionale: scheda = .gestionale
+            case .armadio: scheda = .armadio
+            case .nando: scheda = .nando
+            case .account: scheda = .account
+            case .sos: scheda = .sos
             }
             // 4 nov (il signore, strada B): era dietro: prima torna davanti (la salita), poi fa la richiesta, come nel mockup
             if sulPosto {
@@ -1627,7 +1714,7 @@ struct ContentView: View {
                 HStack(spacing: 10) {
                     Image(uiImage: img).resizable().scaledToFill()
                         .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
-                    Text("Foto pronta: mi dica cosa vuole sapere, o invii così.")
+                    Text("Foto pronta: dimmi cosa vuoi sapere, o invia così.")
                         .font(.footnote).foregroundStyle(Color.tenue)
                     Spacer()
                     Button { jarvis.foto = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) }
@@ -1646,10 +1733,10 @@ struct ContentView: View {
                     .font(.system(size: 17))
                     .foregroundStyle(Color.ciano)
                     .frame(width: 44, height: 44)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.11, green: 0.21, blue: 0.25)))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 64 / 255, green: 41 / 255, blue: 28 / 255)))
             }
             .accessibilityLabel("Fotocamera")
-            TextField("Oppure scriva qui, signore…", text: $testo, axis: .vertical)
+            TextField("Oppure scrivi qui…", text: $testo, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($tastiera)
                 .onChange(of: tastiera) { _, _ in scrive = false }                        // tastiera su o giù: in attesa, non sta ancora scrivendo
@@ -1665,8 +1752,8 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
-                .background(Color(red: 0.04, green: 0.12, blue: 0.15).opacity(0.8))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.11, green: 0.21, blue: 0.25)))
+                .background(Color(red: 38 / 255, green: 20 / 255, blue: 10 / 255).opacity(0.8))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 64 / 255, green: 41 / 255, blue: 28 / 255)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             Button {
                 let t = testo
@@ -1707,7 +1794,7 @@ struct AnelliHUD: View {
                 // passa piano, l'anello interno. Le coordinate 000 · 090 · 180 · 270 le disegna EtichetteGhiera, sopra il cuore.
                 let c = CGPoint(x: size.width / 2, y: size.height / 2)
                 let R = Double(min(size.width, size.height)) / 2
-                let base = caldo ? Color.orange : Color.ciano
+                let base = caldo ? Color.rossoF : Color.ciano
                 func punto(_ r: Double, _ a: Double) -> CGPoint { CGPoint(x: c.x + r * cos(a), y: c.y + r * sin(a)) }
                 func cerchio(_ r: Double) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
                 // il bordo e le 120 tacche che scorrono piano
@@ -1758,7 +1845,7 @@ struct AnelliHUD: View {
 struct EtichetteGhiera: View {
     let fase: Fase
     var body: some View {
-        let base = fase == .elaboro || fase == .parlo ? Color.orange : Color.ciano
+        let base = fase == .elaboro || fase == .parlo ? Color.rossoF : Color.ciano
         GeometryReader { g in
             let R = Double(min(g.size.width, g.size.height)) / 2
             let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
@@ -1768,7 +1855,7 @@ struct EtichetteGhiera: View {
                     .font(.system(size: 7, weight: .semibold, design: .monospaced))
                     .foregroundStyle(base.opacity(0.95))
                     .frame(width: 26, height: 12)
-                    .background(Color(red: 0.02, green: 0.03, blue: 0.035).opacity(0.82))
+                    .background(Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255).opacity(0.82))
                     .overlay(Rectangle().stroke(base.opacity(0.6), lineWidth: 0.8))
                     .position(x: c.x + R * 0.9 * cos(a), y: c.y + R * 0.9 * sin(a))
             }
@@ -1836,16 +1923,16 @@ struct RigaMessaggio: View {
         let jarvis = m.ruolo == "assistant"
         HStack(alignment: .top, spacing: 10) {
             Rectangle()
-                .fill(jarvis ? Color.ciano : Color(red: 0.11, green: 0.21, blue: 0.25))
+                .fill(jarvis ? Color.ciano : Color(red: 64 / 255, green: 41 / 255, blue: 28 / 255))
                 .frame(width: 2)
             VStack(alignment: .leading, spacing: 4) {
-                Text(Glifi.rimescola("\(jarvis ? "JARVIS" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
+                Text(Glifi.rimescola("\(jarvis ? "FRIDAY" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(jarvis ? Color.ciano : Color.tenue)
                 Text(Glifi.rimescola(m.testo.isEmpty ? "…" : (m.conFoto ? "📷 " + m.testo : m.testo), rimescola))
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                    .foregroundStyle(Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
                     .textSelection(.enabled)
                 if let immagini = m.immagini, !immagini.isEmpty {
                     GalleriaMessaggio(immagini: immagini)
@@ -1886,7 +1973,7 @@ func descriviAzioni(_ azioni: [String]) -> String {
         "riconosci_musica": ("ha ascoltato la musica", "ascolti"),
         "apri_apple_music": ("ha aperto Apple Music", "volte"),
         "immagini_cerca": ("ha cercato immagini", "ricerche"),
-        "foto_cerca": ("ha cercato tra le sue foto", "ricerche"),
+        "foto_cerca": ("ha cercato tra le tue foto", "ricerche"),
         "apri_pagina": ("ha aperto la pagina", "pagine"),
         "salute_battito": ("ha letto i battiti", "letture"),
         "musica_riproduci": ("ha messo la musica", "brani"),

@@ -10,7 +10,7 @@ enum MusicaApple {
         let testo = cerca.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !testo.isEmpty else { return (json(["errore": "manca cosa cercare"]), true) }
         guard await MusicAuthorization.request() == .authorized else {
-            return (json(["errore": "il signore non ha dato accesso ad Apple Music: Impostazioni › Jarvis › Contenuti multimediali e Apple Music"]), true)
+            return (json(["errore": "Bea non ha dato accesso ad Apple Music: Impostazioni › FRIDAY › Contenuti multimediali e Apple Music"]), true)
         }
         do {
             let abbonamento = try await MusicSubscription.current

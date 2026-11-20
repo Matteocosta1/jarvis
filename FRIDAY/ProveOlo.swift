@@ -104,12 +104,12 @@ nonisolated enum SezioneOlo: String, CaseIterable {
 
 /// I colori e gli attrezzi del mockup: OLO_C (#8ff0ff), OLO_B (#f0fdff), OLO_S (#4fe3ff) con la loro trasparenza.
 enum OP {
-    static func c(_ a: Double) -> Color { Color(red: 143 / 255, green: 240 / 255, blue: 1).opacity(min(1, max(0, a))) }
-    static func b(_ a: Double) -> Color { Color(red: 240 / 255, green: 253 / 255, blue: 1).opacity(min(1, max(0, a))) }
-    static func s(_ a: Double) -> Color { Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(min(1, max(0, a))) }
-    static let rgbC = Color(red: 143 / 255, green: 240 / 255, blue: 1)
-    static let rgbB = Color(red: 240 / 255, green: 253 / 255, blue: 1)
-    static let rgbS = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+    static func c(_ a: Double) -> Color { Color(red: 1, green: 154 / 255, blue: 92 / 255).opacity(min(1, max(0, a))) }
+    static func b(_ a: Double) -> Color { Color(red: 1, green: 244 / 255, blue: 236 / 255).opacity(min(1, max(0, a))) }
+    static func s(_ a: Double) -> Color { Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(min(1, max(0, a))) }
+    static let rgbC = Color(red: 1, green: 154 / 255, blue: 92 / 255)
+    static let rgbB = Color(red: 1, green: 244 / 255, blue: 236 / 255)
+    static let rgbS = Color(red: 1, green: 106 / 255, blue: 19 / 255)
     static let due = 2 * Double.pi
 
     /// lisO del mockup (smoothstep).
@@ -298,7 +298,7 @@ enum OP {
         let kb = lis((eta - 0.12) / 0.18)
         guard kb > 0 else { return }
         let vetro = CGRect(x: bx, y: by, width: bw, height: bh)
-        gc.fill(Path(vetro), with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.84 * kb)))
+        gc.fill(Path(vetro), with: .color(Color(red: 16 / 255, green: 7 / 255, blue: 2 / 255).opacity(0.84 * kb)))
         gc.stroke(Path(vetro.insetBy(dx: 0.5, dy: 0.5)), with: .color(s(0.4 * kb)), lineWidth: 1)
         var staffe = Path()
         let st = 6.0
@@ -332,7 +332,7 @@ enum OP {
         let pillola = Path(roundedRect: CGRect(x: W / 2 - w / 2, y: y - alta / 2, width: w, height: alta), cornerRadius: alta / 2)
         var g = gc
         g.blendMode = .normal
-        g.fill(pillola, with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.85 * f)))
+        g.fill(pillola, with: .color(Color(red: 16 / 255, green: 7 / 255, blue: 2 / 255).opacity(0.85 * f)))
         g.stroke(pillola, with: .color(s(0.25 * f)), lineWidth: 0.6)
         scritta(&gc, testo, W / 2, H - 6, 7, 600, c(a))
     }
@@ -567,7 +567,7 @@ struct ChipOlo: View {
             Text(testo)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.5)
                 .lineLimit(1).minimumScaleFactor(0.8)
-                .foregroundStyle(acceso ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                .foregroundStyle(acceso ? Color(red: 32 / 255, green: 12 / 255, blue: 0) : Color.ciano)
                 .padding(.vertical, 7).padding(.horizontal, 4)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 8).fill(acceso ? Color.ciano : .clear))

@@ -128,7 +128,7 @@ struct EtichettaOlo: View {
     let testo: String
     var stile: Stile = .normale
 
-    private static let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+    private static let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
     private static let verde = Color(red: 120 / 255, green: 230 / 255, blue: 150 / 255)
     private static let ambra = Color(red: 1, green: 180 / 255, blue: 90 / 255)
 
@@ -144,7 +144,7 @@ struct EtichettaOlo: View {
         case .verde: return Color(red: 168 / 255, green: 245 / 255, blue: 191 / 255)
         case .ambra: return Color(red: 1, green: 214 / 255, blue: 163 / 255)
         case .grande: return .white
-        case .normale: return Color(red: 230 / 255, green: 244 / 255, blue: 248 / 255)
+        case .normale: return Color(red: 246 / 255, green: 236 / 255, blue: 230 / 255)
         }
     }
     private var alone: Color {
@@ -163,7 +163,7 @@ struct EtichettaOlo: View {
             .fixedSize()
             .foregroundStyle(scritta)
             .padding(.horizontal, stile == .grande ? 9 : 6).padding(.vertical, stile == .grande ? 4 : 3)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 5 / 255, green: 8 / 255, blue: 9 / 255).opacity(0.72)))
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255).opacity(0.72)))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(bordo, lineWidth: 1))
             .shadow(color: alone, radius: 5)
     }
@@ -625,7 +625,7 @@ struct PannelloOrganismo: View {
     let diario: DatiVitals?
     @StateObject private var ologramma = OlogrammaOrganismo(leggero: false)
     @State private var storia: [Date: SaluteStorica.Valori] = [:]
-    private let chiaro = Color(red: 207 / 255, green: 226 / 255, blue: 232 / 255)   // #cfe2e8
+    private let chiaro = Color(red: 232 / 255, green: 216 / 255, blue: 207 / 255)   // #cfe2e8
 
     private var dati: DatiOrganismo { DatiOrganismo.calcola(oggi: oggi, storia: storia, diario: diario) }
 

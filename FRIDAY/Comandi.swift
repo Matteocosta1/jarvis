@@ -6,14 +6,14 @@ import SwiftUI
 @MainActor
 final class Comandi: ObservableObject {
     static let condiviso = Comandi()
-    enum Richiesta: Equatable { case ascolta, briefing, leggi(String), guarda, diario(String) }   // leggi: notifica da dire; guarda: occhi; diario: domanda della sera
+    enum Richiesta: Equatable { case ascolta, briefing, leggi(String), guarda, diario(String), sos }   // leggi: notifica da dire; guarda: occhi; diario: domanda della sera
     @Published var richiesta: Richiesta?
 }
 
 struct ParlaConJarvis: AppIntent {
     // nonisolated e calcolate: soddisfano i requisiti (non isolati) di AppIntent anche con MainActor come isolamento predefinito
-    nonisolated static var title: LocalizedStringResource { "Parla con Jarvis" }
-    nonisolated static var description: IntentDescription { IntentDescription("Apre Jarvis già in ascolto.") }
+    nonisolated static var title: LocalizedStringResource { "Parla con FRIDAY" }
+    nonisolated static var description: IntentDescription { IntentDescription("Apre FRIDAY già in ascolto.") }
     nonisolated static var openAppWhenRun: Bool { true }
 
     @MainActor
@@ -24,8 +24,8 @@ struct ParlaConJarvis: AppIntent {
 }
 
 struct BriefingDiJarvis: AppIntent {
-    nonisolated static var title: LocalizedStringResource { "Briefing di Jarvis" }
-    nonisolated static var description: IntentDescription { IntentDescription("Jarvis prepara il briefing: meteo, impegni, note e serate.") }
+    nonisolated static var title: LocalizedStringResource { "Briefing di FRIDAY" }
+    nonisolated static var description: IntentDescription { IntentDescription("FRIDAY prepara il briefing: lezioni, impegni, note e meteo.") }
     nonisolated static var openAppWhenRun: Bool { true }
 
     @MainActor
@@ -36,13 +36,26 @@ struct BriefingDiJarvis: AppIntent {
 }
 
 struct GuardaConJarvis: AppIntent {
-    nonisolated static var title: LocalizedStringResource { "Jarvis, guarda" }
-    nonisolated static var description: IntentDescription { IntentDescription("Apre gli occhi di Jarvis: la fotocamera scatta da sola e Jarvis dice cosa vede.") }
+    nonisolated static var title: LocalizedStringResource { "FRIDAY, guarda" }
+    nonisolated static var description: IntentDescription { IntentDescription("Apre gli occhi di FRIDAY: la fotocamera scatta da sola e FRIDAY dice cosa vede.") }
     nonisolated static var openAppWhenRun: Bool { true }
 
     @MainActor
     func perform() async throws -> some IntentResult {
         Comandi.condiviso.richiesta = .guarda
+        return .result()
+    }
+}
+
+/// FRIDAY · SOS: dal tasto Azione o da Siri («FRIDAY, aiuto»). Apre l'SOS: dopo 5 secondi (annullabili) parte l'aiuto ad Ale.
+struct AiutoAle: AppIntent {
+    nonisolated static var title: LocalizedStringResource { "Aiuto Ale" }
+    nonisolated static var description: IntentDescription { IntentDescription("Apre l'SOS di FRIDAY: dopo 5 secondi avvisa Ale con la tua posizione. Puoi annullare.") }
+    nonisolated static var openAppWhenRun: Bool { true }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        Comandi.condiviso.richiesta = .sos
         return .result()
     }
 }
@@ -55,7 +68,7 @@ struct ScorciatoieJarvis: AppShortcutsProvider {
         AppShortcut(intent: ParlaConJarvis(),
                     phrases: ["\(.applicationName)", "Parla con \(.applicationName)", "Chiedi a \(.applicationName)", "Ehi \(.applicationName)",
                              "Attiva \(.applicationName)", "Svegliati \(.applicationName)"],
-                    shortTitle: "Parla con Jarvis",
+                    shortTitle: "Parla con FRIDAY",
                     systemImageName: "waveform.circle")
         AppShortcut(intent: BriefingDiJarvis(),
                     phrases: ["Buongiorno \(.applicationName)", "Briefing di \(.applicationName)"],
@@ -63,7 +76,11 @@ struct ScorciatoieJarvis: AppShortcutsProvider {
                     systemImageName: "sun.horizon")
         AppShortcut(intent: GuardaConJarvis(),
                     phrases: ["\(.applicationName) guarda", "Guarda con \(.applicationName)", "Occhi di \(.applicationName)"],
-                    shortTitle: "Occhi di Jarvis",
+                    shortTitle: "Occhi di FRIDAY",
                     systemImageName: "eye")
+        AppShortcut(intent: AiutoAle(),
+                    phrases: ["\(.applicationName) aiuto", "Aiuto \(.applicationName)", "SOS \(.applicationName)"],
+                    shortTitle: "Aiuto Ale",
+                    systemImageName: "sos")
     }
 }

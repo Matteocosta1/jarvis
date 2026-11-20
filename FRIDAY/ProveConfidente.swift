@@ -189,7 +189,7 @@ final class ProveConfidente {
 }
 
 #if os(iOS)
-/// L'ologramma del Confidente, sotto le parole di JARVIS (iPhone).
+/// L'ologramma del Confidente, sotto le parole di FRIDAY (iPhone).
 struct OlogrammaConfidente: View {
     let dati: ConfidenteOlo
     @State private var prove = ProveConfidente()

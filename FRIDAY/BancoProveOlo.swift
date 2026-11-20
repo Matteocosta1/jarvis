@@ -40,7 +40,7 @@ struct BancoProveOlo: View {
         case "costi": OlogrammaCostiProve(dati: BancoProveOlo.costi)
         case "traccia": BancoTraccia()
         case "interprete": BancoInterprete()
-        default: Text("Sezione sconosciuta: \(sezione)").foregroundStyle(.orange)
+        default: Text("Sezione sconosciuta: \(sezione)").foregroundStyle(Color.rossoF)
         }
     }
 

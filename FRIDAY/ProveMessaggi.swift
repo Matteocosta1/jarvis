@@ -157,7 +157,7 @@ final class ProveMessaggi {
         p.closeSubpath()
         let prima = gc.blendMode
         gc.blendMode = .normal                                          // il vetro scuro: copre quello che sta dietro
-        gc.fill(p, with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.62 * alfa)))
+        gc.fill(p, with: .color(Color(red: 16 / 255, green: 7 / 255, blue: 2 / 255).opacity(0.62 * alfa)))
         gc.blendMode = prima
         gc.fill(p, with: .color(OP.s((chiaro ? 0.14 : 0.06) * alfa)))
         gc.stroke(p, with: .color(chiaro ? OP.b(0.9 * alfa) : OP.c(0.55 * alfa)), lineWidth: chiaro ? 1.2 : 0.9)

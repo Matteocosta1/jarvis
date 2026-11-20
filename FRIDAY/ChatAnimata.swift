@@ -39,7 +39,7 @@ enum Avvio {
     /// La molla delle icone della coda: la stessa, più svelta.
     static let mollaCoda = 0.12
     /// L'indice della prima icona della coda: da Ricordi (tutte le icone dello scarico).
-    static func inizioCoda(_ nomi: [String]) -> Int { nomi.firstIndex(of: "Ricordi") ?? nomi.count }
+    static func inizioCoda(_ nomi: [String]) -> Int { nomi.firstIndex(of: "Gestionale") ?? nomi.count }
     /// La partitura dell'iPhone (secondi a velocità normale, 27 icone dalla build 23, con SATELLITE): è quella con cui è montata
     /// «avvio». Le prime 16 al passo di sempre (SENSI chiude sul colpo forte di 2,5 s); STRUMENTI e INTELLIGENCE (11 icone,
     /// prima 10) distribuite su tutto lo SCARICO della musica, 2,885 → 3,724 s; Bea sull'ultimo colpo (scelto sul mock, «Dopo»).

@@ -51,7 +51,7 @@ struct VistaFotoScheda: View {
     @Environment(\.sezioneDietro) private var dietro    // dietro (MARK XI) la rilettura delle foto si ferma
 
     var body: some View {
-        CorniceScheda(titolo: "Foto", sottotitolo: foto.map { "\($0.count) foto · \(periodo.rawValue.lowercased())" } ?? "sfoglio la galleria", icona: "photo.on.rectangle", tinta: tinta, pronto: foto != nil) {
+        CorniceScheda(titolo: "Foto", sottotitolo: foto.map { "\($0.count) foto · \(periodo.rawValue.lowercased())" } ?? "sfoglio la galleria", icona: "f:foto", tinta: tinta, pronto: foto != nil) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Periodo.allCases) { p in
@@ -96,9 +96,9 @@ struct VistaFotoScheda: View {
                 Button {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
                 } label: {
-                    Text("Accesso limitato: vedo solo le foto che ha scelto lei. Per cercare in tutta la galleria: Impostazioni › App › Jarvis › Foto › Accesso completo.")
+                    Text("Accesso limitato: vedo solo le foto che hai scelto tu. Per cercare in tutta la galleria: Impostazioni › App › FRIDAY › Foto › Accesso completo.")
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.rossoF)
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
@@ -183,7 +183,7 @@ struct VistaFotoScheda: View {
                 guard !c.isEmpty else { return .no("niente da cercare") }
                 Suoni.tocco()
                 cerca = c
-                return .fatto("cerco «\(c)» in tutte le foto", battuta: { Battute.una("foto.cerca", ["Cerco \(c), Sir.", "Ecco le foto con \(c).", "Setaccio la galleria: \(c)."]) })
+                return .fatto("cerco «\(c)» in tutte le foto", battuta: { Battute.una("foto.cerca", ["Cerco \(c).", "Ecco le foto con \(c).", "Setaccio la galleria: \(c)."]) })
             },
             AzioneRegia("periodo", "oggi, ieri, 7 giorni, 30 giorni, tutte", valore: "quando", frasi: ["di *", "quelle di *", "periodo *"]) { v in
                 let k = Regia.chiave(v["quando"] ?? "")
@@ -210,14 +210,14 @@ struct VistaFotoScheda: View {
     }
 
     private func carica() async {
-        guard await FotoLocali.autorizza() else { nota = "Serve l'accesso alle foto: Impostazioni › App › Jarvis › Foto."; foto = []; return }
+        guard await FotoLocali.autorizza() else { nota = "Serve l'accesso alle foto: Impostazioni › App › FRIDAY › Foto."; foto = []; return }
         limitato = FotoLocali.accessoLimitato
         let (da, a) = periodo.intervallo
         let c = cerca.trimmingCharacters(in: .whitespaces)
         let esito = await FotoLocali.cercaTesto(c, da: da, a: a, quante: c.isEmpty ? 120 : 300)
         guard !Task.isCancelled else { return }                        // un'altra ricerca è già partita
         nota = esito.nota
-        let nuove = esito.trovate.map { Immagine(fonte: "Le sue foto", locale: $0) }
+        let nuove = esito.trovate.map { Immagine(fonte: "Le tue foto", locale: $0) }
         // le foto che arrivano adesso (non quelle già a schermo) si materializzano una dopo l'altra; non sotto il caricamento
         // della sezione e non con «Riduci movimento»
         var r: [String: Double] = [:]

@@ -48,7 +48,7 @@ enum Tav {
     static let verde = Color(red: 120 / 255, green: 1, blue: 190 / 255)
     static let oro = Color(red: 1, green: 200 / 255, blue: 120 / 255)
     static let menta = Color(red: 160 / 255, green: 1, blue: 200 / 255)
-    static let reattore = Color(red: 200 / 255, green: 250 / 255, blue: 1)
+    static let reattore = Color(red: 1, green: 220 / 255, blue: 200 / 255)
     static func a(_ c: Color, _ x: Double) -> Color { c.opacity(min(1, max(0, x))) }
 
     /// scenaOlo: il proiettore, il cono e la prospettiva.

@@ -68,7 +68,7 @@ final class ProveMusica {
         return "\(v / 60):" + String(format: "%02d", v % 60)
     }
 
-    private static func stato(_ D: DatiMusicaOlo) -> String { D.jPausa ? "JARVIS ASCOLTA" : D.suona ? "IN RIPRODUZIONE" : "IN PAUSA" }
+    private static func stato(_ D: DatiMusicaOlo) -> String { D.jPausa ? "FRIDAY ASCOLTA" : D.suona ? "IN RIPRODUZIONE" : "IN PAUSA" }
 
     private static func lis(_ v: Double) -> Double { min(1, max(0, v)) }
 
@@ -353,7 +353,7 @@ enum CopertinaOlo {
         }
         let tinta = rgbDaHsl((185 + r(20)) / 360, 0.7, (8 + r(10)) / 100)
         g.fill(Path(CGRect(x: 0, y: 0, width: L, height: L)),
-               with: .linearGradient(Gradient(colors: [Color(red: 3 / 255, green: 22 / 255, blue: 27 / 255), tinta]),
+               with: .linearGradient(Gradient(colors: [Color(red: 27 / 255, green: 12 / 255, blue: 3 / 255), tinta]),
                                      startPoint: .zero, endPoint: CGPoint(x: L, y: L)))
         let lw = L / 90, tipo = h % 3
         func traccia(_ p: Path, _ a: Double) { g.stroke(p, with: .color(OP.s(0.75 * a)), lineWidth: lw) }

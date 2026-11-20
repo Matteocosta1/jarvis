@@ -132,7 +132,7 @@ final class Regia {
     /// Le azioni delle sezioni prima che si siano mai aperte (dal codice della 12.0 (11)).
     private static let seme: [String: String] = [
         "Spesa": "aggiungi(cosa), togli(cosa), preso(cosa), rimetti(cosa), svuota*, whatsapp",
-        "Email": "aggiorna, apri(quale), non_lette, tutte, cartella(nome), periodo(giorni), chiudi_mail, apri_in_mail",
+        "Mail": "aggiorna, apri(quale), non_lette, tutte, cartella(nome), periodo(giorni), chiudi_mail, apri_in_mail",
         "Meteo": "aggiorna",
         "Musica": "metti(quale), cerca(testo), scheda(nome), apri(quale), play, pausa, avanti, indietro, casuale, ripeti",
         "Messaggi": "a(chi), testo(testo), aggiungi(testo), canale(nome), cambia, svuota*, invia*",
@@ -142,13 +142,13 @@ final class Regia {
         "Shazam": "suona(quale), libreria, chiudi_player, elimina(quale)*",
         "Foto": "cerca(cosa), periodo(quando), apri(quale), pulisci",
         "Serata": "scegli(quale)",
-        "Ricordi": "scheda(nome), cerca(cosa), guida, salva_qui, fatto(quale), elimina(quale)*",
+        "Memoria": "scheda(nome), cerca(cosa), guida, salva_qui, fatto(quale), elimina(quale)*",
         "Satellite": "scegli(luogo), ricognizione(indirizzo), filtro(quali), naviga, guida, dossier",
         "GitHub": "apri(repo), tutti",
         "Supabase": "periodo(ore), aggiorna",
         "Archivio": "cartella(nome), cerca(cosa), apri(file), condividi(file), elimina(file)*",
         "Costi": "aggiorna",
-        "EDITH": "controlla(tipo, dato)",
+        "Difesa": "controlla(tipo, dato)",
         "Vitals": "periodo(giorni)",
     ]
 
@@ -262,7 +262,7 @@ final class Regia {
     /// sezioni che si possono aprire; le strade di sempre; quello che è appena successo. `rigaVecchia`: quello che mostra la
     /// sezione davanti se non è ancora nella regia (la riga di `Schermo`).
     func catalogo(rigaVecchia: String?) -> String {
-        var pezzi: [String] = ["REGIA (strumento «regia»: sezione, azione, valori; * = serve il sì del signore)"]
+        var pezzi: [String] = ["REGIA (strumento «regia»: sezione, azione, valori; * = serve il sì di Bea)"]
         let aperte = pila?.voci ?? []
         if let d = nomeDavanti {
             let stato = statoDi(d) ?? rigaVecchia ?? "aperta"
@@ -271,11 +271,11 @@ final class Regia {
             if !a.isEmpty { pezzi.append("azioni \(d): " + Regia.elenco(a)) }
             if let p = proposta, Date().timeIntervalSince(p.quando) < 45 { pezzi.append("HAI APPENA PROPOSTO: \(p.testo) (se dice sì la fa l'app)") }
         } else {
-            pezzi.append("DAVANTI JARVIS (la schermata principale)")
+            pezzi.append("DAVANTI FRIDAY (la schermata principale)")
         }
         // 12.0 (16): il filo del discorso, il lavoro insieme, la fretta (subito dopo davanti: se la riga è lunga si accorcia altro)
         if let f = Filo.condiviso.perCervello() { pezzi.append(f) }
-        if Battute.umore == .fretta { pezzi.append("RITMO: il signore ha fretta: rispondi in una riga sola (se poi dice «dimmi meglio», la versione intera)") }
+        if Battute.umore == .fretta { pezzi.append("RITMO: Bea ha fretta: rispondi in una riga sola (se poi dice «dimmi meglio», la versione intera)") }
         let dietro = aperte.map(\.sezione.nome).filter { $0 != nomeDavanti }
         for n in dietro.suffix(6) {
             var riga = "DIETRO \(n)"
@@ -285,7 +285,7 @@ final class Regia {
             pezzi.append(riga)
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna JARVIS), di_prima, sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato in FILO, la scheda in alto a destra divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi…), senza aprire sezioni; sparisce da sola in 3 secondi, «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni: rispondi in una riga e metti il dato in FILO (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); «apri…» apre la sezione")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, torna FRIDAY), di_prima, sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato in FILO, la scheda in alto a destra divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi…), senza aprire sezioni; sparisce da sola in 3 secondi, «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni: rispondi in una riga e metti il dato in FILO (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); «apri…» apre la sezione")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -311,7 +311,7 @@ final class Regia {
     /// Lo strumento «regia» com'è descritto al cervello (`strumenti_client_def`): il cervello lo usa senza essere ripubblicato.
     static let definizione: [String: Any] = [
         "name": "regia",
-        "description": "La regia dell'app, come JARVIS nell'armatura di Tony: apri, chiudi, porta davanti, metti da parte le sezioni e fai le loro azioni, quelle elencate dopo REGIA nella riga [Schermo] (sezione, azione, valori). Più passi in una chiamata, in ordine. Le azioni con * (inviare, eliminare, pubblicare, chiamare) aspettano il sì del signore: chiediglielo con una domanda breve e naturale, poi richiama con confermato=true. Agisci e intanto parla come JARVIS con Tony in laboratorio: una frase breve e viva col dato che conta, una battuta asciutta quando ci sta; mai «comando eseguito», mai elenchi.",
+        "description": "La regia dell'app, come FRIDAY nell'armatura di Tony: apri, chiudi, porta davanti, metti da parte le sezioni e fai le loro azioni, quelle elencate dopo REGIA nella riga [Schermo] (sezione, azione, valori). Più passi in una chiamata, in ordine. Le azioni con * (inviare, eliminare, pubblicare, chiamare) aspettano il sì di Bea: chiediglielo con una domanda breve e naturale, poi richiama con confermato=true. Agisci e intanto parla come FRIDAY con Tony in laboratorio: una frase breve e viva col dato che conta, una battuta asciutta quando ci sta; mai «comando eseguito», mai elenchi.",
         "input_schema": [
             "type": "object",
             "properties": [
@@ -329,7 +329,7 @@ final class Regia {
                         "required": ["azione"],
                     ] as [String: Any],
                 ] as [String: Any],
-                "confermato": ["type": "boolean", "description": "Solo dopo il sì del signore alla tua domanda di conferma"],
+                "confermato": ["type": "boolean", "description": "Solo dopo il sì di Bea alla tua domanda di conferma"],
             ] as [String: Any],
             "required": ["passi"],
         ] as [String: Any],
@@ -352,7 +352,7 @@ final class Regia {
                   s.passi.map({ Regia.chiave($0.sezione) + "/" + Regia.chiave($0.azione) }) == passi.map({ Regia.chiave($0.sezione) + "/" + Regia.chiave($0.azione) }),
                   let f = ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
                 inSospeso = nil
-                return (Regia.json(["errore": "conferma non valida: chiedi al signore con una domanda breve e aspetta il suo sì (lo controlla l'app)"]), true)
+                return (Regia.json(["errore": "conferma non valida: chiedi a Bea con una domanda breve e aspetta il suo sì (lo controlla l'app)"]), true)
             }
             passi = s.passi
             inSospeso = nil
@@ -362,7 +362,7 @@ final class Regia {
             if !confermato, azioni(di: p.sezione).first(where: { Regia.chiave($0.nome) == Regia.chiave(p.azione) })?.conferma == true {
                 inSospeso = (Array(passi[k...]), Date())
                 return (Regia.json(["fatti": fatti, "aspetta_il_si": "\(p.sezione) · \(p.azione) \(p.valori.values.joined(separator: " "))",
-                                    "nota": "chiedi conferma al signore con una domanda breve e naturale; se dice sì, richiama regia con gli stessi passi e confermato=true"]), false)
+                                    "nota": "chiedi conferma a Bea con una domanda breve e naturale; se dice sì, richiama regia con gli stessi passi e confermato=true"]), false)
             }
             let e = await passo(p)
             fatti.append(["sezione": p.sezione, "azione": p.azione, "ok": e.ok, "esito": e.dato])
@@ -370,7 +370,7 @@ final class Regia {
         }
         if confermato, !fatti.isEmpty, fatti.allSatisfy({ $0["ok"] as? Bool == true }) { Congedo.condiviso.cosaVera() }   // 12.0 (16)
         var risposta: [String: Any] = ["fatti": fatti]
-        if let d = nomeDavanti { risposta["davanti"] = d + (statoDi(d).map { ": " + Regia.taglia($0, 600) } ?? "") } else { risposta["davanti"] = "JARVIS" }
+        if let d = nomeDavanti { risposta["davanti"] = d + (statoDi(d).map { ": " + Regia.taglia($0, 600) } ?? "") } else { risposta["davanti"] = "FRIDAY" }
         return (Regia.json(risposta), false)
     }
 
@@ -388,12 +388,12 @@ final class Regia {
         case "chiuditutto":
             vai?(.chiudiTutto)
             evento("chiuse tutte le sezioni")
-            return .fatto("tutte chiuse, davanti JARVIS")
+            return .fatto("tutte chiuse, davanti FRIDAY")
         case "daparte", "casa", "home", "via":
-            guard let d = nomeDavanti else { return .fatto("davanti c'è già JARVIS") }
+            guard let d = nomeDavanti else { return .fatto("davanti c'è già FRIDAY") }
             vai?(.daParte)
             evento("\(d) messa da parte")
-            return .fatto("\(d) è andata dietro (resta aperta), davanti JARVIS")
+            return .fatto("\(d) è andata dietro (resta aperta), davanti FRIDAY")
         case "diprima", "precedente":
             vai?(.diPrima)
             return .fatto("torna davanti la sezione di prima")
@@ -506,7 +506,7 @@ final class Regia {
         let parole = Regia.paroleComando(frase)
         guard !parole.isEmpty else { return nil }
         // prima la sezione davanti, poi le azioni che valgono ovunque (i tasti della musica, se c'è qualcosa in coda)
-        let d = nomeDavanti ?? "JARVIS"
+        let d = nomeDavanti ?? "FRIDAY"
         let davanti = nomeDavanti.map { azioni(di: $0) } ?? []
         for a in davanti + globali where !a.conferma {
             for schema in a.frasi {
@@ -931,27 +931,37 @@ final class Regia {
 
     static let destinazioni: [Destinazione] = [
         Destinazione(nome: "Spesa", chiavi: ["spesa", "lista", "listadellaspesa", "listaspesa"], strada: .apri(.spesa)),
-        Destinazione(nome: "Email", chiavi: ["email", "posta", "mail", "mails"], strada: .apri(.email)),
+        Destinazione(nome: "Mail", chiavi: ["email", "posta", "mail", "mails"], strada: .apri(.email)),
         Destinazione(nome: "Messaggi", chiavi: ["messaggi", "messaggio", "sms", "whatsapp"], strada: .apri(.messaggi)),
         Destinazione(nome: "Telefono", chiavi: ["telefono", "chiamate", "rubrica"], strada: .apri(.telefono)),
         Destinazione(nome: "Musica", chiavi: ["musica", "canzoni", "brani", "lettore"], strada: .apri(.musica)),
         Destinazione(nome: "Foto", chiavi: ["foto", "fotografie", "galleria", "rullino"], strada: .apri(.foto)),
         Destinazione(nome: "Diario", chiavi: ["diario"], strada: .apri(.diario)),
         Destinazione(nome: "Sonno", chiavi: ["sonno", "dormito"], strada: .apri(.sonno)),
-        Destinazione(nome: "Ricordi", chiavi: ["ricordi", "traccia", "luoghi"], strada: .apri(.ricordi)),
+        Destinazione(nome: "Memoria", chiavi: ["memoria", "ricordi", "traccia", "luoghi"], strada: .apri(.ricordi)),
         Destinazione(nome: "Scanner", chiavi: ["scanner", "codiceabarre", "barcode"], strada: .apri(.scanner), dopoLaVoce: true),
         Destinazione(nome: "Occhi", chiavi: ["occhi", "fotocamera", "camera"], strada: .apri(.occhi), dopoLaVoce: true),
-        Destinazione(nome: "Cucina", chiavi: ["cucina", "frigo", "dispensa"], strada: .apri(.cucina), dopoLaVoce: true),
-        Destinazione(nome: "Trainer", chiavi: ["trainer", "allenatore", "personaltrainer", "allenamento"], strada: .apri(.allenatore), dopoLaVoce: true),
+        Destinazione(nome: "Cucina", chiavi: ["cucina", "dispensa"], strada: .apri(.cucina), dopoLaVoce: true),
+        Destinazione(nome: "Specchio", chiavi: ["specchio", "trainer", "allenatore", "personaltrainer"], strada: .apri(.allenatore), dopoLaVoce: true),
         Destinazione(nome: "Interprete", chiavi: ["interprete", "traduttore", "traduzione"], strada: .apri(.interprete), dopoLaVoce: true),
-        Destinazione(nome: "EDITH", chiavi: ["edith", "sicurezza"], strada: .apri(.edith)),
+        Destinazione(nome: "Difesa", chiavi: ["difesa", "edith", "sicurezza", "rientro", "sirena"], strada: .apri(.edith)),
         Destinazione(nome: "Vitals", chiavi: ["vitals", "parametri", "salute"], strada: .apri(.vitals)),
         Destinazione(nome: "Confidente", chiavi: ["confidente", "sfogo"], strada: .apri(.confidente), dopoLaVoce: true),
+        Destinazione(nome: "Frigo", chiavi: ["frigo", "frigorifero"], strada: .apri(.frigo)),
+        Destinazione(nome: "Pilates", chiavi: ["pilates", "allenamento", "reformer", "reel", "lezioni"], strada: .apri(.pilates)),
+        Destinazione(nome: "Makeup", chiavi: ["makeup", "trucco", "trousse"], strada: .apri(.makeup), dopoLaVoce: true),
+        Destinazione(nome: "Ciclo", chiavi: ["ciclo", "mestruazioni"], strada: .apri(.ciclo)),
+        Destinazione(nome: "Testa", chiavi: ["testa", "emicrania", "maldi testa", "epistassi", "sangue dal naso"], strada: .apri(.testa)),
+        Destinazione(nome: "Gestionale", chiavi: ["gestionale", "agenda", "clienti", "incassi", "corsi"], strada: .apri(.gestionale)),
+        Destinazione(nome: "Armadio", chiavi: ["armadio", "vestiti", "outfit", "vinted"], strada: .apri(.armadio)),
+        Destinazione(nome: "Nando", chiavi: ["nando", "cane", "barboncino"], strada: .apri(.nando)),
+        Destinazione(nome: "Account", chiavi: ["account", "collegamenti", "impostazioni"], strada: .apri(.account)),
+        Destinazione(nome: "SOS", chiavi: ["sos", "aiuto", "emergenza"], strada: .apri(.sos)),
     ]
 
     /// Le sezioni che si presentano alla regia (stato e azioni): per le altre JARVIS vede la riga di `Schermo` e non aspetta che
     /// si presentino. Si aggiorna quando una sezione entra nella regia.
-    static let conLaRegia: Set<String> = ["Spesa", "Email", "Musica", "Messaggi", "Telefono", "Diario", "Sonno", "Foto", "Ricordi", "EDITH", "Vitals"]
+    static let conLaRegia: Set<String> = ["Spesa", "Mail", "Musica", "Messaggi", "Telefono", "Diario", "Sonno", "Foto", "Memoria", "Difesa", "Vitals"]
 
     static func destinazione(_ nome: String) -> Destinazione? {
         let k = chiave(nome)

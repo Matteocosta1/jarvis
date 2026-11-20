@@ -211,7 +211,7 @@ final class Insieme {
         case .manda(let q, let a, let wa):
             aggiornaBrano()
             let r = q.nome != nil ? filo.cosa(nome: q.nome, di: q.di, prima: q.prima) : filo.cosa(genere: q.genere, plurale: q.plurale)
-            // da riscrivere (una risposta del cervello, che parla a «Sir»): lo fa il cervello, che vede il filo
+            // da riscrivere (una risposta del cervello, che parla a «Bea»): lo fa il cervello, che vede il filo
             guard let r, let testo = r.daMandare else { return nil }
             guard let a, let chi = await destinatario(a) else { return a == nil ? Battute.aChi() : nil }
             return await preparaMessaggio(chi.nome, numero: chi.numero, testo: testo, whatsapp: wa)
@@ -318,12 +318,12 @@ final class Insieme {
         let wa = whatsapp ?? false
         attesa = Attesa(tipo: "messaggio", chi: chi, numero: num, testo: t, whatsapp: wa, quando: Date())
         Filo.condiviso.persona(chi)
-        // il signore (13 nov 20:58): si lavora senza aprire sezioni: la bozza è un widget FILO finché non dice sì
+        // Bea (13 nov 20:58): si lavora senza aprire sezioni: la bozza è un widget FILO finché non dice sì
         Filo.condiviso.mostra("bozza", titolo: Filo.a(chi).capitalizzata, riga: "«\(t)»", sezione: "Messaggi", resta: true)   // aspetta il sì: non è una notifica
         return Battute.chiediMessaggio(chi, t, whatsapp: wa)
     }
 
-    /// Il sì: parte da qui (iMessage col Comando rapido «JARVIS invia», WhatsApp pronto da toccare), quando JARVIS ha finito di parlare.
+    /// Il sì: parte da qui (iMessage col Comando rapido «FRIDAY invia», WhatsApp pronto da toccare), quando FRIDAY ha finito di parlare.
     private func conferma() async -> String {
         guard let a = attesa else { return Battute.lampo() }
         attesa = nil
@@ -340,7 +340,7 @@ final class Insieme {
             let dati = (try? JSONSerialization.data(withJSONObject: ["numero": Strumenti.pulisci(a.numero), "testo": a.testo])) ?? Data()
             url = URL(string: "shortcuts://run-shortcut?name=\(Strumenti.codifica(Strumenti.comandoInvio))&input=text&text=\(Strumenti.codifica(String(decoding: dati, as: UTF8.self)))")
         }
-        guard let url else { return "Non riesco a preparare il messaggio, Sir." }
+        guard let url else { return "Non riesco a preparare il messaggio." }
         Insieme.dopoLaVoce { UIApplication.shared.open(url) }
         let (numero, testo, wa, chi) = (a.numero, a.testo, a.whatsapp, a.chi)
         Task { await RegistroMessaggi.mandato(a: numero, testo: testo, whatsapp: wa) }
@@ -352,7 +352,7 @@ final class Insieme {
                                       testo: testo, daMandare: testo, numero: numero, sezione: "Messaggi"))
         Filo.condiviso.persona(chi)
         Congedo.condiviso.cosaVera()                                    // un messaggio mandato è una cosa vera
-        return wa ? "Pronto per \(Filo.detto(chi)) su WhatsApp, Sir: l'ultimo tocco su Invia è suo." : Battute.mandato(chi)
+        return wa ? "Pronto per \(Filo.detto(chi)) su WhatsApp: l'ultimo tocco su Invia è tuo." : Battute.mandato(chi)
     }
 
     /// Un lavoro da fare quando JARVIS ha finito di parlare (aprire Comandi, WhatsApp, il telefono).

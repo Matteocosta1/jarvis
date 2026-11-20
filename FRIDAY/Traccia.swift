@@ -76,7 +76,7 @@ struct PannelliTraccia: View {
                     RigaHUD("Distanza", rotta.map { Rotta.distanza($0.metri) } ?? "cerco la posizione…")
                     RigaHUD("A piedi", rotta.map { Rotta.aPiedi($0.metri) } ?? "—")
                 } else {
-                    Text("Nessun luogo salvato, Sir. Tocchi «Salva» dove si trova, o dica «Jarvis, ricorda questo luogo».")
+                    Text("Nessun luogo salvato. Tocca «Salva» dove ti trovi, o di' «FRIDAY, ricorda questo luogo».")
                         .font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
                 HStack(spacing: 8) {
@@ -96,12 +96,12 @@ struct PannelliTraccia: View {
             }
             Pannello(titolo: "ULTIMI", tinta: tinta) {
                 if ultimi.isEmpty {
-                    Text("Ancora nessun ricordo, Sir.").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
+                    Text("Ancora nessun ricordo.").font(.system(size: 14)).foregroundStyle(ColoriHUD.testo)
                 }
                 ForEach(ultimi) { r in RigaHUD(r.testo, r.luogo ?? r.quando, valoreSuUnaRiga: true) }   // decisione 45: la data su una riga
             }
-            PannelloAVoce(frasi: ["«Jarvis, traccia il luogo»", "«Jarvis, portami al luogo»",
-                                  "«Jarvis, ricorda questo luogo»", "«Jarvis, dove ho messo le chiavi?»"])
+            PannelloAVoce(frasi: ["«FRIDAY, traccia il luogo»", "«FRIDAY, portami al luogo»",
+                                  "«FRIDAY, ricorda questo luogo»", "«FRIDAY, dove ho messo le chiavi?»"])
         }
         .onAppear { bussola.accendi() }
         .onDisappear { bussola.spegni() }
@@ -127,7 +127,7 @@ struct PannelliTraccia: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.testo).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
                 // sotto il nome la via; se il nome è già la via (un luogo salvato con «Salva»), quando è stato salvato (come nel mockup)
-                Text(l.luogo.flatMap { $0.isEmpty || $0 == l.testo ? nil : $0 } ?? l.quando).font(.system(size: 13)).foregroundStyle(Color(red: 0.56, green: 0.70, blue: 0.74)).lineLimit(1)
+                Text(l.luogo.flatMap { $0.isEmpty || $0 == l.testo ? nil : $0 } ?? l.quando).font(.system(size: 13)).foregroundStyle(Color(red: 189 / 255, green: 160 / 255, blue: 143 / 255)).lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(metri.map { Rotta.distanza($0) } ?? "—")
@@ -136,7 +136,7 @@ struct PannelliTraccia: View {
         .padding(.vertical, 10).padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(tinta.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(attivo ? tinta : Color(red: 0.07, green: 0.20, blue: 0.23), lineWidth: attivo ? 1.5 : 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(attivo ? tinta : Color(red: 59 / 255, green: 33 / 255, blue: 18 / 255), lineWidth: attivo ? 1.5 : 1))
         .contentShape(Rectangle())
     }
 
@@ -144,13 +144,13 @@ struct PannelliTraccia: View {
     private func salva() async {
         guard !salvo else { return }
         guard let lat = bussola.lat, let lon = bussola.lon else {
-            Suoni.errore(); avviso = "Non ho ancora la sua posizione, Sir: un attimo e riprovi."; return
+            Suoni.errore(); avviso = "Non ho ancora la tua posizione: un attimo e riprova."; return
         }
         salvo = true
         defer { salvo = false }
         guard let o = await VistaVitals.chiama(["luogo_salva": ["lat": lat, "lon": lon] as [String: Any]], attesa: 15),
               let riga = o["luogo"] as? [String: Any], let id = (riga["id"] as? NSNumber)?.intValue else {
-            Suoni.errore(); avviso = "Il luogo non si è salvato, Sir: riprovi tra poco."; return
+            Suoni.errore(); avviso = "Il luogo non si è salvato: riprova tra poco."; return
         }
         Suoni.pronto()
         avviso = nil
@@ -163,7 +163,7 @@ struct PannelliTraccia: View {
                                     testo: ["TRACCIA · LUOGO SALVATO", ArchivioCentrale.quando(), "", "Dove: \(via)", "Coordinate: \(coordinate)",
                                             "Mappe: https://maps.apple.com/?ll=\(coordinate)&q=\(via.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"].joined(separator: "\n"),
                                     descrizione: "Traccia · \(via)")
-        await PannelliTraccia.notifica("Luogo salvato, Sir: \(via).")
+        await PannelliTraccia.notifica("Luogo salvato: \(via).")
     }
 
     /// «Studio · Via Tortona 12» (o solo la via, se il nome è la via).
@@ -181,7 +181,7 @@ struct PannelliTraccia: View {
     /// L'avviso che scende dall'alto, come nel mockup: una notifica di iOS subito, senza suono (il «pronto» l'ha già fatto l'app).
     static func notifica(_ testo: String) async {
         let c = UNMutableNotificationContent()
-        c.title = "JARVIS"
+        c.title = "FRIDAY"
         c.body = testo
         c.sound = nil
         c.userInfo = ["jarvis_azione": "avviso"]                          // toccata: niente da leggere, l'ha già vista
@@ -337,7 +337,7 @@ private struct BussolaTraccia: View {
         let giro = (direzione ?? 0) * Double.pi / 180
         let dir = ((rilevamento ?? 0) - (direzione ?? 0)) * Double.pi / 180
         func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: CGFloat(x), y: CGFloat(y)) }
-        let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
+        let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
         gc.stroke(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)), with: .color(ciano.opacity(0.35)), lineWidth: CGFloat(2 * s))
         var tacche = Path()
         for i in 0..<36 {
@@ -381,7 +381,7 @@ struct VistaAR: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.02, green: 0.03, blue: 0.035)          // #050809, se la fotocamera non c'è
+            Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255)          // #050809, se la fotocamera non c'è
             if camera, let m = motore { AnteprimaOcchi(sessione: m.sessione) }
             TimelineView(.animation(minimumInterval: nil, paused: dietro)) { ctx in // 4 nov: a 120 Hz come tutta l'app (prima 30)
                 Canvas { gc, size in disegna(gc, size, t: ctx.date.timeIntervalSinceReferenceDate) }
@@ -406,7 +406,7 @@ struct VistaAR: View {
     private func disegna(_ gc: GraphicsContext, _ size: CGSize, t: Double) {
         let W = Double(size.width), H = Double(size.height)
         let s = W / 720                                       // le misure del mockup sono su una tela larga 720
-        let ciano = Color(red: 0.31, green: 0.89, blue: 1.0)
+        let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
         let rotta = bussola.verso(lat: lat, lon: lon)
         // il luogo sullo schermo: a destra o a sinistra di quanto bisogna girarsi (oltre gli 80° resta sul bordo)
         let rel: Double = rotta.map { Rotta.relativa(rilevamento: $0.rilevamento, direzione: bussola.direzione ?? 0) } ?? 0
@@ -456,7 +456,7 @@ struct VistaAR: View {
         let lw: Double = Double(misura.width) + 28 * s, lh: Double = 42 * s
         let ex: Double = min(max(bx, lw / 2 + 4), W - lw / 2 - 4)
         let riquadro = Path(roundedRect: CGRect(x: ex - lw / 2, y: by - 116 * s, width: lw, height: lh), cornerRadius: CGFloat(8 * s))
-        gc.fill(riquadro, with: .color(Color(red: 0.02, green: 0.03, blue: 0.035).opacity(0.8)))
+        gc.fill(riquadro, with: .color(Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255).opacity(0.8)))
         gc.stroke(riquadro, with: .color(ciano), lineWidth: 1.5)
         gc.draw(scritta, at: pt(ex, by - 95 * s), anchor: .center)
         // la bussola in alto: dove guarda l'iPhone

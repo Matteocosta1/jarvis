@@ -72,7 +72,7 @@ enum Benvenuto {
     /// Il saluto, secondo l'ora.
     static func saluto() -> String {
         let ora = Calendar.current.component(.hour, from: Date())
-        let quando = ora < 6 ? "Notte fonda, Sir" : ora < 13 ? "Buongiorno, Sir" : ora < 19 ? "Bentornato a casa, Sir" : "Buonasera, Sir"
+        let quando = ora < 6 ? "Notte fonda" : ora < 13 ? "Buongiorno" : ora < 19 ? "Bentornato a casa" : "Buonasera"
         return "\(quando). Tutti i sistemi sono operativi. Cosa facciamo?"
     }
 

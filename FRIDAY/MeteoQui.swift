@@ -21,7 +21,7 @@ enum MeteoQui {
             let prossime = orario.forecast.filter { $0.date > Date().addingTimeInterval(-1800) }.prefix(max(1, min(ore, 12)))
             var out: [String: Any] = [
                 "fonte": "Apple Meteo",
-                "posizione": stimata ? "Milano (posizione non disponibile)" : "posizione attuale del signore",
+                "posizione": stimata ? "Milano (posizione non disponibile)" : "posizione attuale di Bea",
                 "adesso": [
                     "temperatura": Int(attuale.temperature.converted(to: .celsius).value.rounded()),
                     "percepita": Int(attuale.apparentTemperature.converted(to: .celsius).value.rounded()),

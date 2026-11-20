@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - 12.0 (10) · Le battute di JARVIS
+// MARK: - Le battute di FRIDAY (nate da quelle di JARVIS 12.0 (10): stesse regole, voce di FRIDAY: donna, dà del tu a Bea)
 // Il signore (12 nov, 05:37–05:41): «non freddi comandi… un dialogo dentro l'app mescolato ai comandi chiave, come fa Tony con
 // Jarvis»; «le reference di dialogo sono Tony e Jarvis mentre creano in studio o sono in missione… il dialogo umano-assistente
 // digitale amico»; «sii molto creativo e crea tante tante frasi di risposta e interazione, non le solite che girano; sii simpatico
@@ -73,7 +73,7 @@ enum Battute {
     }
 
     /// Le frasi da una parola per i comandi a raffica.
-    private static let lampi = ["Fatto.", "Eccolo.", "Ci sono.", "Andata.", "Sistemato.", "Fatto, Sir.", "Preso.", "Agli ordini."]
+    private static let lampi = ["Fatto.", "Eccolo.", "Ci sono.", "Andata.", "Sistemato.", "Fatto, Bea.", "Preso.", "Subito."]
     static func lampo() -> String { una("lampo", lampi) }
 
     /// Un elenco detto bene: «latte», «latte e uova», «latte, uova e pane».
@@ -94,13 +94,13 @@ enum Battute {
     /// «Dicevi?», ma JARVIS aveva già detto tutto.
     static func avevoFinito() -> String {
         una("avevoFinito", [
-            "Avevo finito, Sir. Mi ha fermato proprio sull'ultima parola.",
-            "Era tutto: mi ha interrotto sul punto finale. Tempismo perfetto.",
-            "Niente da aggiungere, Sir. Per una volta sono stato breve.",
-            "[chuckles] Avevo già concluso, Sir. Le serve che ripeta qualcosa?",
-            "Ero arrivato in fondo, Sir. Il resto era silenzio.",
-            "Discorso chiuso, Sir. Se vuole, glielo riassumo in una riga.",
-            "Avevo detto tutto. Mi creda, era un gran finale.",
+            "Avevo finito. Mi hai fermata proprio sull'ultima parola.",
+            "Era tutto: mi hai interrotta sul punto finale. Tempismo perfetto.",
+            "Niente da aggiungere. Per una volta sono stata breve.",
+            "Avevo già concluso. Vuoi che ripeta qualcosa?",
+            "Ero arrivata in fondo. Il resto era silenzio.",
+            "Discorso chiuso. Se vuoi te lo riassumo in una riga.",
+            "Avevo detto tutto. Credimi, era un gran finale.",
         ])
     }
 
@@ -128,61 +128,68 @@ enum Battute {
         let m = momento
         var v: [String]
         switch r {
-        case .occhi: v = ["Occhi aperti, Sir.", "Vista attiva. Mi mostri pure.", "Ottiche accese: cosa guardiamo?",
-                         "Eccomi: vedo quello che vede lei.", "Sensori ottici in linea, Sir."]
-        case .giro: v = ["Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare.",
-                        "Panoramica: cinque secondi. Giri piano, io registro tutto.", "Giro d'orizzonte, Sir. Lei muova, io guardo.",
-                        "Cinque secondi di riprese, Sir. Con calma: ho uno stomaco digitale delicato."]
-        case .cucina: v = ["Cucina. Inquadri frigo, dispensa o piatto, Sir.", "Modalità chef: mi mostri cosa abbiamo.",
-                          "Apriamo la dispensa, Sir. Lei inquadri, al menù ci penso io."]
-        case .scanner: v = ["Scanner pronto. Inquadri il codice a barre, Sir.", "Scanner acceso: avvicini il codice.",
-                           "Pronto a leggere etichette, Sir. Le più piccole sono le mie preferite."]
-        case .diario: v = ["Il diario, Sir.", "Il diario è aperto, Sir.", "Pagina bianca pronta, Sir.", "Il suo diario. Prometto discrezione."]
+        case .occhi: v = ["Occhi aperti.", "Vista attiva: fammi vedere.", "Ottiche accese: cosa guardiamo?",
+                         "Eccomi: vedo quello che vedi tu.", "Occhi in linea, Bea."]
+        case .giro: v = ["Cinque secondi: gira piano, io guardo tutto.", "Panoramica: cinque secondi. Con calma, registro io.",
+                        "Giro d'orizzonte: tu muovi, io guardo.", "Cinque secondi di riprese. Piano, che mi gira la testa."]
+        case .cucina: v = ["Cucina. Inquadra frigo, dispensa o piatto.", "Modalità chef: fammi vedere cosa c'è.",
+                          "Apriamo la dispensa: tu inquadri, al menù ci penso io."]
+        case .scanner: v = ["Scanner pronto: inquadra il codice a barre.", "Scanner acceso: avvicina il codice.",
+                           "Pronta a leggere etichette. Le più piccole sono le mie preferite."]
+        case .diario: v = ["Il diario.", "Il tuo diario è aperto.", "Pagina bianca pronta.", "Il tuo diario. Prometto discrezione."]
         case .sonno:
-            v = ["Il suo sonno, Sir.", "Vediamo come ha dormito.", "Il rapporto della notte, Sir.", "Dati del sonno in arrivo."]
-            if m == .notte { v += ["Il sonno, Sir. E a quest'ora, se posso, sarebbe anche il momento di praticarlo."] }
-            if m == .mattina { v += ["Vediamo com'è andata la notte, Sir. Il caffè lo lascio a lei."] }
-        case .vitals: v = ["Vitals, Sir.", "Parametri vitali in linea.", "Diagnostica completa del pilota, Sir."]
-        case .confidente: v = ["Confidente. La ascolto, Sir.", "Sono qui, Sir. Mi racconti.", "Resta tra noi, Sir. La ascolto.",
-                              "Con calma, Sir. Ho tutto il tempo del mondo."]
-        case .allenatore: v = ["Personal trainer pronto, Sir.", "Allenamento in linea. Si scaldi, io conto.",
-                              "Trainer acceso. Oggi niente scuse, Sir.", "Pronto a contare le ripetizioni. Anche quelle che salterà."]
-        case .email: v = ["La posta, Sir.", "La sua posta, Sir. Prometto di non giudicare le newsletter.", "Casella aperta, Sir.",
-                         "La posta, Sir: vediamo chi la cerca."]
-        case .spesa: v = ["La lista della spesa, Sir.", "La spesa, Sir. Cosa manca in casa?", "Lista aperta. Detti pure, io scrivo.",
-                         "La spesa, Sir: il frigo attende istruzioni."]
-        case .foto: v = ["Le sue foto, Sir.", "La galleria, Sir.", "I suoi scatti, Sir. Cosa cerchiamo?", "Archivio fotografico aperto, Sir."]
-        case .ricordi: v = ["I ricordi, Sir.", "I suoi luoghi, Sir: la mappa di dove è stato.", "Ricordi aperti, Sir."]
-        case .interprete: v = ["Interprete. In che lingua, Sir?", "Interprete pronto. Che lingua parliamo?",
-                              "Traduzione simultanea, Sir: mi dica la lingua.", "Pronto a tradurre, Sir. In quale lingua?"]
-        case .messaggi: v = ["Messaggi, Sir. A chi scriviamo?", "Messaggi, Sir. Chi sentiamo?", "Pronto a scrivere, Sir. A chi?"]
-        case .telefono: v = ["Telefono, Sir.", "Linea pronta, Sir. Chi chiamiamo?", "Centralino in linea, Sir."]
-        case .edith: v = ["EDITH, Sir.", "EDITH in linea, Sir.", "EDITH, Sir: protezione attiva."]
+            v = ["Il tuo sonno.", "Vediamo come hai dormito.", "Il riassunto della notte.", "Ecco i dati del sonno."]
+            if m == .notte { v += ["Il sonno. E a quest'ora, se posso, sarebbe il momento di farlo davvero."] }
+            if m == .mattina { v += ["Vediamo com'è andata la notte. Il caffè lo lascio a te."] }
+        case .vitals: v = ["Vitals.", "I tuoi parametri.", "Come stai, in numeri."]
+        case .confidente: v = ["Sono qui. Ti ascolto.", "Raccontami.", "Resta tra noi. Ti ascolto.", "Con calma: ho tutto il tempo del mondo."]
+        case .allenatore: v = ["Lo specchio. Pronta quando vuoi.", "Reformer in linea: scaldati, io conto.",
+                              "Si comincia. Oggi niente scuse.", "Pronta a contare le ripetizioni. Anche quelle che salterai."]
+        case .email: v = ["La posta.", "La tua posta. Prometto di non giudicare le newsletter.", "Casella aperta.", "Vediamo chi ti cerca."]
+        case .spesa: v = ["La lista della spesa.", "La spesa: cosa manca in casa?", "Lista aperta: detta pure, scrivo io.",
+                         "La spesa: il frigo aspetta istruzioni."]
+        case .foto: v = ["Le tue foto.", "La galleria.", "I tuoi scatti: cosa cerchiamo?", "Ecco le tue foto."]
+        case .ricordi: v = ["La memoria.", "I tuoi luoghi: la mappa di dove sei stata.", "Ecco cosa ricordo."]
+        case .interprete: v = ["Interprete: in che lingua?", "Interprete pronto. Che lingua parliamo?",
+                              "Traduzione in diretta: dimmi la lingua.", "Pronta a tradurre. In quale lingua?"]
+        case .messaggi: v = ["Messaggi: a chi scriviamo?", "Messaggi: chi sentiamo?", "Pronta a scrivere. A chi?"]
+        case .telefono: v = ["Telefono.", "Linea pronta: chi chiamiamo?", "Telefono in linea."]
+        case .edith: v = ["Difesa.", "Difesa attiva.", "Scudi su: sono qui."]
         case .pulisci: return nil                     // parla il cestino: carta appallottolata
-        case .musica: v = ["La musica, Sir.", "La musica, Sir. Cosa mettiamo?", "Impianto pronto, Sir.", "La sala d'ascolto, Sir."]
+        case .musica: v = ["La musica.", "La musica: cosa mettiamo?", "Musica pronta.", "Cosa ascoltiamo?"]
+        case .frigo: v = ["Il frigo.", "Vediamo cosa c'è in frigo.", "Frigo aperto: inquadralo e ti dico cosa scade prima."]
+        case .pilates: v = ["Pilates.", "Pilates: allenamento, Reel o lezioni?", "Reformer pronto. Anche tu?"]
+        case .makeup: v = ["Lo specchio.", "Makeup: mettiti in luce.", "Specchio acceso: si comincia dalla base."]
+        case .ciclo: v = ["Il ciclo.", "Il tuo ciclo, con i dati di Salute.", "Ecco a che punto sei."]
+        case .testa: v = ["Testa.", "Come va la testa?", "Diario della testa aperto. Piano con le luci."]
+        case .gestionale: v = ["Il gestionale.", "Le tue lezioni e le tue clienti.", "Gestionale aperto: chi c'è oggi?"]
+        case .armadio: v = ["L'armadio.", "Il tuo armadio: cosa mettiamo?", "Armadio aperto. Prometto di non giudicare."]
+        case .nando: v = ["Nando.", "La sezione di Nando.", "Nando: pipì, giri e coccole."]
+        case .account: v = ["Il tuo account.", "Account: i tuoi collegamenti.", "Ecco cosa è collegato."]
+        case .sos: return "Mando l'aiuto ad Ale tra cinque secondi. Tocca annulla se è un errore."
         }
-        if diFretta { return una("apertura.breve", ["Eccola.", "Ecco, Sir.", "Pronta.", "Aperta."]) }
+        if diFretta { return una("apertura.breve", ["Eccola.", "Ecco.", "Pronta.", "Aperta."]) }
         return una("apertura." + r.rawValue, v)
     }
 
     /// «Chiudi tutto».
     static func chiusoTutto() -> String {
         if diFretta { return lampo() }
-        return una("chiusoTutto", ["Fatto, Sir. Tavolo sgombro.", "Tutto chiuso. Silenzio in sala.", "Sezioni a riposo, Sir.",
-                                    "Ripulito. Si riparte da zero.", "Banco di lavoro sgombro, Sir.", "Chiuso tutto. Resto solo io."])
+        return una("chiusoTutto", ["Fatto. Tutto in ordine.", "Tutto chiuso. Silenzio in sala.", "Sezioni a riposo.",
+                                    "Ripulito. Si riparte da zero.", "Schermo libero.", "Chiuso tutto. Resto solo io."])
     }
 
     /// «Mettila da parte».
     static func messaDaParte(_ nome: String) -> String {
         if diFretta { return lampo() }
-        return una("daParte", ["\(nome) messa da parte, Sir.", "\(nome) dietro le quinte. Resta lì, pronta.", "Parcheggiata, Sir.",
-                               "La tengo da parte, Sir.", "\(nome) in panchina. La richiamo quando vuole."])
+        return una("daParte", ["\(nome) messa da parte.", "\(nome) dietro le quinte. Resta lì, pronta.", "Parcheggiata.",
+                               "La tengo da parte.", "\(nome) in panchina. La richiamo quando vuoi."])
     }
 
     /// «Quella di prima».
     static func diPrima(_ nome: String) -> String {
         if diFretta { return lampo() }
-        return una("diPrima", ["Ecco \(nome), Sir.", "Torna \(nome).", "Rieccola: \(nome).", "\(nome), di nuovo in scena."])
+        return una("diPrima", ["Ecco \(nome).", "Torna \(nome).", "Rieccola: \(nome).", "\(nome), di nuovo in scena."])
     }
 
     // MARK: La spesa
@@ -191,12 +198,12 @@ enum Battute {
     static func spesaAggiunta(_ cose: [String], totale: Int, gia: [String] = []) -> String {
         let nuove = cose.filter { c in !gia.contains { $0.caseInsensitiveCompare(c) == .orderedSame } }
         if nuove.isEmpty, let g = gia.first {
-            return una("spesa.gia", ["\(maiuscola(g)) c'era già, Sir. Lo lascio una volta sola.", "\(maiuscola(g)) era già in lista: non lo raddoppio.",
-                                      "Già segnato, Sir. Il frigo ringrazia per l'insistenza."])
+            return una("spesa.gia", ["\(maiuscola(g)) c'era già: lo lascio una volta sola.", "\(maiuscola(g)) era già in lista: non lo raddoppio.",
+                                      "Già segnato. Il frigo ringrazia per l'insistenza."])
         }
         if diFretta { return una("spesa.lampo", ["Segnato.", "In lista.", "Preso nota.", "Fatto."]) }
         let cosa = elenco(nuove)
-        let base = una("spesa.aggiunta", ["\(maiuscola(cosa)) in lista, Sir.", "Segnato: \(cosa).", "\(maiuscola(cosa)): preso nota.",
+        let base = una("spesa.aggiunta", ["\(maiuscola(cosa)) in lista.", "Segnato: \(cosa).", "\(maiuscola(cosa)): preso nota.",
                                           "Aggiunto \(cosa).", "\(maiuscola(cosa)) in lista."])
         guard spirito(0.45) else { return base }
         let coda: String
@@ -204,8 +211,8 @@ enum Battute {
         case ..<4: coda = una("spesa.poche", ["Lista ancora leggera.", "Per ora poca roba.", "Siamo a \(totale)."])
         case 4..<10: coda = una("spesa.medie", ["Siamo a \(totale) cose: il supermercato ci aspetta.", "Totale \(totale). Il carrello si scalda.",
                                                  "\(totale) voci in lista. Comincia a sembrare una spedizione."])
-        default: coda = una("spesa.tante", ["Siamo a \(totale). Più che una spesa, un trasloco.", "\(totale) cose, Sir: le serve un carrello grande.",
-                                             "[chuckles] \(totale) voci. Mi preparo a calcolare il percorso fra gli scaffali."])
+        default: coda = una("spesa.tante", ["Siamo a \(totale). Più che una spesa, un trasloco.", "\(totale) cose: ti serve un carrello grande.",
+                                             "\(totale) voci. Ti preparo il percorso fra gli scaffali."])
         }
         return base + " " + coda
     }
@@ -214,115 +221,77 @@ enum Battute {
     static func spesaTolta(_ cose: [String], resta: Int) -> String {
         if diFretta { return una("spesa.via.lampo", ["Tolto.", "Via.", "Depennato."]) }
         let cosa = elenco(cose)
-        let base = una("spesa.via", ["\(maiuscola(cosa)) via dalla lista.", "Depennato: \(cosa).", "Tolto \(cosa), Sir.", "\(maiuscola(cosa)): cancellato."])
-        return resta == 0 ? base + " " + una("spesa.vuota", ["Lista vuota.", "Non resta niente.", "Tabula rasa, Sir."]) : base
+        let base = una("spesa.via", ["\(maiuscola(cosa)) via dalla lista.", "Depennato: \(cosa).", "Tolto \(cosa).", "\(maiuscola(cosa)): cancellato."])
+        return resta == 0 ? base + " " + una("spesa.vuota", ["Lista vuota.", "Non resta niente.", "Tabula rasa."]) : base
     }
 
     /// Cose spuntate (nel carrello).
     static func spesaPresa(_ cose: [String], resta: Int) -> String {
         if resta == 0 {
-            return una("spesa.finita", ["Lista completata, Sir. Missione compiuta.", "Tutto nel carrello. Ottimo lavoro di squadra.",
-                                        "Ultima cosa presa, Sir. Si può andare alla cassa.", "[excited] Lista finita! Torniamo alla base, Sir."])
+            return una("spesa.finita", ["Lista completata. Missione compiuta.", "Tutto nel carrello. Ottimo lavoro di squadra.",
+                                        "Ultima cosa presa: si può andare alla cassa.", "Lista finita! Si torna a casa."])
         }
         if diFretta { return una("spesa.presa.lampo", ["Preso.", "Nel carrello.", "Spuntato."]) }
         let cosa = elenco(cose)
         return una("spesa.presa", ["\(maiuscola(cosa)) nel carrello. Ne mancano \(resta).", "Preso \(cosa). Ancora \(resta).",
-                                   "Spuntato \(cosa), Sir. Restano \(resta) cose."])
+                                   "Spuntato \(cosa). Restano \(resta) cose."])
     }
 
     /// Le cose non trovate in lista.
     static func spesaNonCe(_ cosa: String) -> String {
-        una("spesa.nonce", ["\(maiuscola(cosa)) non è in lista, Sir.", "Non trovo \(cosa) nella lista.", "In lista \(cosa) non c'è, Sir."])
+        una("spesa.nonce", ["\(maiuscola(cosa)) non è in lista.", "Non trovo \(cosa) nella lista.", "In lista \(cosa) non c'è."])
     }
 
     // MARK: La posta
 
     static func postaAperta(_ nome: String, oggetto: String) -> String {
-        if diFretta { return una("posta.lampo", ["Eccola.", "Aperta.", "Ecco, Sir."]) }
-        return una("posta.apri", ["La mail di \(nome), Sir.", "Ecco \(nome): «\(oggetto)».", "Aperta. Scrive \(nome).",
-                                  "\(nome), Sir. Vediamo cosa vuole.", "«\(oggetto)», da \(nome)."])
+        if diFretta { return una("posta.lampo", ["Eccola.", "Aperta.", "Ecco."]) }
+        return una("posta.apri", ["La mail di \(nome).", "Ecco \(nome): «\(oggetto)».", "Aperta. Scrive \(nome).",
+                                  "\(nome): vediamo cosa vuole.", "«\(oggetto)», da \(nome)."])
     }
 
     static func postaCartella(_ nome: String, quante: Int?) -> String {
         if nome == "Indesiderata" {
-            return una("posta.spam", ["Indesiderata, Sir. Entriamo coi guanti.", "La posta che nessuno ha chiesto, Sir.", "Lo scantinato della casella, Sir."])
+            return una("posta.spam", ["Indesiderata: entriamo coi guanti.", "La posta che nessuno ha chiesto.", "Lo scantinato della casella."])
         }
-        if nome == "Cestino" { return una("posta.cestino", ["Il cestino, Sir. Frughiamo con discrezione.", "Cestino aperto."]) }
-        return una("posta.cartella", ["Cartella \(nome).", "Eccoci in \(nome), Sir.", "\(nome), Sir."])
+        if nome == "Cestino" { return una("posta.cestino", ["Il cestino: frughiamo con discrezione.", "Cestino aperto."]) }
+        return una("posta.cartella", ["Cartella \(nome).", "Eccoci in \(nome).", "\(nome)."])
     }
 
     static func postaNonLette(_ n: Int) -> String {
         switch n {
-        case 0: return una("posta.zero", ["Nessuna da leggere, Sir. Casella in ordine.", "Tutto letto. Ammirevole, Sir.", "Zero non lette: un raro momento di pace."])
-        case 1: return una("posta.una", ["Una sola da leggere, Sir.", "Una mail la aspetta."])
-        default: return una("posta.tante", ["\(n) da leggere, Sir.", "Ecco le \(n) non lette.", "\(n) mail aspettano il suo verdetto, Sir."])
+        case 0: return una("posta.zero", ["Nessuna da leggere: casella in ordine.", "Tutto letto. Brava.", "Zero non lette: un raro momento di pace."])
+        case 1: return una("posta.una", ["Una sola da leggere.", "Una mail ti aspetta."])
+        default: return una("posta.tante", ["\(n) da leggere.", "Ecco le \(n) non lette.", "\(n) mail aspettano il tuo verdetto."])
         }
     }
 
-    // MARK: La musica (frasi cortissime: la musica è in pausa mentre JARVIS parla)
+    // MARK: La musica (frasi cortissime: la musica è in pausa mentre FRIDAY parla)
 
     static func musica(_ azione: String, acceso: Bool = true) -> String {
         switch azione {
-        case "avanti": return una("mus.avanti", ["Avanti.", "Prossimo brano.", "Cambio pista, Sir.", "Ecco il prossimo."])
-        case "indietro": return una("mus.indietro", ["Indietro.", "Torno al brano di prima.", "Riavvolgo, Sir."])
-        case "pausa": return una("mus.pausa", ["In pausa.", "Pausa, Sir.", "Musica ferma."])
-        case "play": return una("mus.play", ["Si riparte.", "Musica, Sir.", "Ripartiamo."])
-        case "casuale": return acceso ? una("mus.casuale", ["Casuale: lascio decidere al destino.", "Ordine casuale, Sir."])
-                                      : una("mus.ordine", ["Casuale spento: si torna all'ordine.", "Di nuovo in ordine, Sir."])
-        case "ripeti": return acceso ? una("mus.ripeti", ["Lo stesso brano a ripetizione, Sir.", "Ripeti attivo: questo non ci stanca."])
-                                     : una("mus.nonripeti", ["Ripeti spento.", "Basta replica, Sir."])
+        case "avanti": return una("mus.avanti", ["Avanti.", "Prossimo brano.", "Cambio pista.", "Ecco il prossimo."])
+        case "indietro": return una("mus.indietro", ["Indietro.", "Torno al brano di prima.", "Riavvolgo."])
+        case "pausa": return una("mus.pausa", ["In pausa.", "Pausa.", "Musica ferma."])
+        case "play": return una("mus.play", ["Si riparte.", "Musica.", "Ripartiamo."])
+        case "casuale": return acceso ? una("mus.casuale", ["Casuale: lascio decidere al destino.", "Ordine casuale."])
+                                      : una("mus.ordine", ["Casuale spento: si torna all'ordine.", "Di nuovo in ordine."])
+        case "ripeti": return acceso ? una("mus.ripeti", ["Lo stesso brano a ripetizione.", "Ripeti attivo: questo non ci stanca."])
+                                     : una("mus.nonripeti", ["Ripeti spento.", "Basta replica."])
         default: return lampo()
         }
     }
 
     static func musicaMetti(_ nome: String) -> String {
         if diFretta { return una("mus.metti.lampo", ["Ecco.", "Parte.", "In onda."]) }
-        let base = una("mus.metti", ["Ecco \(nome).", "Parte \(nome), Sir.", "\(nome): ottima scelta.", "Metto \(nome).", "In onda: \(nome)."])
+        let base = una("mus.metti", ["Ecco \(nome).", "Parte \(nome).", "\(nome): ottima scelta.", "Metto \(nome).", "In onda: \(nome)."])
         guard spirito(0.2) else { return base }
-        return base + " " + una("mus.volume", ["Il volume lo lascio a lei: Apple non me lo permette.", "Alzi pure: io tengo il tempo."])
+        return base + " " + una("mus.volume", ["Il volume lo lasci a te: Apple non me lo fa toccare.", "Alza pure: io tengo il tempo."])
     }
 
     static func musicaCerca(_ testo: String, trovati: Int) -> String {
-        if trovati == 0 { return una("mus.cerca.zero", ["Niente per «\(testo)», Sir.", "Apple Music non conosce «\(testo)»."]) }
-        return una("mus.cerca", ["Ecco cosa trovo per «\(testo)».", "\(trovati) risultati per «\(testo)», Sir.", "Cercato: \(testo)."])
-    }
-
-    // MARK: Sistemi (GitHub, Supabase, Costi, Archivio)
-
-    static func repoAperto(_ nome: String) -> String {
-        if diFretta { return una("gh.lampo", ["\(nome).", "Eccolo.", "Aperto."]) }
-        let base = una("gh.apri", ["Ecco \(nome), Sir.", "Cantiere \(nome): ultimi lavori a schermo.", "\(nome) sul tavolo.",
-                                   "\(nome), aperto. Commit, issue, tutto in fila."])
-        guard spirito(0.25) else { return base }
-        return base + " " + una("gh.spirito", ["Il codice non mente. I commenti, a volte.", "Se trova un errore, è stato il compilatore.",
-                                               "Ogni riga ha una storia. Alcune, un po' tormentate."])
-    }
-
-    /// La sala macchine ricontrollata: con gli errori del periodo, se ce ne sono.
-    static func salaMacchine(errori: Int, ore: Int) -> String {
-        if errori > 0 {
-            return una("supa.errori", ["\(errori == 1 ? "Un errore" : "\(errori) errori") nelle ultime \(ore) ore, Sir: sono a schermo.",
-                                       "Sala macchine ricontrollata: \(errori == 1 ? "c'è un errore" : "ci sono \(errori) errori") da guardare."])
-        }
-        if diFretta { return lampo() }
-        let base = una("supa.agg", ["Sala macchine ricontrollata.", "Dati freschi dal motore, Sir.", "Motore ascoltato: ecco i valori.",
-                                    "Ricontrollato tutto, Sir."])
-        guard spirito(0.3) else { return base }
-        return base + " " + una("supa.spirito", ["Nessun errore nel periodo: gira liscio.", "Zero errori. Il motore fa le fusa."])
-    }
-
-    static func costiRifatti() -> String {
-        if diFretta { return lampo() }
-        let base = una("costi.agg", ["Conti rifatti, Sir.", "Ricalcolato al centesimo.", "Ecco i conti aggiornati.", "Bilancio ricontrollato, Sir."])
-        guard spirito(0.25) else { return base }
-        return base + " " + una("costi.spirito", ["I numeri sono a schermo: li ho contati due volte.", "Nessuna sorpresa nascosta tra le righe."])
-    }
-
-    static func archivioTrovati(_ n: Int, _ cosa: String) -> String {
-        if n == 0 { return una("arch.zero", ["Niente per «\(cosa)», Sir.", "Negli schedari «\(cosa)» non c'è.", "Archivio setacciato: di «\(cosa)» nessuna traccia."]) }
-        if diFretta { return una("arch.lampo", ["\(n) file.", "Trovati."]) }
-        return una("arch.cerca", ["\(n == 1 ? "Un file" : "\(n) file") per «\(cosa)», Sir.", "Schedari consultati: \(n == 1 ? "ne trovo uno" : "ne trovo \(n)").",
-                                  "Ecco cosa trovo per «\(cosa)»."])
+        if trovati == 0 { return una("mus.cerca.zero", ["Niente per «\(testo)».", "Non trovo «\(testo)»."]) }
+        return una("mus.cerca", ["Ecco cosa trovo per «\(testo)».", "\(trovati) risultati per «\(testo)».", "Cercato: \(testo)."])
     }
 
     // MARK: 12.0 (12) · B2, B3, B6, il meteo
@@ -330,88 +299,50 @@ enum Battute {
     /// B2: ha scritto in un campo di testo per lui.
     static func campoScritto(_ campo: String, _ testo: String) -> String {
         if diFretta { return una("campo.lampo", ["Scritto.", "Fatto.", "Eccolo."]) }
-        return una("campo", ["Scritto, Sir.", "Ecco «\(testo)».", "Digitato per lei.", "«\(testo)»: fatto. Le dita può tenerle in tasca.",
+        return una("campo", ["Scritto.", "Ecco «\(testo)».", "Scritto per te.", "«\(testo)»: fatto. Le dita puoi tenerle in tasca.",
                              "Scritto nel campo \(campo)."])
     }
 
     /// B3: ha annullato quello che aspettava il sì.
     static func annullato() -> String {
-        una("annullato", ["Annullato, Sir.", "Fermo tutto. Non parte niente.", "Come non detto.", "Annullato. Resta tutto com'era."])
+        una("annullato", ["Annullato.", "Fermo tutto. Non parte niente.", "Come non detto.", "Annullato. Resta tutto com'era."])
     }
 
     /// B3: ha cambiato idea e non vuole più niente.
     static func lasciamoStare() -> String {
-        una("lasciamo", ["Va bene, lasciamo stare.", "Come non detto, Sir.", "Ricevuto: niente.", "D'accordo. Quando vuole, sono qui."])
+        una("lasciamo", ["Va bene, lasciamo stare.", "Come non detto.", "Ricevuto: niente.", "D'accordo. Quando vuoi, sono qui."])
     }
 
-    /// B6: JARVIS propone quello che il signore fa di solito a quest'ora (`cosa`: «la spesa», «Sfera Ebbasta»…).
+    /// B6: FRIDAY propone quello che Bea fa di solito a quest'ora (`cosa`: «la spesa», una playlist…).
     static func propostaSezione(_ cosa: String) -> String {
-        una("proposta.sez", ["Le apro \(cosa), come sempre a quest'ora?", "È l'ora in cui di solito apre \(cosa). Vado?",
-                             "Le preparo \(cosa), Sir?", "Il solito, Sir? Le apro \(cosa)."])
+        una("proposta.sez", ["Ti apro \(cosa), come sempre a quest'ora?", "È l'ora in cui di solito apri \(cosa). Vado?",
+                             "Ti preparo \(cosa)?", "Il solito? Ti apro \(cosa)."])
     }
 
     static func propostaMusica(_ cosa: String) -> String {
-        una("proposta.mus", ["Le metto \(cosa), come al solito?", "A quest'ora di solito c'è \(cosa). Vado?", "\(maiuscola(cosa)), Sir? È quasi tradizione.",
-                             "Le faccio partire \(cosa)?"])
-    }
-
-    /// B1: «che tempo fa», detto da qualsiasi schermata (la sezione Meteo si apre e JARVIS dice il dato che conta).
-    static func meteoAdesso(_ gradi: String, _ cielo: String, massima: String?, pioggia: Int?) -> String {
-        let base: String
-        if let m = massima {
-            base = una("meteo.ora", ["Adesso \(gradi), \(cielo). Oggi si arriva a \(m).", "\(maiuscola(cielo)), \(gradi). Massima di oggi \(m).",
-                                     "Fuori \(gradi) e \(cielo); oggi fino a \(m)."])
-        } else {
-            base = una("meteo.ora.breve", ["Adesso \(gradi), \(cielo).", "\(maiuscola(cielo)), \(gradi)."])
-        }
-        guard let p = pioggia else { return base }
-        if p >= 50 { return base + " " + una("meteo.pioggia", ["Pioggia al \(p) per cento: meglio l'ombrello.", "L'ombrello oggi non è un vezzo, Sir.",
-                                                                "Probabile pioggia: ombrello in tasca."]) }
-        if p < 20, spirito(0.5) { return base + " " + una("meteo.asciutto", ["L'ombrello può restare a casa.", "Niente pioggia in vista.",
-                                                                              "Cielo dalla nostra parte, Sir."]) }
-        return base
+        una("proposta.mus", ["Ti metto \(cosa), come al solito?", "A quest'ora di solito c'è \(cosa). Vado?", "\(maiuscola(cosa))? È quasi tradizione.",
+                             "Ti faccio partire \(cosa)?"])
     }
 
     // MARK: Messaggi e telefono
 
     static func messaggioA(_ nome: String) -> String {
-        if diFretta { return una("msg.a.lampo", ["A \(nome).", "\(nome), Sir."]) }
-        return una("msg.a", ["Scriviamo a \(nome). Detti pure.", "A \(nome), Sir. Cosa scriviamo?", "\(nome) in linea. La ascolto.",
-                             "Pronto per \(nome), Sir: mi dica il testo."])
+        if diFretta { return una("msg.a.lampo", ["A \(nome).", "\(nome)."]) }
+        return una("msg.a", ["Scriviamo a \(nome): detta pure.", "A \(nome): cosa scriviamo?", "\(nome) in linea. Ti ascolto.",
+                             "Pronta per \(nome): dimmi il testo."])
     }
 
     static func messaggioCanale(_ canale: String) -> String {
-        una("msg.canale." + canale, ["Su \(canale).", "\(canale), Sir.", "Passo a \(canale)."])
+        una("msg.canale." + canale, ["Su \(canale).", "\(canale).", "Passo a \(canale)."])
     }
 
     static func telefonoComposto(_ numero: String) -> String {
-        una("tel.componi", ["Numero in tastiera, Sir.", "Composto: \(numero).", "\(numero), pronto da chiamare."])
-    }
-
-    // MARK: Bea
-
-    static func beaSegnato(_ tipo: String, _ testo: String) -> String {
-        if diFretta { return una("bea.lampo", ["Segnato.", "Annotato, Sir.", "Fatto."]) }
-        switch tipo {
-        case "gusto": return una("bea.gusto", ["Annotato: le piace \(testo).", "\(maiuscola(testo)): in archivio fra le cose che ama.",
-                                               "Segnato, Sir. Queste informazioni valgono oro."])
-        case "non_piace": return una("bea.nonpiace", ["Annotato: niente \(testo). Evitiamo incidenti diplomatici.", "Segnato fra le cose da evitare."])
-        case "promessa": return una("bea.promessa", ["Promessa registrata, Sir. Gliela ricorderò io.", "Annotata. Le promesse a Bea non scadono."])
-        case "regalo", "idea": return una("bea.idea", ["Idea in cassaforte, Sir.", "Annotata. Al momento giusto gliela ricordo."])
-        case "data": return una("bea.data", ["Data segnata, Sir. Avviso una settimana prima e il giorno stesso.", "In calendario mentale, Sir."])
-        default: return una("bea.nota", ["Da non dimenticare: segnato.", "Annotato, Sir."])
-        }
-    }
-
-    // MARK: Il meteo
-
-    static func meteoAggiornato(_ gradi: String, _ cielo: String) -> String {
-        una("meteo.agg", ["Aggiornato: \(gradi), \(cielo).", "Dati freschi, Sir: \(gradi) e \(cielo).", "Cielo ricontrollato: \(cielo), \(gradi)."])
+        una("tel.componi", ["Numero in tastiera.", "Composto: \(numero).", "\(numero), pronto da chiamare."])
     }
 
     /// La lista vuota letta.
     static func spesaVuota() -> String {
-        una("spesa.vuota.letta", ["La lista è vuota, Sir. Frigo pieno o memoria corta?", "Niente da comprare, Sir. Per ora.",
+        una("spesa.vuota.letta", ["La lista è vuota. Frigo pieno o memoria corta?", "Niente da comprare. Per ora.",
                                    "Lista vuota. Il supermercato può aspettare."])
     }
 }
@@ -448,32 +379,32 @@ extension Battute {
 #if os(iOS)                // i messaggi preparati, i widget FILO, i Preferiti: solo iPhone e Mac (al polso non ci sono)
     /// Il messaggio preparato, riletto: parte solo col sì.
     static func chiediMessaggio(_ chi: String, _ testo: String, whatsapp: Bool) -> String {
-        "\(Filo.a(chi).capitalizzata)\(whatsapp ? " su WhatsApp" : ""): «\(testo)» " + una("msg.chiedi", ["Lo mando, Sir?", "Glielo mando così?", "Parte così, Sir?", "Lo mando?"])
+        "\(Filo.a(chi).capitalizzata)\(whatsapp ? " su WhatsApp" : ""): «\(testo)» " + una("msg.chiedi", ["Lo mando?", "Glielo mando così?", "Parte così?", "Invio?"])
     }
     static func mandato(_ chi: String) -> String {
-        diFretta ? una("msg.ok.l", ["Mandato.", "Partito."]) : una("msg.ok", ["Mandato, Sir.", "Consegnato \(Filo.a(chi)).", "Partito.", "Inviato, Sir."])
+        diFretta ? una("msg.ok.l", ["Mandato.", "Partito."]) : una("msg.ok", ["Mandato.", "Consegnato \(Filo.a(chi)).", "Partito.", "Inviato."])
     }
     static func fissato() -> String {
-        diFretta ? lampo() : una("filo.fissa", ["Fissato, Sir.", "Lo tengo in vista.", "In vista, Sir.", "Resta lì, in alto.", "Appuntato in alto, Sir."])
+        diFretta ? lampo() : una("filo.fissa", ["Fissato.", "Lo tengo in vista.", "In vista.", "Resta lì, in alto.", "Appuntato in alto."])
     }
-    static func staccato() -> String { diFretta ? lampo() : una("filo.togli", ["Tolto, Sir.", "Via da FILO.", "Fatto, Sir.", "Tolto."]) }
-    static func angoloLibero() -> String { una("filo.tutti", ["FILO chiuso, Sir.", "Tolto tutto.", "Pulito."]) }
-    static func ecco() -> String { diFretta ? lampo() : una("filo.ecco", ["Ecco, Sir.", "In vista.", "Ecco qui, Sir."]) }
+    static func staccato() -> String { diFretta ? lampo() : una("filo.togli", ["Tolto.", "Via da FILO.", "Fatto.", "Via."]) }
+    static func angoloLibero() -> String { una("filo.tutti", ["FILO chiuso.", "Tolto tutto.", "Pulito."]) }
+    static func ecco() -> String { diFretta ? lampo() : una("filo.ecco", ["Ecco.", "In vista.", "Ecco qui."]) }
     static func nienteDaMostrare() -> String {
-        una("filo.niente", ["Non le ho ancora mostrato niente, Sir.", "Qui non c'è ancora niente da prendere, Sir.", "Mi manca il «questo», Sir."])
+        una("filo.niente", ["Non ti ho ancora mostrato niente.", "Qui non c'è ancora niente da prendere.", "Mi manca il «questo»."])
     }
-    static func aChi() -> String { una("msg.achi", ["A chi, Sir?", "A chi lo mando, Sir?"]) }
+    static func aChi() -> String { una("msg.achi", ["A chi?", "A chi lo mando?"]) }
     static func salvataMusica(_ titolo: String) -> String {
-        diFretta ? una("mus.salva.l", ["Salvata.", "Nei Preferiti."]) : una("mus.salva", ["Salvata nei Preferiti, Sir.", "«\(titolo)» è nei Preferiti.", "Messa nei Preferiti, Sir."])
+        diFretta ? una("mus.salva.l", ["Salvata.", "Nei Preferiti."]) : una("mus.salva", ["Salvata nei Preferiti.", "«\(titolo)» è nei Preferiti.", "Messa nei Preferiti."])
     }
 
 #endif
     /// Il congedo: solo alla fine di una cosa vera, sempre variato (il signore, 13 nov).
     static func congedo() -> String {
-        una("congedo", ["Sarà tutto, Sir?", "Le serve altro, Sir?", "Altro per lei, Sir?", "Posso fare altro, Sir?", "Nient'altro, Sir?", "C'è altro, Sir?", "Will that be all, Sir?"])
+        una("congedo", ["Ti serve altro?", "Altro per te?", "Posso fare altro?", "Nient'altro?", "C'è altro, Bea?", "Tutto a posto così?"])
     }
-    static func congedoOk() -> String { una("congedo.ok", ["Molto bene, Sir.", "A disposizione.", "Bene così, Sir.", "Quando vuole, Sir."]) }
-    static func prego() -> String { una("prego", ["Prego, Sir.", "Dovere, Sir.", "Si figuri, Sir."]) }
+    static func congedoOk() -> String { una("congedo.ok", ["Perfetto.", "Sono qui.", "Bene così.", "Quando vuoi."]) }
+    static func prego() -> String { una("prego", ["Prego!", "Figurati.", "Di niente, Bea."]) }
 
     /// La fretta dalle frasi secche (il mockup 12.0 (16)): una frase di due o tre parole (o quattro senza parole che legano) è un
     /// segno, doppio se arriva a raffica appena JARVIS ha finito; due punti in un minuto: risposte di una riga per tre minuti.

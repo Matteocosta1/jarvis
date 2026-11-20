@@ -14,8 +14,8 @@ struct FoglioCancella: View {
     let cancella: () -> Void
     let annulla: () -> Void
 
-    private static var grigio: Color { Color(red: 159 / 255, green: 179 / 255, blue: 185 / 255) }   // #9fb3b9
-    private static var testo: Color { Color(red: 230 / 255, green: 244 / 255, blue: 248 / 255) }    // #e6f4f8
+    private static var grigio: Color { Color(red: 154 / 255, green: 125 / 255, blue: 111 / 255) }   // #9fb3b9
+    private static var testo: Color { Color(red: 246 / 255, green: 236 / 255, blue: 230 / 255) }    // #e6f4f8
     private static var rosso: Color { Color(red: 1, green: 69 / 255, blue: 58 / 255) }                // #ff453a
 
     var body: some View {
@@ -26,7 +26,7 @@ struct FoglioCancella: View {
                     .font(.system(size: 22))
                     .foregroundStyle(Color.ciano)
                     .frame(width: 54, height: 54)
-                    .background(RadialGradient(colors: [Color.ciano.opacity(0.18), Color(red: 2 / 255, green: 6 / 255, blue: 10 / 255).opacity(0.9)],
+                    .background(RadialGradient(colors: [Color.ciano.opacity(0.18), Color(red: 10 / 255, green: 5 / 255, blue: 2 / 255).opacity(0.9)],
                                                center: UnitPoint(x: 0.5, y: 0.4), startRadius: 0, endRadius: 42))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
@@ -39,7 +39,7 @@ struct FoglioCancella: View {
             }
             Button { Suoni.tocco(); cancella() } label: {
                 Text("CANCELLA").font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(2)
-                    .foregroundStyle(Color(red: 0, green: 24 / 255, blue: 32 / 255))
+                    .foregroundStyle(Color(red: 32 / 255, green: 12 / 255, blue: 0))
                     .frame(maxWidth: .infinity, minHeight: 46)
                     .background(RoundedRectangle(cornerRadius: 12).fill(Self.rosso))
             }
@@ -58,7 +58,7 @@ struct FoglioCancella: View {
         }
         .padding(.top, 10).padding(.horizontal, 16).padding(.bottom, 28)
         .background(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22, style: .continuous)
-            .fill(Color(red: 8 / 255, green: 14 / 255, blue: 17 / 255).opacity(0.98))
+            .fill(Color(red: 17 / 255, green: 11 / 255, blue: 8 / 255).opacity(0.98))
             .shadow(color: .black.opacity(0.6), radius: 20, y: -10))
         .overlay(BordoAlto(raggio: 22).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
         .accessibilityElement(children: .contain)

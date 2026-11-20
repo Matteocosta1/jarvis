@@ -396,7 +396,7 @@ struct Occhi: View {
         guard !chiuso else { return false }
         guard ok else {
             Suoni.errore()
-            OcchiAperti.parla?("Non vedo aerei in cielo qui intorno, Sir.")
+            OcchiAperti.parla?("Non vedo aerei in cielo qui intorno.")
             return false
         }
         ComandoOcchi.aereoAgganciato = true
@@ -417,7 +417,7 @@ struct Occhi: View {
     /// I comandi a voce sull'aereo (Occhi aperti; a Occhi chiusi li aprono, agganciano e poi rispondono).
     private func comandoAereo(_ p: String, _ chiesto: String) {
         Task {
-            if p == "AEREO_OFF" { spegniAereo(); OcchiAperti.parla?("Ricerca degli aerei spenta, Sir."); return }
+            if p == "AEREO_OFF" { spegniAereo(); OcchiAperti.parla?("Ricerca degli aerei spenta."); return }
             if cielo.fase != .agganciato {
                 guard await accendiAereo(chiesto), p != "AEREO" else { return }
                 try? await Task.sleep(for: .seconds(1.6))
@@ -429,10 +429,10 @@ struct Occhi: View {
                 return
             }
             if p == "AEREO_ALTRO" {
-                guard await cielo.altro(schermo: stark.schermo, campo: campoAereo) else { OcchiAperti.parla?("Vedo solo questo aereo, Sir."); return }
+                guard await cielo.altro(schermo: stark.schermo, campo: campoAereo) else { OcchiAperti.parla?("Vedo solo questo aereo."); return }
                 Suoni.pronto()
                 cielo.foglio = chiesto
-                OcchiAperti.parla?("Agganciato l'altro, Sir. " + cielo.breve().replacingOccurrences(of: ", Sir", with: ""))
+                OcchiAperti.parla?("Agganciato l'altro. " + cielo.breve().replacingOccurrences(of: "", with: ""))
                 return
             }
             OcchiAperti.parla?(cielo.risposta(p))
@@ -467,7 +467,7 @@ struct Occhi: View {
         }
         if o.tipo == .persona {
             avvisa("LE PERSONE NON LE CERCO")
-            OcchiAperti.parla?("Le persone non le cerco sul web, Sir.")
+            OcchiAperti.parla?("Le persone non le cerco sul web.")
             return
         }
         stark.blocca()                                          // il mirino resta su quello cercato
@@ -483,8 +483,8 @@ struct Occhi: View {
             guard web?.id == id, !chiuso else { return }
             web?.esito = esito
             switch esito {
-            case .trovato: Suoni.schedaPronta(); OcchiAperti.parla?("Ecco cosa ho trovato, Sir.")
-            case .persona: OcchiAperti.parla?("Le persone non le cerco sul web, Sir.")
+            case .trovato: Suoni.schedaPronta(); OcchiAperti.parla?("Ecco cosa ho trovato.")
+            case .persona: OcchiAperti.parla?("Le persone non le cerco sul web.")
             case .errore: Suoni.errore()
             }
         }
@@ -495,7 +495,7 @@ struct Occhi: View {
     private func prepara() async {
         let inizio = Date()
         guard await AVCaptureDevice.requestAccess(for: .video) else {
-            stato = "ACCESSO NEGATO · IMPOSTAZIONI › JARVIS › FOTOCAMERA"
+            stato = "ACCESSO NEGATO · IMPOSTAZIONI › FRIDAY › FOTOCAMERA"
             Suoni.errore()
             try? await Task.sleep(for: .seconds(2.5))
             chiudi([])
@@ -760,7 +760,7 @@ struct MirinoHUD: View {
                 let w = Double(size.width), h = Double(size.height)
                 let c = CGPoint(x: w / 2, y: h / 2)
                 let lato = min(w, h) * 0.72
-                let colore = scattando ? Color.orange : tinta
+                let colore = scattando ? Color.rossoF : tinta
                 let x0 = (w - lato) / 2, y0 = (h - lato) / 2
                 let braccio = lato * 0.12
 

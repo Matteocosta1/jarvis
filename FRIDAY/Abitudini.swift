@@ -86,12 +86,12 @@ enum Abitudini {
     /// Come si dice una sezione in una frase («la spesa», «il meteo», «la posta»).
     static func detta(_ sezione: String) -> String {
         let nomi: [String: String] = [
-            "Spesa": "la spesa", "Email": "la posta", "Meteo": "il meteo", "Musica": "la musica", "Briefing": "il briefing", "Diario": "il diario",
+            "Spesa": "la spesa", "Mail": "la posta", "Frigo": "il frigo", "Pilates": "Pilates", "Makeup": "il Makeup", "Ciclo": "il Ciclo", "Testa": "Testa", "Gestionale": "il gestionale", "Armadio": "l'armadio", "Nando": "Nando", "Account": "l'Account", "SOS": "l'SOS", "Specchio": "lo Specchio", "Meteo": "il meteo", "Musica": "la musica", "Briefing": "il briefing", "Diario": "il diario",
             "Sonno": "il sonno", "Cuore": "il cuore", "Serata": "la serata", "Bea": "la scheda di Bea", "Satellite": "il satellite",
-            "Ricordi": "i ricordi", "Messaggi": "i messaggi", "Telefono": "il telefono", "Foto": "le foto", "Vitals": "i Vitals",
+            "Memoria": "la memoria", "Messaggi": "i messaggi", "Telefono": "il telefono", "Foto": "le foto", "Vitals": "i Vitals",
             "Costi": "i costi", "Archivio": "l'archivio", "Sistemi": "i sistemi", "Impostazioni": "le impostazioni", "Shazam": "Shazam",
-            "GitHub": "GitHub", "Supabase": "Supabase", "EDITH": "EDITH", "Sentinella": "la Sentinella", "Wiretap": "il Wiretap",
-            "Interprete": "l'Interprete", "Trainer": "il Trainer", "LiDAR": "il LiDAR", "Scanner": "lo Scanner", "Occhi": "gli Occhi",
+            "GitHub": "GitHub", "Supabase": "Supabase", "Difesa": "la Difesa", "Sentinella": "la Sentinella", "Wiretap": "il Wiretap",
+            "Interprete": "l'Interprete", "Trainer": "lo Specchio", "LiDAR": "il LiDAR", "Scanner": "lo Scanner", "Occhi": "gli Occhi",
             "Cucina": "la Cucina", "Profiler": "il Profiler", "Confidente": "il Confidente", "Browser": "il Browser",
         ]
         return nomi[sezione] ?? sezione

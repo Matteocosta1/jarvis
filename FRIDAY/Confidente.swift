@@ -38,18 +38,18 @@ struct VistaConfidente: View {
                 if let r = s.riposoTotale, s.pisolini != nil { Label("\(r) tot.", systemImage: "moon.zzz.fill") }
                 if let b = s.battito {
                     let alto = (s.battitoMedia.map { b > $0 + 4 }) ?? false
-                    Label("\(b) bpm", systemImage: "heart.fill").foregroundStyle(alto ? Color.orange : Color(red: 0.81, green: 0.91, blue: 0.95))
+                    Label("\(b) bpm", systemImage: "heart.fill").foregroundStyle(alto ? Color.rossoF : Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
                 }
                 if let p = s.passi { Label(p.formatted(), systemImage: "figure.walk") }
             }
             .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+            .foregroundStyle(Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
             .padding(.horizontal, 12).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.ciano.opacity(0.06))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ciano.opacity(0.3), lineWidth: 0.6))
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            Text("JARVIS terrà conto anche di come sta il suo corpo oggi.")
+            Text("FRIDAY terrà conto anche di come sta il tuo corpo oggi.")
                 .font(.footnote).foregroundStyle(Color.tenue)
         }
     }
@@ -60,9 +60,9 @@ struct VistaConfidente: View {
             ScrollViewReader { lettore in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Mi racconti, Sir. Le dico quello che penso davvero, anche quando non le darò ragione. Vedo solo la sua metà della storia: il mio è un parere, non una sentenza.")
+                    Text("Raccontami. Ti dico quello che penso davvero, anche quando non ti darò ragione. Vedo solo la tua metà della storia: il mio è un parere, non una sentenza.")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                        .foregroundStyle(Color(red: 242 / 255, green: 220 / 255, blue: 207 / 255))
 
                     // v267: la BILANCIA, sotto le parole di JARVIS: la conversazione sui piatti, il cuore di oggi nel perno
                     OlogrammaConfidente(dati: ConfidenteOlo(testo: testo, battito: stato?.battito)).corniceOlo(Color.ciano)
@@ -112,7 +112,7 @@ struct VistaConfidente: View {
                         .padding(.top, -8)
                     }
 
-                    TextField("Cosa vuole sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
+                    TextField("Cosa vuoi sapere? (es. ho esagerato io?)", text: $domanda, axis: .vertical)
                         .campoRegia("domanda", testo: $domanda)   // 12.0 (12) · B2
                         .lineLimit(1...3)
                         .padding(12)
@@ -128,7 +128,7 @@ struct VistaConfidente: View {
                         svuota()                                  // mandata: la bozza non serve più
                         invia("Modalità confidente. \(d.isEmpty ? "Cosa ne pensi? Dimmi la verità." : d)\n\n\(t)", rigaStato)
                     } label: {
-                        Label("Chieda a JARVIS", systemImage: "person.2.wave.2")
+                        Label("Chiedi a FRIDAY", systemImage: "person.2.wave.2")
                             .font(.system(size: 14, weight: .semibold, design: .monospaced))
                             .frame(maxWidth: .infinity).frame(height: 50)
                             .foregroundStyle(Color.ciano)
@@ -138,7 +138,7 @@ struct VistaConfidente: View {
                     .disabled(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .opacity(testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
 
-                    Text("Resta tra voi: JARVIS non lo salva nella memoria, a meno che non glielo chieda lei.")
+                    Text("Resta tra noi: FRIDAY non lo salva nella memoria, a meno che non sia tu a chiederlo.")
                         .font(.footnote).foregroundStyle(Color.tenue)
                 }
                 .padding(16)
@@ -155,7 +155,7 @@ struct VistaConfidente: View {
                 }
             }
             }
-            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "person.2.wave.2")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Confidente", sottotitolo: "mi racconti", icona: "f:confidente")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»
         }
         .task { stato = await SaluteOggi.leggi() }
         .tastiAVoce { a in
@@ -195,7 +195,7 @@ struct VistaConfidente: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .preferredColorScheme(.dark)
-        .aperturaHUD("Confidente", icona: "person.2.wave.2")
+        .aperturaHUD("Confidente", icona: "f:confidente")
     }
 
     /// La bozza si scrive un attimo dopo l'ultimo tasto (sul telefono, protetta); vuota, sparisce.

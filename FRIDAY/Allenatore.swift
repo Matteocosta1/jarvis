@@ -45,7 +45,7 @@ struct Allenatore: View {
                 HStack {
                     AnelloOcchi(icona: "figure.pilates", tinta: Color.ciano)      // 26 ott notte: l'icona animata come le altre sezioni
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("TRAINER").font(.system(size: 17, weight: .bold, design: .monospaced)).tracking(3)   // 7 nov: una parola, come tutte le sezioni
+                        Text("SPECCHIO").font(.system(size: 17, weight: .bold, design: .monospaced)).tracking(3)   // 7 nov: una parola, come tutte le sezioni
                     }
                     .foregroundStyle(Color.ciano)
                     Spacer(minLength: 0)
@@ -146,18 +146,18 @@ struct Allenatore: View {
         .onDisappear { orecchio.ferma(); motore.ferma() }
         .pausaDietro(ferma: { orecchio.ferma(); motore.ferma() },                         // MARK XI: dietro in pausa
                      riprendi: { Task { await motore.avvia(); Suoni.aperturaCamera(); orecchio.avvia() } })
-        .aperturaHUD("Trainer", icona: "figure.pilates", conX: true, fotocamera: true)
+        .aperturaHUD("Specchio", icona: "f:allenatore", conX: true, fotocamera: true)
     }
 
     private func dato(_ titolo: String, _ valore: String, caldo: Bool) -> some View {
         VStack(spacing: 2) {
-            Text(valore).font(.system(size: 22, weight: .bold, design: .monospaced)).foregroundStyle(caldo ? Color.orange : .white)
+            Text(valore).font(.system(size: 22, weight: .bold, design: .monospaced)).foregroundStyle(caldo ? Color.rossoF : .white)
                 .lineLimit(1).minimumScaleFactor(0.6)
             Text(titolo).font(.system(size: 8, weight: .semibold, design: .monospaced)).tracking(1.5).foregroundStyle(Color.ciano)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 8)
         .background(Color.black.opacity(0.45))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke((caldo ? Color.orange : Color.ciano).opacity(0.5), lineWidth: 0.8))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke((caldo ? Color.rossoF : Color.ciano).opacity(0.5), lineWidth: 0.8))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
@@ -181,7 +181,7 @@ struct ScheletroHUD: View {
             let t = ctx.date.timeIntervalSinceReferenceDate
             Canvas { gc, size in
                 guard let posa else { return }
-                let colore = allarme ? Color.orange : Color.ciano
+                let colore = allarme ? Color.rossoF : Color.ciano
                 func p(_ g: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
                     guard let n = posa[g] else { return nil }
                     let x = specchio ? 1 - n.x : n.x
@@ -646,8 +646,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
     private var modoOlo: String?                               // "selfie", "persona", "strada": la frase sotto
     private var candidatoOlo: (modo: String, da: Date)?
     private var ultimaPersonaOlo = Date.distantPast
-    private static let frasiOlo = ["selfie": "Frontale: l'ologramma è su di lei, Sir.", "persona": "Ologramma agganciato sulla persona, Sir.",
-                                   "strada": "Persone in vista: le seguo tutte, Sir."]
+    private static let frasiOlo = ["selfie": "Frontale: l'ologramma è su di te.", "persona": "Ologramma agganciato sulla persona.",
+                                   "strada": "Persone in vista: le seguo tutte."]
 
     /// Oltre questa inclinazione la schiena è «fuori asse».
     let sogliaSchiena: Double = 12
@@ -676,26 +676,26 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         switch a {
         case .fineSerie: inPausa = false; fineSerie()
-        case .azzera: inPausa = false; azzera(); Task { await parla("Azzerato, Sir.") }
+        case .azzera: inPausa = false; azzera(); Task { await parla("Azzerato.") }
         case .ripetizioni:
             let n = ripetizioni
-            Task { await parla(n == 0 ? "Nessuna ripetizione contata, Sir." : "\(n) ripetizion\(n == 1 ? "e" : "i"), Sir.") }
+            Task { await parla(n == 0 ? "Nessuna ripetizione contata." : "\(n) ripetizion\(n == 1 ? "e" : "i").") }
         case .postura:
-            guard posa != nil else { Task { await parla("Non la vedo, Sir: si metta tutta nell'inquadratura.") }; return }
+            guard posa != nil else { Task { await parla("Non ti vedo: mettiti tutta nell'inquadratura.") }; return }
             let sch = Int(inclinazioneSchiena), sim = Int(simmetria), soglia = Int(sogliaSchiena)
             let giudizio = sch <= soglia && sim >= 85 ? "Va bene così." : (sch > soglia ? "Raddrizzi la schiena." : "Cerchi la simmetria.")
             Task { await parla("Schiena a \(sch) gradi, simmetria al \(sim) per cento. \(giudizio)") }
         case .camera: cambiaCamera()
         case .pausa:
             inPausa = true
-            commento = "In pausa. «Jarvis, riprendi» per continuare."
-            Task { await parla("In pausa, Sir.") }
+            commento = "In pausa. «FRIDAY, riprendi» per continuare."
+            Task { await parla("In pausa.") }
         case .riprendi:
             inPausa = false
-            commento = "Si riparte, Sir."
-            Task { await parla("Si riparte, Sir.") }
+            commento = "Si riparte."
+            Task { await parla("Si riparte.") }
         case .pronto:                             // «Jarvis, allenati allo specchio» con il Trainer già aperto (come il mockup)
-            Task { await parla("Personal trainer pronto, Sir.") }
+            Task { await parla("Personal trainer pronto.") }
         case .conta(let parte):
             switch parte {
             case .busto: giunto = .busto
@@ -705,23 +705,23 @@ final class MotoreAllenatore: NSObject, ObservableObject {
             }
             let frase: String
             switch parte {
-            case .busto: frase = "Conto il busto, Sir."
-            case .mani: frase = "Conto le mani, Sir."
-            case .ginocchia: frase = "Conto le ginocchia, Sir."
-            case .ologramma: frase = "Ologramma, Sir."                    // decisione 28: «… ologramma» detto dentro il Trainer
+            case .busto: frase = "Conto il busto."
+            case .mani: frase = "Conto le mani."
+            case .ginocchia: frase = "Conto le ginocchia."
+            case .ologramma: frase = "Ologramma."                    // decisione 28: «… ologramma» detto dentro il Trainer
             }
             Task { await parla(frase) }
         }
     }
 
     func avvia() async {
-        guard await AVCaptureDevice.requestAccess(for: .video) else { commento = "Serve il permesso fotocamera, Sir."; return }
+        guard await AVCaptureDevice.requestAccess(for: .video) else { commento = "Serve il permesso fotocamera."; return }
         camera.esito = { [weak self] punti in Task { @MainActor [weak self] in self?.ricevi(punti) } }
         camera.esitoOlo = { [weak self] scena in Task { @MainActor [weak self] in self?.riceviOlo(scena) } }
         avviato = true
         configura(frontale: false)
         inizioSerie = Date()
-        commento = giunto == .ologramma ? "Aggancio l'ologramma, Sir…" : "Inquadri tutta la persona, Sir."
+        commento = giunto == .ologramma ? "Aggancio l'ologramma…" : "Inquadra tutta la persona."
     }
 
     func ferma() {
@@ -736,7 +736,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         azzeraConteggio()
         serieSchiena.removeAll(); serieSimmetria.removeAll()
         inizioSerie = Date()
-        commento = "Azzerato. Quando vuole, Sir."
+        commento = "Azzerato. Quando vuoi."
     }
 
     private func azzeraConteggio() { ripetizioni = 0; minimo = 1; massimo = 0; giu = false }
@@ -750,8 +750,8 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         camera.usaOlo(olo)
         scenaOlo = nil; modoOlo = nil; candidatoOlo = nil
         datiOlo = ("—", "—", "—")
-        if olo { cambioOlo = Date(); commento = "Aggancio l'ologramma, Sir…" }
-        else { posa = nil; commento = "Inquadri tutta la persona, Sir." }
+        if olo { cambioOlo = Date(); commento = "Aggancio l'ologramma…" }
+        else { posa = nil; commento = "Inquadra tutta la persona." }
         if avviato && !frontale { configura(frontale: false) }   // dietro: LiDAR sì o no
     }
 
@@ -760,7 +760,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         let schiena = serieSchiena.isEmpty ? 0 : serieSchiena.reduce(0, +) / Double(serieSchiena.count)
         let simm = serieSimmetria.isEmpty ? 100 : serieSimmetria.reduce(0, +) / Double(serieSimmetria.count)
         let durata = Int(Date().timeIntervalSince(inizioSerie))
-        var frase = n == 0 ? "Serie chiusa senza ripetizioni contate, Sir." : "Serie chiusa: \(n) ripetizion\(n == 1 ? "e" : "i") in \(durata / 60) minuti e \(durata % 60) secondi."
+        var frase = n == 0 ? "Serie chiusa senza ripetizioni contate." : "Serie chiusa: \(n) ripetizion\(n == 1 ? "e" : "i") in \(durata / 60) minuti e \(durata % 60) secondi."
         if !serieSchiena.isEmpty {
             frase += schiena < 8 ? " Schiena allineata per tutta la serie, davvero bene." : schiena < 15 ? " Schiena un po' inclinata, in media \(Int(schiena)) gradi: si può fare meglio." : " Attenzione alla schiena: in media \(Int(schiena)) gradi fuori asse."
             frase += simm >= 92 ? " Simmetria ottima." : " Simmetria al \(Int(simm)) per cento: un lato lavora più dell'altro."
@@ -779,7 +779,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
                 if ok {
                     if self.frontale != nuova, self.giunto == .ologramma { self.cambioOlo = Date(); self.modoOlo = nil; self.candidatoOlo = nil }
                     self.frontale = nuova
-                } else { self.commento = "Fotocamera non disponibile, Sir." }
+                } else { self.commento = "Fotocamera non disponibile." }
             }
         }
     }
@@ -796,7 +796,7 @@ final class MotoreAllenatore: NSObject, ObservableObject {
         let adesso = Date()
         guard n > 0 else {
             // nessuno per più di un secondo e mezzo: si riaggancia da capo
-            if modoOlo != nil, adesso.timeIntervalSince(ultimaPersonaOlo) > 1.5 { modoOlo = nil; candidatoOlo = nil; commento = "Aggancio l'ologramma, Sir…" }
+            if modoOlo != nil, adesso.timeIntervalSince(ultimaPersonaOlo) > 1.5 { modoOlo = nil; candidatoOlo = nil; commento = "Aggancio l'ologramma…" }
             return
         }
         ultimaPersonaOlo = adesso

@@ -172,7 +172,7 @@ struct TestataScheda: View {
                 if icona == "vinile" {                      // build 23, MUSICA: il vinile olografico del mockup (non è un simbolo di sistema)
                     IconaVinile().frame(width: 17, height: 17).foregroundStyle(tinta)
                 } else {
-                    Image(systemName: icona)
+                    SimboloFriday(nome: icona, lato: 16)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(tinta)
                 }
@@ -181,7 +181,7 @@ struct TestataScheda: View {
             .shadow(color: tinta.opacity(0.5), radius: 10)
             VStack(alignment: .leading, spacing: 3) {
                 if marchio {
-                    Text("J.A.R.V.I.S.")
+                    Text("F.R.I.D.A.Y.")
                         .font(.system(size: 16, weight: .bold, design: .monospaced)).tracking(4)
                         .foregroundStyle(tinta)
                 } else {
@@ -675,8 +675,8 @@ struct FoglioSalva<Extra: View>: View {
     let annulla: () -> Void
     @ViewBuilder var extra: () -> Extra
 
-    private static var grigio: Color { Color(red: 159 / 255, green: 179 / 255, blue: 185 / 255) }   // #9fb3b9
-    private static var testo: Color { Color(red: 230 / 255, green: 244 / 255, blue: 248 / 255) }    // #e6f4f8
+    private static var grigio: Color { Color(red: 154 / 255, green: 125 / 255, blue: 111 / 255) }   // #9fb3b9
+    private static var testo: Color { Color(red: 246 / 255, green: 236 / 255, blue: 230 / 255) }    // #e6f4f8
 
     var body: some View {
         VStack(spacing: 12) {
@@ -686,7 +686,7 @@ struct FoglioSalva<Extra: View>: View {
                     .font(.system(size: 22))
                     .foregroundStyle(Color.ciano)
                     .frame(width: 54, height: 54)
-                    .background(RadialGradient(colors: [Color.ciano.opacity(0.18), Color(red: 2 / 255, green: 6 / 255, blue: 10 / 255).opacity(0.9)],
+                    .background(RadialGradient(colors: [Color.ciano.opacity(0.18), Color(red: 10 / 255, green: 5 / 255, blue: 2 / 255).opacity(0.9)],
                                                center: UnitPoint(x: 0.5, y: 0.4), startRadius: 0, endRadius: 42))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
@@ -708,14 +708,14 @@ struct FoglioSalva<Extra: View>: View {
                     .onChange(of: nome) { _, n in if n.count > 32 { nome = String(n.prefix(32)) } }
                     .padding(.horizontal, 12)
                     .frame(height: 42)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 2 / 255, green: 8 / 255, blue: 12 / 255).opacity(0.8)))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 12 / 255, green: 6 / 255, blue: 2 / 255).opacity(0.8)))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ciano.opacity(0.5), lineWidth: 1))
                     .accessibilityLabel("Nome")
             }
             HStack(spacing: 8) {
                 Button { Suoni.tocco(); salva() } label: {
                     Text("SALVA").font(.system(size: 12, weight: .bold, design: .monospaced)).tracking(2)
-                        .foregroundStyle(Color(red: 0, green: 24 / 255, blue: 32 / 255))
+                        .foregroundStyle(Color(red: 32 / 255, green: 12 / 255, blue: 0))
                         .frame(maxWidth: .infinity, minHeight: 46)
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color.ciano))
                 }
@@ -743,7 +743,7 @@ struct FoglioSalva<Extra: View>: View {
         }
         .padding(.top, 10).padding(.horizontal, 16).padding(.bottom, 28)
         .background(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22, style: .continuous)
-            .fill(Color(red: 8 / 255, green: 14 / 255, blue: 17 / 255).opacity(0.98))
+            .fill(Color(red: 17 / 255, green: 11 / 255, blue: 8 / 255).opacity(0.98))
             .shadow(color: .black.opacity(0.6), radius: 20, y: -10))
         .overlay(BordoAlto(raggio: 22).stroke(Color.ciano.opacity(0.35), lineWidth: 1))
     }
@@ -809,7 +809,7 @@ struct VistaDiario: View {
     @State private var cancellaTutto = false
 
     var body: some View {
-        CorniceScheda(titolo: "Diario", sottotitolo: sottotitolo, icona: "book.closed", tinta: tinta, pronto: pagine != nil || errore != nil) {
+        CorniceScheda(titolo: "Diario", sottotitolo: sottotitolo, icona: "f:diario", tinta: tinta, pronto: pagine != nil || errore != nil) {
             // 11.0 (6), come il mockup v264: l'ologramma del diario con le sue tre prove (ELICA, RILIEVO, ORBITA), scelte con le chip
             if let p = pagine {
                 OlogrammaDiarioProve(dati: diarioOlo(p)).corniceOlo(tinta)
@@ -818,7 +818,7 @@ struct VistaDiario: View {
             if let p = pagine {
                 if p.count > 1 { andamento(p) }
                 if p.isEmpty {
-                    Text("Ancora nessuna pagina. Ogni sera alle 23:30 JARVIS le fa una domanda; oppure tocchi il tasto qui sopra.")
+                    Text("Ancora nessuna pagina. Ogni sera alle 22:30 FRIDAY ti fa una domanda; oppure tocca il tasto qui sopra.")
                         .font(.footnote).foregroundStyle(Color.tenue)
                 }
                 ForEach(p) { pagina in riga(pagina) }
@@ -829,7 +829,7 @@ struct VistaDiario: View {
                     .tint(.red).padding(.top, 8)
                 }
             } else if let errore {
-                Text(errore).font(.footnote).foregroundStyle(.orange)
+                Text(errore).font(.footnote).foregroundStyle(Color.rossoF)
             } else {
                 AttesaAnello(tinta: tinta).frame(maxWidth: .infinity).padding(.top, 40)   // 8 nov: l'anello del mockup (.attesa-l)
             }
@@ -852,7 +852,7 @@ struct VistaDiario: View {
             Button("Cancella tutto", role: .destructive) { Task { await cancella("tutto") } }
         }
         .regia("Diario", stato: testoSchermo, azioni: [                 // 12.0 (10): la regia
-            AzioneRegia("scrivi", "fa partire la pagina di oggi a voce (JARVIS fa la domanda e ascolta)",
+            AzioneRegia("scrivi", "fa partire la pagina di oggi a voce (FRIDAY fa la domanda e ascolta)",
                         frasi: ["scrivi la pagina di oggi", "scrivi il diario", "scriviamo", "aggiungi a oggi", "scrivi la pagina"]) { _ in
                 if let dopo = Regia.condivisa.dopoLaVoce { dopo { scrivi() } } else { scrivi() }
                 return .fatto("la pagina di oggi parte a voce appena hai finito la frase", battuta: { "" })
@@ -898,7 +898,7 @@ struct VistaDiario: View {
             if let p = paginaDiOggi {
                 Text("La pagina di oggi è scritta\(p.umore.map { ": \($0)" } ?? "").").font(.system(size: 15)).foregroundStyle(.white)
             } else {
-                Text("Mi racconti com'è andata: lei parla, io scrivo. Umore ed energia li ricavo io.")
+                Text("Raccontami com'è andata: tu parli, io scrivo. Umore ed energia li ricavo io.")
                     .font(.system(size: 15)).foregroundStyle(.white.opacity(0.85))
             }
             TastoJarvis(testo: paginaDiOggi == nil ? "Scrivi la pagina di oggi" : "Aggiungi a oggi", icona: "mic.fill", tinta: tinta) { scrivi() }
@@ -996,7 +996,7 @@ struct VistaDiario: View {
     }
 
     private func carica() async {
-        guard let o = await VistaVitals.chiama(["vitals": true, "giorni": 90]) else { errore = "Non raggiungo il diario, Sir."; return }
+        guard let o = await VistaVitals.chiama(["vitals": true, "giorni": 90]) else { errore = "Non raggiungo il diario."; return }
         if let e = o["errore"] as? String { errore = e; return }
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -1031,7 +1031,7 @@ struct VistaSonno: View {
     @State private var caricato = false
 
     var body: some View {
-        CorniceScheda(titolo: "Sonno", sottotitolo: oggi?.orari.map { "stanotte \($0)" } ?? "la notte scorsa", icona: "bed.double", tinta: tinta, pronto: caricato) {
+        CorniceScheda(titolo: "Sonno", sottotitolo: oggi?.orari.map { "stanotte \($0)" } ?? "la notte scorsa", icona: "f:sonno", tinta: tinta, pronto: caricato) {
             // 11.0 (6), come il mockup v264: l'ologramma della notte con le sue tre prove (LETTO, CICLI, NOTTI), scelte con le chip.
             // 5 nov sera (il signore: «sonno nell'app non ha ologrammi, perché?»): c'era solo con i dati della notte; ora c'è sempre,
             // come nelle altre sezioni (senza dati scrive «NESSUN DATO DELLA NOTTE», come il mockup)
@@ -1055,7 +1055,7 @@ struct VistaSonno: View {
                 Text(n.prefix(1).uppercased() + n.dropFirst()).font(.footnote).foregroundStyle(Color.tenue)
             }
             if notti.count > 1 { storico }
-            TastoJarvis(testo: "Com'ho dormito? Chieda a JARVIS", tinta: tinta) { chiedi("Come ho dormito stanotte? Dimmi anche come sta andando la settimana.") }
+            TastoJarvis(testo: "Com'ho dormito? Chiedi a FRIDAY", tinta: tinta) { chiedi("Come ho dormito stanotte? Dimmi anche come sta andando la settimana.") }
             if caricato && oggi?.sonno == nil && fasi.isEmpty {
                 Text("Nessun dato di sonno: porti l'orologio a letto con il monitoraggio del sonno attivo (app Salute › Sonno).")
                     .font(.footnote).foregroundStyle(Color.tenue)
@@ -1134,8 +1134,8 @@ nonisolated enum Salute {
         case sveglio, rem, leggero, profondo
         var nome: String { ["Sveglio", "REM", "Leggero", "Profondo"][rawValue] }
         var colore: Color {
-            [Color(red: 1.0, green: 0.6, blue: 0.45), Color(red: 0.55, green: 0.85, blue: 1.0),
-             Color(red: 0.45, green: 0.55, blue: 1.0), Color(red: 0.35, green: 0.3, blue: 0.85)][rawValue]
+            [Color(red: 1.0, green: 0.6, blue: 0.45), Color(red: 1, green: 182 / 255, blue: 140 / 255),
+             Color(red: 1, green: 166 / 255, blue: 115 / 255), Color(red: 0.35, green: 0.3, blue: 0.85)][rawValue]
         }
     }
 

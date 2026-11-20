@@ -538,7 +538,7 @@ final class StatoOcchi: ObservableObject {
         if o.tipo == .persona {
             guard let v = vista, v.frontale else { return "" }
             let piuGrande = v.visti.filter { $0.tipo == .persona }.max { $0.box.width * $0.box.height < $1.box.width * $1.box.height }
-            return piuGrande?.id == o.id ? "Persona · lei, Sir" : ""
+            return piuGrande?.id == o.id ? "Persona · tu" : ""
         }
         return dettagli[o.id]?.titolo
     }
@@ -766,7 +766,7 @@ enum SchedaOcchi {
         for (j, (a1, b1)) in righe.enumerated() {
             let y = ty + 36 * k + CGFloat(j) * 13 * k
             if y > by + H - 12 * k { continue }
-            c.draw(Text(a1).font(DisegnoOlo.mono(9 * k, .medium)).foregroundStyle(Color(red: 200 / 255, green: 240 / 255, blue: 250 / 255).opacity(0.65)),
+            c.draw(Text(a1).font(DisegnoOlo.mono(9 * k, .medium)).foregroundStyle(Color(red: 250 / 255, green: 218 / 255, blue: 200 / 255).opacity(0.65)),
                    at: CGPoint(x: bx + 12 * k, y: y), anchor: .topLeading)
             if !b1.isEmpty {
                 c.draw(Text(b1).font(DisegnoOlo.mono(9 * k, .medium)).foregroundStyle(Color.white), at: CGPoint(x: bx + W - 12 * k, y: y), anchor: .topTrailing)
@@ -891,7 +891,7 @@ struct FoglioWebOcchi: View {
             ScrollView { contenuto }.scrollIndicators(.hidden)
         }
         .frame(maxWidth: 520, alignment: .leading)
-        .background(Color(red: 3 / 255, green: 9 / 255, blue: 11 / 255).opacity(0.92))
+        .background(Color(red: 11 / 255, green: 6 / 255, blue: 3 / 255).opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.ciano.opacity(0.45), lineWidth: 1))
         .shadow(color: Color.ciano.opacity(0.2), radius: 12)
@@ -937,9 +937,9 @@ struct FoglioWebOcchi: View {
                     }
                 }
             case .persona?:
-                Text("Le persone non le cerco sul web, Sir.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
+                Text("Le persone non le cerco sul web.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
             case .errore?:
-                Text("Ricerca non riuscita, Sir: riprovi tra poco.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
+                Text("Ricerca non riuscita: riprova tra poco.").font(.system(size: 14)).foregroundStyle(.white).padding(.vertical, 12)
             }
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 16)
@@ -981,7 +981,7 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     /// Con gli Occhi chiusi, la frase quando si aprono per mandare la foto (come il mockup).
     var annuncioApertura: String? {
         switch self {
-        case .aereo(let p, _): return p == "AEREO_OFF" ? nil : "Cerco l'aereo, Sir."
+        case .aereo(let p, _): return p == "AEREO_OFF" ? nil : "Cerco l'aereo."
         default: return nil
         }
     }
@@ -989,12 +989,12 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
     /// La risposta di JARVIS (come il mockup); CERCA risponde quando ha trovato.
     var risposta: String? {
         switch self {
-        case .etichette(true): return "Etichette attive, Sir."
-        case .etichette(false): return "Etichette disattivate, Sir."
-        case .ologramma(true): return "Scansione olografica, Sir."
-        case .ologramma(false): return "Ologramma disattivato, Sir."
-        case .aggancia: return "Bersaglio agganciato, Sir."
-        case .aereo("AEREO", _): return "Cerco l'aereo, Sir."
+        case .etichette(true): return "Etichette attive."
+        case .etichette(false): return "Etichette disattivate."
+        case .ologramma(true): return "Scansione olografica."
+        case .ologramma(false): return "Ologramma disattivato."
+        case .aggancia: return "Bersaglio agganciato."
+        case .aereo("AEREO", _): return "Cerco l'aereo."
         case .cerca, .aereo: return nil
         }
     }

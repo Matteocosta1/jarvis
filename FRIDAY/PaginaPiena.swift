@@ -185,7 +185,7 @@ struct GrigliaSfumata: View {
             while x < size.width { g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height)); x += passo }
             var y: CGFloat = 0
             while y < size.height { g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y)); y += passo }
-            gc.stroke(g, with: .color(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.03)), lineWidth: 1)
+            gc.stroke(g, with: .color(Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(0.03)), lineWidth: 1)
         }
         .mask(RadialGradient(stops: [.init(color: .black, location: 0.25), .init(color: .clear, location: 0.8)],
                              center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 630))
@@ -254,7 +254,7 @@ struct SfondoFoglio: View {
         let luce = tinta
         Canvas { gc, size in
             let tutto = CGRect(origin: .zero, size: size)
-            gc.fill(Path(tutto), with: .color(Color(red: 5 / 255, green: 8 / 255, blue: 9 / 255)))
+            gc.fill(Path(tutto), with: .color(Color(red: 11 / 255, green: 7 / 255, blue: 5 / 255)))
             // la quadrettatura, sfumata dal cerchio
             gc.drawLayer { strato in
                 var orizzontali = Path()

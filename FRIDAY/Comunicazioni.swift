@@ -137,7 +137,7 @@ enum RegistroMessaggi {
 struct MessaggioRicevuto: AppIntent {
     nonisolated static var title: LocalizedStringResource { "Messaggio ricevuto" }
     nonisolated static var description: IntentDescription {
-        IntentDescription("Passa a Jarvis un messaggio appena arrivato (chi lo manda e il testo): resta sul telefono e compare nell'ologramma di Messaggi.")
+        IntentDescription("Passa a FRIDAY un messaggio appena arrivato (chi lo manda e il testo): resta sul telefono e compare nell'ologramma di Messaggi.")
     }
     @Parameter(title: "Mittente") var mittente: String
     @Parameter(title: "Testo") var testo: String
@@ -225,7 +225,7 @@ struct VistaMessaggi: View {
     @FocusState private var scrivendo: Bool
 
     var body: some View {
-        CorniceScheda(titolo: "Messaggi", sottotitolo: scelto.map { "a \($0.nome) · \(canale.rawValue)" } ?? "scelga a chi scrivere", icona: "message", tinta: tinta, pronto: caricato) {
+        CorniceScheda(titolo: "Messaggi", sottotitolo: scelto.map { "a \($0.nome) · \(canale.rawValue)" } ?? "scegli a chi scrivere", icona: "f:messaggi", tinta: tinta, pronto: caricato) {
             OlogrammaMessaggi(dati: messaggiOlo).corniceOlo(tinta)          // v267: BOLLE, in testa come nelle altre sezioni
             if let s = scelto {
                 destinatario(s)
@@ -240,7 +240,7 @@ struct VistaMessaggi: View {
                 rubrica
             }
             if !registro.isEmpty && scelto == nil {
-                Pannello(titolo: "ULTIMI MESSAGGI DI JARVIS", tinta: tinta) {
+                Pannello(titolo: "ULTIMI MESSAGGI DI FRIDAY", tinta: tinta) {
                     ForEach(registro.prefix(8)) { v in
                         Button { riprendi(v) } label: {
                             HStack(spacing: 10) {
@@ -332,7 +332,7 @@ struct VistaMessaggi: View {
         guard !nome.isEmpty, FineFrase.paroleNude(nome).count <= 3 else { return .no("«\(chi)»: troppo lungo per un nome") }
         guard let c = Regia.scegli(nome, fra: contatti, testo: { $0.nome }) else {
             cerca = nome
-            return .no("\(nome) non è in rubrica", battuta: { "Non trovo \(nome) in rubrica, Sir. Ho messo il nome nella ricerca." })
+            return .no("\(nome) non è in rubrica", battuta: { "Non trovo \(nome) in rubrica. Ho messo il nome nella ricerca." })
         }
         scegli(c)
         return .fatto("destinatario: \(c.nome) (\(numeroScelto ?? "senza numero")), canale \(canale.rawValue)", battuta: { Battute.messaggioA(c.nome) })
@@ -356,7 +356,7 @@ struct VistaMessaggi: View {
         }
         let ultimi: [String] = registro.prefix(5).map { "a \($0.nome): «\(($0.testo ?? "").prefix(120))»" }
         let arrivati: [String] = ricevuti.prefix(5).map { "da \($0.nome): «\(($0.testo ?? "").prefix(120))»" }
-        let mandati: String? = ultimi.isEmpty ? nil : "ultimi mandati da JARVIS: " + ultimi.joined(separator: "; ")
+        let mandati: String? = ultimi.isEmpty ? nil : "ultimi mandati da FRIDAY: " + ultimi.joined(separator: "; ")
         let arrivo: String? = arrivati.isEmpty ? nil : "ultimi arrivati: " + arrivati.joined(separator: "; ")
         return Schermo.unisci("Messaggi", ["nessun destinatario scelto", Schermo.campo("cerca", cerca), mandati, arrivo])
     }
@@ -407,9 +407,9 @@ struct VistaMessaggi: View {
         }
         .padding(12).background(tinta.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 12))
         .id("messaggiCerca")                                 // 12 nov (CampoInAlto): con la tastiera su, in cima con i contatti sotto
-        TastoJarvis(testo: "Detti a JARVIS: «scrivi a Marco…»", icona: "waveform", tinta: tinta) { chiedi("Jarvis, voglio mandare un messaggio: dimmi tu a chi e cosa, poi lo mandi.") }
+        TastoJarvis(testo: "Detta a FRIDAY: «scrivi a Giulia…»", icona: "waveform", tinta: tinta) { chiedi("FRIDAY, voglio mandare un messaggio: dimmi tu a chi e cosa, poi lo mandi.") }
         if contatti.isEmpty && caricato {
-            Text("Rubrica vuota o non autorizzata: Impostazioni › JARVIS › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
+            Text("Rubrica vuota o non autorizzata: Impostazioni › FRIDAY › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
         }
         ForEach(filtrati.prefix(cerca.isEmpty ? 40 : 60)) { c in
             Button { scegli(c) } label: { RigaContatto(c: c, tinta: tinta) }.buttonStyle(.plain)
@@ -446,7 +446,7 @@ struct VistaMessaggi: View {
                 .focused($scrivendo)
                 .overlay(alignment: .topLeading) {
                     if testo.isEmpty && !dettatura.attivo {
-                        Text("Tocchi il microfono e detti, oppure scriva qui.").font(.system(size: 15)).foregroundStyle(Color.tenue).padding(.top, 8).padding(.leading, 4).allowsHitTesting(false)
+                        Text("Tocca il microfono e detta, oppure scrivi qui.").font(.system(size: 15)).foregroundStyle(Color.tenue).padding(.top, 8).padding(.leading, 4).allowsHitTesting(false)
                     }
                 }
             HStack(spacing: 12) {
@@ -539,7 +539,7 @@ struct VistaMessaggi: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Registro.aggiungi(VoceRegistro(nome: s.nome, numero: numero, quando: Date(), tipo: canale == .whatsapp ? "whatsapp" : "imessage", testo: t), a: "registroMessaggi")
         registro = Registro.leggi("registroMessaggi")
-        esito = canale == .imessage ? "Inviato con il Comando rapido «\(Strumenti.comandoInvio)»." : "WhatsApp si apre con il messaggio pronto: tocchi Invia."
+        esito = canale == .imessage ? "Inviato con il Comando rapido «\(Strumenti.comandoInvio)»." : "WhatsApp si apre con il messaggio pronto: tocca Invia."
         UIApplication.shared.open(url)
         testo = ""
     }
@@ -564,7 +564,7 @@ struct VistaTelefono: View {
     @State private var chiamata: Date?                               // e quando è partita l'ultima chiamata
 
     var body: some View {
-        CorniceScheda(titolo: "Telefono", sottotitolo: pagina.rawValue.lowercased(), icona: "phone", tinta: tinta, pronto: caricato) {
+        CorniceScheda(titolo: "Telefono", sottotitolo: pagina.rawValue.lowercased(), icona: "f:telefono", tinta: tinta, pronto: caricato) {
             // 9 nov (build 19, il signore: «un ologramma per la sezione telefono e farla un po' più carina»): in testa l'ologramma con
             // le prove (ANTENNA, STARKPHONE, SATELLITI) e sotto le schede a chip come Musica, al posto del selettore di iOS
             OlogrammaTelefono(dati: datiOlo).corniceOlo(tinta)
@@ -574,7 +574,7 @@ struct VistaTelefono: View {
             case .rubrica: rubrica
             case .recenti: recenti
             }
-            Text("La chiamata parte dall'app Telefono: iOS chiede un tocco di conferma, e riattacca lei da lì. Dica anche «Jarvis, chiama Marco».")
+            Text("La chiamata parte dall'app Telefono: iOS chiede un tocco di conferma, e riattacchi tu da lì. Puoi dire anche «FRIDAY, chiama Giulia».")
                 .font(.system(size: 11)).foregroundStyle(Color.tenue)
         }
         .task { contatti = await Rubrica.tutti(); caricato = true }
@@ -618,7 +618,7 @@ struct VistaTelefono: View {
                 else if Rubrica.pulisci(chi).count >= 3 { bersaglio = (chi, Rubrica.pulisci(chi)) }
                 guard let b = bersaglio else { return .no("non trovo «\(chi)» in rubrica") }
                 let emergenza: Set<String> = ["112", "113", "115", "118", "1515", "1530", "911", "999"]
-                guard !emergenza.contains(Rubrica.pulisci(b.numero)) else { return .no("i numeri d'emergenza li chiama il signore col dito, mai JARVIS a voce") }
+                guard !emergenza.contains(Rubrica.pulisci(b.numero)) else { return .no("i numeri d'emergenza li chiama Bea col dito, mai FRIDAY a voce") }
                 if let dopo = Regia.condivisa.dopoLaVoce { dopo { chiama(nome: b.nome, numero: b.numero) } } else { chiama(nome: b.nome, numero: b.numero) }
                 return .fatto("chiamata a \(b.nome) (\(b.numero)): iOS chiede un tocco di conferma")
             },
@@ -644,7 +644,7 @@ struct VistaTelefono: View {
                     Text(p.rawValue.uppercased())
                         .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
                         .lineLimit(1).minimumScaleFactor(0.8)
-                        .foregroundStyle(attiva ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                        .foregroundStyle(attiva ? Color(red: 32 / 255, green: 12 / 255, blue: 0) : Color.ciano)
                         .padding(.vertical, 8).padding(.horizontal, 6)
                         .frame(maxWidth: .infinity)
                         .background(attiva ? Color.ciano : Color.clear, in: RoundedRectangle(cornerRadius: 8))
@@ -750,7 +750,7 @@ struct VistaTelefono: View {
         .id("telefonoCerca")                                 // 12 nov (CampoInAlto): con la tastiera su, in cima con i contatti sotto
         .onChange(of: cercaAttiva) { _, su in if su { CampoInAlto.porta("telefonoCerca") } }
         if contatti.isEmpty && caricato {
-            Text("Rubrica vuota o non autorizzata: Impostazioni › JARVIS › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
+            Text("Rubrica vuota o non autorizzata: Impostazioni › FRIDAY › Contatti.").font(.footnote).foregroundStyle(Color.tenue)
         }
         ForEach(filtrati.prefix(cerca.isEmpty ? 60 : 80)) { c in
             HStack {
@@ -770,7 +770,7 @@ struct VistaTelefono: View {
 
     @ViewBuilder private var recenti: some View {
         if registro.isEmpty {
-            Text("Nessuna chiamata fatta da JARVIS. Il registro dell'app Telefono resta nell'app Telefono: iOS non lo condivide.")
+            Text("Nessuna chiamata fatta da FRIDAY. Il registro dell'app Telefono resta nell'app Telefono: iOS non lo condivide.")
                 .font(.footnote).foregroundStyle(Color.tenue)
         }
         ForEach(registro) { v in

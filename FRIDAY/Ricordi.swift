@@ -57,14 +57,14 @@ struct VistaRicordi: View {
                     .scrollContentBackground(.hidden)
                     .scrollDismissesKeyboard(.interactively)
                 } else if errore {
-                    Text("Non raggiungo la memoria, Sir.").foregroundStyle(.orange).padding(.top, 40)
+                    Text("Non raggiungo la memoria.").foregroundStyle(Color.rossoF).padding(.top, 40)
                     Spacer()
                 } else {
                     AttesaAnello().padding(.top, 60)   // 8 nov: l'anello del mockup (.attesa-l)
                     Spacer()
                 }
             }
-            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Ricordi", sottotitolo: "seconda memoria", icona: "brain.head.profile")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»; 8 nov (il signore): il titolo resta RICORDI su ogni scheda
+            .modifier(ConBarraChiudi(tinta: Color.ciano, testata: DatiTestata(titolo: "Memoria", sottotitolo: "seconda memoria", icona: "f:memoria")) { chiudi() })   // 7 nov sera: la testata nella riga di «Chiudi»; 8 nov (il signore): il titolo resta RICORDI su ogni scheda
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -95,8 +95,8 @@ struct VistaRicordi: View {
         }
         .chiudiFoglioDietro { fotoAperta = nil }            // 4 nov: la foto (iOS) non resta sopra la sezione che sale
         .preferredColorScheme(.dark)
-        .aperturaHUD("Ricordi", icona: "brain.head.profile")
-        .regia("Ricordi", stato: testoSchermo, azioni: azioniRegia)      // 12.0 (10): la regia
+        .aperturaHUD("Memoria", icona: "f:memoria")
+        .regia("Memoria", stato: testoSchermo, azioni: azioniRegia)      // 12.0 (10): la regia
     }
 
     // MARK: 12.0 (10) · La regia
@@ -120,12 +120,12 @@ struct VistaRicordi: View {
             AzioneRegia("guida", "accende la guida (fotocamera e frecce) verso il luogo salvato più recente", frasi: ["portami al luogo", "guidami", "accendi la guida"]) { _ in
                 scheda = .traccia
                 guidaAccesa = true
-                return .fatto("guida accesa in Traccia", battuta: { Battute.una("ricordi.guida", ["Guida accesa, Sir. Segua la freccia.", "Rotta impostata: mi segua."]) })
+                return .fatto("guida accesa in Traccia", battuta: { Battute.una("ricordi.guida", ["Guida accesa. Segua la freccia.", "Rotta impostata: mi segua."]) })
             },
             AzioneRegia("salva_qui", "salva il posto dove si trova adesso", frasi: ["ricorda questo luogo", "salva questo posto", "segna questo posto"]) { _ in
                 scheda = .traccia
                 salvaDaFare = true
-                return .fatto("salvo il posto dove si trova", battuta: { Battute.una("ricordi.salva", ["Posizione salvata, Sir.", "Segnato sulla mappa.", "Questo posto non me lo scordo."]) })
+                return .fatto("salvo il posto dove si trova", battuta: { Battute.una("ricordi.salva", ["Posizione salvata.", "Segnato sulla mappa.", "Questo posto non me lo scordo."]) })
             },
             AzioneRegia("fatto", "segna fatto un ricordo a schermo (per posizione o parole)", valore: "quale") { v in
                 guard let d = dati, let r = Regia.scegli(v["quale"] ?? "", fra: d.ricordi, testo: { $0.testo }) else { return .no("ricordo non trovato") }
@@ -144,7 +144,7 @@ struct VistaRicordi: View {
 
     /// 8 nov notte: cosa vede JARVIS di Ricordi (la scheda, la ricerca, le prime righe a schermo nell'ordine).
     private var testoSchermo: String {
-        guard let d = dati else { return Schermo.unisci("Ricordi", ["scheda \(scheda.rawValue)", errore ? "non raggiungo la memoria" : "la memoria si sta caricando"]) }
+        guard let d = dati else { return Schermo.unisci("Memoria", ["scheda \(scheda.rawValue)", errore ? "non raggiungo la memoria" : "la memoria si sta caricando"]) }
         let righe: [DatiRicordi.Riga] = scheda == .posti ? d.posti : d.ricordi
         let prime: [String] = righe.prefix(10).enumerated().map { i, r in
             var riga = "\(i + 1). \(r.testo.prefix(160))"
@@ -155,7 +155,7 @@ struct VistaRicordi: View {
         }
         let ricerca: String? = scheda == .ricordi ? Schermo.campo("cerca", cerca) : nil
         let elenco: String = prime.isEmpty ? "nessuna riga a schermo" : "a schermo: " + prime.joined(separator: "; ")
-        return Schermo.unisci("Ricordi", ["scheda \(scheda.rawValue)", ricerca, elenco])
+        return Schermo.unisci("Memoria", ["scheda \(scheda.rawValue)", ricerca, elenco])
     }
 
     // MARK: Ricordi
@@ -172,7 +172,7 @@ struct VistaRicordi: View {
         }
         Section {
             if d.ricordi.isEmpty {
-                Text(cerca.isEmpty ? "Ancora nessun ricordo. Dica a JARVIS «ricordati che le chiavi sono sul mobile»." : "Niente con «\(cerca)».")
+                Text(cerca.isEmpty ? "Ancora nessun ricordo. Di' a FRIDAY «ricordati che le chiavi sono sul mobile»." : "Niente con «\(cerca)».")
                     .font(.footnote).foregroundStyle(Color.tenue).listRowBackground(Color.clear)
             }
             ForEach(d.ricordi) { r in
@@ -221,7 +221,7 @@ struct VistaRicordi: View {
         }
         Section {
             if d.posti.isEmpty {
-                Text(cerca.isEmpty ? "Nessun posto salvato. Dica a JARVIS «ricorda questo luogo» o «ricordati questo posto»." : "Niente con «\(cerca)».")
+                Text(cerca.isEmpty ? "Nessun posto salvato. Di' a FRIDAY «ricorda questo luogo» o «ricordati questo posto»." : "Niente con «\(cerca)».")
                     .font(.footnote).foregroundStyle(Color.tenue).listRowBackground(Color.clear)
             }
             ForEach(d.posti) { r in
@@ -345,7 +345,7 @@ struct ChipSat: View {
             Text(testo)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced)).tracking(1)
                 .lineLimit(1).minimumScaleFactor(0.8)
-                .foregroundStyle(acceso ? Color(red: 0, green: 0.094, blue: 0.125) : Color.ciano)
+                .foregroundStyle(acceso ? Color(red: 32 / 255, green: 12 / 255, blue: 0) : Color.ciano)
                 .padding(.vertical, 8).padding(.horizontal, 6)
                 .frame(maxWidth: .infinity)
                 .background(RoundedRectangle(cornerRadius: 8).fill(acceso ? Color.ciano : .clear))

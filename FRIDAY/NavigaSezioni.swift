@@ -529,9 +529,13 @@ struct StratoSezioniVista<Vista: View>: View {
         case .scheda(let a):
             switch a {
             case .musica: return "vinile"
-            case .edith: return "eyeglasses"
+            case .edith: return "f:difesa"
+            case .account: return "f:account"
+            case .sos: return "f:sos"
             default: return "square.grid.2x2"
             }
+        case .allenatore: return "f:allenatore"
+        case .ricordi: return "f:memoria"
         default: return "square.grid.2x2"
         }
     }
@@ -1754,7 +1758,7 @@ struct LuceAggancio: View {
 struct FondoOlo: View {
     var body: some View {
         ZStack {
-            EllipticalGradient(colors: [Color(red: 6 / 255, green: 27 / 255, blue: 34 / 255), Color(red: 1 / 255, green: 5 / 255, blue: 7 / 255)],
+            EllipticalGradient(colors: [Color(red: 34 / 255, green: 16 / 255, blue: 6 / 255), Color(red: 7 / 255, green: 3 / 255, blue: 1 / 255)],
                                center: UnitPoint(x: 0.5, y: 0.46), startRadiusFraction: 0, endRadiusFraction: 1)
             Canvas { gc, size in
                 var griglia = Path()
@@ -1762,7 +1766,7 @@ struct FondoOlo: View {
                 while x < size.width { griglia.addRect(CGRect(x: x, y: 0, width: 1, height: size.height)); x += 22 }
                 var y: CGFloat = 0
                 while y < size.height { griglia.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)); y += 22 }
-                gc.fill(griglia, with: .color(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.05)))
+                gc.fill(griglia, with: .color(Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(0.05)))
             }
         }
         .contentShape(Rectangle())
@@ -1778,7 +1782,7 @@ struct FondoVivo: View {
         // molto sfocato e scurito, come la Home dietro le app
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
-            Color(red: 2 / 255, green: 8 / 255, blue: 11 / 255).opacity(0.38)
+            Color(red: 11 / 255, green: 5 / 255, blue: 2 / 255).opacity(0.38)
         }
             .environment(\.colorScheme, .dark)
             .contentShape(Rectangle())
@@ -1809,13 +1813,13 @@ struct VeloOlo: View {
     var body: some View {
         ZStack {
             if !web && !pila {
-                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
-                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
+                Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(forza).blendMode(.color)
+                Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity(0.07 * forza).blendMode(.screen)
             }
             RigheOlo().opacity(forza * (pila ? 0.57 : 1))
             // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (60% nella PILA)
             RoundedRectangle(cornerRadius: raggio, style: .continuous)
-                .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity((pila ? 0.6 : 0.55) * forza), lineWidth: 1.5)
+                .strokeBorder(Color(red: 1, green: 106 / 255, blue: 19 / 255).opacity((pila ? 0.6 : 0.55) * forza), lineWidth: 1.5)
         }
         .allowsHitTesting(false)
     }
@@ -1832,10 +1836,10 @@ struct VetroOlo: View {
     let raggio: CGFloat
     var body: some View {
         let forma = RoundedRectangle(cornerRadius: raggio, style: .continuous)
-        let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+        let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
         ZStack {
             forma.fill(.ultraThinMaterial).opacity((0.3 + 0.7 * fuoco) * forza)
-            forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
+            forma.fill(Color(red: 22 / 255, green: 10 / 255, blue: 3 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
             forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
                                               .init(color: ciano.opacity(0.03 * forza), location: 0.4),
                                               .init(color: ciano.opacity(0.06 * forza), location: 1)],
@@ -1953,7 +1957,7 @@ struct IconaPila: View {
                 if icona.hasPrefix("logo:") {
                     Image(String(icona.dropFirst(5))).resizable().renderingMode(.template).scaledToFit().frame(width: 14, height: 14)
                 } else {
-                    Image(systemName: icona).font(.system(size: 13))
+                    SimboloFriday(nome: icona, lato: 13)
                 }
             }
         }
@@ -1986,7 +1990,7 @@ extension EnvironmentValues {
 struct RigheOlo: View {
     var body: some View {
         Canvas { gc, size in
-            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+            let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
             let fondo: CGFloat = 60, w = size.width, h = size.height
             // il bagliore interno dai quattro bordi (box-shadow: inset 0 0 60px rgba(79,227,255,.25))
             let bordi: [(CGRect, CGPoint, CGPoint)] = [
@@ -2037,7 +2041,7 @@ struct AloneOlo: ViewModifier {
     static let immagine: UIImage = {
         let lato = 2 * bordo + 4, forma = lato - 2 * fuori
         let vista = RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .fill(Color(red: 79 / 255, green: 227 / 255, blue: 1))
+            .fill(Color(red: 1, green: 106 / 255, blue: 19 / 255))
             .frame(width: forma, height: forma)
             .blur(radius: 23)
             .frame(width: lato, height: lato)
@@ -2063,7 +2067,7 @@ struct MaterializzaOlo: View {
             let t = ctx.date.timeIntervalSince(inizio)
             let q = min(1, t / 0.43), e = q < 0.5 ? 2 * q * q : 1 - pow(-2 * q + 2, 2) / 2, y = e * 1.06 - 0.03
             GeometryReader { g in
-                let h = g.size.height, yy = CGFloat(y), ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+                let h = g.size.height, yy = CGFloat(y), ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
                 ZStack(alignment: .top) {
                     if q < 1 {
                         let a = max(0, y - 0.05)
@@ -2074,7 +2078,7 @@ struct MaterializzaOlo: View {
                             .frame(height: 70)
                             .offset(y: yy * h - 72)
                         Rectangle()
-                            .fill(Color(red: 223 / 255, green: 250 / 255, blue: 1))
+                            .fill(Color(red: 1, green: 235 / 255, blue: 223 / 255))
                             .frame(height: 2)
                             .shadow(color: ciano, radius: 5)
                             .shadow(color: ciano.opacity(0.85), radius: 13)
@@ -2113,8 +2117,8 @@ struct StaffeOlo: View {
                 p.move(to: CGPoint(x: x, y: y + sy * l)); p.addLine(to: CGPoint(x: x, y: y)); p.addLine(to: CGPoint(x: x + sx * l, y: y))
             }
         }
-        .stroke(Color(red: 143 / 255, green: 240 / 255, blue: 1), style: StrokeStyle(lineWidth: 2, lineCap: .square))
-        .shadow(color: Color(red: 79 / 255, green: 227 / 255, blue: 1), radius: 3)
+        .stroke(Color(red: 1, green: 154 / 255, blue: 92 / 255), style: StrokeStyle(lineWidth: 2, lineCap: .square))
+        .shadow(color: Color(red: 1, green: 106 / 255, blue: 19 / 255), radius: 3)
         .opacity(alfa)
     }
 }

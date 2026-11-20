@@ -19,15 +19,15 @@ import simd
 
 nonisolated enum TintaOlo {
     /// 79,227,255: il celeste di JARVIS.
-    static let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+    static let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
     /// 170,244,255: il secondo tono, un celeste più chiaro (mani, gomiti, gesti, le persone negli Occhi).
-    static let ambra = Color(red: 170 / 255, green: 244 / 255, blue: 1)
+    static let ambra = Color(red: 1, green: 201 / 255, blue: 170 / 255)
     /// 190,248,255: il bordo che brilla.
-    static let filo = Color(red: 190 / 255, green: 248 / 255, blue: 1)
+    static let filo = Color(red: 1, green: 214 / 255, blue: 190 / 255)
     /// 4,10,12: il fondo dei cartellini.
-    static let fondo = Color(red: 4 / 255, green: 10 / 255, blue: 12 / 255)
+    static let fondo = Color(red: 12 / 255, green: 7 / 255, blue: 4 / 255)
     /// 3,9,11: il fondo della scheda del bersaglio.
-    static let fondoScheda = Color(red: 3 / 255, green: 9 / 255, blue: 11 / 255)
+    static let fondoScheda = Color(red: 11 / 255, green: 6 / 255, blue: 3 / 255)
 }
 
 // MARK: - L'inquadratura: dal fotogramma allo schermo
@@ -138,7 +138,7 @@ nonisolated enum DisegnoOlo {
         guard a > 0, r.width > 2, r.height > 2, !clip.isEmpty else { return }
         var c = gc
         c.clip(to: clip)
-        c.fill(Path(r), with: .color(Color(red: 0, green: 10 / 255, blue: 14 / 255).opacity(0.42 * a)))
+        c.fill(Path(r), with: .color(Color(red: 14 / 255, green: 5 / 255, blue: 0).opacity(0.42 * a)))
         c.blendMode = .plusLighter
         c.opacity = a * 0.85
         if specchio {
@@ -209,7 +209,7 @@ nonisolated enum DisegnoOlo {
     /// I bordi dello schermo appena scuri, verso il blu-nero di JARVIS.
     static func vignetta(_ gc: GraphicsContext, W: CGFloat, H: CGFloat, interno: CGFloat, alfa: Double) {
         gc.fill(Path(CGRect(x: 0, y: 0, width: W, height: H)),
-                with: .radialGradient(Gradient(colors: [Color.clear, Color(red: 0, green: 8 / 255, blue: 12 / 255).opacity(alfa)]),
+                with: .radialGradient(Gradient(colors: [Color.clear, Color(red: 12 / 255, green: 4 / 255, blue: 0).opacity(alfa)]),
                                       center: CGPoint(x: W / 2, y: H / 2), startRadius: min(W, H) * interno, endRadius: max(W, H) * 0.75))
     }
 

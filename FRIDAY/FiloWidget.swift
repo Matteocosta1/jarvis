@@ -213,7 +213,7 @@ private struct ArgomentoVista: View {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(r.testo)
                             .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
+                            .foregroundStyle(Color(red: 1, green: 243 / 255, blue: 236 / 255).opacity(0.98))
                             .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -315,7 +315,7 @@ private enum CorniceFilo {
         gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1          // si accende sfarfallando
         let ax = W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
         // il fondo (meno trasparente: la corona dietro si intuisce appena)
-        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.93)))
+        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 16 / 255, green: 8 / 255, blue: 3 / 255).opacity(0.93)))
         gc.blendMode = .plusLighter
         let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
         gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(Olo.ciano.opacity(0.7 * (1 - pul))), lineWidth: 1)

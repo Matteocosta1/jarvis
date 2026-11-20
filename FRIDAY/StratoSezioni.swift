@@ -42,14 +42,15 @@ enum Sezione: Hashable {
         switch self {
         case .occhi: return "Occhi"
         case .interprete: return "Interprete"
-        case .allenatore: return "Trainer"
+        case .allenatore: return "Specchio"
         case .vitals: return "Vitals"
-        case .ricordi: return "Ricordi"
+        case .ricordi: return "Memoria"
         case .confidente: return "Confidente"
         case .scheda(let s):
             switch s {
-            case .edith: return "EDITH"
-            case .email: return "Email"
+            case .edith: return "Difesa"
+            case .email: return "Mail"
+            case .sos: return "SOS"
             default: return s.rawValue.prefix(1).uppercased() + s.rawValue.dropFirst()
             }
         }
@@ -59,7 +60,7 @@ enum Sezione: Hashable {
     var inPausaDietro: Bool {
         switch self {
         case .occhi, .allenatore, .interprete: return true
-        case .scheda(let s): return s == .scanner
+        case .scheda(let s): return s == .scanner || s == .makeup
         default: return false
         }
     }
@@ -72,7 +73,7 @@ enum Sezione: Hashable {
     var conFotocamera: Bool {
         switch self {
         case .occhi, .allenatore: return true
-        case .scheda(let s): return s == .scanner
+        case .scheda(let s): return s == .scanner || s == .makeup
         default: return false
         }
     }

@@ -108,7 +108,7 @@ struct Miniatura: View {
 
     private var segnaposto: some View {
         ZStack {
-            Color(red: 0.04, green: 0.12, blue: 0.15)
+            Color(red: 38 / 255, green: 20 / 255, blue: 10 / 255)
             ProgressView().tint(Color.ciano)
         }
     }

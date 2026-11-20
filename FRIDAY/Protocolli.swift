@@ -74,7 +74,7 @@ struct TendinaProtocolli: View {
     let chiudi: () -> Void
     @ObservedObject private var protocolli = Protocolli.condiviso
     private let tinta = Color.ciano
-    private let fondo = Color(red: 7 / 255, green: 13 / 255, blue: 15 / 255)
+    private let fondo = Color(red: 15 / 255, green: 10 / 255, blue: 7 / 255)
 
     var body: some View {
         // iPhone piccolo o girato: se non ci sta tutta, la tendina scorre (maniglia e frasi restano raggiungibili)
@@ -105,12 +105,12 @@ struct TendinaProtocolli: View {
                 .padding(.horizontal, 4)
             ForEach(Protocollo.allCases) { p in scheda(p) }
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(["«Jarvis, protocollo lavoro»", "«Jarvis, protocollo rientro»", "«Jarvis, protocollo notte»"], id: \.self) {
+                ForEach(["«FRIDAY, protocollo lavoro»", "«FRIDAY, protocollo rientro»", "«FRIDAY, protocollo notte»"], id: \.self) {
                     Text($0).font(.system(size: 13)).foregroundStyle(ColoriHUD.testo)
                 }
             }
             .padding(.horizontal, 6)
-            Text("Avvia accende tutte le luci. Poi tocchi una luce per spegnere quel passo; un altro tocco lo riaccende.")
+            Text("Avvia accende tutte le luci. Poi tocca una luce per spegnere quel passo; un altro tocco lo riaccende.")
                 .font(.system(size: 11)).foregroundStyle(Color.tenue).padding(.horizontal, 6)
             Capsule().fill(ColoriHUD.chiaro.opacity(0.45))
                 .frame(width: 44, height: 5)

@@ -19,18 +19,18 @@ struct VistaLaMiaVoce: View {
     enum FaseVoce { case ferma, registro, calcolo, prova }
 
     private static let frasiBasse = [
-        "Jarvis, parlo piano perché c'è gente intorno. Mi senti lo stesso?",
+        "FRIDAY, parlo piano perché c'è gente intorno. Mi senti lo stesso?",
         "Ricordami di richiamare Matteo appena esco da qui.",
         "Abbassa la musica e dimmi che ore sono, per favore.",
         "Uno, due, tre, quattro, cinque. Questa è la mia voce quando parlo piano.",
     ]
 
     private static let frasi = [
-        "Buonasera Jarvis, sono io. Oggi è stata una giornata lunga, ma il lavoro è andato bene.",
+        "Ciao FRIDAY, sono io. Oggi è stata una giornata lunga, ma le lezioni sono andate bene.",
         "Mi ricordi di chiamare Matteo domani mattina e di controllare i conti della serata.",
         "Metti un po' di musica, qualcosa di elettronico, e abbassa le luci in salotto.",
         "Che tempo farà questo fine settimana a Milano? Vorrei andare al mare se c'è il sole.",
-        "Uno, due, tre, quattro, cinque. Prova, prova. Questa è la mia voce, Jarvis.",
+        "Uno, due, tre, quattro, cinque. Prova, prova. Questa è la mia voce, FRIDAY.",
     ]
 
     var body: some View {
@@ -42,7 +42,7 @@ struct VistaLaMiaVoce: View {
                     Toggle("Riconosci la mia voce nella confusione", isOn: $riconosci)
                 }
             } footer: {
-                Text("Quando intorno c'è folla, musica o TV, JARVIS risponde solo alla sua voce. Nella calma non controlla nulla. L'impronta resta su questo iPhone.")
+                Text("Quando intorno c'è folla, musica o TV, FRIDAY risponde solo alla tua voce. Nella calma non controlla nulla. L'impronta resta su questo iPhone.")
             }
 
             Section {
@@ -81,7 +81,7 @@ struct VistaLaMiaVoce: View {
 
                 Section {
                     if fase == .prova {
-                        HStack { ProgressView(); Text("Parli per 3 secondi…") }
+                        HStack { ProgressView(); Text("Parla per 3 secondi…") }
                     } else {
                         Button("Prova: parlo io") { avvia(prova: true) }
                     }
@@ -137,13 +137,13 @@ struct VistaLaMiaVoce: View {
         if let e, aVoceBassa {
             VoceDelSignore.improntaBassa = e
             bassaRegistrata = true
-            esitoProva = "Fatto: anche la sua voce bassa è registrata."
+            esitoProva = "Fatto: anche la tua voce bassa è registrata."
         } else if let e {
             VoceDelSignore.impronta = e
             registrata = true
-            esitoProva = "Fatto: la sua voce è registrata."
+            esitoProva = "Fatto: la tua voce è registrata."
         } else {
-            esitoProva = "Non sono riuscito a ricavare l'impronta: riprovi parlando un po' più a lungo."
+            esitoProva = "Non sono riuscita a ricavare l'impronta: riprova parlando un po' più a lungo."
         }
         fase = .ferma
     }
@@ -156,9 +156,9 @@ struct VistaLaMiaVoce: View {
         let e = await Task.detached(priority: .userInitiated) { ModelloVoce.condiviso.impronta(audio) }.value
         if let e, let mia {
             let s = VoceDelSignore.punteggio(e, mia: mia, bassa: bassa)
-            esitoProva = "Somiglianza \(Int(s * 100)) su 100 (soglia \(Int(soglia * 100))): " + (Double(s) >= soglia ? "è lei." : "non la riconosco.")
+            esitoProva = "Somiglianza \(Int(s * 100)) su 100 (soglia \(Int(soglia * 100))): " + (Double(s) >= soglia ? "sei tu." : "non ti riconosco.")
         } else {
-            esitoProva = "Troppo corto o troppo silenzioso: riprovi."
+            esitoProva = "Troppo corto o troppo silenzioso: riprova."
         }
         fase = .ferma
     }

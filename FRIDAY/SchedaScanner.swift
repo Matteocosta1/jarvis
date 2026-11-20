@@ -38,7 +38,7 @@ struct VistaScanner: View {
     @Environment(\.chiudiOVia) private var chiudiScheda
 
     var body: some View {
-        CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "barcode.viewfinder", tinta: tinta, fotocamera: true) {
+        CorniceScheda(titolo: "Scanner", sottotitolo: sottotitolo, icona: "f:scanner", tinta: tinta, fotocamera: true) {
             if leggo { lettore } else { Button { ricomincia() } label: { scansionaAncora }.buttonStyle(StileStark()) }
             if carico {
                 HStack(spacing: 10) {
@@ -48,7 +48,7 @@ struct VistaScanner: View {
                 .frame(maxWidth: .infinity)
             }
             if let errore {
-                Pannello(tinta: .orange) { Text(errore).font(.footnote).foregroundStyle(.orange) }
+                Pannello(tinta: .rossoF) { Text(errore).font(.footnote).foregroundStyle(Color.rossoF) }
             }
             if let p = prodotto { scheda(p) }
             if !storico.isEmpty {
@@ -103,7 +103,7 @@ struct VistaScanner: View {
     private var sottotitolo: String {
         if carico { return "leggo l'etichetta" }
         if let p = prodotto { return p.s("giudizio") }
-        return leggo ? "inquadri il codice a barre" : "pronto"
+        return leggo ? "inquadra il codice a barre" : "pronto"
     }
 
     // MARK: lettore
@@ -126,9 +126,9 @@ struct VistaScanner: View {
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(tinta.opacity(0.3), lineWidth: 1))
         } else {
-            Pannello(tinta: .orange) {
-                Text("La fotocamera non può leggere i codici in questo momento (permesso negato o dispositivo non compatibile). Può scrivere il numero qui sotto.")
-                    .font(.footnote).foregroundStyle(.orange)
+            Pannello(tinta: .rossoF) {
+                Text("La fotocamera non può leggere i codici in questo momento (permesso negato o dispositivo non compatibile). Puoi scrivere il numero qui sotto.")
+                    .font(.footnote).foregroundStyle(Color.rossoF)
             }
         }
         HStack(spacing: 8) {
@@ -219,7 +219,7 @@ struct VistaScanner: View {
         let additivi = p.lista("additivi")
         Pannello(titolo: "ADDITIVI · \(additivi.count)", tinta: additivi.contains { $0.s("rischio") == "alto" } ? .red : tinta) {
             if additivi.isEmpty {
-                Label("Nessun additivo, Sir.", systemImage: "checkmark.seal").font(.system(size: 13)).foregroundStyle(Color(red: 0.2, green: 0.85, blue: 0.45))
+                Label("Nessun additivo.", systemImage: "checkmark.seal").font(.system(size: 13)).foregroundStyle(Color(red: 0.2, green: 0.85, blue: 0.45))
             }
             ForEach(Array(additivi.enumerated()), id: \.offset) { _, a in
                 HStack {
@@ -235,7 +235,7 @@ struct VistaScanner: View {
         if !p.s("ingredienti").isEmpty || !p.stringhe("allergeni").isEmpty {
             Pannello(titolo: "INGREDIENTI", tinta: tinta) {
                 if !p.stringhe("allergeni").isEmpty {
-                    Text("Allergeni: " + p.stringhe("allergeni").joined(separator: ", ")).font(.system(size: 12, weight: .semibold)).foregroundStyle(.orange)
+                    Text("Allergeni: " + p.stringhe("allergeni").joined(separator: ", ")).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.rossoF)
                 }
                 if !p.s("ingredienti").isEmpty {
                     Text(p.s("ingredienti")).font(.system(size: 12)).foregroundStyle(.white.opacity(0.85))
@@ -247,10 +247,10 @@ struct VistaScanner: View {
             }
         }
 
-        TastoJarvis(testo: "Chieda a JARVIS", tinta: tinta) {
+        TastoJarvis(testo: "Chiedi a FRIDAY", tinta: tinta) {
             chiedi("Ho scansionato «\(p.s("nome"))» (codice \(p.s("codice"))): è una buona scelta? Dimmi cosa pesa nel voto e che alternativa cercare.")
         }
-        Text("Voto calcolato da JARVIS su Nutri-Score, additivi e biologico · dati Open Food Facts · non è un consiglio medico.")
+        Text("Voto calcolato da FRIDAY su Nutri-Score, additivi e biologico · dati Open Food Facts · non è un consiglio medico.")
             .font(.system(size: 9)).foregroundStyle(Color.tenue)
     }
 
@@ -333,10 +333,10 @@ struct VistaScanner: View {
         Task {
             let o = await VistaVitals.chiama(["prodotto": codice])
             carico = false
-            guard let o else { errore = "Non raggiungo il cervello, Sir."; return }
+            guard let o else { errore = "Non raggiungo il cervello."; return }
             let v = Voce(o)
             if !v.b("trovato") {
-                withAnimation { errore = v.s("errore").isEmpty ? "Prodotto non trovato, Sir." : "\(v.s("errore").prefix(1).uppercased())\(v.s("errore").dropFirst()), Sir (codice \(codice))." }
+                withAnimation { errore = v.s("errore").isEmpty ? "Prodotto non trovato." : "\(v.s("errore").prefix(1).uppercased())\(v.s("errore").dropFirst()) (codice \(codice))." }
                 return
             }
             Suoni.pronto()                                   // prodotto trovato: la conferma, come le altre

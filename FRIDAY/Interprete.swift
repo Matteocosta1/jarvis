@@ -60,8 +60,8 @@ struct Interprete: View {
     // una scheda a parte (SceltaLingua) che si chiudeva, e poi saliva l'Interprete col suo caricamento: due aperture.
     var body: some View {
         let frasi = motore.scambi.map { PonteInterprete.Frase(altro: $0.chi == .altro, testo: $0.originale, trad: $0.tradotto) }
-        CorniceScheda(titolo: "Interprete", sottotitolo: lin.map { $0.nome.lowercased() } ?? "scelga la lingua",
-                      icona: "globe.europe.africa", tinta: Color.ciano, fondo: motore.scambi.count) {
+        CorniceScheda(titolo: "Interprete", sottotitolo: lin.map { $0.nome.lowercased() } ?? "scegli la lingua",
+                      icona: "f:interprete", tinta: Color.ciano, fondo: motore.scambi.count) {
             // v270: il PONTE fra le due lingue, in testa come nel mockup (prima della scelta: IT e il punto di domanda)
             // 9 nov (build 19): tre prove come il mockup, PONTE (quello di prima), GLOBO e VOCI
             let codice = lin.map { $0.codice.uppercased() } ?? "?"
@@ -130,7 +130,7 @@ struct Interprete: View {
         }
         Text(motore.stato)
             .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(3)
-            .foregroundStyle(motore.fase == .ascolto ? Color.ciano : Color.orange)
+            .foregroundStyle(motore.fase == .ascolto ? Color.ciano : Color.rossoF)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, minHeight: 18)
         if !motore.scambi.isEmpty || !motore.parziale.isEmpty {
@@ -143,7 +143,7 @@ struct Interprete: View {
                     .padding(.vertical, 8).padding(.horizontal, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(RoundedRectangle(cornerRadius: 10)
-                        .stroke(s.chi == .io ? Color.ciano.opacity(0.35) : Color.orange.opacity(0.4), lineWidth: 1))
+                        .stroke(s.chi == .io ? Color.ciano.opacity(0.35) : Color.rossoF.opacity(0.4), lineWidth: 1))
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(s.chi == .io ? "Lei" : l.nome): \(s.originale). Tradotto: \(s.tradotto)")
                 }
@@ -201,7 +201,7 @@ struct Interprete: View {
             case .sceltaLingua: withAnimation(.easeOut(duration: 0.25)) { scegliendo = true }   // 9 nov: il pannello LINGUA, qui dentro
             case .turniAutomatici(let si):
                 automatico = si
-                orecchio.ferma(); motore.annuncia(si ? "Turni automatici, Sir." : "Turni manuali, Sir.")
+                orecchio.ferma(); motore.annuncia(si ? "Turni automatici." : "Turni manuali.")
             case .ascoltaMe, .ascoltaAltro, .ripeti:
                 guard let l = lin, !scegliendo else { return }       // senza lingua non c'è niente da ascoltare né da ripetere
                 switch a {
@@ -224,7 +224,7 @@ struct Interprete: View {
         scelta(l)
         motore.prepara(lingua: l)
         orecchio.ferma()
-        motore.annuncia("\(l.nome), Sir.")
+        motore.annuncia("\(l.nome).")
     }
 
     private func lato(_ l: Lingua, attivo: Bool, titolo: String) -> some View {
@@ -320,7 +320,7 @@ enum PonteInterprete {
             let f = frasi[corrente], meta = abs(s - 0.5) < 0.06, tradotta = parla == 1 ? s < 0.5 : s > 0.5
             let testo = OP.taglia(tradotta ? (f.trad.isEmpty ? "…" : f.trad) : f.testo, 22)
             let w = min(150, 14 + Double(testo.count) * 5.2), hC = 20.0, bx = cap.x - w / 2, by = cap.y - hC - 8
-            gc.fill(Path(CGRect(x: bx, y: by, width: w, height: hC)), with: .color(Color(red: 2 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82)))
+            gc.fill(Path(CGRect(x: bx, y: by, width: w, height: hC)), with: .color(Color(red: 16 / 255, green: 7 / 255, blue: 2 / 255).opacity(0.82)))
             var tacche = Path()
             let spigoli: [(x: Double, y: Double, dx: Double, dy: Double)] = [(bx, by, 1, 1), (bx + w, by, -1, 1), (bx, by + hC, 1, -1), (bx + w, by + hC, -1, -1)]
             for g in spigoli {
