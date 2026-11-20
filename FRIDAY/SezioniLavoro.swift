@@ -4,7 +4,7 @@ import Combine
 import UIKit
 import Photos
 import HealthKit
-import AVFoundation
+@preconcurrency import AVFoundation
 import CryptoKit
 import UserNotifications
 
@@ -421,7 +421,10 @@ struct VistaPilates: View {
     @State private var didascalia = ""
     @State private var ultimoAsset: String?
     @State private var passo = -1
-    @State private var nuovoEs = "", nuovoDett = "", nuovaAllieva = "", nuovaNota = ""
+    @State private var nuovoEs = ""
+    @State private var nuovoDett = ""
+    @State private var nuovaAllieva = ""
+    @State private var nuovaNota = ""
 
     static let reformer: [EsercizioP] = [
         .init(nome: "Footwork", dettaglio: "4 posizioni · 10 rip"), .init(nome: "Hundred", dettaglio: "100 battute"),
@@ -611,6 +614,7 @@ struct RegistraReelVista: View {
     let titolo: String
     let fine: (Esito?) -> Void
     @StateObject private var r = RegistraReel()
+    @EnvironmentObject private var jarvis: Jarvis           // la fotocamera dei Reel registra anche l'audio: il richiamo tace
     @State private var conto: Int?
     @State private var frontale = true
 
@@ -641,8 +645,8 @@ struct RegistraReelVista: View {
                 .padding(.bottom, 30)
             }
         }
-        .onAppear { r.prepara(frontale: frontale, video: video) }
-        .onDisappear { r.ferma() }
+        .onAppear { jarvis.micOccupato = true; r.prepara(frontale: frontale, video: video) }
+        .onDisappear { r.ferma(); jarvis.micOccupato = false }
         .onChange(of: r.esito) { _, e in if let e { fine(Esito(asset: e, video: video)) } }
     }
 
@@ -842,14 +846,17 @@ struct VistaArmadio: View {
     @State private var risultato: UIImage?
     @State private var doppione: String?
     @State private var annuncio: [String: String] = [:]
-    @State private var pagato = "", condizioni = "ottime"
+    @State private var pagato = ""
+    @State private var condizioni = "ottime"
     @State private var capoVinted: CapoA?
     @StateObject private var bea = Salvato<String>("armadio_bea", iniziale: "")
     @StateObject private var desideri = Salvato<[DesiderioA]>("armadio_desideri", iniziale: [])
     @StateObject private var conti = Salvato<[MovimentoA]>("armadio_conti", iniziale: [])
     @StateObject private var pubblicati = Salvato<Int>("armadio_pubblicati", iniziale: 0)
     @State private var nuovoDesiderio = ""
-    @State private var nuovoMov = "", nuovoEuro = "", nuovoVenduto = false
+    @State private var nuovoMov = ""
+    @State private var nuovoEuro = ""
+    @State private var nuovoVenduto = false
 
     enum Compito: String, Identifiable { case capo, bea, doppione, vinted; var id: String { rawValue } }
 

@@ -5,7 +5,7 @@ import UIKit
 import HealthKit
 import WeatherKit
 import CoreLocation
-import AVFoundation
+@preconcurrency import AVFoundation
 import Vision
 import UserNotifications
 
@@ -615,7 +615,7 @@ extension UIImage {
 }
 
 /// I punti del viso (normalizzati 0…1, origine in alto a sinistra, già specchiati come lo vede Bea).
-struct VisoF {
+nonisolated struct VisoF {
     var contorno: [CGPoint] = []
     var occhioSx: [CGPoint] = [], occhioDx: [CGPoint] = []
     var sopraccSx: [CGPoint] = [], sopraccDx: [CGPoint] = []

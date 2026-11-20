@@ -315,6 +315,7 @@ enum SOSF {
 
 struct StradaDifesa: View {
     let tinta: Color
+    @EnvironmentObject private var jarvis: Jarvis           // mentre registra o c'è la chiamata finta il richiamo tace (microfono suo)
     @StateObject private var s = StradaMotore.condiviso
     @State private var minuti = 25
     @State private var numeroAle = SOSF.numeroAle
@@ -368,6 +369,7 @@ struct StradaDifesa: View {
             }
         }
         .fullScreenCover(isPresented: $s.chiamata) { ChiamataFinta { s.chiamata = false } }
+        .onChange(of: s.registra || s.chiamata) { _, occupato in jarvis.micOccupato = occupato }
     }
 
     private func scudo(_ nome: String, _ sotto: String, _ icona: String, attivo: Bool, azione: @escaping () -> Void) -> some View {

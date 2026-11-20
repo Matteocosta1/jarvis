@@ -4044,7 +4044,7 @@ extension VoceCloud: AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
 
 // MARK: - 11 nov · Risposta anticipata, finestra della conversazione, tempi del turno (analisi del dialogo, approvata da Bea)
 
-extension FRIDAY {
+extension Jarvis {
 
     /// La risposta preparata durante la pausa di Bea. I pezzi arrivano e restano da parte finché Bea non ha davvero
     /// finito (allora si adotta e si dicono subito); se riprende a parlare, si butta e il cervello si ferma (linea chiusa).
@@ -4071,7 +4071,7 @@ extension FRIDAY {
 
         /// È la stessa frase, detta nello stesso punto della conversazione e con le stesse note?
         func vale(per m: Messaggio, dopo ultimo: UUID?) -> Bool {
-            FRIDAY.normaAnticipo(m.testo) == FRIDAY.normaAnticipo(messaggio.testo) && m.seguito == messaggio.seguito
+            Jarvis.normaAnticipo(m.testo) == Jarvis.normaAnticipo(messaggio.testo) && m.seguito == messaggio.seguito
                 && m.interruzione == nil && m.aggiunta != true && m.nascosto == nil && ultimo == ultimoPrima
         }
 
@@ -4097,7 +4097,7 @@ extension FRIDAY {
     /// Acceso? (iPhone; sul Mac la frase si trascrive in cloud a frase finita: lì non serve). Spento per 10 minuti se il cervello
     /// ha risposto «no_anticipo» (il suo interruttore d'emergenza, ANTICIPO=off).
     private var anticipoAcceso: Bool {
-        !FRIDAY.usaAscoltoCloud && !Impostazioni.muto && Date() >= anticipoSpentoFino
+        !Jarvis.usaAscoltoCloud && !Impostazioni.muto && Date() >= anticipoSpentoFino
             && UserDefaults.standard.object(forKey: "rispostaAnticipata") as? Bool ?? true
     }
 
@@ -4108,14 +4108,14 @@ extension FRIDAY {
     /// faceva ripartire il conto da capo. Ora, se le parole sono le stesse, il conto non riparte; e il conto è di 0,35 s (prima 0,45):
     /// il silenzio vero lo controlla comunque `provaAnticipo`.
     fileprivate func programmaAnticipo(_ testo: String) {
-        let norma = FRIDAY.normaAnticipo(FRIDAY.fraseAnticipabile(testo))
+        let norma = Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(testo))
         if norma == normaProgrammata, timerAnticipo?.isValid == true { return }
         normaProgrammata = norma
         timerAnticipo?.invalidate()
         guard anticipoAcceso, fase == .ascolto, !(richiamo.sveglio && richiamo.perRecupero) else { return }   // 12.0 (10)
         // 12 nov: il confronto con la frase come la vede il cervello (senza «allora», «senti», «ok» davanti): prima «allora gli ho detto
         // che» non era mai uguale a «gli ho detto che» e la risposta anticipata si buttava a ogni parola, anche quella di riserva
-        if let a = anticipo, !a.adottato, FRIDAY.normaAnticipo(a.messaggio.testo) != norma { scartaAnticipo() }
+        if let a = anticipo, !a.adottato, Jarvis.normaAnticipo(a.messaggio.testo) != norma { scartaAnticipo() }
         let t = testo
         timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.provaAnticipo(t) }
@@ -4123,7 +4123,7 @@ extension FRIDAY {
     }
 
     private func provaAnticipo(_ t: String) {
-        guard fase == .ascolto, anticipo == nil, anticipiTurno < 3, FRIDAY.normaAnticipo(parziale) == FRIDAY.normaAnticipo(t) else { return }
+        guard fase == .ascolto, anticipo == nil, anticipiTurno < 3, Jarvis.normaAnticipo(parziale) == Jarvis.normaAnticipo(t) else { return }
         // la voce si sente ancora (le parole trascritte arrivano in ritardo): si riprova fra un attimo
         if VoceAttiva.condivisa.silenzioPerFineFrase < 0.3 {     // 13 nov: la voce viva (col rumore l'anticipo non partiva mai)
             timerAnticipo = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
@@ -4134,7 +4134,7 @@ extension FRIDAY {
         guard let m = messaggioAnticipabile(t) else { return }
         // 12 nov (errore 4): sulla frase su cui il cervello ha già detto «aspetto» non si rifà la risposta normale (poteva dire di nuovo
         // «aspetto», venire adottata e finire in 8 secondi di silenzio e un «Mi dica»): si fa quella di riserva, che sa dove si è fermato
-        lanciaAnticipo(m, dopoAspetto: aspettoSu != nil && aspettoSu == FRIDAY.normaAnticipo(m.testo))
+        lanciaAnticipo(m, dopoAspetto: aspettoSu != nil && aspettoSu == Jarvis.normaAnticipo(m.testo))
     }
 
     /// La richiesta della risposta anticipata. `dopoAspetto`: la frase è quella su cui il cervello ha detto «aspetto» (errore 4):
@@ -4147,8 +4147,8 @@ extension FRIDAY {
         let a = Anticipo(messaggio: m, ultimoPrima: ultimoPrima)
         a.dopoAspetto = dopoAspetto
         anticipo = a
-        var storia: [[String: Any]] = finestraCervello().filter { $0.id != senza }.map(FRIDAY.perCervello)
-        storia.append(FRIDAY.perCervello(m))
+        var storia: [[String: Any]] = finestraCervello().filter { $0.id != senza }.map(Jarvis.perCervello)
+        storia.append(Jarvis.perCervello(m))
         // 12 nov (P4, P5): anche qui la frase d'attesa sulla richiesta e il silenzio se la frase non era per FRIDAY
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
                                     "strumenti_client_def": [Regia.definizione],                       // 12.0 (10): la regia
@@ -4191,12 +4191,12 @@ extension FRIDAY {
     /// niente foto)? Allora ecco il messaggio come lo manderebbe `instrada` (con la nota del seguito se serve). Nil: niente anticipo.
     private func messaggioAnticipabile(_ t: String) -> Messaggio? {
         let frase = t.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard frase.count >= 6, Dialogo.volume(frase).cambio == nil, !FRIDAY.eSoloSilenzio(frase), !Seguito.soloAspetta(frase) else { return nil }
+        guard frase.count >= 6, Dialogo.volume(frase).cambio == nil, !Jarvis.eSoloSilenzio(frase), !Seguito.soloAspetta(frase) else { return nil }
         guard ConfidenteAperto.domanda == nil, occhi == nil, foto == nil, fotoGiro.isEmpty, allegato == nil, !micSpento else { return nil }
-        let (_, chiede) = FRIDAY.togliRichiamo(frase)
+        let (_, chiede) = Jarvis.togliRichiamo(frase)
         guard !chiede, !aggiuntaInArrivo, dopoAspetta == .no, interruzioneValida() == nil else { return nil }
-        let detta = FRIDAY.fraseAnticipabile(frase)
-        guard FRIDAY.normaAnticipo(detta).split(separator: " ").count >= 2, !comandoLocale(frase), !comandoLocale(detta) else { return nil }
+        let detta = Jarvis.fraseAnticipabile(frase)
+        guard Jarvis.normaAnticipo(detta).split(separator: " ").count >= 2, !comandoLocale(frase), !comandoLocale(detta) else { return nil }
         var m = Messaggio(ruolo: "user", testo: detta)
         if let u = messaggi.last(where: { $0.ruolo == "user" }), Date().timeIntervalSince(u.data) < 60, FineFrase.fraseEllittica(detta) { m.seguito = true }   // 12.0 (12)
         return m
@@ -4218,7 +4218,7 @@ extension FRIDAY {
     /// La frase come la manderebbe `instrada` (senza «FRIDAY», «aspetta», «allora» davanti): la stessa per l'anticipo e per l'attesa.
     nonisolated static func fraseAnticipabile(_ t: String) -> String {
         let frase = t.trimmingCharacters(in: .whitespacesAndNewlines)
-        let pulito = FRIDAY.togliRichiamo(frase).0
+        let pulito = Jarvis.togliRichiamo(frase).0
         return pulito.isEmpty ? frase : pulito
     }
 
@@ -4231,7 +4231,7 @@ extension FRIDAY {
         guard anticipo === a, !a.adottato, fase == .ascolto else { return }
         anticipo = nil
         anticipiButtati += 1
-        aspettoSu = FRIDAY.normaAnticipo(a.messaggio.testo)
+        aspettoSu = Jarvis.normaAnticipo(a.messaggio.testo)
         pausaMinimaAscolto = 3
         if richiamo.sveglio { richiamo.riarmaChiusura() }
         else { armaSilenzio(secondi: pausaAscolto(parziale), giaPassati: min(VoceAttiva.condivisa.silenzioPerFineFrase, 3)) }
@@ -4247,7 +4247,7 @@ extension FRIDAY {
             if case .testo(let t) = ev { return t }
             return nil
         }
-        guard let frase = FRIDAY.primaFraseVoce(pezzi, finita: finita) else { return }
+        guard let frase = Jarvis.primaFraseVoce(pezzi, finita: finita) else { return }
         a.voceFatta = true
         cloud.preparaUna(frase)
     }
@@ -4315,7 +4315,7 @@ extension FRIDAY {
         compitoRete = Task { [weak self] in
             let esito = await withTaskCancellationHandler { await a.esitoFinale() } onCancel: { rete?.cancel() }
             guard let self, !Task.isCancelled else { return }
-            if let esito, !FRIDAY.eNoAnticipo(esito) {
+            if let esito, !Jarvis.eNoAnticipo(esito) {
                 // finita durante la pausa: il cervello aveva rimandato i ricordi e la giornata; adottata, li fa adesso
                 if case .fine(let testo, _) = esito, let lavoro = a.lavoroFine {
                     Task { _ = await VistaVitals.chiama(["anticipo_adottato": ["lavoro": lavoro, "testo": testo] as [String: Any],
@@ -4326,7 +4326,7 @@ extension FRIDAY {
                 // la richiesta anticipata non è arrivata in fondo (rete, interruttore): la domanda riparte come sempre
                 if case .noAnticipo? = esito { self.anticipoSpentoFino = Date().addingTimeInterval(600) }
                 self.azzeraTesto(risposta.id)
-                let storia = self.finestraCervello().filter { $0.id != risposta.id && !$0.testo.isEmpty }.map(FRIDAY.perCervello)
+                let storia = self.finestraCervello().filter { $0.id != risposta.id && !$0.testo.isEmpty }.map(Jarvis.perCervello)
                 await self.turno(storia: storia, foto: nil, id: risposta.id, fineVoce: fineVoce)
             }
         }
