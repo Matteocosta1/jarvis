@@ -530,6 +530,11 @@ Commit di lavoro senza [compila] (minuti di GitHub finiti: un solo controllo qua
 - Mockup v271 pubblicato (pulito e di lavoro).
 
 
+## Prossima build (numero da chiedere al signore) — correzioni pronte sul ramo, NON ancora compilate né caricate
+- 20 nov notte · la tab (FILO), nota n. 56 di JARVIS («la sezione Test mostra le righe affiancate in orizzontale e lo scorrimento col dito non funziona»). Causa: solo l'argomento Agenda andava in colonna (voci separate da « · »); negli altri la riga era un dato unico, tagliato a 90 caratteri su una riga sola, quindi niente da scorrere. Correzione (solo app, il cervello non cambia: l'istruzione gli arriva dall'app): un elenco arriva con le voci a capo e va in colonna in ogni argomento (Filo.voci; FiloWidget.righeDi), ogni voce fino a 90 caratteri, fino a 12 voci, l'ora sulla prima; l'istruzione di `mostra` in Regia lo dice al cervello. Meteo e gli altri dati con « · » restano su una riga. Niente sull'orologio (la tab lì non c'è). Disegno della tab invariato.
+- DA VERIFICARE SUL TELEFONO: lo scorrimento col dito con un elenco lungo (oltre i 200 punti di altezza della tab). Lo scorrimento verticale nel codice c'era già; stanotte non è stato davvero provato perché c'era una riga sola.
+- Controllo di compilazione: non ancora lanciato (una sola compilazione per build, quando è da consegnare).
+
 ## 13.4 (1) — controllo completo · 18 nov sera · numero deciso dal signore (20:58, «build 13.4»: Version 13.4, Build 1 su tutti i target) · commit d742a12 · controllo di compilazione VERDE (0 errori, 0 warning, run 44390875700) · contiene tutta la 13.3 (1) · cervello invariato (v135)
 Il signore (20:47): «controllo completo… fallo con massima competenza»; correzioni approvate una per una (20:58).
 - **Orologio, la scheda del sì come nel mockup** («orologio: si fa come nel mock up»): al tocco la scheda sparisce subito (niente rotellina, niente «Ci penso io»); dopo un Sì arriva «FATTO» con la risposta di JARVIS, dopo un No niente.

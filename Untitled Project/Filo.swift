@@ -185,12 +185,12 @@ final class Filo: ObservableObject {
         let righe = v.enumerated().map { i, r -> String in
             if r.tipo == "persona" { return "\(i + 1). \(r.detto) (persona, \(r.genere == "f" ? "lei" : "lui"))" }
             let nomi = r.nomi.map { "\($0) \(Filo.generi[$0] ?? "m")" }.joined(separator: ", ")
-            return "\(i + 1). \(r.detto) [\(nomi)]" + (r.riga.isEmpty ? "" : " — " + String(r.riga.prefix(140)))
+            return "\(i + 1). \(r.detto) [\(nomi)]" + (r.riga.isEmpty ? "" : " — " + String(Filo.inLinea(r.riga).prefix(140)))
         }
         var riga = "FILO (le cose di cui si parla, dalla più recente: «questo», «lo», «la», «quello di prima», «lei», «gli», «le» si risolvono qui guardando genere e numero; se è davvero ambiguo chiedi in quattro parole): " + righe.joined(separator: " · ")
         if !visti.isEmpty {
             let schede: [String] = visti.map { (a: ArgomentoFilo) -> String in
-                let dati: String = a.righe.map { Filo.testo(di: $0, in: a.nome) }.joined(separator: " / ")
+                let dati: String = a.righe.map { Filo.inLinea(Filo.testo(di: $0, in: a.nome)) }.joined(separator: " / ")
                 return a.nome + (a.fisso ? " (fissato)" : "") + ": " + dati
             }
             riga += " ‖ FILO sullo schermo: " + schede.joined(separator: "; ")
@@ -338,6 +338,18 @@ final class Filo: ObservableObject {
         guard !t.isEmpty, t.lowercased() != argomento.lowercased() else { return r.riga }
         return t + ": " + r.riga
     }
+
+    /// 20 nov (il signore: «righe in colonna, scorrimento verticale»): un elenco dentro una riga ha le voci una per riga (a capo).
+    /// Una voce sola non è un elenco. Vale per ogni argomento; l'agenda resta coi suoi « · ».
+    static func voci(_ riga: String) -> [String] {
+        riga.replacingOccurrences(of: "\\n", with: "\n")                  // l'a capo scritto per esteso dal cervello vale lo stesso
+            .split(whereSeparator: \.isNewline)
+            .map { (s: Substring) -> String in s.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// L'elenco su una riga sola (per il cervello e per i registri): le voci separate da « / ».
+    static func inLinea(_ riga: String) -> String { voci(riga).joined(separator: " / ") }
 
     /// La X sulla testata: chiude solo quell'argomento.
     @discardableResult

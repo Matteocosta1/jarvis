@@ -302,7 +302,7 @@ final class Regia {
         }
         pezzi.append("SI APRONO: " + Regia.destinazioni.map(\.nome).joined(separator: ", "))
         // 14 nov (il signore: «come Iron Man: attivo, sveglio, reattivo»): la tab mostra da sola i dati che servono per decidere
-        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine. LA TAB A VOCE (sezione vuota): tab_fissa(titolo) e tab_sgancia(titolo) (titolo = l'argomento: Meteo, Agenda, Messaggi…; vuoto = quello di cui si parla), tab_togli(titolo), tab_vuota, tab_nascondi (va via, si richiama), tab_richiama. Le viste dell'ologramma della sezione davanti: vista(nome), coi nomi delle sue chip. Scorrere la pagina: mano scorri. «Mandalo a Foto», «portalo in Musica», «mandalo a LiDAR»: se il nome è di una sezione e non di una persona della rubrica è andare in quella sezione (apri), non un messaggio")
+        pezzi.append("SEMPRE: apri(sezione), chiudi(sezione), da_parte (quella davanti va dietro, resta accesa), di_prima (torna davanti quella di prima), sfoglia, chiudi_tutto, mostra(sezione, titolo, riga): il dato nella tab in alto a destra (FILO), divisa per argomento (sezione = di quale argomento è: Meteo, Briefing per l'agenda, Messaggi, Travel…), senza aprire sezioni. LA TAB DA SOLA: ogni volta che nella risposta dai un dato che serve al signore per decidere (meteo e pioggia, orari, impegni, percorsi e mezzi, numeri, incassi, un messaggio) e non è già sullo schermo davanti, mettilo nella tab con mostra mentre rispondi (titolo una parola, riga il dato in breve; l'agenda un impegno dopo l'altro separati da « · »; ogni altro elenco, cioè più voci dello stesso argomento come una lista o dei passi, con le voci una per riga dentro riga, separate da un a capo (\\n), fino a 12 e ognuna breve: la tab le mette in colonna e il signore le scorre col dito); per chiacchiere, pareri e battute niente tab. Resta finché parli, poi sparisce da sola; «fissalo» la tiene. «Mostrami…», «fammi vedere…» non aprono sezioni; «apri…» apre la sezione. Più cose in una frase («mettilo dietro e apri i messaggi», «torna allo studio»): fai tutto, in ordine. LA TAB A VOCE (sezione vuota): tab_fissa(titolo) e tab_sgancia(titolo) (titolo = l'argomento: Meteo, Agenda, Messaggi…; vuoto = quello di cui si parla), tab_togli(titolo), tab_vuota, tab_nascondi (va via, si richiama), tab_richiama. Le viste dell'ologramma della sezione davanti: vista(nome), coi nomi delle sue chip. Scorrere la pagina: mano scorri. «Mandalo a Foto», «portalo in Musica», «mandalo a LiDAR»: se il nome è di una sezione e non di una persona della rubrica è andare in quella sezione (apri), non un messaggio")
         let recenti = eventi.filter { Date().timeIntervalSince($0.quando) < 600 }
         if !recenti.isEmpty {
             let f = DateFormatter()
@@ -423,11 +423,18 @@ final class Regia {
             // «mostra» senza riga, con una sezione: come prima, la apre (i passi scritti prima della 12.0 (16))
             if riga.isEmpty, !p.sezione.isEmpty, Regia.chiave(p.azione) == "mostra" { return await apri(p.sezione) }
             guard !titolo.isEmpty, !riga.isEmpty else { return .no("mostra vuole titolo e riga") }
-            Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: String(titolo.prefix(14)), riga: String(riga.prefix(90)),
+            // 20 nov (il signore: «righe in colonna, scorrimento verticale»): un elenco arriva con le voci a capo. Ogni voce resta
+            // breve come il dato solo (90 caratteri), fino a 12 voci: la tab le mette in colonna e si scorre col dito. Prima tutta la
+            // riga era tagliata a 90 caratteri e le voci finivano affiancate su una riga sola
+            let voci: [String] = Filo.voci(riga)
+            let mostrata: String = voci.count > 1 ? voci.prefix(12).map { String($0.prefix(90)) }.joined(separator: "\n")
+                                                  : String((voci.first ?? riga).prefix(90))
+            Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: String(titolo.prefix(14)), riga: mostrata,
                                   sezione: Regia.destinazione(p.sezione)?.nome)
+            let intera: String = voci.count > 1 ? voci.joined(separator: "\n") : riga   // nel filo del discorso resta tutta, come prima
             Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: String(titolo.prefix(14)),
-                                          riga: riga, detto: "il dato di " + titolo, testo: riga, sezione: Regia.destinazione(p.sezione)?.nome))
-            return .fatto("widget FILO: \(titolo) · \(riga)")
+                                          riga: intera, detto: "il dato di " + titolo, testo: intera, sezione: Regia.destinazione(p.sezione)?.nome))
+            return .fatto("widget FILO: \(titolo) · \(Filo.inLinea(mostrata))")
         // 14 nov (il signore: «apri il meteo e fissalo» faceva metà): la tab a voce anche per il cervello
         case "tabfissa", "tabsgancia":
             let si = Regia.chiave(p.azione) == "tabfissa"

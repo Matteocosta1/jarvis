@@ -437,7 +437,7 @@ private struct ArgomentoVista: View {
     private var righe: [RigaVista] { ArgomentoVista.righeDi(a) }
 
     /// L'agenda un impegno per riga («11:30 dentista», «18:00 palestra»), senza l'ora di quando è stata mostrata; le altre una riga
-    /// per dato, con l'ora.
+    /// per dato, con l'ora. 20 nov: un elenco (le voci a capo, Filo.voci) va in colonna in ogni argomento, l'ora sulla prima voce.
     private static func righeDi(_ a: ArgomentoFilo) -> [RigaVista] {
         var v: [RigaVista] = []
         for r in a.righe {
@@ -452,7 +452,17 @@ private struct ArgomentoVista: View {
                     v.append(RigaVista(id: r.id + "#\(k)", testo: (k == 0 && !titolo.isEmpty ? titolo : "") + pezzo, sezione: r.sezione, ora: nil))
                 }
             } else {
-                v.append(RigaVista(id: r.id, testo: Filo.testo(di: r, in: a.nome), sezione: r.sezione, ora: ArgomentoVista.formato.string(from: r.alle), icona: r.icona))
+                let ora: String = ArgomentoVista.formato.string(from: r.alle)
+                let voci: [String] = Filo.voci(r.riga)
+                if voci.count > 1 {
+                    let titolo = Filo.testo(di: RigaFilo(id: r.id, titolo: r.titolo, riga: "", sezione: nil, alle: r.alle), in: a.nome)
+                    for (k, voce) in voci.enumerated() {
+                        v.append(RigaVista(id: r.id + "#\(k)", testo: (k == 0 && !titolo.isEmpty ? titolo : "") + voce, sezione: r.sezione,
+                                           ora: k == 0 ? ora : nil, icona: k == 0 ? r.icona : nil))
+                    }
+                } else {
+                    v.append(RigaVista(id: r.id, testo: Filo.testo(di: r, in: a.nome), sezione: r.sezione, ora: ora, icona: r.icona))
+                }
             }
         }
         return v
