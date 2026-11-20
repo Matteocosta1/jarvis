@@ -425,16 +425,26 @@ final class Regia {
             guard !titolo.isEmpty, !riga.isEmpty else { return .no("mostra vuole titolo e riga") }
             // 20 nov (il signore: «righe in colonna, scorrimento verticale»): un elenco arriva con le voci a capo. Ogni voce resta
             // breve come il dato solo (90 caratteri), fino a 12 voci: la tab le mette in colonna e si scorre col dito. Prima tutta la
-            // riga era tagliata a 90 caratteri e le voci finivano affiancate su una riga sola
-            let voci: [String] = Filo.voci(riga)
-            let mostrata: String = voci.count > 1 ? voci.prefix(12).map { String($0.prefix(90)) }.joined(separator: "\n")
-                                                  : String((voci.first ?? riga).prefix(90))
-            Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: String(titolo.prefix(14)), riga: mostrata,
-                                  sezione: Regia.destinazione(p.sezione)?.nome)
-            let intera: String = voci.count > 1 ? voci.joined(separator: "\n") : riga   // nel filo del discorso resta tutta, come prima
-            Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: String(titolo.prefix(14)),
-                                          riga: intera, detto: "il dato di " + titolo, testo: intera, sezione: Regia.destinazione(p.sezione)?.nome))
-            return .fatto("widget FILO: \(titolo) · \(Filo.inLinea(mostrata))")
+            // riga era tagliata a 90 caratteri e le voci finivano affiancate su una riga sola. L'agenda ha i suoi « · »: anche lì il
+            // taglio è per impegno (prima un'agenda lunga si troncava a metà di un impegno) e un elenco a capo diventa il suo formato
+            let corto: String = String(titolo.prefix(14))
+            let sezioneVera: String? = Regia.destinazione(p.sezione)?.nome
+            let agenda: Bool = Filo.argomento(sezione: sezioneVera, titolo: corto) == "Agenda"
+            let voci: [String] = agenda
+                ? Filo.voci(riga).flatMap { $0.components(separatedBy: " · ") }.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                : Filo.voci(riga)
+            let colonna: Bool = voci.count > 1
+            let scelte: [String] = voci.prefix(12).map { String($0.prefix(90)) }
+            let mostrata: String = colonna ? scelte.joined(separator: agenda ? " · " : "\n") : String((voci.first ?? riga).prefix(90))
+            Filo.condiviso.mostra("cer:" + Regia.chiave(titolo), titolo: corto, riga: mostrata, sezione: sezioneVera)
+            let intera: String = colonna ? voci.joined(separator: agenda ? " · " : "\n") : riga   // nel filo del discorso resta tutta, come prima
+            Filo.condiviso.metti(CosaFilo(chiave: "cer:" + Regia.chiave(titolo), tipo: "risposta", nomi: ["risposta"], titolo: corto,
+                                          riga: intera, detto: "il dato di " + titolo, testo: intera, sezione: sezioneVera))
+            // l'esito dice al cervello che cosa c'è davvero nella tab (quante voci, se è stato tagliato): così non afferma quello che non vede
+            let oltre: String = voci.count > scelte.count ? " (le prime \(scelte.count) di \(voci.count))" : ""
+            let taglio: String = (voci.first ?? riga).count > 90 ? " (tagliato a 90 caratteri)" : ""
+            let esito: String = colonna ? "\(scelte.count) voci in colonna\(oltre), si scorrono col dito se non entrano tutte" : Filo.inLinea(mostrata) + taglio
+            return .fatto("widget FILO: \(titolo) · \(esito). Mandato alla tab: come si vede sullo schermo lo sa solo il signore")
         // 14 nov (il signore: «apri il meteo e fissalo» faceva metà): la tab a voce anche per il cervello
         case "tabfissa", "tabsgancia":
             let si = Regia.chiave(p.azione) == "tabfissa"
