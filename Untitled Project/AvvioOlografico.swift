@@ -51,7 +51,7 @@ enum AvvioOlo {
     /// L'accensione di un ologramma (come il mockup): trema (opacità 0 · ,8 · ,2 · ,95 · ,5 · 1), si rivela dall'alto, il lampo si spegne.
     static func accendi(_ u: Double) -> (opacita: Double, rivela: Double, luce: Double) {
         let x = min(1, max(0, u))
-        return (spezzata(x, [(0, 0), (0.25, 0.8), (0.4, 0.2), (0.55, 0.95), (0.7, 0.5), (1, 1)]), x, 2.6 + (1 - 2.6) * x)
+        return (spezzata(x, [(0, 0), (0.25, 0.8), (0.4, 0.2), (0.55, 0.95), (0.7, 0.5), (1, 1)]), x, 1.5 + (1 - 1.5) * x)
     }
 
     /// Lo spegnimento tremolante di tutta la scena.
@@ -94,9 +94,9 @@ struct AvvioOlografico: View {
     /// Quante icone vere sono già al loro posto: l'ologramma resta finché la sua icona non c'è (nessun fotogramma vuoto).
     let arrivate: Int
 
-    private static let luce = Color(red: 191 / 255, green: 246 / 255, blue: 1)        // #bff6ff
-    private static let chiaro = Color(red: 180 / 255, green: 247 / 255, blue: 1)      // #b4f7ff
-    private static let bianco = Color(red: 223 / 255, green: 251 / 255, blue: 1)      // #dffbff
+    // 20 nov, 06:06 (il signore: «deve essere quel ciano chiaro che non è bianco»): tutto nel ciano chiaro degli ologrammi di JARVIS
+    // (#8FF0FF, lo stesso dell'ologramma della ruota), con gli aloni nel ciano pieno; prima era quasi bianco (#B4F7FF)
+    private static let chiaro = Color(red: 143 / 255, green: 240 / 255, blue: 1)     // #8ff0ff
     private static let buio = Color(red: 2 / 255, green: 9 / 255, blue: 12 / 255)
 
     var body: some View {
@@ -120,10 +120,11 @@ struct AvvioOlografico: View {
             let lampo = t > AvvioOlo.operational
                 ? AvvioOlo.spezzata(min(1, (t - AvvioOlo.operational) / 0.56), [(0, 0), (0.3, 1), (1, 0)]) : 0
             ZStack {
-                // il campo di proiezione: un buio morbido senza bordi, perché la luce si legga sopra la corona
+                // il campo di proiezione: un buio morbido senza bordi, perché la luce si legga sopra la corona (06:06: più trasparente,
+                // la corona si intravede)
                 Circle()
-                    .fill(RadialGradient(stops: [.init(color: Self.buio.opacity(0.88), location: 0), .init(color: Self.buio.opacity(0.88), location: 0.45),
-                                                 .init(color: Self.buio.opacity(0.6), location: 0.62), .init(color: Self.buio.opacity(0), location: 0.72)],
+                    .fill(RadialGradient(stops: [.init(color: Self.buio.opacity(0.68), location: 0), .init(color: Self.buio.opacity(0.68), location: 0.40),
+                                                 .init(color: Self.buio.opacity(0.38), location: 0.58), .init(color: Self.buio.opacity(0), location: 0.72)],
                                          center: .center, startRadius: 0, endRadius: 125))
                     .frame(width: 250, height: 250)
                     .position(x: cx, y: cy + 14)
@@ -132,7 +133,7 @@ struct AvvioOlografico: View {
                 Anello(percento: p)
                     .frame(width: AvvioOlo.raggio * 2 + 8, height: AvvioOlo.raggio * 2 + 8)
                     .shadow(color: Color.ciano.opacity(0.8), radius: 4 + 6 * lampo)
-                    .brightness(0.3 * (acceso.luce - 1) + 0.45 * lampo)
+                    .brightness(0.3 * (acceso.luce - 1) + 0.25 * lampo)
                     .mask(alignment: .top) { Rectangle().frame(height: (AvvioOlo.raggio * 2 + 8) * CGFloat(acceso.rivela)) }
                     .scaleEffect(CGFloat(0.6 + 0.4 * entra))
                     .rotationEffect(.degrees(-40 * (1 - entra)))
@@ -143,11 +144,11 @@ struct AvvioOlografico: View {
                     Text("\(Int(p))%")
                         .font(.system(size: 22, weight: .regular, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundStyle(Self.luce)
+                        .foregroundStyle(Self.chiaro)
                     Text(t >= AvvioOlo.operational ? "OPERATIVI" : "PREFERENZE")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .tracking(2)
-                        .foregroundStyle(Self.bianco)
+                        .foregroundStyle(Self.chiaro)
                 }
                 .shadow(color: Color.ciano.opacity(0.95), radius: 3)
                 .shadow(color: Color.ciano.opacity(0.5), radius: 8)
@@ -182,14 +183,14 @@ struct AvvioOlografico: View {
             let sx: CGFloat = e < 0.5 ? 1 + (meta - 1) * a : meta + (f - meta) * b
             let ox: CGFloat = dx * 0.3 * a + dx * 0.7 * b
             let oy: CGFloat = dy * 0.55 * a + dy * 0.45 * b
-            let luce: Double = e < 0.5 ? 1 + 0.7 * Double(a) : 1.7 - 0.3 * Double(b)
+            let luce: Double = e < 0.5 ? 1 + 0.25 * Double(a) : 1.25 - 0.15 * Double(b)
             AvvioOlografico.glifo(j, m: m)
                 .frame(width: AvvioOlo.lato, height: AvvioOlo.lato)
                 .foregroundStyle(Self.chiaro)
                 .mask { RigheScansione() }                                     // le righe di luce dell'ologramma
-                .shadow(color: Self.luce.opacity(0.9), radius: 1)
-                .shadow(color: Color.ciano.opacity(0.75), radius: 5)
-                .shadow(color: Color.ciano.opacity(0.35), radius: 11)
+                .shadow(color: Color.ciano.opacity(0.9), radius: 1)
+                .shadow(color: Color.ciano.opacity(0.6), radius: 5)
+                .shadow(color: Color.ciano.opacity(0.3), radius: 11)
                 .brightness(0.3 * (acceso.luce - 1) + 0.3 * (luce - 1))
                 .mask(alignment: .top) { Rectangle().frame(height: (AvvioOlo.lato + 24) * CGFloat(acceso.rivela)) }
                 .opacity(acceso.opacita)
@@ -238,7 +239,7 @@ private struct Anello: View {
             if percento > 0 {
                 var arco = Path()
                 arco.addArc(center: centro, radius: r, startAngle: .degrees(-90), endAngle: .degrees(-90 + 360 * min(100, percento) / 100), clockwise: false)
-                c.stroke(arco, with: .color(Color(red: 191 / 255, green: 246 / 255, blue: 1)), lineWidth: 2.2)
+                c.stroke(arco, with: .color(Color(red: 143 / 255, green: 240 / 255, blue: 1)), lineWidth: 2.2)
             }
         }
     }
