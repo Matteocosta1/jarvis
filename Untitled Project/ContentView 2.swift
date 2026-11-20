@@ -920,8 +920,10 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        // 20 nov · avvio SINGOLO: la testata misurata (sotto di lei, a destra, nasce la tab e lì nasce l'anello degli ologrammi)
-        .anchorPreference(key: PostiTesta.self, value: .bounds) { [AvvioOlografico.testata: $0] }
+        // 20 nov · avvio SINGOLO: la testata misurata (sotto di lei, a destra, nasce la tab e lì nasce l'anello degli ologrammi).
+        // «transform»: si AGGIUNGE ai posti delle 6 icone che arrivano da dentro (13.6 (3): con `anchorPreference` li sostituiva e
+        // la scena non partiva mai)
+        .transformAnchorPreference(key: PostiTesta.self, value: .bounds) { posti, riquadro in posti[AvvioOlografico.testata] = riquadro }
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
         // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
         // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
