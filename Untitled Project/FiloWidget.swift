@@ -299,35 +299,53 @@ private struct ArgomentoVista: View {
                     .padding(.top, compatta ? 2 : 10)
             }
             HStack(spacing: 6) {
-                Text((a.etichetta ?? a.nome).uppercased())
-                    .font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1.8)
-                    .foregroundStyle(Olo.bianco)
-                    .shadow(color: Olo.azzurro.opacity(0.95), radius: 3.5)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: a.etichetta == nil, vertical: false)   // 14 nov: il titolo lungo del piano si accorcia, la X resta
-                    .layoutPriority(1)
-                if a.fisso {
-                    Text("◆")
-                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Olo.bianco.opacity(0.95))
-                        .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
-                        .accessibilityLabel("fissato")
-                }
-                if compatta {
-                    // compatta: al posto della linea e della X, il dato che conta
-                    Text(tutte.first.map { r in (r.segno.map { $0 + " " } ?? "") + r.testo } ?? "")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.96))
-                        .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                // 20 nov (il signore: «sistemare quel punto debole»): tenuto premuto sul nome si fissa (◆) come con «fissalo»; ancora,
+                // si sgancia. Prima era `onLongPressGesture` su tutta la testata: dentro la lista che scorre, un gesto esclusivo può
+                // trattenere il dito e lo scorrimento non parte se il dito comincia proprio sul nome. Ora la pressione lavora insieme
+                // allo scorrimento (si annulla da sola se il dito si sposta di più di 10 punti, cioè se si scorre) e solo su nome e
+                // linea: la X resta un tasto e basta, come nel mockup (lì la pressione non parte dalla X).
+                HStack(spacing: 6) {
+                    Text((a.etichetta ?? a.nome).uppercased())
+                        .font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1.8)
+                        .foregroundStyle(Olo.bianco)
+                        .shadow(color: Olo.azzurro.opacity(0.95), radius: 3.5)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity)
-                } else {
-                    LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
-                        .frame(height: 1)
-                        .transition(.opacity)
+                        .fixedSize(horizontal: a.etichetta == nil, vertical: false)   // 14 nov: il titolo lungo del piano si accorcia, la X resta
+                        .layoutPriority(1)
+                    if a.fisso {
+                        Text("◆")
+                            .font(.system(size: 7, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Olo.bianco.opacity(0.95))
+                            .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
+                            .accessibilityLabel("fissato")
+                    }
+                    if compatta {
+                        // compatta: al posto della linea e della X, il dato che conta
+                        Text(tutte.first.map { r in (r.segno.map { $0 + " " } ?? "") + r.testo } ?? "")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.96))
+                            .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                    } else {
+                        LinearGradient(colors: [Olo.ciano.opacity(0.7), Olo.ciano.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 1)
+                            .transition(.opacity)
+                    }
+                }
+                .frame(minHeight: 24)
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.45)
+                        .onEnded { _ in
+                            Aptica.tabFissa(!a.fisso)                           // 14 nov: fissata un colpo pieno, sganciata la selezione
+                            withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
+                        }
+                )
+                if !compatta {
                     Button {
                         guard !Filo.condiviso.consumaSveglia() else { return }   // era compatta: il tocco l'ha solo riaperta
                         Suoni.filoVia()
@@ -350,12 +368,6 @@ private struct ArgomentoVista: View {
                 }
             }
             .frame(minHeight: 24)
-            // 14 nov: tenuto premuto sul nome, si fissa (◆) come con «fissalo»; ancora, si sgancia
-            .contentShape(Rectangle())
-            .onLongPressGesture(minimumDuration: 0.45) {
-                Aptica.tabFissa(!a.fisso)                                       // 14 nov: fissata un colpo pieno, sganciata la selezione
-                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
-            }
             .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
             if !compatta {
                 // la riga che JARVIS sta dicendo si accende: una sola in tutta la tab, quella detta per ultima. La tab si ridisegna proprio
