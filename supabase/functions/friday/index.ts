@@ -92,6 +92,15 @@ const STRUMENTI_SERVER: any[] = ([
       temi: { type: "array", items: { type: "string" }, description: "temi toccati, es. Beatrice, lavoro, serata, arte, sonno, amici" },
       sonno_min: { type: "number" }, battito_riposo: { type: "number" }, passi: { type: "number" },
     }, required: ["risposta"] } },
+  { name: "riposo_segna", description: "Segna un riposo (un pisolino, o il sonno) che Bea ti dice a voce e che in Salute non c'è: il diario della sera lo conta nel sonno di quel giorno. Usalo solo dopo aver visto che in Salute quel riposo non risulta, con la durata detta da lei («un paio d'ore» = 120 minuti, «mezz'ora» = 30). Se te lo ripete non serve rifarlo (è già nel registro delle azioni); se lo corregge («erano tre ore») usalo con correggi=true; elimina=true toglie l'ultimo riposo segnato quel giorno.",
+    input_schema: { type: "object", properties: {
+      minuti: { type: "number", description: "quanto ha dormito Bea, in minuti (10-720)" },
+      da: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è addormentato, HH:mm" },
+      a: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è svegliato, HH:mm" },
+      giorno: { type: "string", description: "facoltativo: YYYY-MM-DD; di base oggi (dopo mezzanotte e fino alle 5 vale il giorno prima)" },
+      correggi: { type: "boolean", description: "true se corregge il riposo appena segnato (stesso riposo, durata o orari nuovi)" },
+      elimina: { type: "boolean", description: "true per togliere l'ultimo riposo segnato quel giorno" },
+    } } },
   { name: "diario_leggi", description: "Rilegge il diario: le ultime pagine (default 7 giorni), o cerca una parola o un tema.",
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "1-180, default 7" }, cerca: { type: "string" } } } },
   { name: "diario_cancella", description: "Cancella pagine del diario: una per id, tutte quelle di un giorno (YYYY-MM-DD), oppure tutto il diario (tutto=true, solo dopo conferma esplicita di Bea).",
@@ -266,7 +275,7 @@ const SEMPRE_PERICOLOSI = new Set(["posta_rispondi", "invia_messaggio", "messagg
 const FERMATO = "fermato per sicurezza: in questo turno ho letto contenuti esterni. Chieda a Bea di confermare questa azione; nel prossimo messaggio, se conferma, si può fare.";
 function pericoloso(nome: string, i: Record<string, any>) {
   if (SEMPRE_PERICOLOSI.has(nome)) return true;
-  return (nome === "note_completa" || nome === "bea_fatto" || nome === "ricordi_fatto") && !!i.elimina;
+  return (nome === "note_completa" || nome === "bea_fatto" || nome === "ricordi_fatto" || nome === "riposo_segna") && !!i.elimina;
 }
 function turnoContaminato(lavoro: any[]) {
   let inizio = 0;
@@ -349,6 +358,7 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
     case "diagnostica": return await diagnostica();
     case "ricorda": return await ricorda(i, turno);
     case "diario_scrivi": return await diarioScrivi(i);
+    case "riposo_segna": return await riposoSegna(i, turno);
     case "diario_leggi": return await diarioLeggi(i);
     case "diario_cancella": return await diarioCancella(i);
     case "vitals": return await vitals(num(i.giorni) || 30);
@@ -417,7 +427,95 @@ async function diarioScrivi(i: Record<string, any>) {
   };
   const { data, error } = await db.from("friday_diario").insert(riga).select("id").single();
   if (error) throw error;
-  return { ok: true, id: data.id, giorno, nota: "pagina salvata: non leggere a Bea punteggi o numeri, rispondigli da persona" };
+  const riposi = await riposiNelDiario(giorno).catch((e) => { console.log(`diario, riposi: ${(e as Error).message}`); return null; });
+  return { ok: true, id: data.id, giorno, nota: "pagina salvata: non leggere a Bea punteggi o numeri, rispondile da persona",
+    ...(riposi?.riposo_detto_del_giorno_min ? { riposo_detto_min: riposi.riposo_detto_del_giorno_min, nota_riposo: "nel sonno di oggi conta anche il riposo che ti ha detto a voce" } : {}) };
+}
+
+// ───────── 13 nov · Il riposo detto a voce  ─────────
+// Il 13 nov l'orologio non aveva registrato né la notte né il pisolino del pomeriggio, e JARVIS diceva «lo conto io come riposo»
+// senza segnarlo da nessuna parte. Ora il riposo detto a voce va in friday_riposi; la pagina di diario di quel giorno ne porta la
+// somma in riposo_detto_min (subito, se è già scritta; stasera, quando si scrive) e Vitals lo somma al sonno di quel giorno.
+const oraHHmm = (x: unknown): string | null => {
+  const m = String(x ?? "").trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]), mi = Number(m[2]);
+  return h < 24 && mi < 60 ? `${String(h).padStart(2, "0")}:${m[2]}` : null;
+};
+/// Due riposi della stessa giornata (HH:mm) si sovrappongono? Uno che passa la mezzanotte finisce il giorno dopo.
+function siSovrappongono(da1: string, a1: string, da2: string, a2: string): boolean {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const fine = (i: number, f: number) => (f <= i ? f + 1440 : f);
+  const x1 = m(da1), x2 = fine(x1, m(a1)), y1 = m(da2), y2 = fine(y1, m(a2));
+  // anche spostando l'altro di un giorno avanti o indietro (23:30–01:00 e 00:30–02:00 sono lo stesso riposo)
+  return [-1440, 0, 1440].some((d) => x1 < y2 + d && y1 + d < x2);
+}
+
+/// I pisolini di oggi che Salute ha registrato, se la Salute è arrivata con la domanda.
+function pisoliniInSalute(turno: Turno): { da: string; a: string }[] {
+  try {
+    const sal = (turno as any).salute;
+    const o = sal?.riepilogo ? JSON.parse(sal.riepilogo) : null;
+    return (Array.isArray(o?.pisolini_oggi) ? o.pisolini_oggi : []).map((p: any) => ({ da: oraHHmm(p?.da), a: oraHHmm(p?.a) }))
+      .filter((p: any) => p.da && p.a) as { da: string; a: string }[];
+  } catch { return []; }
+}
+
+/// La somma dei riposi detti a voce di quel giorno va nella pagina di diario di quel giorno (l'ultima, se ce n'è più d'una; nelle
+/// altre niente, così non si conta due volte). Se la pagina non c'è ancora, la mette diarioScrivi quando si scrive.
+async function riposiNelDiario(giorno: string) {
+  const { data: righe, error } = await db.from("friday_riposi").select("minuti").eq("giorno", giorno);
+  if (error) throw error;
+  const totale = (righe ?? []).reduce((s: number, r: any) => s + num(r.minuti), 0);
+  const { data: pagine, error: e2 } = await db.from("friday_diario").select("id").eq("giorno", giorno).order("creato", { ascending: false });
+  if (e2) throw e2;
+  if (pagine?.length) {
+    const { error: e3 } = await db.from("friday_diario").update({ riposo_detto_min: totale || null }).eq("id", pagine[0].id);
+    if (e3) throw e3;
+    if (pagine.length > 1) {
+      const { error: e4 } = await db.from("friday_diario").update({ riposo_detto_min: null }).in("id", pagine.slice(1).map((p: any) => p.id));
+      if (e4) throw e4;
+    }
+  }
+  return { riposo_detto_del_giorno_min: totale, diario: pagine?.length ? "già nella pagina di diario di quel giorno" : "lo conterà la pagina di diario della sera" };
+}
+
+async function riposoSegna(i: Record<string, any>, turno: Turno) {
+  const giorno = /^\d{4}-\d{2}-\d{2}$/.test(String(i.giorno ?? "")) ? String(i.giorno) : giornoDiarioF();
+  const { data: segnati, error: e1 } = await db.from("friday_riposi").select("id, minuti, da, a, creato").eq("giorno", giorno)
+    .order("creato", { ascending: false }).limit(10);
+  if (e1) throw e1;
+  const ultimo: any = segnati?.[0] ?? null;
+  if (i.elimina === true) {
+    if (!ultimo) return { errore: `nessun riposo segnato per il ${giorno}` };
+    const { error } = await db.from("friday_riposi").delete().eq("id", ultimo.id);
+    if (error) throw error;
+    return { ok: true, tolto: { giorno, minuti: ultimo.minuti }, ...(await riposiNelDiario(giorno)) };
+  }
+  const minuti = i.minuti == null ? null : intero(i.minuti, 10, 720);
+  if (minuti === null) return { errore: "dimmi quanto ha dormito Bea, in minuti (da 10 a 720)" };
+  const da = oraHHmm(i.da), a = oraHHmm(i.a);
+  // con la Salute arrivata insieme alla domanda: un riposo che l'orologio ha già registrato non si conta due volte
+  const misurati = giorno === oggiRoma() ? pisoliniInSalute(turno) : [];   // FRIDAY: la Salute non arriva con la domanda → vuoto
+  if (da && a && misurati.some((p) => siSovrappongono(da, a, p.da, p.a))) {
+    return { gia_in_salute: true, pisolini_in_salute: misurati, nota: "questo riposo l'orologio l'ha registrato: è già nel sonno del giorno, non serve segnarlo" };
+  }
+  const riga = { giorno, minuti, da, a };
+  // lo stesso riposo detto due volte (stessi minuti, segnato da poco) non diventa un doppione; correggi=true cambia l'ultimo
+  const doppione = (segnati ?? []).find((r: any) => Date.now() - Date.parse(r.creato) < 30 * 60_000 && Math.abs(num(r.minuti) - minuti) <= 15);
+  const daCambiare = i.correggi === true ? ultimo : doppione;
+  const { error } = daCambiare
+    ? await db.from("friday_riposi").update(riga).eq("id", daCambiare.id)
+    : await db.from("friday_riposi").insert(riga);
+  if (error) throw error;
+  return { ok: true, giorno, minuti, ...(daCambiare ? { aggiornato: true } : {}), ...(await riposiNelDiario(giorno)) };
+}
+
+/// Il giorno del diario: dopo mezzanotte e fino alle 5 vale ancora il giorno prima.
+function giornoDiarioF(): string {
+  const adesso = new Date();
+  const ora = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", hourCycle: "h23" }).format(adesso));
+  return ora < 5 ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(adesso.getTime() - 6 * 3600_000)) : oggiRoma();
 }
 
 async function diarioLeggi(i: Record<string, any>) {
@@ -479,7 +577,7 @@ async function diarioCancella(i: Record<string, any>) {
 async function vitals(giorniRichiesti: number) {
   const giorni = Math.min(Math.max(giorniRichiesti, 7), 180);
   const dal = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date(Date.now() - giorni * 86400_000));
-  const { data, error } = await db.from("friday_diario").select("id, giorno, umore, punteggio, energia, temi, sonno_min, battito_riposo, passi, risposta, domanda")
+  const { data, error } = await db.from("friday_diario").select("id, giorno, umore, punteggio, energia, temi, sonno_min, riposo_detto_min, battito_riposo, passi, risposta, domanda")
     .gte("giorno", dal).order("giorno");
   if (error) throw error;
   const righe = data ?? [];
@@ -490,6 +588,7 @@ async function vitals(giorniRichiesti: number) {
     if (r.energia) g.energie.push(r.energia);
     if (r.umore) g.umore = r.umore;
     if (r.sonno_min) g.sonno_min = r.sonno_min;
+    if (r.riposo_detto_min) g.riposo_detto = Math.max(g.riposo_detto ?? 0, r.riposo_detto_min);   // il riposo detto a voce
     if (r.battito_riposo) g.battito_riposo = r.battito_riposo;
     if (r.passi) g.passi = r.passi;
     g.temi.push(...(r.temi ?? []));
@@ -498,7 +597,8 @@ async function vitals(giorniRichiesti: number) {
   const media = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
   const serie = [...perGiorno.values()].map((g) => ({
     giorno: g.giorno, umore: g.umore ?? null, punteggio: media(g.punteggi), energia: media(g.energie),
-    sonno_ore: g.sonno_min ? Math.round(g.sonno_min / 6) / 10 : null, battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set<string>(g.temi)],
+    sonno_ore: g.sonno_min ? Math.round((g.sonno_min + (g.riposo_detto ?? 0)) / 6) / 10 : null,
+    ...(g.riposo_detto ? { riposo_detto_ore: Math.round(g.riposo_detto / 6) / 10 } : {}), battito_riposo: g.battito_riposo ?? null, passi: g.passi ?? null, temi: [...new Set<string>(g.temi)],
   }));
   const conPunteggio = serie.filter((s) => s.punteggio != null);
   const meta = Math.floor(conPunteggio.length / 2);
@@ -2703,7 +2803,7 @@ const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRu
 
 const DA_REGISTRARE = new Set(["invia_messaggio", "messaggio", "telefono_comando", "chiama", "calendario_crea", "promemoria_crea", "naviga",
   "musica_riproduci", "apri_apple_music", "apri_pagina", "note_salva", "note_completa", "memoria_salva", "memoria_dimentica",
-  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto", "impegni_conferma"]);
+  "ricorda", "ricordi_fatto", "interprete_avvia", "bea_segna", "bea_fatto", "impegni_conferma", "riposo_segna"]);
 
 const GESTIONALE_BEA_URL = Deno.env.get("GESTIONALE_BEA_URL") || "https://xqayklmnglhldeutepqw.supabase.co";
 const GESTIONALE_BEA_KEY = Deno.env.get("GESTIONALE_BEA_KEY") || "";
@@ -3853,7 +3953,7 @@ const STATI: Record<string, string> = {
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
   credito: "controllo il credito", impegni_conferma: "segno gli impegni", prodotto_scansiona: "leggo l'etichetta", supabase_stato: "controllo la sala macchine", supabase_log: "leggo i log", supabase_query: "interrogo il database", archivio_salva: "salvo nell'archivio", archivio_cerca: "cerco nell'archivio",
   posta_priorita: "smisto la posta", posta_rispondi: "spedisco la risposta", radar_pioggia: "guardo il radar",
-  discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
+  discogs_cerca: "cerco su Discogs", note_cerca: "consulto le note", vitals: "leggo i suoi parametri vitali", diario_leggi: "sfoglio il diario", riposo_segna: "segno il riposo", ricordi_cerca: "cerco tra i ricordi", ricordi_oggi: "ripercorro la giornata", calendario_leggi: "guardo il calendario", contatti_cerca: "cerco in rubrica",
 };
 
 let tokenMemo: { t: number; v: string } | null = null;
