@@ -822,12 +822,12 @@ struct ContentView: View {
             // MARK X: SOCIAL, la prima in alto (Instagram di @kingrusto, il glifo ufficiale in ciano)
             Button { toccaDock(ContentView.postoTesta.social) } label: {
                 IconaSocial()
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.social: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.social: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.social, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.social))
             .accessibilityLabel("Social")
@@ -835,13 +835,13 @@ struct ContentView: View {
             Button { toccaDock(ContentView.postoTesta.musica) } label: {
                 VinileDock()                                        // 9 nov notte: gira mentre la musica suona
                     .frame(width: 18, height: 18)
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott notte (il signore): il disco un poco più a destra, verso Studio
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.6).padding(.trailing, (mini ? 1 : ContentView.margineDock) - 0.6)
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
@@ -849,7 +849,6 @@ struct ContentView: View {
             Button { toccaDock(ContentView.postoTesta.studio) } label: {
                 IconaStudio(pieno: true)                            // 27 ott: alta 15 punti come le altre 5 (misurate sulla foto), cubo più grande
                     .frame(width: 18, height: 18)                       // 27 ott notte (il signore): Studio più grande, armonico con le altre (20 un filo troppo)
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.studio: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott: il riquadro è 2 punti più stretto di prima ma il disegno quasi uguale: +0,75 per lato e la distanza a vista
                     // dalle icone vicine resta quella di sempre (~7,5 punti, misurata sulla foto), uguale tra tutte e 6
@@ -858,31 +857,32 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.studio: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.studio, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.studio))
             .accessibilityLabel("Studio")
             Button { toccaDock(ContentView.postoTesta.sistemi) } label: {
                 Image(systemName: "server.rack")
                     .font(.system(size: 11.8, weight: .semibold))   // 27 ott notte (il signore): linee spesse come Social (1,33 pt, misurate sulla foto)                      // 27 ott notte (il signore: «sembra sempre grande»): larga e piena di righe, a vista pesa di più: 13,5 × 10,5 pt
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sistemi: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.horizontal, mini ? 1 : ContentView.margineDock)   // MARK X: 6 icone, 2 per lato (mockup b32); con la tastiera 1
                     .contentShape(Rectangle())          // 27 ott (il signore): niente alone intorno all'icona col menu aperto
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sistemi: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.sistemi, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sistemi))
             .accessibilityLabel("Sistemi")
             Button { toccaDock(ContentView.postoTesta.cestino) } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13.9, weight: .semibold))                      // 27 ott notte (misurato: 15 × 17,3 pt a 16): lato maggiore 15 pt come le altre; tratto leggero come Social e Musica (foto 02:49: il tratto pieno le faceva sembrare più grandi)
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.cestino))
             .accessibilityLabel("Pulisci la conversazione")
@@ -895,7 +895,6 @@ struct ContentView: View {
             Button { toccaDock(ContentView.postoTesta.impostazioni) } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14.4, weight: .regular))                      // 27 ott notte (misurata: 17,7 × 17,7 pt a 17): lato maggiore 15 pt come le altre
-                    .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.impostazioni: $0] }   // 20 nov: qui si posa l'ologramma
                     .foregroundStyle(Color.ciano)
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) + 0.35).padding(.trailing, mini ? 1 : ContentView.margineDock)   // foto 02:49: spazio 7
                     // 9 nov notte (il signore: «l'icona di impostazioni mi piace che si animi all'avvio e alla chiusura… aggiungiamola»):
@@ -905,6 +904,7 @@ struct ContentView: View {
                     .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.impostazioni: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
             .arrivoTesta(ContentView.postoTesta.impostazioni, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.impostazioni))
             .accessibilityLabel("Impostazioni")
