@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var chiediPulizia = false
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
+    @State private var chiediParola = Portachiavi.leggi().isEmpty   // FRIDAY: senza parola d'ordine si comincia da Benvenuta
     @State private var ascoltaDopoAvvio = false      // l'ascolto all'apertura parte a sequenza finita: col microfono aperto l'iPhone abbassa l'altoparlante (e il Mac registrerebbe la musica)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
@@ -186,7 +187,16 @@ struct ContentView: View {
                 Regia.condivisa.pila = pila                                                 // 12.0 (10): la regia vede le sezioni aperte
                 Regia.condivisa.vai = { strada in regiaVai(strada) }                        // e le muove
                 accendi()
-                if Portachiavi.leggi().isEmpty { return }                 // FRIDAY: la parola d'ordine arriva con il cervello (fase 3)
+                if Portachiavi.leggi().isEmpty { chiediParola = true; return }   // FRIDAY: prima la parola d'ordine (Benvenuta)
+                primoAvvio()
+            }
+            .fullScreenCover(isPresented: $chiediParola) {
+                Benvenuta { chiediParola = false; primoAvvio() }
+            }
+    }
+
+    /// L'avvio vero, con la parola d'ordine già nel Portachiavi: l'ascolto dopo la sequenza e il comando arrivato da fuori.
+    private func primoAvvio() {
                 if primaApertura {
                     primaApertura = false
                     if comandi.richiesta == nil && ascoltaApertura {
@@ -196,7 +206,6 @@ struct ContentView: View {
                     }
                 }
                 eseguiComando()
-            }
     }
 
     /// La schermata di JARVIS (reattore, chat, tendina, contenitore delle sezioni) con i primi collegamenti: protocolli, pagina

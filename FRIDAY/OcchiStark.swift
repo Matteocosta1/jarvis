@@ -1022,9 +1022,9 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
             .split(separator: " ").map(String.init)
-        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
+        while let p = t.first, ["ehi", "ok", "hey", "friday", "fraidei", "fraidai", "fraidi", "fridai", "frida"].contains(p) { t.removeFirst() }
         let detta = frase.trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "^(?i)(ehi |ok |hey )?(jarvis|giarvis|jervis)[,. ]*", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "^(?i)(ehi |ok |hey )?(friday|fraidei|fraidai|fraidi|fridai|frida)[,. ]*", with: "", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: " ,."))
         if let p = fraseAereo(t.joined(separator: " ")) { return .aereo(p, frase: detta.prefix(1).lowercased() + detta.dropFirst()) }
         switch t.joined(separator: " ") {

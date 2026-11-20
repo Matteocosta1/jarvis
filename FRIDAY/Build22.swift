@@ -175,7 +175,7 @@ nonisolated enum Dialogo {
     private static let paroleSue: Set<String> = ["muto", "muta", "zitto", "zitta", "basta", "stop", "fermati", "fermo", "silenzio", "taci",
                                                  "aspetta", "aspetti", "ascoltami", "ascolta", "senti", "scusa", "ehi", "hey"]
     private static func sua(_ p: String) -> Bool {
-        paroleSue.contains(p) || ["jarvi", "giarvi", "jervis", "charvis", "jarves", "jarbis"].contains(where: { p.hasPrefix($0) })
+        paroleSue.contains(p) || FineFrase.nomiJarvis.contains(where: { p.hasPrefix($0) })
     }
 
     /// Mac: il microfono resta acceso mentre JARVIS parla, senza cancellazione dell'eco, e il pezzo di audio contiene le parole di
@@ -384,7 +384,7 @@ nonisolated enum ComandoDedicato: Equatable, Sendable {
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
             .split(separator: " ").map(String.init)
-        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) { t.removeFirst() }
+        while let p = t.first, ["ehi", "ok", "hey", "friday", "fraidei", "fraidai", "fraidi", "fridai", "frida"].contains(p) { t.removeFirst() }
         // «protocollo notte», anche con attiva / avvia / esegui / lancia davanti («avvia il protocollo notte»)
         var p = t
         if let v = p.first, ["attiva", "avvia", "esegui", "lancia"].contains(v) {

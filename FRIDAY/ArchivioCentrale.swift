@@ -240,7 +240,7 @@ nonisolated enum InvioArchivio {
         req.httpMethod = "POST"
         req.timeoutInterval = attesa
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(token, forHTTPHeaderField: "x-friday-token")
         req.httpBody = body
         guard let (d, r) = try? await URLSession.shared.data(for: req), (r as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]

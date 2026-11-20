@@ -119,7 +119,7 @@ final class Wiretap: ObservableObject {
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
         r.addsPunctuation = true
-        r.contextualStrings = ["Discosizer", "Jarvis", "Matteo", "Pier", "Cristina", "Beatrice"]
+        r.contextualStrings = ["FRIDAY", "Ale", "Nando", "Pilates", "Reformer", "Vinted"]
         if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // tutto sul telefono
         presa.metti(r)
         turno += 1

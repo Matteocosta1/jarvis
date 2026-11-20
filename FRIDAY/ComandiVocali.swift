@@ -83,7 +83,7 @@ enum Seguito {
         let parole = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
             .components(separatedBy: CharacterSet.letters.inverted).filter { !$0.isEmpty }
         let segnali: Set<String> = ["aspetta", "aspetti", "ascoltami", "ascolta", "ascolti", "attimo", "momento"]
-        let contorno: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok", "senti", "scusa", "un", "mi", "dai", "no", "allora", "ah",
+        let contorno: Set<String> = ["friday", "fraidei", "fraidai", "fraidi", "fridai", "frida", "ehi", "hey", "ok", "senti", "scusa", "un", "mi", "dai", "no", "allora", "ah",
                                      "si", "per", "favore", "secondo"]
         let unSecondo = parole.joined(separator: " ").contains("un secondo")    // «un secondo» sì, «secondo» da solo no
         guard !parole.isEmpty, parole.count <= 6, unSecondo || parole.contains(where: { segnali.contains($0) }) else { return false }
@@ -231,7 +231,7 @@ enum ComandoVocale: Equatable {
             .split(separator: " ").map(String.init)
         // via il richiamo iniziale: «Jarvis», «ehi Jarvis», «ok Jarvis»
         var chiamato = false
-        while let p = t.first, ["ehi", "ok", "hey", "jarvis", "giarvis", "jervis"].contains(p) {
+        while let p = t.first, ["ehi", "ok", "hey", "friday", "fraidei", "fraidai", "fraidi", "fridai", "frida"].contains(p) {
             if p != "ehi" && p != "ok" && p != "hey" { chiamato = true }
             t.removeFirst()
         }
@@ -437,7 +437,7 @@ enum ComandoVocale: Equatable {
         let verbiSemplici: Set<String> = ["vai", "passa", "fammi", "fai", "metti", "parti", "controlla", "controlliamo", "guardiamo"]
         let ponteScheda: Set<String> = ["il", "lo", "la", "l", "i", "gli", "le", "al", "allo", "alla", "all", "ai", "agli", "alle", "su", "sul", "sullo",
                                         "sulla", "sull", "sui", "sugli", "sulle", "nel", "nello", "nella", "nell", "nei", "negli", "nelle", "a", "in", "con"]
-        let cortesia: Set<String> = ["per", "favore", "sir", "jarvis", "grazie", "pure", "subito", "adesso", "ora", "prego"]
+        let cortesia: Set<String> = ["per", "favore", "friday", "grazie", "pure", "subito", "adesso", "ora", "prego"]
         var fine = t.count                                   // la frase senza le parole di cortesia in fondo («…il meteo, per favore»)
         while fine > 1, cortesia.contains(t[fine - 1]) { fine -= 1 }
         let interrogative: Set<String> = ["che", "quale", "quali", "qual", "quanto", "quanta", "quanti", "quante", "chi", "come", "dove", "quando",
@@ -521,7 +521,7 @@ final class OrecchioComandi {
         guard acceso, let riconoscitore else { return }
         let r = SFSpeechAudioBufferRecognitionRequest()
         r.shouldReportPartialResults = true
-        r.contextualStrings = ["Jarvis", "Sentinella", "Wiretap", "Profiler", "Occhi", "Diario", "Vitals", "Briefing", "Shazam", "Cucina", "Scanner", "EDITH"]
+        r.contextualStrings = ["FRIDAY", "Occhi", "Frigo", "Cucina", "Scanner", "Pilates", "Makeup", "Vitals", "Ciclo", "Diario", "Memoria", "Armadio", "Nando", "Gestionale", "Difesa"]
         if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         presa.metti(r)
         turno += 1

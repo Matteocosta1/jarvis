@@ -329,8 +329,9 @@ nonisolated enum FineFrase {
     // la frase… comandi umani… perché voglio un perfetto dialogo umano»)
 
     /// Il nome di JARVIS come lo storpia il riconoscimento («Giarvis», «Jervis»…): una lista sola per iPhone, Mac e polso.
-    static let nomiJarvis = ["jarvi", "giarvi", "giàrvi", "jervis", "charvis", "jarves", "jarbis"]
-    private static let nomiNudi = ["jarvi", "giarvi", "jervis", "charvis", "jarves", "jarbis"]   // gli stessi, senza accenti
+    /// FRIDAY: il suo nome e come lo scrive il riconoscimento italiano («fraidei», «Frida»…), come inizio di parola.
+    static let nomiJarvis = ["frida", "fraid", "freid", "fraj"]
+    private static let nomiNudi = ["frida", "fraid", "freid", "fraj"]   // gli stessi, senza accenti
 
     /// Quanto JARVIS ricorda la frase su cui ha taciuto perché credeva che il signore parlasse con qualcun altro (deciso dal
     /// signore: 8 secondi). Entro quel tempo «Jarvis?», «ci sei?», «dico a te» vogliono dire che era per lui.

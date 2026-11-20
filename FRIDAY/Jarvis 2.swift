@@ -50,8 +50,8 @@ enum Fase: String {
 }
 
 enum Impostazioni {
-    static let indirizzoPredefinito = "https://axalouhijcsizqgnneco.supabase.co/functions/v1/jarvis"
-    static var indirizzo: String { UserDefaults.standard.string(forKey: "indirizzo") ?? indirizzoPredefinito }
+    /// FRIDAY: il suo cervello (progetto «Gestionale Bea Pilates», funzione friday). Fisso: mai quello di JARVIS.
+    static let indirizzo = "https://xqayklmnglhldeutepqw.supabase.co/functions/v1/friday"
     static var voce: String { UserDefaults.standard.string(forKey: "voce") ?? "" }
     static var muto: Bool { UserDefaults.standard.bool(forKey: "muto") }
     /// Voce di JARVIS in cloud (ElevenLabs, tramite il cervello). Se non risponde, ripiega sulla voce dell'iPhone.
@@ -80,7 +80,7 @@ enum Impostazioni {
 // MARK: - Portachiavi (la parola d'ordine non sta in chiaro)
 
 enum Portachiavi {
-    private static let servizio = "it.discosizer.jarvis.token"
+    private static let servizio = "it.discosizer.friday.token"
 
     static func leggi() -> String {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
@@ -730,7 +730,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Parole di richiamo all'inizio della frase: «Jarvis», «aspetta», «ascoltami»…
     /// Restituisce la frase senza richiamo e se il signore sta chiaramente completando la richiesta di prima.
     nonisolated static func togliRichiamo(_ frase: String) -> (String, Bool) {
-        let richiami = ["jarvis", "giarvis", "ehi", "hey", "bro", "fratello", "frate", "socio", "amico", "capo", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
+        let richiami = ["friday", "fraidei", "fraidai", "fraidi", "fridai", "frida", "ehi", "hey", "tesoro", "amica", "amore", "aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo",
                         "un momento", "un secondo", "fermati", "senti", "scusa", "no", "ah", "ok", "allora"]
         let segnaliAggiunta = ["aspetta", "aspetti", "ascoltami", "mi ascolti", "ascolta", "un attimo", "un momento", "un secondo"]
         let attacchi = ["aggiungo", "volevo aggiungere", "dimenticavo", "e poi", "inoltre", "anche", "e anche"]   // «un'altra cosa» è una domanda nuova (Seguito)
@@ -1789,7 +1789,7 @@ final class Jarvis: NSObject, ObservableObject {
         req.httpMethod = "POST"
         req.timeoutInterval = 10
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-friday-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["sveglia": true])
         // il cervello dice anche qual è la voce predefinita: se cambia, le frasi in cache si rifanno con la voce nuova
         if let (d, _) = try? await URLSession.shared.data(for: req),
@@ -2067,7 +2067,7 @@ final class Jarvis: NSObject, ObservableObject {
         req.httpMethod = "POST"
         req.timeoutInterval = 120
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-friday-token")
         req.setValue(richiesta, forHTTPHeaderField: "x-richiesta")
         req.httpBody = try JSONSerialization.data(withJSONObject: corpo)
 
@@ -2577,9 +2577,22 @@ final class Jarvis: NSObject, ObservableObject {
             .sorted { ($0.quality.rawValue, $0.name) > ($1.quality.rawValue, $1.name) }
     }
 
+    /// FRIDAY: la voce scelta in Account; se no la femminile italiana migliore che c'è sul telefono (Federica, poi Alice: la
+    /// qualità «Premium» o «Avanzata» si scarica in Impostazioni › Accessibilità › Contenuto letto ad alta voce › Voci).
     static func voceScelta() -> AVSpeechSynthesisVoice? {
         if let v = AVSpeechSynthesisVoice(identifier: Impostazioni.voce) { return v }
-        return Jarvis.vociItaliane().first ?? AVSpeechSynthesisVoice(language: "it-IT")
+        return vociFemminili().first ?? Jarvis.vociItaliane().first ?? AVSpeechSynthesisVoice(language: "it-IT")
+    }
+
+    /// Le voci femminili italiane, dalla migliore: prima la qualità, poi Federica prima di Alice.
+    static func vociFemminili() -> [AVSpeechSynthesisVoice] {
+        let ordine = ["federica", "alice"]
+        return AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("it") && ($0.gender == .female || ordine.contains($0.name.lowercased())) }
+            .sorted {
+                if $0.quality != $1.quality { return $0.quality.rawValue > $1.quality.rawValue }
+                return (ordine.firstIndex(of: $0.name.lowercased()) ?? 9) < (ordine.firstIndex(of: $1.name.lowercased()) ?? 9)
+            }
     }
 
     // MARK: Foto
@@ -2941,7 +2954,7 @@ final class Jarvis: NSObject, ObservableObject {
         r.addsPunctuation = true                 // il «?» aiuta a capire quando la domanda è finita
         // 12 nov (A4): anche i nomi delle sue persone e dei suoi progetti, imparati dal cervello (arrivano con la sveglia)
         let imparate = UserDefaults.standard.stringArray(forKey: "paroleRiconoscimento") ?? []
-        r.contextualStrings = Array((["Discosizer", "Jarvis", "Discogs", "Resident Advisor", "SumUp", "EDITH", "mi ricevi"] + imparate).prefix(100))
+        r.contextualStrings = Array((["FRIDAY", "Nando", "Ale", "Pilates", "Reformer", "Bosu", "Vinted", "Matwork", "mi ricevi"] + imparate).prefix(100))
         return r
     }
 
@@ -3759,7 +3772,7 @@ final class VoceCloud: NSObject {
             req.httpMethod = "POST"
             req.timeoutInterval = 15
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+            req.setValue(token, forHTTPHeaderField: "x-friday-token")
             var corpo: [String: Any] = ["voce": testo, "flusso": true]
             if !id.isEmpty { corpo["id_voce"] = id }
             if let prima, !prima.isEmpty { corpo["prima"] = prima }   // punto 4: l'intonazione continua dalla frase prima
@@ -3846,7 +3859,7 @@ final class VoceCloud: NSObject {
         req.httpMethod = "POST"
         req.timeoutInterval = 15                 // il cervello può riprovare con ElevenLabs: diamogli tempo
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(token, forHTTPHeaderField: "x-friday-token")
         var corpo: [String: Any] = ["voce": testo]
         if !id.isEmpty { corpo["id_voce"] = id }
         req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
@@ -3868,7 +3881,7 @@ final class VoceCloud: NSObject {
         req.httpMethod = "POST"
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-friday-token")
         req.httpBody = Data(#"{"voci":true}"#.utf8)
         struct Risposta: Decodable { let attiva: Bool; let voci: [VoceRemota] }
         guard let (d, _) = try? await URLSession.shared.data(for: req),

@@ -142,7 +142,7 @@ nonisolated final class RegistratoreVoce: @unchecked Sendable {
         req.httpMethod = "POST"
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(token, forHTTPHeaderField: "x-friday-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["trascrivi": audio.base64EncodedString()])
         guard let (d, r) = try? await URLSession.shared.data(for: req) else { return (nil, "Non raggiungo le mie orecchie in cloud, Sir.") }
         let codice = (r as? HTTPURLResponse)?.statusCode ?? 0

@@ -307,7 +307,7 @@ struct VistaVitals: View {
         req.httpMethod = "POST"
         req.timeoutInterval = attesa
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-friday-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
         guard let (d, _) = try? await URLSession.shared.data(for: req) else { return nil }
         return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]

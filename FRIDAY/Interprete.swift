@@ -591,7 +591,7 @@ final class MotoreInterprete: NSObject, ObservableObject {
         req.httpMethod = "POST"
         req.timeoutInterval = 20
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-friday-token")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["traduci": testo, "da": da, "a": a])
         guard let (d, r) = try? await URLSession.shared.data(for: req), (r as? HTTPURLResponse)?.statusCode == 200,
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }

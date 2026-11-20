@@ -82,7 +82,7 @@ final class PosizioneSfondo: NSObject, ObservableObject, CLLocationManagerDelega
         req.httpMethod = "POST"
         req.timeoutInterval = 20
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "x-jarvis-token")
+        req.setValue(token, forHTTPHeaderField: "x-friday-token")
         let posizione: [String: Any] = ["lat": lat, "lon": lon, "precisione": precisione, "quando": iso.string(from: quando)]
         let corpo: [String: Any] = ["posizione_aggiorna": posizione, "dispositivo": Impostazioni.dispositivo]
         req.httpBody = try? JSONSerialization.data(withJSONObject: corpo)

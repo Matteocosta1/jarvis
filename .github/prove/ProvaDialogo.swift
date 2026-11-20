@@ -35,7 +35,7 @@ struct ProvaDialogo {
         let casi: [(String, Double)] = [
             ("sì sì", 0.6), ("no no", 0.6), ("ok ok", 0.6), ("grazie grazie", 0.6), ("sì", 0.6), ("va bene", 0.6), ("sì, mandala pure", 0.6),
             ("Che ore sono?", 0.7), ("Perché?", 0.7), ("che ore sono", 1.2), ("Gli ho detto che", 2.4), ("ci sono ancora delle delle", 2.4),
-            ("apri il meteo", 0.9), ("Jarvis, apri il meteo", 0.9), ("oggi sono stato a Bari", 1.8), ("fammi pensare", 2.4),
+            ("apri il meteo", 0.9), ("Friday, apri il meteo", 0.9), ("oggi sono stato a Bari", 1.8), ("fammi pensare", 2.4),
             ("ciao ciao", 1.2), ("piano piano", 1.2), ("No, aspetta", 2.4), ("che tempo fa domani", 0.8), ("allora,", 2.4),
         ]
         for (frase, attesa) in casi {
@@ -57,7 +57,7 @@ struct ProvaDialogo {
         let casi: [(String, FineFrase.SegnaleAscolto)] = [
             ("sì", .ascolto), ("sì sì", .ascolto), ("mh", .ascolto), ("ah ok", .ascolto), ("va bene", .ascolto), ("certo certo", .ascolto),
             ("esatto", .ascolto), ("sì sì sì", .chiusura), ("ho capito", .chiusura), ("ok grazie", .chiusura), ("va bene va bene", .chiusura),
-            ("sì ma domani", .nessuno), ("no", .nessuno), ("aspetta", .nessuno), ("Jarvis", .nessuno),
+            ("sì ma domani", .nessuno), ("no", .nessuno), ("aspetta", .nessuno), ("Friday", .nessuno),
             // 13 nov (prova dei tre punti): il mugugno scritto in tanti modi è sempre «mh»
             ("Mmm", .ascolto), ("Hmm", .ascolto), ("hm", .ascolto), ("mhmm", .ascolto), ("mmh, sì", .ascolto), ("hmm no", .nessuno),
             ("ehm", .nessuno), ("h", .nessuno), ("mmm mmm mmm", .chiusura),
@@ -151,11 +151,11 @@ struct ProvaDialogo {
     /// 12.0 (10): richiamare JARVIS dopo che ha taciuto («Jarvis?», «ci sei?», «dico a te»; «tu che ne pensi?» va con la frase).
     static func provaRichiami() {
         let casi: [(String, String?)] = [
-            ("Jarvis?", ""), ("Jarvis!", ""), ("", nil), ("ci sei?", ""), ("Jarvis, ci sei?", ""), ("ma ci sei o no?", ""),
-            ("mi senti?", ""), ("allora?", ""), ("e allora?", ""), ("dico a te", ""), ("sto parlando con te, Jarvis", ""),
+            ("Friday?", ""), ("Friday!", ""), ("", nil), ("ci sei?", ""), ("Friday, ci sei?", ""), ("ma ci sei o no?", ""),
+            ("mi senti?", ""), ("allora?", ""), ("e allora?", ""), ("dico a te", ""), ("sto parlando con te, Friday", ""),
             ("sì, dico a te", ""), ("senti, ci sei?", ""), ("rispondi per favore", ""), ("perché non mi rispondi?", ""),
             ("sei lì?", ""), ("pronto?", ""), ("hai sentito cosa ho detto?", ""),
-            ("tu che ne pensi?", "tu che ne pensi?"), ("e tu?", "e tu?"), ("Jarvis, secondo te?", "Jarvis, secondo te?"),
+            ("tu che ne pensi?", "tu che ne pensi?"), ("e tu?", "e tu?"), ("Friday, secondo te?", "Friday, secondo te?"),
             ("Bea, mi passi il sale?", nil), ("allora domani andiamo da Marco", nil), ("sì", nil), ("no", nil), ("ok", nil),
             ("che tempo fa domani", nil), ("ci sono ancora delle cose da fare", nil),
         ]
@@ -170,7 +170,7 @@ struct ProvaDialogo {
     static func provaRiprese() {
         let casi: [(String, Bool, Bool, Bool)] = [   // frase, dopo una domanda, presa senza nome, attesa
             ("dicevi?", false, false, true), ("scusa, dicevi?", false, false, true), ("continua pure", false, false, true),
-            ("continua pure", false, true, false), ("Jarvis, continua", false, false, true), ("scusa, vai avanti", false, false, true),
+            ("continua pure", false, true, false), ("Friday, continua", false, false, true), ("scusa, vai avanti", false, false, true),
             ("vai", false, false, true), ("vai", true, false, false), ("vai", false, true, false), ("prego", false, false, true),
             ("prego", true, false, false), ("no niente, continua", false, false, true), ("dove eri rimasto?", false, false, true),
             ("dove eri rimasto?", false, true, true), ("dov'eri rimasto?", false, false, true), ("ti ho interrotto, scusa", false, false, true),
@@ -187,7 +187,7 @@ struct ProvaDialogo {
     /// 12.0 (10): più comandi in una frase vanno al cervello (la regia li fa in fila); le frasi normali no.
     static func provaComposti() {
         let casi: [(String, Bool)] = [
-            ("apri la spesa e aggiungi il latte", true), ("Jarvis, chiudi tutto e poi dimmi il meteo", true),
+            ("apri la spesa e aggiungi il latte", true), ("Friday, chiudi tutto e poi dimmi il meteo", true),
             ("apri il meteo e dimmi se piove domani", true), ("metti pausa e apri la posta", true),
             ("aggiungi il latte e togli il pane", true), ("apri la spesa", false), ("aggiungi pane e latte", false),
             ("aggiungi latte, uova e pane", false), ("Bea e io andiamo al cinema", false), ("che tempo fa domani e sabato?", false),
@@ -261,7 +261,7 @@ struct ProvaDialogo {
             ("Buongiorno, come ho dormito", true), ("Gianni ascolta Prima quando ero a letto", true), ("come ho dormito Avis, come ho dormito prima", true),
             ("non so se registra anche nel pomeriggio il sonno", true), ("ho dormito un paio d'ore fa", true), ("quanti passi ho fatto oggi?", true),
             ("com'è il battito?", true), ("ho fatto un pisolino", true), ("sono stanchissimo", true), ("come sto ultimamente?", true),
-            ("quante calorie ho bruciato", true), ("Jarvis, diario", true), ("mi sono addormentato sul divano", true), ("com'è la mia attività fisica", true),
+            ("quante calorie ho bruciato", true), ("Friday, diario", true), ("mi sono addormentato sul divano", true), ("com'è la mia attività fisica", true),
             ("che tempo fa domani?", false), ("apri il meteo", false), ("manda un messaggio a Bea", false), ("ti ho detto", false),
             ("ho letto la mail di Matteo", false), ("che ore sono", false), ("metti un po' di musica", false),
         ]

@@ -6,7 +6,7 @@ import Foundation
 /// Tutto resta sul dispositivo (iPhone o Mac), niente rete. Valori: «rito» oppure il nome di un reparto («diario», «sentinella»…).
 enum Storpiature {
     private static let chiave = "storpiature"
-    private static let richiami: Set<String> = ["jarvis", "giarvis", "jervis", "ehi", "hey", "ok"]
+    private static let richiami: Set<String> = ["friday", "fraidei", "fraidai", "fraidi", "fridai", "frida", "ehi", "hey", "ok"]
     private static let domande: Set<String> = ["come", "cosa", "che", "quanto", "quanti", "quante", "quando", "dove", "perche", "chi", "qual", "quale", "quali", "ma"]
 
     /// Minuscole, senza accenti né punteggiatura, senza «Jarvis» davanti: così «Jarvis, backup Daddy!» e «backup daddy» sono la stessa frase.

@@ -64,7 +64,7 @@ final class Orecchio {
     private var voluto = false          // il signore vuole l'orecchio acceso (JARVIS sta parlando)
     private var acceso = false
 
-    private static let paroleStop = ["jarvis", "giarvis", "jervis", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio", "muto", "muta", "taci",
+    private static let paroleStop = ["friday", "fraidei", "fraidai", "fraidi", "fridai", "frida", "basta", "aspetta", "ascoltami", "fermati", "zitto", "silenzio", "muto", "muta", "taci",
                                      "un attimo", "stop", "ehi", "hey", "bro", "fratello"]
 
     /// 12 nov (il signore: «in riservato gli stavo parlando e mi ha subito risposto»): in RISERVATO, mentre JARVIS parla, la
@@ -254,7 +254,7 @@ final class Orecchio {
             let r = SFSpeechAudioBufferRecognitionRequest()
             r.shouldReportPartialResults = true
             r.addsPunctuation = true
-            r.contextualStrings = ["Jarvis", "EDITH", "mi ricevi"]
+            r.contextualStrings = ["FRIDAY", "mi ricevi"]
             if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // niente quota Apple, niente rete
             richiesta = r
             try Orecchio.collega(motore, a: r)
@@ -420,7 +420,7 @@ final class Orecchio {
                 if let r = segmento.range(of: parola, options: [.caseInsensitive, .backwards]) {
                     // M2: se la parola è il nome, quello che il signore ha detto subito prima («Che ore sono, Jarvis?») si tiene da
                     // parte, senza l'eco di JARVIS in testa: se dopo il nome non aggiunge altro, la domanda è quella (prima si perdeva)
-                    if ["jarvis", "giarvis", "jervis"].contains(parola), !AmbienteSonoro.condiviso.affollato {   // con TV o folla no: «Thank you, Jarvis»
+                    if ["friday", "fraidei", "fraidai", "fraidi", "fridai", "frida"].contains(parola), !AmbienteSonoro.condiviso.affollato {   // con TV o folla no: «Thank you, Jarvis»
                         primaDelNome = Orecchio.senzaEco(String(segmento[..<r.lowerBound]), detto: testoDetto)
                     }
                     inizioSegmento = min(inizioSegmento + segmento.distance(from: segmento.startIndex, to: r.lowerBound), testo.count)
@@ -535,7 +535,7 @@ final class Orecchio {
             // «Che ore sono, Jarvis?»: la domanda c'è già, la pausa è quella della frase)
             let (pulito, chiede) = Jarvis.togliRichiamo(ultimoTesto)
             let basso = ultimoTesto.lowercased()
-            let chiama = chiede || ["jarvi", "giarvi", "jervis", "ehi", "hey", "bro", "fratello"].contains(where: { basso.contains($0) })
+            let chiama = chiede || ["frida", "fraid", "freid", "fraj", "ehi", "hey", "tesoro", "amica"].contains(where: { basso.contains($0) })
             let attesa: Double
             if pulito.isEmpty, !chiede, !primaDelNome.isEmpty { attesa = Jarvis.pausaFineFrase(primaDelNome + " " + ultimoTesto) }
             else if pulito.isEmpty { attesa = chiede ? Dialogo.silenzioDopoAspetta : (chiama ? 4.0 : 1.2) }
