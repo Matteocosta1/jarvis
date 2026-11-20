@@ -50,8 +50,48 @@ async function cervelloVero(): Promise<Esito> {
   }
 }
 
+/// 20 nov (il signore: «AGGIUNGILI»): alle 02:07 il controllo ha dato «tutto ok» con la chiave Anthropic non valida, e per
+/// quattro giorni non ha visto Langfuse spento. Ora si provano davvero, senza spendere: la chiave con l'elenco dei modelli
+/// (niente token), Langfuse con un invio vuoto all'indirizzo vero delle tracce (non crea niente).
+async function chiaveAnthropic(): Promise<Esito> {
+  const nome = "Chiave Anthropic";
+  const k = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+  if (!k) return { nome, ok: false, dettaglio: "manca nei segreti di Supabase: JARVIS non può ragionare" };
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers: { "x-api-key": k, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(15_000) });
+    if (r.ok) return { nome, ok: true };
+    if (r.status === 401) return { nome, ok: false, dettaglio: "non valida: va rifatta nella Console e messa nei segreti di Supabase" };
+    if (r.status === 403) return { nome, ok: false, dettaglio: "rifiutata per i permessi: va controllata nella Console" };
+    // 429/5xx: Anthropic occupato o giù, non la chiave
+    return { nome, ok: false, dettaglio: `Anthropic risponde ${r.status}` };
+  } catch (e) {
+    return { nome, ok: false, dettaglio: `Anthropic non risponde (${(e as Error).message.slice(0, 80)})` };
+  }
+}
+async function langfuse(): Promise<Esito | null> {
+  const nome = "Langfuse";
+  const pub = (Deno.env.get("LANGFUSE_PUBLIC_KEY") ?? "").trim(), sec = (Deno.env.get("LANGFUSE_SECRET_KEY") ?? "").trim();
+  if (!pub || !sec) return null;                                   // non configurato: non è un guasto
+  const host = (Deno.env.get("LANGFUSE_HOST") || "https://cloud.langfuse.com").replace(/\/$/, "");
+  try {
+    const r = await fetch(`${host}/api/public/otel/v1/traces`, {
+      method: "POST", signal: AbortSignal.timeout(15_000),
+      headers: { authorization: "Basic " + btoa(`${pub}:${sec}`), "content-type": "application/json", "x-langfuse-ingestion-version": "4" },
+      body: JSON.stringify({ resourceSpans: [] }),
+    });
+    if (r.ok) return { nome, ok: true };
+    if (r.status === 401 || r.status === 403) return { nome, ok: false, dettaglio: "rifiuta le chiavi: vanno ricontrollate nei segreti di Supabase" };
+    if (r.status === 404 || r.status === 410) return { nome, ok: false, dettaglio: `l'indirizzo delle tracce non esiste più (${r.status}): il tracciamento è perso` };
+    return { nome, ok: false, dettaglio: `risponde ${r.status}` };
+  } catch (e) {
+    return { nome, ok: false, dettaglio: `non risponde (${(e as Error).message.slice(0, 80)})` };
+  }
+}
+
 async function controlla(): Promise<Esito[]> {
-  return await Promise.all([
+  const tutti = await Promise.all([
+    chiaveAnthropic(),
+    langfuse(),
     bussa("Cervello", "jarvis"),
     cervelloVero(),
     bussa("Tocco d'aiuto di Bea", "jarvis-bea-sos"),
@@ -59,6 +99,7 @@ async function controlla(): Promise<Esito[]> {
     bussa("Briefing del mattino", "jarvis-briefing"),
     bussa("Ascolto", "jarvis-ascolto"),
   ]);
+  return tutti.filter((e): e is Esito => e !== null);
 }
 
 // ───────── Notifiche (stesse chiavi Apple del resto di JARVIS) ─────────
@@ -114,6 +155,8 @@ Deno.serve(async (req) => {
 
   const esiti = await controlla();
   const guasti = esiti.filter((e) => !e.ok);
+  // { verifica: true }: solo i controlli, senza notifiche e senza scrivere nello storico (per provarlo a mano)
+  if (corpo?.verifica === true) return json({ ok: guasti.length === 0, esiti, verifica: true });
   const { data: ultimi } = await db.from("jarvis_systems").select("ok, avvisato, creato").order("creato", { ascending: false }).limit(1);
   const prima = ultimi?.[0];
   let avvisato = false;

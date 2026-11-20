@@ -224,6 +224,16 @@ final class Filo: ObservableObject {
 
     static let durataNotifica: TimeInterval = 2.8
 
+    /// 20 nov (il signore: «OK», l'elenco che sparisce): una notifica resta in base a quante voci ha l'argomento. Un dato solo
+    /// 2,8 s come sempre; ogni voce in più di un elenco (o impegno dell'agenda) altri 0,9 s, fino a 14 s (12 voci ≈ 12,7 s).
+    static func durata(_ a: ArgomentoFilo) -> TimeInterval {
+        let n: Int = a.righe.reduce(0) { (somma: Int, r: RigaFilo) -> Int in
+            let voci: Int = a.nome == "Agenda" ? r.riga.components(separatedBy: " · ").count : Filo.voci(r.riga).count
+            return somma + max(1, voci)
+        }
+        return min(durataNotifica + 0.9 * Double(max(0, n - 1)), 14)
+    }
+
     /// Il nome dell'argomento: la sezione da cui viene (il briefing è l'agenda), o il titolo.
     static func argomento(sezione: String?, titolo: String) -> String {
         switch sezione {
@@ -257,7 +267,7 @@ final class Filo: ObservableObject {
         if a.righe.count > 4 { a.righe.removeLast(a.righe.count - 4) }
         if fisso { a.fisso = true }
         // una notifica scade; un argomento fissato, o con dentro qualcosa che aspetta il sì, resta
-        a.scade = a.fisso || a.righe.contains(where: \.resta) ? nil : Date().addingTimeInterval(dura ?? Filo.durataNotifica)
+        a.scade = a.fisso || a.righe.contains(where: \.resta) ? nil : Date().addingTimeInterval(max(dura ?? Filo.durataNotifica, Filo.durata(a)))
         a.nascosto = false
         a.nascostoAlle = nil
         a.giro += 1
@@ -322,7 +332,7 @@ final class Filo: ObservableObject {
             argomenti[i].righe.removeAll { $0.id == chiave }
             if argomenti[i].righe.isEmpty { argomenti.remove(at: i) }
             else if !argomenti[i].fisso, !argomenti[i].righe.contains(where: \.resta), argomenti[i].scade == nil {
-                argomenti[i].scade = Date().addingTimeInterval(Filo.durataNotifica)   // non aspetta più niente: torna una notifica
+                argomenti[i].scade = Date().addingTimeInterval(Filo.durata(argomenti[i]))   // non aspetta più niente: torna una notifica
             }
             fineSeVuoto()
             return true
@@ -416,13 +426,16 @@ final class Filo: ObservableObject {
             fuoco = true
             return
         }
-        let t = Date().addingTimeInterval(Filo.durataNotifica)
         for k in argomenti.indices where !argomenti[k].fisso && argomenti[k].scade != nil {
+            let t = Date().addingTimeInterval(Filo.durata(argomenti[k]))         // 20 nov: un elenco lascia più tempo per leggerlo
             argomenti[k].scade = max(argomenti[k].scade ?? t, t)
         }
         programma()
         svegli()
     }
+
+    /// 20 nov: quanto aspetta prima di stringersi: 2,8 s, o di più se sullo schermo c'è un elenco (come la sua scadenza).
+    private var attesaCompatta: TimeInterval { visti.map { Filo.durata($0) }.max() ?? Filo.durataNotifica }
 
     /// FILO a fuoco adesso; in secondo piano (compatta) 2,8 s dopo, se nessuno lo tocca.
     /// 14 nov: mai mentre JARVIS parla (riparte da quando ha finito, `jarvisParla`); e se sullo schermo c'è solo roba che sta per
@@ -431,8 +444,9 @@ final class Filo: ObservableObject {
         fuoco = true
         riposa?.cancel()
         guard !tocco else { return }
+        let attesa: TimeInterval = attesaCompatta
         riposa = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(Filo.durataNotifica))
+            try? await Task.sleep(for: .seconds(attesa))
             // 14 nov (il signore: «il saltello tra un'azione e l'altra, no»): durante la missione non si stringe, se no a ogni passo
             // si riaprirebbe (a missione finita riparte il conto)
             guard let self, !Task.isCancelled, !self.tocco, !self.voce, !Piano.condiviso.inCorso else { return }
@@ -542,8 +556,8 @@ final class Filo: ObservableObject {
         guard si != voce else { return }
         voce = si
         if !si {
-            let fine = Date().addingTimeInterval(Filo.durataNotifica)
             for k in argomenti.indices where !argomenti[k].fisso && !argomenti[k].nascosto {
+                let fine = Date().addingTimeInterval(Filo.durata(argomenti[k]))   // 20 nov: un elenco resta di più dopo la sua ultima parola
                 if let s = argomenti[k].scade, s < fine { argomenti[k].scade = fine }
             }
             voceOra = nil                                                // ha finito: nessuna riga accesa
@@ -573,7 +587,7 @@ final class Filo: ObservableObject {
     func fissaArgomento(_ nome: String) {
         guard let i = argomenti.firstIndex(where: { $0.nome == nome }) else { return }
         argomenti[i].fisso.toggle()
-        argomenti[i].scade = argomenti[i].fisso ? nil : Date().addingTimeInterval(Filo.durataNotifica)
+        argomenti[i].scade = argomenti[i].fisso ? nil : Date().addingTimeInterval(Filo.durata(argomenti[i]))
         argomenti[i].giro += 1
         programma()
         svegli()
