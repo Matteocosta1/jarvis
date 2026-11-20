@@ -938,9 +938,12 @@ async function vicini(tabella: TabellaSignificato, testo: string, quanti = 12, s
 // (used: Supabase.ai.Session("gte-small"))». Senza data, ma se lo spengono la ricerca per significato muore. Ora ogni riga ha
 // anche il vettore di Gemini (768 numeri, legge l'italiano meglio di gte-small, che è addestrato in inglese), calcolato in
 // sottofondo con la chiave Gemini che JARVIS ha già (quota gratuita; in Europa i dati non servono a Google per addestrare).
-// La ricerca usa il motore primo (segreto MOTORE_SIGNIFICATO: «gte», com'è, o «gemini»); se quello non risponde usa l'altro.
+// La ricerca usa il motore primo; se quello non risponde (quota, rete) usa l'altro.
+// Misurato il 20 nov sulle righe vere (4 domande a parole diverse sulla memoria): Gemini mette la riga giusta al primo posto 4 volte
+// su 4 (0,66-0,73, le sbagliate sotto 0,65); gte-small 1 su 4 e dà ≥ 0,82 all'88 % delle coppie di righe qualsiasi (non distingue
+// l'italiano). Quindi il primo è Gemini; gte resta di riserva finché Supabase lo tiene. Il segreto MOTORE_SIGNIFICATO=gte torna a prima.
 const DIM_G = 768;
-const MOTORE_PRIMO: "gte" | "gemini" = (Deno.env.get("MOTORE_SIGNIFICATO") ?? "").trim().toLowerCase() === "gemini" ? "gemini" : "gte";
+const MOTORE_PRIMO: "gte" | "gemini" = (Deno.env.get("MOTORE_SIGNIFICATO") ?? "").trim().toLowerCase() === "gte" ? "gte" : "gemini";
 function ordineMotori(): ("gte" | "gemini")[] {
   const altro = MOTORE_PRIMO === "gemini" ? "gte" : "gemini";
   return [MOTORE_PRIMO, altro];
@@ -951,7 +954,8 @@ const TARATURA_G: [number, number][] = (() => {
     const t = JSON.parse(Deno.env.get("CALIBRAZIONE_G") ?? "");
     if (Array.isArray(t) && t.length >= 2 && t.every((c: any) => Array.isArray(c) && c.length === 2 && c.every(Number.isFinite))) return t.sort((a: number[], b: number[]) => a[0] - b[0]);
   } catch { /* stima sotto */ }
-  return [[0.5, 0.55], [0.75, 0.68], [0.82, 0.72], [0.97, 0.9], [1, 1]];
+  // taratura del 20 nov: domande vere (giuste 0,66-0,73, rumore 0,59-0,65) e coppie di righe (2892, a percentili uguali: 0,97 → 0,97)
+  return [[0.5, 0.5], [0.75, 0.62], [0.8, 0.64], [0.82, 0.65], [0.9, 0.8], [0.97, 0.96], [1, 1]];
 })();
 function sogliaGemini(sogliaGte: number): number {
   const t = TARATURA_G;

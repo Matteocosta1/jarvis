@@ -227,6 +227,7 @@ final class Filo: ObservableObject {
     /// 20 nov (il signore: «OK», l'elenco che sparisce): una notifica resta in base a quante voci ha l'argomento. Un dato solo
     /// 2,8 s come sempre; ogni voce in più di un elenco (o impegno dell'agenda) altri 0,9 s, fino a 14 s (12 voci ≈ 12,7 s).
     static func durata(_ a: ArgomentoFilo) -> TimeInterval {
+        guard a.nome != "Piano" else { return durataNotifica }           // il piano ha le sue regole (resta mentre lavora, finito 5 s)
         let n: Int = a.righe.reduce(0) { (somma: Int, r: RigaFilo) -> Int in
             let voci: Int = a.nome == "Agenda" ? r.riga.components(separatedBy: " · ").count : Filo.voci(r.riga).count
             return somma + max(1, voci)
