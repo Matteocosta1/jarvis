@@ -49,7 +49,6 @@ final class Sentinella: ObservableObject {
     private var ultimaFoto: Data?                          // l'ultimo fotogramma leggero, per «Guarda ora»
     private var presenzaPrima = false
     private var ultimoAllarme = Date.distantPast
-    private var luminositaPrima: CGFloat = 0.5
 
     /// Accende la sentinella. Falso se manca il permesso della fotocamera.
     func avvia() async -> Bool {
@@ -80,10 +79,9 @@ final class Sentinella: ObservableObject {
             restaSveglio = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .idleDisplaySleepDisabled, .userInitiated],
                                                                  reason: "Sentinella di JARVIS accesa: la webcam sorveglia la stanza")
         }
-        if !ProcessInfo.processInfo.isiOSAppOnMac {          // sul Mac la luminosità non si tocca
-            luminositaPrima = UIScreen.main.brightness
-            UIScreen.main.brightness = 0.25                  // consuma meno e non illumina la stanza
-        }
+        // 21 nov (il signore: «quando la lancio si abbassa la luminosità del telefono, vorrei che si aprisse normalmente»): la
+        // Sentinella non tocca più la luminosità dello schermo. Prima la portava al 25 % e la rialzava solo con «Jarvis, torna»: se
+        // l'app si chiudeva in un altro modo lo schermo restava scuro. Per oscurare restano il tasto BUIO e «schermo nero».
         PonteSentinella.inviaStato(attiva: true)
         return true
     }
@@ -98,7 +96,6 @@ final class Sentinella: ObservableObject {
         violato = false
         UIApplication.shared.isIdleTimerDisabled = false
         if let a = restaSveglio { ProcessInfo.processInfo.endActivity(a); restaSveglio = nil }   // il Mac torna a fare come sempre
-        if !ProcessInfo.processInfo.isiOSAppOnMac { UIScreen.main.brightness = luminositaPrima }
         PonteSentinella.inviaStato(attiva: false)
     }
 
