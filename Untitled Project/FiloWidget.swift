@@ -338,16 +338,10 @@ private struct ArgomentoVista: View {
                 }
                 .frame(minHeight: 24)
                 .contentShape(Rectangle())
-                .simultaneousGesture(
-                    LongPressGesture(minimumDuration: 0.45)
-                        .onEnded { _ in
-                            Aptica.tabFissa(!a.fisso)                           // 14 nov: fissata un colpo pieno, sganciata la selezione
-                            withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
-                        }
-                )
                 if !compatta {
                     Button {
                         guard !Filo.condiviso.consumaSveglia() else { return }   // era compatta: il tocco l'ha solo riaperta
+                        guard !Filo.condiviso.consumaFissa() else { return }     // 21 nov: la pressione lunga ha appena fissato
                         Suoni.filoVia()
                         withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
                     } label: {
@@ -383,6 +377,17 @@ private struct ArgomentoVista: View {
                 .transition(.opacity)
             }
         }
+        // 21 nov (scelta del signore: «l'argomento sotto il dito»): tenuto premuto ovunque sull'argomento (il nome, la linea o il
+        // testo) si fissa ◆; di nuovo, si sgancia. Prima solo su nome e linea. Lavora insieme allo scorrimento (si annulla da sola se
+        // il dito si sposta di più di 10 punti, cioè se si scorre); il dito che si alza dopo non apre la riga e non chiude (consumaFissa).
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in
+                    Aptica.tabFissa(!a.fisso)                                   // 14 nov: fissata un colpo pieno, sganciata la selezione
+                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
+                }
+        )
         // appena arrivato (o aggiornato) si accende un attimo; richiamato col dito dal bordo no (come il mockup)
         .brightness(accesa ? 0.35 : 0)
         .onAppear { if Date().timeIntervalSince(a.aggiornato) < 0.6 { accendi() } }
@@ -393,6 +398,7 @@ private struct ArgomentoVista: View {
     private func riga(_ r: RigaVista, detta: Bool) -> some View {
         Button {
             guard !Filo.condiviso.consumaSveglia() else { return }       // era compatta: il tocco l'ha solo riaperta
+            guard !Filo.condiviso.consumaFissa() else { return }         // 21 nov: la pressione lunga ha appena fissato
             if let s = r.sezione { Suoni.tocco(); Regia.condivisa.porta(s) }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -410,9 +416,12 @@ private struct ArgomentoVista: View {
                         Text(segno)
                             .frame(width: 10, alignment: .leading)
                     }
+                    // 21 nov (il signore: «la frase finisce coi puntini anziché poter rileggere lì tutta la risposta»): il testo va
+                    // a capo e si legge tutto; se è più alto della tab (200 punti) la lista scorre su e giù
                     Text(r.testo)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .lineSpacing(1.5)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))

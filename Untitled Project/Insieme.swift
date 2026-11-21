@@ -464,7 +464,7 @@ final class Insieme {
 
     /// Una cosa del discorso in FILO come notifica («mostrami…»: sparisce da sola; «fissalo» la tiene).
     private func mostraCosa(_ r: CosaFilo) {
-        Filo.condiviso.mostra("c:" + r.chiave, titolo: r.titolo, riga: r.riga.isEmpty ? r.detto : r.riga, sezione: r.sezione)
+        Filo.condiviso.mostra("c:" + r.chiave, titolo: r.titolo, riga: Filo.rigaIntera(r), sezione: r.sezione)   // 21 nov: la risposta intera
     }
 
     /// Il brano che suona nel filo: se nel filo c'è un altro brano (è cambiato) prende il suo posto; se non c'è, entra in fondo

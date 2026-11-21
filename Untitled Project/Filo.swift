@@ -101,6 +101,8 @@ final class Filo: ObservableObject {
     @Published private(set) var fuoco = true
     /// Quando il dito l'ha appena svegliata (era compatta): quel tocco la riapre e basta, non apre e non chiude niente.
     private var svegliataAlle: Date?
+    /// 21 nov: quando la pressione lunga ha appena fissato (o sganciato) un argomento: il dito che si alza non apre e non chiude niente.
+    private var fissatoAlle: Date?
     /// 14 nov (scelta del signore: «si accende la riga che dice»): la frase che JARVIS sta dicendo adesso, piegata (minuscole, senza
     /// accenti), da quando e per quanto (stimato): nella tab si accende la riga di cui sta parlando.
     struct VoceOra: Equatable {
@@ -113,8 +115,6 @@ final class Filo: ObservableObject {
     /// Dove sta la scheda sullo schermo (coordinate della finestra): un tocco fuori la manda in secondo piano.
     var rettScheda: CGRect = .zero
     private var pulizia: Task<Void, Never>?
-    /// Dopo quanto un argomento sparito (non fissato) non si richiama più.
-    static let vitaNascosti: TimeInterval = 1800
 
     // MARK: Il filo
 
@@ -232,7 +232,19 @@ final class Filo: ObservableObject {
             let voci: Int = a.nome == "Agenda" ? r.riga.components(separatedBy: " · ").count : Filo.voci(r.riga).count
             return somma + max(1, voci)
         }
-        return min(durataNotifica + 0.9 * Double(max(0, n - 1)), 14)
+        // 21 nov (il signore: «poter rileggere lì tutta la risposta»): un testo lungo resta il tempo di leggerlo, 50 ms a lettera
+        // oltre le prime 60 (come il mockup), sempre fino a 14 s; toccata o fissata resta finché lui vuole
+        let lettere: Int = a.righe.reduce(0) { (somma: Int, r: RigaFilo) -> Int in somma + r.riga.count }
+        let elenco: TimeInterval = durataNotifica + 0.9 * Double(max(0, n - 1))
+        let lettura: TimeInterval = durataNotifica + 0.05 * Double(max(0, lettere - 60))
+        return min(max(elenco, lettura), 14)
+    }
+
+    /// 21 nov (il signore: «la frase finisce coi puntini anziché poter rileggere lì tutta la risposta»): di una risposta di JARVIS
+    /// la tab mostra tutto il testo, non solo la prima frase; le altre cose la loro riga (o come si chiamano).
+    static func rigaIntera(_ c: CosaFilo) -> String {
+        if c.tipo == "risposta", let t = c.testo, !t.isEmpty { return t }
+        return c.riga.isEmpty ? c.detto : c.riga
     }
 
     /// Il nome dell'argomento: la sezione da cui viene (il briefing è l'agenda), o il titolo.
@@ -321,7 +333,7 @@ final class Filo: ObservableObject {
             Suoni.filo()
             return
         }
-        mostra("c:" + c.chiave, titolo: c.titolo, riga: c.riga.isEmpty ? c.detto : c.riga, sezione: c.sezione, fisso: true)
+        mostra("c:" + c.chiave, titolo: c.titolo, riga: Filo.rigaIntera(c), sezione: c.sezione, fisso: true)
     }
 
     /// Toglie un dato (`chiave`), o senza chiave l'argomento di cui si parla («toglilo»: la cosa del discorso, se no quello davanti,
@@ -474,6 +486,13 @@ final class Filo: ObservableObject {
     }
 
     /// Il tocco che l'ha appena riaperta (era compatta): vero una volta sola, e chi lo riceve non fa niente (come il Dock).
+    /// La pressione lunga ha appena fissato: vero una volta sola (entro 0,8 s), e chi lo riceve (la riga, la X) non fa niente.
+    func consumaFissa() -> Bool {
+        guard let f = fissatoAlle else { return false }
+        fissatoAlle = nil
+        return Date().timeIntervalSince(f) < 0.8
+    }
+
     func consumaSveglia() -> Bool {
         guard let s = svegliataAlle else { return false }
         svegliataAlle = nil
@@ -587,6 +606,7 @@ final class Filo: ObservableObject {
     /// 14 nov: tenuto premuto col dito, l'argomento si fissa (come «fissalo»); di nuovo, si sgancia.
     func fissaArgomento(_ nome: String) {
         guard let i = argomenti.firstIndex(where: { $0.nome == nome }) else { return }
+        fissatoAlle = Date()
         argomenti[i].fisso.toggle()
         argomenti[i].scade = argomenti[i].fisso ? nil : Date().addingTimeInterval(Filo.durata(argomenti[i]))
         argomenti[i].giro += 1
@@ -614,18 +634,12 @@ final class Filo: ObservableObject {
         }
     }
 
-    /// Gli argomenti spariti da mezz'ora (non fissati) escono da FILO: il dato è vecchio («mostrami…» lo porta nuovo).
+    /// 21 nov (scelta del signore: «le ultime cose mostrate»): gli argomenti spariti non escono più da FILO dopo mezz'ora; lo swipe
+    /// dal bordo riporta sempre le ultime cose mostrate. Restano gli ultimi 6 (i più vecchi escono quando ne arriva uno nuovo).
+    /// Prima qui partiva la pulizia dei 30 minuti: si ferma quella eventualmente in corso.
     private func programmaPulizia() {
         pulizia?.cancel()
-        let prossima = argomenti.filter { $0.nascosto && !$0.fisso }.compactMap(\.nascostoAlle).min()
-        guard let prossima else { return }
-        pulizia = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(max(1, prossima.addingTimeInterval(Filo.vitaNascosti).timeIntervalSinceNow)))
-            guard let self, !Task.isCancelled else { return }
-            let limite = Date().addingTimeInterval(-Filo.vitaNascosti + 1)
-            self.argomenti.removeAll { $0.nascosto && !$0.fisso && ($0.nascostoAlle ?? Date()) <= limite }
-            self.programmaPulizia()
-        }
+        pulizia = nil
     }
 
     // MARK: I nomi, il genere, il numero
