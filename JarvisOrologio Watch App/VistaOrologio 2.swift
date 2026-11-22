@@ -154,6 +154,11 @@ struct VistaOrologio: View {
     @State private var acceso = false                    // sequenza di avvio: reattore e icone si accendono in fila
     @State private var zeroAvvio: Date?                  // 13.7: l'inizio della traccia d'avvio (sul suono che si sente): la testa si scrive a tempo
     @State private var testaFinita = false               // 13.7: la testa ha finito di scriversi (J.A.R.V.I.S. · MARK XIII · SISTEMI IN LINEA)
+    /// 13.8 (2) (il signore, 22 nov 08:44, video: «le icone caricano così e non è bello»): aprendo l'app il Watch mostra per un attimo
+    /// la sua foto dell'ultima volta (la schermata piena, perfino quella di una versione vecchia), poi tutto si spegne e parte l'avvio.
+    /// In sottofondo la schermata resta solo col suo fondo, come il primo istante dell'avvio: la foto che il Watch tiene è quella, e
+    /// l'avvio parte senza salti. Tornando attiva (senza un avvio nuovo) il contenuto riappare in 0,25 s.
+    @State private var perLaFoto = false
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
     @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
@@ -234,6 +239,8 @@ struct VistaOrologio: View {
         .onChange(of: mostraVitals) { _, _ in aggiornaRegia() }
         .onChange(of: mostraSentinella) { _, _ in aggiornaRegia() }
         .onChange(of: scena) { _, fase in
+            if fase == .background { perLaFoto = true }         // 13.8 (2): la foto del Watch è il fondo dell'avvio, non la schermata piena
+            else if fase == .active, perLaFoto { withAnimation(.easeOut(duration: 0.25)) { perLaFoto = false } }
             jarvis.scenaCambiata(attiva: fase == .active)       // build 30: fuori schermo niente ascolti da soli
             if fase == .active { PonteOrologio.condiviso.mandaBatteria() }   // 13.7: la batteria del polso per la tab PAGINE
             if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi(); jarvis.vaInSottofondo() }
@@ -578,6 +585,7 @@ struct VistaOrologio: View {
                 }
             }
             .padding(.horizontal, 4)
+            .opacity(perLaFoto ? 0 : 1)
         }
         .background { sfondo }
     }
@@ -780,8 +788,10 @@ struct VistaOrologio: View {
             .onChange(of: g.size.width) { _, w in misuraBarra(larghezza: w) }
         }
         .frame(height: 34)
-        // come prima la barra taglia ai lati; finito l'avvio la lente può uscire un poco sopra e sotto (come nel mockup)
-        .mask { Rectangle().padding(.vertical, accese >= n ? -14 : 0) }
+        // la barra taglia ai lati; sopra e sotto lascia uscire 15 punti, anche durante l'avvio (come il mockup, clip-path −12 sulla barra
+        // da 40). 13.8 (2) (il signore, 22 nov 08:44: «le icone caricano così e non è bello»): all'avvio le icone nascono grandi (×2,4)
+        // e si restringono, e la maschera esatta di 34 punti le tagliava piatte sopra e sotto
+        .mask { Rectangle().padding(.vertical, -15) }
         .contentShape(Rectangle())
         // MARK XI: il dito sposta la barra (sotto i 5 punti è un tocco sull'icona), con l'ologramma (5 nov: la corona non più)
         .highPriorityGesture(
