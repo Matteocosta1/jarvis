@@ -590,8 +590,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// 9 nov: RISERVATO, scelto col tocco sul reattore in attesa. L'orecchio dell'attesa resta aperto ma va avanti solo una frase con
     /// «Jarvis»; niente congedo da solo. Un altro tocco torna IN ATTESA. Riaprendo l'app riparte IN ATTESA.
     @Published var riservato = false
-    /// La pressione lunga: il dito che si alza subito dopo non è un tocco.
-    private var spentoLungo = Date.distantPast
+    /// La pressione lunga: il dito che si alza dopo non è un tocco (vale per il rilascio che segue, al massimo 3 s, una volta sola).
+    private var rilascioDaIgnorare: Date?
 
     /// Lo stato sotto le icone: IN ATTESA, RISERVATO, SPENTO (in attesa); LA ASCOLTO, ELABORO, PARLO (le parole dell'iPhone).
     var etichettaFase: String {
@@ -606,8 +606,9 @@ final class JarvisOrologio: NSObject, ObservableObject {
     /// 13.7 · la pressione lunga sul reattore (0,6 s, come l'iPhone): SPENTO. Vero se l'ha spento adesso (la vista vibra e suona).
     /// Durante la sequenza d'avvio no: lì il microfono è già chiuso e il tocco serve a parlare subito.
     @discardableResult func spegniMicrofono() -> Bool {
-        guard fase == .attesa, avvioFinito, !micSpento else { return false }
-        spentoLungo = Date()
+        guard fase == .attesa, avvioFinito else { return false }
+        rilascioDaIgnorare = Date()                          // anche se era già spento: il rilascio non lo riaccende
+        guard !micSpento else { return false }
         riservato = false
         micSpento = true
         return true
@@ -626,7 +627,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 SuoniOrologio.sfumaAvvio()
                 return
             }
-            if Date().timeIntervalSince(spentoLungo) < 0.8 { return }   // il dito alzato dopo la pressione lunga non è un tocco
+            if let r = rilascioDaIgnorare {                   // il dito alzato dopo la pressione lunga non è un tocco
+                rilascioDaIgnorare = nil
+                if Date().timeIntervalSince(r) < 3 { return }
+            }
             // 13.7 (come l'iPhone, logica del 9 nov): SPENTO → il tocco lo riaccende e ascolta subito; altrimenti il tocco passa fra
             // IN ATTESA e RISERVATO (solo «Jarvis»)
             if micSpento { micSpento = false; Task { await self.ascolta() } } else { riservato.toggle() }
@@ -1208,7 +1212,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
             .split(separator: " ")
-        return parole.contains { ["jarvis", "giarvis", "jervis"].contains(String($0)) }
+        // le stesse storpiature che l'iPhone riconosce come suo nome (Build22: «jarvi…», «giarvi…», «charvis», «jarves», «jarbis»)
+        return parole.contains { p in ["jarvi", "giarvi", "jervis", "charvis", "jarves", "jarbis"].contains { p.hasPrefix($0) } }
     }
 
     /// Nella trascrizione ci sono parole vere (non vuota, non solo «ah», «mh», versi).

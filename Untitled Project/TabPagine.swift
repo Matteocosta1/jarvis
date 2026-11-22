@@ -280,8 +280,7 @@ final class Pagine: ObservableObject {
     /// `vivo`: l'avvio olografico c'è ancora (se la voce è stata interrotta, la tab non si forma o si richiude).
     func avvio(zero: Date, nomi: [String], icone: [String], vivo: @escaping () -> Bool) {
         guard !nomi.isEmpty else { return }
-        if su { chiudi(muto: true) }
-        giro += 1
+        if su { chiudi(muto: true) }                          // (aumenta già il giro: qui non si tocca, se no la chiusura resterebbe a metà)
         let mio = giro
         let interface = 11.66, posate = 14.31, operational = AvvioOlo.operational, fine = 15.08
         Task { @MainActor in
@@ -326,8 +325,12 @@ final class Pagine: ObservableObject {
         miniature[id] = img
     }
 
-    /// Le pagine chiuse non hanno più la loro foto.
+    /// Le pagine chiuse non hanno più la loro foto; e se ne sono rimaste meno, le carte non restano oltre l'ultima.
     func tieni(_ ids: Set<UUID>) {
+        if avvio == nil {
+            let ultima = Double(max(0, ids.count - 1))
+            if offAdesso(Date()) > ultima { corsa = nil; off = ultima }
+        }
         let via = miniature.keys.filter { !ids.contains($0) }
         guard !via.isEmpty else { return }
         for k in via { miniature[k] = nil }

@@ -162,11 +162,15 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var riservato = false {
         didSet { if riservato != oldValue { aggiornaRichiamo() } }
     }
-    private var spentoLungo = Date.distantPast     // la pressione lunga: il rilascio che segue non è un tocco
+    /// La pressione lunga col dito: il dito che si alza subito dopo non è un tocco. 13.7 (debug): prima valeva solo 0,8 s dalla
+    /// pressione, e tenendo il dito giù più di 1,4 s in tutto il rilascio arrivava come tocco e riaccendeva il microfono appena
+    /// spento. Ora vale per il rilascio che segue (al massimo 3 s), e lo prende una volta sola.
+    private var rilascioDaIgnorare: Date?
     /// 9 nov: pressione lunga sul reattore (o «Jarvis, spegni il microfono»): SPENTO, sordo davvero. Un tocco lo riaccende.
-    func spegniMicrofono() {
+    /// `daDito`: dalla pressione lunga (col dito già spento conta comunque: il rilascio non deve riaccenderlo).
+    func spegniMicrofono(daDito: Bool = false) {
+        if daDito { rilascioDaIgnorare = Date() }
         guard !micSpento else { return }
-        spentoLungo = Date()
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         Suoni.microfonoSpento()
         riservato = false
@@ -558,7 +562,11 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Interazione
 
     func toccaReattore() {
-        if Date().timeIntervalSince(spentoLungo) < 0.8 { return }   // 9 nov: il dito alzato dopo la pressione lunga non è un tocco
+        // 9 nov: il dito alzato dopo la pressione lunga non è un tocco (13.7: anche se è rimasto giù a lungo)
+        if let r = rilascioDaIgnorare {
+            rilascioDaIgnorare = nil
+            if Date().timeIntervalSince(r) < 3 { return }
+        }
         fermaBenvenuto()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()

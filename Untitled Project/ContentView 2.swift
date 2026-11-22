@@ -201,14 +201,19 @@ struct ContentView: View {
                 if let prima { ultimaDavanti = prima }                // 13.7: la tab PAGINE si apre su questa
                 davantiCambiata(d)
             }
-            // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (un secondo dopo che è arrivata, poi
-            // ogni tre secondi), mai mentre le pagine si muovono
+            // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (1,2 s dopo che è arrivata, poi ogni
+            // 10 s), mai mentre le pagine si muovono. Debug: ogni foto ridisegna la finestra (qualche millisecondo), quindi poche e
+            // solo quando il dito è fermo, così gli ologrammi delle sezioni non perdono fotogrammi
             .task(id: pila.davanti) {
                 guard let id = pila.davanti else { return }
                 try? await Task.sleep(for: .seconds(1.2))
+                var fatte = 0
                 while !Task.isCancelled, pila.davanti == id {
-                    if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 { Pagine.condivisa.fotografa(id) }
-                    try? await Task.sleep(for: .seconds(3))
+                    if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
+                        Pagine.condivisa.fotografa(id)
+                        fatte += 1
+                    }
+                    try? await Task.sleep(for: .seconds(fatte == 0 ? 1 : 10))   // non ancora fatta (il dito si muoveva): si riprova presto
                 }
             }
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
@@ -536,7 +541,7 @@ struct ContentView: View {
             // 13.7 · la tab PAGINE si forma su «interface» e dentro scorrono come dischi le icone di tutte le sezioni
             if olo, let inizio = avvioOlo {
                 let el = tutteLeIcone
-                Pagine.condivisa.avvio(zero: inizio, nomi: el.map(\.nome), icone: el.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil })
+                Pagine.condivisa.avvio(zero: inizio, nomi: el.map(\.nome), icone: el.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil && pila.davanti == nil && !tastiera })
             }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
@@ -1123,7 +1128,7 @@ struct ContentView: View {
                 Button { tastiera = false; jarvis.toccaReattore() } label: { reattore }
                     .buttonStyle(StileStark())
                     // 9 nov (logica approvata dal signore): pressione lunga sul reattore = microfono SPENTO (sordo); un tocco lo riaccende
-                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono() })
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono(daDito: true) })
                     .scaleEffect(acceso ? 1 : 0.7)
                     .opacity(acceso ? 1 : 0)
                     .accessibilityLabel("Parla con Jarvis")
@@ -1204,7 +1209,7 @@ struct ContentView: View {
                     if !piccolo { jarvis.toccaReattore() }
                 } label: { reattore }
                 .buttonStyle(StileStark())
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in if !piccolo { jarvis.spegniMicrofono() } })   // 9 nov: SPENTO
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in if !piccolo { jarvis.spegniMicrofono(daDito: true) } })   // 9 nov: SPENTO
                 .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
                 .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
                 .opacity(acceso ? 1 : 0)

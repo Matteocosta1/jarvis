@@ -314,6 +314,16 @@ struct OlogrammaRuota: View {
         .accessibilityHidden(!vivo)
         .accessibilityLabel(etichetta)
         .onChange(of: ruota.scelta) { cambiataDa = Date() }
+        // 13.7 (debug, i 120 Hz): i pezzi di ogni icona si preparano prima, a avvio finito e uno alla volta. Prima si calcolavano
+        // la prima volta che l'icona arrivava in alto, mentre lui girava la ruota: un piccolo scatto alla prima passata
+        .task {
+            try? await Task.sleep(for: .seconds(20))
+            for v in voci {
+                guard !Task.isCancelled else { return }
+                if !ruota.vivo { _ = Accensione.pezzi("iphone." + v.icona, icona: OlogrammaRuota.simbolo(v.icona, lato: 26)) }
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+        }
     }
 
     /// Il simbolo di una voce, grande `lato` punti (le proporzioni di prima: il simbolo è i 5/8 del riquadro).

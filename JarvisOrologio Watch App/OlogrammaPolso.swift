@@ -69,6 +69,15 @@ struct OlogrammaPolso<Icona: View>: View {
         .accessibilityHidden(!vivo)
         .accessibilityLabel(etichetta)
         .onChange(of: ruota.scelta) { cambiataDa = Date() }
+        // 13.7 (debug): i pezzi di ogni icona si preparano prima, a avvio finito e uno alla volta (non mentre gira la ruota)
+        .task {
+            try? await Task.sleep(for: .seconds(20))
+            for k in nomi.indices {
+                guard !Task.isCancelled else { return }
+                if !ruota.vivo { _ = Accensione.pezzi("polso.\(k).\(nomi[k])", icona: icona(k, 26)) }
+                try? await Task.sleep(for: .milliseconds(60))
+            }
+        }
     }
 
     /// Il guizzo quando cambia l'icona in alto (0,2 s): un tremolio di luce.
