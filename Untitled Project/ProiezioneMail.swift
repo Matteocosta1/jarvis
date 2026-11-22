@@ -314,7 +314,7 @@ struct PelleLuce: View {
             ZStack(alignment: .topLeading) {
                 // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la mail
                 // si legge davanti, quindi il fondo è quello della pagina olografica davanti (88 %, come la PILA), prima 34 % sfocato
-                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.88)
+                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(TintaTab.vetroDavanti)   // 13.8 (5): come gli altri ologrammi davanti (70 %)
                 // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
                 EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
                     .frame(width: W * 2.6, height: 760)

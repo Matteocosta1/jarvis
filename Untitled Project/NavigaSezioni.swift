@@ -1822,7 +1822,8 @@ struct VetroOlo: View {
         ZStack {
             // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura né tinta
             // di iOS; la trasparenza dinamica è il fondo qui sotto (50 % dietro, 88 % davanti), come prima
-            forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
+            // 13.8 (5): davanti 70 % come gli altri ologrammi (prima 88 %), dietro 50 %
+            forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((TintaTab.vetroAperta + (TintaTab.vetroDavanti - TintaTab.vetroAperta) * fuoco) * forza))
             forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
                                               .init(color: ciano.opacity(0.03 * forza), location: 0.4),
                                               .init(color: ciano.opacity(0.06 * forza), location: 1)],

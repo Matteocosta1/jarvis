@@ -20,6 +20,10 @@ enum TintaTab {
     // pagine che vanno dietro): il fondo delle tab è quello delle pagine olografiche (VetroOlo a riposo: 50 %), da piccola 45 %
     static let vetroAperta = 0.5
     static let vetroPiccola = 0.45
+    /// 13.8 (5) (il signore, 22:49: «88 % forse meglio più basso, altrimenti sembra uguale a prima: si deve capire che è olografico»;
+    /// «anche Mail deve essere uguale agli altri»): un ologramma davanti (FILO a fuoco sopra una sezione, la tendina sopra una
+    /// sezione, la mail, la pagina davanti della PILA) ha il fondo al 70 %, uguale per tutti.
+    static let vetroDavanti = 0.7
 }
 
 /// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la fascia invisibile del bordo destro che lo richiama quando è via.
@@ -179,9 +183,9 @@ private struct SchedaFilo: View {
     /// Quanto è pieno il fondo scuro. 13.7 (il signore, 22 nov 01:04: «la trasparenza dinamica: piccola 55 %, aperta 60 %»): uguale
     /// sulla schermata di JARVIS e sopra una sezione, con il vetro sfocato dietro (prima 0,93 su JARVIS; 0,88 / 0,5 sopra una sezione).
     /// 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la trasparenza
-    /// dinamica la fa il fondo, come le pagine della PILA: sopra una sezione, a fuoco, quasi pieno (0,88 come la pagina davanti), così
+    /// dinamica la fa il fondo, come le pagine della PILA: sopra una sezione, a fuoco, quasi pieno (70 %, TintaTab.vetroDavanti, come la pagina davanti), così
     /// si legge; in secondo piano e sulla schermata di JARVIS trasparente (50 %, piccola 45 %).
-    private var fondoVoluto: Double { vetro && filo.fuoco ? 0.88 : (filo.fuoco ? TintaTab.vetroAperta : TintaTab.vetroPiccola) }
+    private var fondoVoluto: Double { vetro && filo.fuoco ? TintaTab.vetroDavanti : (filo.fuoco ? TintaTab.vetroAperta : TintaTab.vetroPiccola) }
 
     var body: some View {
         let altezza = min(Self.altezzaMassima, max(30, contenuto))
