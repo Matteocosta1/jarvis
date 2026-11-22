@@ -223,7 +223,7 @@ enum Sintesi {
             guard a > 0.004 else { continue }
             let anello = Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2))
             g.stroke(anello, with: .color(colore(0.16 * a, 0.35)), lineWidth: lw(3.4))
-            g.stroke(anello, with: .color(colore(0.8 * a, 0.7)), lineWidth: lw(0.9))
+            g.stroke(anello, with: .color(colore(0.8 * a, 0.7)), lineWidth: lw(0.9 * (1 + 0.5 * vol)))   // con la voce anche un filo più spesso
         }
     }
 

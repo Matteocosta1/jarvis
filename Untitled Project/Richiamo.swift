@@ -551,6 +551,7 @@ final class Richiamo {
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
             VoceAttiva.condivisa.misura(buffer)                 // 11 nov: la voce dal suono (la fine frase non dipende solo dalle parole)
+            Volume.voce.misuraAscolto(buffer)                   // 13.8 (3): chiamato a voce, il reattore (le ONDE) segue la sua voce
         }
     }
 

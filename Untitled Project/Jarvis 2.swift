@@ -227,6 +227,7 @@ final class Jarvis: NSObject, ObservableObject {
             if fase == .ascolto || fase == .parlo { Suoni.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
             if fase == .attesa { Iniziativa.condivisa.pausa() }            // 14 nov: una pausa nel dialogo: l'iniziativa può parlare
             Filo.condiviso.jarvisParla(fase == .parlo)                     // 14 nov: la tab non sparisce mentre JARVIS parla
+            Volume.voce.ascolto(fase == .ascolto)                          // 13.8 (3): il richiamo e l'orecchio misurano la voce solo ascoltando
         }
     }
     @Published var parziale = ""
