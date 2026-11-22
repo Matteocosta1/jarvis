@@ -178,7 +178,10 @@ private struct SchedaFilo: View {
 
     /// Quanto è pieno il fondo scuro. 13.7 (il signore, 22 nov 01:04: «la trasparenza dinamica: piccola 55 %, aperta 60 %»): uguale
     /// sulla schermata di JARVIS e sopra una sezione, con il vetro sfocato dietro (prima 0,93 su JARVIS; 0,88 / 0,5 sopra una sezione).
-    private var fondoVoluto: Double { filo.fuoco ? TintaTab.vetroAperta : TintaTab.vetroPiccola }
+    /// 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la trasparenza
+    /// dinamica la fa il fondo, come le pagine della PILA: sopra una sezione, a fuoco, quasi pieno (0,88 come la pagina davanti), così
+    /// si legge; in secondo piano e sulla schermata di JARVIS trasparente (50 %, piccola 45 %).
+    private var fondoVoluto: Double { vetro && filo.fuoco ? 0.88 : (filo.fuoco ? TintaTab.vetroAperta : TintaTab.vetroPiccola) }
 
     var body: some View {
         let altezza = min(Self.altezzaMassima, max(30, contenuto))
@@ -254,14 +257,8 @@ private struct SchedaFilo: View {
             // 13.1: sopra una sezione, sotto il fondo c'è il vetro della PILA (VetroOlo): a fuoco pieno e sfocato, in secondo
             // piano trasparente (la sezione si vede attraverso), con gli stessi valori delle pagine olografiche.
             ZStack {
-                // 13.7 (22 nov 01:04, mockup: sfocato 10 sulla schermata di JARVIS, 20 sopra una sezione): il vetro dietro al fondo
-                // scuro c'è sempre, aperta e piccola (prima solo sopra una sezione); entra a nascita finita
-                // 13.8 (4): solo sfocatura, senza la tinta di iOS (il fondo scuro è quello del mockup, dentro la cornice);
-                // sopra una sezione, a fuoco, sfoca di più: la trasparenza dinamica del mockup
-                SfocaturaOlo(forte: vetro && filo.fuoco)
-                    .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
-                    .opacity(vetroPronto ? 1 : 0)
-                    .animation(.easeOut(duration: 0.2), value: vetroPronto)
+                // 13.8 (4) (il signore, 12:45): niente sfocatura di Apple; il fondo scuro (dentro la cornice) fa la trasparenza dinamica:
+                // sopra una sezione, a fuoco, 88 %; altrimenti 50 % (piccola 45 %)
                 TimelineView(.animation) { tl in
                     let t = tl.date.timeIntervalSince(nata)
                     let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
@@ -753,25 +750,9 @@ final class VetroSenzaTinta: UIVisualEffectView {
     }
 }
 
-/// 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica deve essere ben visibile come nello swipe… le tab, e anche la
-/// tendina Protocolli, senza l'effetto Apple»): sopra il fondo scuro delle tab, la luce delle pagine olografiche (VetroOlo e VeloOlo
-/// della PILA): la sfocatura leggera senza la tinta di iOS, la luce ciano dall'alto, il bagliore dai bordi e le righe di scansione.
-/// Due strati, come le pagine: sotto il fondo scuro `SfocaturaOlo` (la sfocatura senza tinta, al 30 % come le pagine dietro); sopra
-/// `LuceOlografica` (la luce ciano, il bagliore dai bordi, le righe). Il fondo scuro lo mette chi li usa.
-struct SfocaturaOlo: View {
-    var forte = false
-    var body: some View {
-        // il passaggio leggero ↔ forte è una dissolvenza di SwiftUI fra i due vetri (0,35 s), come la trasparenza dinamica del mockup
-        ZStack {
-            VetroTab().opacity(forte ? 0 : 1)
-            VetroTab(forte: true).opacity(forte ? 1 : 0)
-        }
-        .animation(.easeInOut(duration: 0.35), value: forte)
-        .opacity(0.3)
-        .allowsHitTesting(false)
-    }
-}
-
+/// 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica ben visibile come nello swipe»; 12:45: «quell'effetto sfocato
+/// di Apple deve sparire da ogni ologramma»): sopra il fondo scuro delle tab e della tendina, la luce delle pagine olografiche: la luce
+/// ciano dall'alto, il bagliore dai bordi e le righe di scansione. Niente sfocatura: il fondo scuro lo mette chi la usa.
 struct LuceOlografica: View {
     var body: some View {
         let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)

@@ -117,6 +117,10 @@ final class Pagine: ObservableObject {
     struct Corsa: Equatable { let da: Double, a: Double, inizio: Date, durata: Double }
     @Published private(set) var corsa: Corsa?
     @Published private(set) var miniature: [UUID: UIImage] = [:]
+    /// 13.8 (4) (il signore, 22 nov 12:45: «nell'avvio le carte con la sezione vera, che si illumina quando selezionata; devono
+    /// scorrere tutte così»): l'ultima foto di ogni sezione (la stessa della miniatura) resta sul telefono, una per sezione, e all'avvio
+    /// le carte mostrano le pagine vere. Una sezione mai aperta ha la carta con la sua icona, finché non la apre una volta.
+    @Published private(set) var fotoSezioni: [String: UIImage] = [:]
 
     // le misure della schermata (coordinate della finestra), scritte da ContentView
     var anello: (rett: CGRect, angoli: [Double], raggio: CGFloat, lato: CGFloat)?
@@ -133,6 +137,14 @@ final class Pagine: ObservableObject {
     private var giro = 0
 
     static let altaPiccola: CGFloat = 72
+    /// 13.8 (4): la tab non è mai più stretta della sua riga di stato (misurata dalla tab: cresce soltanto, così non si muove).
+    @Published private(set) var rigaMin: CGFloat = 0
+
+    /// La riga di stato alla sua misura naturale `w`: la tab le lascia sempre posto (10 a sinistra e 8 a destra, la riga ne esce 3 per lato).
+    func misuraRiga(_ w: CGFloat) {
+        let serve = (w - 6 + 18 + 1).rounded(.up)
+        if serve > rigaMin { rigaMin = serve }
+    }
     /// Metà della riga di telemetria più lunga (21 lettere × 6,8 punti).
     static let mezzaTelemetria: CGFloat = 21 * 6.8 / 2
 
@@ -165,7 +177,7 @@ final class Pagine: ObservableObject {
         }
         let alto = (colonna.max().map { $0 + 4 } ?? giu - 112) - 10 - 30
         let h = min(134 + 30, giu - alto)
-        return CGRect(x: S, y: alto.rounded(), width: max(90, (destra - S).rounded()), height: max(Pagine.altaPiccola, h.rounded()))
+        return CGRect(x: S, y: alto.rounded(), width: max(90, rigaMin, (destra - S).rounded()), height: max(Pagine.altaPiccola, h.rounded()))
     }
 
     /// Dove sta adesso: piccola, lo stesso inizio e alta 72 (misurata a tab aperta e tenuta, così non salta dietro alle icone).
@@ -290,6 +302,7 @@ final class Pagine: ObservableObject {
         if su { chiudi(muto: true) }                          // (aumenta già il giro: qui non si tocca, se no la chiusura resterebbe a metà)
         let mio = giro
         let interface = 11.66, posate = 14.31, operational = AvvioOlo.operational, fine = 15.08
+        caricaFotoSezioni(nomi)                               // pronte molto prima di «interface» (11,66 s)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + interface)))
             guard mio == self.giro, vivo(), !self.su else { return }
@@ -319,7 +332,8 @@ final class Pagine: ObservableObject {
     // MARK: le miniature
 
     /// La foto della pagina davanti, adesso, piccola (circa 160 pixel di larghezza): dove iOS non la fotografa resta scura.
-    func fotografa(_ id: UUID) {
+    /// 13.8 (4): resta anche come ultima foto della sua sezione (`nome`), per le carte dell'avvio.
+    func fotografa(_ id: UUID, nome: String) {
         guard let w = FasciaAlta.finestra else { return }
         let b = w.bounds
         guard b.width > 0 else { return }
@@ -330,6 +344,38 @@ final class Pagine: ObservableObject {
             _ = w.drawHierarchy(in: b, afterScreenUpdates: false)
         }
         miniature[id] = img
+        fotoSezioni[nome] = img
+        // EDITH (le password) non si salva mai: la sua carta resta in memoria finché l'app è aperta
+        guard nome != "EDITH", let dati = img.jpegData(compressionQuality: 0.7), let file = Self.fileFoto(nome) else { return }
+        Task.detached(priority: .utility) {
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? dati.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+    }
+
+    /// Dove sta l'ultima foto di una sezione: Caches/PagineFoto/<nome>.jpg (iOS può liberarla: allora torna la carta con l'icona).
+    nonisolated private static func fileFoto(_ nome: String) -> URL? {
+        guard let cartella = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let pulito = nome.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? nome
+        return cartella.appendingPathComponent("PagineFoto", isDirectory: true).appendingPathComponent(pulito).appendingPathExtension("jpg")
+    }
+
+    /// Le ultime foto delle sezioni, lette dal telefono fuori dal thread principale (una volta: poi le aggiorna `fotografa`).
+    private func caricaFotoSezioni(_ nomi: [String]) {
+        let mancano = nomi.filter { fotoSezioni[$0] == nil }
+        guard !mancano.isEmpty else { return }
+        Task {
+            let lette = await Task.detached(priority: .userInitiated) { () -> [String: Data] in
+                var r: [String: Data] = [:]
+                for n in mancano {
+                    if let f = Pagine.fileFoto(n), let d = try? Data(contentsOf: f) { r[n] = d }
+                }
+                return r
+            }.value
+            for (n, d) in lette where self.fotoSezioni[n] == nil {
+                if let img = UIImage(data: d) { self.fotoSezioni[n] = img }
+            }
+        }
     }
 
     /// Le pagine chiuse non hanno più la loro foto; e se ne sono rimaste meno, le carte non restano oltre l'ultima.
@@ -422,7 +468,6 @@ private struct TabPagineVista: View {
     let icone: [String: String]
     let apri: (UUID) -> Void
     let chiudi: (UUID) -> Void
-    @State private var vetroPronto = false
     @State private var nascita: Double = 0
     @State private var tremolio: Double = 0
 
@@ -432,9 +477,6 @@ private struct TabPagineVista: View {
             // il vetro: sfocatura, fondo scuro (aperta 50 %, piccola 45 %), luce olografica, poi la cornice
             // 13.8 (4) (il signore, 12:22: «come nello swipe»): la sfocatura senza la tinta di iOS, il fondo delle pagine olografiche
             // (aperta 50 %, piccola 45 %), sopra la luce ciano, il bagliore e le righe; poi la cornice
-            SfocaturaOlo()
-                .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
-                .opacity(vetroPronto ? 1 : 0)
             Rectangle()
                 .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(piccola ? TintaTab.vetroPiccola : TintaTab.vetroAperta))
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
@@ -475,10 +517,6 @@ private struct TabPagineVista: View {
             withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3)) { nascita = 1 }
             withAnimation(.linear(duration: 0.36).delay(0.17)) { tremolio = 1 }   // le carte si accendono tremolando
         }
-        .task {
-            try? await Task.sleep(for: .milliseconds(450))
-            vetroPronto = true
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("PAGINE")
     }
@@ -487,52 +525,16 @@ private struct TabPagineVista: View {
 
     private var rigaStato: some View {
         TimelineView(.periodic(from: .now, by: 1)) { tl in
-            HStack(spacing: 0) {
-                Text(TabPagineVista.formatoOra.string(from: tl.date))
-                    .font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.2)
-                    .monospacedDigit()
-                    .foregroundStyle(Olo.ciano)
-                    .shadow(color: Olo.azzurro.opacity(0.95), radius: 3)
-                if p.fissa {
-                    Text("◆")
-                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                        .foregroundStyle(TintaTab.chiaro)
-                        .shadow(color: Olo.azzurro.opacity(0.9), radius: 2.5)
-                        .padding(.leading, 0.5)
-                        .accessibilityLabel("fissata")
+            contenutoRiga(tl.date, misura: false)
+                .lineLimit(1)
+                // 13.8 (4) (il signore, 12:40: «il bottone sborda dalla tab»): la stessa riga alla sua misura naturale, invisibile: la tab
+                // non diventa mai più stretta di così (cresce soltanto, quindi non si muove). Sull'iPhone grande non cambia niente.
+                .background(alignment: .leading) {
+                    contenutoRiga(tl.date, misura: true)
+                        .fixedSize()
+                        .hidden()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { w in p.misuraRiga(w) }
                 }
-                Spacer(minLength: 1.5)
-                HStack(spacing: 0.5) {
-                    GlifoTab(disegno: .telefono).frame(width: 5.5 * 8 / 14, height: 5.5)
-                    batteria(TabPagineVista.batteriaTelefono, carica: TabPagineVista.telefonoInCarica)
-                }
-                Spacer(minLength: 1.5)
-                HStack(spacing: 0.5) {
-                    GlifoTab(disegno: .orologio).frame(width: 5.5 * 10 / 14, height: 5.5)
-                    if polso.collegato, let b = polso.batteria { batteria(b, carica: polso.carica) } else { testoStato("—") }
-                }
-                .opacity(polso.collegato ? 1 : 0.4)
-                Spacer(minLength: 1.5)
-                Group {
-                    switch rete.tipo {
-                    case .wifi: GlifoTab(disegno: .onde).frame(width: 5.5 * 14 / 10, height: 5.5)
-                    case .dati(let t): Text(t).font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.4)
-                    case .nessuna: Text("OFFLINE").font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.4)
-                    }
-                }
-                .foregroundStyle(Olo.ciano)
-                .opacity(rete.tipo == .nessuna ? 0.4 : 1)
-                Spacer(minLength: 1.5)
-                TastiTab(lato: 11, spazio: 4, oltre: (v: 7.5, h: 2), chiudi: {
-                    p.chiudi(muto: false)
-                }, riduci: {
-                    p.stringi(true)
-                }, apri: {
-                    p.stringi(false)
-                })
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { p.rettTasti = $0 }
-            }
-            .lineLimit(1)
         }
         .frame(height: 20)
         .padding(.top, 1)
@@ -540,6 +542,57 @@ private struct TabPagineVista: View {
         .contentShape(Rectangle())
         // lo swipe verso sinistra dalla testata la manda via (sulle pagine il dito scorre e chiude le pagine, mai la tab)
         .simultaneousGesture(DragGesture(minimumDistance: 10).onEnded { v in fineTesta(v) })
+    }
+
+    /// La riga: l'ora, la batteria dell'iPhone, l'orologio con la sua batteria, la rete, i tre tasti. `misura`: la copia invisibile
+    /// che misura quanto è lunga (i suoi tasti non fanno niente e non dicono dove stanno).
+    private func contenutoRiga(_ adesso: Date, misura: Bool) -> some View {
+        // 13.8 (4): fra un pezzo e l'altro almeno 1 punto (prima 1,5): sull'iPhone grande gli spazi sono più larghi e non cambia niente
+        HStack(spacing: 0) {
+            Text(TabPagineVista.formatoOra.string(from: adesso))
+                .font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.2)
+                .monospacedDigit()
+                .foregroundStyle(Olo.ciano)
+                .shadow(color: Olo.azzurro.opacity(0.95), radius: 3)
+            if p.fissa {
+                Text("◆")
+                    .font(.system(size: 7, weight: .bold, design: .monospaced))
+                    .foregroundStyle(TintaTab.chiaro)
+                    .shadow(color: Olo.azzurro.opacity(0.9), radius: 2.5)
+                    .padding(.leading, 0.5)
+                    .accessibilityLabel("fissata")
+            }
+            Spacer(minLength: 1)
+            HStack(spacing: 0.5) {
+                GlifoTab(disegno: .telefono).frame(width: 5.5 * 8 / 14, height: 5.5)
+                batteria(TabPagineVista.batteriaTelefono, carica: TabPagineVista.telefonoInCarica)
+            }
+            Spacer(minLength: 1)
+            HStack(spacing: 0.5) {
+                GlifoTab(disegno: .orologio).frame(width: 5.5 * 10 / 14, height: 5.5)
+                if polso.collegato, let b = polso.batteria { batteria(b, carica: polso.carica) } else { testoStato("—") }
+            }
+            .opacity(polso.collegato ? 1 : 0.4)
+            Spacer(minLength: 1)
+            Group {
+                switch rete.tipo {
+                case .wifi: GlifoTab(disegno: .onde).frame(width: 5.5 * 14 / 10, height: 5.5)
+                case .dati(let t): Text(t).font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.4)
+                case .nessuna: Text("OFFLINE").font(.system(size: 6.5, weight: .bold, design: .monospaced)).tracking(0.4)
+                }
+            }
+            .foregroundStyle(Olo.ciano)
+            .opacity(rete.tipo == .nessuna ? 0.4 : 1)
+            Spacer(minLength: 1)
+            TastiTab(lato: 11, spazio: 4, oltre: (v: 7.5, h: 2), chiudi: {
+                p.chiudi(muto: false)
+            }, riduci: {
+                p.stringi(true)
+            }, apri: {
+                p.stringi(false)
+            })
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in if !misura { p.rettTasti = r } }
+        }
     }
 
     private func batteria(_ b: Int, carica: Bool) -> some View {
@@ -688,7 +741,11 @@ private struct LibroPagine: View {
                     }
                     ForEach(0..<n, id: \.self) { i in
                         let d = Double(i) - off, ad = abs(d)
-                        let foto: UIImage? = avvio == nil && voci.indices.contains(i) ? p.miniature[voci[i].id] : nil
+                        // 13.8 (4): all'avvio la carta mostra l'ultima foto della sua sezione (la sezione vera), come le pagine aperte
+                        let foto: UIImage? = {
+                            if let a = avvio { return a.nomi.indices.contains(i) ? p.fotoSezioni[a.nomi[i]] : nil }
+                            return voci.indices.contains(i) ? p.miniature[voci[i].id] : nil
+                        }()
                         let icona: String = avvio.map { $0.icone[i] } ?? (icone[voci[i].sezione.nome] ?? voci[i].sezione.iconaDiRiserva)
                         CartaPagina(foto: foto, icona: icona, cur: ad < 0.5, lum: 1.15 - 0.45 * min(1, ad))
                             .frame(width: CW, height: CH)

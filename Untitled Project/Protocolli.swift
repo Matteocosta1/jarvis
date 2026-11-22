@@ -97,8 +97,7 @@ struct TendinaProtocolli: View {
             let forma = UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
             forma
                 .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(TintaTab.vetroAperta))
-                .background { SfocaturaOlo().clipShape(forma) }     // 13.8 (4): come le pagine olografiche: sfocatura senza tinta di iOS,
-                .overlay { LuceOlografica().clipShape(forma) }      // il fondo al 50 %, sopra la luce ciano e le righe
+                .overlay { LuceOlografica().clipShape(forma) }      // 13.8 (4): come le pagine olografiche, senza sfocatura: il fondo al 50 %, la luce ciano e le righe
                 .environment(\.colorScheme, .dark)
                 .overlay(alignment: .top) { scansione.clipShape(forma) }
                 .overlay(alignment: .bottom) {

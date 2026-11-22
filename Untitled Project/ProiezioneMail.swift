@@ -309,9 +309,9 @@ struct PelleLuce: View {
         GeometryReader { g in
             let W = g.size.width, H = g.size.height
             ZStack(alignment: .topLeading) {
-                // il vetro: il più leggero di iOS (nel mockup blur 5 e saturazione 1,4) e il fondo al 34 %
-                VetroTab()                                              // 13.8 (4), 12:26 (il signore): senza la tinta di iOS
-                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.34)
+                // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la mail
+                // si legge davanti, quindi il fondo è quello della pagina olografica davanti (88 %, come la PILA), prima 34 % sfocato
+                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.88)
                 // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
                 EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
                     .frame(width: W * 2.6, height: 760)

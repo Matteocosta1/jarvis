@@ -210,7 +210,7 @@ struct ContentView: View {
                 var fatte = 0
                 while !Task.isCancelled, pila.davanti == id {
                     if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
-                        Pagine.condivisa.fotografa(id)
+                        if let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { Pagine.condivisa.fotografa(id, nome: nome) }
                         fatte += 1
                     }
                     try? await Task.sleep(for: .seconds(fatte == 0 ? 1 : 10))   // non ancora fatta (il dito si muoveva): si riprova presto
