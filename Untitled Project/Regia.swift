@@ -374,7 +374,7 @@ final class Regia {
             if let s = inSospeso, Date().timeIntervalSince(s.quando) < 180,
                chiavi(passi) == chiavi(s.passi) || Array(chiavi(passi).suffix(s.passi.count)) == chiavi(s.passi) {
                 guard let f = ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
-                    return (Regia.json(["errore": "il signore non ha ancora detto sì: la domanda resta aperta, aspetta la sua risposta (lo controlla l'app)"]), true)
+                    return (Regia.json(["errore": "il signore non ha detto sì (se ha detto no, o vuole cambiare, non farlo e chiedi): la domanda resta aperta, aspetta la sua risposta (lo controlla l'app)"]), true)
                 }
                 passi = s.passi
                 inSospeso = nil

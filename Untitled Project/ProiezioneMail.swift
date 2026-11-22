@@ -51,6 +51,8 @@ struct ProiezioneMail<Contenuto: View>: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var riduci
+    @Environment(\.sezioneDietro) private var dietro   // la Posta è dietro (PILA): il gesto della testata torna alla tendina
+    @State private var idTendina = UUID()
     @State private var fase: CGFloat = 0            // 0 chiusa · 1 aperta
     @State private var aprendo = true
     @State private var scivola = false              // apertura/chiusura che scivola dal basso (tirata giù, Riduci movimento)
@@ -101,9 +103,12 @@ struct ProiezioneMail<Contenuto: View>: View {
         .frame(width: larga, height: schermo.height, alignment: .topLeading)
         .ignoresSafeArea()
         .onAppear(perform: apri)
-        // 13.8 (4): la mail si chiude tirandola giù dalla sua barra: finché è aperta, quel gesto è suo (non chiama la tendina PROTOCOLLI)
-        .onAppear { TendinaOvunque.occupata += 1 }
-        .onDisappear { TendinaOvunque.occupata = max(0, TendinaOvunque.occupata - 1) }
+        // 13.8 (5): la mail si chiude tirandola giù dalla sua barra: finché è aperta e davanti, quel gesto è suo (non chiama la
+        // tendina PROTOCOLLI); con la Posta dietro nella PILA non conta
+        .onChange(of: dietro, initial: true) { _, d in
+            if d { TendinaOvunque.occupata.remove(idTendina) } else { TendinaOvunque.occupata.insert(idTendina) }
+        }
+        .onDisappear { TendinaOvunque.occupata.remove(idTendina) }
     }
 
     private var trascina: some Gesture {

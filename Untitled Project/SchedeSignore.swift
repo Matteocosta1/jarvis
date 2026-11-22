@@ -177,6 +177,8 @@ struct TestataScheda: View {
                     IconaStudio(pieno: true).frame(width: 17, height: 17).foregroundStyle(tinta)
                 } else if icona == "social" {
                     IconaSocial().frame(width: 17, height: 17).foregroundStyle(tinta)
+                } else if icona == "profiler" {             // revisione 13.8 (6): disegnata (non è un simbolo di sistema), come nella corona
+                    IconaProfiler().frame(width: 20, height: 15).foregroundStyle(tinta)
                 } else {
                     Image(systemName: icona)
                         .font(.system(size: 16, weight: .medium))

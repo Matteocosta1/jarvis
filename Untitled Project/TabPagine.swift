@@ -188,7 +188,10 @@ final class Pagine: ObservableObject {
     /// Dove sta adesso: piccola, lo stesso inizio e alta 72 (misurata a tab aperta e tenuta, così non salta dietro alle icone).
     func posto() -> CGRect {
         let z = zona()
-        if piccola { return zonaPiccola ?? CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola) }
+        if piccola {
+            let zp = zonaPiccola ?? CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola)
+            return CGRect(x: zp.minX, y: zp.minY, width: max(zp.width, rigaMin), height: zp.height)   // revisione 13.8 (6): anche piccola, i tasti dentro
+        }
         return z
     }
 
@@ -326,6 +329,8 @@ final class Pagine: ObservableObject {
             try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + fine)))
             guard suo == self.giro else { return }
             self.chiudi(muto: true)
+            try? await Task.sleep(for: .seconds(1))             // revisione 13.8 (6): finita la chiusura, via dalla memoria
+            if self.avvio == nil { self.liberaFotoAvvio() }
         }
     }
 
@@ -350,8 +355,8 @@ final class Pagine: ObservableObject {
             _ = w.drawHierarchy(in: b, afterScreenUpdates: false)
         }
         miniature[id] = img
-        fotoSezioni[nome] = img
-        // EDITH (le password) non si salva mai: la sua carta resta in memoria finché l'app è aperta
+        // revisione 13.8 (6): la foto per l'avvio va solo sul telefono (in memoria serve solo durante l'avvio: la legge `avvio`).
+        // EDITH (le password) non si salva mai: all'avvio la sua carta è la pagina di caricamento.
         guard nome != "EDITH", let dati = img.jpegData(compressionQuality: 0.7), let file = Self.fileFoto(nome) else { return }
         Task.detached(priority: .utility) {
             try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -369,20 +374,31 @@ final class Pagine: ObservableObject {
     /// Le pagine di caricamento delle sezioni (per le carte dell'avvio): lette dal telefono se ci sono già, altrimenti disegnate una
     /// alla volta (con una pausa fra l'una e l'altra, così l'avvio non perde fotogrammi) e salvate per le volte dopo.
     private func preparaCaricamenti(_ nomi: [String], icone: [String]) {
-        guard caricamenti.isEmpty, let w = FasciaAlta.finestra, w.bounds.width > 0 else { return }
-        let misura = w.bounds.size, alto = w.safeAreaInsets.top
+        guard caricamenti.isEmpty else { return }
         let coppie: [(nome: String, icona: String)] = Array(zip(nomi, icone)).map { (nome: $0.0, icona: $0.1) }
-        let chiavi = coppie.map { Self.chiaveCaricamento($0.nome, misura) }
         Task {
+            // revisione 13.8 (6): all'apertura dell'app la finestra può non esserci ancora: la si aspetta (al massimo 3 s)
+            var finestra = FasciaAlta.finestra
+            var attese = 0
+            while (finestra?.bounds.width ?? 0) == 0, attese < 30 {
+                try? await Task.sleep(for: .milliseconds(100))
+                finestra = FasciaAlta.finestra
+                attese += 1
+            }
+            guard let w = finestra, w.bounds.width > 0 else { return }
+            let misura = w.bounds.size, alto = w.safeAreaInsets.top
+            let chiavi = coppie.map { Self.chiaveCaricamento($0.nome, misura) }
             let lette = await Task.detached(priority: .userInitiated) { () -> [String: Data] in
                 var r: [String: Data] = [:]
                 for k in chiavi { if let f = Pagine.fileFoto(k), let d = try? Data(contentsOf: f) { r[k] = d } }
+                Pagine.pulisciCaricamentiVecchi()
                 return r
             }.value
             for c in coppie {
                 let k = Self.chiaveCaricamento(c.nome, misura)
                 if let d = lette[k], let img = UIImage(data: d) { self.caricamenti[c.nome] = img; continue }
-                try? await Task.sleep(for: .milliseconds(40))
+                // disegnata una alla volta, distanziate (36 × 150 ms ≈ 5 s, ben prima di «interface» a 11,66 s): l'avvio non scatta
+                try? await Task.sleep(for: .milliseconds(150))
                 let vista = ZStack(alignment: .top) {
                     SfondoSezione()
                     SchermoCaricamento(titolo: c.nome, icona: c.icona, conX: Self.conFotocamera.contains(c.nome))
@@ -404,9 +420,29 @@ final class Pagine: ObservableObject {
         }
     }
 
-    /// Il nome del file della pagina di caricamento (cambia con la misura dello schermo).
+    /// Il nome del file della pagina di caricamento: cambia con la build (una build nuova la ridisegna come è adesso) e con la misura
+    /// dello schermo.
     nonisolated private static func chiaveCaricamento(_ nome: String, _ misura: CGSize) -> String {
-        "~caricamento-\(Int(misura.width))x\(Int(misura.height))-\(nome)"
+        "~caricamento-\(Pagine.buildApp)-\(Int(misura.width))x\(Int(misura.height))-\(nome)"
+    }
+
+    nonisolated private static var buildApp: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0" }
+
+    /// Le pagine di caricamento delle build di prima: via dal telefono.
+    nonisolated private static func pulisciCaricamentiVecchi() {
+        guard let campione = fileFoto("~caricamento-"), let attuale = fileFoto("~caricamento-\(buildApp)-") else { return }
+        let cartella = campione.deletingLastPathComponent()
+        let tutti = campione.deletingPathExtension().lastPathComponent, questa = attuale.deletingPathExtension().lastPathComponent
+        guard let nomi = try? FileManager.default.contentsOfDirectory(atPath: cartella.path) else { return }
+        for n in nomi where n.hasPrefix(tutti) && !n.hasPrefix(questa) {
+            try? FileManager.default.removeItem(at: cartella.appendingPathComponent(n))
+        }
+    }
+
+    /// Finito l'avvio le foto e le pagine di caricamento non servono più in memoria (restano sul telefono per il prossimo).
+    private func liberaFotoAvvio() {
+        fotoSezioni = [:]
+        caricamenti = [:]
     }
 
     /// Le ultime foto delle sezioni, lette dal telefono fuori dal thread principale (una volta: poi le aggiorna `fotografa`).

@@ -37,8 +37,9 @@ enum TocchiSchermo {
 enum TendinaOvunque {
     /// Una sezione è davanti e la tendina si può tirare (lo scrive ContentView).
     static var attiva = false
-    /// Quante schede tirano già giù dalla loro barra per chiudersi (la mail proiettata): allora il gesto è loro.
-    static var occupata = 0
+    /// Le schede davanti che si chiudono tirandole giù dalla loro barra (la mail proiettata): finché ce n'è una, il gesto è loro.
+    /// (Revisione 13.8 (6): conta solo quella davanti; con la sua sezione dietro, nella PILA, la tendina si tira come sempre.)
+    static var occupata: Set<UUID> = []
     /// L'altezza della fascia della testata, sotto il margine in alto (l'ora e l'isola).
     static let fascia: CGFloat = 76
     /// Il dito che tira (spostamento) e che lascia (spostamento, dove arriverebbe lanciato): li collega ContentView.
@@ -59,10 +60,13 @@ private final class TiraTendina: UIPanGestureRecognizer, UIGestureRecognizerDele
     }
 
     func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
-        guard TendinaOvunque.attiva, TendinaOvunque.occupata == 0, let v = view else { return false }
+        guard TendinaOvunque.attiva, TendinaOvunque.occupata.isEmpty, let v = view else { return false }
         let t = translation(in: v), p = location(in: v)
-        let partenza = p.y - t.y, alto = v.safeAreaInsets.top
-        guard partenza >= alto - 4, partenza <= alto + TendinaOvunque.fascia else { return false }
+        let partenza = CGPoint(x: p.x - t.x, y: p.y - t.y), alto = v.safeAreaInsets.top
+        guard partenza.y >= alto - 4, partenza.y <= alto + TendinaOvunque.fascia else { return false }
+        // revisione 13.8 (6): sulla tab FILO (in alto a destra, sopra la testata) il dito scorre le sue notifiche: lì non è la tendina
+        let filo = Filo.condiviso
+        if !filo.daParte, !filo.visti.isEmpty || filo.vuota, filo.rettScheda.insetBy(dx: -8, dy: -8).contains(partenza) { return false }
         return t.y > 0 && t.y > abs(t.x) * 1.2
     }
 
