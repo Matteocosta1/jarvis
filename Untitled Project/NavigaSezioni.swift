@@ -1763,7 +1763,7 @@ struct FondoVivo: View {
         // 5 nov sera (PILA, scelta del signore «JARVIS sfocato, come iOS»): al posto del fondo a griglia, JARVIS che sta sotto,
         // molto sfocato e scurito, come la Home dietro le app
         ZStack {
-            Rectangle().fill(.ultraThinMaterial)
+            VetroTab()                                                  // 13.8 (4), 12:26 (il signore): senza la tinta di iOS
             Color(red: 2 / 255, green: 8 / 255, blue: 11 / 255).opacity(0.38)
         }
             .environment(\.colorScheme, .dark)
@@ -1821,8 +1821,9 @@ struct VetroOlo: View {
         let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
         ZStack {
             // 13.8 (4) (il signore, 12:18: «quella della mia foto non l'hai cambiata vero? era bellissima, era quello il risultato
-            // che volevo»): il vetro delle pagine olografiche resta com'era (non toccare)
-            forma.fill(.ultraThinMaterial).opacity((0.3 + 0.7 * fuoco) * forza)
+            // che volevo»): il vetro delle pagine olografiche resta com'era (stessi valori); 12:26 (scelta del signore «tutti, anche la
+            // PILA»): la stessa sfocatura senza la tinta di iOS, come il mockup (backdrop-filter, senza tinta)
+            VetroTab().clipShape(forma).opacity((0.3 + 0.7 * fuoco) * forza)
             forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
             forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
                                               .init(color: ciano.opacity(0.03 * forza), location: 0.4),

@@ -174,7 +174,7 @@ struct VistaProfiler: View {
             .buttonStyle(StileStark())
         }
         .padding(16)
-        .background(.ultraThinMaterial.opacity(0.6))
+        .background(VetroTab().opacity(0.6))                  // 13.8 (4), 12:26 (il signore): sfocatura senza la tinta di iOS
         .background(Color.black.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(ambra.opacity(0.45), lineWidth: 1))

@@ -16,8 +16,10 @@ import UIKit
 enum TintaTab {
     static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)
     /// La trasparenza dinamica delle due tab (22 nov 01:04): aperta 60 %, piccola 55 %.
-    static let vetroAperta = 0.6
-    static let vetroPiccola = 0.55
+    // 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica deve essere ben visibile come nello swipe», cioè come le
+    // pagine che vanno dietro): il fondo delle tab è quello delle pagine olografiche (VetroOlo a riposo: 50 %), da piccola 45 %
+    static let vetroAperta = 0.5
+    static let vetroPiccola = 0.45
 }
 
 /// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la fascia invisibile del bordo destro che lo richiama quando è via.
@@ -256,7 +258,7 @@ private struct SchedaFilo: View {
                 // scuro c'è sempre, aperta e piccola (prima solo sopra una sezione); entra a nascita finita
                 // 13.8 (4): solo sfocatura, senza la tinta di iOS (il fondo scuro è quello del mockup, dentro la cornice);
                 // sopra una sezione, a fuoco, sfoca di più: la trasparenza dinamica del mockup
-                VetroTab(forte: vetro && filo.fuoco)
+                SfocaturaOlo(forte: vetro && filo.fuoco)
                     .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                     .opacity(vetroPronto ? 1 : 0)
                     .animation(.easeOut(duration: 0.2), value: vetroPronto)
@@ -268,6 +270,10 @@ private struct SchedaFilo: View {
                         CorniceFilo.disegna(&gc, size, t: t, fondo: fondo)
                     }
                 }
+                // 13.8 (4): sopra il fondo, la luce delle pagine olografiche (come nello swipe delle sezioni)
+                LuceOlografica()
+                    .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
+                    .opacity(vetroPronto ? 1 : 0)
             }
             .animation(.easeInOut(duration: 0.35), value: vetro)
             .allowsHitTesting(false)
@@ -706,6 +712,7 @@ enum CorniceFilo {
 /// più il fondo scuro al 60 % (55 % da piccola). Il «materiale» di iOS aggiunge una sua tinta scura sopra la sfocatura: con il
 /// fondo al 60 % le tab diventavano quasi piene. Questo vetro tiene la sola sfocatura (la tinta di iOS si toglie) e il fondo scuro
 /// resta quello del mockup. `forte`: sopra una sezione, a fuoco, sfoca di più (come il mockup).
+/// 12:26 (il signore: «va tolta la tinta Apple da tutti i vetri»): è il vetro di tutta l'app (tab, tendina, PILA, Mail, Profiler).
 struct VetroTab: UIViewRepresentable {
     var forte = false
 
@@ -719,8 +726,8 @@ struct VetroTab: UIViewRepresentable {
     func updateUIView(_ v: VetroSenzaTinta, context: Context) {
         guard v.forte != forte else { return }
         v.forte = forte
-        let effetto = UIBlurEffect(style: forte ? .systemThinMaterialDark : .systemUltraThinMaterialDark)
-        UIView.animate(withDuration: 0.35) { v.effect = effetto }
+        v.effect = UIBlurEffect(style: forte ? .systemThinMaterialDark : .systemUltraThinMaterialDark)
+        v.togliTinta()
     }
 }
 
@@ -739,9 +746,56 @@ final class VetroSenzaTinta: UIVisualEffectView {
         togliTinta()
     }
 
-    private func togliTinta() {
+    func togliTinta() {
         for s in subviews where !String(describing: type(of: s)).contains("Backdrop") {
             s.backgroundColor = .clear
         }
+    }
+}
+
+/// 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica deve essere ben visibile come nello swipe… le tab, e anche la
+/// tendina Protocolli, senza l'effetto Apple»): sopra il fondo scuro delle tab, la luce delle pagine olografiche (VetroOlo e VeloOlo
+/// della PILA): la sfocatura leggera senza la tinta di iOS, la luce ciano dall'alto, il bagliore dai bordi e le righe di scansione.
+/// Due strati, come le pagine: sotto il fondo scuro `SfocaturaOlo` (la sfocatura senza tinta, al 30 % come le pagine dietro); sopra
+/// `LuceOlografica` (la luce ciano, il bagliore dai bordi, le righe). Il fondo scuro lo mette chi li usa.
+struct SfocaturaOlo: View {
+    var forte = false
+    var body: some View {
+        // il passaggio leggero ↔ forte è una dissolvenza di SwiftUI fra i due vetri (0,35 s), come la trasparenza dinamica del mockup
+        ZStack {
+            VetroTab().opacity(forte ? 0 : 1)
+            VetroTab(forte: true).opacity(forte ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.35), value: forte)
+        .opacity(0.3)
+        .allowsHitTesting(false)
+    }
+}
+
+struct LuceOlografica: View {
+    var body: some View {
+        let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+        ZStack {
+            LinearGradient(stops: [.init(color: ciano.opacity(0.1), location: 0), .init(color: ciano.opacity(0.03), location: 0.4),
+                                   .init(color: ciano.opacity(0.06), location: 1)], startPoint: .top, endPoint: .bottom)
+            Canvas { gc, size in
+                let w = size.width, h = size.height, b: CGFloat = 18
+                // il bagliore dai bordi (come le pagine, in piccolo: 18 punti) e le righe (1 scura ogni 3, al 57 % come la PILA)
+                let bordi: [(CGRect, CGPoint, CGPoint)] = [
+                    (CGRect(x: 0, y: 0, width: w, height: b), CGPoint(x: 0, y: 0), CGPoint(x: 0, y: b)),
+                    (CGRect(x: 0, y: h - b, width: w, height: b), CGPoint(x: 0, y: h), CGPoint(x: 0, y: h - b)),
+                    (CGRect(x: 0, y: 0, width: b, height: h), CGPoint(x: 0, y: 0), CGPoint(x: b, y: 0)),
+                    (CGRect(x: w - b, y: 0, width: b, height: h), CGPoint(x: w, y: 0), CGPoint(x: w - b, y: 0)),
+                ]
+                for (r, da, a) in bordi {
+                    gc.fill(Path(r), with: .linearGradient(Gradient(colors: [ciano.opacity(0.14), ciano.opacity(0)]), startPoint: da, endPoint: a))
+                }
+                var righe = Path()
+                var y: CGFloat = 0
+                while y < h { righe.addRect(CGRect(x: 0, y: y, width: w, height: 1)); y += 3 }
+                gc.fill(righe, with: .color(.black.opacity(0.24)))
+            }
+        }
+        .allowsHitTesting(false)
     }
 }

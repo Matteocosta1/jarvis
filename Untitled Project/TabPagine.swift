@@ -429,14 +429,18 @@ private struct TabPagineVista: View {
     var body: some View {
         let piccola = p.piccola
         ZStack(alignment: .topLeading) {
-            // il vetro sfocato e il fondo scuro (aperta 60 %, piccola 55 %), poi la cornice olografica
-            VetroTab()                                       // 13.8 (4): solo sfocatura, come il mockup (senza la tinta di iOS)
+            // il vetro: sfocatura, fondo scuro (aperta 50 %, piccola 45 %), luce olografica, poi la cornice
+            // 13.8 (4) (il signore, 12:22: «come nello swipe»): la sfocatura senza la tinta di iOS, il fondo delle pagine olografiche
+            // (aperta 50 %, piccola 45 %), sopra la luce ciano, il bagliore e le righe; poi la cornice
+            SfocaturaOlo()
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                 .opacity(vetroPronto ? 1 : 0)
             Rectangle()
                 .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(piccola ? TintaTab.vetroPiccola : TintaTab.vetroAperta))
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                 .animation(.easeOut(duration: 0.3), value: piccola)
+            LuceOlografica()
+                .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
             TimelineView(.animation) { tl in
                 let t = tl.date.timeIntervalSince(p.nataDa)
                 Canvas(rendersAsynchronously: false) { gc, size in
