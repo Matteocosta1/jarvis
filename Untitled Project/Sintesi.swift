@@ -215,7 +215,9 @@ enum Sintesi {
             let u = ti.truncatingRemainder(dividingBy: per) / per
             let forza = OndeAscolto.condivise.forza(i, giro: Int(floor(ti / per)), vol: vol)
             let r = nucleo * 1.02 + (Rsh * 0.95 - nucleo * 1.02) * (1 - pow(1 - u, 2))
-            let a = pow(1 - u, 2) * (0.1 + 0.9 * forza) * 0.75
+            // 13.8 (2) (il signore, 22 nov 08:42, e la issue #17: «leggerissimi, quasi invisibili: alzare un filo la luminosità, linee
+            // lente e sottili»): con la voce vera del microfono la forza resta bassa; ora si vedono anche a voce normale (base 0,25)
+            let a = pow(1 - u, 2) * (0.25 + 0.75 * forza) * 0.95
             guard a > 0.004 else { continue }
             let anello = Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2))
             g.stroke(anello, with: .color(colore(0.16 * a, 0.35)), lineWidth: lw(3.4))
