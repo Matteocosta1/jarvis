@@ -485,7 +485,7 @@ struct VistaOrologio: View {
             VStack(spacing: 8) {
                 // 13.7 (il signore, 21 nov 21:47: «questo è il layout da seguire»; mockup «JARVIS Approvato»): in alto J.A.R.V.I.S. e
                 // MARK XIII con sotto la riga dei sistemi; SINTESI grande; le icone un po' sopra il reattore; sotto le icone lo stato
-                // del microfono e la riga «Tocchi il reattore e parli, Sir», tutti e due ciano
+                // del microfono in ciano (dal 13.8 solo la parola, senza la frase sotto)
                 VStack(spacing: 4) {
                     TestaPolso(zero: zeroAvvio, finita: testaFinita)
                     Button { jarvis.toccaReattore() } label: { reattore }   // 26 ott sera: niente click in più, la vibrazione d'inizio ascolto basta
@@ -518,16 +518,8 @@ struct VistaOrologio: View {
                         .opacity(testaFinita ? 1 : 0)                        // all'avvio compare a voce finita
                         .animation(.easeOut(duration: 0.35), value: testaFinita)
 
-                    if jarvis.fase == .attesa && (jarvis.micSpento || jarvis.riservato || (jarvis.risposta.isEmpty && jarvis.stato == nil)) {
-                        // SPENTO e RISERVATO con le parole dell'iPhone (approvate il 9 nov)
-                        Text(jarvis.micSpento ? "Non ascolto nulla · tocchi il reattore per parlare"
-                             : jarvis.riservato ? "Sento solo «Jarvis» · un tocco per tutto" : "Tocchi il reattore e parli, Sir")
-                            .font(.system(size: 11))
-                            .foregroundStyle(TintaOrologio.ciano)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 6)
-                            .padding(.top, -2)
-                    }
+                    // 13.8 (il signore, 22 nov 07:38: «vanno tolte le descrizioni sotto lo stato del reattore, lascia solo
+                    // riservato, spento…»): sotto il reattore solo la parola dello stato, niente frasi di aiuto
                 }
 
                 // In alternativa si scrive (tastiera o scarabocchio).

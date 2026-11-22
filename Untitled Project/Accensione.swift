@@ -23,6 +23,12 @@ enum Accensione {
     private static func E(_ p: Double) -> Double { 1 - pow(1 - C(p), 3) }
 
     private static var cache: [String: [Pezzo]] = [:]
+    private static var scarti: [String: CGSize] = [:]
+
+    /// 13.8 (il signore, 22 nov: «Spesa è l'unico ologramma non centrato bene»): di quanto il disegno vero dell'icona è fuori dal
+    /// centro della sua cornice, in frazioni del lato (il simbolo «cart» ha la cornice più alta del carrello). Chi mostra l'icona la
+    /// sposta di −scarto × lato, così il disegno sta al centro; i pezzi sono già spostati. Sotto una cella (4 punti) resta com'è.
+    static func scarto(_ chiave: String) -> CGSize { scarti[chiave] ?? .zero }
 
     /// I pezzi di un'icona: la si disegna in bianco su una griglia di 26 × 26 e ogni cella piena diventa un pezzo (calcolati una volta
     /// per icona e tenuti da parte).
@@ -43,12 +49,22 @@ enum Accensione {
                 }
             }
             let cella = lato / Double(N), mezzo = lato / 2
+            // dove sta il disegno vero (le celle piene): il suo centro rispetto al centro della griglia
+            var x0 = N, x1 = -1, y0 = N, y1 = -1
+            for y in 0..<N { for x in 0..<N where dati[(y * N + x) * 4 + 3] >= 70 { x0 = min(x0, x); x1 = max(x1, x); y0 = min(y0, y); y1 = max(y1, y) } }
+            var sx = 0.0, sy = 0.0
+            if x1 >= x0 && y1 >= y0 {
+                let cx = Double(x0 + x1 + 1) / 2 - Double(N) / 2, cy = Double(y0 + y1 + 1) / 2 - Double(N) / 2
+                if abs(cx) >= 1 { sx = cx }
+                if abs(cy) >= 1 { sy = cy }
+            }
+            scarti[chiave] = CGSize(width: sx / Double(N), height: sy / Double(N))
             for y in 0..<N { for x in 0..<N {
                 // la riga 0 del buffer è in alto (CGContext disegna l'immagine dritta nel buffer: la prima riga è quella di sopra)
                 let al = Double(dati[(y * N + x) * 4 + 3])
                 if al < 70 { continue }
                 let i = Double(out.count), dir = h(i * 3.1) * 2 * .pi, dist = 120 + 50 * h(i * 1.7)
-                out.append(Pezzo(x: -mezzo + (Double(x) + 0.5) * cella, y: -mezzo + (Double(y) + 0.5) * cella,
+                out.append(Pezzo(x: -mezzo + (Double(x) + 0.5 - sx) * cella, y: -mezzo + (Double(y) + 0.5 - sy) * cella,
                                  x0: cos(dir) * dist, y0: sin(dir) * dist,
                                  w: cella * (h(i * 5.5) > 0.5 ? 1.6 : 0.9), hh: cella * 0.55,
                                  da: 20 + h(i * 2.3) * 220, dur: 130 + 70 * h(i * 8.1), a: al / 255))
@@ -75,7 +91,19 @@ enum Accensione {
 
     /// Tutto quello che non è l'icona, centrato sull'icona (coordinate del mockup: il riquadro è 300 × 300).
     /// `forza` è la luce generale (mentre la ruota gira 0,32, ferma 1), `nata` se l'ologramma si è creato, `lungNome` le lettere del nome.
-    static func disegna(_ gc: GraphicsContext, centro c: CGPoint, T: Double, t: Double, forza: Double, nata: Bool, lungNome: Int, pezzi: [Pezzo]) {
+    /// Le staffe attorno al nome: cima e fondo (dal centro dell'icona), quanto è larga una lettera, il margine e la base.
+    struct Staffe {
+        let y0, y1, passo, margine, base: Double
+        /// L'iPhone: il nome a 14 punti (tracking 5,5), 72 punti sotto il centro dell'icona.
+        static let iphone = Staffe(y0: 62, y1: 79, passo: 14, margine: 8, base: 14)
+        /// 13.8 (il signore, 22 nov 07:38: «le parentesi quadre con la scritta in mezzo vanno alzate un po', non a contatto con le
+        /// icone tonde»): al polso il nome è a 9,5 punti (tracking 1,9) e 48 punti sotto il centro; le staffe usavano le misure
+        /// dell'iPhone e finivano attorno al gruppo, sulle icone tonde. Ora stanno attorno al nome, strette sulla sua misura.
+        static let polso = Staffe(y0: 40.5, y1: 55.5, passo: 7.6, margine: 6, base: 10)
+    }
+
+    static func disegna(_ gc: GraphicsContext, centro c: CGPoint, T: Double, t: Double, forza: Double, nata: Bool, lungNome: Int, pezzi: [Pezzo],
+                        staffe st: Staffe = .iphone) {
         var g = gc
         g.translateBy(x: c.x, y: c.y)
         g.opacity = forza
@@ -131,11 +159,11 @@ enum Accensione {
         l.fill(orbita, with: .color(chiaro.opacity(0.5 + 0.3 * sin(t * 2))))
         // le staffe sul nome
         if nata {
-            let sb = E((T - 100) / 220), w = 14 + (Double(lungNome) * 14 / 2 + 8) * sb
+            let sb = E((T - 100) / 220), w = st.base + (Double(lungNome) * st.passo / 2 + st.margine) * sb
             var staffe = Path()
             for sx in [-1.0, 1.0] {
-                staffe.move(to: CGPoint(x: sx * (w - 5), y: 62)); staffe.addLine(to: CGPoint(x: sx * w, y: 62))
-                staffe.addLine(to: CGPoint(x: sx * w, y: 79)); staffe.addLine(to: CGPoint(x: sx * (w - 5), y: 79))
+                staffe.move(to: CGPoint(x: sx * (w - 5), y: st.y0)); staffe.addLine(to: CGPoint(x: sx * w, y: st.y0))
+                staffe.addLine(to: CGPoint(x: sx * w, y: st.y1)); staffe.addLine(to: CGPoint(x: sx * (w - 5), y: st.y1))
             }
             g.stroke(staffe, with: .color(ciano.opacity(0.8 * sb)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
         }

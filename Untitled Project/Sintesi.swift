@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// 13.7 · SINTESI, il cuore del reattore: VELO sull'iPhone (dentro la ghiera e le fasce) e, grande, sull'Apple Watch.
@@ -115,7 +116,7 @@ enum Sintesi {
         let (rBase, coll): (Double, Double) = {
             switch fase {
             case .attesa: return (0.36 + 0.012 * battito, 0)
-            case .ascolto: return (0.34 + 0.22 * energia + 0.1 * vol, 0)
+            case .ascolto: return (0.36, 0)          // 13.8 (il signore, 22 nov 08:02): ascoltando la sfera non cresce, percepisce
             case .elaboro: return (0.3, 0.55 + 0.1 * sin(t * 9))
             case .parlo: return (0.34 + 0.16 * energia + 0.08 * vol, 0)
             }
@@ -126,7 +127,18 @@ enum Sintesi {
         let ay = tv * 0.18, ax = 0.32 + 0.06 * sin(t * 0.15)
         let luce: Double = fase == .elaboro ? 1 : (fase == .attesa ? 0.8 : 0.88 + 0.2 * vol)
         let acceso: Double = fase == .elaboro ? 1 : (fase == .attesa ? 0.18 : 0.55 + 0.45 * vol)
-        let nucleo = Rsh * 0.58
+        // 13.8 · le scelte del signore (22 nov, mockup «JARVIS Approvato»):
+        // · NUCLEO BRILLANTE (07:56): il vetro più acceso anche a riposo, un cuore di luce al centro, la rete più chiara; le linee
+        //   prospettiche dietro non cambiano, così il nucleo stacca;
+        // · ASCOLTO ONDE (08:02–08:05): le linee dietro restano calme come a riposo (niente corsa fitta), la sfera non cresce; dal
+        //   nucleo escono due anelli leggeri, forti quanto la voce che li ha fatti nascere, e il nucleo si accende con la voce;
+        // · PARLO ECO (08:05): le linee prospettiche tenui, sottili e lente (la luce segue la voce, non la velocità) e la sfera che
+        //   cresce (fino a +12 %) e si accende con la voce di JARVIS.
+        let ascolta = fase == .ascolto, parla = fase == .parlo
+        let faseL: SintesiFase = ascolta ? .attesa : fase           // le linee e i frammenti ascoltando: come a riposo
+        let volL = ascolta ? 0 : vol
+        let accN = min(1, max(acceso, 0.5) + 0.12 + (ascolta ? 0.28 * vol : 0) + (parla ? 0.25 * vol : 0))
+        let nucleo = Rsh * 0.58 * (parla ? 1 + 0.12 * vol : 1)
         func resp(_ per: Double, _ ph: Double) -> Double { 0.5 + 0.5 * sin(t * 2 * .pi / per + ph) }
         let dietroA = 0.5 + 0.3 * resp(12, 0), davantiA = 0.45 + 0.4 * resp(12, .pi), anelloA = 0.62 + 0.25 * resp(9, 1.3)
 
@@ -135,31 +147,47 @@ enum Sintesi {
         g.fill(velo, with: .radialGradient(Gradient(colors: [colore(0.08 * luce, 0.3), colore(0, 0)]), center: .zero,
                                            startRadius: Rsh * 0.2, endRadius: Rsh * 1.05))
         var gg = g; gg.opacity = dietroA
-        guscioFilm(gg, t: t, Rsh: Rsh, ax: ax, ay: ay, luce: luce, vol: vol, lw: lw, colore: colore)
+        guscioFilm(gg, t: t, Rsh: Rsh, ax: ax, ay: ay, luce: luce, vol: volL, lw: lw, colore: colore)
         var gf = g; gf.opacity = 0.55 + 0.35 * resp(12, .pi)
-        frammenti(gf, t: t, tv: tv, R: Rsh * 0.96, luce: luce, fase: fase, davanti: false, forza: 0.7, lw: lw, colore: colore)
+        frammenti(gf, t: t, tv: tv, R: Rsh * 0.96, luce: luce, fase: faseL, davanti: false, forza: 0.7, lw: lw, colore: colore)
 
-        // 2 · le lineette del film che vengono avanti, dal bordo del nucleo verso fuori
-        lineette(g, t: t, Rsh: Rsh, luce: luce, vol: vol, fase: fase, r0min: nucleo / Rsh + 0.04, lw: lw, colore: colore)
+        // 2 · le lineette del film che vengono avanti, dal bordo del nucleo verso fuori (parlando: ECO, tenui e lente)
+        if parla {
+            lineette(g, t: t, Rsh: Rsh, luce: luce * 0.55 * (0.3 + 0.7 * vol), vol: 0, fase: .attesa, r0min: nucleo / Rsh + 0.04,
+                     velocita: 0.45, spessore: 0.6, lw: lw, colore: colore)
+        } else {
+            lineette(g, t: t, Rsh: Rsh, luce: luce, vol: volL, fase: faseL, r0min: nucleo / Rsh + 0.04, lw: lw, colore: colore)
+        }
 
         // 3 · il nucleo di vetro (tenue al centro, più chiaro sul bordo) e la rete che ruota
         let vetro = Path(ellipseIn: CGRect(x: -nucleo * 1.45, y: -nucleo * 1.45, width: nucleo * 2.9, height: nucleo * 2.9))
         g.fill(vetro, with: .radialGradient(Gradient(stops: [
-            .init(color: colore(0.05 + 0.3 * acceso, 0.3), location: 0),
-            .init(color: colore(0.1 + 0.22 * acceso, 0.25), location: 0.55),
-            .init(color: colore(0.04 + 0.1 * acceso, 0.2), location: 0.72),
+            .init(color: colore(0.05 + 0.3 * accN, 0.3), location: 0),
+            .init(color: colore(0.1 + 0.22 * accN, 0.25), location: 0.55),
+            .init(color: colore(0.04 + 0.1 * accN, 0.2), location: 0.72),
             .init(color: colore(0, 0), location: 1)]), center: .zero, startRadius: 0, endRadius: nucleo * 1.45))
-        rete(g, t: t, tv: tv, fase: fase, vol: vol, battito: battito, coll: coll, Rs: Rs, k: nucleo / Rs, luce: 0.26 + 0.74 * acceso, lw: lw, colore: colore)
+        // il cuore di luce (NUCLEO BRILLANTE)
+        let cuore = Path(ellipseIn: CGRect(x: -nucleo * 0.75, y: -nucleo * 0.75, width: nucleo * 1.5, height: nucleo * 1.5))
+        g.fill(cuore, with: .radialGradient(Gradient(stops: [
+            .init(color: colore(0.32 + 0.2 * accN, 0.75), location: 0),
+            .init(color: colore(0.12 + 0.1 * accN, 0.5), location: 0.5),
+            .init(color: colore(0, 0), location: 1)]), center: .zero, startRadius: 0, endRadius: nucleo * 0.75))
+        rete(g, t: t, tv: tv, fase: fase, vol: vol, volAccesi: volL, battito: battito, coll: coll, Rs: Rs, k: nucleo / Rs,
+             luce: min(1, 0.26 + 0.74 * accN + 0.12), lw: lw, colore: colore)
 
         // 4 · i due cerchi che si illuminano attorno al nucleo (semitrasparenti)
         let fr: Double = fase == .elaboro ? 2.2 : 1
         var ga = g; ga.opacity = anelloA
-        cerchio(ga, t: t, Rsh: Rsh, rr: Rsh * 0.74, inc: 1.05 + 0.12 * sin(t * 0.23), rot: tv * 0.35 * fr + 0.6, luce: luce, largo: 2.6, lw: lw, colore: colore)
-        cerchio(ga, t: t, Rsh: Rsh, rr: Rsh * 0.64, inc: 1.75 + 0.1 * sin(t * 0.31), rot: -tv * 0.5 * fr, luce: luce * 0.7, largo: 1, lw: lw, colore: colore)
+        let kN = nucleo / (Rsh * 0.58)                              // 13.8: con PARLO ECO i cerchi seguono il nucleo che cresce (come il mockup)
+        cerchio(ga, t: t, Rsh: Rsh, rr: Rsh * min(0.9, 0.74 * kN), inc: 1.05 + 0.12 * sin(t * 0.23), rot: tv * 0.35 * fr + 0.6, luce: luce, largo: 2.6, lw: lw, colore: colore)
+        cerchio(ga, t: t, Rsh: Rsh, rr: Rsh * min(0.82, 0.64 * kN), inc: 1.75 + 0.1 * sin(t * 0.31), rot: -tv * 0.5 * fr, luce: luce * 0.7, largo: 1, lw: lw, colore: colore)
+
+        // ascoltando: le ONDE che escono dal nucleo
+        if ascolta { onde(g, t: t, Rsh: Rsh, nucleo: nucleo, vol: vol, lw: lw, colore: colore) }
 
         // 5 · sopra a tutto: la metà davanti dei frammenti, che passa sul nucleo
         var gd = g; gd.opacity = davantiA
-        frammenti(gd, t: t, tv: tv, R: Rsh * 0.96, luce: luce, fase: fase, davanti: true, forza: 0.8, lw: lw, colore: colore)
+        frammenti(gd, t: t, tv: tv, R: Rsh * 0.96, luce: luce, fase: faseL, davanti: true, forza: 0.8, lw: lw, colore: colore)
 
         // 6 · pensando, le scie che escono dal centro (cuoreVero del mockup: 48, sul raggio del cuore)
         if coll > 0 {
@@ -176,6 +204,24 @@ enum Sintesi {
     }
 
     // MARK: Le parti
+
+    /// 13.8 · ASCOLTO ONDE: due anelli che escono dal bordo del nucleo verso il guscio (2,4 s l'uno, sfasati di mezzo giro), sottili e
+    /// leggeri; ognuno è forte quanto la voce nel momento in cui è nato (come il mockup), così mostrano che JARVIS sta percependo.
+    private static func onde(_ g: GraphicsContext, t: Double, Rsh: Double, nucleo: Double, vol: Double,
+                             lw: (Double) -> Double, colore: (Double, Double) -> Color) {
+        let per = 2.4
+        for i in 0..<2 {
+            let ti = t + Double(i) * per / 2
+            let u = ti.truncatingRemainder(dividingBy: per) / per
+            let forza = OndeAscolto.condivise.forza(i, giro: Int(floor(ti / per)), vol: vol)
+            let r = nucleo * 1.02 + (Rsh * 0.95 - nucleo * 1.02) * (1 - pow(1 - u, 2))
+            let a = pow(1 - u, 2) * (0.1 + 0.9 * forza) * 0.75
+            guard a > 0.004 else { continue }
+            let anello = Path(ellipseIn: CGRect(x: -r, y: -r, width: r * 2, height: r * 2))
+            g.stroke(anello, with: .color(colore(0.16 * a, 0.35)), lineWidth: lw(3.4))
+            g.stroke(anello, with: .color(colore(0.8 * a, 0.7)), lineWidth: lw(0.9))
+        }
+    }
 
     private static func guscioFilm(_ g: GraphicsContext, t: Double, Rsh: Double, ax: Double, ay: Double, luce: Double, vol: Double,
                                    lw: (Double) -> Double, colore: (Double, Double) -> Color) {
@@ -222,8 +268,8 @@ enum Sintesi {
     }
 
     private static func lineette(_ g: GraphicsContext, t: Double, Rsh: Double, luce: Double, vol: Double, fase: SintesiFase, r0min: Double,
-                                 lw: (Double) -> Double, colore: (Double, Double) -> Color) {
-        let vel: Double = fase == .elaboro ? 2.2 : (fase == .attesa ? 1 : 1.3 + 1.4 * vol)
+                                 velocita: Double = 1, spessore: Double = 1, lw: (Double) -> Double, colore: (Double, Double) -> Color) {
+        let vel: Double = (fase == .elaboro ? 2.2 : (fase == .attesa ? 1 : 1.3 + 1.4 * vol)) * velocita
         var B = [Path(), Path()]
         for s in scintille {
             let u = (t * s.v * vel * 0.35 + s.ph).truncatingRemainder(dividingBy: 1)
@@ -233,8 +279,8 @@ enum Sintesi {
             let k = sin(Double.pi * u) > 0.6 ? 1 : 0
             B[k].move(to: CGPoint(x: cs * r1, y: sn * r1)); B[k].addLine(to: CGPoint(x: cs * r2, y: sn * r2))
         }
-        g.stroke(B[0], with: .color(colore(0.28 * luce, 0.4)), lineWidth: lw(0.4))
-        g.stroke(B[1], with: .color(colore(min(1, (0.7 + 0.3 * vol) * luce), 0.7)), lineWidth: lw(0.55))
+        g.stroke(B[0], with: .color(colore(0.28 * luce, 0.4)), lineWidth: lw(0.4 * spessore))
+        g.stroke(B[1], with: .color(colore(min(1, (0.7 + 0.3 * vol) * luce), 0.7)), lineWidth: lw(0.55 * spessore))
     }
 
     private static func frammenti(_ g: GraphicsContext, t: Double, tv: Double, R: Double, luce: Double, fase: SintesiFase, davanti: Bool,
@@ -277,7 +323,7 @@ enum Sintesi {
         }
     }
 
-    private static func rete(_ g: GraphicsContext, t: Double, tv: Double, fase: SintesiFase, vol: Double, battito: Double, coll: Double,
+    private static func rete(_ g: GraphicsContext, t: Double, tv: Double, fase: SintesiFase, vol: Double, volAccesi: Double, battito: Double, coll: Double,
                              Rs: Double, k: Double, luce: Double, lw: (Double) -> Double, colore: (Double, Double) -> Color) {
         let gy = tv * 0.45, inc = 0.38 + 0.18 * sin(t * 0.21)
         let (sy, cyR, sx, cxR) = (sin(gy), cos(gy), sin(inc), cos(inc))
@@ -306,7 +352,7 @@ enum Sintesi {
         // le larghezze del mockup sono nella scala della rete (k): qui la rete è già nella scala del nucleo
         let stili: [(Double, Double, Double)] = [(0.14, 0.1, 0.45), (0.28, 0.25, 0.6), (0.5, 0.45, 0.8)]
         for (s, st) in stili.enumerated() { g.stroke(strati[s], with: .color(colore(st.0 * luce, st.1)), lineWidth: lw(st.2 * k)) }
-        g.stroke(accesi, with: .color(colore((0.4 + 0.4 * vol) * luce, 0.7)), lineWidth: lw(0.9 * k))
+        g.stroke(accesi, with: .color(colore((0.4 + 0.4 * volAccesi) * luce, 0.7)), lineWidth: lw(0.9 * k))
         var punti = Path()
         for (p, z, o) in P {
             let r = (0.45 + 0.75 * (z + 1) / 2) * (1 + 0.8 * o) * k
@@ -345,5 +391,21 @@ enum Sintesi {
             stile.lineWidth = lw(largo); g.stroke(B[b], with: .color(colore(ca2 * luce, s)), style: stile)
             stile.lineWidth = lw(0.4); g.stroke(B[b], with: .color(colore(min(1, ca2 * 1.3 * luce), 0.6)), style: stile)
         }
+    }
+}
+
+/// 13.8 · la forza di ogni anello delle ONDE, presa dalla voce quando l'anello nasce (un giro nuovo) e tenuta per tutto il giro.
+/// Letta a ogni fotogramma dal disegno del reattore: protetta da un lucchetto, come Volume e Giri.
+nonisolated final class OndeAscolto: @unchecked Sendable {
+    static let condivise = OndeAscolto()
+    private let lock = NSLock()
+    private var giri: [Int] = [-1, -1]
+    private var forze: [Double] = [0, 0]
+
+    func forza(_ i: Int, giro: Int, vol: Double) -> Double {
+        lock.lock(); defer { lock.unlock() }
+        guard giri.indices.contains(i) else { return vol }
+        if giri[i] != giro { giri[i] = giro; forze[i] = vol }
+        return forze[i]
     }
 }

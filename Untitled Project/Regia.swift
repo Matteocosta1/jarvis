@@ -465,12 +465,12 @@ final class Regia {
             if n > 0 { Suoni.filoVia() }
             return .fatto(n > 0 ? "tab vuota (tolti \(n) argomenti)" : "la tab era già vuota")
         case "tabnascondi":
-            guard !Filo.condiviso.visti.isEmpty else { return .fatto("la tab non si vede già") }
+            guard !Filo.condiviso.visti.isEmpty || Filo.condiviso.vuota else { return .fatto("la tab non si vede già") }
             Suoni.filoVia()
             Filo.condiviso.rimandaVia()
             return .fatto("tab nascosta (si richiama)")
         case "tabrichiama":
-            return Filo.condiviso.richiama() ? .fatto("tab richiamata: " + Filo.condiviso.visti.map(\.nome).joined(separator: ", ")) : .no("niente da richiamare")
+            return Filo.condiviso.richiama() ? .fatto("tab richiamata: " + Filo.condiviso.visti.map(\.nome).joined(separator: ", ")) : .fatto("tab richiamata vuota: nessuna notifica")
         default:
             break
         }

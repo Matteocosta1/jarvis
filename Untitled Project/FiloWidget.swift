@@ -33,7 +33,7 @@ struct StratoFilo: View {
         let alto = filo.sottoIcone > 0 ? filo.sottoIcone + 6 : (FasciaAlta.finestra?.safeAreaInsets.top ?? 59) + 58
         ZStack(alignment: .topTrailing) {
             Color.clear
-            if !visti.isEmpty {
+            if !visti.isEmpty || filo.vuota {
                 SchedaFilo(argomenti: visti, vetro: suSezione)
                     .padding(.top, alto)
                     .padding(.trailing, 10)
@@ -43,7 +43,8 @@ struct StratoFilo: View {
             // punto di luce, «swipe invisibile in alto»): con FILO via e qualcosa da richiamare, lo swipe verso sinistra dal bordo
             // destro nella fascia di FILO (sotto le icone di sistema, sopra la corona) lo riporta. Prima la striscia era lunga
             // 280 punti e copriva l'anello delle icone a destra e la sua rotazione.
-            if visti.isEmpty && !filo.argomenti.isEmpty {
+            // 13.8: la fascia c'è sempre, anche senza niente da riportare (la tab si apre vuota, con «NESSUNA NOTIFICA»)
+            if visti.isEmpty && !filo.vuota {
                 FasciaFilo()
                     .padding(.top, alto - FasciaFilo.sopra)
             }
@@ -53,6 +54,7 @@ struct StratoFilo: View {
         .allowsHitTesting(!daParte)
         .animation(.easeOut(duration: 0.2), value: daParte)
         .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3), value: visti.isEmpty)
+        .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.3), value: filo.vuota)
         .onChange(of: daParte, initial: true) { _, v in filo.daParte = v }
     }
 }
@@ -209,6 +211,15 @@ private struct SchedaFilo: View {
             .padding(.trailing, 8)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
+                    if argomenti.isEmpty {
+                        // 13.8 · richiamata vuota (come la tab bassa con «NESSUNA PAGINA»)
+                        Text("NESSUNA NOTIFICA")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2.4)
+                            .foregroundStyle(Color.tenue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 14)
+                            .padding(.bottom, 10)
+                    }
                     ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
                         // 14 nov (scelta del signore): in secondo piano compatta, una riga per argomento
                         ArgomentoVista(a: a, primo: i == 0, compatta: !filo.fuoco)

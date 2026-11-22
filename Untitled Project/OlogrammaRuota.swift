@@ -287,6 +287,7 @@ struct OlogrammaRuota: View {
                 if vivo {
                     let simbolo = voci[k].icona
                     let pezzi = Accensione.pezzi("iphone." + simbolo, icona: OlogrammaRuota.simbolo(simbolo, lato: 26))
+                    let scarto = Accensione.scarto("iphone." + simbolo)                     // 13.8: centrata sul disegno vero
                     Canvas { gc, size in
                         Accensione.disegna(gc, centro: CGPoint(x: size.width / 2, y: size.height / 2), T: T, t: t, forza: 0.32 + 0.68 * luce,
                                            nata: ferma, lungNome: voci[k].nome.count, pezzi: pezzi)
@@ -294,7 +295,8 @@ struct OlogrammaRuota: View {
                     .frame(width: 300, height: 300)
                     .position(x: 100, y: 82)
                     IconaAccensione(T: T, ferma: ferma, lato: Accensione.lato) { OlogrammaRuota.simbolo(simbolo, lato: Accensione.lato) }
-                        .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)                          // sospesa: respira appena
+                        // 13.8 (il signore: «l'icona non vada su e giù»): ferma; spostata sul centro del suo disegno
+                        .position(x: 100 - scarto.width * Accensione.lato, y: 82 - scarto.height * Accensione.lato)
                     nome(voci[k].nome, T: T, luce: luce)
                     Text(aperte.contains(voci[k].nome) ? "APERTA" : voci[k].gruppo)
                         .font(.system(size: 8.5, weight: .semibold, design: .monospaced)).tracking(2.6)

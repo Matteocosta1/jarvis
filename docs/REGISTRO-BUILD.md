@@ -545,6 +545,29 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 5. **Memoria per significato**: l'avviso vero nei log è «Built-in ONNX inference is being considered for deprecation… (used: Supabase.ai.Session("gte-small"))», senza data. Ora ogni riga di memoria, ricordi, note, diario ed episodi ha anche il vettore **Gemini** (`gemini-embedding-001`, 768 numeri, colonna `vettore_g`, funzione `jarvis_significato_g`), con la chiave Gemini già nei segreti (quota gratuita; in Europa i dati non servono a Google per addestrare: termini di Gemini API, «Paid Services» valgono anche per la quota gratuita in SEE/CH/UK). Misurato sulle righe vere (4 domande dette con parole diverse sulla memoria): **Gemini mette la riga giusta al primo posto 4 su 4, gte-small 1 su 4** (gte dà ≥ 0,82 all'88 % delle coppie di righe qualsiasi: in italiano non distingue). Quindi dal **cervello v140** il motore primo è Gemini, gte-small resta di riserva (se Gemini non risponde o finisce la quota del minuto). Soglie tradotte con la taratura misurata (0,82 → 0,65; doppioni 0,97 → 0,96). Per tornare a prima: segreto `MOTORE_SIGNIFICATO=gte`. Limite: la quota gratuita ha dato 429 dopo ~86 vettori in un minuto (riempimento iniziale); per le domande di tutti i giorni (1-3 al turno) basta, e se scatta risponde gte.
 6. **Fatto n. 42** corretto: «Alessandro usa per JARVIS i 200 $ al mese di crediti API Anthropic inclusi nel piano dell'account di Matteo (dal 20 nov 2026…)».
 
+## 13.8 (1) — 22 nov mattina · numero deciso dal signore (08:14: «la nuova build 13.8»; Version 13.8, Build 1 su app, Watch, complicazione e isola) · correzioni dopo la prova della 13.7 (1) e il reattore scelto nel mockup «JARVIS Approvato» (v16) · controllo di compilazione: IN CORSO · cervello invariato
+**Tab**
+1. **Tab alta richiamabile anche vuota** (07:28): lo swipe dal bordo destro (la fascia c'è sempre) la apre anche senza niente da riportare, con «NESSUNA NOTIFICA»; a voce «riportami la tab» la apre vuota e risponde «Nessuna notifica, Sir.» (`Filo.vuota`). Si chiude come sempre; un dato nuovo la riempie.
+2. **Tab bassa ferma** (video 07:27): la riga di telemetria sotto lo stato cambia ogni 2,5 s con lunghezze diverse e la tab la seguiva. Ora si ferma prima della più lunga (21 lettere) e dello stato più lungo; sempre sopra la riga dei suggerimenti. Stessa misura nel mockup.
+3. **Fulmine di carica ciano** (07:31): il simbolo `bolt.fill` al posto dell'emoji gialla, nella tab bassa e nel Travel del polso (BikeMi); nel mockup un fulmine disegnato.
+**Ologrammi**
+4. **Spesa centrata** (07:33): il simbolo «cart» ha la cornice più alta del disegno. L'icona dell'ologramma (e i suoi pezzi) si centra sul disegno vero, misurato sui pixel (`Accensione.scarto`), per tutte le icone, su iPhone e Watch; sotto i 4 punti resta com'è.
+5. **Icona ferma** (07:59): via il su e giù (1,5 punti) dell'icona, girando e accesa; il resto di ACCENSIONE uguale.
+**Apple Watch**
+6. **Solo la parola dello stato** (07:38): via le frasi sotto lo stato (SPENTO, RISERVATO, IN ATTESA… restano).
+7. **Parentesi quadre attorno al nome** (07:38): usavano le misure dell'iPhone e finivano attorno al gruppo, sulle icone tonde; ora attorno al nome del polso (circa 17 punti più su), strette sulla sua misura (`Accensione.Staffe.polso`).
+**Reattore (iPhone e Watch, Sintesi.swift)** — scelte nel mockup 07:43–08:08, issue #17
+8. **Nucleo BRILLANTE**: vetro più acceso anche a riposo, cuore di luce al centro, rete più chiara; le linee prospettiche non cambiano.
+9. **Ascolto ONDE**: linee, guscio e frammenti calmi come a riposo; la sfera non cresce; due anelli leggeri escono dal nucleo, forti quanto la voce quando nascono; il nucleo si accende con la voce.
+10. **Parlo ECO**: linee prospettiche tenui, sottili (60 %) e lente (45 %), la luce segue la voce; la sfera (e i due cerchi) cresce fino a +12 % e si accende con la voce.
+**Debug prima della consegna**
+- Mockup: in ascolto anche i frammenti davanti restavano veloci (solo quelli dietro erano calmi) e la sfera cresceva ancora un poco: corretti, come l'app.
+- Mockup: chiudendo l'ultima notifica di una tab richiamata compariva «NESSUNA NOTIFICA» (l'app la chiude): ora solo il richiamo senza niente la apre vuota, come l'app.
+- App: con ECO i due cerchi attorno al nucleo restavano fermi mentre il nucleo cresceva (nel mockup lo seguono): ora lo seguono.
+- Tab bassa: il limite in basso (la riga dei suggerimenti) valeva solo se la frase era lunga: una frase corta la faceva allungare. Ora vale sempre (app e mockup).
+**Da verificare sul telefono e al polso**: la tab bassa ferma; Spesa centrata (e che nessun'altra icona si sia spostata male); ONDE ed ECO dal vero con la voce; le parentesi al polso.
+Le fasce di plasma esterne (VELO) seguono ancora la voce, anche in ascolto (detto al signore, nessuna richiesta di cambiarle).
+
 ## 13.7 (1) — 22 nov notte · numero deciso dal signore (01:40: «nome build 13.7»; Version 13.7, Build 1 su app, Watch, complicazione e isola) · tutto il mockup «JARVIS Approvato» su iPhone e Apple Watch · commit 764aa72 (prima a123823, poi il debug qui sotto) · controllo di compilazione VERDE (0 errori, 0 warning, run 44978201808) · cervello invariato · **su TestFlight il 22 nov alle 7:23** (Pull con conflitto su project.pbxproj risolto con Discard All Changes; caricamento riuscito con controllo preliminare saltato per timeout di Apple) · in prova sui dispositivi
 **iPhone**
 - **Reattore VELO** (scelta 01:40): ghiera senza i tre archi coi fermi; fasce di plasma e scintille velate al 62 %; al centro **SINTESI** (Sintesi.swift, nuovo: guscio di trattini, frammenti dietro e davanti, lineette, nucleo di vetro con la rete 3D, due cerchi; pensando le scie) a 1,68; tutto dentro il cerchio di 145. Disegni raccolti per colore (un'ottantina al fotogramma) per i 120 Hz.

@@ -133,6 +133,8 @@ final class Pagine: ObservableObject {
     private var giro = 0
 
     static let altaPiccola: CGFloat = 72
+    /// Metà della riga di telemetria più lunga (21 lettere × 6,8 punti).
+    static let mezzaTelemetria: CGFloat = 21 * 6.8 / 2
 
     private init() {
         UIDevice.current.isBatteryMonitoringEnabled = true
@@ -144,10 +146,15 @@ final class Pagine: ObservableObject {
     /// LUNGA con i tasti ALTA (parte 30 punti più su), larga fino alle scritte, alta al massimo 164.
     func zona() -> CGRect {
         let S: CGFloat = 10
-        let sinistre = [fase, tele].filter { $0.width > 0 && $0.height > 0 }.map(\.minX)
+        // 13.8 (il signore, 22 nov: «la tab bassa si muove a caso»): la riga sotto lo stato (TelemetriaHUD) cambia ogni 2,5 s e
+        // ha lunghezze diverse; la tab la seguiva e si allargava e stringeva. Ora si ferma prima della più lunga (MEMORIA SINCRONIZZATA
+        // / ELABORAZIONE IN CORSO, 21 lettere da 6,8 punti: monospaziato 8 punti con tracking 2), centrata dove sta la riga: non si muove più
+        var sinistre: [CGFloat] = []
+        if fase.width > 0 && fase.height > 0 { sinistre.append(fase.midX - 10 * 11.2 / 2) }   // anche lo stato: il più lungo (LA ASCOLTO)
+        if tele.width > 0 && tele.height > 0 { sinistre.append(tele.midX - Pagine.mezzaTelemetria) }
         let destra = min(S + 212, (sinistre.min().map { $0 - 6 } ?? S + 140) + 8)
         var giu: CGFloat = chatAlto.map { $0 - 6 } ?? 600
-        if sugg.width > 0, sugg.minX < destra { giu = min(giu, sugg.minY - 5) }
+        if sugg.width > 0 { giu = min(giu, sugg.minY - 5) }   // 13.8: sempre (una frase corta non la fa più allungare)
         var colonna: [CGFloat] = []
         if let a = anello, a.lato > 0 {
             let s = a.rett.height / a.lato, mezzo = 19 * s
@@ -535,7 +542,8 @@ private struct TabPagineVista: View {
 
     private func batteria(_ b: Int, carica: Bool) -> some View {
         HStack(spacing: 0.5) {
-            if carica { Text("⚡").font(.system(size: 6)).foregroundStyle(TintaTab.chiaro) }
+            // 13.8 (il signore: «le icone di carica devono essere ciano»): il simbolo, non l'emoji (iOS la fa sempre gialla)
+            if carica { Image(systemName: "bolt.fill").font(.system(size: 5, weight: .semibold)).foregroundStyle(TintaTab.chiaro) }
             testoStato("\(b)%")
         }
     }

@@ -83,6 +83,9 @@ final class Filo: ObservableObject {
     @Published private(set) var argomenti: [ArgomentoFilo] = []
     /// Richiamato con lo swipe dal bordo destro: resta finché lui non lo rimanda via.
     @Published private(set) var richiamato = false
+    /// 13.8 · richiamata col dito senza niente da riportare: la tab si apre lo stesso, vuota, con «NESSUNA NOTIFICA» (il
+    /// signore, 22 nov 07:28: «la tab alta non si può richiamare col dito anche se vuota»), finché lui non la manda via.
+    @Published private(set) var vuota = false
     /// Il dito è su FILO (scorre, tocca): le notifiche aspettano.
     private var tocco = false
     private var fonti: Set<String> = []
@@ -267,7 +270,7 @@ final class Filo: ObservableObject {
     func mostra(_ chiave: String, titolo: String, riga: String, sezione: String?, dura: TimeInterval? = nil, suono: Bool = true,
                 resta: Bool = false, fisso: Bool = false, icona: String? = nil) {
         let nome = Filo.argomento(sezione: sezione, titolo: titolo)
-        let appare = visti.isEmpty                                          // 14 nov (il signore): ogni volta che la tab compare, il suo suono
+        let appare = visti.isEmpty && !vuota                              // 14 nov (il signore): ogni volta che la tab compare, il suo suono
         let nuova = RigaFilo(id: chiave, titolo: titolo, riga: riga, sezione: sezione, alle: Date(), resta: resta, icona: icona)
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) {
@@ -299,6 +302,7 @@ final class Filo: ObservableObject {
         // 14 nov (il signore: «le cose non spariscono dopo 2,8 secondi»): richiamato dal bordo restava fermo per sempre, anche coi
         // dati nuovi; un dato nuovo riporta le regole di sempre (notifica 2,8 s, fissato resta)
         richiamato = false
+        vuota = false
         programma()
         svegli()
         if suono || appare { Suoni.filo() }
@@ -308,7 +312,7 @@ final class Filo: ObservableObject {
     /// torna davanti a ogni passo; finito, è una notifica di 5 secondi (poi si richiama come gli altri).
     func mostraPiano(titolo: String, righe: [RigaFilo], finito: Bool) {
         let nome = "Piano"
-        let appare = visti.isEmpty
+        let appare = visti.isEmpty && !vuota
         var a: ArgomentoFilo
         if let i = argomenti.firstIndex(where: { $0.nome == nome }) { a = argomenti.remove(at: i) } else { a = ArgomentoFilo(nome: nome, righe: []) }
         a.righe = Array(righe.prefix(8))
@@ -321,6 +325,7 @@ final class Filo: ObservableObject {
         argomenti.insert(a, at: 0)
         if argomenti.count > 6 { argomenti.removeLast(argomenti.count - 6) }
         richiamato = false
+        vuota = false
         programma()
         svegli()
         if appare { Suoni.filo() }
@@ -394,6 +399,7 @@ final class Filo: ObservableObject {
         let n = argomenti.count
         argomenti.removeAll()
         richiamato = false
+        vuota = false
         controllo?.cancel()
         pulizia?.cancel()
         riposa?.cancel()
@@ -401,10 +407,20 @@ final class Filo: ObservableObject {
         return n
     }
 
-    /// Lo swipe verso sinistra dal bordo destro, nella fascia di FILO: tutto quello che c'era torna, e resta.
+    /// Lo swipe verso sinistra dal bordo destro, nella fascia di FILO: tutto quello che c'era torna, e resta. Senza niente da
+    /// riportare (13.8) si apre vuota, con «NESSUNA NOTIFICA». Il valore dice se c'era qualcosa da riportare.
     @discardableResult
     func richiama() -> Bool {
-        guard !argomenti.isEmpty else { return false }
+        guard !argomenti.isEmpty else {
+            let eraVia = !vuota
+            vuota = true
+            richiamato = true
+            controllo?.cancel()
+            svegli()
+            if eraVia { Suoni.filo() }
+            return false
+        }
+        vuota = false
         for k in argomenti.indices {
             argomenti[k].nascosto = false
             argomenti[k].nascostoAlle = nil
@@ -424,6 +440,7 @@ final class Filo: ObservableObject {
             argomenti[k].nascostoAlle = ora
         }
         richiamato = false
+        vuota = false
         controllo?.cancel()
         riposa?.cancel()
         fuoco = true
@@ -479,7 +496,7 @@ final class Filo: ObservableObject {
     /// notifiche fermo finché il dito non si alza. Fuori: lui lavora su quello che c'è sotto (la sezione, la corona), FILO va
     /// subito in secondo piano.
     func toccoSchermo(_ p: CGPoint) {
-        guard !visti.isEmpty, !daParte, rettScheda.width > 0 else { return }
+        guard !visti.isEmpty || vuota, !daParte, rettScheda.width > 0 else { return }
         if rettTasti.width > 0, rettTasti.insetBy(dx: -4, dy: -7).contains(p) { return }   // 13.7: i tre tasti fanno solo il loro
         if rettScheda.contains(p) {
             if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
@@ -495,13 +512,13 @@ final class Filo: ObservableObject {
     /// ridurla»): la tab compatta, una riga per argomento, subito.
     func riduci() {
         riposa?.cancel()
-        guard !visti.isEmpty else { return }
+        guard !visti.isEmpty || vuota else { return }
         fuoco = false
     }
 
     /// 13.7 · il tasto «apri»: la tab intera (poi, come sempre, compatta 2,8 s dopo se nessuno la tocca).
     func apri() {
-        guard !visti.isEmpty else { return }
+        guard !visti.isEmpty || vuota else { return }
         svegli()
     }
 

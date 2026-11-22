@@ -279,7 +279,8 @@ final class Insieme {
             Suoni.filoVia()
             return Battute.angoloLibero()
         case .richiama:
-            guard filo.richiama() else { return nil }                       // niente da riportare: la frase va avanti
+            // 13.8, come il mockup: senza niente da riportare la tab si apre vuota («NESSUNA NOTIFICA»)
+            guard filo.richiama() else { return "Nessuna notifica, Sir." }
             return Battute.una("richiamaTab", ["Ecco, Sir.", "Di nuovo in vista.", "Eccolo qui."])
         case .fissa(let q):
             aggiornaBrano()

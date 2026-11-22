@@ -189,13 +189,16 @@ struct VistaTravelOrologio: View {
                         Text("\(b["n"] as? String ?? "BikeMi")\(Text(" \(b["m"] as? String ?? "")").foregroundStyle(ColoriTravel.tenue))")
                             .lineLimit(1).truncationMode(.tail)
                         Spacer(minLength: 2)
-                        Text("\(b["b"] as? Int ?? 0) · \(b["e"] as? Int ?? 0)⚡").font(.system(size: 10, design: .monospaced)).foregroundStyle(ColoriTravel.tenue)
+                        // 13.8: il fulmine ciano (il simbolo, non l'emoji gialla)
+                        Text("\(b["b"] as? Int ?? 0) · \(b["e"] as? Int ?? 0)\(Text(Image(systemName: "bolt.fill")).foregroundStyle(ColoriTravel.ciano))")
+                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(ColoriTravel.tenue)
                     }
                     .font(.system(size: 10)).foregroundStyle(ColoriTravel.testo)
                 }
                 if ((d["stazioni"] as? [Any]) ?? []).isEmpty { nota("Nessuna stazione BikeMi qui vicino, Sir.", colore: ColoriTravel.tenue) }
             }
-            nota("bici · elettriche ⚡ · BikeMi", colore: ColoriTravel.tenue)
+            Text("bici · elettriche \(Text(Image(systemName: "bolt.fill")).foregroundStyle(ColoriTravel.ciano)) · BikeMi")
+                .font(.system(size: 9)).foregroundStyle(ColoriTravel.tenue).multilineTextAlignment(.center)
         case .taxi:
             nota("RADIOTAXI", colore: ColoriTravel.tenue)
             grande("02 8585", misura: 28)

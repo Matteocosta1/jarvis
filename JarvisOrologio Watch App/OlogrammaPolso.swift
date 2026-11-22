@@ -33,14 +33,16 @@ struct OlogrammaPolso<Icona: View>: View {
             ZStack {
                 if vivo {
                     let pezzi = Accensione.pezzi("polso.\(k).\(nomi[k])", icona: icona(k, 26))
+                    let scarto = Accensione.scarto("polso.\(k).\(nomi[k])")                 // 13.8: centrata sul disegno vero
                     Canvas { gc, size in
                         Accensione.disegna(gc, centro: CGPoint(x: size.width / 2, y: size.height / 2), T: T, t: t, forza: 0.32 + 0.68 * luce,
-                                           nata: ferma, lungNome: nomi[k].count, pezzi: pezzi)
+                                           nata: ferma, lungNome: nomi[k].count, pezzi: pezzi, staffe: .polso)
                     }
                     .frame(width: 300, height: 300)
                     .position(x: 100, y: 82)
                     IconaAccensione(T: T, ferma: ferma, lato: Accensione.lato) { icona(k, Accensione.lato) }
-                        .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)                          // sospesa: respira appena
+                        // 13.8 (il signore: «l'icona non vada su e giù»): ferma; spostata sul centro del suo disegno
+                        .position(x: 100 - scarto.width * Accensione.lato, y: 82 - scarto.height * Accensione.lato)
                     Text(nome(nomi[k], T: T))
                         .font(.system(size: 9.5, weight: .bold, design: .monospaced)).tracking(1.9)
                         .foregroundStyle(bianco)
