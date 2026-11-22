@@ -254,9 +254,9 @@ private struct SchedaFilo: View {
             ZStack {
                 // 13.7 (22 nov 01:04, mockup: sfocato 10 sulla schermata di JARVIS, 20 sopra una sezione): il vetro dietro al fondo
                 // scuro c'è sempre, aperta e piccola (prima solo sopra una sezione); entra a nascita finita
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
+                // 13.8 (4): solo sfocatura, senza la tinta di iOS (il fondo scuro è quello del mockup, dentro la cornice);
+                // sopra una sezione, a fuoco, sfoca di più: la trasparenza dinamica del mockup
+                VetroTab(forte: vetro && filo.fuoco)
                     .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                     .opacity(vetroPronto ? 1 : 0)
                     .animation(.easeOut(duration: 0.2), value: vetroPronto)
@@ -700,3 +700,48 @@ enum CorniceFilo {
     }
 }
 #endif
+
+/// 13.8 (4) (il signore, 22 nov 12:03, foto delle tab: «non sono trasparenti quasi per nulla: rendile come nel mockup, e usa la
+/// trasparenza dinamica dove richiesta»). Nel mockup il vetro delle tab è solo sfocatura (10 punti, 20 sopra una sezione a fuoco)
+/// più il fondo scuro al 60 % (55 % da piccola). Il «materiale» di iOS aggiunge una sua tinta scura sopra la sfocatura: con il
+/// fondo al 60 % le tab diventavano quasi piene. Questo vetro tiene la sola sfocatura (la tinta di iOS si toglie) e il fondo scuro
+/// resta quello del mockup. `forte`: sopra una sezione, a fuoco, sfoca di più (come il mockup).
+struct VetroTab: UIViewRepresentable {
+    var forte = false
+
+    func makeUIView(context: Context) -> VetroSenzaTinta {
+        let v = VetroSenzaTinta(effect: UIBlurEffect(style: forte ? .systemThinMaterialDark : .systemUltraThinMaterialDark))
+        v.forte = forte
+        v.isUserInteractionEnabled = false
+        return v
+    }
+
+    func updateUIView(_ v: VetroSenzaTinta, context: Context) {
+        guard v.forte != forte else { return }
+        v.forte = forte
+        let effetto = UIBlurEffect(style: forte ? .systemThinMaterialDark : .systemUltraThinMaterialDark)
+        UIView.animate(withDuration: 0.35) { v.effect = effetto }
+    }
+}
+
+/// La vista di sfocatura senza la tinta di iOS: dopo ogni disegno toglie il colore ai livelli della tinta (tutto tranne quello
+/// della sfocatura). Se iOS un giorno li chiamasse in un altro modo, il vetro resta semplicemente quello di iOS.
+final class VetroSenzaTinta: UIVisualEffectView {
+    var forte = false
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        togliTinta()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        togliTinta()
+    }
+
+    private func togliTinta() {
+        for s in subviews where !String(describing: type(of: s)).contains("Backdrop") {
+            s.backgroundColor = .clear
+        }
+    }
+}

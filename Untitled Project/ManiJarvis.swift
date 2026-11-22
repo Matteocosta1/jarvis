@@ -160,11 +160,11 @@ enum ManiJarvis {
         }
         let chiave = Regia.chiave(t.etichetta)
         if rischioso(t.etichetta) {
-            if i["confermato"] as? Bool == true {
-                guard let s = inSospeso, s.chiave == chiave, Date().timeIntervalSince(s.quando) < 180,
-                      let f = Regia.condivisa.ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
-                    inSospeso = nil
-                    return (Regia.json(["errore": "conferma non valida: chiedi al signore con una domanda breve e aspetta il suo sì (lo controlla l'app)"]), true)
+            // 13.8 (4) (issue #18, come la regia): un sì che non c'è ancora lascia la domanda aperta (prima la cancellava e i «sì»
+            // dopo venivano tutti rifiutati); una domanda scaduta o per un altro tasto si rifà
+            if i["confermato"] as? Bool == true, let s = inSospeso, s.chiave == chiave, Date().timeIntervalSince(s.quando) < 180 {
+                guard let f = Regia.condivisa.ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
+                    return (Regia.json(["errore": "il signore non ha ancora detto sì: la domanda resta aperta, aspetta la sua risposta (lo controlla l'app)"]), true)
                 }
                 inSospeso = nil
             } else {
@@ -280,8 +280,11 @@ enum ManiJarvis {
         let k = Regia.chiave(nome)
         if rischioso(nome) || ["messaggio", "rispost", "rispondi", "commento", "didascalia", "mail", "scrivia"].contains(where: { k.contains($0) }) {
             let chiave = "scrivi:" + k
-            if i["confermato"] as? Bool == true, let s = inSospeso, s.chiave == chiave, Date().timeIntervalSince(s.quando) < 180,
-               let f = Regia.condivisa.ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) {
+            if i["confermato"] as? Bool == true, let s = inSospeso, s.chiave == chiave, Date().timeIntervalSince(s.quando) < 180 {
+                // 13.8 (4) (issue #18): senza il sì la domanda resta aperta (rifarla spostava l'ora della domanda dopo il sì già detto)
+                guard let f = Regia.condivisa.ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
+                    return (Regia.json(["errore": "il signore non ha ancora detto sì: la domanda resta aperta, aspetta la sua risposta (lo controlla l'app)"]), true)
+                }
                 inSospeso = nil
             } else {
                 inSospeso = (chiave, Date())

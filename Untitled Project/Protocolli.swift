@@ -97,7 +97,7 @@ struct TendinaProtocolli: View {
             let forma = UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
             forma
                 .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.6))
-                .background(.ultraThinMaterial, in: forma)
+                .background { VetroTab().clipShape(forma) }         // 13.8 (4): solo sfocatura, come il mockup (senza la tinta di iOS)
                 .environment(\.colorScheme, .dark)
                 .overlay(alignment: .top) { scansione.clipShape(forma) }
                 .overlay(alignment: .bottom) {

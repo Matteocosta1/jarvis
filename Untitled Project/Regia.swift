@@ -361,18 +361,27 @@ final class Regia {
             return Passo(sezione: g["sezione"] as? String ?? "", azione: g["azione"] as? String ?? "", valori: valori)
         }
         guard !passi.isEmpty else { return (Regia.json(["errore": "nessun passo"]), true) }
-        let confermato = input["confermato"] as? Bool ?? false
+        var confermato = input["confermato"] as? Bool ?? false
         if confermato {
             // il sì vale solo per i passi chiesti (con i loro valori, quelli che il signore ha sentito), entro 3 minuti, e solo se
-            // l'ultima frase del signore, detta dopo la domanda, è davvero un sì
-            guard let s = inSospeso, Date().timeIntervalSince(s.quando) < 180,
-                  s.passi.map({ Regia.chiave($0.sezione) + "/" + Regia.chiave($0.azione) }) == passi.map({ Regia.chiave($0.sezione) + "/" + Regia.chiave($0.azione) }),
-                  let f = ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
+            // l'ultima frase del signore, detta dopo la domanda, è davvero un sì.
+            // 13.8 (4) (issue #18, missione «Purosangue a Bea»: tre «sì» rifiutati di fila, la bozza è rimasta): in sospeso restano solo
+            // i passi dalla conferma in poi, ma il cervello richiamava regia con TUTTI i passi della prima chiamata (apri Messaggi,
+            // poi svuota): i passi non coincidevano, la conferma veniva rifiutata e cancellata, e i «sì» dopo non trovavano più niente.
+            // Ora: valgono sia i passi in sospeso sia la chiamata intera che finisce con loro; se il sì non c'è ancora la domanda resta
+            // aperta; se la domanda non c'è più (scaduta o passi diversi) la regia la rifà invece di chiudere la porta.
+            let chiavi: ([Passo]) -> [String] = { $0.map { Regia.chiave($0.sezione) + "/" + Regia.chiave($0.azione) } }
+            if let s = inSospeso, Date().timeIntervalSince(s.quando) < 180,
+               chiavi(passi) == chiavi(s.passi) || Array(chiavi(passi).suffix(s.passi.count)) == chiavi(s.passi) {
+                guard let f = ultimaFrase?(), f.quando > s.quando, Regia.eAssenso(f.testo) else {
+                    return (Regia.json(["errore": "il signore non ha ancora detto sì: la domanda resta aperta, aspetta la sua risposta (lo controlla l'app)"]), true)
+                }
+                passi = s.passi
                 inSospeso = nil
-                return (Regia.json(["errore": "conferma non valida: chiedi al signore con una domanda breve e aspetta il suo sì (lo controlla l'app)"]), true)
+            } else {
+                inSospeso = nil
+                confermato = false          // la conferma si rifà: sotto la regia richiede il sì per questi passi
             }
-            passi = s.passi
-            inSospeso = nil
         }
         var fatti: [[String: Any]] = []
         for (k, p) in passi.enumerated() {
@@ -1308,7 +1317,7 @@ final class Regia {
     static func eAssenso(_ frase: String) -> Bool {
         let p = FineFrase.paroleNude(frase)
         guard !p.isEmpty, p.count <= 7 else { return false }
-        let si: Set<String> = ["si", "sisi", "vai", "procedi", "procediamo", "conferma", "confermo", "certo", "certamente", "ok", "okay",
+        let si: Set<String> = ["jarvis", "per", "favore", "prego", "si", "sisi", "vai", "procedi", "procediamo", "conferma", "confermo", "certo", "certamente", "ok", "okay",
                                "esatto", "perfetto", "giusto", "fallo", "falla", "mandalo", "mandala", "mandali", "mandale", "manda",
                                "invia", "invialo", "inviala", "inviali", "chiama", "chiamalo", "chiamala", "elimina", "eliminalo",
                                "eliminala", "cancella", "cancellalo", "cancellala", "pubblica", "pubblicalo", "pubblicala", "sicuro",
@@ -1317,7 +1326,8 @@ final class Regia {
         let contro: Set<String> = ["no", "non", "aspetta", "aspetti", "ferma", "fermo", "fermati", "annulla", "lascia", "stop", "niente",
                                    "nulla", "dopo", "ma", "cambia", "prima", "invece"]
         guard !p.contains(where: { contro.contains($0) }) else { return false }
-        let pieni: Set<String> = si.subtracting(["va", "bene", "dai", "pure", "sir", "grazie", "lo", "la", "e", "cosi", "adesso", "ora", "subito", "tutto"])
+        let pieni: Set<String> = si.subtracting(["jarvis", "per", "favore", "prego", "va", "bene", "dai", "pure", "sir", "grazie", "lo", "la", "e",
+                                                 "cosi", "adesso", "ora", "subito", "tutto"])   // 13.8 (4): anche «Jarvis, sì», «sì, per favore»
         return p.contains(where: { pieni.contains($0) }) && p.allSatisfy { si.contains($0) }
     }
 

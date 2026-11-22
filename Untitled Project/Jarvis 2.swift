@@ -2593,11 +2593,24 @@ final class Jarvis: NSObject, ObservableObject {
                 if sessione.category != .playAndRecord || !sessione.categoryOptions.contains(.mixWithOthers) {
                     try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
                 }
-            } else if conOrecchio {
-                // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
-                try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
             } else {
-                try? sessione.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                // 13.8 (4) (issue #18: «la musica non si abbassa quando JARVIS risponde a un messaggio scritto, a volte sì a volte
+                // no»): scrivendo, mentre JARVIS pensa resta acceso il «Jarvis» in attesa, che tiene l'audio attivo SENZA abbassare
+                // la musica. «Abbassa gli altri» iOS lo applica solo quando l'audio si accende: cambiato con l'audio già acceso non
+                // abbassa niente. Succedeva quando il richiamo era già ripartito (a volte non ancora: per questo era a intermittenza).
+                // Ora: se la musica suona e l'audio non la stava già abbassando, il richiamo si ferma (mentre parla non serve) e
+                // l'audio si spegne e si riaccende, così iOS la abbassa davvero.
+                let daRiaccendere = !sessione.categoryOptions.contains(.duckOthers) && sessione.isOtherAudioPlaying
+                if daRiaccendere {
+                    richiamo.ferma()
+                    try? sessione.setActive(false)
+                }
+                if conOrecchio {
+                    // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
+                    try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
+                } else {
+                    try? sessione.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                }
             }
             try? sessione.setActive(true)
             // la scelta si fa solo qui, quando nessuna delle due voci sta parlando: così non si accavallano

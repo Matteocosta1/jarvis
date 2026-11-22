@@ -430,9 +430,7 @@ private struct TabPagineVista: View {
         let piccola = p.piccola
         ZStack(alignment: .topLeading) {
             // il vetro sfocato e il fondo scuro (aperta 60 %, piccola 55 %), poi la cornice olografica
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .environment(\.colorScheme, .dark)
+            VetroTab()                                       // 13.8 (4): solo sfocatura, come il mockup (senza la tinta di iOS)
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                 .opacity(vetroPronto ? 1 : 0)
             Rectangle()

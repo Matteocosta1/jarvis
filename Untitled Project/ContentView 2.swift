@@ -232,7 +232,14 @@ struct ContentView: View {
             .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
                 Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
                     jarvis.impostaFoto(immagine)
-                    jarvis.ascoltaSubito()          // subito dopo la foto: «che disco è?»
+                    // 13.8 (4) (issue #18: «dopo aver selezionato una foto non deve partire subito con "Che cos'è?" e l'analisi»):
+                    // prima partiva l'ascolto e, in silenzio, la foto andava al cervello con «Che cos'è?». Ora la foto resta sopra il
+                    // campo (con la X per toglierla) e si apre la tastiera: il signore scrive, se vuole, e la manda lui con la freccia.
+                    // Mandata senza testo, la domanda è «Che cos'è?» (come prima); può anche toccare il reattore e chiederlo a voce.
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(450))   // la fotocamera/libreria finisce di chiudersi
+                        tastiera = true
+                    }
                 }
                 .ignoresSafeArea()
             }
@@ -2490,7 +2497,7 @@ struct RigaMessaggio: View {
                 if !m.azioni.isEmpty {
                     Text("▸ " + descriviAzioni(m.azioni))
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color(red: 0.36, green: 0.42, blue: 0.23))
+                        .foregroundStyle(Color.tenue)                   // 13.8 (4) (issue #18): grigio come le altre scritte, non verde oliva
                 }
             }
         }
