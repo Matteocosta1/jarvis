@@ -77,6 +77,9 @@ struct TendinaProtocolli: View {
     let margineAlto: CGFloat
     /// Quanto è giù (0 chiusa, 1 tutta aperta): passata la metà, la riga di scansione scende una volta.
     var visibile: Double = 1
+    /// 13.8 (4): chiamata sopra una sezione (dalla testata): il fondo quasi pieno (88 %, come la pagina davanti), così si legge;
+    /// sulla schermata di JARVIS trasparente (50 %). È la trasparenza dinamica, senza sfocatura.
+    var suSezione = false
     let chiudi: () -> Void
     @ObservedObject private var protocolli = Protocolli.condiviso
     @State private var scansioneDa: Date?
@@ -96,7 +99,7 @@ struct TendinaProtocolli: View {
         .background {
             let forma = UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
             forma
-                .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(TintaTab.vetroAperta))
+                .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(suSezione ? 0.88 : TintaTab.vetroAperta))
                 .overlay { LuceOlografica().clipShape(forma) }      // 13.8 (4): come le pagine olografiche, senza sfocatura: il fondo al 50 %, la luce ciano e le righe
                 .environment(\.colorScheme, .dark)
                 .overlay(alignment: .top) { scansione.clipShape(forma) }

@@ -436,6 +436,13 @@ struct ContentView: View {
             // 12 nov: l'app sta uscendo con un dialogo in corso: l'isola VOCE si accende adesso (iOS la permette solo da davanti)
             if fase == .inactive, jarvis.dialogoPuoContinuareFuori { jarvis.aggiornaIsolaVoce() }
         }
+        // 13.8 (4) (il signore, 22:34: «la tendina voglio poterla chiamare in ogni momento e in ogni sezione»): con una sezione
+        // davanti si tira giù dalla testata (TendinaOvunque, sulla finestra), con lo stesso inseguimento del dito di sempre
+        .onAppear {
+            TendinaOvunque.segue = { s in tendinaSegue(s) }
+            TendinaOvunque.lascia = { s, p in tendinaLasciata(s, previsto: p) }
+        }
+        .onChange(of: pila.davanti != nil && tendinaLibera && aiutoBea == nil, initial: true) { _, si in TendinaOvunque.attiva = si }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
             chiudiTutto()
@@ -1266,8 +1273,8 @@ struct ContentView: View {
             .ignoresSafeArea()
             .allowsHitTesting(tendinaAperta)
             .onTapGesture { chiudiTendina() }
-            .zIndex(19)
-        TendinaProtocolli(margineAlto: g.safeAreaInsets.top, visibile: quanto) { chiudiTendina() }
+            .zIndex(pila.davanti != nil ? 27 : 19)              // 13.8 (4): chiamata da una sezione, sta sopra la sezione (e sopra FILO)
+        TendinaProtocolli(margineAlto: g.safeAreaInsets.top, visibile: quanto, suSezione: pila.davanti != nil) { chiudiTendina() }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in if h > 100 { altezzaTendina = h } }
             .offset(y: y)
             .gesture(
@@ -1290,7 +1297,7 @@ struct ContentView: View {
             .opacity(quanto > 0 ? 1 : 0)                       // chiusa del tutto: nemmeno l'ombra sotto la barra di stato
             .allowsHitTesting(tendinaAperta)
             .accessibilityHidden(!tendinaAperta)
-            .zIndex(20)
+            .zIndex(pila.davanti != nil ? 28 : 20)
     }
 
     /// Giù col dito dal titolo o dal reattore: la tendina segue il dito (anche se torna su) e, lasciata oltre un terzo

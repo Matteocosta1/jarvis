@@ -25,6 +25,63 @@ enum TocchiSchermo {
     private static func aggancia(_ w: UIWindow) {
         guard !(w.gestureRecognizers ?? []).contains(where: { $0 is OsservaTocchi }) else { return }
         w.addGestureRecognizer(OsservaTocchi())
+        w.addGestureRecognizer(TiraTendina())                      // 13.8 (4): la tendina PROTOCOLLI dalla testata di ogni sezione
+    }
+}
+
+/// 13.8 (4) (il signore, 22 nov 22:34: «la tendina Protocolli voglio poterla chiamare in ogni momento e in ogni sezione»; scelta:
+/// swipe giù dalla testata). Con una sezione davanti, il dito che parte dalla testata (la fascia subito sotto l'ora: icona, nome,
+/// «Chiudi») e tira giù porta la tendina sopra la sezione, e la segue come sulla schermata di JARVIS. Lo scorrimento delle pagine
+/// non cambia (si parte dalla testata, non dalla pagina); lo swipe dal bordo in alto resta di iOS (Centro notifiche).
+@MainActor
+enum TendinaOvunque {
+    /// Una sezione è davanti e la tendina si può tirare (lo scrive ContentView).
+    static var attiva = false
+    /// Quante schede tirano già giù dalla loro barra per chiudersi (la mail proiettata): allora il gesto è loro.
+    static var occupata = 0
+    /// L'altezza della fascia della testata, sotto il margine in alto (l'ora e l'isola).
+    static let fascia: CGFloat = 76
+    /// Il dito che tira (spostamento) e che lascia (spostamento, dove arriverebbe lanciato): li collega ContentView.
+    static var segue: ((CGSize) -> Void)?
+    static var lascia: ((CGSize, CGSize) -> Void)?
+}
+
+/// Il gesto della tendina dalla testata: un pan sulla finestra che non ferma nessun altro gesto e non cancella i tocchi.
+private final class TiraTendina: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
+    init() {
+        super.init(target: nil, action: nil)
+        addTarget(self, action: #selector(muove(_:)))
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+        maximumNumberOfTouches = 1
+        delegate = self
+    }
+
+    func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+        guard TendinaOvunque.attiva, TendinaOvunque.occupata == 0, let v = view else { return false }
+        let t = translation(in: v), p = location(in: v)
+        let partenza = p.y - t.y, alto = v.safeAreaInsets.top
+        guard partenza >= alto - 4, partenza <= alto + TendinaOvunque.fascia else { return false }
+        return t.y > 0 && t.y > abs(t.x) * 1.2
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith altro: UIGestureRecognizer) -> Bool { true }
+
+    @objc private func muove(_ g: UIPanGestureRecognizer) {
+        guard let v = view else { return }
+        let t = g.translation(in: v), vel = g.velocity(in: v)
+        let spostamento = CGSize(width: t.x, height: t.y)
+        switch g.state {
+        case .began, .changed:
+            TendinaOvunque.segue?(spostamento)
+        case .ended:
+            TendinaOvunque.lascia?(spostamento, CGSize(width: t.x + vel.x * 0.25, height: t.y + vel.y * 0.25))
+        case .cancelled, .failed:
+            TendinaOvunque.lascia?(spostamento, spostamento)
+        default:
+            break
+        }
     }
 }
 

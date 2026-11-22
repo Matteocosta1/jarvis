@@ -101,6 +101,9 @@ struct ProiezioneMail<Contenuto: View>: View {
         .frame(width: larga, height: schermo.height, alignment: .topLeading)
         .ignoresSafeArea()
         .onAppear(perform: apri)
+        // 13.8 (4): la mail si chiude tirandola giù dalla sua barra: finché è aperta, quel gesto è suo (non chiama la tendina PROTOCOLLI)
+        .onAppear { TendinaOvunque.occupata += 1 }
+        .onDisappear { TendinaOvunque.occupata = max(0, TendinaOvunque.occupata - 1) }
     }
 
     private var trascina: some Gesture {
