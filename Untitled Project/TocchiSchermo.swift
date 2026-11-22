@@ -45,7 +45,10 @@ private final class OsservaTocchi: UIGestureRecognizer, UIGestureRecognizerDeleg
         BattitoMani.ignora(per: Self.silenzio)
         TocchiSchermo.ultimoTocco = Date()
         // 13.1: FILO sa dove si appoggia il dito (su di lui: a fuoco e fermo; fuori: in secondo piano)
-        if let t = touches.first { Filo.condiviso.toccoSchermo(t.location(in: nil)) }
+        if let t = touches.first {
+            Filo.condiviso.toccoSchermo(t.location(in: nil))
+            Pagine.condivisa.toccoSchermo(t.location(in: nil))     // 13.7: fuori dalla tab PAGINE la rimpicciolisce
+        }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {

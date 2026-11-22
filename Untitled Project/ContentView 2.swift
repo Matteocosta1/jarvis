@@ -38,7 +38,7 @@ struct ContentView: View {
     @State private var ascoltaDopoAvvio = false      // l'ascolto all'apertura parte a sequenza finita: col microfono aperto l'iPhone abbassa l'altoparlante (e il Mac registrerebbe la musica)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
-    @State private var sottotitolo = "AVVIO SISTEMI"
+    @State private var sottotitolo = ""                  // 13.7: si scrive decodificandosi (AVVIO SISTEMI all'avvio, poi SISTEMI IN LINEA, MARK XIII)
     @State private var testaArrivate = 0         // MARK X: quante icone in alto sono già arrivate (da destra, una alla volta, a tempo con l'avvio)
     /// 20 nov · avvio SINGOLO: quando è partita la voce d'avvio (lo zero dell'avvio olografico delle icone in alto); nil = scena spenta.
     @State private var avvioOlo: Date? = nil
@@ -76,6 +76,7 @@ struct ContentView: View {
     /// MARK XI: le sezioni aperte (fino a 10), nel contenitore sopra JARVIS al posto delle schermate di iOS.
     @StateObject private var pila = PilaSezioni()
     @State private var naviga = NavigaSezioni()                // i gesti fra le sezioni (letti solo dal contenitore)
+    @State private var ultimaDavanti: UUID?                    // 13.7: l'ultima sezione stata davanti (al centro della tab PAGINE)
     @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)
     @State private var riprendo: Sezione?                      // la sezione che torna davanti da dietro (non una richiesta nuova)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var giroDavanti: [UUID] = []                // le sezioni state davanti, dall'ultima: «Jarvis, quella di prima»
@@ -196,7 +197,20 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .jarvisComandoSezioni)) { n in
                 if let c = n.userInfo?["comando"] as? ComandoVocale { comandoSezioni(c) }
             }
-            .onChange(of: pila.davanti) { _, d in davantiCambiata(d) }
+            .onChange(of: pila.davanti) { prima, d in
+                if let prima { ultimaDavanti = prima }                // 13.7: la tab PAGINE si apre su questa
+                davantiCambiata(d)
+            }
+            // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (un secondo dopo che è arrivata, poi
+            // ogni tre secondi), mai mentre le pagine si muovono
+            .task(id: pila.davanti) {
+                guard let id = pila.davanti else { return }
+                try? await Task.sleep(for: .seconds(1.2))
+                while !Task.isCancelled, pila.davanti == id {
+                    if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 { Pagine.condivisa.fotografa(id) }
+                    try? await Task.sleep(for: .seconds(3))
+                }
+            }
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
             .onChange(of: jarvis.repartoRichiesto) { _, r in
                 guard let r else { return }
@@ -285,6 +299,7 @@ struct ContentView: View {
                         .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO
                         VStack(spacing: 0) {
                             registro
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }
                             barraTesto
                         }
                         .frame(width: max(0, min(860, g.size.width - 32)) / zc, height: (altezzaChat + 60) / zc)
@@ -309,6 +324,7 @@ struct ContentView: View {
                                 .transition(.opacity)
                         }
                         registro
+                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }   // 13.7
                         barraTesto
                     }
                     // 14 nov: con una sezione davanti del tutto, JARVIS sotto non è più «sullo schermo» per l'accessibilità (VoiceOver e
@@ -364,6 +380,17 @@ struct ContentView: View {
                 // 26 ott notte (il signore): lo swipe giù dal bordo in alto è di iOS (Centro notifiche), senza linguetta; i PROTOCOLLI
                 // scendono con lo swipe giù da metà pagina (titolo, reattore e corona, testi). Tolta la fascia dell'ora che li apriva.
                 tendina(g)
+                // 13.7 · PAGINE, la tab bassa (in basso a sinistra, accanto a IN ATTESA): sopra la schermata di JARVIS, sotto il menu
+                // SISTEMI, la tendina e le sezioni. Si forma all'avvio e si richiama con lo swipe verso destra dal bordo sinistro.
+                StratoPagine(voci: pila.voci,
+                             icone: Dictionary(tutteLeIcone.map { ($0.nome, $0.icona) }, uniquingKeysWith: { a, _ in a }),
+                             ultima: ultimaDavanti,
+                             sezioneDavanti: pila.davanti != nil,
+                             tastiera: tastiera,
+                             tendina: tendinaAperta || tendinaTrascina != 0,
+                             apri: { id in portaDavanti(id) },
+                             chiudi: { id in chiudiDietro(id) })
+                    .zIndex(9)
                 // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
                 // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
                 // scendono come le altre schede e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
@@ -475,6 +502,7 @@ struct ContentView: View {
         Suoni.apriAvvio()                   // 13 nov: da qui il tasto Azione o una notifica (anche nel primo istante) fanno sfumare la voce
         Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano (solo la prima volta)
         withAnimation(.spring(duration: 0.6 / Avvio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
+        sottotitolo = "AVVIO SISTEMI"                                    // 13.7: si scrive lettera per lettera mentre la testata compare
         let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
         if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
         Task { @MainActor in
@@ -505,6 +533,11 @@ struct ContentView: View {
             // Con «Riduci movimento» resta l'arrivo di prima (solo dissolvenza).
             let olo = !UIAccessibility.isReduceMotionEnabled
             if olo { oloStile = true; oloSpegni = nil; avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
+            // 13.7 · la tab PAGINE si forma su «interface» e dentro scorrono come dischi le icone di tutte le sezioni
+            if olo, let inizio = avvioOlo {
+                let el = tutteLeIcone
+                Pagine.condivisa.avvio(zero: inizio, nomi: el.map(\.nome), icone: el.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil })
+            }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
             // da Social a Impostazioni; il bagliore del titolo con l'ultima. Se la voce dell'avvio viene sfumata prima (il signore
@@ -603,6 +636,7 @@ struct ContentView: View {
     private func spegniOlo() {
         guard avvioOlo != nil, oloSpegni == nil else { return }
         oloSpegni = Date()
+        Pagine.condivisa.interrompiAvvio()                                 // 13.7: anche la tab PAGINE dell'avvio si richiude
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(AvvioOlo.fine - AvvioOlo.spegni + 0.05))
             avvioOlo = nil
@@ -791,13 +825,12 @@ struct ContentView: View {
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
                     .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text(sottotitolo)
+                    // 13.7 (il signore, 22 nov 00:50: «le scritte che vengono prima di MARK XIII con la stessa animazione dell'Apple
+                    // Watch, le lettere che girano come un computer»): ogni cambio si decodifica dalla scritta di prima (0,5 s)
+                    TestoDecodificato(testo: sottotitolo)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .tracking(3)
                         .foregroundStyle(sottotitolo == ContentView.marca ? Color.tenue : Color.ciano)
-                        .contentTransition(.numericText())
-                        .id(sottotitolo)
-                        .transition(.opacity)
                     // 8 nov · CUFFIE (il signore: «scritta piccola con logo cuffie, finché sono collegate, non invadente… accanto a
                     // MARK XI»): «· EARPODS» sulla stessa riga, stesso carattere e grigio, come il mockup v285; con la tastiera no
                     if !mini && sottotitolo == ContentView.marca { IndicatoreCuffie() }
@@ -1029,8 +1062,10 @@ struct ContentView: View {
                 .foregroundStyle(Color.ciano)
                 .contentTransition(.numericText())
                 .animation(.easeOut(duration: 0.3), value: jarvis.fase)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.fase = $0 }   // 13.7: la tab PAGINE si ferma prima
                 .padding(.top, 8)
             TelemetriaHUD(fase: jarvis.fase)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.tele = $0 }
                 .padding(.top, 4)
                 .opacity(acceso ? 1 : 0)
             if !jarvis.diagnosiMac.isEmpty {         // solo sul Mac: cosa sente il microfono in attesa
@@ -1045,6 +1080,7 @@ struct ContentView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
                 .multilineTextAlignment(.center)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.sugg = $0 }   // 13.7: la tab PAGINE finisce sopra
                 .padding(.horizontal, 24)
                 .frame(minHeight: 44)
 
@@ -1131,7 +1167,10 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity).frame(height: ContentView.latoCorona)          // largo quanto lo schermo: i nomi non vengono tagliati
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { rettCorona = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { q in
+            rettCorona = q
+            Pagine.condivisa.anello = (rett: q, angoli: ang, raggio: r, lato: ContentView.latoCorona)   // 13.7: il posto della tab PAGINE
+        }
         .contentShape(Rectangle())
         .highPriorityGesture(gestoCorona)                                          // MARK XI: sull'anello gira la ruota, altrove la tendina
         .frame(maxWidth: .infinity).frame(height: altezza, alignment: .top)       // sotto resta lo spazio per la chat
@@ -1216,7 +1255,7 @@ struct ContentView: View {
             .allowsHitTesting(tendinaAperta)
             .onTapGesture { chiudiTendina() }
             .zIndex(19)
-        TendinaProtocolli(margineAlto: g.safeAreaInsets.top) { chiudiTendina() }
+        TendinaProtocolli(margineAlto: g.safeAreaInsets.top, visibile: quanto) { chiudiTendina() }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in if h > 100 { altezzaTendina = h } }
             .offset(y: y)
             .gesture(
@@ -2289,18 +2328,8 @@ struct AnelliHUD: View {
                 // il controanello tratteggiato, che gira al contrario (la fase del tratteggio lo fa girare)
                 gc.stroke(cerchio(R * 0.9), with: .color(base.opacity(0.45)),
                           style: StrokeStyle(lineWidth: 1, dash: [1.6, 4.2], dashPhase: t * 0.12 * fretta * R * 0.9))
-                // il binario e i tre archi coi fermi
+                // il binario (13.7, VELO: senza i tre archi coi fermi, il signore 21 nov 20:30 «toglimi quelle 3 linee curve con le lineette»)
                 gc.stroke(cerchio(R * 0.855), with: .color(base.opacity(0.1)), lineWidth: 3.2)
-                var archi = Path(), fermi = Path()
-                for q in 0..<3 {
-                    let a = t * 0.32 * fretta + Double(q) * 2 * .pi / 3
-                    let l = 0.5 + (caldo ? 0.12 * sin(t * 3 + Double(q)) : 0)
-                    archi.move(to: punto(R * 0.855, a))
-                    archi.addArc(center: c, radius: R * 0.855, startAngle: .radians(a), endAngle: .radians(a + l), clockwise: false)
-                    for e in [a, a + l] { fermi.move(to: punto(R * 0.825, e)); fermi.addLine(to: punto(R * 0.885, e)) }
-                }
-                gc.stroke(archi, with: .color(base.opacity(0.85)), lineWidth: 2.4)
-                gc.stroke(fermi, with: .color(base.opacity(0.85)), lineWidth: 1.2)
                 // il raggio di scansione: una scia che sfuma dietro
                 let sa = t * 0.7 * fretta
                 for i in 0..<18 {

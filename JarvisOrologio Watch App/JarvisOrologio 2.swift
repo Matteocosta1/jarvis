@@ -581,10 +581,36 @@ final class JarvisOrologio: NSObject, ObservableObject {
         rispostaInStoria = false
     }
 
-    /// 24 ott, come sull'iPhone: in attesa il tocco sul reattore spegne il microfono (niente ascolto da solo dopo le risposte);
-    /// il tocco dopo lo riaccende e ascolta subito. Riaprendo l'app riparte acceso.
+    /// SPENTO: il microfono è sordo davvero (niente orecchio dell'attesa). Dal 13.7, come sull'iPhone, ci si arriva con la pressione
+    /// lunga sul reattore (prima col tocco); il tocco lo riaccende e ascolta subito. Riaprendo l'app riparte acceso.
     @Published var micSpento = false {
         didSet { if micSpento { chiudiAttesa() } else if fase == .attesa { programmaAttesa() } }   // build 31
+    }
+    /// 13.7 (il signore: «le modalità riservato e spento (con pressione lunga del dito)… anche su Apple Watch»), come l'iPhone del
+    /// 9 nov: RISERVATO, scelto col tocco sul reattore in attesa. L'orecchio dell'attesa resta aperto ma va avanti solo una frase con
+    /// «Jarvis»; niente congedo da solo. Un altro tocco torna IN ATTESA. Riaprendo l'app riparte IN ATTESA.
+    @Published var riservato = false
+    /// La pressione lunga: il dito che si alza subito dopo non è un tocco.
+    private var spentoLungo = Date.distantPast
+
+    /// Lo stato sotto le icone: IN ATTESA, RISERVATO, SPENTO (in attesa); LA ASCOLTO, ELABORO, PARLO (le parole dell'iPhone).
+    var etichettaFase: String {
+        switch fase {
+        case .attesa: return micSpento ? "SPENTO" : (riservato ? "RISERVATO" : "IN ATTESA")
+        case .ascolto: return "LA ASCOLTO"
+        case .elaboro: return "ELABORO"
+        case .parlo: return "PARLO"
+        }
+    }
+
+    /// 13.7 · la pressione lunga sul reattore (0,6 s, come l'iPhone): SPENTO. Vero se l'ha spento adesso (la vista vibra e suona).
+    /// Durante la sequenza d'avvio no: lì il microfono è già chiuso e il tocco serve a parlare subito.
+    @discardableResult func spegniMicrofono() -> Bool {
+        guard fase == .attesa, avvioFinito, !micSpento else { return false }
+        spentoLungo = Date()
+        riservato = false
+        micSpento = true
+        return true
     }
 
     func toccaReattore() {
@@ -600,7 +626,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 SuoniOrologio.sfumaAvvio()
                 return
             }
-            if micSpento { micSpento = false; Task { await self.ascolta() } } else { micSpento = true }
+            if Date().timeIntervalSince(spentoLungo) < 0.8 { return }   // il dito alzato dopo la pressione lunga non è un tocco
+            // 13.7 (come l'iPhone, logica del 9 nov): SPENTO → il tocco lo riaccende e ascolta subito; altrimenti il tocco passa fra
+            // IN ATTESA e RISERVATO (solo «Jarvis»)
+            if micSpento { micSpento = false; Task { await self.ascolta() } } else { riservato.toggle() }
         case .ascolto: fermaEInvia()
         case .elaboro, .parlo:
             micSpento = false
@@ -677,7 +706,7 @@ final class JarvisOrologio: NSObject, ObservableObject {
         let da = Date()
         congedo = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(9))
-            guard let self, !Task.isCancelled, self.fase == .attesa, self.primoPiano, !self.micSpento, Battute.umore != .fretta,
+            guard let self, !Task.isCancelled, self.fase == .attesa, self.primoPiano, !self.micSpento, !self.riservato, Battute.umore != .fretta,
                   (self.inizioUltimaFrase ?? .distantPast) <= da, Date().timeIntervalSince(self.ultimoCongedo) > 15 * 60 else { return }
             self.ultimoCongedo = Date()
             let frase = Battute.congedo()
@@ -1173,6 +1202,15 @@ final class JarvisOrologio: NSObject, ObservableObject {
         programmaAttesa()
     }
 
+    /// 13.7 · RISERVATO: nella frase c'è il suo nome («Jarvis», anche come lo scrive a volte la trascrizione).
+    nonisolated static func chiamaJarvis(_ t: String) -> Bool {
+        let parole = t.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT"))
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
+            .split(separator: " ")
+        return parole.contains { ["jarvis", "giarvis", "jervis"].contains(String($0)) }
+    }
+
     /// Nella trascrizione ci sono parole vere (non vuota, non solo «ah», «mh», versi).
     nonisolated static func paroleVere(_ t: String) -> Bool {
         let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1199,6 +1237,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 self.livelloUltimaFrase = nil            // un rumore: non diventa la sua «voce abituale»
                 return
             }
+            // 13.7 · RISERVATO: va avanti solo una frase che lo chiama per nome (le altre restano fuori, senza bip né scritte)
+            if self.riservato, !JarvisOrologio.chiamaJarvis(t) { return }
             self.chiudiAttesa()
             self.fase = .elaboro
             self.stato = "Trascrivo…"
@@ -1768,7 +1808,10 @@ final class JarvisOrologio: NSObject, ObservableObject {
                     let (testo, errore) = await JarvisOrologio.trascrivi(u.audio, token: token, indirizzo: JarvisOrologio.indirizzoAscolto)
                     let esito = TrascrittoOrologio(testo: testo, errore: errore, vuoto: false)
                     if u.canale.silenzioso {                     // partita da sola: solo con parole vere
-                        guard errore == nil, JarvisOrologio.paroleVere(testo ?? "") else { u.canale.consegna(esito); tornaInAttesaMuto(); return }
+                        // 13.7 · RISERVATO: solo una frase che lo chiama per nome
+                        guard errore == nil, JarvisOrologio.paroleVere(testo ?? ""), !riservato || JarvisOrologio.chiamaJarvis(testo ?? "") else {
+                            u.canale.consegna(esito); tornaInAttesaMuto(); return
+                        }
                         u.canale.silenzioso = false
                     }
                     u.canale.consegna(esito)
@@ -1919,7 +1962,8 @@ final class JarvisOrologio: NSObject, ObservableObject {
                 let t = (e["d"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if t.isEmpty, e["errore"] != nil { canale.presa.chiudi(); return .ripiega }
                 if canale.silenzioso {                                 // partita da sola in attesa: si va avanti solo con parole vere
-                    guard JarvisOrologio.paroleVere(t) else { livelloUltimaFrase = nil; canale.consegna(TrascrittoOrologio(testo: nil, errore: nil, vuoto: true)); canale.presa.chiudi(); return .silenzio }
+                    // 13.7 · RISERVATO: solo una frase che lo chiama per nome (le altre restano fuori, come un rumore)
+                    guard JarvisOrologio.paroleVere(t), !riservato || JarvisOrologio.chiamaJarvis(t) else { livelloUltimaFrase = nil; canale.consegna(TrascrittoOrologio(testo: nil, errore: nil, vuoto: true)); canale.presa.chiudi(); return .silenzio }
                     canale.silenzioso = false
                 }
                 imparaVoce(t)                                          // build 30: parole vere → la sua voce abituale

@@ -100,6 +100,8 @@ enum SuoniOrologio {
     static func clickTesta() { sfumaAvvio(); suona(file("clicktesta") ?? file("tick"), volume: 1.0) }   // 13 nov: come il tocco, la voce dell'avvio sfuma
     /// La conversazione si svuota: «chatsvuota», 70%.
     static func chatSvuota() { suona(file("chatsvuota"), volume: 1.0) }
+    /// 13.7: la pressione lunga sul reattore, microfono SPENTO: lo stesso suono dell'iPhone («spento», scelto dal signore il 9 nov).
+    static func spento() { suona(file("spento"), volume: 1.0) }
     /// La conversazione si ricarica all'avvio: «chatcarica», 70%.
     static func chatCarica() { suona(file("chatcarica"), volume: 0.7) }
     /// Apertura delle sezioni senza fotocamera (Bea, Spesa): «apertura», 70%; «schedaPronta» lo sfuma.
@@ -150,7 +152,8 @@ struct VistaOrologio: View {
     @State private var mostraVitals = false
     @State private var accese = 0                        // quante icone si sono già accese all'avvio
     @State private var acceso = false                    // sequenza di avvio: reattore e icone si accendono in fila
-    @State private var titolo = "AVVIO SISTEMI"
+    @State private var zeroAvvio: Date?                  // 13.7: l'inizio della traccia d'avvio (sul suono che si sente): la testa si scrive a tempo
+    @State private var testaFinita = false               // 13.7: la testa ha finito di scriversi (J.A.R.V.I.S. · MARK XIII · SISTEMI IN LINEA)
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
     @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
@@ -232,6 +235,7 @@ struct VistaOrologio: View {
         .onChange(of: mostraSentinella) { _, _ in aggiornaRegia() }
         .onChange(of: scena) { _, fase in
             jarvis.scenaCambiata(attiva: fase == .active)       // build 30: fuori schermo niente ascolti da soli
+            if fase == .active { PonteOrologio.condiviso.mandaBatteria() }   // 13.7: la batteria del polso per la tab PAGINE
             if fase == .active { PosizioneOrologio.risveglia() } else if fase == .background { PosizioneOrologio.dormi(); jarvis.vaInSottofondo() }
         }
         // comando vocale: «apri il meteo», «fammi vedere la spesa»
@@ -389,7 +393,14 @@ struct VistaOrologio: View {
             let pre = AvvioOrologio.anticipo(0, elenco.count)
             SuoniOrologio.avvio(fra: pre)                                  // programmata al campione: niente ritardi del Task
             // un solo orologio: niente pause in fila che sommano i ritardi; il suono arriva all'altoparlante un attimo dopo
-            let zero = Date().addingTimeInterval(pre + AVAudioSession.sharedInstance().outputLatency)
+            // 13.7 (il signore: «il timing delle icone perfetto, clic per clic»): + 19 ms, l'attacco del clic dentro la traccia
+            // (misurato: il suono del clic parte 17–21 ms dopo il colpo della partitura), come il mockup
+            let zero = Date().addingTimeInterval(pre + AVAudioSession.sharedInstance().outputLatency + 0.019)
+            zeroAvvio = zero
+            Task { @MainActor in                                       // la testa finita: a voce finita compare lo stato
+                try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + VoceAvvioPolso.fine + 0.2)))
+                withAnimation(.easeOut(duration: 0.35)) { testaFinita = true }
+            }
             var prima = -10.0, kv = 0
             for k in 0..<elenco.count {
                 // ogni icona parte prima del suo colpo di quanto la sua molla ci mette ad «arrivare»: l'arrivo cade sul beep
@@ -430,7 +441,6 @@ struct VistaOrologio: View {
             }
             let resta = (colpi.last ?? 0) + 0.370 / v - Date().timeIntervalSince(zero)   // la coda della musica
             if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
-            withAnimation(.easeOut(duration: 0.3)) { titolo = "SISTEMI IN LINEA" }
             vibra(.click)
             if !jarvis.risposta.isEmpty || !jarvis.domanda.isEmpty {     // c'è la conversazione di prima: si ricarica decodificandosi
                 try? await Task.sleep(for: .seconds(0.9 / v))         // un respiro, come sull'iPhone
@@ -446,8 +456,6 @@ struct VistaOrologio: View {
                 await SuoniOrologio.attendiFineAvvio()                  // 12.0 (14): la voce di JARVIS II finisce (o sfuma) prima del microfono
                 jarvis.ascoltaDopoAvvio()
             }
-            try? await Task.sleep(for: .seconds(2.2 / v))
-            withAnimation(.easeOut(duration: 0.5)) { titolo = "J.A.R.V.I.S. · MARK XIII" }
         }
     }
 
@@ -475,36 +483,51 @@ struct VistaOrologio: View {
     private var principale: some View {
         ScrollView {
             VStack(spacing: 8) {
-                Text(titolo)
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .tracking(1.5)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)                                 // 13.0: «MARK XIII» è una lettera più lunga: sempre su una riga
-                    .foregroundStyle(ReattoreOrologio.colore(caldo ? 1 : 0, titolo == "J.A.R.V.I.S. · MARK XIII" ? 0.8 : 1, schiarisci: titolo == "SISTEMI IN LINEA" ? 0.4 : 0))
-                    .shadow(color: .white.opacity(titolo == "J.A.R.V.I.S. · MARK XIII" ? 0.35 : 0), radius: 4)   // MARK X: leggero bagliore bianco, fermo
-                    .id(titolo)
-                    .transition(.opacity)
-                    .opacity(acceso ? 1 : 0)
-                Button { jarvis.toccaReattore() } label: { reattore }   // 26 ott sera: niente click in più, la vibrazione d'inizio ascolto basta
-                    .modifier(DoppioTocco())                                // 12.0 (12) · C2: il doppio tocco delle dita fa come il tocco
-                    .buttonStyle(StileStarkOrologio())
-                    .scaleEffect(acceso ? 1 : 0.6)
-                    .opacity(acceso ? 1 : 0)
-                    .modifier(VeloPolso(ruota: ruota))
-                    .overlay {
-                        // MARK XI: l'ologramma dell'icona al centro della barra, al posto del reattore; toccato, apre la sezione
-                        OlogrammaPolso(ruota: ruota, nomi: scorciatoie.map { nomeScorciatoia($0.frase) }, gruppi: scorciatoie.map(\.gruppo),
-                                       icona: { k in iconaOlogramma(scorciatoie[k].icona) },
-                                       apri: { k in ruota.spegni(); toccaScorciatoia(k) })
+                // 13.7 (il signore, 21 nov 21:47: «questo è il layout da seguire»; mockup «JARVIS Approvato»): in alto J.A.R.V.I.S. e
+                // MARK XIII con sotto la riga dei sistemi; SINTESI grande; le icone un po' sopra il reattore; sotto le icone lo stato
+                // del microfono e la riga «Tocchi il reattore e parli, Sir», tutti e due ciano
+                VStack(spacing: 4) {
+                    TestaPolso(zero: zeroAvvio, finita: testaFinita)
+                    Button { jarvis.toccaReattore() } label: { reattore }   // 26 ott sera: niente click in più, la vibrazione d'inizio ascolto basta
+                        .modifier(DoppioTocco())                                // 12.0 (12) · C2: il doppio tocco delle dita fa come il tocco
+                        .buttonStyle(StileStarkOrologio())
+                        // 13.7 (come l'iPhone): la pressione lunga spegne il microfono (SPENTO); il dito che si alza dopo non è un tocco
+                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in
+                            if jarvis.spegniMicrofono() { vibra(.click); SuoniOrologio.spento() }   // il tocco leggero (gli altri hanno il bip), poi «spento»
+                        })
+                        .scaleEffect(acceso ? 1 : 0.6)
+                        .opacity(acceso ? 1 : 0)
+                        .modifier(VeloPolso(ruota: ruota))
+                        .overlay {
+                            // MARK XI: l'ologramma dell'icona al centro della barra, al posto del reattore; toccato, apre la sezione
+                            OlogrammaPolso(ruota: ruota, nomi: scorciatoie.map { nomeScorciatoia($0.frase) }, gruppi: scorciatoie.map(\.gruppo),
+                                           icona: { k, lato in iconaOlogramma(scorciatoie[k].icona, lato: lato) },
+                                           apri: { k in ruota.spegni(); toccaScorciatoia(k) })
+                        }
+
+                    barraRapida
+                        .padding(.top, -30)                                  // le icone un po' sopra SINTESI
+                        .zIndex(1)
+
+                    Text(jarvis.etichettaFase)
+                        .font(.system(size: 7.5, weight: .bold, design: .monospaced)).tracking(1.6)
+                        .foregroundStyle(TintaOrologio.ciano)
+                        .lineLimit(1)
+                        .frame(height: 9)
+                        .padding(.top, 1)
+                        .opacity(testaFinita ? 1 : 0)                        // all'avvio compare a voce finita
+                        .animation(.easeOut(duration: 0.35), value: testaFinita)
+
+                    if jarvis.fase == .attesa && (jarvis.micSpento || jarvis.riservato || (jarvis.risposta.isEmpty && jarvis.stato == nil)) {
+                        // SPENTO e RISERVATO con le parole dell'iPhone (approvate il 9 nov)
+                        Text(jarvis.micSpento ? "Non ascolto nulla · tocchi il reattore per parlare"
+                             : jarvis.riservato ? "Sento solo «Jarvis» · un tocco per tutto" : "Tocchi il reattore e parli, Sir")
+                            .font(.system(size: 11))
+                            .foregroundStyle(TintaOrologio.ciano)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 6)
+                            .padding(.top, -2)
                     }
-
-                barraRapida
-
-                if jarvis.fase == .attesa && (jarvis.micSpento || (jarvis.risposta.isEmpty && jarvis.stato == nil)) {
-                    Text(jarvis.micSpento ? "MICROFONO SPENTO" : "Tocchi il reattore e parli, Sir")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                 }
 
                 // In alternativa si scrive (tastiera o scarabocchio).
@@ -569,16 +592,14 @@ struct VistaOrologio: View {
 
     private var caldo: Bool { jarvis.fase == .elaboro || jarvis.fase == .parlo }
 
+    /// 13.7 · SINTESI grande (21 nov 21:23): il riquadro è largo quanto lo schermo e alto 142 punti, il disegno (208 punti) ne esce
+    /// un poco e sfuma; lo stato non è più dentro il reattore ma sotto le icone.
     private var reattore: some View {
-        ZStack {
-            ReattoreOrologio(fase: jarvis.fase)
-            Text(etichetta)
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .tracking(1)
-                .foregroundStyle(.white.opacity(0.85))
-                .offset(y: 38)
-        }
-        .frame(width: 112, height: 112)
+        ReattorePolso(ruota: ruota, fase: jarvis.fase)
+            .frame(width: 208, height: 208)
+            .frame(maxWidth: .infinity)
+            .frame(height: 142)
+            .contentShape(Circle())
     }
 
     /// Sfondo: un bagliore azzurro o arancione secondo la fase.
@@ -647,11 +668,12 @@ struct VistaOrologio: View {
     }
 
     /// L'icona nell'ologramma: i simboli a 34 punti, i disegni e i loghi (fatti per 15) ingranditi alla stessa misura.
-    @ViewBuilder private func iconaOlogramma(_ icona: String) -> some View {
+    /// L'icona dell'ologramma grande `lato` punti (le proporzioni di prima, fatte per 64: 34 punti, i loghi × 2,4).
+    @ViewBuilder private func iconaOlogramma(_ icona: String, lato: Double = 64) -> some View {
         if icona.hasPrefix("logo:") || ["archivio", "satellite", "vinile"].contains(icona) {
-            iconaScorciatoia(icona).scaleEffect(2.4)
+            iconaScorciatoia(icona).scaleEffect(2.4 * lato / 64)
         } else {
-            iconaScorciatoia(icona).font(.system(size: 34))
+            iconaScorciatoia(icona).font(.system(size: 34 * lato / 64))
         }
     }
 
@@ -732,7 +754,16 @@ struct VistaOrologio: View {
                             .font(.system(size: 14))
                             .symbolEffect(.pulse, options: .repeating, isActive: inCorso)
                             .frame(width: 34, height: 34)
-                            .background(ReattoreOrologio.colore(caldo ? 1 : 0, inCorso ? 0.3 : 0.12, schiarisci: 0))
+                            // 13.7 (il signore: «le icone un po' meno trasparenti, che giocano con la trasparenza» sopra SINTESI): fondo
+                            // scuro velato col colore sopra, chiaro in alto; il reattore si intravede dietro
+                            .background {
+                                ZStack {
+                                    Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.58)
+                                    RadialGradient(colors: [ReattoreOrologio.colore(caldo ? 1 : 0, inCorso ? 0.3 : 0.2, schiarisci: 0),
+                                                            ReattoreOrologio.colore(caldo ? 1 : 0, inCorso ? 0.3 : 0.07, schiarisci: 0)],
+                                                   center: UnitPoint(x: 0.5, y: 0.38), startRadius: 0, endRadius: 19)
+                                }
+                            }
                             .overlay(Circle().stroke(ReattoreOrologio.colore(caldo ? 1 : 0, inCorso ? 1 : 0.5, schiarisci: 0), lineWidth: inCorso ? 1.4 : 0.8))
                             .overlay(AnelloRotanteOrologio(attivo: inCorso, colore: ReattoreOrologio.colore(caldo ? 1 : 0, 1, schiarisci: 0.3)))
                             .clipShape(Circle())
@@ -771,17 +802,11 @@ struct VistaOrologio: View {
         // 5 nov (il signore: «mentre le scorro JARVIS si illumina di arancio e cerca di ascoltare»): con la ruota viva il
         // microfono d'attesa è spento; si riapre fatta la scelta (o spenta la ruota dopo 5 s)
         .onReceive(ruota.$vivo.removeDuplicates()) { vivo in jarvis.iconeInMoto = vivo }
+        // 13.7: toccato il reattore durante l'avvio (la voce sfuma e JARVIS ascolta) la testa si completa subito, e lo stato si vede
+        .onChange(of: jarvis.fase) { _, f in if f != .attesa, zeroAvvio != nil, !testaFinita { withAnimation(.easeOut(duration: 0.35)) { testaFinita = true } } }
         .disabled(jarvis.fase == .elaboro)
     }
 
-    private var etichetta: String {
-        switch jarvis.fase {
-        case .attesa: return "JARVIS"
-        case .ascolto: return "ASCOLTO"
-        case .elaboro: return "…"
-        case .parlo: return "PARLO"
-        }
-    }
 }
 
 /// Tasti alla Stark anche sul polso: si schiacciano, si illuminano e tornano su con una molla.
@@ -1318,6 +1343,109 @@ struct TestoChatOrologio: View {
 
 
 /// I numeri dell'avvio al polso (+35%; la raffica finale in anticipo di 110 ms con la molla svelta).
+/// 13.7 · le parole della voce d'avvio al polso (secondi dall'inizio della traccia «avvioorologio»; la voce è la stessa
+/// dell'iPhone, misurata: 0 ms di scarto; i tempi del mockup `VOCE_AVVIO`).
+enum VoceAvvioPolso {
+    static let importing = 10.02        // «Importing»: J.A.R.V.I.S. comincia a scriversi…
+    static let from = 11.30             // …fino a «from»
+    static let home = 11.46             // «home interface»: MARK XIII
+    static let fineInterface = 12.20
+    static let systems = 13.14          // «Systems»: AVVIO SISTEMI diventa SISTEMI IN LINEA…
+    static let operational = 14.44      // …fino a «operational», con un lampo
+    static let fine = 15.08             // la voce è finita
+}
+
+/// 13.7 · la testa del polso (il signore, 21 nov 21:47: «questo è il layout da seguire»; mockup «JARVIS Approvato»): J.A.R.V.I.S. a
+/// sinistra e MARK XIII a destra, sotto al centro e piccola, in grigio, la riga dei sistemi. All'avvio si scrivono decodificandosi
+/// a tempo con la voce: AVVIO SISTEMI col reattore, J.A.R.V.I.S. su «Importing… from», MARK XIII su «home interface», poi AVVIO
+/// SISTEMI diventa SISTEMI IN LINEA, lettera per lettera, da «Systems» a «operational», con un lampo. Tutto è una funzione del
+/// tempo della traccia (niente ritardi in fila).
+private struct TestaPolso: View {
+    /// L'inizio della traccia d'avvio, sul suono che si sente (nil: la traccia non è ancora partita).
+    let zero: Date?
+    /// La testa è scritta (finita la voce, o toccato il reattore durante l'avvio).
+    let finita: Bool
+
+    private static let testa = "J.A.R.V.I.S.", marca = "MARK XIII", avvio = "AVVIO SISTEMI", linea = "SISTEMI IN LINEA"
+    private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
+
+    var body: some View {
+        if finita {
+            righe(TestaPolso.testa, TestaPolso.marca, TestaPolso.linea, lampo: 0)
+        } else if let zero {
+            TimelineView(.animation) { ctx in
+                let t = ctx.date.timeIntervalSince(zero), V = VoceAvvioPolso.self
+                let sotto: String = t < V.systems
+                    ? TestaPolso.decodifica(TestaPolso.avvio, min(1, max(0, (t + 0.25) / 0.75)))
+                    : TestaPolso.trasforma(TestaPolso.avvio, TestaPolso.linea, min(1, (t - V.systems) / (V.operational - V.systems)))
+                let pT = min(1, max(0, (t - V.importing) / (V.from - V.importing)))
+                let pC = min(1, max(0, (t - V.home) / (V.fineInterface - V.home)))
+                // il lampo: 0,34 s dopo «operational», con 0,25 s per accendersi e spegnersi (la transizione del mockup)
+                let lampo = min(1, max(0, (t - V.operational) / 0.25)) * min(1, max(0, (V.operational + 0.34 + 0.25 - t) / 0.25))
+                righe(t >= V.importing ? TestaPolso.decodifica(TestaPolso.testa, pT) : " ",
+                      pC > 0 ? TestaPolso.decodifica(TestaPolso.marca, pC) : " ", sotto, lampo: lampo)
+            }
+        } else {
+            righe(" ", " ", " ", lampo: 0)
+        }
+    }
+
+    private func righe(_ a: String, _ b: String, _ c: String, lampo: Double) -> some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 0) {
+                Text(a)
+                Spacer(minLength: 4)
+                Text(b)
+            }
+            .font(.system(size: 8.5, weight: .semibold, design: .monospaced)).tracking(1.2)
+            .foregroundStyle(TintaOrologio.ciano)
+            .lineLimit(1)
+            .frame(height: 11)
+            Text(c)
+                .font(.system(size: 6.5, weight: .semibold, design: .monospaced)).tracking(1.6)
+                .foregroundStyle(Color(red: (190 + 33 * lampo) / 255, green: (205 + 45 * lampo) / 255, blue: (210 + 45 * lampo) / 255)
+                    .opacity(0.55 + 0.4 * lampo))
+                .shadow(color: TintaOrologio.ciano.opacity(0.9 * lampo), radius: 3)
+                .lineLimit(1)
+                .frame(height: 8)
+        }
+        .padding(.horizontal, 13)                          // 17 punti dal bordo, come il mockup (la vista ne ha già 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("J.A.R.V.I.S. MARK XIII, sistemi in linea")
+    }
+
+    /// La scritta che si decodifica: le lettere scoperte, tre glifi che cambiano davanti, il resto vuoto (spazi e punti restano).
+    private static func decodifica(_ testo: String, _ p: Double) -> String {
+        let c = Array(testo), n = Double(c.count)
+        return String(c.enumerated().map { i, ch -> Character in
+            if ch == " " || ch == "·" || ch == "." { return ch }
+            if Double(i) < p * n { return ch }
+            if p > 0 && Double(i) < p * n + 3 { return TestaPolso.glifi.randomElement() ?? ch }
+            return " "
+        })
+    }
+
+    /// Da una scritta all'altra, lettera per lettera (tre glifi sul fronte).
+    private static func trasforma(_ da: String, _ a: String, _ p: Double) -> String {
+        let x = Array(da), y = Array(a), n = max(x.count, y.count), f = p * Double(n)
+        var q = ""
+        for i in 0..<n {
+            if Double(i) < f { if i < y.count { q.append(y[i]) } }
+            else if Double(i) < f + 3 && p > 0 { q.append(i < y.count && y[i] == " " ? " " : (TestaPolso.glifi.randomElement() ?? " ")) }
+            else if i < x.count { q.append(x[i]) }
+        }
+        return q
+    }
+}
+
+/// 13.7 · il reattore del polso: si ferma sull'ultimo fotogramma mentre c'è l'ologramma della ruota (è velato all'1,5 %: così
+/// l'orologio disegna solo l'ologramma).
+private struct ReattorePolso: View {
+    @ObservedObject var ruota: RuotaPolso
+    let fase: JarvisOrologio.Fase
+    var body: some View { ReattoreOrologio(fase: fase, fermo: ruota.vivo) }
+}
+
 enum AvvioOrologio {
     static let velocita = 1.15          // il polso è piccolo: +15%, scelto dal signore sul mock (l'iPhone resta a +60%)
     /// L'apertura di un'app sul Watch (lo zoom dall'icona) dura circa mezzo secondo: la sequenza parte quando lo schermo si vede.

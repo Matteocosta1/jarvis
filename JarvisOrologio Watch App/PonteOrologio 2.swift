@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import WatchKit
 
 /// Il ponte con l'iPhone: riceve la parola d'ordine (e l'indirizzo del cervello) senza doverli scrivere sull'orologio,
 /// chiede le foto della galleria e parla con la Sentinella (allarmi, «Guarda ora», «Disattiva»).
@@ -26,6 +27,25 @@ final class PonteOrologio: NSObject {
         if !forza, Date().timeIntervalSince(ultimoSegnaleUso) < 3 { return }
         ultimoSegnaleUso = Date()
         s.sendMessage(["orologio": "in uso"], replyHandler: nil, errorHandler: nil)
+    }
+
+    /// 13.7 · la tab PAGINE dell'iPhone mostra la batteria dell'orologio (e il fulmine se è in carica): l'orologio la manda quando
+    /// l'app si sveglia e quando cambia di almeno un punto. Subito se l'iPhone è raggiungibile, altrimenti in coda (arriva appena
+    /// può). Al massimo una volta al minuto, se non cambia niente.
+    private var ultimaBatteria: (livello: Int, carica: Bool, quando: Date)?
+    func mandaBatteria() {
+        guard WCSession.isSupported() else { return }
+        let d = WKInterfaceDevice.current()
+        d.isBatteryMonitoringEnabled = true
+        guard d.batteryLevel >= 0 else { return }
+        let livello = Int((d.batteryLevel * 100).rounded())
+        let carica = d.batteryState == .charging || d.batteryState == .full
+        if let u = ultimaBatteria, u.livello == livello, u.carica == carica, Date().timeIntervalSince(u.quando) < 60 { return }
+        let s = WCSession.default
+        guard s.activationState == .activated else { return }
+        ultimaBatteria = (livello, carica, Date())
+        let m: [String: Any] = ["polso_batteria": livello, "polso_carica": carica, "quando": Date().timeIntervalSince1970]
+        if s.isReachable { s.sendMessage(m, replyHandler: nil, errorHandler: nil) } else { s.transferUserInfo(m) }
     }
 
     /// Chiede la parola d'ordine all'iPhone. Vero se ne è arrivata una.
@@ -283,6 +303,7 @@ extension PonteOrologio: WCSessionDelegate {
         Task { @MainActor in
             self.salva(consegna)
             self.sbloccaAttese()
+            self.mandaBatteria()                    // 13.7: la batteria del polso per la tab PAGINE dell'iPhone
         }
     }
 

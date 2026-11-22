@@ -114,6 +114,11 @@ final class Filo: ObservableObject {
     private var riposa: Task<Void, Never>?
     /// Dove sta la scheda sullo schermo (coordinate della finestra): un tocco fuori la manda in secondo piano.
     var rettScheda: CGRect = .zero
+    /// 13.7: dove stanno i tre tasti (chiudi, riduci, apri): il dito lì non sveglia la tab (se no da piccola si aprirebbe sotto il
+    /// dito e il tasto non arriverebbe), come il mockup.
+    var rettTasti: CGRect = .zero
+    /// 13.7: l'argomento che sta uscendo a sinistra (chiuso con lo swipe): la sua uscita va verso sinistra invece che a destra.
+    @Published var esceASinistra: String?
     private var pulizia: Task<Void, Never>?
 
     // MARK: Il filo
@@ -475,6 +480,7 @@ final class Filo: ObservableObject {
     /// subito in secondo piano.
     func toccoSchermo(_ p: CGPoint) {
         guard !visti.isEmpty, !daParte, rettScheda.width > 0 else { return }
+        if rettTasti.width > 0, rettTasti.insetBy(dx: -4, dy: -7).contains(p) { return }   // 13.7: i tre tasti fanno solo il loro
         if rettScheda.contains(p) {
             if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
             svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta
@@ -483,6 +489,20 @@ final class Filo: ObservableObject {
             riposa?.cancel()
             fuoco = false
         }
+    }
+
+    /// 13.7 · il tasto «riduci» (il signore, 21 nov 20:22: «come quelli di Apple: uno per farla grande, uno per chiuderla e uno per
+    /// ridurla»): la tab compatta, una riga per argomento, subito.
+    func riduci() {
+        riposa?.cancel()
+        guard !visti.isEmpty else { return }
+        fuoco = false
+    }
+
+    /// 13.7 · il tasto «apri»: la tab intera (poi, come sempre, compatta 2,8 s dopo se nessuno la tocca).
+    func apri() {
+        guard !visti.isEmpty else { return }
+        svegli()
     }
 
     /// Il tocco che l'ha appena riaperta (era compatta): vero una volta sola, e chi lo riceve non fa niente (come il Dock).

@@ -191,6 +191,12 @@ nonisolated final class PonteTelefono: NSObject, WCSessionDelegate, @unchecked S
     /// L'orologio avvisa che il signore lo sta usando (ascolta, pensa o parla): vedi `OrologioInUso`.
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         if message["orologio"] != nil { OrologioInUso.segnala() }
+        StatoPolso.ricevi(message)                                   // 13.7: la batteria del polso (tab PAGINE)
+    }
+
+    /// 13.7: la batteria del polso arrivata in coda (l'iPhone non era raggiungibile quando l'orologio l'ha mandata).
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        StatoPolso.ricevi(userInfo)
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {

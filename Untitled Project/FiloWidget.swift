@@ -11,6 +11,15 @@ import UIKit
 // rimanda via. Scelta SCORRI (23:02): gli argomenti uno sotto l'altro, giù e su. Sopra una sezione FILO è vetro con la
 // trasparenza dinamica della PILA (13.1). Misure, colori e tempi come il mockup (v1216/q16-9.js, q16-9.css).
 
+/// 13.7 (il signore, 21 nov 20:05: «tutto deve essere in gradazione di ciano»): niente più bianco nelle tab; il più chiaro è il
+/// ciano chiaro #bff6ff, poi #8ff0ff (Olo.ciano) e #4fe3ff (Olo.azzurro). La stessa luce nella tab bassa (PAGINE).
+enum TintaTab {
+    static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)
+    /// La trasparenza dinamica delle due tab (22 nov 01:04): aperta 60 %, piccola 55 %.
+    static let vetroAperta = 0.6
+    static let vetroPiccola = 0.55
+}
+
 /// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la fascia invisibile del bordo destro che lo richiama quando è via.
 struct StratoFilo: View {
     @ObservedObject private var filo = Filo.condiviso
@@ -163,9 +172,9 @@ private struct SchedaFilo: View {
     static let larghezza: CGFloat = 212
     static let altezzaMassima: CGFloat = 200
 
-    /// Quanto è pieno il fondo scuro: sulla schermata di JARVIS 0,93 come sempre; sopra una sezione come il vetro della PILA
-    /// (0,5 + 0,38 × fuoco): 0,88 a fuoco, 0,5 in secondo piano.
-    private var fondoVoluto: Double { vetro ? (filo.fuoco ? 0.88 : 0.5) : 0.93 }
+    /// Quanto è pieno il fondo scuro. 13.7 (il signore, 22 nov 01:04: «la trasparenza dinamica: piccola 55 %, aperta 60 %»): uguale
+    /// sulla schermata di JARVIS e sopra una sezione, con il vetro sfocato dietro (prima 0,93 su JARVIS; 0,88 / 0,5 sopra una sezione).
+    private var fondoVoluto: Double { filo.fuoco ? TintaTab.vetroAperta : TintaTab.vetroPiccola }
 
     var body: some View {
         let altezza = min(Self.altezzaMassima, max(30, contenuto))
@@ -173,13 +182,39 @@ private struct SchedaFilo: View {
             // 14 nov (il signore: «in alto FILO, ma che c'entra? mostri solo l'headline con scritto meteo»): niente testata FILO,
             // si vedono solo gli argomenti (METEO, AGENDA…) col loro nome
             Color.clear.frame(height: 22)                                        // lo spazio della testata resta (come prima)
+            // 13.7 (il signore, 21 nov 20:22–20:38): i tre tasti come quelli di Apple, in alto a destra dentro la tab, con la linea
+            // sotto; si toccano anche da piccola (e il dito lì non la sveglia)
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                TastiTab(chiudi: {
+                    Suoni.filoVia()                                                // suono e tocco insieme (Aptica.tabVia)
+                    withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { Filo.condiviso.rimandaVia() }
+                }, riduci: {
+                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { Filo.condiviso.riduci() }
+                }, apri: {
+                    withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { Filo.condiviso.apri() }
+                })
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { filo.rettTasti = $0 }
+            }
+            .frame(height: 14, alignment: .top)
+            .padding(.bottom, 5)
+            .overlay(alignment: .bottom) {
+                // la linea sotto i tasti, poi gli argomenti
+                LinearGradient(colors: [Olo.azzurro.opacity(0.08), Olo.azzurro.opacity(0.6)], startPoint: .leading, endPoint: .trailing)
+                    .frame(height: 1)
+                    .padding(.leading, -2)
+            }
+            .padding(.top, 4)
+            .padding(.leading, 12)
+            .padding(.trailing, 8)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(argomenti.enumerated()), id: \.element.id) { i, a in
                         // 14 nov (scelta del signore): in secondo piano compatta, una riga per argomento
                         ArgomentoVista(a: a, primo: i == 0, compatta: !filo.fuoco)
+                            // 13.7: chiuso con lo swipe esce a sinistra (−110 %), come il mockup; mandato via in altro modo, a destra
                             .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -6)),
-                                                    removal: .opacity.combined(with: .offset(x: 24))))
+                                                    removal: .opacity.combined(with: .offset(x: filo.esceASinistra == a.nome ? -SchedaFilo.larghezza * 1.1 : 24))))
                     }
                 }
                 .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26), value: filo.fuoco)
@@ -206,16 +241,14 @@ private struct SchedaFilo: View {
             // 13.1: sopra una sezione, sotto il fondo c'è il vetro della PILA (VetroOlo): a fuoco pieno e sfocato, in secondo
             // piano trasparente (la sezione si vede attraverso), con gli stessi valori delle pagine olografiche.
             ZStack {
-                if vetro {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .environment(\.colorScheme, .dark)
-                        .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
-                        .opacity(vetroPronto ? 0.3 + 0.7 * (filo.fuoco ? 1 : 0) : 0)
-                        .animation(.easeInOut(duration: 0.35), value: filo.fuoco)
-                        .animation(.easeOut(duration: 0.2), value: vetroPronto)
-                        .transition(.opacity)
-                }
+                // 13.7 (22 nov 01:04, mockup: sfocato 10 sulla schermata di JARVIS, 20 sopra una sezione): il vetro dietro al fondo
+                // scuro c'è sempre, aperta e piccola (prima solo sopra una sezione); entra a nascita finita
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+                    .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
+                    .opacity(vetroPronto ? 1 : 0)
+                    .animation(.easeOut(duration: 0.2), value: vetroPronto)
                 TimelineView(.animation) { tl in
                     let t = tl.date.timeIntervalSince(nata)
                     let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
@@ -307,7 +340,7 @@ private struct ArgomentoVista: View {
                 HStack(spacing: 6) {
                     Text((a.etichetta ?? a.nome).uppercased())
                         .font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1.8)
-                        .foregroundStyle(Olo.bianco)
+                        .foregroundStyle(TintaTab.chiaro)
                         .shadow(color: Olo.azzurro.opacity(0.95), radius: 3.5)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -316,7 +349,7 @@ private struct ArgomentoVista: View {
                     if a.fisso {
                         Text("◆")
                             .font(.system(size: 7, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Olo.bianco.opacity(0.95))
+                            .foregroundStyle(TintaTab.chiaro.opacity(0.95))
                             .shadow(color: Olo.azzurro.opacity(0.9), radius: 3)
                             .accessibilityLabel("fissato")
                     }
@@ -324,7 +357,7 @@ private struct ArgomentoVista: View {
                         // compatta: al posto della linea e della X, il dato che conta
                         Text(tutte.first.map { r in (r.segno.map { $0 + " " } ?? "") + r.testo } ?? "")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.96))
+                            .foregroundStyle(TintaTab.chiaro)
                             .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -338,31 +371,12 @@ private struct ArgomentoVista: View {
                 }
                 .frame(minHeight: 24)
                 .contentShape(Rectangle())
-                if !compatta {
-                    Button {
-                        guard !Filo.condiviso.consumaSveglia() else { return }   // era compatta: il tocco l'ha solo riaperta
-                        guard !Filo.condiviso.consumaFissa() else { return }     // 21 nov: la pressione lunga ha appena fissato
-                        Suoni.filoVia()
-                        withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.24)) { _ = Filo.condiviso.togliArgomento(a.nome) }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 6.5, weight: .bold))
-                            .foregroundStyle(Olo.bianco)
-                            .frame(width: 15, height: 15)
-                            .background(Circle().fill(Olo.azzurro.opacity(0.08)))
-                            .overlay(Circle().stroke(Olo.ciano.opacity(0.55), lineWidth: 1))
-                            .shadow(color: Olo.azzurro.opacity(0.35), radius: 3)
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle().inset(by: -8))           // 14 nov: si prende col dito (44 punti), il disegno è quello
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, -6)
-                    .accessibilityLabel("Chiudi \(a.nome)")
-                    .transition(.opacity)
-                }
+                // 13.7 (il signore, 22 nov 01:04: «per evitare la ripetizione grafica, nella tab grande le sezioni si chiudono con
+                // uno swipe verso sinistra e non con la X»): la X non c'è più (lo swipe qui sotto)
             }
             .frame(minHeight: 24)
             .accessibilityAction(named: a.fisso ? "Sgancia" : "Fissa") { Filo.condiviso.fissaArgomento(a.nome) }
+            .accessibilityAction(named: "Chiudi") { chiudiASinistra() }
             if !compatta {
                 // la riga che JARVIS sta dicendo si accende: una sola in tutta la tab, quella detta per ultima. La tab si ridisegna proprio
                 // negli istanti in cui la voce arriva a una riga (niente controlli a intervalli), l'accensione corre a 120 Hz
@@ -386,6 +400,17 @@ private struct ArgomentoVista: View {
                 .onEnded { _ in
                     Aptica.tabFissa(!a.fisso)                                   // 14 nov: fissata un colpo pieno, sganciata la selezione
                     withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { Filo.condiviso.fissaArgomento(a.nome) }
+                }
+        )
+        // 13.7: il dito che corre verso sinistra sull'argomento lo chiude (esce a sinistra). Verso destra resta il gesto che manda
+        // via tutta la tab. Come il mockup: almeno 40 punti, orizzontale (il doppio del verticale), lungo (70) o svelto
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { v in
+                    let dx = v.translation.width, dy = abs(v.translation.height)
+                    let svelto = -v.predictedEndTranslation.width > 170                 // circa 0,35 punti al millisecondo
+                    guard dx < -40, -dx > dy * 2, -dx > 70 || svelto else { return }
+                    chiudiASinistra()
                 }
         )
         // appena arrivato (o aggiornato) si accende un attimo; richiamato col dito dal bordo no (come il mockup)
@@ -424,7 +449,7 @@ private struct ArgomentoVista: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(Color(red: 236 / 255, green: 252 / 255, blue: 1).opacity(0.98))
+                .foregroundStyle(TintaTab.chiaro)
                 .shadow(color: Olo.azzurro.opacity(0.85), radius: 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let ora = r.ora {
@@ -453,6 +478,19 @@ private struct ArgomentoVista: View {
     private func accendi() {
         accesa = true
         withAnimation(.easeOut(duration: 0.5)) { accesa = false }
+    }
+
+    /// 13.7 · chiuso con lo swipe a sinistra: esce verso sinistra (0,26 s, la curva del mockup), poi il posto si chiude.
+    private func chiudiASinistra() {
+        let nome = a.nome
+        Suoni.filoVia()                                                // suono e tocco insieme (Aptica.tabVia)
+        Filo.condiviso.esceASinistra = nome
+        Task { @MainActor in
+            await Task.yield()                                         // la sua uscita (a sinistra) è già quella nuova
+            withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.26)) { _ = Filo.condiviso.togliArgomento(nome) }
+            try? await Task.sleep(for: .milliseconds(320))
+            if Filo.condiviso.esceASinistra == nome { Filo.condiviso.esceASinistra = nil }
+        }
     }
 
     private var righe: [RigaVista] { ArgomentoVista.righeDi(a) }
@@ -494,6 +532,68 @@ private struct ArgomentoVista: View {
         f.dateFormat = "HH:mm"
         return f
     }()
+}
+
+/// 13.7 · i tre tasti delle tab (il signore, 21 nov 20:22: «in entrambe un tastino come quelli di Apple: uno per farla grande, uno
+/// per chiuderla e uno per ridurla»): chiudi, riduci, apri, in gradazioni di ciano. Nella tab alta 16 punti, 8 fra l'uno e l'altro
+/// (22 nov 00:32), con attorno un'area di tocco invisibile alta 30 e larga 24; nella tab bassa 11 punti, 4 fra l'uno e l'altro.
+struct TastiTab: View {
+    var lato: CGFloat = 16
+    var spazio: CGFloat = 8
+    /// L'area di tocco oltre il disegno: sopra e sotto, ai lati.
+    var oltre: (v: CGFloat, h: CGFloat) = (v: 7, h: 4)
+    let chiudi: () -> Void
+    let riduci: () -> Void
+    let apri: () -> Void
+
+    var body: some View {
+        HStack(spacing: spazio) {
+            tasto("Chiudi la tab", azione: chiudi) { p in
+                p.move(to: CGPoint(x: 3.6, y: 3.6)); p.addLine(to: CGPoint(x: 8.4, y: 8.4))
+                p.move(to: CGPoint(x: 8.4, y: 3.6)); p.addLine(to: CGPoint(x: 3.6, y: 8.4))
+            }
+            tasto("Riduci la tab", azione: riduci) { p in
+                p.move(to: CGPoint(x: 3.2, y: 6)); p.addLine(to: CGPoint(x: 8.8, y: 6))
+            }
+            tasto("Apri la tab intera", azione: apri) { p in
+                p.move(to: CGPoint(x: 3.4, y: 8.6)); p.addLine(to: CGPoint(x: 8.6, y: 3.4))
+                p.move(to: CGPoint(x: 5.2, y: 3.4)); p.addLine(to: CGPoint(x: 8.6, y: 3.4)); p.addLine(to: CGPoint(x: 8.6, y: 6.8))
+            }
+        }
+    }
+
+    private func tasto(_ nome: String, azione: @escaping () -> Void, segno: @escaping (inout Path) -> Void) -> some View {
+        Button(action: azione) {
+            let k = lato * 10 / 16 / 12                                   // il disegno (12 unità) è 10 punti nel tasto da 16
+            Canvas { gc, size in
+                var p = Path()
+                segno(&p)
+                let t = CGAffineTransform(translationX: (size.width - 12 * k) / 2, y: (size.height - 12 * k) / 2).scaledBy(x: k, y: k)
+                gc.stroke(p.applying(t), with: .color(TintaTab.chiaro), style: StrokeStyle(lineWidth: 1.5 * k, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: lato, height: lato)
+            .padding(EdgeInsets(top: oltre.v, leading: oltre.h, bottom: oltre.v, trailing: oltre.h))
+            .contentShape(Rectangle())
+            .padding(EdgeInsets(top: -oltre.v, leading: -oltre.h, bottom: -oltre.v, trailing: -oltre.h))
+        }
+        .buttonStyle(StileTastoTab(lato: lato))
+        .accessibilityLabel(nome)
+    }
+}
+
+/// Il tasto tondo delle tab: bordo ciano, fondo velato, un poco più acceso sotto il dito.
+private struct StileTastoTab: ButtonStyle {
+    let lato: CGFloat
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background {
+                Circle()
+                    .fill(Olo.azzurro.opacity(configuration.isPressed ? 0.35 : 0.1))
+                    .overlay(Circle().stroke(Olo.ciano.opacity(0.6), lineWidth: 1))
+                    .shadow(color: Olo.azzurro.opacity(0.35), radius: 3)
+                    .frame(width: lato, height: lato)
+            }
+    }
 }
 
 /// Dove è lo scorrimento (sfumatura sopra e sotto) e se il dito sta scorrendo (le notifiche aspettano). Su iOS 17 (l'app parte da
@@ -545,21 +645,27 @@ private struct Sfuma: View {
 
 /// La cornice olografica di FILO (corniceFilo del mockup): il punto di luce in alto a destra che pulsa, il filo che scende e
 /// corre sotto la testata, il fondo scuro, gli angoli, la riga di scansione che scende lenta.
-private enum CorniceFilo {
-    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93) {
+/// 13.7: `specchio` è la tab bassa (PAGINE): il punto di luce in alto a SINISTRA e il filo che corre verso destra, il resto uguale.
+enum CorniceFilo {
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93, specchio: Bool = false) {
         let W = Double(size.width), H = Double(size.height)
         let u0 = min(1, t / 0.5)
         gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1          // si accende sfarfallando
-        let ax = W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
+        let ax = specchio ? 6 : W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
         // il fondo (meno trasparente: la corona dietro si intuisce appena); 13.1: sopra una sezione segue il fuoco (vetro della PILA)
         gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(fondo)))
         gc.blendMode = .plusLighter
         let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
         gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(Olo.ciano.opacity(0.7 * (1 - pul))), lineWidth: 1)
         Olo.alone(&gc, CGPoint(x: ax, y: ay), 10, 0.5)
-        gc.fill(Olo.ellisse(ax, ay, 2.4, 2.4), with: .color(Olo.bianco))
+        gc.fill(Olo.ellisse(ax, ay, 2.4, 2.4), with: .color(TintaTab.chiaro))
         var f = Path()
-        f.move(to: CGPoint(x: ax, y: ay)); f.addLine(to: CGPoint(x: W - 24, y: ly - 4)); f.addLine(to: CGPoint(x: W - 24 - (W - 28) * u, y: ly - 4))
+        f.move(to: CGPoint(x: ax, y: ay))
+        if specchio {
+            f.addLine(to: CGPoint(x: 24, y: ly - 4)); f.addLine(to: CGPoint(x: 24 + (W - 28) * u, y: ly - 4))
+        } else {
+            f.addLine(to: CGPoint(x: W - 24, y: ly - 4)); f.addLine(to: CGPoint(x: W - 24 - (W - 28) * u, y: ly - 4))
+        }
         gc.stroke(f, with: .color(Olo.ciano.opacity(0.85)), style: Olo.tratto(1.1))
         gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)),
                 with: .linearGradient(Gradient(colors: [Olo.azzurro.opacity(0.13), Olo.azzurro.opacity(0.02)]),
@@ -572,7 +678,7 @@ private enum CorniceFilo {
         for (px, py, sx, sy) in angoli {
             ang.move(to: CGPoint(x: px + sx * k, y: py)); ang.addLine(to: CGPoint(x: px, y: py)); ang.addLine(to: CGPoint(x: px, y: py + sy * k))
         }
-        gc.stroke(ang, with: .color(Olo.bianco.opacity(0.9)), style: Olo.tratto(1.5))
+        gc.stroke(ang, with: .color(TintaTab.chiaro.opacity(0.9)), style: Olo.tratto(1.5))
         // la riga di scansione che scende lenta dentro la scheda
         if bh > 12 {
             let sy = by + (t * 26).truncatingRemainder(dividingBy: bh)

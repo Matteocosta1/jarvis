@@ -274,4 +274,50 @@ private struct RigheScansione: View {
         }
     }
 }
+/// 13.7 · la scritta sotto J.A.R.V.I.S. (il signore, 22 nov 00:50: «con la stessa animazione dell'Apple Watch, le lettere che girano
+/// come un computer»): ogni volta che cambia si decodifica lettera per lettera da sinistra, con tre caratteri che girano davanti,
+/// partendo dalla scritta di prima (0,5 s), come `scriviSotto` del mockup «JARVIS Approvato».
+struct TestoDecodificato: View {
+    let testo: String
+    var durata: Double = 0.5
+    @State private var da = ""
+    @State private var inizio: Date?
+    private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
+
+    var body: some View {
+        Group {
+            if let inizio {
+                TimelineView(.animation) { tl in
+                    Text(TestoDecodificato.mescola(da, testo, min(1, tl.date.timeIntervalSince(inizio) / durata)))
+                }
+            } else {
+                Text(testo)
+            }
+        }
+        .onChange(of: testo) { vecchio, nuovo in
+            guard !nuovo.isEmpty else { return }
+            da = vecchio
+            let t = Date()
+            inizio = t
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(durata + 0.05))
+                if inizio == t { inizio = nil }                          // finita: il testo fermo, niente più fotogrammi
+            }
+        }
+    }
+
+    /// Da `da` a `a`, a che punto `p`: le lettere scoperte di `a`, tre glifi sul fronte, poi il resto di `da`.
+    private static func mescola(_ da: String, _ a: String, _ p: Double) -> String {
+        guard p < 1 else { return a }
+        let x = Array(da), y = Array(a), n = max(x.count, y.count), f = p * Double(n)
+        var q = ""
+        for i in 0..<n {
+            if Double(i) < f { if i < y.count { q.append(y[i]) } }
+            else if Double(i) < f + 3 { q.append(i < y.count && y[i] == " " ? " " : (glifi.randomElement() ?? " ")) }
+            else if i < x.count { q.append(x[i]) }
+        }
+        return q
+    }
+}
+
 #endif

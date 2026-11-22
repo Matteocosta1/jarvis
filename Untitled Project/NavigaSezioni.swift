@@ -518,29 +518,7 @@ struct StratoSezioniVista<Vista: View>: View {
             let p = posaPila(v)
             let o = mano != nil ? Double(r - rm) : scarto(v.id)
             let a = nascoste ? 0 : (naviga.modo == .tira ? naviga.rivela : p.opacita)
-            return EtichettePila.Dato(id: v.id, nome: v.sezione.nome, icona: icone[v.sezione.nome] ?? iconaDiRiserva(v.sezione), o: o, alfa: a)
-        }
-    }
-
-    /// Le sezioni che non stanno sulla corona hanno la loro icona di sempre (5 nov sera, il signore: «devono avere la loro icona
-    /// come tutte le altre»): Social e Studio quelle in alto, Musica il vinile, Impostazioni l'ingranaggio, le schede di Sistemi
-    /// quelle del loro menu (GitHub, Supabase, Archivio, Costi, EDITH).
-    private func iconaDiRiserva(_ s: Sezione) -> String {
-        switch s {
-        case .impostazioni: return "gearshape"
-        case .browser: return "safari"
-        case .pagina(let n): return n == "Studio" ? "studio" : "social"
-        case .scheda(let a):
-            switch a {
-            case .musica: return "vinile"
-            case .github: return "logo:github-logo"
-            case .supabase: return "logo:supabase-logo"
-            case .archivio: return "archivio"
-            case .costi: return "costi"
-            case .edith: return "eyeglasses"
-            default: return "square.grid.2x2"
-            }
-        default: return "square.grid.2x2"
+            return EtichettePila.Dato(id: v.id, nome: v.sezione.nome, icona: icone[v.sezione.nome] ?? v.sezione.iconaDiRiserva, o: o, alfa: a)
         }
     }
 
@@ -1946,6 +1924,31 @@ struct EtichettePila: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// 13.7: anche la tab PAGINE usa le icone di riserva.
+extension Sezione {
+    /// Le sezioni che non stanno sulla corona hanno la loro icona di sempre (5 nov sera, il signore: «devono avere la loro icona
+    /// come tutte le altre»): Social e Studio quelle in alto, Musica il vinile, Impostazioni l'ingranaggio, le schede di Sistemi
+    /// quelle del loro menu (GitHub, Supabase, Archivio, Costi, EDITH).
+    var iconaDiRiserva: String {
+        switch self {
+        case .impostazioni: return "gearshape"
+        case .browser: return "safari"
+        case .pagina(let n): return n == "Studio" ? "studio" : "social"
+        case .scheda(let a):
+            switch a {
+            case .musica: return "vinile"
+            case .github: return "logo:github-logo"
+            case .supabase: return "logo:supabase-logo"
+            case .archivio: return "archivio"
+            case .costi: return "costi"
+            case .edith: return "eyeglasses"
+            default: return "square.grid.2x2"
+            }
+        default: return "square.grid.2x2"
+        }
     }
 }
 
