@@ -808,15 +808,20 @@ private struct CartaPagina: View {
     var body: some View {
         let forma = RoundedRectangle(cornerRadius: 4)
         ZStack {
+            // 13.8 (4) (il signore, 22 nov 12:06: «alcune pagine della tab non sono uguali di altezza»): la foto della pagina stava
+            // dentro la pila delle carte e, riempiendo, poteva dare alla carta la sua misura (una pagina lunga, come il browser,
+            // la faceva più alta, sopra e sotto). Ora la carta è sempre CW × CH: la foto sta sopra un fondo che prende la misura
+            // della carta e non la cambia mai (il troppo si taglia).
             Color(red: 3 / 255, green: 13 / 255, blue: 16 / 255)
-            if let foto {
-                Image(uiImage: foto)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .clipped()
-                    .opacity(0.55)
-            }
+                .overlay(alignment: .top) {
+                    if let foto {
+                        Image(uiImage: foto)
+                            .resizable()
+                            .scaledToFill()
+                            .opacity(0.55)
+                    }
+                }
+                .clipped()
             Olo.azzurro.blendMode(.color).opacity(0.5)
             VeloCarta()
             GlifoSezione(icona: icona, lato: 13)
