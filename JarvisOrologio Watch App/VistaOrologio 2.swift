@@ -159,6 +159,9 @@ struct VistaOrologio: View {
     /// In sottofondo la schermata resta solo col suo fondo, come il primo istante dell'avvio: la foto che il Watch tiene è quella, e
     /// l'avvio parte senza salti. Tornando attiva (senza un avvio nuovo) il contenuto riappare in 0,25 s.
     @State private var perLaFoto = false
+    /// 13.8 (2): l'altezza dello schermo sotto l'ora. Il reattore ci sta insieme alla testa, alla barra e allo stato, come nel mockup:
+    /// se lo schermo è più basso (44 e 40 mm) il riquadro si accorcia e SINTESI si stringe con lui, così le icone si vedono intere.
+    @State private var altezzaSchermo: CGFloat = 0
     @State private var iconaAttiva: Int?                 // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var chatDa: Date?                      // la conversazione si decodifica all'avvio (come sull'iPhone)
     @State private var svuotaDa: Date?                    // la conversazione si ritira verso sinistra quando si pulisce
@@ -181,21 +184,8 @@ struct VistaOrologio: View {
                 .navigationDestination(isPresented: $mostraSentinella) { VistaSentinellaOrologio() }
                 .navigationDestination(item: $scheda) { r in paginaScheda(r) }
                 .navigationDestination(item: $polso) { s in paginaPolso(s) }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        // Ricordi: la seconda memoria (luoghi, spesa, promesse, ultime cose segnate)
-                        NavigationLink { VistaRicordiOrologio() } label: {
-                            Image(systemName: "brain.head.profile").foregroundStyle(ciano)
-                        }
-                        .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink { VistaCronologia() } label: {
-                            Image(systemName: "text.bubble").foregroundStyle(ciano)   // 13.1: ciano come l'icona accanto (prima il colore di sistema)
-                        }
-                        .simultaneousGesture(TapGesture().onEnded { SuoniOrologio.clickTesta() })
-                    }
-                }
+                // 13.8 (2) (il signore, 22 nov 08:55: «togliamo quei due tasti in alto che ci rubano spazio… sono veramente inutili»):
+                // niente più Ricordi e Conversazione nella riga dell'ora (Ricordi resta una sezione, come prima)
         }
         // 13.1 (2): il sì dal polso (mockup FUORI): la scheda Sì / No sopra l'app, ovunque si trovi
         .overlay {
@@ -487,6 +477,13 @@ struct VistaOrologio: View {
         }
     }
 
+    /// Il riquadro del reattore: 142 punti (il mockup), meno se lo schermo non ci sta. Sotto restano testa (20), barra e stato
+    /// (34 − 30 + 10), gli spazi (12) e 10 punti dal bordo: 56 in tutto.
+    private var latoReattore: CGFloat {
+        guard altezzaSchermo > 0 else { return 142 }
+        return min(142, max(100, altezzaSchermo - 56))
+    }
+
     private var principale: some View {
         ScrollView {
             VStack(spacing: 8) {
@@ -510,6 +507,7 @@ struct VistaOrologio: View {
                             OlogrammaPolso(ruota: ruota, nomi: scorciatoie.map { nomeScorciatoia($0.frase) }, gruppi: scorciatoie.map(\.gruppo),
                                            icona: { k, lato in iconaOlogramma(scorciatoie[k].icona, lato: lato) },
                                            apri: { k in ruota.spegni(); toccaScorciatoia(k) })
+                                .scaleEffect(latoReattore / 142)                    // 13.8 (2): si stringe col reattore
                         }
 
                     barraRapida
@@ -587,6 +585,8 @@ struct VistaOrologio: View {
             .padding(.horizontal, 4)
             .opacity(perLaFoto ? 0 : 1)
         }
+        // l'altezza vera sotto l'ora (se lo ScrollView passa sotto l'ora, la parte coperta non conta)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height - $0.safeAreaInsets.top - $0.safeAreaInsets.bottom } action: { altezzaSchermo = $0 }
         .background { sfondo }
     }
 
@@ -597,8 +597,9 @@ struct VistaOrologio: View {
     private var reattore: some View {
         ReattorePolso(ruota: ruota, fase: jarvis.fase)
             .frame(width: 208, height: 208)
+            .scaleEffect(latoReattore / 142)                                   // 13.8 (2): sugli schermi più bassi si stringe
             .frame(maxWidth: .infinity)
-            .frame(height: 142)
+            .frame(height: latoReattore)
             .contentShape(Circle())
     }
 
