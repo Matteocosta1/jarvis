@@ -121,6 +121,11 @@ final class Pagine: ObservableObject {
     /// scorrere tutte così»): l'ultima foto di ogni sezione (la stessa della miniatura) resta sul telefono, una per sezione, e all'avvio
     /// le carte mostrano le pagine vere. Una sezione mai aperta ha la carta con la sua icona, finché non la apre una volta.
     @Published private(set) var fotoSezioni: [String: UIImage] = [:]
+    /// 13.8 (5) (il signore, 23:18: «all'avvio c'è la vecchia animazione, non la nuova»): una sezione mai aperta mostra la sua pagina
+    /// com'è quando si apre (lo schermo di caricamento di tutte le sezioni: testata con icona, nome e «Chiudi», il caricamento al
+    /// centro), disegnata una volta e tenuta sul telefono; dopo che l'ha aperta, la sua foto vera.
+    @Published private(set) var caricamenti: [String: UIImage] = [:]
+    private static let conFotocamera: Set<String> = ["Occhi", "Cucina", "Trainer", "Profiler", "Scanner", "LiDAR", "Sentinella"]
 
     // le misure della schermata (coordinate della finestra), scritte da ContentView
     var anello: (rett: CGRect, angoli: [Double], raggio: CGFloat, lato: CGFloat)?
@@ -303,6 +308,7 @@ final class Pagine: ObservableObject {
         let mio = giro
         let interface = 11.66, posate = 14.31, operational = AvvioOlo.operational, fine = 15.08
         caricaFotoSezioni(nomi)                               // pronte molto prima di «interface» (11,66 s)
+        preparaCaricamenti(nomi, icone: icone)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + interface)))
             guard mio == self.giro, vivo(), !self.su else { return }
@@ -358,6 +364,49 @@ final class Pagine: ObservableObject {
         guard let cartella = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
         let pulito = nome.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? nome
         return cartella.appendingPathComponent("PagineFoto", isDirectory: true).appendingPathComponent(pulito).appendingPathExtension("jpg")
+    }
+
+    /// Le pagine di caricamento delle sezioni (per le carte dell'avvio): lette dal telefono se ci sono già, altrimenti disegnate una
+    /// alla volta (con una pausa fra l'una e l'altra, così l'avvio non perde fotogrammi) e salvate per le volte dopo.
+    private func preparaCaricamenti(_ nomi: [String], icone: [String]) {
+        guard caricamenti.isEmpty, let w = FasciaAlta.finestra, w.bounds.width > 0 else { return }
+        let misura = w.bounds.size, alto = w.safeAreaInsets.top
+        let coppie: [(nome: String, icona: String)] = Array(zip(nomi, icone)).map { (nome: $0.0, icona: $0.1) }
+        let chiavi = coppie.map { Self.chiaveCaricamento($0.nome, misura) }
+        Task {
+            let lette = await Task.detached(priority: .userInitiated) { () -> [String: Data] in
+                var r: [String: Data] = [:]
+                for k in chiavi { if let f = Pagine.fileFoto(k), let d = try? Data(contentsOf: f) { r[k] = d } }
+                return r
+            }.value
+            for c in coppie {
+                let k = Self.chiaveCaricamento(c.nome, misura)
+                if let d = lette[k], let img = UIImage(data: d) { self.caricamenti[c.nome] = img; continue }
+                try? await Task.sleep(for: .milliseconds(40))
+                let vista = ZStack(alignment: .top) {
+                    SfondoSezione()
+                    SchermoCaricamento(titolo: c.nome, icona: c.icona, conX: Self.conFotocamera.contains(c.nome))
+                        .padding(.top, alto)
+                }
+                .frame(width: misura.width, height: misura.height)
+                .environment(\.colorScheme, .dark)
+                let r = ImageRenderer(content: vista)
+                r.scale = 0.4
+                guard let img = r.uiImage else { continue }
+                self.caricamenti[c.nome] = img
+                if let dati = img.jpegData(compressionQuality: 0.7), let file = Self.fileFoto(k) {
+                    Task.detached(priority: .utility) {
+                        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                        try? dati.write(to: file, options: [.atomic])
+                    }
+                }
+            }
+        }
+    }
+
+    /// Il nome del file della pagina di caricamento (cambia con la misura dello schermo).
+    nonisolated private static func chiaveCaricamento(_ nome: String, _ misura: CGSize) -> String {
+        "~caricamento-\(Int(misura.width))x\(Int(misura.height))-\(nome)"
     }
 
     /// Le ultime foto delle sezioni, lette dal telefono fuori dal thread principale (una volta: poi le aggiorna `fotografa`).
@@ -743,7 +792,10 @@ private struct LibroPagine: View {
                         let d = Double(i) - off, ad = abs(d)
                         // 13.8 (4): all'avvio la carta mostra l'ultima foto della sua sezione (la sezione vera), come le pagine aperte
                         let foto: UIImage? = {
-                            if let a = avvio { return a.nomi.indices.contains(i) ? p.fotoSezioni[a.nomi[i]] : nil }
+                            if let a = avvio {
+                                guard a.nomi.indices.contains(i) else { return nil }
+                                return p.fotoSezioni[a.nomi[i]] ?? p.caricamenti[a.nomi[i]]   // 13.8 (5): mai aperta: la sua pagina di caricamento
+                            }
                             return voci.indices.contains(i) ? p.miniature[voci[i].id] : nil
                         }()
                         let icona: String = avvio.map { $0.icone[i] } ?? (icone[voci[i].sezione.nome] ?? voci[i].sezione.iconaDiRiserva)
