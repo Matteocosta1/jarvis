@@ -1820,7 +1820,8 @@ struct VetroOlo: View {
         let forma = RoundedRectangle(cornerRadius: raggio, style: .continuous)
         let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
         ZStack {
-            forma.fill(.ultraThinMaterial).opacity((0.3 + 0.7 * fuoco) * forza)
+            // 13.8 (4) (il signore, 22 nov 12:12: «trasparenze vere, senza la tinta scura di Apple»): la sola sfocatura, come le tab
+            VetroTab(forte: fuoco > 0.5).clipShape(forma).opacity((0.3 + 0.7 * fuoco) * forza)
             forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
             forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
                                               .init(color: ciano.opacity(0.03 * forza), location: 0.4),

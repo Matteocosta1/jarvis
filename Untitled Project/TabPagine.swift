@@ -807,34 +807,38 @@ private struct CartaPagina: View {
 
     var body: some View {
         let forma = RoundedRectangle(cornerRadius: 4)
+        // 13.8 (4) (il signore, 22 nov 12:12, con la foto di una pagina olografica sopra JARVIS: «le carte vanno rese trasparenti
+        // olografiche, più luminose quando selezionate; trasparenze vere»): la carta non ha più il fondo pieno né il nero dei lati:
+        // è la pagina vera in versione olografica (la foto, la tinta ciano leggera, le righe), e attraverso si vede quello che c'è
+        // dietro. Al centro, selezionata: la pagina quasi piena, più luminosa, il bordo acceso. Ai lati: più tenue e trasparente.
+        // L'icona della sezione resta solo sulle carte senza foto (quelle che iOS non riesce a fotografare).
         ZStack {
-            // 13.8 (4) (il signore, 22 nov 12:06: «alcune pagine della tab non sono uguali di altezza»): la foto della pagina stava
-            // dentro la pila delle carte e, riempiendo, poteva dare alla carta la sua misura (una pagina lunga, come il browser,
-            // la faceva più alta, sopra e sotto). Ora la carta è sempre CW × CH: la foto sta sopra un fondo che prende la misura
-            // della carta e non la cambia mai (il troppo si taglia).
-            Color(red: 3 / 255, green: 13 / 255, blue: 16 / 255)
+            // 12:06 («alcune pagine non sono uguali di altezza»): la carta è sempre CW × CH, la foto non le dà mai la sua misura
+            Color(red: 3 / 255, green: 13 / 255, blue: 16 / 255).opacity(cur ? 0.22 : 0.32)
                 .overlay(alignment: .top) {
                     if let foto {
                         Image(uiImage: foto)
                             .resizable()
                             .scaledToFill()
-                            .opacity(0.55)
+                            .opacity(cur ? 0.92 : 0.5)
                     }
                 }
                 .clipped()
-            Olo.azzurro.blendMode(.color).opacity(0.5)
+            Olo.azzurro.blendMode(.color).opacity(cur ? 0.3 : 0.5)
             VeloCarta()
-            GlifoSezione(icona: icona, lato: 13)
-                .foregroundStyle(Olo.ciano)
-                .shadow(color: Olo.azzurro, radius: 2)
-            // la luce: le carte ai lati più scure, quella al centro un poco più chiara
-            Color.black.opacity(lum < 1 ? 1 - lum : 0)
+            if foto == nil {
+                GlifoSezione(icona: icona, lato: 13)
+                    .foregroundStyle(Olo.ciano)
+                    .shadow(color: Olo.azzurro, radius: 2)
+            }
         }
-        .brightness(lum > 1 ? (lum - 1) * 0.35 : 0)
+        .compositingGroup()                                        // la tinta colora la pagina, non quello che c'è dietro
+        .brightness(cur ? 0.12 : 0)
+        .opacity(cur ? 1 : max(0.35, lum))                         // ai lati più tenue (prima un velo nero: la carta diventava piena)
         .clipShape(forma)
-        .overlay(forma.strokeBorder(Olo.ciano.opacity(cur ? 0.6 : 0.3), lineWidth: 1))
-        .overlay { if cur { forma.stroke(Olo.azzurro.opacity(0.14), lineWidth: 6).blur(radius: 5).clipShape(forma) } }
-        .shadow(color: Olo.azzurro.opacity(cur ? 0.32 : 0), radius: 5)
+        .overlay(forma.strokeBorder(Olo.ciano.opacity(cur ? 0.8 : 0.3), lineWidth: 1))
+        .overlay { if cur { forma.stroke(Olo.azzurro.opacity(0.22), lineWidth: 6).blur(radius: 5).clipShape(forma) } }
+        .shadow(color: Olo.azzurro.opacity(cur ? 0.45 : 0), radius: 6)
     }
 }
 
