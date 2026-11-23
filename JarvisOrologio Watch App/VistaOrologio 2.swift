@@ -516,6 +516,7 @@ struct VistaOrologio: View {
                         }
 
                     barraRapida
+                        .padding(.horizontal, -4)                            // 13.9 (2): la barra da bordo a bordo, la prima icona a 2 punti (come il mockup)
                         .padding(.top, -30)                                  // le icone un po' sopra SINTESI
                         .zIndex(1)
 
@@ -600,7 +601,11 @@ struct VistaOrologio: View {
     private var reattore: some View {
         ReattorePolso(ruota: ruota, fase: jarvis.fase)
             .frame(width: 208, height: 208)
-            .frame(maxWidth: .infinity)
+            // 13.9 (2) (il signore, 23 nov 09:41, video: «le icone nel caricamento ancora non ci siamo con la posizione: l'ultima è
+            // tagliata»): con il solo maxWidth il riquadro restava largo quanto il disegno (208, più dello schermo da 184) e allargava
+            // tutta la schermata, centrata: tutto andava 12 punti a sinistra (Supabase tagliata dal bordo, la testa a 6 punti invece
+            // di 17). Con minWidth 0 il riquadro è largo quanto lo schermo e il disegno ne esce ai lati e sfuma, come il mockup
+            .frame(minWidth: 0, maxWidth: .infinity)
             .frame(height: latoReattore)
             .contentShape(Circle())
     }
