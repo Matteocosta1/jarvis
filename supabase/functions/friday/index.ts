@@ -105,16 +105,6 @@ const STRUMENTI_SERVER: any[] = ([
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "1-180, default 7" }, cerca: { type: "string" } } } },
   { name: "diario_cancella", description: "Cancella pagine del diario: una per id, tutte quelle di un giorno (YYYY-MM-DD), oppure tutto il diario (tutto=true, solo dopo conferma esplicita di Bea).",
     input_schema: { type: "object", properties: { id: { type: "number" }, giorno: { type: "string" }, tutto: { type: "boolean" } } } },
-  // 13 nov (Bea: «mettilo nel diario della sera»): il riposo detto a voce che l'orologio non ha registrato
-  { name: "riposo_segna", description: "Segna un riposo (un pisolino, o il sonno) che Bea ti dice a voce e che in Salute non c'è: il diario della sera lo conta nel sonno di quel giorno. Usalo solo dopo aver visto che in Salute quel riposo non risulta, con la durata detta da lui («un paio d'ore» = 120 minuti, «mezz'ora» = 30). Se te lo ripete non serve rifarlo (è già nel registro delle azioni); se lo corregge («erano tre ore») usalo con correggi=true; elimina=true toglie l'ultimo riposo segnato quel giorno.",
-    input_schema: { type: "object", properties: {
-      minuti: { type: "number", description: "quanto ha dormito, in minuti (10-720)" },
-      da: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è addormentato, HH:mm" },
-      a: { type: "string", description: "facoltativo, solo se lo dice: ora in cui si è svegliato, HH:mm" },
-      giorno: { type: "string", description: "facoltativo: YYYY-MM-DD; di base oggi (dopo mezzanotte e fino alle 5 vale il giorno prima)" },
-      correggi: { type: "boolean", description: "true se corregge il riposo appena segnato (stesso riposo, durata o orari nuovi)" },
-      elimina: { type: "boolean", description: "true per togliere l'ultimo riposo segnato quel giorno" },
-    } } },
   { name: "vitals", description: "I parametri vitali di Bea: per ogni giorno umore, punteggio, energia, sonno, battito a riposo e passi dal diario, con medie, andamento e i temi più frequenti nei giorni migliori e peggiori. Default 30 giorni.",
     input_schema: { type: "object", properties: { giorni: { type: "number", description: "7-180, default 30" } } } },
   { name: "prodotto_scansiona", description: "Scheda di un prodotto alimentare dal codice a barre (EAN), con i dati aperti di Open Food Facts: nome, marca, voto 0-100 calcolato da FRIDAY (eccellente/buono/mediocre/scarso), Nutri-Score, NOVA, additivi con il loro rischio, nutrienti per 100 g, ingredienti, allergeni.",
