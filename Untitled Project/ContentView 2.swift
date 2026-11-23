@@ -542,8 +542,10 @@ struct ContentView: View {
             if olo { oloStile = true; oloSpegni = nil; avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
             // 13.7 · la tab PAGINE si forma su «interface» e dentro scorrono come dischi le icone di tutte le sezioni
             if olo, let inizio = avvioOlo {
-                let el = tutteLeIcone
-                Pagine.condivisa.avvio(zero: inizio, nomi: el.map(\.nome), icone: el.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil && pila.davanti == nil && !tastiera })
+                // 23 nov (il signore: «36»): le carte dell'avvio sono le 36 del mockup, nello stesso ordine (`Pagine.carteAvvio`)
+                let icone: [String: String] = Dictionary(tutteLeIcone.map { ($0.nome, $0.icona) }, uniquingKeysWith: { a, _ in a })
+                let carte: [(nome: String, icona: String)] = Pagine.carteAvvio.map { (nome: $0, icona: icone[$0] ?? Pagine.iconeAvvio[$0] ?? "square.grid.2x2") }
+                Pagine.condivisa.avvio(zero: inizio, nomi: carte.map(\.nome), icone: carte.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil && pila.davanti == nil && !tastiera })
             }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),

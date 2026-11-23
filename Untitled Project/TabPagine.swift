@@ -341,6 +341,20 @@ final class Pagine: ObservableObject {
 
     // MARK: le miniature
 
+    /// 23 nov (il signore: «36»): le carte che scorrono all'avvio, le stesse del mockup e nello stesso ordine (ICONE del mockup):
+    /// le sezioni della corona e di INTELLIGENCE più Musica, quelle di SISTEMI, Studio, Travel e Social. All'avvio le carte si guardano
+    /// soltanto (non si toccano): Travel ha la sua carta anche se nell'app si apre da Satellite.
+    static let carteAvvio: [String] = [
+        "Musica", "Diario", "Confidente", "Vitals", "Sonno", "Cuore", "Trainer", "Briefing", "Meteo", "Email", "Messaggi", "Spesa",
+        "Occhi", "Cucina", "Scanner", "Shazam", "Foto", "Ricordi", "Interprete", "Browser", "Serata", "Telefono", "Bea", "Sentinella",
+        "Profiler", "LiDAR", "Wiretap", "Satellite", "GitHub", "Supabase", "Archivio", "Costi", "EDITH", "Studio", "Travel", "Social",
+    ]
+    /// I simboli delle carte dell'avvio che non sono sulla corona (gli stessi delle pagine aperte, `iconaDiRiserva`).
+    static let iconeAvvio: [String: String] = [
+        "Musica": "vinile", "GitHub": "logo:github-logo", "Supabase": "logo:supabase-logo", "Archivio": "archivio", "Costi": "costi",
+        "EDITH": "eyeglasses", "Studio": "studio", "Travel": "safari", "Social": "social",
+    ]
+
     /// Il nome della miniatura fissa di una sezione nelle Assets: «Miniatura-email», «Miniatura-lidar»…
     nonisolated static func nomeMiniatura(_ sezione: String) -> String { "Miniatura-" + sezione.lowercased() }
 
