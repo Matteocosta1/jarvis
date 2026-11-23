@@ -1126,12 +1126,7 @@ private struct GlifoSezione: View {
     var body: some View {
         Group {
             switch icona {
-            case "profiler": IconaProfiler().scaleEffect(lato / 15)
-            case "satellite": IconaSatellite(lato: lato)
-            case "social": IconaSocial().scaleEffect(lato / 15)
-            case "studio": IconaStudio(pieno: true).frame(width: lato, height: lato)
             case "vinile": IconaVinile().frame(width: lato, height: lato)
-            case "archivio": IconaArchivio().frame(width: 22, height: 22).scaleEffect(lato / 22)
             case "costi":
                 if UIImage(named: "langfuse-logo") != nil {
                     Image("langfuse-logo").resizable().renderingMode(.template).scaledToFit().frame(width: lato, height: lato)
@@ -1142,7 +1137,7 @@ private struct GlifoSezione: View {
                 if icona.hasPrefix("logo:") {
                     Image(String(icona.dropFirst(5))).resizable().renderingMode(.template).scaledToFit().frame(width: lato, height: lato)
                 } else {
-                    Image(systemName: icona).font(.system(size: lato * 0.95))
+                    SimboloFriday(nome: icona, lato: lato * 0.8)                // FRIDAY: le icone del mockup (f:…) e i simboli di iOS
                 }
             }
         }

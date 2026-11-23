@@ -330,9 +330,7 @@ struct OlogrammaRuota: View {
 
     /// Il simbolo di una voce, grande `lato` punti (le proporzioni di prima: il simbolo è i 5/8 del riquadro).
     @ViewBuilder static func simbolo(_ s: String, lato: Double) -> some View {
-        if s == "profiler" { IconaProfiler().scaleEffect(2 * lato / 64).frame(width: lato, height: lato) }
-        else if s == "satellite" { IconaSatellite(lato: lato * 40 / 64) }
-        else { SimboloFriday(nome: s, lato: lato * 40 / 64).font(.system(size: lato * 40 / 64, weight: .light)).symbolRenderingMode(.monochrome) }   // FRIDAY: le icone del mockup
+        SimboloFriday(nome: s, lato: lato * 40 / 64).font(.system(size: lato * 40 / 64, weight: .light)).symbolRenderingMode(.monochrome)   // FRIDAY: le icone del mockup
     }
 
     /// Il guizzo quando cambia l'icona in alto (0,2 s): un tremolio di luce.

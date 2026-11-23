@@ -386,7 +386,7 @@ struct ContentView: View {
                 strato
                     .zIndex(25)
                 // 12.0 (16): i widget FILO («mostrami…», «fissalo»), in alto a destra sopra le sezioni
-                StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0,   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
+                StratoFilo(daParte: tendinaAperta || tendinaTrascina != 0,   // 13.1: coi PROTOCOLLI si fa da parte
                            suSezione: pila.davanti != nil)                                 // 13.1: sopra una sezione, vetro con la trasparenza dinamica
                     .zIndex(26)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
@@ -409,8 +409,6 @@ struct ContentView: View {
             if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
             if fase == .active { jarvis.tornaDavanti() }            // 11 nov (#16): il dialogo fuori dall'app finisce qui
             if fase == .active, avvioRimandato { avvioRimandato = false; accendi() }   // 14 nov: svegliata dietro, l'avvio parte adesso
-            // 12 nov: l'app sta uscendo con un dialogo in corso: l'isola VOCE si accende adesso (iOS la permette solo da davanti)
-            if fase == .inactive, jarvis.dialogoPuoContinuareFuori { jarvis.aggiornaIsolaVoce() }
         }
         // 13.8 (4) (il signore, 22:34: «la tendina voglio poterla chiamare in ogni momento e in ogni sezione»): con una sezione
         // davanti si tira giù dalla testata (TendinaOvunque, sulla finestra), con lo stesso inseguimento del dito di sempre
@@ -418,7 +416,7 @@ struct ContentView: View {
             TendinaOvunque.segue = { s in tendinaSegue(s) }
             TendinaOvunque.lascia = { s, p in tendinaLasciata(s, previsto: p) }
         }
-        .onChange(of: pila.davanti != nil && tendinaLibera && aiutoBea == nil, initial: true) { _, si in TendinaOvunque.attiva = si }
+        .onChange(of: pila.davanti != nil && tendinaLibera, initial: true) { _, si in TendinaOvunque.attiva = si }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
             chiudiTutto()

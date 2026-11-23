@@ -137,7 +137,6 @@ final class Insieme {
         guard let i = riconosci(Insieme.norma(frase), nudo: nudo) else { return false }
         let filo = Filo.condiviso
         switch i {
-        case .sessione: return false                                  // la sessione la propone il cervello
         case .mostra(let cosa, let pron): return mostraLocale(cosa, pron: pron, frase: frase)
         case .togli, .togliTutti, .richiama: return !filo.argomenti.isEmpty   // FILO vuoto: «toglilo» è forse della sezione davanti
         case .salva(let q):
@@ -160,7 +159,7 @@ final class Insieme {
     func chiedeSi(_ frase: String) -> Bool {
         let nudo = FineFrase.paroleNude(frase).joined(separator: " ")
         switch riconosci(Insieme.norma(frase), nudo: nudo) {
-        case .scrivi?, .scriviCosa?, .manda?, .chiama?, .pubblica?: return true
+        case .scrivi?, .scriviCosa?, .manda?, .chiama?: return true
         default: return false
         }
     }

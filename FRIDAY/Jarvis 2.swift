@@ -521,7 +521,6 @@ final class Jarvis: NSObject, ObservableObject {
         SiPolso.condiviso.avvia()
         FiloCondiviso.condiviso.battute = { [weak self] in self?.messaggi ?? [] }
         FiloCondiviso.condiviso.riservato = { [weak self] in self?.riservato ?? false }
-        ComandiIsola.ascoltaFuori = { [weak self] in self?.ascoltaDaFuori() ?? false }
         // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
         NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
             BattitoMani.tastieraAperta(true)
@@ -3205,7 +3204,6 @@ final class Jarvis: NSObject, ObservableObject {
         AperturaFuori.riprendi()                        // 13.1 (2): WhatsApp, Mappe, il messaggio rimasto allo sblocco
         SiPolso.condiviso.controlla()                   // 13.1 (2): il telefono è in mano: l'orologio non bussa più
         riprendiSeServe()                               // 13.1 (2): «dove eravamo rimasti»
-        IsolaJarvis.fineVoce()                          // 12 nov: dentro JARVIS l'isola VOCE non serve
         if micChiusoFuori { micChiusoFuori = false; aggiornaRichiamo() }
         Iniziativa.condivisa.avvia()                    // 14 nov: l'iniziativa riparte (le notifiche degli impegni le sostituisce la voce)
         proponiAbitudine()                              // 12.0 (12) · B6
@@ -4602,7 +4600,6 @@ extension Jarvis {
             ascoltaSubito(bip: true)
             return true
         }
-        IsolaJarvis.voce(fase: Fase.ascolto.rawValue, riga: "La ascolto.")   // iOS vuole l'attività accesa subito
         dialogoFuori = true
         micChiusoFuori = false
         if fase != .attesa { interrompi() }
@@ -4631,7 +4628,7 @@ extension Jarvis {
             // 13.4 (il signore: «ESEGUI», con qualsiasi sezione aperta; dopo «non ora» la dice lo stesso): non sopra la musica, non in
             // RISERVATO («niente frasi»), non con una sezione davanti né col Wiretap che registra dietro (la voce finirebbe nel verbale).
             // In quei casi aspetta: la dice alla prossima apertura
-            let calmo = !self.musicaSuona && !self.riservato && Regia.condivisa.davantiNome == nil && WiretapAperto.chiudi == nil
+            let calmo = !self.musicaSuona && !self.riservato && Regia.condivisa.davantiNome == nil
             guard !Task.isCancelled, calmo, self.fase == .attesa, self.inCoda.isEmpty, UIApplication.shared.applicationState == .active else {
                 if let qui, !Task.isCancelled { Ripresa.rimetti(qui) }   // occupato (gli sta già parlando): la dice la prossima volta
                 return
@@ -4646,7 +4643,7 @@ extension Jarvis {
         var frase: String?
         if let p = s.piano {
             Piano.condiviso.ripristina(p)
-            frase = "riprendo \(FRIDAY.titoloDetto(p.titolo))." + (s.domanda.map { " " + $0 } ?? " Lo faccio?")
+            frase = "riprendo \(Jarvis.titoloDetto(p.titolo))." + (s.domanda.map { " " + $0 } ?? " Lo faccio?")
         } else if let a = s.attesa, let q = Insieme.condiviso.riprendi(tipo: a.tipo, chi: a.chi, numero: a.numero, testo: a.testo, whatsapp: a.whatsapp) {
             frase = "Riprendo da dove eravamo. " + q
         }
@@ -4675,7 +4672,7 @@ extension Jarvis {
         var frase: String?
         if let p = la.stato.piano {
             Piano.condiviso.ripristina(p)
-            frase = "\(mac ? "Dal Mac" : "Dal telefono") riprendo \(FRIDAY.titoloDetto(p.titolo))." + (la.stato.domanda.map { " " + $0 } ?? " Lo faccio?")
+            frase = "\(mac ? "Dal Mac" : "Dal telefono") riprendo \(Jarvis.titoloDetto(p.titolo))." + (la.stato.domanda.map { " " + $0 } ?? " Lo faccio?")
         } else if let a = la.stato.attesa, let q = Insieme.condiviso.riprendi(tipo: a.tipo, chi: a.chi, numero: a.numero, testo: a.testo, whatsapp: a.whatsapp) {
             frase = "Dicevamo \(mac ? "sul Mac" : "sul telefono"). " + q
         } else if let d = la.stato.domanda, Date().timeIntervalSince(la.aggiornato) < 900 {

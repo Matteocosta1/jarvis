@@ -220,19 +220,18 @@ struct AvvioOlografico: View {
     @ViewBuilder
     static func glifo(_ j: Int, m: CGFloat) -> some View {
         switch j {
-        case ContentView.postoTesta.social:
-            Image("GlifoInstagram").renderingMode(.template).resizable().interpolation(.high)
-                .frame(width: 15 * m, height: 15 * m).padding(1.5 * m)
         case ContentView.postoTesta.musica:
             IconaVinile().frame(width: 18 * m, height: 18 * m)
-        case ContentView.postoTesta.studio:
-            IconaStudio(pieno: true).frame(width: 18 * m, height: 18 * m)
-        case ContentView.postoTesta.sistemi:
-            Image(systemName: "server.rack").font(.system(size: 11.8 * m, weight: .semibold))
         case ContentView.postoTesta.cestino:
             Image(systemName: "trash").font(.system(size: 13.9 * m, weight: .semibold))
-        default:
-            Image(systemName: "gearshape").font(.system(size: 14.4 * m, weight: .regular))
+        case ContentView.postoTesta.difesa:
+            SimboloFriday(nome: "f:difesa", lato: 14.4 * m)
+        case ContentView.postoTesta.account:
+            SimboloFriday(nome: "f:account", lato: 14.4 * m)
+        default:                                                        // FRIDAY: il tondo rosso dell'SOS, come in alto
+            Text("SOS").font(.system(size: 8.5 * m, weight: .bold, design: .monospaced)).tracking(0.8 * m)
+                .frame(width: 30 * m, height: 30 * m)
+                .overlay(Circle().stroke(lineWidth: 1.4 * m))
         }
     }
 }
