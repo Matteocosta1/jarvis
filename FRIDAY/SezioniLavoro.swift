@@ -401,7 +401,33 @@ struct FoglioGestionale: View {
 // MARK: - PILATES (CORPO): Allena (lo Specchio, i programmi, la settimana da Salute), Reel (foto o video 9:16 col conto alla
 // rovescia, salvati in Foto, verso Instagram con la didascalia), Lezioni (oggi dal gestionale, la sequenza, le note sulle allieve).
 
-struct EsercizioP: Codable, Equatable, Identifiable { var id = UUID(); var nome: String; var dettaglio: String }
+/// Un esercizio di un programma: lo scrive e lo cambia Bea (nome, ripetizioni o tempo, molle, timer, note).
+struct EsercizioP: Codable, Equatable, Identifiable {
+    var id = UUID()
+    var nome: String
+    var dettaglio: String                 // ripetizioni o tempo, come lo scrive lei («3 × 10», «100 battute»)
+    var molle: String? = nil              // «2 rosse», «1 blu»
+    var secondi: Int? = nil               // il timer della sessione guidata: finito, passa da solo al prossimo
+    var note: String? = nil               // cosa dire o ricordare («spalle giù»)
+
+    /// La riga breve sotto il nome (e quella che FRIDAY dice).
+    var riassunto: String {
+        var v: [String] = []
+        if !dettaglio.trimmingCharacters(in: .whitespaces).isEmpty { v.append(dettaglio) }
+        if let m = molle, !m.trimmingCharacters(in: .whitespaces).isEmpty { v.append("molle \(m)") }
+        if let s = secondi, s > 0 { v.append(s >= 60 ? "\(s / 60) min\(s % 60 > 0 ? " \(s % 60) s" : "")" : "\(s) s") }
+        return v.joined(separator: " · ")
+    }
+}
+
+/// Un programma di Bea: un attrezzo, una durata e gli esercizi in ordine. Si crea, si cambia e si toglie dall'app.
+struct ProgrammaP: Codable, Equatable, Identifiable {
+    var id = UUID()
+    var nome: String
+    var attrezzo: String
+    var minuti: Int
+    var esercizi: [EsercizioP]
+}
 struct AllievaP: Codable, Equatable, Identifiable { var id = UUID(); var nome: String; var nota: String; var ok: Bool }
 struct ReelP: Codable, Equatable, Identifiable { var id = UUID(); var titolo: String; var video: Bool; var quando = Date(); var foto: String }
 
@@ -410,7 +436,8 @@ struct VistaPilates: View {
     let specchio: () -> Void
     private let tinta = Color.ciano
     @StateObject private var g = Gestionale.condiviso
-    @StateObject private var sequenza = Salvato<[EsercizioP]>("pilates_sequenza", iniziale: VistaPilates.reformer)
+    @StateObject private var programmi = Salvato<[ProgrammaP]>("pilates_programmi", iniziale: VistaPilates.programmiIniziali)
+    @StateObject private var lezione = Salvato<String>("pilates_lezione", iniziale: "")       // il programma scelto per le lezioni
     @StateObject private var allieve = Salvato<[AllievaP]>("pilates_allieve", iniziale: [])
     @StateObject private var reel = Salvato<[ReelP]>("pilates_reel", iniziale: [])
     @State private var parte = 0
@@ -420,18 +447,30 @@ struct VistaPilates: View {
     @State private var esercizio = ""
     @State private var didascalia = ""
     @State private var ultimoAsset: String?
-    @State private var passo = -1
-    @State private var nuovoEs = ""
-    @State private var nuovoDett = ""
+    @State private var modifica: ModificaP?
+    @State private var sessione: SessioneAperta?
     @State private var nuovaAllieva = ""
     @State private var nuovaNota = ""
+    @State private var allievaInModifica: UUID?
 
-    static let reformer: [EsercizioP] = [
-        .init(nome: "Footwork", dettaglio: "4 posizioni · 10 rip"), .init(nome: "Hundred", dettaglio: "100 battute"),
-        .init(nome: "Short Spine", dettaglio: "6 rip"), .init(nome: "Elephant", dettaglio: "8 rip"),
-        .init(nome: "Knee Stretches", dettaglio: "3 × 10"), .init(nome: "Long Stretch", dettaglio: "6 rip"), .init(nome: "Mermaid", dettaglio: "3 per lato"),
+    struct ModificaP: Identifiable { let id = UUID(); let programma: ProgrammaP; let nuovo: Bool }
+    struct SessioneAperta: Identifiable { let id = UUID(); let programma: ProgrammaP; let sottovoce: Bool }
+
+    /// I due programmi di partenza (Reformer e Bosu): da qui in poi li cambia Bea.
+    static let programmiIniziali: [ProgrammaP] = [
+        ProgrammaP(nome: "Reformer", attrezzo: "Reformer", minuti: 50, esercizi: [
+            .init(nome: "Footwork", dettaglio: "4 posizioni · 10 rip"), .init(nome: "Hundred", dettaglio: "100 battute"),
+            .init(nome: "Short Spine", dettaglio: "6 rip"), .init(nome: "Elephant", dettaglio: "8 rip"),
+            .init(nome: "Knee Stretches", dettaglio: "3 × 10"), .init(nome: "Long Stretch", dettaglio: "6 rip"), .init(nome: "Mermaid", dettaglio: "3 per lato"),
+        ]),
+        ProgrammaP(nome: "Bosu", attrezzo: "Bosu", minuti: 20, esercizi: [
+            .init(nome: "Squat sulla cupola", dettaglio: "3 × 12"), .init(nome: "Affondi", dettaglio: "3 × 10 per gamba"),
+            .init(nome: "Plank sul lato piatto", dettaglio: "3 volte", secondi: 40), .init(nome: "Ponte con piedi sulla cupola", dettaglio: "3 × 12"),
+        ]),
     ]
-    static let bosu: [(String, String)] = [("Squat sulla cupola", "3 × 12"), ("Affondi", "3 × 10 per gamba"), ("Plank sul lato piatto", "3 × 40 s"), ("Ponte con piedi sulla cupola", "3 × 12")]
+
+    /// Il programma delle lezioni: quello scelto, se c'è ancora, altrimenti il primo.
+    private var programmaLezione: ProgrammaP? { programmi.valore.first { $0.id.uuidString == lezione.valore } ?? programmi.valore.first }
 
     var body: some View {
         CorniceScheda(titolo: "Pilates", sottotitolo: settimana.map { "\($0.sessioni) sessioni questa settimana" } ?? "Reformer · Bosu · Reel", icona: "f:allenatore", tinta: tinta) {
@@ -449,6 +488,18 @@ struct VistaPilates: View {
                 if let esito { Task { await salvato(esito) } }
             }
         }
+        .sheet(item: $modifica) { m in
+            EditorProgrammaP(programma: m.programma, nuovo: m.nuovo, tinta: tinta) { nuovo in
+                if let i = programmi.valore.firstIndex(where: { $0.id == nuovo.id }) { programmi.valore[i] = nuovo } else { programmi.valore.append(nuovo) }
+            } togli: {
+                programmi.valore.removeAll { $0.id == m.programma.id }
+            }
+            .presentationDetents([.large]).presentationBackground(Color.fondo2)
+        }
+        .sheet(item: $sessione) { s in
+            SessionePilates(programma: s.programma, sottovoce: s.sottovoce, tinta: tinta)
+                .presentationDetents([.large]).presentationBackground(Color.fondo2).interactiveDismissDisabled()
+        }
     }
 
     // ── Allena
@@ -458,14 +509,21 @@ struct VistaPilates: View {
             RigaF(etichetta: "Visione del corpo", valore: "sull'iPhone · nessun video esce", stato: .ok)
             TastoF(testo: "Apri lo Specchio", icona: "f:allenatore") { specchio() }
         }
-        Pannello(titolo: "REFORMER", tinta: tinta) {
-            RigaF(etichetta: "Durata", valore: "50 min")
-            ForEach(Self.reformer) { RigaF(etichetta: $0.nome, valore: $0.dettaglio) }
+        ForEach(programmi.valore) { p in
+            Pannello(titolo: p.nome.uppercased(), tinta: tinta) {
+                RigaF(etichetta: p.attrezzo, valore: "\(p.minuti) min · \(p.esercizi.count) esercizi")
+                ForEach(Array(p.esercizi.enumerated()), id: \.element.id) { k, e in RigaF(etichetta: "\(k + 1). \(e.nome)", valore: e.riassunto) }
+                if p.esercizi.isEmpty { NotaF(testo: "Ancora nessun esercizio: tocca «Modifica» e aggiungili.") }
+                HStack(spacing: 10) {
+                    TastoF(testo: "Inizia", icona: "play.fill") { if !p.esercizi.isEmpty { sessione = SessioneAperta(programma: p, sottovoce: false) } }
+                    TastoF(testo: "Modifica", icona: "pencil", pieno: false) { modifica = ModificaP(programma: p, nuovo: false) }
+                }
+            }
         }
-        Pannello(titolo: "BOSU", tinta: tinta) {
-            RigaF(etichetta: "Durata", valore: "20 min")
-            ForEach(Self.bosu, id: \.0) { RigaF(etichetta: $0.0, valore: $0.1) }
+        TastoF(testo: "Nuovo programma", icona: "plus", pieno: false) {
+            modifica = ModificaP(programma: ProgrammaP(nome: "", attrezzo: "Reformer", minuti: 50, esercizi: []), nuovo: true)
         }
+        NotaF(testo: "I programmi sono tuoi: li scrivi, li cambi e li riordini tu. «Inizia» ti guida esercizio per esercizio, a voce e col timer.")
         Pannello(titolo: "SETTIMANA", tinta: tinta) {
             if let s = settimana {
                 HStack {
@@ -540,30 +598,26 @@ struct VistaPilates: View {
             NotaF(testo: "Dal tuo gestionale.")
         }
         Pannello(titolo: "SEQUENZA", tinta: tinta) {
-            NotaF(testo: "La sequenza della lezione in ordine, con tempi e molle. Durante la lezione tocca «Prossimo»: FRIDAY te lo dice sottovoce negli AirPods.")
-            ForEach(Array(sequenza.valore.enumerated()), id: \.element.id) { k, e in
-                HStack {
-                    RigaF(etichetta: "\(k + 1). \(e.nome)", valore: e.dettaglio, stato: k == passo ? .ok : .normale)
-                    Button { sequenza.valore.removeAll { $0.id == e.id } } label: { Image(systemName: "minus.circle") }.foregroundStyle(Color.tenue).buttonStyle(.plain)
+            NotaF(testo: "Scegli il programma della lezione. Durante la lezione FRIDAY ti dice ogni esercizio sottovoce negli AirPods: «Prossimo» quando vuoi, o da solo a fine timer.")
+            FlowF(spazio: 6) {
+                ForEach(programmi.valore) { p in ChipF(testo: p.nome, acceso: p.id == programmaLezione?.id) { lezione.valore = p.id.uuidString } }
+            }
+            if let p = programmaLezione {
+                ForEach(Array(p.esercizi.enumerated()), id: \.element.id) { k, e in RigaF(etichetta: "\(k + 1). \(e.nome)", valore: e.riassunto) }
+                HStack(spacing: 10) {
+                    TastoF(testo: "Inizia la lezione", icona: "forward.fill") { if !p.esercizi.isEmpty { sessione = SessioneAperta(programma: p, sottovoce: true) } }
+                    TastoF(testo: "Modifica", icona: "pencil", pieno: false) { modifica = ModificaP(programma: p, nuovo: false) }
                 }
-            }
-            HStack {
-                TextField("", text: $nuovoEs, prompt: Text("Esercizio").foregroundStyle(Color.tenue)).foregroundStyle(Color.testo)
-                TextField("", text: $nuovoDett, prompt: Text("molle · rip").foregroundStyle(Color.tenue)).foregroundStyle(Color.testo)
-                Button {
-                    guard !nuovoEs.isEmpty else { return }
-                    sequenza.valore.append(EsercizioP(nome: nuovoEs, dettaglio: nuovoDett)); nuovoEs = ""; nuovoDett = ""
-                } label: { Image(systemName: "plus.circle.fill").font(.system(size: 22)) }.foregroundStyle(tinta)
-            }
-            HStack(spacing: 10) {
-                TastoF(testo: passo < 0 ? "Inizia la lezione" : "Prossimo", icona: "forward.fill") { prossimo() }
-                if passo >= 0 { TastoF(testo: "Fine", pieno: false) { passo = -1; Parlato.sottovoce = false } }
+            } else {
+                NotaF(testo: "Nessun programma: crealo in Allena con «Nuovo programma».")
             }
         }
         Pannello(titolo: "ALLIEVE", tinta: tinta) {
             ForEach(allieve.valore) { a in
                 HStack {
-                    RigaF(etichetta: a.nome, valore: a.nota, stato: a.ok ? .ok : .no)
+                    Button {                                                                     // toccata: la cambi nei campi qui sotto
+                        allievaInModifica = a.id; nuovaAllieva = a.nome; nuovaNota = a.nota
+                    } label: { RigaF(etichetta: a.nome, valore: a.nota, stato: a.ok ? .ok : .no) }.buttonStyle(.plain)
                     Button { allieve.valore.removeAll { $0.id == a.id } } label: { Image(systemName: "minus.circle") }.foregroundStyle(Color.tenue).buttonStyle(.plain)
                 }
             }
@@ -573,20 +627,16 @@ struct VistaPilates: View {
                 Button {
                     guard !nuovaAllieva.isEmpty else { return }
                     let pronta = nuovaNota.lowercased().contains("pronta")
-                    allieve.valore.append(AllievaP(nome: nuovaAllieva, nota: nuovaNota, ok: pronta)); nuovaAllieva = ""; nuovaNota = ""
-                } label: { Image(systemName: "plus.circle.fill").font(.system(size: 22)) }.foregroundStyle(tinta)
+                    if let id = allievaInModifica, let i = allieve.valore.firstIndex(where: { $0.id == id }) {
+                        allieve.valore[i].nome = nuovaAllieva; allieve.valore[i].nota = nuovaNota; allieve.valore[i].ok = pronta
+                    } else {
+                        allieve.valore.append(AllievaP(nome: nuovaAllieva, nota: nuovaNota, ok: pronta))
+                    }
+                    nuovaAllieva = ""; nuovaNota = ""; allievaInModifica = nil
+                } label: { Image(systemName: allievaInModifica == nil ? "plus.circle.fill" : "checkmark.circle.fill").font(.system(size: 22)) }.foregroundStyle(tinta)
             }
-            NotaF(testo: "Note tue, visibili solo a te.")
+            NotaF(testo: "Note tue, visibili solo a te. Tocca un'allieva per cambiarla; «pronta» nella nota la segna in verde.")
         }
-    }
-
-    private func prossimo() {
-        guard !sequenza.valore.isEmpty else { return }
-        passo += 1
-        Parlato.sottovoce = true
-        if passo >= sequenza.valore.count { Parlato.dici("Fine della lezione. Brava."); passo = -1; Parlato.sottovoce = false; return }
-        let e = sequenza.valore[passo]
-        Parlato.dici("\(e.nome). \(e.dettaglio)")
     }
 
     /// Gli allenamenti di Pilates in Salute negli ultimi 7 giorni.
