@@ -1,8 +1,7 @@
 #if os(iOS)
 import SwiftUI
 
-/// Il «cuore» visivo di JARVIS (Mark IV): un anello di plasma fatto di decine di fili ondulati,
-/// archi da HUD che girano e, al centro, una sfera di particelle legate da filamenti che ruota in 3D.
+/// Il «cuore» visivo di JARVIS: dal 13.7 VELO (fasce di plasma velate e, al centro, SINTESI).
 /// Azzurro quando aspetta e ascolta; diventa un'intelligenza arancione, più agitata, quando pensa e parla.
 struct Reattore: View {
     let fase: Fase
@@ -14,30 +13,6 @@ struct Reattore: View {
 
     private static let azzurro = (r: 0.22, g: 0.88, b: 0.80)
 
-    /// I nodi della sfera: 150 punti distribuiti in modo uniforme (spirale di Fibonacci).
-    private static let nodi: [(x: Double, y: Double, z: Double)] = {
-        let n = 150
-        let aureo = Double.pi * (3 - 5.0.squareRoot())
-        return (0..<n).map { i in
-            let y = 1 - (Double(i) + 0.5) / Double(n) * 2
-            let r = (1 - y * y).squareRoot()
-            let th = aureo * Double(i)
-            return (r * cos(th), y, r * sin(th))
-        }
-    }()
-
-    /// I filamenti: ogni nodo è legato ai vicini più prossimi (calcolato una volta sola).
-    private static let legami: [(Int, Int)] = {
-        var out: [(Int, Int)] = []
-        let p = nodi
-        for i in 0..<p.count {
-            for j in (i + 1)..<p.count {
-                let dx = p[i].x - p[j].x, dy = p[i].y - p[j].y, dz = p[i].z - p[j].z
-                if dx * dx + dy * dy + dz * dz < 0.16 { out.append((i, j)) }
-            }
-        }
-        return out
-    }()
     private static let arancio = (r: 1.00, g: 0.47, b: 0.10)
 
     /// 5 nov (punto 8 approvato: «stesso disegno, meno lavoro»): i seni e coseni degli angoli dell'anello di plasma, calcolati
@@ -86,10 +61,17 @@ struct Reattore: View {
 
     // MARK: Disegno
 
+    /// 13.7 · VELO (la scelta del signore, 22 nov 01:40): dentro la ghiera (AnelliHUD, senza gli archi coi fermi) il bagliore, le
+    /// fasce di plasma e le scintille velate al 62 % e, al centro, SINTESI (Sintesi.swift) a 1,68 (il cuore era a 1,4). Tutto resta
+    /// dentro il cerchio della ghiera (145 punti), come il mockup «JARVIS Approvato».
     private func disegna(_ gc: GraphicsContext, size: CGSize, t: Double, mix: Double) {
         let cx = Double(size.width) / 2, cy = Double(size.height) / 2
         let c = CGPoint(x: cx, y: cy)
-        let R: Double = Double(min(size.width, size.height)) / 2 * 0.80
+        let R: Double = Double(min(size.width, size.height)) / 2 * 0.80     // il raggio del cuore (88 unità del mockup a 1,4)
+        let u = R / 88                                                         // punti per unità alla scala 1,4
+        var gc = gc
+        let bordo = Double(min(size.width, size.height)) / 2 * 145 / 154     // il cerchio della ghiera (145 su 154)
+        gc.clip(to: Path(ellipseIn: CGRect(x: cx - bordo, y: cy - bordo, width: bordo * 2, height: bordo * 2)))
 
         // energia e velocità secondo la fase; ascoltando e parlando seguono il volume vero della voce
         let letto = Volume.voce.leggi()                        // letto sempre, così in silenzio ricade da solo
@@ -107,14 +89,16 @@ struct Reattore: View {
         }()
         let tv = Giri.reattore.avanza(velocita)                // tempo × velocità, senza salti
 
-        // 1. bagliore di fondo
-        let alone = Path(ellipseIn: CGRect(x: cx - R * 1.25, y: cy - R * 1.25, width: R * 2.5, height: R * 2.5))
+        // 1. il bagliore di fondo, alla scala di SINTESI (1,68)
+        let Rb = 88 * u * 1.2
+        let alone = Path(ellipseIn: CGRect(x: cx - Rb * 1.25, y: cy - Rb * 1.25, width: Rb * 2.5, height: Rb * 2.5))
         gc.fill(alone, with: .radialGradient(Gradient(colors: [colore(mix, 0.34 + 0.12 * battito), colore(mix, 0)]),
-                                             center: c, startRadius: R * 0.2, endRadius: R * 1.25))
+                                             center: c, startRadius: Rb * 0.2, endRadius: Rb * 1.25))
 
-        // 2. anello di plasma: tanti fili chiusi, ognuno deformato da onde diverse
+        // 2. le fasce di plasma, velate (VELO: 62 %)
         var plasma = gc
         plasma.blendMode = .plusLighter
+        plasma.opacity = 0.62
         let fili = 30
         let spinta: Double = 0.6 + 0.4 * battito
         for i in 0..<fili {
@@ -136,7 +120,7 @@ struct Reattore: View {
             plasma.stroke(p, with: .color(colore(mix, luce, schiarisci: i % 7 == 0 ? 0.5 : 0.1)), lineWidth: 1.0)
         }
 
-        // 3. scintille che scorrono lungo l'anello
+        // 3. le scintille che scorrono lungo l'anello (anche loro velate)
         let scintille = 90
         var puntini = Path()                                   // 5 nov (punto 8): un riempimento solo, stesso colore per tutte
         for s in 0..<scintille {
@@ -152,138 +136,13 @@ struct Reattore: View {
         }
         plasma.fill(puntini, with: .color(colore(mix, 0.8, schiarisci: 0.55)))
 
-        // 4. archi HUD che girano in senso opposto
-        let archi: [(Double, Double, Double, Double)] = [(0.66, 0.25, 0.70, 1.5), (0.60, -0.4, 0.45, 3.0), (0.71, 0.12, 0.25, 1.0)]
-        let fretta: Double = fase == .elaboro ? 3 : 1
-        for (n, arcoDati) in archi.enumerated() {
-            let (fr, vel, lung, spessore) = arcoDati
-            let inizio = Angle(radians: t * vel * fretta + Double(n) * 2.1)
-            var arco = Path()
-            arco.addArc(center: c, radius: R * fr, startAngle: inizio, endAngle: inizio + .radians(2 * .pi * lung), clockwise: false)
-            gc.stroke(arco, with: .color(colore(mix, 0.75, schiarisci: 0.15)), style: StrokeStyle(lineWidth: spessore, lineCap: .round))
-        }
-        // tacche sull'anello interno
-        let tacche = 60
-        var lunghe = Path(), corte = Path()                    // 5 nov (punto 8): due tratti invece di 60, stessi segni
-        for k in 0..<tacche {
-            let th: Double = Double(k) / Double(tacche) * 2 * .pi - t * 0.08
-            let lunga = k % 5 == 0
-            let r1: Double = R * 0.54
-            let r2: Double = R * (lunga ? 0.575 : 0.56)
-            let (ct, st) = (cos(th), sin(th))
-            if lunga {
-                lunghe.move(to: CGPoint(x: cx + r1 * ct, y: cy + r1 * st)); lunghe.addLine(to: CGPoint(x: cx + r2 * ct, y: cy + r2 * st))
-            } else {
-                corte.move(to: CGPoint(x: cx + r1 * ct, y: cy + r1 * st)); corte.addLine(to: CGPoint(x: cx + r2 * ct, y: cy + r2 * st))
-            }
-        }
-        gc.stroke(lunghe, with: .color(colore(mix, 0.5)), lineWidth: 1)
-        gc.stroke(corte, with: .color(colore(mix, 0.22)), lineWidth: 1)
-
-        // 5. il cuore: una sfera di particelle collegate da filamenti (una rete neurale) che ruota in 3D.
-        //    In attesa respira piano; ascoltando si gonfia; pensando collassa in un nucleo e lancia scintille;
-        //    parlando è attraversata da onde.
-        let (rBase, collasso): (Double, Double) = {
-            switch fase {
-            case .attesa: return (0.36 + 0.012 * battito, 0)
-            case .ascolto: return (0.34 + 0.22 * energia + 0.10 * vol, 0)   // il discorso la gonfia, ogni sillaba la spinge
-            case .elaboro: return (0.30, 0.55 + 0.1 * sin(t * 9))
-            case .parlo: return (0.34 + 0.16 * energia + 0.08 * vol, 0)
-            }
+        // 4. il cuore: SINTESI, a 1,68
+        let fs: SintesiFase = {
+            switch fase { case .attesa: return .attesa; case .ascolto: return .ascolto; case .elaboro: return .elaboro; case .parlo: return .parlo }
         }()
-        let Rs: Double = R * rBase * (1 - collasso * 0.5)
-        let giroY: Double = tv * 0.45
-        let inclina: Double = 0.38 + 0.18 * sin(t * 0.21)
-        let (sy, cyR, sx, cxR) = (sin(giroY), cos(giroY), sin(inclina), cos(inclina))
-        // onde di pensiero: due fasce di luce attraversano la sfera, più svelte e forti con la voce
-        let fronte1: Double = (t * 1.3 * (1 + vol)).truncatingRemainder(dividingBy: 2.4) - 1.2
-        let fronte2: Double = (t * 1.0 * (1 + vol) + 2.1).truncatingRemainder(dividingBy: 2.4) - 1.2
-        let forzaOnda: Double = 0.25 + 0.9 * vol
-        func onda(_ n: (x: Double, y: Double, z: Double)) -> Double {
-            let p1 = n.x * 0.6 + n.y * 0.8, p2 = -n.x * 0.7 + n.y * 0.2 + n.z * 0.68
-            let d1 = (p1 - fronte1) / 0.18, d2 = (p2 - fronte2) / 0.18
-            let a = exp(-d1 * d1), b = exp(-d2 * d2)
-            return max(a, b) * forzaOnda
+        Sintesi.disegna(gc, centro: c, scala: u * 1.2, t: t, tv: tv, fase: fs, vol: vol, energia: energia) { op, sch in
+            colore(mix, op, schiarisci: sch)
         }
-        var proiettati: [(CGPoint, Double, Double)] = []           // punto, profondità, onda
-        proiettati.reserveCapacity(Reattore.nodi.count)
-        for (i, n) in Reattore.nodi.enumerated() {
-            let fi = Double(i)
-            // respiro organico: ogni nodo si muove un poco per conto suo
-            var raggio: Double = 1 + 0.045 * sin(t * 1.3 + fi * 1.7)
-            if fase == .parlo { raggio += 0.13 * battito * sin(n.y * 6 - t * 8) }          // onde che attraversano la sfera
-            if collasso > 0 { raggio *= 1 - collasso * (0.5 + 0.5 * sin(fi * 7.3)) * 0.6 } // tutti verso il centro
-            // rotazione attorno a Y, poi inclinazione attorno a X
-            let x1 = n.x * cyR + n.z * sy, z1 = -n.x * sy + n.z * cyR
-            let y2 = n.y * cxR - z1 * sx, z2 = n.y * sx + z1 * cxR
-            let prospettiva: Double = 1 / (1 - z2 * 0.22)
-            let pt = CGPoint(x: cx + x1 * Rs * raggio * prospettiva, y: cy + y2 * Rs * raggio * prospettiva)
-            proiettati.append((pt, z2, onda(n)))
-        }
-        // i filamenti, in tre strati di profondità (davanti più luminosi)
-        var rete = gc
-        rete.blendMode = .plusLighter
-        var strati = [Path(), Path(), Path()]
-        var accesi = Path()                                                  // i filamenti attraversati dall'onda
-        for (a, b) in Reattore.legami {
-            let (pa, za, oa) = proiettati[a], (pb, zb, ob) = proiettati[b]
-            let z = (za + zb) / 2
-            let k = z > 0.35 ? 2 : (z > -0.3 ? 1 : 0)
-            strati[k].move(to: pa)
-            strati[k].addLine(to: pb)
-            if (oa + ob) / 2 > 0.12 { accesi.move(to: pa); accesi.addLine(to: pb) }
-        }
-        for k in 0..<3 {
-            rete.stroke(strati[k], with: .color(colore(mix, [0.18, 0.36, 0.62][k], schiarisci: [0.1, 0.25, 0.45][k])), lineWidth: CGFloat([0.6, 0.8, 1.0][k]))
-        }
-        rete.stroke(accesi, with: .color(colore(mix, 0.45 + 0.4 * vol, schiarisci: 0.7)), lineWidth: 1.1)
-        // i nodi: puntini più grandi e luminosi quando sono davanti
-        var nodiPath = [Path(), Path(), Path()]
-        var nodiOnda = Path()
-        for (pt, z, o) in proiettati {
-            let lato: Double = (1.1 + 1.9 * (z + 1) / 2) * (1 + 0.9 * o)
-            let k = z > 0.35 ? 2 : (z > -0.3 ? 1 : 0)
-            nodiPath[k].addEllipse(in: CGRect(x: pt.x - lato / 2, y: pt.y - lato / 2, width: lato, height: lato))
-            if o > 0.2 { nodiOnda.addEllipse(in: CGRect(x: pt.x - lato, y: pt.y - lato, width: lato * 2, height: lato * 2)) }
-        }
-        for k in 0..<3 {
-            rete.fill(nodiPath[k], with: .color(colore(mix, [0.45, 0.75, 1.0][k], schiarisci: [0.2, 0.45, 0.7][k])))
-        }
-        rete.fill(nodiOnda, with: .color(colore(mix, 0.35 + 0.3 * vol, schiarisci: 0.85)))   // alone attorno ai nodi investiti dall'onda
-        // pulviscolo: particelle libere che orbitano attorno alla sfera
-        var polvere = Path()
-        for d in 0..<70 {
-            let fd = Double(d)
-            let caso: Double = 0.5 + 0.5 * sin(fd * 78.233)
-            let th: Double = fd * 2.399 + tv * (0.08 + 0.12 * caso)
-            let r: Double = R * (rBase * (1 - collasso * 0.5) + 0.04 + 0.13 * caso)
-            let lato: Double = 0.8 + 1.2 * (0.5 + 0.5 * sin(fd * 3.7 + t * 2))
-            polvere.addEllipse(in: CGRect(x: cx + r * cos(th) - lato / 2, y: cy + r * sin(th) * 0.92 - lato / 2, width: lato, height: lato))
-        }
-        rete.fill(polvere, with: .color(colore(mix, 0.55, schiarisci: 0.45)))
-        // pensando: scintille che schizzano fuori dal nucleo, come un big bang continuo
-        if collasso > 0 {
-            var scie = Path()
-            for s in 0..<48 {
-                let fs = Double(s)
-                let dir: Double = fs * 2.399
-                let vita: Double = (t * 0.9 + (0.5 + 0.5 * sin(fs * 12.9898))).truncatingRemainder(dividingBy: 1)
-                let r1: Double = R * (0.06 + 0.46 * vita)
-                let r2: Double = r1 + R * 0.035 * (1 - vita)
-                scie.move(to: CGPoint(x: cx + r1 * cos(dir), y: cy + r1 * sin(dir)))
-                scie.addLine(to: CGPoint(x: cx + r2 * cos(dir), y: cy + r2 * sin(dir)))
-            }
-            rete.stroke(scie, with: .color(colore(mix, 0.6, schiarisci: 0.5)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
-        }
-
-        // 6. nucleo: si accende quando parla, pulsa quando ascolta
-        let scala: Double = fase == .parlo ? 0.2 + 0.36 * vol + 0.03 * sin(t * 3) : (fase == .ascolto ? 0.18 + 0.36 * vol : 0.2)
-        let nucleo: Double = Rs * scala
-        gc.fill(Path(ellipseIn: CGRect(x: cx - nucleo * 2.2, y: cy - nucleo * 2.2, width: nucleo * 4.4, height: nucleo * 4.4)),
-                with: .radialGradient(Gradient(colors: [colore(mix, 0.8, schiarisci: 0.7), colore(mix, 0)]),
-                                      center: c, startRadius: 0, endRadius: nucleo * 2.2))
-        gc.fill(Path(ellipseIn: CGRect(x: cx - nucleo / 2, y: cy - nucleo / 2, width: nucleo, height: nucleo)),
-                with: .color(colore(mix, 1, schiarisci: 0.85)))
     }
 }
 

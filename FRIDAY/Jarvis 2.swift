@@ -162,11 +162,15 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var riservato = false {
         didSet { if riservato != oldValue { aggiornaRichiamo() } }
     }
-    private var spentoLungo = Date.distantPast     // la pressione lunga: il rilascio che segue non è un tocco
+    /// La pressione lunga col dito: il dito che si alza subito dopo non è un tocco. 13.7 (debug): prima valeva solo 0,8 s dalla
+    /// pressione, e tenendo il dito giù più di 1,4 s in tutto il rilascio arrivava come tocco e riaccendeva il microfono appena
+    /// spento. Ora vale per il rilascio che segue (al massimo 3 s), e lo prende una volta sola.
+    private var rilascioDaIgnorare: Date?
     /// 9 nov: pressione lunga sul reattore (o «Jarvis, spegni il microfono»): SPENTO, sordo davvero. Un tocco lo riaccende.
-    func spegniMicrofono() {
+    /// `daDito`: dalla pressione lunga (col dito già spento conta comunque: il rilascio non deve riaccenderlo).
+    func spegniMicrofono(daDito: Bool = false) {
+        if daDito { rilascioDaIgnorare = Date() }
         guard !micSpento else { return }
-        spentoLungo = Date()
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         Suoni.microfonoSpento()
         riservato = false
@@ -220,6 +224,9 @@ final class Jarvis: NSObject, ObservableObject {
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
             aggiornaRichiamo()
             if fase == .ascolto || fase == .parlo { Suoni.sfumaAvvio() }   // 12.0 (14): se ascolta o parla, la voce dell'avvio sfuma
+            if fase == .attesa { Iniziativa.condivisa.pausa() }            // 14 nov: una pausa nel dialogo: l'iniziativa può parlare
+            Filo.condiviso.jarvisParla(fase == .parlo)                     // 14 nov: la tab non sparisce mentre JARVIS parla
+            Volume.voce.ascolto(fase == .ascolto)                          // 13.8 (3): il richiamo e l'orecchio misurano la voce solo ascoltando
         }
     }
     @Published var parziale = ""
@@ -336,6 +343,18 @@ final class Jarvis: NSObject, ObservableObject {
     private var inizioUltimaFrase: Date?
     /// 12.0 (10): lavori della regia che aspettano la fine della voce di JARVIS (si apre una sezione col microfono o la fotocamera)
     private var lavoriDopoVoce: [@MainActor () -> Void] = []
+    /// 13.1 (2) · FUORI DALL'APP (FuoriApp.swift): l'istanza viva, per il tasto Azione da bloccato (l'intent non vede la schermata).
+    static weak var attivo: Jarvis?
+    /// 13.1 (2): il sì è arrivato dal polso col telefono in tasca: la risposta va all'orologio, scritta, e il telefono tace.
+    var tacePerPolso = false
+    /// 13.1 (2): il cervello sta rispondendo a un sì dato dal polso: a fine turno la risposta va all'orologio.
+    private var attesaPolso = false
+    /// 13.1 (2): la ripresa («dove eravamo rimasti») e il filo dell'altro dispositivo, riaprendo JARVIS.
+    private var compitoRipresa: Task<Void, Never>?
+    /// 13.2 (debug): la ripresa sta guardando (anche in rete) se c'è qualcosa da dire, e quando l'ha detta: le abitudini aspettano
+    /// e, se la ripresa ha parlato, quella volta tacciono (due frasi di fila all'apertura erano troppe).
+    private var ripresaInCorso = false
+    private var ultimaRipresa = Date.distantPast
     /// 12 nov (P3): com'è finita la voce nell'ultima frase (va nei tempi del turno, per regolare le soglie sui dati veri)
     private var ultimaIntonazione: Intonazione.Giudizio?
     /// 12 nov (B4): la frase d'attesa preparata dal cervello per questa risposta (al posto di quella a caso)
@@ -382,6 +401,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard avvioInCorso != oldValue else { return }
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio non è «confusione»
             aggiornaRichiamo()
+            if !avvioInCorso { riprendiSeServe() }   // 13.1 (2): JARVIS appena aperto: «dove eravamo rimasti» (FuoriApp.swift)
         }
     }
     private let orecchio = Orecchio()   // ascolta mentre JARVIS parla: «Jarvis», «basta»… lo interrompono
@@ -473,6 +493,7 @@ final class Jarvis: NSObject, ObservableObject {
             self?.messaggi.last(where: { $0.ruolo == "user" }).map { (testo: $0.testo, quando: $0.data) }
         }
         Regia.condivisa.dopoLaVoce = { [weak self] lavoro in self?.dopoLaVoce(lavoro) }
+        Regia.condivisa.rigaVecchia = { [weak self] in Schermo.perCervello(sezione: self?.sezioneAperta) }   // 14 nov: «schermo» e «mano»
         // 12.0 (16): il dialogo. Le frasi dell'app lasciano aperto il seguito («sì», «leggimi quello di Bea» senza «Jarvis»); il
         // congedo («Will that be all, Sir?») solo a cosa vera finita, quando il signore tace
         Insieme.condiviso.parla = { [weak self] frase in self?.annunciaConSeguito(frase) }
@@ -483,6 +504,24 @@ final class Jarvis: NSObject, ObservableObject {
             return max(self.inizioUltimaFrase ?? .distantPast, self.messaggi.last(where: { $0.ruolo == "user" })?.data ?? .distantPast)
         }
         OcchiAperti.parla = { [weak self] frase in self?.annuncia(frase) }   // build 23: la voce dagli Occhi («Ecco cosa ho trovato, Sir.»)
+        // 14 nov · L'INIZIATIVA (Iniziativa.swift): gli impegni e i messaggi detti prima che li chieda, solo quando non disturba
+        Iniziativa.condivisa.parla = { [weak self] frase in self?.annunciaConSeguito(frase) }
+        Iniziativa.condivisa.libero = { [weak self] urgente in self?.puoDireDaSolo(urgente: urgente) ?? false }
+        Iniziativa.condivisa.aspettaSi = { Insieme.condiviso.aspettaIlSi || Regia.condivisa.aspettaIlSi || ManiJarvis.aspettaIlSi || Piano.condiviso.passoInAttesa != nil }   // 14 nov; 13.2: anche il piano
+        Iniziativa.condivisa.inConversazione = { [weak self] in
+            guard let self else { return false }
+            return self.fase != .attesa || !self.inCoda.isEmpty || self.richiamo.sveglio || Date() < self.richiamo.seguitoFinoA
+        }
+        Iniziativa.condivisa.avvia()
+        // 13.1 (2) · FUORI DALL'APP (FuoriApp.swift): il sì dal polso, il filo col Mac, il tasto Azione da bloccato
+        Jarvis.attivo = self
+        SiPolso.condiviso.ultimaDomanda = { [weak self] in self.flatMap { SiInAttesa.domanda(in: $0.messaggi) } }
+        SiPolso.condiviso.esegui = { [weak self] si, cosa in await self?.rispondiDalPolso(si: si, cosa: cosa) }
+        SiPolso.condiviso.dialogoFuori = { [weak self] in self?.dialogoFuori ?? false }
+        SiPolso.condiviso.avvia()
+        FiloCondiviso.condiviso.battute = { [weak self] in self?.messaggi ?? [] }
+        FiloCondiviso.condiviso.riservato = { [weak self] in self?.riservato ?? false }
+        ComandiIsola.ascoltaFuori = { [weak self] in self?.ascoltaDaFuori() ?? false }
         // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
         NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
             BattitoMani.tastieraAperta(true)
@@ -518,7 +557,11 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Interazione
 
     func toccaReattore() {
-        if Date().timeIntervalSince(spentoLungo) < 0.8 { return }   // 9 nov: il dito alzato dopo la pressione lunga non è un tocco
+        // 9 nov: il dito alzato dopo la pressione lunga non è un tocco (13.7: anche se è rimasto giù a lungo)
+        if let r = rilascioDaIgnorare {
+            rilascioDaIgnorare = nil
+            if Date().timeIntervalSince(r) < 3 { return }
+        }
         fermaBenvenuto()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.tocco()
@@ -659,7 +702,7 @@ final class Jarvis: NSObject, ObservableObject {
             Congedo.condiviso.zitto()
             messaggi.append(Messaggio(ruolo: "user", testo: scritta))
             salva()
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Aptica.comandoFatto()                                        // 14 nov: dal motore, mai sopra il tocco della tab
             if !battuta.isEmpty { annunciaConSeguito(battuta) }
             return
         }
@@ -997,10 +1040,13 @@ final class Jarvis: NSObject, ObservableObject {
         // cervello, con la battuta di JARVIS
         Congedo.condiviso.zitto()                                         // 12.0 (16): ha parlato lui, niente congedo in arrivo
         if !pulito.isEmpty { Battute.ritmo(pulito, dopoRisposta: FineFrase.dopoRisposta(fine: fineUltimaRisposta, inizio: inizioUltimaFrase)) }
-        if !pulito.isEmpty, let battuta = await Regia.condivisa.subito(pulito) {
+        let inizioComando = Date()
+        if !pulito.isEmpty, var battuta = await Regia.condivisa.subito(pulito) {
+            // 13.1 (2): col telefono bloccato (tasto Azione) la sezione si apre, ma lui non la vede: lo dice
+            if !Jarvis.usaAscoltoCloud, UIApplication.shared.applicationState == .background, Regia.condivisa.apertaAlle >= inizioComando { battuta = "La trova aperta appena sblocca." }
             chiudiInterruzione()
             fraseAVoce = ""
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Aptica.comandoFatto()                                        // 14 nov: dal motore, mai sopra il tocco della tab
             // 12.0 (16): anche dopo una frase dell'app il seguito vale senza «Jarvis» (il dialogo continua)
             if !battuta.isEmpty { annunciaConSeguito(battuta) } else { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
             return
@@ -1148,6 +1194,11 @@ final class Jarvis: NSObject, ObservableObject {
     /// Il rito di Tony: due battiti di mani + «Wake up, daddy's home», in qualsiasi ordine, a meno di 8 secondi l'uno dall'altra.
     /// Arrivati tutti e due: i Clash per qualche secondo, poi il saluto. Da soli: i battiti danno il segnale «pronto» e aspettano
     /// la frase (che passa anche senza «Jarvis»); la frase aspetta i battiti e, se non arrivano, il rito parte lo stesso.
+    /// 14 nov (il signore: «a volte mentre ascolto la musica da Apple Music o da Spotify… o della musica che sto sentendo da fuori
+    /// nella vita vera… Trrrr, parte il cazzo di avvio»): i colpi di batteria di una canzone sembrano battiti di mani, e da soli,
+    /// dopo 4 secondi, facevano partire il rito (i Clash, o il suono d'avvio se l'anteprima non arriva). Ora i battiti da soli non
+    /// fanno partire più niente: aspettano la frase di Tony per 8 secondi, e solo la frase fa partire il rito. Con JARVIS dietro
+    /// (il dialogo che continua fuori dall'app) i battiti non contano affatto.
     private var inBenvenuto = false
     private var ultimiBattiti = Date.distantPast
     private var ultimaFraseTony = Date.distantPast
@@ -1159,17 +1210,15 @@ final class Jarvis: NSObject, ObservableObject {
     /// Due battiti di mani.
     private func applaudito() {
         guard fase == .attesa, !inBenvenuto, !musicaSuona, !riservato else { return }   // 9 nov: con la musica (e in RISERVATO) niente battiti
+        guard UIApplication.shared.applicationState == .active else { return }          // 14 nov: con JARVIS dietro i battiti non contano
         if Date().timeIntervalSince(ultimaFraseTony) < Jarvis.finestraRito { benvenuto(); return }
         ultimiBattiti = Date()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         Suoni.pronto()                               // «pronto»: ora la frase
         mostraRito("👏👏  Sì?")
+        // 14 nov: niente più rito da solo dopo 4 secondi (una canzone lo faceva partire): i battiti aspettano la frase
+        // per 8 secondi (finestraRito); se non arriva, non succede altro
         attesaBattiti?.cancel()
-        attesaBattiti = Task { [weak self] in       // se la frase non arriva (o il riconoscimento non la capisce) parte lo stesso
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled, let self, self.ultimiBattiti != .distantPast else { return }
-            self.benvenuto()
-        }
     }
 
     /// Una riga sullo schermo per qualche secondo: così si vede che JARVIS ha sentito (battiti o frase).
@@ -1217,6 +1266,23 @@ final class Jarvis: NSObject, ObservableObject {
             try? await Task.sleep(for: .seconds(1))
             if fase == .attesa { aggiornaRichiamo() } // modalità silenziosa: nessuna voce, il richiamo va riacceso a mano
         }
+    }
+
+    /// 14 nov · L'INIZIATIVA: JARVIS può dire una cosa da sé adesso, senza disturbare: app davanti, in attesa e zitto, nessuna voce
+    /// intorno da 4 secondi, niente avvio né rito, niente sezioni col microfono o la fotocamera, microfono acceso, voce accesa, nessuna
+    /// missione in corso. Non urgente: anche niente RISERVATO, seguito chiuso, la sua ultima risposta finita da almeno 5 secondi e il
+    /// dito lontano dallo schermo da 6 (con una sezione davanti e con la musica sì: il signore, 14 nov).
+    private func puoDireDaSolo(urgente: Bool) -> Bool {
+        guard UIApplication.shared.applicationState == .active, fase == .attesa, !avvioInCorso, !inBenvenuto, inCoda.isEmpty,
+              !richiamo.sveglio, !micSpento, !micOccupato, !Impostazioni.muto, richiamoConsentito, occhi == nil,
+              Date().timeIntervalSince(richiamo.ultimaVoce) > 4 else { return false }
+        // 14 nov (il signore: «deve parlare anche quando l'app è aperta e non sto facendo niente… vabbè, ci sta durante la missione»):
+        // mai durante la missione; per il resto anche con una sezione davanti e con la musica, se lui non parla e non tocca lo schermo
+        guard !Piano.condiviso.inCorso else { return false }
+        if urgente { return true }
+        return !riservato && Date() >= richiamo.seguitoFinoA
+            && Date().timeIntervalSince(fineUltimaRisposta ?? .distantPast) > 5
+            && Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 6
     }
 
     /// Il rito si ferma subito (tocco sul reattore, una domanda, un avviso): musica spenta, niente saluto.
@@ -1750,7 +1816,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func armaPonte(id: UUID, testo: String) {
         compitoPonte?.cancel()
         inizioTurno = Date()
-        guard !Impostazioni.muto, testo.count > 6 else { return }      // «pausa», «avanti»: rispondono già in un lampo
+        guard !Impostazioni.muto, !tacePerPolso, testo.count > 6 else { return }      // «pausa», «avanti»: rispondono già in un lampo
         let finestra = max(0, richiamo.liberoFinoA.timeIntervalSinceNow)
         compitoPonte = Task { @MainActor [weak self] in
             // niente «mh» o mezze parole (suonano come un balbettio): solo frasi intere, e solo se serve davvero
@@ -1824,8 +1890,10 @@ final class Jarvis: NSObject, ObservableObject {
                        primo: Esito? = nil, dopoAspetto: Bool = false, comeParla: String? = nil, libera: Bool = false,
                        recupero: String? = nil, inizioFrase: Date? = nil) async {
         defer { unico?.libera() }          // idea D: l'attesa del Mac può mandare la frase dopo, qualunque cosa succeda qui
+        defer { Piano.condiviso.turnoFinito() }   // 14 nov: un piano interrotto o fermo non resta sullo schermo
+        defer { fineTurnoFuori(id: id) }          // 13.1 (2): la risposta a un sì dal polso va all'orologio; il filo col Mac
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
-                                    "strumenti_client_def": [Regia.definizione]]     // 12.0 (10): la regia
+                                    "strumenti_client_def": Regia.definizioni]     // 12.0 (10): la regia
         if let unico {
             // idea D: la frase come audio; il cervello la trascrive, la mette dopo la cronologia con la nota e risponde
             corpo["audio_domanda"] = unico.audio.base64EncodedString()
@@ -1886,7 +1954,9 @@ final class Jarvis: NSObject, ObservableObject {
         defer { if sfondo != .invalid { UIApplication.shared.endBackgroundTask(sfondo) } }
         do {
             var pronto = primo                 // 11 nov: l'esito della risposta anticipata adottata (la sua richiesta è già fatta)
-            for _ in 0..<6 {
+            // 14 nov (più passi senza guida): fino a 16 giri col telefono in una risposta (prima 6): un piano intero (leggere,
+            // scrivere, segnare, controllare) ci sta; resta il tocco sul reattore per fermarlo
+            for _ in 0..<16 {
                 // ogni passo ha un suo numero: se la linea cade e si riprova, il cervello riconosce la stessa richiesta e non ripete le azioni
                 let esito: Esito
                 if let p = pronto { esito = p; pronto = nil }
@@ -1904,7 +1974,7 @@ final class Jarvis: NSObject, ObservableObject {
                     let continua: [String: Any] = ["lavoro": e["lavoro"] ?? [Any](), "modello": e["modello"] ?? "", "azioni": e["azioni"] ?? [Any](),
                                                    "detto": e["detto"] ?? "", "esegui": true]
                     corpo = ["messaggi": [Any](), "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
-                             "strumenti_client_def": [Regia.definizione], "continua": continua]
+                             "strumenti_client_def": Regia.definizioni, "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
                     if let salute = await SalutePronta.perDomanda(attesa: 0.5) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 case .fine(let testo, let azioni):
@@ -1968,7 +2038,7 @@ final class Jarvis: NSObject, ObservableObject {
                     let continua: [String: Any] = ["lavoro": lavoro, "risultati": risultati,
                                                    "modello": modello, "azioni": azioniFatte, "detto": detto]
                     corpo = ["messaggi": [Any](), "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
-                             "strumenti_client_def": [Regia.definizione], "continua": continua]
+                             "strumenti_client_def": Regia.definizioni, "continua": continua]
                     if let posizione { corpo["posizione"] = posizione }
                     if let salute = await SalutePronta.perDomanda(attesa: 0) { corpo["salute_pronta"] = salute }   // 13 nov (12.0 (17))
                 }
@@ -2365,7 +2435,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// `di`: la risposta a cui appartiene il testo (per sapere cosa il signore ha sentito davvero se la interrompe).
     private func accodaVoce(_ pezzo: String, forza: Bool = false, di risposta: UUID? = nil) {
         bufferVoce += pezzo
-        guard !Impostazioni.muto else { bufferVoce = ""; return }
+        guard !Impostazioni.muto, !tacePerPolso else { bufferVoce = ""; return }   // 13.1 (2): il sì dal polso, telefono in tasca
         if forza {
             let resto = bufferVoce.trimmingCharacters(in: .whitespacesAndNewlines)
             bufferVoce = ""
@@ -2436,11 +2506,24 @@ final class Jarvis: NSObject, ObservableObject {
                 if sessione.category != .playAndRecord || !sessione.categoryOptions.contains(.mixWithOthers) {
                     try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
                 }
-            } else if conOrecchio {
-                // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
-                try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
             } else {
-                try? sessione.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                // 13.8 (4) (issue #18: «la musica non si abbassa quando JARVIS risponde a un messaggio scritto, a volte sì a volte
+                // no»): scrivendo, mentre JARVIS pensa resta acceso il «Jarvis» in attesa, che tiene l'audio attivo SENZA abbassare
+                // la musica. «Abbassa gli altri» iOS lo applica solo quando l'audio si accende: cambiato con l'audio già acceso non
+                // abbassa niente. Succedeva quando il richiamo era già ripartito (a volte non ancora: per questo era a intermittenza).
+                // Ora: se la musica suona e l'audio non la stava già abbassando, il richiamo si ferma (mentre parla non serve) e
+                // l'audio si spegne e si riaccende, così iOS la abbassa davvero.
+                let daRiaccendere = !sessione.categoryOptions.contains(.duckOthers) && sessione.isOtherAudioPlaying
+                if daRiaccendere {
+                    richiamo.ferma()
+                    try? sessione.setActive(false)
+                }
+                if conOrecchio {
+                    // altoparlante e microfono insieme: JARVIS parla e intanto sente se il signore lo chiama
+                    try? sessione.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
+                } else {
+                    try? sessione.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                }
             }
             try? sessione.setActive(true)
             // la scelta si fa solo qui, quando nessuna delle due voci sta parlando: così non si accavallano
@@ -3034,6 +3117,18 @@ final class Jarvis: NSObject, ObservableObject {
     /// lasciate a metà non si legano più a niente: tornando nell'app JARVIS riparte pulito e non risponde a frasi vecchie
     /// (prima, per esempio, rispondeva a quello che dicevano gli amici mentre lui scansionava con LiDAR).
     func vaInSottofondo() {
+        Iniziativa.condivisa.ferma()                    // 14 nov: con JARVIS dietro gli impegni diventano notifiche all'ora di uscire
+        // 13.1 (2) (FuoriApp.swift): quello che aspetta il sì si salva per la ripresa; l'orologio sa che il telefono è in tasca; il
+        // filo va su Supabase per il Mac (iOS concede qualche secondo)
+        compitoRipresa?.cancel()
+        Ripresa.salva(domanda: SiInAttesa.domanda(in: messaggi))
+        SiPolso.condiviso.controlla()
+        let compitoFilo = CompitoSfondo()
+        compitoFilo.id = UIApplication.shared.beginBackgroundTask(withName: "jarvis-filo") { compitoFilo.chiudi() }
+        Task { @MainActor in
+            await FiloCondiviso.condiviso.salva()
+            compitoFilo.chiudi()
+        }
         // 11 nov (#16, il signore: «se esco da JARVIS mentre parla non lo sento… vorrei che continuasse a parlare e ad ascoltare, e
         // appena capisce che il dialogo è finito richiuda il microfono»): con un dialogo in corso (JARVIS parla, pensa, lo ascolta,
         // o ha appena risposto) il dialogo continua fuori dall'app. Finito il dialogo, `chiudiDialogoFuori` spegne il microfono.
@@ -3106,7 +3201,13 @@ final class Jarvis: NSObject, ObservableObject {
     func tornaDavanti() {
         chiusuraFuori?.cancel()
         dialogoFuori = false
+        tacePerPolso = false                            // 13.1 (2): di nuovo in mano, JARVIS parla
+        AperturaFuori.riprendi()                        // 13.1 (2): WhatsApp, Mappe, il messaggio rimasto allo sblocco
+        SiPolso.condiviso.controlla()                   // 13.1 (2): il telefono è in mano: l'orologio non bussa più
+        riprendiSeServe()                               // 13.1 (2): «dove eravamo rimasti»
+        IsolaJarvis.fineVoce()                          // 12 nov: dentro JARVIS l'isola VOCE non serve
         if micChiusoFuori { micChiusoFuori = false; aggiornaRichiamo() }
+        Iniziativa.condivisa.avvia()                    // 14 nov: l'iniziativa riparte (le notifiche degli impegni le sostituisce la voce)
         proponiAbitudine()                              // 12.0 (12) · B6
     }
 
@@ -3116,8 +3217,13 @@ final class Jarvis: NSObject, ObservableObject {
     private func proponiAbitudine() {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2.5))
+            // 13.2 (debug): prima la ripresa («dove eravamo rimasti»); se ha parlato, la proposta questa volta non si fa
+            var giri = 0
+            while self?.ripresaInCorso == true, giri < 40 { try? await Task.sleep(for: .milliseconds(200)); giri += 1 }
+            if let r = self?.ultimaRipresa, Date().timeIntervalSince(r) < 30 { return }
             // 13 nov (prova dei tre punti): non durante la sequenza d'avvio (app appena aperta): finirebbe sopra la musica
             guard let self, self.fase == .attesa, !self.avvioInCorso, !self.inBenvenuto, !self.musicaSuona, !self.riservato, !self.micSpento, !Impostazioni.muto,
+                  !Iniziativa.condivisa.tace,                   // 14 nov: «non ora», «basta iniziative» valgono anche per le proposte
                   UIApplication.shared.applicationState == .active, Regia.condivisa.davantiNome == nil, Regia.condivisa.proposta == nil,
                   let p = Abitudini.previsione() else { return }
             let frase: String
@@ -4151,7 +4257,7 @@ extension Jarvis {
         storia.append(Jarvis.perCervello(m))
         // 12 nov (P4, P5): anche qui la frase d'attesa sulla richiesta e il silenzio se la frase non era per FRIDAY
         var corpo: [String: Any] = ["messaggi": storia, "dispositivo": Impostazioni.dispositivo, "strumenti_client": Strumenti.nomi,
-                                    "strumenti_client_def": [Regia.definizione],                       // 12.0 (10): la regia
+                                    "strumenti_client_def": Regia.definizioni,                       // 12.0 (10): la regia
                                     "a_voce": true, "anticipo": true, "capisce_silenzio": true, "ponte_contesto": true]
         if dopoAspetto { corpo["dopo_aspetto"] = true } else { corpo["capisce_aspetto"] = true }   // 12 nov (A1)
         if richiamo.sveglio && !richiamo.conNome {
@@ -4405,6 +4511,8 @@ extension Jarvis {
     fileprivate func suonoIniziato(_ chiave: ObjectIdentifier) {
         fraseInVoce = frasiRisposta[chiave]?.frase          // 12 nov (P1): se è una domanda, «sì» detto sopra è la risposta
         orecchio.fraseOra = fraseInVoce ?? ""               // 13 nov (punto 2): per il registro dei tentativi di interromperlo
+        // 14 nov (scelta del signore: «si accende la riga che dice»): la frase che comincia adesso, per la tab
+        Filo.condiviso.voceIniziata(frasiVive[chiave]?.speechString ?? fraseInVoce ?? "")
         guard let da = misuraDa, let t = misuraTurno, frasiRisposta[chiave]?.id == t else { return }
         misura["ms_primo_suono"] = Int(Date().timeIntervalSince(da) * 1000)
         misura["ms_totale"] = Int(Date().timeIntervalSince(ultimoInvio) * 1000)
@@ -4433,5 +4541,165 @@ final class RaccoltaBriefing {
         let inizio = Date()
         while inCorso > 0, Date().timeIntervalSince(inizio) < secondi { try? await Task.sleep(for: .milliseconds(30)) }
         return dati
+    }
+}
+
+// MARK: - 18 nov · 13.1 (2) · FUORI DALL'APP (FuoriApp.swift; mockup FUORI approvato dal signore)
+
+extension Jarvis {
+    /// Il sì (o il no) toccato sull'orologio o sulla notifica vale come detto a voce. Col telefono in tasca la risposta va
+    /// all'orologio, scritta, e il telefono tace. Restituisce la battuta dell'app (nil: risponde il cervello, al polso a fine turno).
+    func rispondiDalPolso(si: Bool, cosa: InAttesa) async -> String? {
+        let frase = si ? "Sì" : (cosa.tipo == "piano" ? "Lascia stare" : "No")
+        // JARVIS sta ancora facendo la domanda: si aspetta che finisca (al massimo 10 secondi), come un «sì» detto sopra la domanda
+        var giri = 0
+        while fase != .attesa, giri < 50 { try? await Task.sleep(for: .milliseconds(200)); giri += 1 }
+        if fase != .attesa { interrompi() }
+        let fuori = UIApplication.shared.applicationState == .background && !dialogoFuori
+        tacePerPolso = fuori
+        if let battuta = await Regia.condivisa.subito(frase) {
+            Congedo.condiviso.zitto()
+            messaggi.append(Messaggio(ruolo: "user", testo: frase))
+            salva()
+            if !battuta.isEmpty { annunciaConSeguito(battuta) }
+            tacePerPolso = false
+            return battuta.isEmpty ? "Fatto." : battuta
+        }
+        attesaPolso = true
+        // rete di sicurezza: se il turno del cervello non parte (o non finisce), fra 90 secondi JARVIS torna a parlare
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(90))
+            guard let self, self.attesaPolso else { return }
+            self.attesaPolso = false
+            self.tacePerPolso = false
+            if !AperturaFuori.davanti { Ripresa.aggiorna(domanda: SiInAttesa.domanda(in: self.messaggi)) }   // 13.4: com'è rimasto
+        }
+        await invia(frase)
+        return nil
+    }
+
+    /// A fine turno: la risposta a un sì dato dal polso va all'orologio; il filo col Mac si aggiorna.
+    func fineTurnoFuori(id: UUID) {
+        FiloCondiviso.condiviso.cambiato()
+        // 13.4: un turno finito con JARVIS dietro (il sì dal polso, il tasto Azione) può aver chiuso o cambiato quello che aspettava il
+        // sì: la ripresa salvata si rifà su com'è adesso
+        if !AperturaFuori.davanti { Ripresa.aggiorna(domanda: SiInAttesa.domanda(in: messaggi)) }
+        guard attesaPolso else { return }
+        attesaPolso = false
+        tacePerPolso = false
+        SiPolso.condiviso.fatto(messaggi.first(where: { $0.id == id })?.testo ?? "")
+    }
+
+    /// Il tasto Azione col telefono bloccato (AscoltaDaBloccato, iOS 18): JARVIS ascolta senza aprirsi, con l'isola VOCE già
+    /// approvata (Apri e Fine) e il pallino arancione di iOS. Il dialogo fuori dall'app è quello di sempre (#16): finito, il
+    /// microfono si spegne da solo. Falso: non può (Mac, microfono spento a mano).
+    func ascoltaDaFuori() -> Bool {
+        guard !Jarvis.usaAscoltoCloud, !micSpento else { return false }
+        tacePerPolso = false                           // gli parla lui: JARVIS risponde a voce
+        attesaPolso = false
+        if UIApplication.shared.applicationState != .background {
+            if fase != .attesa { interrompi() }
+            ascoltaSubito(bip: true)
+            return true
+        }
+        IsolaJarvis.voce(fase: Fase.ascolto.rawValue, riga: "La ascolto.")   // iOS vuole l'attività accesa subito
+        dialogoFuori = true
+        micChiusoFuori = false
+        if fase != .attesa { interrompi() }
+        Task { await avviaAscolto(bip: true) }
+        chiudiDialogoFuori(fra: 8)
+        return true
+    }
+
+    /// JARVIS appena aperto (o tornato davanti): se qualcosa era rimasto in sospeso qui, o sull'altro dispositivo, lo dice una
+    /// volta sola, appena è libero. Niente in sospeso: silenzio.
+    func riprendiSeServe() {
+        compitoRipresa?.cancel()
+        compitoRipresa = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.2))
+            var giri = 0
+            while !Task.isCancelled, giri < 100, self?.avvioInCorso == true { try? await Task.sleep(for: .milliseconds(300)); giri += 1 }
+            guard let self, !Task.isCancelled, !self.avvioInCorso, UIApplication.shared.applicationState == .active else { return }
+            self.ripresaInCorso = true
+            defer { self.ripresaInCorso = false }
+            let qui = Ripresa.prendi()
+            let ultimaQui = self.messaggi.last(where: { !$0.testo.isEmpty })?.data ?? .distantPast
+            let la = await FiloCondiviso.condiviso.leggi(dopo: max(ultimaQui, qui?.uscito ?? .distantPast))
+            guard qui != nil || la != nil else { return }
+            giri = 0
+            while !Task.isCancelled, giri < 50, !(self.fase == .attesa && self.inCoda.isEmpty) { try? await Task.sleep(for: .milliseconds(200)); giri += 1 }
+            // 13.4 (il signore: «ESEGUI», con qualsiasi sezione aperta; dopo «non ora» la dice lo stesso): non sopra la musica, non in
+            // RISERVATO («niente frasi»), non con una sezione davanti né col Wiretap che registra dietro (la voce finirebbe nel verbale).
+            // In quei casi aspetta: la dice alla prossima apertura
+            let calmo = !self.musicaSuona && !self.riservato && Regia.condivisa.davantiNome == nil && WiretapAperto.chiudi == nil
+            guard !Task.isCancelled, calmo, self.fase == .attesa, self.inCoda.isEmpty, UIApplication.shared.applicationState == .active else {
+                if let qui, !Task.isCancelled { Ripresa.rimetti(qui) }   // occupato (gli sta già parlando): la dice la prossima volta
+                return
+            }
+            if let la { self.riprendiDa(la) } else if let qui { self.riprendiQui(qui) }
+        }
+    }
+
+    /// «Sir, riprendo la serata di sabato. Scrivo a Cristina che mancano gin, tonica e lime?» · «Riprendo da dove eravamo. A Bea:
+    /// «Arrivo alle nove.» Lo mando, Sir?»
+    private func riprendiQui(_ s: Ripresa.Salvata) {
+        var frase: String?
+        if let p = s.piano {
+            Piano.condiviso.ripristina(p)
+            frase = "riprendo \(FRIDAY.titoloDetto(p.titolo))." + (s.domanda.map { " " + $0 } ?? " Lo faccio?")
+        } else if let a = s.attesa, let q = Insieme.condiviso.riprendi(tipo: a.tipo, chi: a.chi, numero: a.numero, testo: a.testo, whatsapp: a.whatsapp) {
+            frase = "Riprendo da dove eravamo. " + q
+        }
+        if let frase { dillaRipresa(frase) }
+    }
+
+    /// Il filo dell'altro dispositivo: le sue battute entrano in chat (stesso filo), poi la domanda rimasta a metà.
+    private func riprendiDa(_ la: FiloCondiviso.Altro) {
+        FiloCondiviso.condiviso.segnaPreso(la)
+        let ultimaQui = messaggi.last(where: { !$0.testo.isEmpty })?.data ?? .distantPast
+        var nuove = 0
+        for b in la.stato.battute where b.d > ultimaQui && (b.r == "user" || b.r == "assistant") && !b.t.isEmpty {
+            var m = Messaggio(ruolo: b.r, testo: b.t)
+            m.data = b.d
+            messaggi.append(m)
+            nuove += 1
+        }
+        if nuove > 0 {
+            salva()
+            // 13.2 (debug): il discorso è andato avanti di là: quello che qui aspettava il sì non vale più (niente doppi invii)
+            Insieme.condiviso.dimenticaAttesa()
+            Piano.condiviso.ferma()
+            Ripresa.dimentica()
+        }
+        let mac = la.dispositivo == "mac"
+        var frase: String?
+        if let p = la.stato.piano {
+            Piano.condiviso.ripristina(p)
+            frase = "\(mac ? "Dal Mac" : "Dal telefono") riprendo \(FRIDAY.titoloDetto(p.titolo))." + (la.stato.domanda.map { " " + $0 } ?? " Lo faccio?")
+        } else if let a = la.stato.attesa, let q = Insieme.condiviso.riprendi(tipo: a.tipo, chi: a.chi, numero: a.numero, testo: a.testo, whatsapp: a.whatsapp) {
+            frase = "Dicevamo \(mac ? "sul Mac" : "sul telefono"). " + q
+        } else if let d = la.stato.domanda, Date().timeIntervalSince(la.aggiornato) < 900 {
+            frase = "Dicevamo \(mac ? "sul Mac" : "sul telefono"). " + d
+        }
+        Regia.condivisa.evento("filo \(mac ? "dal Mac" : "dal telefono"): \(nuove) battute")
+        if let frase { dillaRipresa(frase) }
+    }
+
+    /// «la serata di sabato»; senza titolo «da dove eravamo»; un titolo che non è un nome comune fra le virgolette.
+    private static func titoloDetto(_ titolo: String) -> String {
+        let t = titolo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return "da dove eravamo" }
+        let a = Iniziativa.articolato(t)
+        return a.hasPrefix("in agenda") ? "«\(t)»" : a
+    }
+
+    /// La frase della ripresa: in chat (il cervello la vede al sì) e a voce, col seguito aperto («sì» senza «Jarvis»).
+    private func dillaRipresa(_ frase: String) {
+        Regia.condivisa.proposta = nil                 // il «sì» che segue è per la ripresa, non per «la solita playlist?»
+        ultimaRipresa = Date()
+        messaggi.append(Messaggio(ruolo: "assistant", testo: frase))
+        salva()
+        Regia.condivisa.evento("ripresa: \(frase.prefix(90))")
+        annunciaConSeguito(frase)
     }
 }

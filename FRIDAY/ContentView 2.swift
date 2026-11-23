@@ -23,11 +23,18 @@ struct ContentView: View {
     @State private var sorgenteFoto: UIImagePickerController.SourceType?
     @State private var primaApertura = true
     @State private var chiediParola = Portachiavi.leggi().isEmpty   // FRIDAY: senza parola d'ordine si comincia da Benvenuta
+    @State private var avvioRimandato = false        // 14 nov: l'app svegliata dietro (dal polso, da una notifica): l'avvio aspetta che lei la apra
     @State private var ascoltaDopoAvvio = false      // l'ascolto all'apertura parte a sequenza finita: col microfono aperto l'iPhone abbassa l'altoparlante (e il Mac registrerebbe la musica)
     @State private var acceso = false            // sequenza di avvio: le icone si accendono una dopo l'altra
     @State private var regiaChat = RegiaChat()     // la chat che si carica all'avvio e si svuota col cestino (ChatAnimata.swift)
-    @State private var sottotitolo = "AVVIO SISTEMI"
+    @State private var sottotitolo = ""                  // 13.7: si scrive decodificandosi (AVVIO SISTEMI all'avvio, poi SISTEMI IN LINEA, MARK XIII)
     @State private var testaArrivate = 0         // MARK X: quante icone in alto sono già arrivate (da destra, una alla volta, a tempo con l'avvio)
+    /// 20 nov · avvio SINGOLO: quando è partita la voce d'avvio (lo zero dell'avvio olografico delle icone in alto); nil = scena spenta.
+    @State private var avvioOlo: Date? = nil
+    /// Avvio SINGOLO interrotto (voce sfumata prima della fine): da qui la scena si spegne tremolando invece di sparire di colpo.
+    @State private var oloSpegni: Date? = nil
+    /// Le icone in alto entrano al posto dell'ologramma (di colpo, col lampo), anche quelle che arrivano tutte insieme a voce sfumata.
+    @State private var oloStile = false
     @State private var bagliore = false          // MARK X: a «SISTEMI IN LINEA» il titolo prende un leggero bagliore bianco, poi resta fermo
     @State private var iconaAttiva: Int?         // scorciatoia in corso: pulsa finché JARVIS non ha finito
     @State private var scegliLingua = false       // icona Interprete: scelta della lingua
@@ -51,6 +58,7 @@ struct ContentView: View {
     /// MARK XI: le sezioni aperte (fino a 10), nel contenitore sopra JARVIS al posto delle schermate di iOS.
     @StateObject private var pila = PilaSezioni()
     @State private var naviga = NavigaSezioni()                // i gesti fra le sezioni (letti solo dal contenitore)
+    @State private var ultimaDavanti: UUID?                    // 13.7: l'ultima sezione stata davanti (al centro della tab PAGINE)
     @State private var pilaCopre = false                       // una sezione è davanti del tutto: JARVIS sotto si ferma (jarvisCoperto)
     @State private var riprendo: Sezione?                      // la sezione che torna davanti da dietro (non una richiesta nuova)                      // MARK XI: la lente del Dock in alto (anche lei non osservata qui)
     @State private var giroDavanti: [UUID] = []                // le sezioni state davanti, dall'ultima: «Jarvis, quella di prima»
@@ -163,7 +171,25 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .jarvisComandoSezioni)) { n in
                 if let c = n.userInfo?["comando"] as? ComandoVocale { comandoSezioni(c) }
             }
-            .onChange(of: pila.davanti) { _, d in davantiCambiata(d) }
+            .onChange(of: pila.davanti) { prima, d in
+                if let prima { ultimaDavanti = prima }                // 13.7: la tab PAGINE si apre su questa
+                davantiCambiata(d)
+            }
+            // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (1,2 s dopo che è arrivata, poi ogni
+            // 10 s), mai mentre le pagine si muovono. Debug: ogni foto ridisegna la finestra (qualche millisecondo), quindi poche e
+            // solo quando il dito è fermo, così gli ologrammi delle sezioni non perdono fotogrammi
+            .task(id: pila.davanti) {
+                guard let id = pila.davanti else { return }
+                try? await Task.sleep(for: .seconds(1.2))
+                var fatte = 0
+                while !Task.isCancelled, pila.davanti == id {
+                    if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
+                        if let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { Pagine.condivisa.fotografa(id, nome: nome) }
+                        fatte += 1
+                    }
+                    try? await Task.sleep(for: .seconds(fatte == 0 ? 1 : 10))   // non ancora fatta (il dito si muoveva): si riprova presto
+                }
+            }
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
             .onChange(of: jarvis.repartoRichiesto) { _, r in
                 guard let r else { return }
@@ -179,7 +205,14 @@ struct ContentView: View {
             .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
                 Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
                     jarvis.impostaFoto(immagine)
-                    jarvis.ascoltaSubito()          // subito dopo la foto: «che disco è?»
+                    // 13.8 (4) (issue #18: «dopo aver selezionato una foto non deve partire subito con "Che cos'è?" e l'analisi»):
+                    // prima partiva l'ascolto e, in silenzio, la foto andava al cervello con «Che cos'è?». Ora la foto resta sopra il
+                    // campo (con la X per toglierla) e si apre la tastiera: il signore scrive, se vuole, e la manda lui con la freccia.
+                    // Mandata senza testo, la domanda è «Che cos'è?» (come prima); può anche toccare il reattore e chiederlo a voce.
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(450))   // la fotocamera/libreria finisce di chiudersi
+                        tastiera = true
+                    }
                 }
                 .ignoresSafeArea()
             }
@@ -187,7 +220,8 @@ struct ContentView: View {
                 Aptica.prepara()
                 Regia.condivisa.pila = pila                                                 // 12.0 (10): la regia vede le sezioni aperte
                 Regia.condivisa.vai = { strada in regiaVai(strada) }                        // e le muove
-                accendi()
+                // 14 nov (JARVIS): l'app svegliata in sottofondo (una notifica) costruisce la schermata: l'avvio aspetta che lei la apra
+                if UIApplication.shared.applicationState == .background { avvioRimandato = true } else { accendi() }
                 if Portachiavi.leggi().isEmpty { chiediParola = true; return }   // FRIDAY: prima la parola d'ordine (Benvenuta)
                 primoAvvio()
             }
@@ -250,8 +284,10 @@ struct ContentView: View {
                             Color.clear.frame(height: altezzaChat + 60)           // il posto della conversazione
                         }
                         .ignoresSafeArea(.keyboard, edges: .bottom)                // il reattore resta fermo
+                        .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO
                         VStack(spacing: 0) {
                             registro
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }
                             barraTesto
                         }
                         .frame(width: max(0, min(860, g.size.width - 32)) / zc, height: (altezzaChat + 60) / zc)
@@ -276,8 +312,12 @@ struct ContentView: View {
                                 .transition(.opacity)
                         }
                         registro
+                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }   // 13.7
                         barraTesto
                     }
+                    // 14 nov: con una sezione davanti del tutto, JARVIS sotto non è più «sullo schermo» per l'accessibilità (VoiceOver e
+                    // le mani di JARVIS leggono solo quello che si vede)
+                    .accessibilityHidden(pilaCopre)
                     // 27 ott (video del signore 01:34, misurato fotogramma per fotogramma): aprendo la tastiera titolo e icone salivano di
                     // ~10 punti e ridiscendevano in 0,2 s. Lo spazio si accorcia subito (sale la tastiera) ma il reattore grande lascia
                     // il posto un attimo dopo: per quell'attimo il contenuto è più alto dello spazio e iOS lo centrava, spingendo su la
@@ -285,6 +325,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     // build 23: il reattore sopra la schermata, nel suo posto grande o in quello piccolo (vola dall'uno all'altro)
                     .overlayPreferenceValue(PostiReattore.self) { posti in reattoreVolante(posti) }
+                    .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO, sopra il reattore
                     .onChange(of: tastiera) { _, aperta in
                         guard telefono else { return }                      // iPad: come prima, niente reattore piccolo
                         if aperta {
@@ -327,6 +368,17 @@ struct ContentView: View {
                 // 26 ott notte (il signore): lo swipe giù dal bordo in alto è di iOS (Centro notifiche), senza linguetta; i PROTOCOLLI
                 // scendono con lo swipe giù da metà pagina (titolo, reattore e corona, testi). Tolta la fascia dell'ora che li apriva.
                 tendina(g)
+                // 13.7 · PAGINE, la tab bassa (in basso a sinistra, accanto a IN ATTESA): sopra la schermata di JARVIS, sotto il menu
+                // SISTEMI, la tendina e le sezioni. Si forma all'avvio e si richiama con lo swipe verso destra dal bordo sinistro.
+                StratoPagine(voci: pila.voci,
+                             icone: Dictionary(tutteLeIcone.map { ($0.nome, $0.icona) }, uniquingKeysWith: { a, _ in a }),
+                             ultima: ultimaDavanti,
+                             sezioneDavanti: pila.davanti != nil,
+                             tastiera: tastiera,
+                             tendina: tendinaAperta || tendinaTrascina != 0,
+                             apri: { id in portaDavanti(id) },
+                             chiudi: { id in chiudiDietro(id) })
+                    .zIndex(9)
                 // 26 ott sera (video del signore 21:58: alla chiusura di Studio e Social quasi un secondo di nero): STUDIO e SOCIAL
                 // non sono più una schermata di iOS ma uno strato qui sopra JARVIS (StratoPagina, in PaginaPiena.swift): salgono e
                 // scendono come le altre schede e JARVIS sotto resta sempre disegnato. Sopra tutto, anche la tendina (19-20).
@@ -334,7 +386,8 @@ struct ContentView: View {
                 strato
                     .zIndex(25)
                 // 12.0 (16): i widget FILO («mostrami…», «fissalo»), in alto a destra sopra le sezioni
-                StratoFilo()
+                StratoFilo(daParte: mostraSistemi || tendinaAperta || tendinaTrascina != 0,   // 13.1: col menu SISTEMI e i PROTOCOLLI si fa da parte
+                           suSezione: pila.davanti != nil)                                 // 13.1: sopra una sezione, vetro con la trasparenza dinamica
                     .zIndex(26)
                 // MARK XI: Studio e Social stanno nel contenitore come le altre sezioni (la pagina web resta viva dietro)
             }
@@ -355,7 +408,17 @@ struct ContentView: View {
             if fase != .active && !tendinaAperta { tendinaTrascina = 0 }
             if fase == .background { jarvis.vaInSottofondo() }      // 25 ott: niente risposte a frasi vecchie al ritorno
             if fase == .active { jarvis.tornaDavanti() }            // 11 nov (#16): il dialogo fuori dall'app finisce qui
+            if fase == .active, avvioRimandato { avvioRimandato = false; accendi() }   // 14 nov: svegliata dietro, l'avvio parte adesso
+            // 12 nov: l'app sta uscendo con un dialogo in corso: l'isola VOCE si accende adesso (iOS la permette solo da davanti)
+            if fase == .inactive, jarvis.dialogoPuoContinuareFuori { jarvis.aggiornaIsolaVoce() }
         }
+        // 13.8 (4) (il signore, 22:34: «la tendina voglio poterla chiamare in ogni momento e in ogni sezione»): con una sezione
+        // davanti si tira giù dalla testata (TendinaOvunque, sulla finestra), con lo stesso inseguimento del dito di sempre
+        .onAppear {
+            TendinaOvunque.segue = { s in tendinaSegue(s) }
+            TendinaOvunque.lascia = { s, p in tendinaLasciata(s, previsto: p) }
+        }
+        .onChange(of: pila.davanti != nil && tendinaLibera && aiutoBea == nil, initial: true) { _, si in TendinaOvunque.attiva = si }
         // «Jarvis, protocollo notte»: si chiude quello che è aperto, scende la tendina e il protocollo parte (come nel mockup)
         .onReceive(protocolli.$richiesta.dropFirst()) { _ in
             chiudiTutto()
@@ -375,6 +438,7 @@ struct ContentView: View {
         Suoni.apriAvvio()                   // 13 nov: da qui il tasto Azione o una notifica (anche nel primo istante) fanno sfumare la voce
         Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano (solo la prima volta)
         withAnimation(.spring(duration: 0.6 / Avvio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
+        sottotitolo = "AVVIO SISTEMI"                                    // 13.7: si scrive lettera per lettera mentre la testata compare
         let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
         if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
         Task { @MainActor in
@@ -400,6 +464,16 @@ struct ContentView: View {
             let ritardoAudio = AVAudioSession.sharedInstance().outputLatency   // il suono arriva all'altoparlante un attimo dopo
             let zero = CACurrentMediaTime() + ritardoAudio
             Aptica.avvio(tempi: tempiAptica.map { $0 + ritardoAudio })
+            // 20 nov · avvio SINGOLO (scelto dal signore sul mockup): le icone in alto nascono come ologrammi grandi in alto a destra,
+            // una alla volta dentro l'anello della percentuale, e sul loro suono si stringono al loro posto (AvvioOlografico.swift).
+            // Con «Riduci movimento» resta l'arrivo di prima (solo dissolvenza).
+            let olo = !UIAccessibility.isReduceMotionEnabled
+            if olo { oloStile = true; oloSpegni = nil; avvioOlo = Date(timeIntervalSinceNow: zero - CACurrentMediaTime()) }
+            // 13.7 · la tab PAGINE si forma su «interface» e dentro scorrono come dischi le icone di tutte le sezioni
+            if olo, let inizio = avvioOlo {
+                let el = tutteLeIcone
+                Pagine.condivisa.avvio(zero: inizio, nomi: el.map(\.nome), icone: el.map(\.icona), vivo: { avvioOlo != nil && oloSpegni == nil && pila.davanti == nil && !tastiera })
+            }
             // MARK X: le icone in alto arrivano da destra, rapide (0,2 s), una alla volta; partono 110 ms prima del loro suono.
             // 12.0 (14): non più coi colpi della corona ma coi suoni di caricamento del finale di JARVIS II (`Avvio.testaVoce`),
             // da Social a Impostazioni; il bagliore del titolo con l'ultima. Se la voce dell'avvio viene sfumata prima (il signore
@@ -408,13 +482,25 @@ struct ContentView: View {
             Task { @MainActor in
                 for j in 0..<nTesta {
                     let posa = Avvio.testaVoce[min(j, Avvio.testaVoce.count - 1)]
-                    let manca = zero + posa - 0.110 - CACurrentMediaTime()
+                    // SINGOLO: l'icona vera prende il posto dell'ologramma esattamente sul suo suono (di prima: arrivo da destra in 0,2 s, 110 ms prima)
+                    let manca = zero + posa - (olo ? 0 : 0.110) - CACurrentMediaTime()
                     if manca > 0 { try? await Task.sleep(for: .seconds(manca)) }
                     guard testaArrivate < nTesta else { return }               // sono già arrivate tutte (voce sfumata prima)
-                    withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = max(testaArrivate, j + 1) }
+                    if olo {
+                        var senza = Transaction()
+                        senza.disablesAnimations = true                        // c'è di colpo, col lampo (ArrivoTesta)
+                        withTransaction(senza) { testaArrivate = max(testaArrivate, j + 1) }
+                    } else {
+                        withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = max(testaArrivate, j + 1) }
+                    }
                 }
-                try? await Task.sleep(for: .milliseconds(110))                 // l'ultima si posa sul suo bip: lì il bagliore
+                if !olo { try? await Task.sleep(for: .milliseconds(110)) }     // l'ultima si posa sul suo bip: lì il bagliore
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
+                guard olo else { return }
+                // la scena olografica si spegne da sola (OPERATIVI, poi il tremolio): finita, si toglie
+                let resta = zero + AvvioOlo.fine + 0.05 - CACurrentMediaTime()
+                if resta > 0 { try? await Task.sleep(for: .seconds(resta)) }
+                avvioOlo = nil
             }
             // «SISTEMI IN LINEA» sulla chiusura della musica (4,35 s nel tempo di base), mai prima di 120 ms dopo l'ultima icona
             let inLinea = zero + max(Avvio.chiusuraMusica / v, fineMusica + 0.120 / v)
@@ -455,6 +541,7 @@ struct ContentView: View {
             }
             if !Suoni.avvioSuona {                                        // senza la voce dell'avvio (file mancante): come prima
                 testaArrivate = ContentView.postoTesta.totale             // per sicurezza: a sistemi in linea ci sono tutte
+                avvioOlo = nil                                            // senza la voce niente scena olografica (a 2,7 s non è ancora comparsa)
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }    // MARK X: il bagliore bianco si accende e resta fermo
             }
             await chatStampa?.value                                       // v266: la chat è partita sull'ultima icona
@@ -463,6 +550,7 @@ struct ContentView: View {
             if jarvis.ascoltoDaAvvio { Suoni.sfumaAvvio() }              // 13 nov: il tocco sul reattore durante le icone vale adesso
             await Suoni.attendiFineAvvio()
             if testaArrivate < ContentView.postoTesta.totale {            // voce sfumata prima dei suoi bip: le icone arrivano adesso
+                spegniOlo()                                               // e la scena olografica si spegne tremolando (0,34 s)
                 withAnimation(.timingCurve(0.2, 0.9, 0.3, 1, duration: 0.2)) { testaArrivate = ContentView.postoTesta.totale }
                 withAnimation(.easeOut(duration: 1.6)) { bagliore = true }
             }
@@ -476,6 +564,33 @@ struct ContentView: View {
                 // (finito l'ascolto, il richiamo «Jarvis» e i battiti di mani riprendono come sempre)
                 try? await Task.sleep(for: .milliseconds(300))        // la coda dei suoni si spegne
                 jarvis.ascoltaSubito(bip: daTocco)
+            }
+        }
+    }
+
+    /// Avvio SINGOLO interrotto: la scena olografica si spegne tremolando (come alla fine), poi si toglie.
+    private func spegniOlo() {
+        guard avvioOlo != nil, oloSpegni == nil else { return }
+        oloSpegni = Date()
+        Pagine.condivisa.interrompiAvvio()                                 // 13.7: anche la tab PAGINE dell'avvio si richiude
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(AvvioOlo.fine - AvvioOlo.spegni + 0.05))
+            avvioOlo = nil
+            oloSpegni = nil
+        }
+    }
+
+    /// Avvio SINGOLO: gli ologrammi delle icone in alto, sopra titolo e reattore ma sotto sezioni, tendina, menu SISTEMI e tab
+    /// (che li coprono se si aprono durante l'avvio). Con la tastiera aperta (testata stretta, reattore piccolo) non c'è.
+    @ViewBuilder
+    private func ologrammiAvvio(_ posti: [Int: Anchor<CGRect>]) -> some View {
+        if let inizio = avvioOlo, !tastiera {
+            GeometryReader { geo in
+                AvvioOlografico(inizio: inizio,
+                                spegniDa: oloSpegni,
+                                testata: posti[AvvioOlografico.testata].map { a in geo[a] },
+                                posti: (0..<ContentView.postoTesta.totale).compactMap { j in posti[j].map { a in geo[a] } },
+                                arrivate: testaArrivate)
             }
         }
     }
@@ -641,13 +756,12 @@ struct ContentView: View {
                     .shadow(color: .white.opacity(bagliore ? 0.38 : 0), radius: 7)      // MARK X: bagliore bianco, si accende una volta e resta
                     .shadow(color: .white.opacity(bagliore ? 0.15 : 0), radius: 16)
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text(sottotitolo)
+                    // 13.7 (il signore, 22 nov 00:50: «le scritte che vengono prima di MARK XIII con la stessa animazione dell'Apple
+                    // Watch, le lettere che girano come un computer»): ogni cambio si decodifica dalla scritta di prima (0,5 s)
+                    TestoDecodificato(testo: sottotitolo)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .tracking(3)
                         .foregroundStyle(sottotitolo == ContentView.marca ? Color.tenue : Color.ciano)
-                        .contentTransition(.numericText())
-                        .id(sottotitolo)
-                        .transition(.opacity)
                     // 8 nov · CUFFIE (il signore: «scritta piccola con logo cuffie, finché sono collegate, non invadente… accanto a
                     // MARK XI»): «· EARPODS» sulla stessa riga, stesso carattere e grigio, come il mockup v285; con la tastiera no
                     if !mini && sottotitolo == ContentView.marca { IndicatoreCuffie() }
@@ -679,7 +793,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.musica: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
+            .arrivoTesta(ContentView.postoTesta.musica, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.musica))
             .accessibilityLabel("Musica")
             Button { toccaDock(ContentView.postoTesta.cestino) } label: {
@@ -688,9 +803,11 @@ struct ContentView: View {
                     .foregroundStyle(Color.ciano)
                     // 27 ott (misurato sulla foto: SISTEMI-cestino 7,3 punti, gli altri 7): 0,3 in meno a sinistra
                     .padding(.vertical, 8).padding(.leading, (mini ? 1 : ContentView.margineDock) - 0.8)   /* 27 ott notte: SISTEMI-cestino era troppo larga */.padding(.trailing, (mini ? 1 : ContentView.margineDock) + 0.35)   // foto 02:49: cestino-impostazioni 6,3 → 7
+                    .contentShape(Rectangle())          // 13.1: si tocca tutto il riquadro, come le altre icone in alto (prima solo il disegno)
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.cestino: $0] }   // 20 nov: qui si posa l'ologramma (sul tasto, come nella 13.6 (1))
+            .arrivoTesta(ContentView.postoTesta.cestino, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.cestino))
             .accessibilityLabel("Pulisci la conversazione")
             .confirmationDialog("Pulire la conversazione?", isPresented: $chiediPulizia, titleVisibility: .visible) {
@@ -708,7 +825,8 @@ struct ContentView: View {
                         .contentShape(Rectangle())
                 }
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-                .arrivoTesta(ContentView.postoTesta.difesa, arrivate: testaArrivate)
+                .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.difesa: $0] }   // qui si posa l'ologramma dell'avvio
+            .arrivoTesta(ContentView.postoTesta.difesa, arrivate: testaArrivate, olo: oloStile)
                 .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.difesa))
                 .accessibilityLabel("Difesa")
                 Button { toccaDock(ContentView.postoTesta.account) } label: {
@@ -718,7 +836,8 @@ struct ContentView: View {
                         .contentShape(Rectangle())
                 }
                 .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-                .arrivoTesta(ContentView.postoTesta.account, arrivate: testaArrivate)
+                .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.account: $0] }   // qui si posa l'ologramma dell'avvio
+            .arrivoTesta(ContentView.postoTesta.account, arrivate: testaArrivate, olo: oloStile)
                 .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.account))
                 .accessibilityLabel("Account")
             }
@@ -735,7 +854,8 @@ struct ContentView: View {
                     .contentShape(Rectangle())
             }
             .alignmentGuide(.rigaMark) { d in d[VerticalAlignment.center] }
-            .arrivoTesta(ContentView.postoTesta.sos, arrivate: testaArrivate)
+            .anchorPreference(key: PostiTesta.self, value: .bounds) { [ContentView.postoTesta.sos: $0] }   // qui si posa l'ologramma dell'avvio
+            .arrivoTesta(ContentView.postoTesta.sos, arrivate: testaArrivate, olo: oloStile)
             .modifier(PostoDock(dock: dock, indice: ContentView.postoTesta.sos))
             .accessibilityLabel("SOS, chiedi aiuto ad Ale")
         }
@@ -750,6 +870,10 @@ struct ContentView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
+        // 20 nov · avvio SINGOLO: la testata misurata (sotto di lei, a destra, nasce la tab e lì nasce l'anello degli ologrammi).
+        // «transform»: si AGGIUNGE ai posti delle 6 icone che arrivano da dentro (13.6 (3): con `anchorPreference` li sostituiva e
+        // la scena non partiva mai)
+        .transformAnchorPreference(key: PostiTesta.self, value: .bounds) { posti, riquadro in posti[AvvioOlografico.testata] = riquadro }
         // 26 ott sera (testata «non fluida» con la tastiera): sul 15 Pro, aprendo la tastiera arriva il posto del reattore piccolo e il
         // titolo a spaziatura 5 non ci stava più: scattava di colpo a una spaziatura più stretta (prima rimpiccioliva di colpo). Ora fa
         // posto la testata, non il titolo: le icone si avvicinano di 1 punto per lato e lo spazio vuoto prima delle icone può arrivare a 0
@@ -853,8 +977,10 @@ struct ContentView: View {
                 .foregroundStyle(Color.ciano)
                 .contentTransition(.numericText())
                 .animation(.easeOut(duration: 0.3), value: jarvis.fase)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.fase = $0 }   // 13.7: la tab PAGINE si ferma prima
                 .padding(.top, 8)
             TelemetriaHUD(fase: jarvis.fase)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.tele = $0 }
                 .padding(.top, 4)
                 .opacity(acceso ? 1 : 0)
             if !jarvis.diagnosiMac.isEmpty {         // solo sul Mac: cosa sente il microfono in attesa
@@ -869,6 +995,7 @@ struct ContentView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(jarvis.parziale.isEmpty ? Color.tenue : .white)
                 .multilineTextAlignment(.center)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.sugg = $0 }   // 13.7: la tab PAGINE finisce sopra
                 .padding(.horizontal, 24)
                 .frame(minHeight: 44)
 
@@ -911,7 +1038,7 @@ struct ContentView: View {
                 Button { tastiera = false; jarvis.toccaReattore() } label: { reattore }
                     .buttonStyle(StileStark())
                     // 9 nov (logica approvata dal signore): pressione lunga sul reattore = microfono SPENTO (sordo); un tocco lo riaccende
-                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono() })
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in jarvis.spegniMicrofono(daDito: true) })
                     .scaleEffect(acceso ? 1 : 0.7)
                     .opacity(acceso ? 1 : 0)
                     .accessibilityLabel("Parla con FRIDAY")
@@ -955,7 +1082,10 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity).frame(height: ContentView.latoCorona)          // largo quanto lo schermo: i nomi non vengono tagliati
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { rettCorona = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { q in
+            rettCorona = q
+            Pagine.condivisa.anello = (rett: q, angoli: ang, raggio: r, lato: ContentView.latoCorona)   // 13.7: il posto della tab PAGINE
+        }
         .contentShape(Rectangle())
         .highPriorityGesture(gestoCorona)                                          // MARK XI: sull'anello gira la ruota, altrove la tendina
         .frame(maxWidth: .infinity).frame(height: altezza, alignment: .top)       // sotto resta lo spazio per la chat
@@ -989,7 +1119,7 @@ struct ContentView: View {
                     if !piccolo { jarvis.toccaReattore() }
                 } label: { reattore }
                 .buttonStyle(StileStark())
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in if !piccolo { jarvis.spegniMicrofono() } })   // 9 nov: SPENTO
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in if !piccolo { jarvis.spegniMicrofono(daDito: true) } })   // 9 nov: SPENTO
                 .scaleEffect(piccolo ? ContentView.latoMini / 290 : (acceso ? 1 : 0.7))
                 .shadow(color: .ciano.opacity(piccolo ? 0.85 : 0), radius: 3)       // MARK X (mockup b32): piccolo, ma luminoso
                 .opacity(acceso ? 1 : 0)
@@ -1037,8 +1167,8 @@ struct ContentView: View {
             .ignoresSafeArea()
             .allowsHitTesting(tendinaAperta)
             .onTapGesture { chiudiTendina() }
-            .zIndex(19)
-        TendinaProtocolli(margineAlto: g.safeAreaInsets.top) { chiudiTendina() }
+            .zIndex(pila.davanti != nil ? 27 : 19)              // 13.8 (4): chiamata da una sezione, sta sopra la sezione (e sopra FILO)
+        TendinaProtocolli(margineAlto: g.safeAreaInsets.top, visibile: quanto, suSezione: pila.davanti != nil) { chiudiTendina() }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in if h > 100 { altezzaTendina = h } }
             .offset(y: y)
             .gesture(
@@ -1061,7 +1191,7 @@ struct ContentView: View {
             .opacity(quanto > 0 ? 1 : 0)                       // chiusa del tutto: nemmeno l'ombra sotto la barra di stato
             .allowsHitTesting(tendinaAperta)
             .accessibilityHidden(!tendinaAperta)
-            .zIndex(20)
+            .zIndex(pila.davanti != nil ? 28 : 20)
     }
 
     /// Giù col dito dal titolo o dal reattore: la tendina segue il dito (anche se torna su) e, lasciata oltre un terzo
@@ -1812,18 +1942,8 @@ struct AnelliHUD: View {
                 // il controanello tratteggiato, che gira al contrario (la fase del tratteggio lo fa girare)
                 gc.stroke(cerchio(R * 0.9), with: .color(base.opacity(0.45)),
                           style: StrokeStyle(lineWidth: 1, dash: [1.6, 4.2], dashPhase: t * 0.12 * fretta * R * 0.9))
-                // il binario e i tre archi coi fermi
+                // il binario (13.7, VELO: senza i tre archi coi fermi, il signore 21 nov 20:30 «toglimi quelle 3 linee curve con le lineette»)
                 gc.stroke(cerchio(R * 0.855), with: .color(base.opacity(0.1)), lineWidth: 3.2)
-                var archi = Path(), fermi = Path()
-                for q in 0..<3 {
-                    let a = t * 0.32 * fretta + Double(q) * 2 * .pi / 3
-                    let l = 0.5 + (caldo ? 0.12 * sin(t * 3 + Double(q)) : 0)
-                    archi.move(to: punto(R * 0.855, a))
-                    archi.addArc(center: c, radius: R * 0.855, startAngle: .radians(a), endAngle: .radians(a + l), clockwise: false)
-                    for e in [a, a + l] { fermi.move(to: punto(R * 0.825, e)); fermi.addLine(to: punto(R * 0.885, e)) }
-                }
-                gc.stroke(archi, with: .color(base.opacity(0.85)), lineWidth: 2.4)
-                gc.stroke(fermi, with: .color(base.opacity(0.85)), lineWidth: 1.2)
                 // il raggio di scansione: una scia che sfuma dietro
                 let sa = t * 0.7 * fretta
                 for i in 0..<18 {
@@ -1941,7 +2061,7 @@ struct RigaMessaggio: View {
                 if !m.azioni.isEmpty {
                     Text("▸ " + descriviAzioni(m.azioni))
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color(red: 0.36, green: 0.42, blue: 0.23))
+                        .foregroundStyle(Color.tenue)                   // 13.8 (4) (issue #18): grigio come le altre scritte, non verde oliva
                 }
             }
         }
@@ -2046,15 +2166,27 @@ extension VerticalAlignment {
 // MARK: - MARK X · arrivo delle icone in alto
 private struct ArrivoTesta: ViewModifier {
     let posto: Int, arrivate: Int
+    /// 20 nov · avvio SINGOLO: l'icona non arriva da destra, prende il posto del suo ologramma con un lampo (come «icoCarica» del mockup).
+    let olo: Bool
     func body(content: Content) -> some View {
         let dentro = posto < arrivate
+        let attivo = olo, alone = Color.ciano                  // copiati qui: la chiusura del lampo gira fuori dal main actor
         content
             .opacity(dentro ? 1 : 0)
-            .offset(x: dentro || UIAccessibility.isReduceMotionEnabled ? 0 : 28)   // da destra; con «Riduci movimento» solo dissolvenza
+            .offset(x: dentro || olo || UIAccessibility.isReduceMotionEnabled ? 0 : 28)   // da destra; con «Riduci movimento» solo dissolvenza
+            // il lampo parte quando l'icona entra; conta solo nell'avvio SINGOLO (a scena finita `olo` torna falso senza rifarlo)
+            .keyframeAnimator(initialValue: 0.0, trigger: dentro) { vista, lampo in
+                vista
+                    .brightness(0.35 * (attivo ? lampo : 0))
+                    .shadow(color: alone.opacity(0.95 * (attivo ? lampo : 0)), radius: 6 * (attivo ? lampo : 0))
+            } keyframes: { _ in
+                CubicKeyframe(1.0, duration: 0.15)
+                CubicKeyframe(0.0, duration: 0.35)
+            }
             .allowsHitTesting(dentro)
     }
 }
 extension View {
-    /// L'icona in alto arriva da destra quando tocca a lei (vedi `accendi()`).
-    func arrivoTesta(_ posto: Int, arrivate: Int) -> some View { modifier(ArrivoTesta(posto: posto, arrivate: arrivate)) }
+    /// L'icona in alto arriva quando tocca a lei (vedi `accendi()`): da destra, o (avvio SINGOLO) al posto del suo ologramma.
+    func arrivoTesta(_ posto: Int, arrivate: Int, olo: Bool = false) -> some View { modifier(ArrivoTesta(posto: posto, arrivate: arrivate, olo: olo)) }
 }

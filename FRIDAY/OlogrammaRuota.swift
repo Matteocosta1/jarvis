@@ -256,12 +256,10 @@ struct VeloRuota: ViewModifier {
     }
 }
 
-/// L'ologramma dell'icona in alto, nel reattore (mockup approvato). Mentre gira: l'anteprima tenue, che cambia di scatto con un
-/// guizzo. Ferma: si crea alla Tony Stark sul tono «olo» — 0–90 ms il proiettore si accende (lampo alla base, colonna di luce che
-/// sale, poi il cono); 0–470 ms la GRIGLIA (11.0 (6), al posto dei puntini: spigoli di costruzione, gabbia di luce, piano di
-/// stampa con la sua griglia); 90–380 ms l'icona si disegna dal basso dietro il piano di stampa, col disco di scansione;
-/// 120–420 ms il nome si decodifica; 150–420 ms gli anelli giroscopici si aprono; 100–320 ms le staffe attorno al nome.
-/// Toccato: apre la sezione.
+/// L'ologramma dell'icona in alto, nel reattore. Dal 13.7 ACCENSIONE (Accensione.swift, scelta del signore): niente proiettore,
+/// l'icona grande (104 punti) galleggia con la sua luce; mentre la ruota gira è un'anteprima tenue che cambia di scatto con un
+/// guizzo; ferma, i suoi pezzi arrivano con la scia e si posano, poi si accende tremolando e si rivela dall'alto (sul tono «olo»);
+/// il nome si decodifica (120–420 ms) e le staffe si aprono attorno al nome. Toccato: apre la sezione.
 struct OlogrammaRuota: View {
     @ObservedObject var ruota: RuotaCorona
     /// Nome, gruppo e simbolo di ogni icona della corona, nell'ordine.
@@ -273,7 +271,6 @@ struct OlogrammaRuota: View {
     @State private var cambiataDa = Date.distantPast
 
     private static let glifi = Array("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/\\|▪▫░▒")
-    private static let chiaro = Color(red: 1, green: 154 / 255, blue: 92 / 255)      // #8ff0ff
     private static let bianco = Color(red: 1, green: 215 / 255, blue: 191 / 255)      // #bff6ff
 
     var body: some View {
@@ -282,23 +279,30 @@ struct OlogrammaRuota: View {
         let etichetta: String = vivo ? "Apri \(voci[k].nome)" : ""
         TimelineView(.animation(minimumInterval: nil, paused: !vivo)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
-            // ms dalla creazione, a 1,5× (5 nov sera, il signore: «l'animazione è lenta, troppo lenta» e poi «un minimo più lenta,
-            // che si veda il target come prima, ma fluida»; mockup v266): GRIGLIA in 0,31 s, luce piena in 0,23 s, nome in 0,2 s
+            // ms dalla creazione, a 1,5× come tutta la ruota
             let T = ruota.creataDa.map { ctx.date.timeIntervalSince($0) * 1500 } ?? 1e9
-            // 5 nov (il signore: «il primo ologramma deve essere poco luminoso mentre ruoto, poi si illumina quando è fermo»),
-            // come il mockup v266: mentre gira icona al 20%, nome al 25%, gruppo spento, proiettore al 26%; ferma, pieni e più chiari
-            let luce = T < 1e8 ? OlogrammaRuota.ease(T / 350) : 0
+            let ferma = T < 1e8
+            let luce = ferma ? OlogrammaRuota.ease(T / 350) : 0
             ZStack {
                 if vivo {
-                    Canvas { gc, _ in disegna(gc, t: t, T: T, luce: luce) }
-                        .frame(width: 200, height: 200)
-                    icona(voci[k].icona, T: T, t: t, luce: luce)
+                    let simbolo = voci[k].icona
+                    let pezzi = Accensione.pezzi("iphone." + simbolo, icona: OlogrammaRuota.simbolo(simbolo, lato: 26))
+                    let scarto = Accensione.scarto("iphone." + simbolo)                     // 13.8: centrata sul disegno vero
+                    Canvas { gc, size in
+                        Accensione.disegna(gc, centro: CGPoint(x: size.width / 2, y: size.height / 2), T: T, t: t, forza: 0.32 + 0.68 * luce,
+                                           nata: ferma, lungNome: voci[k].nome.count, pezzi: pezzi)
+                    }
+                    .frame(width: 300, height: 300)
+                    .position(x: 100, y: 82)
+                    IconaAccensione(T: T, ferma: ferma, lato: Accensione.lato) { OlogrammaRuota.simbolo(simbolo, lato: Accensione.lato) }
+                        // 13.8 (il signore: «l'icona non vada su e giù»): ferma; spostata sul centro del suo disegno
+                        .position(x: 100 - scarto.width * Accensione.lato, y: 82 - scarto.height * Accensione.lato)
                     nome(voci[k].nome, T: T, luce: luce)
                     Text(aperte.contains(voci[k].nome) ? "APERTA" : voci[k].gruppo)
-                        .font(.system(size: 7, weight: .semibold, design: .monospaced)).tracking(2)
+                        .font(.system(size: 8.5, weight: .semibold, design: .monospaced)).tracking(2.6)
                         .foregroundStyle(Color.tenue)
                         .opacity(luce)
-                        .position(x: 100, y: 147)
+                        .position(x: 100, y: 175)
                 }
             }
             .frame(width: 200, height: 200)
@@ -312,6 +316,23 @@ struct OlogrammaRuota: View {
         .accessibilityHidden(!vivo)
         .accessibilityLabel(etichetta)
         .onChange(of: ruota.scelta) { cambiataDa = Date() }
+        // 13.7 (debug, i 120 Hz): i pezzi di ogni icona si preparano prima, a avvio finito e uno alla volta. Prima si calcolavano
+        // la prima volta che l'icona arrivava in alto, mentre lui girava la ruota: un piccolo scatto alla prima passata
+        .task {
+            try? await Task.sleep(for: .seconds(20))
+            for v in voci {
+                guard !Task.isCancelled else { return }
+                if !ruota.vivo { _ = Accensione.pezzi("iphone." + v.icona, icona: OlogrammaRuota.simbolo(v.icona, lato: 26)) }
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+        }
+    }
+
+    /// Il simbolo di una voce, grande `lato` punti (le proporzioni di prima: il simbolo è i 5/8 del riquadro).
+    @ViewBuilder static func simbolo(_ s: String, lato: Double) -> some View {
+        if s == "profiler" { IconaProfiler().scaleEffect(2 * lato / 64).frame(width: lato, height: lato) }
+        else if s == "satellite" { IconaSatellite(lato: lato * 40 / 64) }
+        else { SimboloFriday(nome: s, lato: lato * 40 / 64).font(.system(size: lato * 40 / 64, weight: .light)).symbolRenderingMode(.monochrome) }   // FRIDAY: le icone del mockup
     }
 
     /// Il guizzo quando cambia l'icona in alto (0,2 s): un tremolio di luce.
@@ -323,34 +344,6 @@ struct OlogrammaRuota: View {
 
     private static func ease(_ p: Double) -> Double { let q = max(0, min(1, p)); return 1 - pow(1 - q, 3) }
 
-    @ViewBuilder private func icona(_ simbolo: String, T: Double, t: Double, luce: Double) -> some View {
-        let creata = T < 1e8
-        // l'icona si disegna dal basso in alto mentre il disco di scansione la percorre (90–380 ms)
-        let rivela = creata ? OlogrammaRuota.ease((T - 90) / 290) : 1
-        Group {
-            SimboloFriday(nome: simbolo, lato: 40)
-        }
-        .font(.system(size: 40, weight: .light))
-        .symbolRenderingMode(.monochrome)
-        .foregroundStyle(OlogrammaRuota.chiaro)
-        .brightness(0.25 * luce)                                                   // 7 nov (il signore: «scelte ancora più luminose»): 0,25 (era 0,12)
-        .frame(width: 64, height: 64)
-        .mask {
-            VStack(spacing: 0) {
-                Color.clear
-                LinearGradient(colors: [.black.opacity(0.4), .black], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 64 * rivela)
-            }
-            .frame(height: 64)
-        }
-        .mask { RigheIcona() }                                                     // 5 nov sera: le righe come nel mockup
-        .shadow(color: .ciano.opacity(0.45 + 0.55 * luce), radius: 3 + 5 * luce)   // mentre gira: alone corto e tenue; scelta, pieno
-        .shadow(color: .ciano.opacity(0.7 * luce), radius: 14 * luce)              // 7 nov: scelta, un secondo alone più largo (mockup v274)
-        .opacity(0.3 + 0.7 * luce)                                                 // 7 nov (il signore: «un pochino più luminose»): girando 30% (era 20%)
-        .offset(x: creata && T > 380 && T < 520 ? sin(T * 0.25) * 0.8 : 0)      // due tremolii, poi resta sospesa
-        .position(x: 100, y: 82 + sin(t * 1.6) * 1.5)                              // sospesa: respira appena
-    }
-
     private func nome(_ n: String, T: Double, luce: Double) -> some View {
         let v = n.uppercased()
         var q = v
@@ -361,106 +354,12 @@ struct OlogrammaRuota: View {
             }
         }
         return Text(q)
-            .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(4)
+            .font(.system(size: 14, weight: .bold, design: .monospaced)).tracking(5.5)
             .foregroundStyle(OlogrammaRuota.bianco)
-            .shadow(color: .ciano.opacity(0.8 * luce), radius: 4)                    // mentre gira: senza alone
-            .opacity(0.35 + 0.65 * luce)                                              // 7 nov: girando 35% (era 25%)
+            .shadow(color: .ciano.opacity(0.8 * luce), radius: 4)
+            .opacity(0.35 + 0.65 * luce)
             .lineLimit(1)
             .fixedSize()
-            .position(x: 100, y: 130)
-    }
-
-    /// Il proiettore e tutto ciò che non è l'icona (coordinate del mockup, centro 100,100).
-    private func disegna(_ gc: GraphicsContext, t: Double, T: Double, luce: Double) {
-        var g = gc
-        g.translateBy(x: 100, y: 100)
-        let creata = T < 1e8, nuova = T < 600
-        let forza = 0.32 + 0.68 * luce                               // 7 nov: mentre gira il proiettore al 32% (era 26%)
-        g.opacity = forza
-        let ciano = Color.ciano
-        func ellisse(_ cx: Double, _ cy: Double, _ rx: Double, _ ry: Double) -> Path {
-            Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2))
-        }
-        func arcoEllisse(_ cy: Double, _ rx: Double, _ ry: Double, _ da: Double, _ lung: Double) -> Path {
-            var p = Path()
-            let passi = 16
-            for i in 0...passi {
-                let a = da + lung * Double(i) / Double(passi)
-                let pt = CGPoint(x: rx * cos(a), y: cy + ry * sin(a))
-                if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
-            }
-            return p
-        }
-        // 1) il proiettore: la base, il lampo che si allarga, la colonna di luce che sale, poi il cono
-        let lampo = max(0, 1 - T / 260), colonna = OlogrammaRuota.ease(T / 90), cono = creata ? OlogrammaRuota.ease((T - 60) / 160) : 1
-        g.stroke(ellisse(0, 70, 30, 6), with: .color(ciano.opacity(0.55)), lineWidth: 1)
-        g.stroke(arcoEllisse(70, 30, 6, t * 2.4, 1.6), with: .color(ciano.opacity(0.9)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-        g.stroke(arcoEllisse(70, 18, 3.5, -t * 3.1, 1.1), with: .color(ciano.opacity(0.9)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-        if lampo > 0 {
-            g.stroke(ellisse(0, 70, 30 + (1 - lampo) * 46, 6 + (1 - lampo) * 9), with: .color(OlogrammaRuota.bianco.opacity(lampo)), lineWidth: 2)
-            g.fill(ellisse(0, 70, 14 * lampo + 4, 3 * lampo + 1), with: .color(Color.white.opacity(lampo * 0.9)))
-        }
-        if creata && T < 260 {
-            let cima = 70 - 125 * colonna, a = max(0, 1 - (T - 90) / 170)
-            var col = Path(); col.move(to: CGPoint(x: 0, y: 70)); col.addLine(to: CGPoint(x: 0, y: cima))
-            g.stroke(col, with: .linearGradient(Gradient(colors: [Color.white.opacity(0.95 * a), .clear]),
-                                                startPoint: CGPoint(x: 0, y: 70), endPoint: CGPoint(x: 0, y: cima)), lineWidth: 2.2)
-        }
-        var fascio = Path()
-        fascio.move(to: CGPoint(x: -24 * cono, y: 70)); fascio.addLine(to: CGPoint(x: 24 * cono, y: 70))
-        fascio.addLine(to: CGPoint(x: 56 * cono, y: -50)); fascio.addLine(to: CGPoint(x: -56 * cono, y: -50)); fascio.closeSubpath()
-        g.fill(fascio, with: .linearGradient(Gradient(colors: [ciano.opacity((0.26 + lampo * 0.3) * cono), ciano.opacity(0)]),
-                                             startPoint: CGPoint(x: 0, y: 70), endPoint: CGPoint(x: 0, y: -50)))
-        // 2) 11.0 (6): la GRIGLIA, come nasce l'ologramma (al posto dei puntini); a riposo qualche granello nel cono
-        if nuova {
-            NascitaGriglia.disegna(g, T)
-        } else {
-            for i in 0..<6 {
-                let p = (t * 0.35 + Double(i) / 6).truncatingRemainder(dividingBy: 1)
-                let x = sin(Double(i) * 12.9 + t) * 30 * p, y = 70 - p * 120
-                g.fill(Path(ellipseIn: CGRect(x: x - 0.9, y: y - 0.9, width: 1.8, height: 1.8)), with: .color(OlogrammaRuota.chiaro.opacity(0.5 * sin(p * .pi))))
-            }
-        }
-        // 3) il disco di scansione: alla creazione sale con il piano di stampa; poi passa lento
-        let sale = nuova && T < 380
-        let ys = sale ? NascitaGriglia.piano(T) : -54 + (t * 40).truncatingRemainder(dividingBy: 72)
-        let forzaDisco = sale ? 0.95 : 0.35
-        if !nuova || T > 60 {
-            g.stroke(ellisse(0, ys, 42, 5), with: .color(OlogrammaRuota.bianco.opacity(forzaDisco)), lineWidth: 1)
-            g.fill(Path(CGRect(x: -42, y: ys - 8, width: 84, height: 16)),
-                   with: .linearGradient(Gradient(colors: [ciano.opacity(0), ciano.opacity(forzaDisco * 0.25), ciano.opacity(0)]),
-                                         startPoint: CGPoint(x: 0, y: ys - 8), endPoint: CGPoint(x: 0, y: ys + 8)))
-            var tacche = Path()
-            tacche.move(to: CGPoint(x: -50, y: ys)); tacche.addLine(to: CGPoint(x: -45, y: ys))
-            tacche.move(to: CGPoint(x: 45, y: ys)); tacche.addLine(to: CGPoint(x: 50, y: ys))
-            g.stroke(tacche, with: .color(ciano.opacity(forzaDisco)), lineWidth: 1)
-        }
-        // 4) gli anelli giroscopici attorno all'icona (solo ferma), che si aprono alla creazione; le staffe attorno al nome
-        if creata {
-            let sc = OlogrammaRuota.ease((T - 150) / 270)
-            if sc > 0 {
-                for (inclina, vel, fase, rx, ry) in [(0.14, 0.9, 0.0, 48.0, 9.0), (-0.1, -0.7, 1.7, 42.0, 7.0)] as [(Double, Double, Double, Double, Double)] {
-                    var a = g
-                    a.translateBy(x: 0, y: -18)
-                    a.rotate(by: .radians(inclina))
-                    a.scaleBy(x: sc, y: sc)
-                    a.stroke(ellisse(0, 0, rx, ry), with: .color(ciano.opacity(0.18)), lineWidth: 1)
-                    for q in 0..<2 {
-                        let ang = t * vel + fase + Double(q) * .pi
-                        let davanti = sin(ang + 0.35) > 0
-                        a.stroke(arcoEllisse(0, rx, ry, ang, 0.7), with: .color(OlogrammaRuota.chiaro.opacity(davanti ? 0.8 : 0.3)), lineWidth: 1.4)
-                    }
-                }
-            }
-            let sb = OlogrammaRuota.ease((T - 100) / 220)
-            let lungo = Double(voci.indices.contains(ruota.scelta) ? voci[ruota.scelta].nome.count : 6)
-            let w = 12 + (lungo * 10.6 / 2 + 6) * sb
-            var staffe = Path()
-            for sx in [-1.0, 1.0] {
-                staffe.move(to: CGPoint(x: sx * (w - 4), y: 24)); staffe.addLine(to: CGPoint(x: sx * w, y: 24))
-                staffe.addLine(to: CGPoint(x: sx * w, y: 36)); staffe.addLine(to: CGPoint(x: sx * (w - 4), y: 36))
-            }
-            g.stroke(staffe, with: .color(ciano.opacity(0.8 * sb)), lineWidth: 1)
-        }
+            .position(x: 100, y: 154)
     }
 }

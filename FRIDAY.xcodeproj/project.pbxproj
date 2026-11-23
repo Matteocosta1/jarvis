@@ -281,6 +281,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove sei e per la guida a piedi.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "FRIDAY ti ascolta quando tocchi il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarti le tue foto.";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Per salvare in Foto i tuoi Reel di Pilates.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Per capire ciò che dici a FRIDAY.";
@@ -342,6 +343,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Per il meteo esatto dove sei e per la guida a piedi.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "FRIDAY ti ascolta quando tocchi il reattore.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Per cercare e mostrarti le tue foto.";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Per salvare in Foto i tuoi Reel di Pilates.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Per creare i promemoria con avviso.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Per capire ciò che dici a FRIDAY.";

@@ -613,6 +613,7 @@ final class Orecchio {
             ambiente?.analizza(buffer, posizione: quando.sampleTime)
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
             SopraLaVoce.condivisa.misura(buffer)                // 13 nov (punto 1): la sua voce forte sopra quella di JARVIS
+            Volume.voce.misuraAscolto(buffer)                   // 13.8 (3): dopo avergli parlato sopra, le ONDE seguono la sua voce
         }
     }
 

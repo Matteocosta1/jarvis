@@ -55,6 +55,14 @@ final class Notifiche: NSObject, UIApplicationDelegate, UNUserNotificationCenter
     /// Tocco sulla notifica: per il briefing JARVIS lo prepara completo (con calendario e sonno); per il resto legge il testo.
     func userNotificationCenter(_ centro: UNUserNotificationCenter, didReceive risposta: UNNotificationResponse) async {
         let contenuto = risposta.notification.request.content
+        // 13.1 (2): Sì o No sulla notifica del sì in attesa (sul telefono o, con lo specchio acceso, sull'orologio). Toccata e basta:
+        // si apre JARVIS, dove la domanda è ancora lì
+        if contenuto.categoryIdentifier == SiPolso.categoria {
+            let tasto = risposta.actionIdentifier
+            let chiave = contenuto.userInfo["chiave"] as? String ?? ""
+            if tasto == "si" || tasto == "no" { await SiPolso.condiviso.dallaNotifica(si: tasto == "si", chiave: chiave) }
+            return
+        }
         let azione = contenuto.userInfo["jarvis_azione"] as? String
         let testo = contenuto.userInfo["jarvis_testo"] as? String ?? contenuto.body
         await MainActor.run {

@@ -186,6 +186,26 @@ enum Battute {
                                "La tengo da parte.", "\(nome) in panchina. La richiamo quando vuoi."])
     }
 
+    /// 14 nov · le mani subito: la pagina scorsa a voce («scendi», «torna su», «in fondo»). `dove`: com'è adesso (in cima, in fondo…).
+    static func scorri(_ verso: String, dove: String) -> String {
+        if diFretta { return lampo() }
+        if dove == "in fondo" && verso != "fondo" { return una("scorri.fine", ["In fondo: non c'è altro.", "Fine pagina."]) }
+        switch verso {
+        case "su": return una("scorri.su", ["Su.", "Più su.", "Ecco, risalgo.", "Torniamo su."])
+        case "cima": return una("scorri.cima", ["In cima.", "Dall'inizio.", "Torniamo in cima."])
+        case "fondo": return una("scorri.fondo", ["In fondo.", "Fino in fondo.", "Eccoci in fondo."])
+        default: return una("scorri.giu", ["Più giù.", "Scendo.", "Ecco il resto.", "Giù."])
+        }
+    }
+
+    /// 14 nov · la vista dell'ologramma cambiata a voce («passa al globo»): «Globo, Sir.».
+    static func vista(_ nome: String, gia: Bool) -> String {
+        let n = maiuscola(nome.lowercased())
+        if gia { return una("vista.gia", ["È già \(n).", "Ci siamo già: \(n)."]) }
+        if diFretta { return n + "." }
+        return una("vista", ["\(n).", "Ecco \(n).", "\(n).", "Passo a \(n)."])
+    }
+
     /// «Quella di prima».
     static func diPrima(_ nome: String) -> String {
         if diFretta { return lampo() }

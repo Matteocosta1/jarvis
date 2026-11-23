@@ -518,25 +518,7 @@ struct StratoSezioniVista<Vista: View>: View {
             let p = posaPila(v)
             let o = mano != nil ? Double(r - rm) : scarto(v.id)
             let a = nascoste ? 0 : (naviga.modo == .tira ? naviga.rivela : p.opacita)
-            return EtichettePila.Dato(id: v.id, nome: v.sezione.nome, icona: icone[v.sezione.nome] ?? iconaDiRiserva(v.sezione), o: o, alfa: a)
-        }
-    }
-
-    /// Le sezioni che non stanno sulla corona hanno la loro icona di sempre (5 nov sera, il signore: «devono avere la loro icona
-    /// come tutte le altre»): Musica il vinile, EDITH gli occhiali.
-    private func iconaDiRiserva(_ s: Sezione) -> String {
-        switch s {
-        case .scheda(let a):
-            switch a {
-            case .musica: return "vinile"
-            case .edith: return "f:difesa"
-            case .account: return "f:account"
-            case .sos: return "f:sos"
-            default: return "square.grid.2x2"
-            }
-        case .allenatore: return "f:allenatore"
-        case .ricordi: return "f:memoria"
-        default: return "square.grid.2x2"
+            return EtichettePila.Dato(id: v.id, nome: v.sezione.nome, icona: icone[v.sezione.nome] ?? v.sezione.iconaDiRiserva, o: o, alfa: a)
         }
     }
 
@@ -1781,7 +1763,7 @@ struct FondoVivo: View {
         // 5 nov sera (PILA, scelta del signore «JARVIS sfocato, come iOS»): al posto del fondo a griglia, JARVIS che sta sotto,
         // molto sfocato e scurito, come la Home dietro le app
         ZStack {
-            Rectangle().fill(.ultraThinMaterial)
+            VetroTab()                                                  // 13.8 (4), 12:26 (il signore): senza la tinta di iOS
             Color(red: 11 / 255, green: 5 / 255, blue: 2 / 255).opacity(0.38)
         }
             .environment(\.colorScheme, .dark)
@@ -1838,8 +1820,10 @@ struct VetroOlo: View {
         let forma = RoundedRectangle(cornerRadius: raggio, style: .continuous)
         let ciano = Color(red: 1, green: 106 / 255, blue: 19 / 255)
         ZStack {
-            forma.fill(.ultraThinMaterial).opacity((0.3 + 0.7 * fuoco) * forza)
-            forma.fill(Color(red: 22 / 255, green: 10 / 255, blue: 3 / 255).opacity((0.5 + 0.38 * fuoco) * forza))
+            // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura né tinta
+            // di iOS; la trasparenza dinamica è il fondo qui sotto (50 % dietro, 88 % davanti), come prima
+            // 13.8 (5): davanti 70 % come gli altri ologrammi (prima 88 %), dietro 50 %
+            forma.fill(Color(red: 22 / 255, green: 10 / 255, blue: 3 / 255).opacity((TintaTab.vetroAperta + (TintaTab.vetroDavanti - TintaTab.vetroAperta) * fuoco) * forza))
             forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
                                               .init(color: ciano.opacity(0.03 * forza), location: 0.4),
                                               .init(color: ciano.opacity(0.06 * forza), location: 1)],
@@ -1943,6 +1927,30 @@ struct EtichettePila: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
+}
+
+/// 13.7: anche la tab PAGINE usa le icone di riserva.
+extension Sezione {
+    /// Le sezioni che non stanno sulla corona hanno la loro icona di sempre (5 nov sera, il signore: «devono avere la loro icona
+    /// come tutte le altre»): Social e Studio quelle in alto, Musica il vinile, Impostazioni l'ingranaggio, le schede di Sistemi
+    /// quelle del loro menu (GitHub, Supabase, Archivio, Costi, EDITH).
+    var iconaDiRiserva: String {
+        // FRIDAY: le sezioni fuori dalla corona hanno l'icona del mockup (Musica il vinile, Difesa, Account, SOS, lo Specchio)
+        switch self {
+        case .scheda(let a):
+            switch a {
+            case .musica: return "vinile"
+            case .edith: return "f:difesa"
+            case .account: return "f:account"
+            case .sos: return "f:sos"
+            default: return "square.grid.2x2"
+            }
+        case .allenatore: return "f:allenatore"
+        case .ricordi: return "f:memoria"
+        default: return "square.grid.2x2"
+        }
+    }
+
 }
 
 /// L'icona dell'etichetta della PILA: il simbolo della sezione (come sulla corona) in ciano, in un quadrato di 26 punti col bordo di luce.

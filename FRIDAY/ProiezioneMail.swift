@@ -51,6 +51,8 @@ struct ProiezioneMail<Contenuto: View>: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var riduci
+    @Environment(\.sezioneDietro) private var dietro   // la Posta è dietro (PILA): il gesto della testata torna alla tendina
+    @State private var idTendina = UUID()
     @State private var fase: CGFloat = 0            // 0 chiusa · 1 aperta
     @State private var aprendo = true
     @State private var scivola = false              // apertura/chiusura che scivola dal basso (tirata giù, Riduci movimento)
@@ -101,6 +103,12 @@ struct ProiezioneMail<Contenuto: View>: View {
         .frame(width: larga, height: schermo.height, alignment: .topLeading)
         .ignoresSafeArea()
         .onAppear(perform: apri)
+        // 13.8 (5): la mail si chiude tirandola giù dalla sua barra: finché è aperta e davanti, quel gesto è suo (non chiama la
+        // tendina PROTOCOLLI); con la Posta dietro nella PILA non conta
+        .onChange(of: dietro, initial: true) { _, d in
+            if d { TendinaOvunque.occupata.remove(idTendina) } else { TendinaOvunque.occupata.insert(idTendina) }
+        }
+        .onDisappear { TendinaOvunque.occupata.remove(idTendina) }
     }
 
     private var trascina: some Gesture {
@@ -309,9 +317,9 @@ struct PelleLuce: View {
         GeometryReader { g in
             let W = g.size.width, H = g.size.height
             ZStack(alignment: .topLeading) {
-                // il vetro: il più leggero di iOS (nel mockup blur 5 e saturazione 1,4) e il fondo al 34 %
-                Rectangle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark)
-                Color(red: 18 / 255, green: 8 / 255, blue: 2 / 255).opacity(0.34)
+                // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la mail
+                // si legge davanti, quindi il fondo è quello della pagina olografica davanti (88 %, come la PILA), prima 34 % sfocato
+                Color(red: 18 / 255, green: 8 / 255, blue: 2 / 255).opacity(TintaTab.vetroDavanti)   // 13.8 (5): come gli altri ologrammi davanti (70 %)
                 // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
                 EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
                     .frame(width: W * 2.6, height: 760)

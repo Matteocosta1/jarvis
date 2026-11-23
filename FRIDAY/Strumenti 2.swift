@@ -47,6 +47,9 @@ final class Strumenti {
         case "comando_app": return "subito"
         case "mac_comando": return "comando il Mac"
         case "regia": return "all'opera"                            // 12.0 (10)
+        case "piano": return "seguo il piano"                       // 14 nov
+        case "mano": return "all'opera"
+        case "schermo": return "controllo"
         default: return "un attimo"
         }
     }
@@ -86,7 +89,16 @@ final class Strumenti {
     func apriInSospeso() {
         guard let url = daAprire.first else { return }
         daAprire.removeAll()
-        UIApplication.shared.open(url)
+        AperturaFuori.apri(url, chi: nil)       // 13.1 (2): col telefono in tasca ci pensa l'orologio, o parte appena sblocca
+    }
+
+    /// 13.1 (2): la nota per il cervello quando il telefono è in tasca (JARVIS dietro): così non dice «mandato» a vuoto.
+    private func notaFuori(_ url: URL, _ normale: String) -> String {
+        switch AperturaFuori.via(url) {
+        case .subito: return normale
+        case .polso: return "il telefono è in tasca: è pronto sull'orologio di Bea, che lo conferma con un tocco. Diglielo in breve"
+        case .allaSblocco: return "il telefono è bloccato: parte appena Bea lo sblocca. Diglielo in breve"
+        }
     }
 
     func annullaInSospeso() { daAprire.removeAll(); comandoDaEseguire = nil }
@@ -144,6 +156,9 @@ final class Strumenti {
             case "telefono_comando": return (try comandoTelefono(i), false)
             case "mac_comando": return (try comandoMac(i), false)
             case "regia": return await Regia.condivisa.esegui(i)        // 12.0 (10): la regia dell'app (Regia.swift)
+            case "piano": return Piano.condiviso.esegui(i)              // 14 nov: più passi senza guida (Piano.swift)
+            case "mano": return await ManiJarvis.esegui(i)              // 14 nov: le mani su tutto JARVIS (ManiJarvis.swift)
+            case "schermo": return (Regia.condivisa.catalogo(rigaVecchia: Regia.condivisa.rigaVecchia?()), false)
             case "comando_app":
                 let c = i["comando"] as? String ?? ""
                 guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }
@@ -231,7 +246,7 @@ final class Strumenti {
         let numero = Strumenti.pulisci(i["numero"] as? String ?? "")
         guard !numero.isEmpty, let url = URL(string: "tel://\(numero)") else { throw Problema("Numero non valido.") }
         daAprire.append(url)
-        return json(["ok": true, "nota": "la chiamata parte quando hai finito di parlare; l'iPhone chiede conferma"])
+        return json(["ok": true, "nota": notaFuori(url, "la chiamata parte quando hai finito di parlare; l'iPhone chiede conferma")])
     }
 
     private func messaggio(_ i: [String: Any]) throws -> String {
@@ -246,7 +261,7 @@ final class Strumenti {
         daAprire.append(url)
         let testoVero = i["testo"] as? String ?? ""                        // 7 nov: anche questo nell'ologramma di Messaggi
         Task { await RegistroMessaggi.mandato(a: numero, testo: testoVero, whatsapp: whatsapp) }
-        return json(["ok": true, "nota": "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia Bea"])
+        return json(["ok": true, "nota": notaFuori(url, "il messaggio si apre pronto in \(whatsapp ? "WhatsApp" : "Messaggi") quando hai finito di parlare: lo invia Bea")])
     }
 
     private func naviga(_ i: [String: Any]) throws -> String {
@@ -271,7 +286,7 @@ final class Strumenti {
         }
         daAprire.append(url)
         Task { await RegistroMessaggi.mandato(a: numero, testo: testo, whatsapp: false) }   // 7 nov: anche questo nell'ologramma di Messaggi
-        return json(["ok": true, "nota": "il Comando rapido «\(Strumenti.comandoInvio)» lo invia appena hai finito di parlare, senza conferma"])
+        return json(["ok": true, "nota": notaFuori(url, "il Comando rapido «\(Strumenti.comandoInvio)» lo invia appena hai finito di parlare, senza conferma")])
     }
 
     // MARK: Telefono: torcia, schermo, batteria e i comandi che passano dai Comandi rapidi

@@ -21,6 +21,19 @@ nonisolated final class Volume: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// 13.8 (3) (il signore, 22 nov 09:34: «le onde non reagiscono alla mia voce, che io urli o parli piano non cambia niente»):
+    /// chiamato a voce («Jarvis, …») o quando gli parla sopra, JARVIS ascolta col microfono del richiamo o dell'orecchio, che non
+    /// misuravano il volume: il reattore restava fermo a zero. Ora anche loro lo misurano, ma solo mentre JARVIS ascolta (in attesa
+    /// e mentre parla quel microfono sente la stanza e la sua voce, e non deve muovere il reattore).
+    private var ascoltoAperto = false
+    func ascolto(_ si: Bool) {
+        lock.lock(); ascoltoAperto = si; lock.unlock()
+    }
+    func misuraAscolto(_ b: AVAudioPCMBuffer) {
+        lock.lock(); let si = ascoltoAperto; lock.unlock()
+        if si { misura(b) }
+    }
+
     /// Un valore in decibel (come quelli di AVAudioPlayer e AVAudioRecorder).
     func mettiDecibel(_ db: Float) { metti(Volume.normalizza(Double(db))) }
 
