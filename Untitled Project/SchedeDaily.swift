@@ -556,6 +556,7 @@ struct VistaPosta: View {
                                    fine: { aperta = nil }) { chiudiLettore in
                         LettoreMail(chiave: m.chiave, nome: m.nome, oggetto: m.oggetto, tinta: tinta, margineBasso: FasciaAlta.fondo,
                                     chiudi: chiudiLettore) { frase, testo in
+                            Suoni.filoVia()                          // 23 nov: «Chiedi a JARVIS» chiude la mail col suono delle tab, come il mockup
                             aperta = nil
                             if let chiediCon { chiediCon(frase, testo) } else { chiedi(frase) }
                         }

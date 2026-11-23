@@ -233,7 +233,7 @@ final class Filo: ObservableObject {
     static let durataNotifica: TimeInterval = 2.8
 
     /// 20 nov (il signore: «OK», l'elenco che sparisce): una notifica resta in base a quante voci ha l'argomento. Un dato solo
-    /// 2,8 s come sempre; ogni voce in più di un elenco (o impegno dell'agenda) altri 0,9 s, fino a 14 s (12 voci ≈ 12,7 s).
+    /// 2,8 s come sempre; ogni voce in più di un elenco (o impegno dell'agenda) altri 0,9 s, fino a 20 s (20 voci ≈ 19,9 s; 23 nov: prima 14 s, con 12 voci al massimo).
     static func durata(_ a: ArgomentoFilo) -> TimeInterval {
         guard a.nome != "Piano" else { return durataNotifica }           // il piano ha le sue regole (resta mentre lavora, finito 5 s)
         let n: Int = a.righe.reduce(0) { (somma: Int, r: RigaFilo) -> Int in
@@ -241,11 +241,11 @@ final class Filo: ObservableObject {
             return somma + max(1, voci)
         }
         // 21 nov (il signore: «poter rileggere lì tutta la risposta»): un testo lungo resta il tempo di leggerlo, 50 ms a lettera
-        // oltre le prime 60 (come il mockup), sempre fino a 14 s; toccata o fissata resta finché lui vuole
+        // oltre le prime 60 (come il mockup), sempre fino a 20 s (23 nov); toccata o fissata resta finché lui vuole
         let lettere: Int = a.righe.reduce(0) { (somma: Int, r: RigaFilo) -> Int in somma + r.riga.count }
         let elenco: TimeInterval = durataNotifica + 0.9 * Double(max(0, n - 1))
         let lettura: TimeInterval = durataNotifica + 0.05 * Double(max(0, lettere - 60))
-        return min(max(elenco, lettura), 14)
+        return min(max(elenco, lettura), 20)                              // 23 nov: fino a 20 s (le 20 voci), come il mockup
     }
 
     /// 21 nov (il signore: «la frase finisce coi puntini anziché poter rileggere lì tutta la risposta»): di una risposta di JARVIS
@@ -498,6 +498,10 @@ final class Filo: ObservableObject {
     func toccoSchermo(_ p: CGPoint) {
         guard !visti.isEmpty || vuota, !daParte, rettScheda.width > 0 else { return }
         if rettTasti.width > 0, rettTasti.insetBy(dx: -4, dy: -7).contains(p) { return }   // 13.7: i tre tasti fanno solo il loro
+        // 23 nov (il signore: «le tab possono rimanere ingrandite entrambe nello stesso istante»): il dito sulla tab bassa (PAGINE)
+        // non è «fuori»: FILO resta com'è
+        let pagine = Pagine.condivisa
+        if pagine.su, pagine.rett.contains(p) { return }
         if rettScheda.contains(p) {
             if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
             svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta

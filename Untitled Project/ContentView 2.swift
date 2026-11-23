@@ -204,16 +204,20 @@ struct ContentView: View {
             // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (1,2 s dopo che è arrivata, poi ogni
             // 10 s), mai mentre le pagine si muovono. Debug: ogni foto ridisegna la finestra (qualche millisecondo), quindi poche e
             // solo quando il dito è fermo, così gli ologrammi delle sezioni non perdono fotogrammi
+            // 23 nov (il signore, video: «molte carte non hanno la miniatura della reale sezione»): le sezioni aperte e richiuse in
+            // un paio di secondi restavano senza foto (la prima arrivava a 1,2 s e solo col dito fermo). Ora la prima si scatta appena
+            // la sezione è pronta (finito il caricamento, davanti del tutto, nessuno sfoglio), anche col dito sopra; le altre come prima
             .task(id: pila.davanti) {
                 guard let id = pila.davanti else { return }
-                try? await Task.sleep(for: .seconds(1.2))
+                try? await Task.sleep(for: .seconds(0.3))
                 var fatte = 0
                 while !Task.isCancelled, pila.davanti == id {
-                    if naviga.modo == .normale, pilaCopre, Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
+                    let pronta: Bool = naviga.modo == .normale && pilaCopre && !CaricamentiVivi.inCorso
+                    if pronta, fatte == 0 || Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
                         if let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { Pagine.condivisa.fotografa(id, nome: nome) }
                         fatte += 1
                     }
-                    try? await Task.sleep(for: .seconds(fatte == 0 ? 1 : 10))   // non ancora fatta (il dito si muoveva): si riprova presto
+                    try? await Task.sleep(for: .seconds(fatte == 0 ? 0.15 : 10))   // non ancora pronta: si riprova subito
                 }
             }
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»

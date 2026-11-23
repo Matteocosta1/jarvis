@@ -1762,10 +1762,10 @@ struct FondoVivo: View {
     var body: some View {
         // 5 nov sera (PILA, scelta del signore «JARVIS sfocato, come iOS»): al posto del fondo a griglia, JARVIS che sta sotto,
         // molto sfocato e scurito, come la Home dietro le app
-        ZStack {
-            VetroTab()                                                  // 13.8 (4), 12:26 (il signore): senza la tinta di iOS
-            Color(red: 2 / 255, green: 8 / 255, blue: 11 / 255).opacity(0.38)
-        }
+        // 23 nov (il signore: «sì, prova» e «vetro scuro su tutto»): niente più sfocatura dietro la PILA (era la parte che faceva
+        // lavorare di più il telefono, e il reattore sfocato faceva una macchia ciano); la schermata di JARVIS si scurisce e basta,
+        // come il mockup (.olo-fondo.pila: rgb(1,5,7) al 94 %)
+        Color(red: 1 / 255, green: 5 / 255, blue: 7 / 255).opacity(0.94)
             .environment(\.colorScheme, .dark)
             .contentShape(Rectangle())
             .opacity(tiro.fondo)
@@ -1793,17 +1793,12 @@ struct VeloOlo: View {
     /// PILA (5 nov sera, come il mockup v268): la tinta è luce ciano sul vetro (VetroOlo), non «color»; righe più leggere.
     var pila = false
     var body: some View {
-        ZStack {
-            if !web && !pila {
-                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(forza).blendMode(.color)
-                Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.07 * forza).blendMode(.screen)
-            }
-            RigheOlo().opacity(forza * (pila ? 0.57 : 1))
-            // il bordo come .foglio.in-vista del mockup (le pagine olografiche): 1,5 punti di ciano al 55% (60% nella PILA)
-            RoundedRectangle(cornerRadius: raggio, style: .continuous)
-                .strokeBorder(Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity((pila ? 0.6 : 0.55) * forza), lineWidth: 1.5)
-        }
-        .allowsHitTesting(false)
+        // 23 nov (il signore: «ologrammi tutti con lo stesso stile identico, senza righine»; «vetro scuro su tutto»): il vetro unico
+        // (StileOlo, LuceOlografica): la luce ciano dall'alto, il bagliore dai bordi e il bordo di luce, sulla forma della pagina.
+        // Via la tinta ciano «color» e le righe; come il mockup (.olo-tinta: la luce, .olo-righe: niente). `web` e `pila` restano
+        // per chi la chiama (la pagina web e la PILA hanno sotto lo stesso vetro).
+        LuceOlografica(forma: RoundedRectangle(cornerRadius: raggio, style: .continuous), forza: forza)
+            .allowsHitTesting(false)
     }
 }
 
@@ -1818,16 +1813,13 @@ struct VetroOlo: View {
     let raggio: CGFloat
     var body: some View {
         let forma = RoundedRectangle(cornerRadius: raggio, style: .continuous)
-        let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
         ZStack {
             // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura né tinta
             // di iOS; la trasparenza dinamica è il fondo qui sotto (50 % dietro, 88 % davanti), come prima
             // 13.8 (5): davanti 70 % come gli altri ologrammi (prima 88 %), dietro 50 %
-            forma.fill(Color(red: 3 / 255, green: 16 / 255, blue: 22 / 255).opacity((TintaTab.vetroAperta + (TintaTab.vetroDavanti - TintaTab.vetroAperta) * fuoco) * forza))
-            forma.fill(LinearGradient(stops: [.init(color: ciano.opacity(0.1 * forza), location: 0),
-                                              .init(color: ciano.opacity(0.03 * forza), location: 0.4),
-                                              .init(color: ciano.opacity(0.06 * forza), location: 1)],
-                                      startPoint: .top, endPoint: .bottom))
+            // 23 nov (vetro unico SCURO): 50 % dietro e 70 % davanti più StileOlo.pila (come il mockup: --vetro + --oPd); la luce
+            // ciano la mette VeloOlo sopra la pagina
+            forma.fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(min(1, max(0, 0.5 + 0.2 * fuoco + StileOlo.scelto.pila)) * forza))
         }
         .environment(\.colorScheme, .dark)
         .allowsHitTesting(false)
@@ -2005,31 +1997,6 @@ extension EnvironmentValues {
     }
 }
 
-/// Il bagliore interno e le righe di scansione del velo olografico. Una vista senza dati: SwiftUI non la ridisegna mentre la
-/// pagina si muove o la tinta cresce (si ridisegna solo se cambia la misura).
-struct RigheOlo: View {
-    var body: some View {
-        Canvas { gc, size in
-            let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
-            let fondo: CGFloat = 60, w = size.width, h = size.height
-            // il bagliore interno dai quattro bordi (box-shadow: inset 0 0 60px rgba(79,227,255,.25))
-            let bordi: [(CGRect, CGPoint, CGPoint)] = [
-                (CGRect(x: 0, y: 0, width: w, height: fondo), CGPoint(x: 0, y: 0), CGPoint(x: 0, y: fondo)),
-                (CGRect(x: 0, y: h - fondo, width: w, height: fondo), CGPoint(x: 0, y: h), CGPoint(x: 0, y: h - fondo)),
-                (CGRect(x: 0, y: 0, width: fondo, height: h), CGPoint(x: 0, y: 0), CGPoint(x: fondo, y: 0)),
-                (CGRect(x: w - fondo, y: 0, width: fondo, height: h), CGPoint(x: w, y: 0), CGPoint(x: w - fondo, y: 0)),
-            ]
-            for (r, da, a) in bordi {
-                gc.fill(Path(r), with: .linearGradient(Gradient(colors: [ciano.opacity(0.25), ciano.opacity(0)]), startPoint: da, endPoint: a))
-            }
-            var righe = Path()
-            var y: CGFloat = 0
-            while y < h { righe.addRect(CGRect(x: 0, y: y, width: w, height: 1)); y += 3 }
-            gc.fill(righe, with: .color(.black.opacity(0.42)))
-        }
-    }
-}
-
 /// Il bagliore attorno alla pagina olografica, come .foglio.in-vista del mockup (0 0 46px al 22%); `forza` 0,45 = quello pieno.
 /// 5 nov pomeriggio (il signore: «troppo luminosi»): prima era quello più forte (26 px al 55% e 70 px al 25%).
 /// 5 nov pomeriggio (punto 5 approvato: «alone disegnato una volta»): prima era l'ombra della pagina intera, ricalcolata a ogni
@@ -2041,7 +2008,8 @@ struct AloneOlo: ViewModifier {
     /// Quanto è piena la pagina (1 − trasparenza × tinta): l'ombra di prima prendeva la trasparenza della pagina.
     var alfa: Double = 1
     func body(content: Content) -> some View {
-        let k = min(1, max(0, forza / 0.45))
+        // 23 nov (vetro unico): l'alone fuori segue StileOlo (SCURO: niente, come il mockup)
+        let k = min(1, max(0, forza / 0.45)) * min(1, StileOlo.scelto.fuori / 0.45)
         content
             .background {
                 if k > 0.001 {
@@ -2087,23 +2055,15 @@ struct MaterializzaOlo: View {
             let t = ctx.date.timeIntervalSince(inizio)
             let q = min(1, t / 0.43), e = q < 0.5 ? 2 * q * q : 1 - pow(-2 * q + 2, 2) / 2, y = e * 1.06 - 0.03
             GeometryReader { g in
-                let h = g.size.height, yy = CGFloat(y), ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+                let h = g.size.height
                 ZStack(alignment: .top) {
                     if q < 1 {
                         let a = max(0, y - 0.05)
+                        // 23 nov (il signore: «senza l'animazione della riga che scende»): la luce si scioglie dall'alto, senza la
+                        // riga e la sua scia, come il mockup (.olo-scan: niente)
                         VeloOlo(forza: 1, web: web)
                             .mask(LinearGradient(stops: [.init(color: .clear, location: a), .init(color: .black, location: max(a + 0.0001, y))],
                                                  startPoint: .top, endPoint: .bottom))
-                        LinearGradient(colors: [ciano.opacity(0), ciano.opacity(0.22)], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 70)
-                            .offset(y: yy * h - 72)
-                        Rectangle()
-                            .fill(Color(red: 223 / 255, green: 250 / 255, blue: 1))
-                            .frame(height: 2)
-                            .shadow(color: ciano, radius: 5)
-                            .shadow(color: ciano.opacity(0.85), radius: 13)
-                            .offset(y: yy * h)
-                            .opacity(q < 0.85 ? 1 : (1 - q) / 0.15)
                     }
                     StaffeOlo(t: t, misura: g.size)
                 }

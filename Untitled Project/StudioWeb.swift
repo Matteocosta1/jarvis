@@ -1095,8 +1095,10 @@ enum OloWeb {
           R.appendChild(e);
           return e;
         };
-        C = crea('jarvis-olo-c', '#4fe3ff', 'color');
-        S = crea('jarvis-olo-s', 'rgba(79, 227, 255, 0.07)', 'screen');
+        // 23 nov (vetro unico SCURO, «senza colori ed effetti diversi»): la pagina web non si tinge più di ciano; la luce del vetro
+        // la mette VeloOlo sopra (SwiftUI, senza fusioni: arriva anche sopra la pagina web). I due strati restano, vuoti, per i tempi
+        C = crea('jarvis-olo-c', 'transparent', 'normal');
+        S = crea('jarvis-olo-s', 'transparent', 'normal');
         void C.offsetWidth;
       }
       if (m) {

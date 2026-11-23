@@ -18,12 +18,62 @@ enum TintaTab {
     /// La trasparenza dinamica delle due tab (22 nov 01:04): aperta 60 %, piccola 55 %.
     // 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica deve essere ben visibile come nello swipe», cioè come le
     // pagine che vanno dietro): il fondo delle tab è quello delle pagine olografiche (VetroOlo a riposo: 50 %), da piccola 45 %
-    static let vetroAperta = 0.5
-    static let vetroPiccola = 0.45
+    // 23 nov: i valori li dà il vetro unico degli ologrammi (StileOlo)
+    static var vetroAperta: Double { StileOlo.scelto.fondo }
+    static var vetroPiccola: Double { StileOlo.scelto.fondoPiccola }
     /// 13.8 (5) (il signore, 22:49: «88 % forse meglio più basso, altrimenti sembra uguale a prima: si deve capire che è olografico»;
     /// «anche Mail deve essere uguale agli altri»): un ologramma davanti (FILO a fuoco sopra una sezione, la tendina sopra una
     /// sezione, la mail, la pagina davanti della PILA) ha il fondo al 70 %, uguale per tutti.
-    static let vetroDavanti = 0.7
+    static var vetroDavanti: Double { StileOlo.scelto.fondoDavanti }
+}
+
+/// 23 nov (il signore, dopo la 13.8 (7): «ologrammi molto belli ma vanno ottimizzati: due versioni senza righine orizzontali e senza
+/// l'animazione della riga che scende; tutti con lo stesso stile identico, invece di colori ed effetti diversi»): UN SOLO VETRO per
+/// FILO, la tab bassa (PAGINE), la tendina PROTOCOLLI, la Mail e la navigazione (la PILA e lo sfoglio dal bordo). Niente righe,
+/// niente riga che scende, niente sfocatura. Il vetro: il fondo scuro (la trasparenza dinamica: aperta, piccola, davanti sopra una
+/// sezione), la luce ciano dall'alto, il bordo di luce, il bagliore dai bordi dentro e (solo CHIARO) l'alone fuori. Due prove nel
+/// mockup (JARVIS Telefono, OLOGRAMMI): SCURO e CHIARO, valori uguali al mockup. Scelto SCURO (04:42).
+struct StileOlo {
+    /// Il fondo scuro: aperta, piccola, davanti (sopra una sezione, la Mail, la pagina davanti della PILA).
+    let fondo: Double
+    let fondoPiccola: Double
+    let fondoDavanti: Double
+    /// La PILA: il vetro delle pagine è 50 % dietro e 70 % davanti, più questo.
+    let pila: Double
+    /// La luce ciano dall'alto: in cima, al 40 %, in fondo.
+    let luceAlto: Double
+    let luceMezzo: Double
+    let luceBasso: Double
+    /// Il bordo di luce (1 punto).
+    let bordo: Color
+    /// Il bagliore dai bordi, dentro: quanto e quanto entra.
+    let alone: Double
+    let aloneRaggio: CGFloat
+    /// L'alone fuori (0: niente).
+    let fuori: Double
+    let fuoriRaggio: CGFloat
+
+    /// SCURO: vetro denso con la luce ciano (il signore, 04:38: «il ciano ci deve essere»).
+    static let scuro = StileOlo(fondo: 0.72, fondoPiccola: 0.62, fondoDavanti: 0.84, pila: 0.14,
+                                luceAlto: 0.12, luceMezzo: 0.03, luceBasso: 0.07,
+                                bordo: Color(red: 79 / 255, green: 227 / 255, blue: 1).opacity(0.45),
+                                alone: 0.16, aloneRaggio: 18, fuori: 0, fuoriRaggio: 0)
+    /// CHIARO: ologramma ciano molto trasparente e luminoso, bordo acceso e alone attorno.
+    static let chiaro = StileOlo(fondo: 0.28, fondoPiccola: 0.24, fondoDavanti: 0.42, pila: -0.2,
+                                 luceAlto: 0.2, luceMezzo: 0.07, luceBasso: 0.13,
+                                 bordo: Color(red: 160 / 255, green: 244 / 255, blue: 1).opacity(0.85),
+                                 alone: 0.28, aloneRaggio: 30, fuori: 0.45, fuoriRaggio: 16)
+    /// Quello scelto dal signore (23 nov, 04:42: «vetro SCURO su tutto, bellissimo»).
+    static let scelto: StileOlo = .scuro
+
+    /// La luce ciano dall'alto (forza 0…1: le pagine della PILA la fanno crescere col dito).
+    func luce(_ forza: Double = 1) -> LinearGradient {
+        let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
+        return LinearGradient(stops: [.init(color: ciano.opacity(luceAlto * forza), location: 0),
+                                      .init(color: ciano.opacity(luceMezzo * forza), location: 0.4),
+                                      .init(color: ciano.opacity(luceBasso * forza), location: 1)],
+                              startPoint: .top, endPoint: .bottom)
+    }
 }
 
 /// Lo strato di FILO sopra la schermata e le sezioni (ContentView), con la fascia invisibile del bordo destro che lo richiama quando è via.
@@ -267,9 +317,13 @@ private struct SchedaFilo: View {
                     let t = tl.date.timeIntervalSince(nata)
                     let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
                     let fondo = scuro.da + (scuro.a - scuro.da) * Olo.liscia(p)
+                    // 23 nov (il signore: «il cerchio che le lancia è tagliato da 2 spigoli, come fosse un quadrato»): il bagliore del
+                    // punto di luce (6 punti dall'angolo, largo 10) usciva dalla tela; la tela sporge 12 punti per lato
                     Canvas(rendersAsynchronously: false) { gc, size in
-                        CorniceFilo.disegna(&gc, size, t: t, fondo: fondo)
+                        gc.translateBy(x: CorniceFilo.sporge, y: CorniceFilo.sporge)
+                        CorniceFilo.disegna(&gc, CorniceFilo.dentro(size), t: t, fondo: fondo)
                     }
+                    .padding(-CorniceFilo.sporge)
                 }
                 // 13.8 (4): sopra il fondo, la luce delle pagine olografiche (come nello swipe delle sezioni)
                 LuceOlografica()
@@ -665,6 +719,13 @@ private struct Sfuma: View {
 /// corre sotto la testata, il fondo scuro, gli angoli, la riga di scansione che scende lenta.
 /// 13.7: `specchio` è la tab bassa (PAGINE): il punto di luce in alto a SINISTRA e il filo che corre verso destra, il resto uguale.
 enum CorniceFilo {
+    /// 23 nov: quanto la tela della cornice esce dalla tab, così il bagliore del punto di luce non si taglia.
+    static let sporge: CGFloat = 12
+    /// La misura della tab dentro la tela più grande.
+    static func dentro(_ tela: CGSize) -> CGSize {
+        CGSize(width: max(0, tela.width - 2 * sporge), height: max(0, tela.height - 2 * sporge))
+    }
+
     static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93, specchio: Bool = false) {
         let W = Double(size.width), H = Double(size.height)
         let u0 = min(1, t / 0.5)
@@ -685,10 +746,8 @@ enum CorniceFilo {
             f.addLine(to: CGPoint(x: W - 24, y: ly - 4)); f.addLine(to: CGPoint(x: W - 24 - (W - 28) * u, y: ly - 4))
         }
         gc.stroke(f, with: .color(Olo.ciano.opacity(0.85)), style: Olo.tratto(1.1))
-        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)),
-                with: .linearGradient(Gradient(colors: [Olo.azzurro.opacity(0.13), Olo.azzurro.opacity(0.02)]),
-                                      startPoint: CGPoint(x: 0, y: by), endPoint: CGPoint(x: 0, y: by + bh)))
-        gc.stroke(Path(CGRect(x: bx + 0.5, y: by + 0.5, width: bw * u, height: bh)), with: .color(Olo.ciano.opacity(0.32)), style: Olo.tratto(1.1))
+        // 23 nov (il signore: «lo stesso stile identico»): la luce e il bordo li mette il vetro unico (LuceOlografica); la cornice
+        // tiene il punto di luce, il filo e gli angoli
         var ang = Path()
         let k = 9.0
         let angoli: [(x: Double, y: Double, sx: Double, sy: Double)] = [(x: bx, y: by, sx: 1, sy: 1), (x: bx + bw * u, y: by, sx: -1, sy: 1),
@@ -697,13 +756,7 @@ enum CorniceFilo {
             ang.move(to: CGPoint(x: px + sx * k, y: py)); ang.addLine(to: CGPoint(x: px, y: py)); ang.addLine(to: CGPoint(x: px, y: py + sy * k))
         }
         gc.stroke(ang, with: .color(TintaTab.chiaro.opacity(0.9)), style: Olo.tratto(1.5))
-        // la riga di scansione che scende lenta dentro la scheda
-        if bh > 12 {
-            let sy = by + (t * 26).truncatingRemainder(dividingBy: bh)
-            gc.fill(Path(CGRect(x: bx, y: sy - 10, width: bw * u, height: 10)),
-                    with: .linearGradient(Gradient(colors: [Olo.azzurro.opacity(0), Olo.azzurro.opacity(0.10)]),
-                                          startPoint: CGPoint(x: 0, y: sy - 10), endPoint: CGPoint(x: 0, y: sy)))
-        }
+        // 23 nov (il signore: «senza l'animazione della riga che scende»): niente più riga di scansione
     }
 }
 #endif
@@ -754,18 +807,20 @@ final class VetroSenzaTinta: UIVisualEffectView {
     }
 }
 
-/// 13.8 (4) (il signore, 22 nov 12:22, video: «la trasparenza olografica ben visibile come nello swipe»; 12:45: «quell'effetto sfocato
-/// di Apple deve sparire da ogni ologramma»): sopra il fondo scuro delle tab e della tendina, la luce delle pagine olografiche: la luce
-/// ciano dall'alto, il bagliore dai bordi e le righe di scansione. Niente sfocatura: il fondo scuro lo mette chi la usa.
-struct LuceOlografica: View {
+/// La luce del vetro unico degli ologrammi (StileOlo), sopra il fondo scuro che mette chi la usa: la luce ciano dall'alto, il
+/// bagliore dai bordi dentro, il bordo di luce e (solo CHIARO) l'alone fuori. 23 nov: niente più righe di scansione. Una vista
+/// senza dati: si ridisegna solo se cambia la misura.
+struct LuceOlografica<Forma: InsettableShape>: View {
+    let forma: Forma
+    var forza: Double = 1
+
     var body: some View {
+        let s = StileOlo.scelto
         let ciano = Color(red: 79 / 255, green: 227 / 255, blue: 1)
         ZStack {
-            LinearGradient(stops: [.init(color: ciano.opacity(0.1), location: 0), .init(color: ciano.opacity(0.03), location: 0.4),
-                                   .init(color: ciano.opacity(0.06), location: 1)], startPoint: .top, endPoint: .bottom)
+            forma.fill(s.luce(forza))
             Canvas { gc, size in
-                let w = size.width, h = size.height, b: CGFloat = 18
-                // il bagliore dai bordi (come le pagine, in piccolo: 18 punti) e le righe (1 scura ogni 3, al 57 % come la PILA)
+                let w = size.width, h = size.height, b = min(s.aloneRaggio, w / 2, h / 2)
                 let bordi: [(CGRect, CGPoint, CGPoint)] = [
                     (CGRect(x: 0, y: 0, width: w, height: b), CGPoint(x: 0, y: 0), CGPoint(x: 0, y: b)),
                     (CGRect(x: 0, y: h - b, width: w, height: b), CGPoint(x: 0, y: h), CGPoint(x: 0, y: h - b)),
@@ -773,14 +828,23 @@ struct LuceOlografica: View {
                     (CGRect(x: w - b, y: 0, width: b, height: h), CGPoint(x: w, y: 0), CGPoint(x: w - b, y: 0)),
                 ]
                 for (r, da, a) in bordi {
-                    gc.fill(Path(r), with: .linearGradient(Gradient(colors: [ciano.opacity(0.14), ciano.opacity(0)]), startPoint: da, endPoint: a))
+                    gc.fill(Path(r), with: .linearGradient(Gradient(colors: [ciano.opacity(s.alone * forza), ciano.opacity(0)]), startPoint: da, endPoint: a))
                 }
-                var righe = Path()
-                var y: CGFloat = 0
-                while y < h { righe.addRect(CGRect(x: 0, y: y, width: w, height: 1)); y += 3 }
-                gc.fill(righe, with: .color(.black.opacity(0.24)))
+            }
+            .clipShape(forma)
+            forma.strokeBorder(s.bordo.opacity(forza), lineWidth: 1)
+        }
+        .background {
+            if s.fuori > 0 {
+                forma.stroke(ciano.opacity(s.fuori * forza), lineWidth: 2)
+                    .blur(radius: s.fuoriRaggio / 2)
             }
         }
         .allowsHitTesting(false)
     }
+}
+
+extension LuceOlografica where Forma == Rectangle {
+    /// Le tab: un rettangolo.
+    init(forza: Double = 1) { self.init(forma: Rectangle(), forza: forza) }
 }

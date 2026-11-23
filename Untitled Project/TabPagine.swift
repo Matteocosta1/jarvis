@@ -259,6 +259,9 @@ final class Pagine: ObservableObject {
         guard su, avvio == nil, chiusura == nil else { return }
         if rett.contains(p) { return }
         if fascia(zona()).contains(p) { return }
+        // 23 nov (il signore: «le tab possono rimanere ingrandite entrambe»): il dito su FILO (la tab alta) non la rimpicciolisce
+        let filo = Filo.condiviso
+        if filo.rettScheda.width > 0, !filo.daParte, !filo.visti.isEmpty || filo.vuota, filo.rettScheda.contains(p) { return }
         if !fissa { stringi(true) }
     }
 
@@ -401,7 +404,7 @@ final class Pagine: ObservableObject {
                 try? await Task.sleep(for: .milliseconds(150))
                 let vista = ZStack(alignment: .top) {
                     SfondoSezione()
-                    SchermoCaricamento(titolo: c.nome, icona: c.icona, conX: Self.conFotocamera.contains(c.nome))
+                    SchermoCaricamento(titolo: c.nome, icona: c.icona, conX: Self.conFotocamera.contains(c.nome), disegno: true)
                         .padding(.top, alto)
                 }
                 .frame(width: misura.width, height: misura.height)
@@ -570,9 +573,12 @@ private struct TabPagineVista: View {
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
             TimelineView(.animation) { tl in
                 let t = tl.date.timeIntervalSince(p.nataDa)
+                // 23 nov: la tela sporge 12 punti per lato (il bagliore del punto di luce non si taglia), come FILO
                 Canvas(rendersAsynchronously: false) { gc, size in
-                    CorniceFilo.disegna(&gc, size, t: t, fondo: 0, specchio: true)
+                    gc.translateBy(x: CorniceFilo.sporge, y: CorniceFilo.sporge)
+                    CorniceFilo.disegna(&gc, CorniceFilo.dentro(size), t: t, fondo: 0, specchio: true)
                 }
+                .padding(-CorniceFilo.sporge)
             }
             .allowsHitTesting(false)
             VStack(spacing: 0) {
@@ -798,6 +804,8 @@ private struct LibroPagine: View {
     @State private var alzata: CGFloat = 0
     @State private var vola: Int?
     @State private var ultimoScatto = -1
+    /// 23 nov: quando il dito si è appoggiato (lo swipe veloce verso sinistra chiude la tab).
+    @State private var appoggio: Date?
 
     var body: some View {
         GeometryReader { g in
@@ -882,6 +890,7 @@ private struct LibroPagine: View {
 
     private func segue(_ v: DragGesture.Value, W: Double, CW: Double, CH: Double) {
         guard p.avvio == nil, vola == nil, !voci.isEmpty else { return }
+        if appoggio == nil { appoggio = Date() }
         let dx = Double(v.translation.width), dy = Double(v.translation.height)
         if asse == .nessuno {
             guard hypot(dx, dy) >= 6 else { return }
@@ -903,11 +912,20 @@ private struct LibroPagine: View {
     }
 
     private func fine(_ v: DragGesture.Value, W: Double, CW: Double, CH: Double) {
-        defer { asse = .nessuno }
+        let partito = appoggio
+        defer { asse = .nessuno; appoggio = nil }
         guard p.avvio == nil, vola == nil, !voci.isEmpty else { return }
         let n = voci.count
         switch asse {
         case .lato:
+            // 23 nov (scelta del signore: «swipe veloce chiude»): il colpo veloce verso sinistra (orizzontale, almeno 40 punti, oltre
+            // 0,6 punti al millisecondo dall'appoggio) chiude la tab anche da aperta, dalle carte; il dito lento le fa scorrere
+            let dx = Double(v.translation.width), dy = abs(Double(v.translation.height))
+            let ms = max(1, Date().timeIntervalSince(partito ?? Date()) * 1000)
+            if dx < -40, -dx > dy * 1.8, -dx / ms > 0.6 {
+                p.chiudi(muto: false)
+                return
+            }
             let lancio = -Double(v.velocity.width) / 1000 * 9                   // inerzia: più veloce, più carte
             p.vaiA(Int((p.off + lancio).rounded()), totale: n)
         case .su:
@@ -947,7 +965,7 @@ private struct LibroPagine: View {
     }
 }
 
-/// Una carta: la foto della pagina (velata di ciano, con le righe di scansione e un riflesso) e sopra la sua icona.
+/// Una carta: la foto della pagina (velata di ciano, con un riflesso) e sopra la sua icona.
 private struct CartaPagina: View {
     let foto: UIImage?
     let icona: String
@@ -991,7 +1009,7 @@ private struct CartaPagina: View {
     }
 }
 
-/// Il velo della miniatura: un riflesso in diagonale e le righe di scansione (1 punto scuro ogni 3).
+/// Il velo della miniatura: un riflesso in diagonale (23 nov: senza più le righe di scansione).
 private struct VeloCarta: View {
     var body: some View {
         Canvas { gc, size in
@@ -1002,10 +1020,7 @@ private struct VeloCarta: View {
                 Gradient(stops: [.init(color: Olo.azzurro.opacity(0.2), location: 0), .init(color: Olo.azzurro.opacity(0), location: 0.38),
                                  .init(color: Olo.azzurro.opacity(0), location: 0.7), .init(color: Olo.azzurro.opacity(0.12), location: 1)]),
                 startPoint: CGPoint(x: c.x - dx * l / 2, y: c.y - dy * l / 2), endPoint: CGPoint(x: c.x + dx * l / 2, y: c.y + dy * l / 2)))
-            var righe = Path()
-            var y = 0.0
-            while y < H { righe.addRect(CGRect(x: 0, y: H - y - 1, width: W, height: 1)); y += 3 }
-            gc.fill(righe, with: .color(.black.opacity(0.3)))
+            // 23 nov (il signore: «senza righine orizzontali»): niente più righe di scansione sulle carte, come il mockup
         }
         .allowsHitTesting(false)
     }

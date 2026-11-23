@@ -75,14 +75,13 @@ final class Protocolli: ObservableObject {
 struct TendinaProtocolli: View {
     /// Lo spazio in alto da lasciare libero (la Dynamic Island e l'ora).
     let margineAlto: CGFloat
-    /// Quanto è giù (0 chiusa, 1 tutta aperta): passata la metà, la riga di scansione scende una volta.
+    /// Quanto è giù (0 chiusa, 1 tutta aperta). 23 nov: la riga di scansione che scendeva all'apertura non c'è più (vetro unico).
     var visibile: Double = 1
     /// 13.8 (4): chiamata sopra una sezione (dalla testata): il fondo quasi pieno (88 %, come la pagina davanti), così si legge;
     /// sulla schermata di JARVIS trasparente (50 %). È la trasparenza dinamica, senza sfocatura.
     var suSezione = false
     let chiudi: () -> Void
     @ObservedObject private var protocolli = Protocolli.condiviso
-    @State private var scansioneDa: Date?
     private static let azzurro = Color(red: 79 / 255, green: 227 / 255, blue: 1)      // #4fe3ff
     private static let ciano = Color(red: 143 / 255, green: 240 / 255, blue: 1)       // #8ff0ff
     private static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)      // #bff6ff
@@ -100,9 +99,8 @@ struct TendinaProtocolli: View {
             let forma = UnevenRoundedRectangle(bottomLeadingRadius: 34, bottomTrailingRadius: 34)
             forma
                 .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(suSezione ? TintaTab.vetroDavanti : TintaTab.vetroAperta))
-                .overlay { LuceOlografica().clipShape(forma) }      // 13.8 (4): come le pagine olografiche, senza sfocatura: il fondo al 50 %, la luce ciano e le righe
+                .overlay { LuceOlografica(forma: forma) }           // 23 nov: il vetro unico degli ologrammi (StileOlo), senza righe
                 .environment(\.colorScheme, .dark)
-                .overlay(alignment: .top) { scansione.clipShape(forma) }
                 .overlay(alignment: .bottom) {
                     // il bordo di luce in basso, che sfuma ai lati
                     LinearGradient(stops: [.init(color: TendinaProtocolli.ciano.opacity(0), location: 0),
@@ -119,52 +117,6 @@ struct TendinaProtocolli: View {
                 .shadow(color: .black.opacity(0.45), radius: 25, y: 18)
                 .ignoresSafeArea(edges: .top)
         }
-        .onChange(of: visibile > 0.5) { _, su in
-            guard su else { return }
-            let da = Date()
-            scansioneDa = da
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(800))
-                if scansioneDa == da { scansioneDa = nil }                   // finita: niente più fotogrammi
-            }
-        }
-    }
-
-    /// La riga di scansione che scende quando la tendina si apre (0,75 s, una volta): alta il 40 % della tendina, parte da sopra
-    /// e finisce sotto, sfumando nell'ultimo 15 %.
-    @ViewBuilder private var scansione: some View {
-        if let da = scansioneDa {
-            TimelineView(.animation) { tl in
-                GeometryReader { g in
-                    let u = min(1, max(0, tl.date.timeIntervalSince(da) / 0.75))
-                    let e = TendinaProtocolli.curva(u)                     // cubic-bezier(.3,.6,.4,1)
-                    let h = g.size.height * 0.4
-                    let op = u < 0.85 ? 1 : max(0, 1 - (u - 0.85) / 0.15)
-                    LinearGradient(stops: [.init(color: TendinaProtocolli.azzurro.opacity(0), location: 0),
-                                           .init(color: TendinaProtocolli.azzurro.opacity(0.10), location: 0.85),
-                                           .init(color: TendinaProtocolli.chiaro.opacity(0.55), location: 0.99),
-                                           .init(color: TendinaProtocolli.chiaro.opacity(0), location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .frame(height: h)
-                        .offset(y: -h + (h + h * 1.6) * e)
-                        .opacity(u >= 1 ? 0 : op)
-                }
-            }
-            .allowsHitTesting(false)
-        }
-    }
-
-    /// cubic-bezier(.3, .6, .4, 1) del mockup (y in funzione di x, con qualche passo di Newton).
-    private static func curva(_ x: Double) -> Double {
-        let (x1, y1, x2, y2) = (0.3, 0.6, 0.4, 1.0)
-        func b(_ t: Double, _ a: Double, _ c: Double) -> Double { 3 * (1 - t) * (1 - t) * t * a + 3 * (1 - t) * t * t * c + t * t * t }
-        var t = x
-        for _ in 0..<6 {
-            let d = 3 * (1 - t) * (1 - t) * x1 + 6 * (1 - t) * t * (x2 - x1) + 3 * t * t * (1 - x2)
-            guard abs(d) > 1e-6 else { break }
-            t = min(1, max(0, t - (b(t, x1, x2) - x) / d))
-        }
-        return b(t, y1, y2)
     }
 
     private var contenuto: some View {

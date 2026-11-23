@@ -74,16 +74,19 @@ struct ProiezioneMail<Contenuto: View>: View {
         let alta = altezza
         ZStack(alignment: .topLeading) {
             // 8 nov (LUCE, scelta del signore 09:49): dietro la scheda trasparente si vede la Posta, velata al 28 %
-            Color.black.opacity(velo ? 0.28 : 0)
+            // 23 nov (il signore: «ottimizzare la trasparenza»): col vetro unico la Posta dietro si abbassa al 72 % (come il velo dei
+            // fogli di iOS): la scheda resta trasparente e il testo della mail si legge, come il mockup
+            Color.black.opacity(velo ? 0.72 : 0)
                 .contentShape(Rectangle())
                 .onTapGesture { chiudi() }                      // un tocco fuori dalla scheda, come iOS
             // LUCE: il bagliore ciano sopra la scheda (box-shadow 0 -10px 50px del mockup). Nella PROIEZIONE il mockup lo taglia
             // col clip-path finché la scheda non è aperta del tutto: qui c'è solo a fase 1 (letta fotogramma per fotogramma)
             let su = cima + tiro + (scivola ? (1 - fase) * alta : 0)
+            // 23 nov: è l'alone fuori del vetro unico (StileOlo: niente in SCURO, 16 punti in CHIARO)
             UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
-                .fill(tinta.opacity(0.30))
+                .fill(tinta.opacity(StileOlo.scelto.fuori * 0.65))
                 .frame(width: larga, height: alta)
-                .blur(radius: 25)
+                .blur(radius: max(0.1, StileOlo.scelto.fuoriRaggio))
                 .offset(y: su - 10)
                 .mask(alignment: .topLeading) { Rectangle().frame(width: larga, height: max(0, su)) }
                 .modifier(SoloAperta(fase: fase, sempre: scivola))
@@ -123,6 +126,7 @@ struct ProiezioneMail<Contenuto: View>: View {
     }
 
     private func apri() {
+        Suoni.filo()                                                   // 23 nov (il signore): entra col suono delle tab, come il mockup
         withAnimation(.easeOut(duration: 0.32)) { velo = true }
         if riduci || riga() == nil {
             scivola = true
@@ -138,6 +142,7 @@ struct ProiezioneMail<Contenuto: View>: View {
         guard !via else { return }
         if scivola || riduci || riga() == nil { chiudiScivolando(); return }
         via = true
+        Suoni.filoVia()                                                // 23 nov (il signore): esce col suono delle tab
         aprendo = false
         accendiRiga(0.20, 0.52)
         withAnimation(.easeOut(duration: 0.26)) { velo = false }
@@ -147,6 +152,7 @@ struct ProiezioneMail<Contenuto: View>: View {
     private func chiudiScivolando() {
         guard !via else { return }
         via = true
+        Suoni.filoVia()
         scivola = true
         withAnimation(.easeOut(duration: 0.32)) { velo = false }
         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.32)) { fase = 0 } completion: { fine() }
@@ -307,47 +313,22 @@ private struct SoloAperta: ViewModifier, Animatable {
 }
 
 /// 8 nov (il signore, 09:49: «per MAIL la mia scelta è LUCE»): la scheda della mail olografica, come la prova LUCE del mockup v290.
-/// Vetro trasparente (dietro si vede la Posta), la luce del proiettore che scende dall'alto, le righe di scansione fini, gli angoli
-/// da mirino, il filo di luce sul bordo e una fascia di luce che attraversa la scheda dall'alto in basso ogni 4 s.
+/// 23 nov (il signore: «ologramma di Mail: ottimizzare la trasparenza»; «tutti con lo stesso stile identico»): il vetro unico degli
+/// ologrammi (StileOlo, davanti): il fondo, la luce ciano dall'alto, il bagliore dai bordi e il bordo di luce. Restano la griglia e
+/// gli angoli da mirino; via le righe di scansione, la luce del proiettore e la fascia di luce che scendeva ogni 4 s.
 struct PelleLuce: View {
     let tinta: Color
-    @Environment(\.sezioneDietro) private var dietro
 
     var body: some View {
-        GeometryReader { g in
-            let W = g.size.width, H = g.size.height
-            ZStack(alignment: .topLeading) {
-                // 13.8 (4) (il signore, 12:45: «quell'effetto sfocato di Apple deve sparire da ogni ologramma»): niente sfocatura; la mail
-                // si legge davanti, quindi il fondo è quello della pagina olografica davanti (88 %, come la PILA), prima 34 % sfocato
-                Color(red: 2 / 255, green: 14 / 255, blue: 18 / 255).opacity(TintaTab.vetroDavanti)   // 13.8 (5): come gli altri ologrammi davanti (70 %)
-                // la luce del proiettore: ellisse 130 % × 380 dall'alto, ciano al 30 %
-                EllipticalGradient(colors: [tinta.opacity(0.30), tinta.opacity(0)], center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5)
-                    .frame(width: W * 2.6, height: 760)
-                    .position(x: W / 2, y: 0)
-                GrigliaSfumata()
-                RigheLuce(tinta: tinta)
-                AngoliLuce()
-                if !dietro { ScansioneLuce(tinta: tinta, alta: H) }
-                BordoLuce(tinta: tinta)
-            }
-            .frame(width: W, height: H, alignment: .topLeading)
-            .clipped()
+        let forma = UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+        ZStack(alignment: .topLeading) {
+            forma.fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(StileOlo.scelto.fondoDavanti))
+            GrigliaSfumata()
+            AngoliLuce()
+            LuceOlografica(forma: forma)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-    }
-}
-
-/// Le righe di scansione della scheda: 1 punto ogni 3, ciano al 6 % (dal basso, come il gradiente del mockup).
-private struct RigheLuce: View {
-    let tinta: Color
-    var body: some View {
-        Canvas { gc, size in
-            var p = Path()
-            var y = size.height - 1
-            while y > -1 { p.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)); y -= 3 }
-            gc.fill(p, with: .color(tinta.opacity(0.06)))
-        }
     }
 }
 
@@ -366,51 +347,4 @@ private struct AngoliLuce: View {
     }
 }
 
-/// La scansione lenta: una fascia di luce (110 punti, più chiara sul bordo basso) che attraversa la scheda dall'alto in basso in
-/// 2,2 s con la curva del mockup (0,45 0 0,55 1), poi una pausa; un giro ogni 4 s, a 120 Hz. Dietro si ferma.
-private struct ScansioneLuce: View {
-    let tinta: Color
-    let alta: CGFloat
-    private static let curva = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.45, y: 0), endControlPoint: UnitPoint(x: 0.55, y: 1))
-    var body: some View {
-        TimelineView(.animation) { t in
-            let c = t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4) / 4
-            let p = c < 0.55 ? Self.curva.value(at: c / 0.55) : 1
-            let bordo = 2 * alta * CGFloat(p)
-            LinearGradient(stops: [.init(color: tinta.opacity(0), location: 0),
-                                   .init(color: tinta.opacity(0.10), location: 80 / 110),
-                                   .init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.40), location: 109 / 110),
-                                   .init(color: tinta.opacity(0), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 110)
-                .offset(y: bordo - 110)
-                .opacity(bordo > 0 && bordo < alta + 110 ? 1 : 0)
-        }
-    }
-}
-
-/// Il filo di luce sul bordo (lati e angoli alti di 32, come la scheda): in alto più chiaro, sui lati ciano al 50 %; dentro, un alone.
-private struct BordoLuce: View {
-    let tinta: Color
-    private struct Bordo: Shape {
-        func path(in r: CGRect) -> Path {
-            var p = Path()
-            p.move(to: CGPoint(x: r.minX, y: r.maxY))
-            p.addLine(to: CGPoint(x: r.minX, y: r.minY + 32))
-            p.addArc(center: CGPoint(x: r.minX + 32, y: r.minY + 32), radius: 32, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-            p.addLine(to: CGPoint(x: r.maxX - 32, y: r.minY))
-            p.addArc(center: CGPoint(x: r.maxX - 32, y: r.minY + 32), radius: 32, startAngle: .degrees(270), endAngle: .degrees(360), clockwise: false)
-            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
-            return p
-        }
-    }
-    var body: some View {
-        ZStack {
-            Bordo().stroke(tinta.opacity(0.14), lineWidth: 60).blur(radius: 30)
-            Bordo().stroke(LinearGradient(stops: [.init(color: Color(red: 190 / 255, green: 248 / 255, blue: 1).opacity(0.95), location: 0),
-                                                  .init(color: tinta.opacity(0.5), location: 0.06)],
-                                          startPoint: .top, endPoint: .bottom), lineWidth: 2.5)
-        }
-    }
-}
 #endif
