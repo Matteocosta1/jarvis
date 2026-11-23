@@ -240,6 +240,9 @@ struct BarraSezione<Tasti: View>: View {
     var etichettaX = "Chiudi"
     let chiudi: (() -> Void)?
     @ViewBuilder let tasti: () -> Tasti
+    @Environment(\.sezioneDietro) private var dietro
+    /// Debug 13.8 (8), punto 4: dove finisce la riga (coordinate della finestra), per la fascia della tendina dalla testata.
+    @State private var fondo: CGFloat?
 
     var body: some View {
         // con una riga in più sotto il sottotitolo i tasti restano in alto, centrati sull'icona
@@ -274,6 +277,15 @@ struct BarraSezione<Tasti: View>: View {
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 44)
+        // debug 13.8 (8), punto 4: la riga vera della sezione davanti dice dove finisce (la tendina si tira solo da qui sopra)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { y in
+            guard chiudi != nil else { return }
+            fondo = y
+            if !dietro { TendinaOvunque.fondoTestata = y }
+        }
+        .onChange(of: dietro) { _, d in
+            if !d, let fondo { TendinaOvunque.fondoTestata = fondo }
+        }
     }
 }
 
@@ -384,7 +396,12 @@ struct CaricamentoHUD: View {
                 }
             }
         }
-        .onAppear { inizio = Date(); if conta { CaricamentiVivi.entra(vivo) } }
+        // debug 13.8 (8), punto 5: conta solo il caricamento della sezione davanti (una che carica dietro non ferma la foto)
+        .onAppear { inizio = Date(); if conta && !dietro { CaricamentiVivi.entra(vivo) } }
+        .onChange(of: dietro) { _, d in
+            guard conta else { return }
+            if d { CaricamentiVivi.esce(vivo) } else { CaricamentiVivi.entra(vivo) }
+        }
         .onDisappear { CaricamentiVivi.esce(vivo) }
     }
 }

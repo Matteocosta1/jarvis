@@ -90,7 +90,7 @@ struct StratoFilo: View {
         ZStack(alignment: .topTrailing) {
             Color.clear
             if !visti.isEmpty || filo.vuota {
-                SchedaFilo(argomenti: visti, vetro: suSezione)
+                SchedaFilo(argomenti: visti, vetro: suSezione, fermo: daParte)
                     .padding(.top, alto)
                     .padding(.trailing, 10)
                     .transition(.asymmetric(insertion: .identity, removal: .offset(x: 240).combined(with: .opacity)))   // la nascita la fa la scheda
@@ -214,6 +214,8 @@ private struct SchedaFilo: View {
     let argomenti: [ArgomentoFilo]
     /// 13.1: sopra una sezione (vetro olografico che segue il fuoco); sulla schermata di JARVIS resta il fondo scuro di sempre.
     let vetro: Bool
+    /// Debug 13.8 (8), punto 7: FILO nascosto (menu SISTEMI o tendina aperti): la cornice non si ridisegna (120 volte al secondo).
+    var fermo = false
     @ObservedObject private var filo = Filo.condiviso
     /// Il fondo scuro: da quanto a quanto sta andando, e da quando (lo legge la cornice a ogni fotogramma, 120 Hz).
     @State private var scuro: (da: Double, a: Double, t0: Date) = (da: 0.93, a: 0.93, t0: .distantPast)
@@ -313,7 +315,7 @@ private struct SchedaFilo: View {
             ZStack {
                 // 13.8 (4) (il signore, 12:45): niente sfocatura di Apple; il fondo scuro (dentro la cornice) fa la trasparenza dinamica:
                 // sopra una sezione, a fuoco, 88 %; altrimenti 50 % (piccola 45 %)
-                TimelineView(.animation) { tl in
+                TimelineView(.animation(minimumInterval: nil, paused: fermo)) { tl in
                     let t = tl.date.timeIntervalSince(nata)
                     let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
                     let fondo = scuro.da + (scuro.a - scuro.da) * Olo.liscia(p)

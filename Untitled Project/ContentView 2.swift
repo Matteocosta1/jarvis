@@ -212,7 +212,11 @@ struct ContentView: View {
                 try? await Task.sleep(for: .seconds(0.3))
                 var fatte = 0
                 while !Task.isCancelled, pila.davanti == id {
-                    let pronta: Bool = naviga.modo == .normale && pilaCopre && !CaricamentiVivi.inCorso
+                    // debug 13.8 (8), punti 1 e 6: solo con l'app davanti e attiva (in sottofondo, con la musica o la guida, la foto
+                    // usciva nera e prendeva il posto di quella buona), senza la tendina sopra e senza schermate di iOS sopra
+                    let attiva: Bool = scena == .active && UIApplication.shared.applicationState == .active
+                    let libera: Bool = !tendinaAperta && tendinaTrascina == 0 && FasciaAlta.finestra?.rootViewController?.presentedViewController == nil
+                    let pronta: Bool = attiva && libera && naviga.modo == .normale && pilaCopre && !CaricamentiVivi.inCorso
                     if pronta, fatte == 0 || Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
                         if let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { Pagine.condivisa.fotografa(id, nome: nome) }
                         fatte += 1
@@ -428,7 +432,8 @@ struct ContentView: View {
         }
         // MARK XI (3 nov sera, «DEFINITIVA»): il bordo in basso è tutto di iOS (si esce dall'app al primo swipe); lo swipe su delle
         // sezioni parte poco sopra la barretta (GestoBassoSezioni). Con la tendina aperta o tirata, è fermo (come nel mockup).
-        .onChange(of: tendinaAperta || tendinaTrascina != 0) { _, ferma in naviga.bassoFermo = ferma }
+        // debug 13.8 (8), punto 8: anche col menu SISTEMI aperto (la PILA usciva sopra il menu)
+        .onChange(of: tendinaAperta || tendinaTrascina != 0 || mostraSistemi) { _, ferma in naviga.bassoFermo = ferma }
         // 4 nov: quando cambia la sezione davanti (aperta, chiusa, mandata dietro con lo swipe) le icone del Dock tornano allineate
         .onChange(of: pila.davanti) { if dock.x != nil { dock.lascia() } }
         // app in sottofondo a metà di una tirata: il gesto non finisce mai, la tendina non deve restare appesa

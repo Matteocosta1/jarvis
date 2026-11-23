@@ -245,6 +245,8 @@ struct StratoSezioniVista<Vista: View>: View {
     @State private var telai: [UUID: CGRect] = [:]   // dove sta ogni pagina a riposo (coordinate globali)
     @State private var usate: [UUID] = []            // PILA: le sezioni in ordine d'uso (l'ultima è la più recente)
     @State private var cartaDito: UUID?              // PILA: la pagina sotto il dito quando è partito
+    /// Debug 13.8 (8), punto 3: il dito partito dal bordo è andato su o giù: quel gesto non sfoglia (come il mockup).
+    @State private var bordoScartato = false
 
     private var altezza: CGFloat { FasciaAlta.finestra?.bounds.height ?? 852 }
     private var larghezza: CGFloat { FasciaAlta.finestra?.bounds.width ?? 393 }
@@ -922,7 +924,11 @@ struct StratoSezioniVista<Vista: View>: View {
     private func gestoBordo(da lato: Int) -> some Gesture {
         DragGesture(minimumDistance: 6, coordinateSpace: .global)
             .onChanged { v in
+                if bordoScartato { return }
                 if naviga.modo == .normale {
+                    // debug 13.8 (8), punto 3: lo sfoglio parte solo in orizzontale. Prima anche scorrendo su e giù vicino al bordo
+                    // la pagina diventava ologramma per un attimo (lo sfarfallio) e non scorreva
+                    guard abs(v.translation.width) > abs(v.translation.height) else { bordoScartato = true; return }
                     guard let r = pila.vicina(di: pila.davanti, passo: lato) else { return }
                     naviga.verso = r
                     naviga.modo = .bordo
@@ -934,6 +940,7 @@ struct StratoSezioniVista<Vista: View>: View {
                 naviga.bordo = lato > 0 ? min(0, p) : max(0, p)
             }
             .onEnded { v in
+                bordoScartato = false
                 guard naviga.modo == .bordo else { return }
                 let p = v.predictedEndTranslation.width / larghezza
                 let fatto = abs(naviga.bordo) > 0.35 || (lato > 0 ? p < -0.6 : p > 0.6)

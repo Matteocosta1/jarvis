@@ -42,6 +42,10 @@ enum TendinaOvunque {
     static var occupata: Set<UUID> = []
     /// L'altezza della fascia della testata, sotto il margine in alto (l'ora e l'isola).
     static let fascia: CGFloat = 76
+    /// Debug 13.8 (8), punto 4: dove finisce davvero la testata della sezione davanti (BarraSezione, coordinate della finestra). La
+    /// fascia non scende oltre: prima entrava di una trentina di punti nella pagina e, tirando giù in cima alla lista, la pagina
+    /// scorreva e insieme scendeva la tendina.
+    static var fondoTestata: CGFloat?
     /// Il dito che tira (spostamento) e che lascia (spostamento, dove arriverebbe lanciato): li collega ContentView.
     static var segue: ((CGSize) -> Void)?
     static var lascia: ((CGSize, CGSize) -> Void)?
@@ -61,9 +65,13 @@ private final class TiraTendina: UIPanGestureRecognizer, UIGestureRecognizerDele
 
     func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
         guard TendinaOvunque.attiva, TendinaOvunque.occupata.isEmpty, let v = view else { return false }
+        // debug 13.8 (8), punto 2: con una schermata di iOS sopra (il browser di JARVIS, le foto, un foglio, la condivisione) il dito
+        // è suo: prima la tendina scendeva di nascosto dietro (come il gesto dal basso, GestoBassoSezioni)
+        if let w = v as? UIWindow, w.rootViewController?.presentedViewController != nil { return false }
         let t = translation(in: v), p = location(in: v)
         let partenza = CGPoint(x: p.x - t.x, y: p.y - t.y), alto = v.safeAreaInsets.top
-        guard partenza.y >= alto - 4, partenza.y <= alto + TendinaOvunque.fascia else { return false }
+        let fondo = min(alto + TendinaOvunque.fascia, TendinaOvunque.fondoTestata.map { max(alto + 24, $0) } ?? .infinity)
+        guard partenza.y >= alto - 4, partenza.y <= fondo else { return false }
         // revisione 13.8 (6): sulla tab FILO (in alto a destra, sopra la testata) il dito scorre le sue notifiche: lì non è la tendina
         let filo = Filo.condiviso
         if !filo.daParte, !filo.visti.isEmpty || filo.vuota, filo.rettScheda.insetBy(dx: -8, dy: -8).contains(partenza) { return false }
