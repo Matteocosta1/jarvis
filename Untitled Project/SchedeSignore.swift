@@ -327,12 +327,9 @@ struct ConBarraChiudi: ViewModifier {
 struct CaricamentoHUD: View {
     let titolo: String
     let tinta: Color
-    /// 23 nov: falso per le pagine di caricamento disegnate come immagine (le carte dell'avvio): non sono sullo schermo.
-    var conta = true
     // 27 ott (il signore): la prima voce è quella della sezione (TestiCaricamento), poi i sistemi di sempre
     private var sistemi: [String] { [TestiCaricamento.di(titolo).uppercased(), "LETTURA SENSORI", "ANALISI", "COMPILAZIONE SCHEDA"] }
     @State private var inizio = Date()
-    @State private var vivo = UUID()                           // 23 nov: per CaricamentiVivi (la foto della tab PAGINE aspetta)
     @Environment(\.sezioneDietro) private var dietro          // 4 nov: dietro si ferma (MARK XI)
 
     var body: some View {
@@ -396,28 +393,7 @@ struct CaricamentoHUD: View {
                 }
             }
         }
-        // debug 13.8 (8), punto 5: conta solo il caricamento della sezione davanti (una che carica dietro non ferma la foto)
-        .onAppear { inizio = Date(); if conta && !dietro { CaricamentiVivi.entra(vivo) } }
-        .onChange(of: dietro) { _, d in
-            guard conta else { return }
-            if d { CaricamentiVivi.esce(vivo) } else { CaricamentiVivi.entra(vivo) }
-        }
-        .onDisappear { CaricamentiVivi.esce(vivo) }
-    }
-}
-
-/// 23 nov (il signore: «molte carte sono sbagliate e non hanno la miniatura della reale sezione»): gli schermi di caricamento sullo
-/// schermo adesso. La foto della sezione per la tab PAGINE si scatta solo quando non ce n'è nessuno (mai lo schermo di caricamento
-/// al posto della pagina vera). Uno rimasto per più di 30 s non conta (se iOS non avvisa che è sparito, le foto non si fermano).
-@MainActor
-enum CaricamentiVivi {
-    private static var vivi: [UUID: Date] = [:]
-    static func entra(_ id: UUID) { vivi[id] = Date() }
-    static func esce(_ id: UUID) { vivi[id] = nil }
-    static var inCorso: Bool {
-        let ora = Date()
-        vivi = vivi.filter { ora.timeIntervalSince($0.value) < 30 }
-        return !vivi.isEmpty
+        .onAppear { inizio = Date() }
     }
 }
 
@@ -567,8 +543,6 @@ struct SchermoCaricamento: View {
     /// 8 nov sera (come il mockup v293): mentre il caricamento sfuma la sua scritta sotto il nome sparisce subito, così quella vera
     /// della sezione arriva da sola, insieme alla pagina (senza la vecchia in trasparenza sopra per 0,25 s).
     var senzaScritta = false
-    /// 23 nov: disegnata come immagine per le carte dell'avvio (non conta come caricamento sullo schermo).
-    var disegno = false
     private let tinta = Color.ciano
 
     // 8 nov mattina: anche in Studio e Social sta nel margine sicuro della sezione, come in tutte le altre (prima lì prendeva il
@@ -585,7 +559,7 @@ struct SchermoCaricamento: View {
                     Spacer(minLength: 0)
                 }
             }
-            CaricamentoHUD(titolo: titolo, tinta: tinta, conta: !disegno)
+            CaricamentoHUD(titolo: titolo, tinta: tinta)
                 .padding(.top, 120)
         }
         .allowsHitTesting(false)

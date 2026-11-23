@@ -14,8 +14,8 @@ import QuartzCore
 // con lo swipe verso destra», «in alto, con ora e batteria, l'Apple Watch connesso, la sua batteria, la rete». Scelte del signore:
 // LUNGA (00:20), i tasti ALTA da 11 punti (00:49), piccola anche lei con «k/N» (00:27), trasparenza 55 % piccola e 60 % aperta, chiusa
 // con lo swipe anche da piccola (01:04). Tutto come il mockup «JARVIS Approvato» (RIEPILOGO). 22 nov 02:0x, il signore: tutto in
-// questa build; la miniatura di ogni pagina è la sua foto (fatta mentre è davanti, a dito fermo): dove iOS non la fotografa (la
-// fotocamera) resta il fondo scuro con l'icona.
+// questa build. 23 nov (il signore: «fai le 38 miniature, le prendi dalle sezioni vere, uguali al mockup»): la miniatura di ogni
+// pagina è quella fissa della sua sezione (Assets «Miniatura-<nome>», le stesse del mockup): niente più foto delle pagine.
 
 /// La batteria dell'Apple Watch, mandata dall'app del polso (PonteOrologio.mandaBatteria) quando si sveglia o cambia.
 @MainActor
@@ -116,16 +116,12 @@ final class Pagine: ObservableObject {
     @Published var off: Double = 0
     struct Corsa: Equatable { let da: Double, a: Double, inizio: Date, durata: Double }
     @Published private(set) var corsa: Corsa?
-    @Published private(set) var miniature: [UUID: UIImage] = [:]
-    /// 13.8 (4) (il signore, 22 nov 12:45: «nell'avvio le carte con la sezione vera, che si illumina quando selezionata; devono
-    /// scorrere tutte così»): l'ultima foto di ogni sezione (la stessa della miniatura) resta sul telefono, una per sezione, e all'avvio
-    /// le carte mostrano le pagine vere. Una sezione mai aperta ha la carta con la sua icona, finché non la apre una volta.
-    @Published private(set) var fotoSezioni: [String: UIImage] = [:]
-    /// 13.8 (5) (il signore, 23:18: «all'avvio c'è la vecchia animazione, non la nuova»): una sezione mai aperta mostra la sua pagina
-    /// com'è quando si apre (lo schermo di caricamento di tutte le sezioni: testata con icona, nome e «Chiudi», il caricamento al
-    /// centro), disegnata una volta e tenuta sul telefono; dopo che l'ha aperta, la sua foto vera.
-    @Published private(set) var caricamenti: [String: UIImage] = [:]
-    private static let conFotocamera: Set<String> = ["Occhi", "Cucina", "Trainer", "Profiler", "Scanner", "LiDAR", "Sentinella"]
+    /// 23 nov (il signore, 05:30: «prendi le miniature, fai le 38 miniature, le prendi dalle sezioni vere… e ogni volta che c'è
+    /// una sezione, c'è aperto Mail, lì ci va la miniatura di Mail»): le carte dell'avvio, già decodificate fuori dal thread principale
+    /// prima di «interface» (lo sfoglio velocissimo non perde fotogrammi); finito l'avvio non restano in memoria.
+    @Published private(set) var miniAvvio: [String: UIImage] = [:]
+    /// Quale preparazione delle miniature dell'avvio vale (una più vecchia non le tocca).
+    private var giroMini = 0
 
     // le misure della schermata (coordinate della finestra), scritte da ContentView
     var anello: (rett: CGRect, angoli: [Double], raggio: CGFloat, lato: CGFloat)?
@@ -155,6 +151,8 @@ final class Pagine: ObservableObject {
 
     private init() {
         UIDevice.current.isBatteryMonitoringEnabled = true
+        // le foto delle pagine delle build di prima (Caches/PagineFoto): non servono più, via dal telefono
+        Task.detached(priority: .background) { Pagine.togliFotoVecchie() }
     }
 
     // MARK: il posto
@@ -216,7 +214,7 @@ final class Pagine: ObservableObject {
     func chiudi(muto: Bool) {
         guard su, chiusura == nil else { return }
         giro += 1
-        let mio = giro
+        let mio = giro, gm = giroMini
         if !muto { Suoni.filoVia() }
         withAnimation(.timingCurve(0.4, 0, 0.8, 0.4, duration: 0.24)) { chiusura = muto ? .muto : .via }
         Task { @MainActor in
@@ -227,6 +225,7 @@ final class Pagine: ObservableObject {
             withTransaction(t) {
                 self.su = false
                 self.chiusura = nil
+                if self.avvio != nil { self.liberaMiniAvvio(gm) }   // finito l'avvio (anche interrotto), le sue miniature via dalla memoria
                 self.avvio = nil
                 self.piccola = false
                 self.fissa = false
@@ -313,11 +312,10 @@ final class Pagine: ObservableObject {
         if su { chiudi(muto: true) }                          // (aumenta già il giro: qui non si tocca, se no la chiusura resterebbe a metà)
         let mio = giro
         let interface = 11.66, posate = 14.31, operational = AvvioOlo.operational, fine = 15.08
-        caricaFotoSezioni(nomi)                               // pronte molto prima di «interface» (11,66 s)
-        preparaCaricamenti(nomi, icone: icone)
+        let gm = preparaMiniAvvio(nomi)                       // pronte molto prima di «interface» (11,66 s)
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + interface)))
-            guard mio == self.giro, vivo(), !self.su else { return }
+            guard mio == self.giro, vivo(), !self.su else { self.liberaMiniAvvio(gm); return }
             self.avvio = Avvio(nomi: nomi, icone: icone, da: Date(), durata: max(0.8, posate - interface - 0.06))
             self.piccola = false
             self.fissa = false
@@ -332,8 +330,6 @@ final class Pagine: ObservableObject {
             try? await Task.sleep(for: .seconds(max(0, zero.timeIntervalSinceNow + fine)))
             guard suo == self.giro else { return }
             self.chiudi(muto: true)
-            try? await Task.sleep(for: .seconds(1))             // revisione 13.8 (6): finita la chiusura, via dalla memoria
-            if self.avvio == nil { self.liberaFotoAvvio() }
         }
     }
 
@@ -345,136 +341,54 @@ final class Pagine: ObservableObject {
 
     // MARK: le miniature
 
-    /// La foto della pagina davanti, adesso, piccola (circa 160 pixel di larghezza): dove iOS non la fotografa resta scura.
-    /// 13.8 (4): resta anche come ultima foto della sua sezione (`nome`), per le carte dell'avvio.
-    func fotografa(_ id: UUID, nome: String) {
-        guard let w = FasciaAlta.finestra else { return }
-        let b = w.bounds
-        guard b.width > 0 else { return }
-        let formato = UIGraphicsImageRendererFormat()
-        formato.scale = 0.4
-        formato.opaque = true
-        let img = UIGraphicsImageRenderer(bounds: b, format: formato).image { _ in
-            _ = w.drawHierarchy(in: b, afterScreenUpdates: false)
-        }
-        miniature[id] = img
-        // revisione 13.8 (6): la foto per l'avvio va solo sul telefono (in memoria serve solo durante l'avvio: la legge `avvio`).
-        // EDITH (le password) non si salva mai: all'avvio la sua carta è la pagina di caricamento.
-        guard nome != "EDITH", let dati = img.jpegData(compressionQuality: 0.7), let file = Self.fileFoto(nome) else { return }
-        Task.detached(priority: .utility) {
-            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? dati.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        }
+    /// Il nome della miniatura fissa di una sezione nelle Assets: «Miniatura-email», «Miniatura-lidar»…
+    nonisolated static func nomeMiniatura(_ sezione: String) -> String { "Miniatura-" + sezione.lowercased() }
+
+    /// La miniatura di una sezione aperta: la sua (gli Occhi aperti per la cucina hanno quella di Cucina).
+    static func miniatura(_ v: PilaSezioni.Voce) -> UIImage? {
+        let nome = v.sezione == .occhi && v.occhiata?.cucina == true ? "Cucina" : v.sezione.nome
+        return UIImage(named: nomeMiniatura(nome))
     }
 
-    /// Dove sta l'ultima foto di una sezione: Caches/PagineFoto/<nome>.jpg (iOS può liberarla: allora torna la carta con l'icona).
-    nonisolated private static func fileFoto(_ nome: String) -> URL? {
-        guard let cartella = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
-        let pulito = nome.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? nome
-        return cartella.appendingPathComponent("PagineFoto", isDirectory: true).appendingPathComponent(pulito).appendingPathExtension("jpg")
-    }
-
-    /// Le pagine di caricamento delle sezioni (per le carte dell'avvio): lette dal telefono se ci sono già, altrimenti disegnate una
-    /// alla volta (con una pausa fra l'una e l'altra, così l'avvio non perde fotogrammi) e salvate per le volte dopo.
-    private func preparaCaricamenti(_ nomi: [String], icone: [String]) {
-        guard caricamenti.isEmpty else { return }
-        let coppie: [(nome: String, icona: String)] = Array(zip(nomi, icone)).map { (nome: $0.0, icona: $0.1) }
+    /// Le miniature delle carte dell'avvio, lette e decodificate fuori dal thread principale. Restituisce il suo giro.
+    private func preparaMiniAvvio(_ nomi: [String]) -> Int {
+        giroMini += 1
+        let suo = giroMini
         Task {
-            // revisione 13.8 (6): all'apertura dell'app la finestra può non esserci ancora: la si aspetta (al massimo 3 s)
-            var finestra = FasciaAlta.finestra
-            var attese = 0
-            while (finestra?.bounds.width ?? 0) == 0, attese < 30 {
-                try? await Task.sleep(for: .milliseconds(100))
-                finestra = FasciaAlta.finestra
-                attese += 1
-            }
-            guard let w = finestra, w.bounds.width > 0 else { return }
-            let misura = w.bounds.size, alto = w.safeAreaInsets.top
-            let chiavi = coppie.map { Self.chiaveCaricamento($0.nome, misura) }
-            let lette = await Task.detached(priority: .userInitiated) { () -> [String: Data] in
-                var r: [String: Data] = [:]
-                for k in chiavi { if let f = Pagine.fileFoto(k), let d = try? Data(contentsOf: f) { r[k] = d } }
-                Pagine.pulisciCaricamentiVecchi()
-                return r
-            }.value
-            for c in coppie {
-                let k = Self.chiaveCaricamento(c.nome, misura)
-                if let d = lette[k], let img = UIImage(data: d) { self.caricamenti[c.nome] = img; continue }
-                // disegnata una alla volta, distanziate (36 × 150 ms ≈ 5 s, ben prima di «interface» a 11,66 s): l'avvio non scatta
-                try? await Task.sleep(for: .milliseconds(150))
-                let vista = ZStack(alignment: .top) {
-                    SfondoSezione()
-                    SchermoCaricamento(titolo: c.nome, icona: c.icona, conX: Self.conFotocamera.contains(c.nome), disegno: true)
-                        .padding(.top, alto)
-                }
-                .frame(width: misura.width, height: misura.height)
-                .environment(\.colorScheme, .dark)
-                let r = ImageRenderer(content: vista)
-                r.scale = 0.4
-                guard let img = r.uiImage else { continue }
-                self.caricamenti[c.nome] = img
-                if let dati = img.jpegData(compressionQuality: 0.7), let file = Self.fileFoto(k) {
-                    Task.detached(priority: .utility) {
-                        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-                        try? dati.write(to: file, options: [.atomic])
-                    }
-                }
-            }
-        }
-    }
-
-    /// Il nome del file della pagina di caricamento: cambia con la build (una build nuova la ridisegna come è adesso) e con la misura
-    /// dello schermo.
-    nonisolated private static func chiaveCaricamento(_ nome: String, _ misura: CGSize) -> String {
-        "~caricamento-\(Pagine.buildApp)-\(Int(misura.width))x\(Int(misura.height))-\(nome)"
-    }
-
-    nonisolated private static var buildApp: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0" }
-
-    /// Le pagine di caricamento delle build di prima: via dal telefono.
-    nonisolated private static func pulisciCaricamentiVecchi() {
-        guard let campione = fileFoto("~caricamento-"), let attuale = fileFoto("~caricamento-\(buildApp)-") else { return }
-        let cartella = campione.deletingLastPathComponent()
-        let tutti = campione.deletingPathExtension().lastPathComponent, questa = attuale.deletingPathExtension().lastPathComponent
-        guard let nomi = try? FileManager.default.contentsOfDirectory(atPath: cartella.path) else { return }
-        for n in nomi where n.hasPrefix(tutti) && !n.hasPrefix(questa) {
-            try? FileManager.default.removeItem(at: cartella.appendingPathComponent(n))
-        }
-    }
-
-    /// Finito l'avvio le foto e le pagine di caricamento non servono più in memoria (restano sul telefono per il prossimo).
-    private func liberaFotoAvvio() {
-        fotoSezioni = [:]
-        caricamenti = [:]
-    }
-
-    /// Le ultime foto delle sezioni, lette dal telefono fuori dal thread principale (una volta: poi le aggiorna `fotografa`).
-    private func caricaFotoSezioni(_ nomi: [String]) {
-        let mancano = nomi.filter { fotoSezioni[$0] == nil }
-        guard !mancano.isEmpty else { return }
-        Task {
-            let lette = await Task.detached(priority: .userInitiated) { () -> [String: Data] in
-                var r: [String: Data] = [:]
-                for n in mancano {
-                    if let f = Pagine.fileFoto(n), let d = try? Data(contentsOf: f) { r[n] = d }
+            let pronte = await Task.detached(priority: .userInitiated) { () -> [String: UIImage] in
+                var r: [String: UIImage] = [:]
+                for n in nomi {
+                    guard let img = UIImage(named: Pagine.nomeMiniatura(n)) else { continue }
+                    r[n] = img.preparingForDisplay() ?? img
                 }
                 return r
             }.value
-            for (n, d) in lette where self.fotoSezioni[n] == nil {
-                if let img = UIImage(data: d) { self.fotoSezioni[n] = img }
-            }
+            guard suo == self.giroMini else { return }
+            self.miniAvvio = pronte
         }
+        return suo
     }
 
-    /// Le pagine chiuse non hanno più la loro foto; e se ne sono rimaste meno, le carte non restano oltre l'ultima.
+    /// Le miniature dell'avvio non servono più: via dalla memoria (se nel frattempo non ne è partito un altro).
+    private func liberaMiniAvvio(_ suo: Int) {
+        guard suo == giroMini else { return }
+        giroMini += 1
+        miniAvvio = [:]
+    }
+
+    /// Le foto delle pagine delle build di prima (fino alla 13.8 (9)): via dal telefono, una volta.
+    nonisolated private static func togliFotoVecchie() {
+        guard let cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
+        let cartella = cache.appendingPathComponent("PagineFoto", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: cartella.path) else { return }
+        try? FileManager.default.removeItem(at: cartella)
+    }
+
+    /// Se sono rimaste meno pagine, le carte non restano oltre l'ultima.
     func tieni(_ ids: Set<UUID>) {
-        if avvio == nil {
-            let ultima = Double(max(0, ids.count - 1))
-            if offAdesso(Date()) > ultima { corsa = nil; off = ultima }
-        }
-        let via = miniature.keys.filter { !ids.contains($0) }
-        guard !via.isEmpty else { return }
-        for k in via { miniature[k] = nil }
+        guard avvio == nil else { return }
+        let ultima = Double(max(0, ids.count - 1))
+        if offAdesso(Date()) > ultima { corsa = nil; off = ultima }
     }
 }
 
@@ -834,13 +748,14 @@ private struct LibroPagine: View {
                     }
                     ForEach(0..<n, id: \.self) { i in
                         let d = Double(i) - off, ad = abs(d)
-                        // 13.8 (4): all'avvio la carta mostra l'ultima foto della sua sezione (la sezione vera), come le pagine aperte
+                        // 23 nov: ogni carta ha la miniatura fissa della sua sezione, all'avvio e da aperta (le lontane, invisibili, no)
                         let foto: UIImage? = {
+                            guard ad <= 3.4 else { return nil }
                             if let a = avvio {
                                 guard a.nomi.indices.contains(i) else { return nil }
-                                return p.fotoSezioni[a.nomi[i]] ?? p.caricamenti[a.nomi[i]]   // 13.8 (5): mai aperta: la sua pagina di caricamento
+                                return p.miniAvvio[a.nomi[i]]
                             }
-                            return voci.indices.contains(i) ? p.miniature[voci[i].id] : nil
+                            return voci.indices.contains(i) ? Pagine.miniatura(voci[i]) : nil
                         }()
                         let icona: String = avvio.map { $0.icone[i] } ?? (icone[voci[i].sezione.nome] ?? voci[i].sezione.iconaDiRiserva)
                         CartaPagina(foto: foto, icona: icona, cur: ad < 0.5, lum: 1.15 - 0.45 * min(1, ad))
@@ -978,7 +893,7 @@ private struct CartaPagina: View {
         // olografiche, più luminose quando selezionate; trasparenze vere»): la carta non ha più il fondo pieno né il nero dei lati:
         // è la pagina vera in versione olografica (la foto, la tinta ciano leggera, le righe), e attraverso si vede quello che c'è
         // dietro. Al centro, selezionata: la pagina quasi piena, più luminosa, il bordo acceso. Ai lati: più tenue e trasparente.
-        // L'icona della sezione resta solo sulle carte senza foto (quelle che iOS non riesce a fotografare).
+        // L'icona della sezione resta solo su una carta senza miniatura.
         ZStack {
             // 12:06 («alcune pagine non sono uguali di altezza»): la carta è sempre CW × CH, la foto non le dà mai la sua misura
             Color(red: 3 / 255, green: 13 / 255, blue: 16 / 255).opacity(cur ? 0.22 : 0.32)

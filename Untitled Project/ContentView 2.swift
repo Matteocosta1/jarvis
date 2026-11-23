@@ -201,29 +201,8 @@ struct ContentView: View {
                 if let prima { ultimaDavanti = prima }                // 13.7: la tab PAGINE si apre su questa
                 davantiCambiata(d)
             }
-            // 13.7 · la miniatura della tab PAGINE: la foto della sezione davanti, a dito fermo (1,2 s dopo che è arrivata, poi ogni
-            // 10 s), mai mentre le pagine si muovono. Debug: ogni foto ridisegna la finestra (qualche millisecondo), quindi poche e
-            // solo quando il dito è fermo, così gli ologrammi delle sezioni non perdono fotogrammi
-            // 23 nov (il signore, video: «molte carte non hanno la miniatura della reale sezione»): le sezioni aperte e richiuse in
-            // un paio di secondi restavano senza foto (la prima arrivava a 1,2 s e solo col dito fermo). Ora la prima si scatta appena
-            // la sezione è pronta (finito il caricamento, davanti del tutto, nessuno sfoglio), anche col dito sopra; le altre come prima
-            .task(id: pila.davanti) {
-                guard let id = pila.davanti else { return }
-                try? await Task.sleep(for: .seconds(0.3))
-                var fatte = 0
-                while !Task.isCancelled, pila.davanti == id {
-                    // debug 13.8 (8), punti 1 e 6: solo con l'app davanti e attiva (in sottofondo, con la musica o la guida, la foto
-                    // usciva nera e prendeva il posto di quella buona), senza la tendina sopra e senza schermate di iOS sopra
-                    let attiva: Bool = scena == .active && UIApplication.shared.applicationState == .active
-                    let libera: Bool = !tendinaAperta && tendinaTrascina == 0 && FasciaAlta.finestra?.rootViewController?.presentedViewController == nil
-                    let pronta: Bool = attiva && libera && naviga.modo == .normale && pilaCopre && !CaricamentiVivi.inCorso
-                    if pronta, fatte == 0 || Date().timeIntervalSince(TocchiSchermo.ultimoTocco) > 0.8 {
-                        if let nome = pila.voci.first(where: { $0.id == id })?.sezione.nome { Pagine.condivisa.fotografa(id, nome: nome) }
-                        fatte += 1
-                    }
-                    try? await Task.sleep(for: .seconds(fatte == 0 ? 0.15 : 10))   // non ancora pronta: si riprova subito
-                }
-            }
+            // 23 nov (il signore: «fai le 38 miniature dalle sezioni vere… c'è aperto Mail, lì ci va la miniatura di Mail»): la tab
+            // PAGINE non fotografa più le sezioni: ogni carta ha la miniatura fissa della sua sezione (Assets «Miniatura-<nome>»)
             // comandi vocali: «attiva la Sentinella», «apri il Wiretap», «fammi un profilo», «fai un giro»
             .onChange(of: jarvis.repartoRichiesto) { _, r in
                 guard let r else { return }
