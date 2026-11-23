@@ -30,11 +30,24 @@ final class Wiretap: ObservableObject {
     /// davanti e la registrazione continua (lo dice la vista, da `sezioneDietro`).
     var dietro = false
 
-    private let motore = AVAudioEngine()
+    /// 13.9 (3): «Jarvis, fai il verbale» detto al Wiretap: la trascrizione va a JARVIS (prima la chiudeva nell'Archivio, senza verbale).
+    var verbaleAVoce: (() -> Void)?
+
+    private var motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private let presa = PresaRichiesta()
     private var compito: SFSpeechRecognitionTask?
     private var turno = 0
+    /// 13.9 (3) (il signore, 24 nov: «registra alcune parole, se faccio una pausa riprende perdendo il resto»): il microfono si
+    /// riprende da solo. iOS lo ferma quando qualcun altro cambia o spegne l'audio dell'iPhone (un suono, la voce di JARVIS, una
+    /// chiamata, le cuffie): prima il Wiretap restava acceso ma sordo. Ora se ne accorge (gli avvisi di iOS e un controllo ogni
+    /// secondo) e riparte, tenendo il testo già scritto.
+    private var osservatori: [NSObjectProtocol] = []
+    private var guardia: Task<Void, Never>?
+    private var ultimaRipartenza = Date.distantPast
+    private var ripartenzeFallite = 0
+    /// Quando è partita la frase in corso: una frase che il riconoscitore chiude subito (un errore) non riparte all'istante.
+    private var inizioFrase = Date.distantPast
 
     var testo: String {
         (confermato + (parziale.isEmpty ? [] : [parziale])).joined(separator: " ")
@@ -68,6 +81,7 @@ final class Wiretap: ObservableObject {
         if let p = pausaDa { pause += Date().timeIntervalSince(p) }
         pausaDa = nil
         inPausa = false
+        if !motore.isRunning { riparti(); return }       // 13.9 (3): in pausa iOS gli ha fermato il microfono: riparte da capo
         nuovaFrase()
     }
 
@@ -85,22 +99,13 @@ final class Wiretap: ObservableObject {
             return
         }
         do {
-            let s = AVAudioSession.sharedInstance()
-            try s.setCategory(.record, mode: .measurement, options: [.duckOthers])   // .measurement: niente filtri sulla voce, sente tutta la stanza
-            try s.setActive(true)
-            try Wiretap.collega(motore.inputNode, presa: presa) { [weak self] l in
-                let io = self
-                Task { @MainActor in
-                    guard let io else { return }
-                    io.livello = io.livello * 0.6 + l * 0.4
-                }
-            }
-            motore.prepare()
-            try motore.start()
+            try accendiMicrofono(categoria: true)
         } catch {
             problema = "Il microfono non parte: \(error.localizedDescription)"
             return
         }
+        problema = nil
+        ripartenzeFallite = 0
         confermato = []
         parziale = ""
         inizio = Date()
@@ -110,7 +115,94 @@ final class Wiretap: ObservableObject {
         pause = 0
         attivo = true
         UIApplication.shared.isIdleTimerDisabled = true      // una riunione lunga: lo schermo resta acceso
+        sorveglia()
         nuovaFrase()
+    }
+
+    /// L'audio e il microfono. 13.9 (3): l'audio «suona e registra» (prima «solo registra»): così un suono dell'app o la voce di
+    /// JARVIS suonano sopra senza cambiarlo, e il microfono non si ferma. `.measurement`: niente filtri sulla voce, sente tutta la
+    /// stanza (come prima). `categoria` falso (ripartenza): se l'audio è già «suona e registra» non si tocca (cambiarlo fermerebbe
+    /// il microfono di un'altra sezione aperta davanti, che a sua volta…).
+    private func accendiMicrofono(categoria: Bool) throws {
+        let s = AVAudioSession.sharedInstance()
+        if categoria || s.category != .playAndRecord {
+            try s.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .duckOthers])
+        }
+        try s.setActive(true)
+        if motore.isRunning { motore.stop() }
+        try Wiretap.collega(motore.inputNode, presa: presa) { [weak self] l in
+            let io = self
+            Task { @MainActor in
+                guard let io else { return }
+                io.livello = io.livello * 0.6 + l * 0.4
+            }
+        }
+        motore.prepare()
+        try motore.start()
+    }
+
+    /// Gli avvisi di iOS (audio interrotto o ripreso, motore audio riconfigurato, servizi audio ripartiti) e un controllo ogni
+    /// secondo: se il microfono si è fermato mentre registra, riparte.
+    private func sorveglia() {
+        smettiDiSorvegliare()
+        let nc = NotificationCenter.default
+        osservatori.append(nc.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main) { [weak self] _ in
+            let io = self
+            Task { @MainActor in io?.riparti() }
+        })
+        osservatori.append(nc.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] n in
+            let finita = (n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) == AVAudioSession.InterruptionType.ended.rawValue
+            let io = self
+            Task { @MainActor in if finita { io?.riparti() } }      // iniziata: si aspetta la fine (o il controllo)
+        })
+        osservatori.append(nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+            let io = self
+            Task { @MainActor in io?.riparti(motoreNuovo: true) }
+        })
+        guardia = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, self.attivo else { return }
+                if !self.inPausa, !self.motore.isRunning { self.riparti() }
+            }
+        }
+    }
+
+    private func smettiDiSorvegliare() {
+        for o in osservatori { NotificationCenter.default.removeObserver(o) }
+        osservatori = []
+        guardia?.cancel()
+        guardia = nil
+    }
+
+    /// Il microfono riparte: la frase a metà resta nel testo, poi una frase nuova. Al massimo una volta al secondo.
+    private func riparti(motoreNuovo: Bool = false) {
+        guard attivo, !inPausa else { return }
+        if motore.isRunning && !motoreNuovo { return }              // un cambio che non l'ha fermato: niente da fare
+        guard Date().timeIntervalSince(ultimaRipartenza) >= 1 else { return }
+        ultimaRipartenza = Date()
+        turno += 1
+        let chiuso = parziale.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !chiuso.isEmpty { confermato.append(chiuso) }
+        parziale = ""
+        presa.metti(nil)?.endAudio()
+        compito?.cancel()
+        compito = nil
+        if motoreNuovo {
+            if motore.isRunning { motore.stop() }
+            motore.inputNode.removeTap(onBus: 0)
+            motore = AVAudioEngine()
+        }
+        do {
+            try accendiMicrofono(categoria: false)
+            ripartenzeFallite = 0
+            problema = nil
+            nuovaFrase()
+        } catch {
+            // un'altra app ha il microfono (una telefonata): si riprova al prossimo controllo, il testo resta
+            ripartenzeFallite += 1
+            if ripartenzeFallite >= 3 { problema = "Il microfono è occupato: riprendo appena si libera." }
+        }
     }
 
     /// Ogni tratto di parlato ha la sua richiesta: quando il riconoscitore chiude una frase (o dopo circa un minuto),
@@ -124,6 +216,7 @@ final class Wiretap: ObservableObject {
         if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple   // tutto sul telefono
         presa.metti(r)
         turno += 1
+        inizioFrase = Date()
         let mio = turno
         compito = Wiretap.riconosci(riconoscitore, r) { [weak self] testo, fine in
             let io = self
@@ -133,13 +226,23 @@ final class Wiretap: ObservableObject {
 
     private func risultato(_ testo: String?, fine: Bool, turno mio: Int) {
         guard attivo, mio == turno else { return }
-        if let testo { parziale = testo }
+        if let testo {
+            // 13.9 (3): dopo una pausa il riconoscimento sul telefono a volte ricomincia la frase da capo senza chiuderla: il testo
+            // nuovo prendeva il posto di quello di prima, che si perdeva. Ora quello di prima resta nel testo.
+            if Wiretap.ricominciata(da: parziale, a: testo) {
+                confermato.append(parziale.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            if !testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || parziale.isEmpty { parziale = testo }
+        }
         guard fine else { return }
         let chiuso = parziale.trimmingCharacters(in: .whitespacesAndNewlines)
         parziale = ""
         presa.metti(nil)
         compito = nil
         if let c = ComandoVocale.riconosci(chiuso, serveJarvis: true, dentro: .wiretap) {   // «Jarvis, fai il verbale»
+            // 13.9 (3): «Jarvis, fai il verbale» manda la trascrizione a JARVIS, come il tasto (prima la salvava nell'Archivio
+            // e chiudeva, senza verbale). «Fine riunione», «ferma la registrazione»: come prima.
+            if c == .chiudiSezione("Wiretap"), Wiretap.chiedeVerbale(chiuso), let v = verbaleAVoce { v(); return }
             comando?(c)                       // la frase di comando non entra nel verbale
             // MARK XI: «Jarvis, quella di prima», «mettila da parte»… muovono le sezioni, «Jarvis, apri…» manda il Wiretap dietro e,
             // col Wiretap dietro, «Jarvis, chiudi» vale per la sezione davanti: la registrazione continua, se il comando non l'ha
@@ -148,11 +251,37 @@ final class Wiretap: ObservableObject {
             return
         }
         if !chiuso.isEmpty { confermato.append(chiuso) }
+        // una frase chiusa appena aperta (un errore del riconoscimento, niente parlato): la prossima tra mezzo secondo, non a raffica
+        if Date().timeIntervalSince(inizioFrase) < 0.5 {
+            let atteso = turno
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, self.attivo, !self.inPausa, self.turno == atteso, self.compito == nil else { return }
+                self.nuovaFrase()
+            }
+            return
+        }
         nuovaFrase()
+    }
+
+    /// 13.9 (3): il testo nuovo non continua quello di prima (inizia in un altro modo ed è molto più corto): il riconoscimento ha
+    /// ricominciato la frase da capo.
+    nonisolated static func ricominciata(da vecchio: String, a nuovo: String) -> Bool {
+        let v = vecchio.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let n = nuovo.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard v.count >= 12, !n.isEmpty, n.count < v.count / 2 else { return false }
+        let testa = { (t: String) -> String in String(t.prefix(8)) }
+        return !n.hasPrefix(testa(v)) && !v.hasPrefix(testa(n))
+    }
+
+    /// «Jarvis, fai il verbale», «Jarvis, il verbale»: il verbale, non la chiusura.
+    nonisolated static func chiedeVerbale(_ frase: String) -> Bool {
+        frase.lowercased().contains("verbale")
     }
 
     func ferma() {
         guard attivo else { return }
+        smettiDiSorvegliare()
         if let p = pausaDa { pause += Date().timeIntervalSince(p) }
         pausaDa = nil
         inPausa = false
@@ -371,6 +500,18 @@ struct VistaWiretap: View {
             WiretapAperto.registra(ObjectIdentifier(registratore)) { [weak registratore] in
                 guard let w = registratore else { return }
                 VistaWiretap.salvaEChiudi(w, chiudi: chiudi)
+            }
+            // 13.9 (3): «Jarvis, fai il verbale» (anche da dietro): la trascrizione a JARVIS, come il tasto
+            let verbale = self.verbale
+            w.verbaleAVoce = { [weak registratore] in
+                guard let w = registratore else { return }
+                w.ferma()
+                guard !w.testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    w.problema = "Non c'è ancora niente da mettere nel verbale."
+                    return
+                }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                verbale(w.testo, w.minuti)
             }
             w.comando = { c in
                 // le sezioni aperte a voce («quella di prima», «mettila da parte», «chiudi il meteo», «fai il verbale»), «Jarvis,

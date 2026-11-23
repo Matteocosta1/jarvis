@@ -37,8 +37,21 @@ enum ComandiSezioni {
 enum WiretapAperto {
     private(set) static var chiudi: (() -> Void)?
     private static var padrone: ObjectIdentifier?
-    static func registra(_ id: ObjectIdentifier, chiudi c: @escaping () -> Void) { padrone = id; chiudi = c }
-    static func lascia(_ id: ObjectIdentifier) { if padrone == id { padrone = nil; chiudi = nil } }
+    static func registra(_ id: ObjectIdentifier, chiudi c: @escaping () -> Void) { padrone = id; chiudi = c; quandoSiApre?() }
+    static func lascia(_ id: ObjectIdentifier) {
+        guard padrone == id else { return }
+        padrone = nil
+        chiudi = nil
+        quandoSiChiude?()
+    }
+    /// 13.9 (3): JARVIS lascia il microfono al Wiretap appena si apre, e lo riprende quando si chiude (li mette Jarvis).
+    static var quandoSiApre: (() -> Void)?
+    static var quandoSiChiude: (() -> Void)?
+    /// 13.9 (3) (il signore, 24 nov: «Wiretap funziona malissimo: registra alcune parole, dopo una pausa perde il resto, il verbale
+    /// risulta vuoto»): il Wiretap è aperto (davanti o dietro) e il microfono è suo. Finché è vero JARVIS non ascolta (né il «Jarvis»
+    /// in attesa, né l'ascolto dopo una risposta, né l'orecchio mentre parla) e non cambia né spegne l'audio dell'iPhone: prima lo
+    /// faceva e il microfono del Wiretap si fermava dopo poche parole.
+    static var aperto: Bool { chiudi != nil }
 }
 
 /// Una sezione del contenitore.

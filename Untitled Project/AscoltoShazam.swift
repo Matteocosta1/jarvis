@@ -137,6 +137,7 @@ final class AscoltoShazam: ObservableObject {
     static func chiudiMicrofono() {
         let s = AVAudioSession.sharedInstance()
         guard s.category == .playAndRecord || s.category == .record else { return }
+        guard !WiretapAperto.aperto else { return }        // 13.9 (3): il Wiretap registra (anche dietro): il suo audio non si spegne
         try? s.setActive(false, options: .notifyOthersOnDeactivation)
         try? s.setCategory(.ambient, mode: .default, options: [])
     }

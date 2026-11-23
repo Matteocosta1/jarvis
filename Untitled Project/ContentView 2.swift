@@ -1714,7 +1714,10 @@ struct ContentView: View {
             VistaSentinella(chiudi: { mostraSentinella = false }, comando: comandoDaReparto)
         case .wiretap:
             VistaWiretap(verbale: { testo, minuti in
+                // 13.9 (3): anche a voce col Wiretap dietro un'altra sezione: esce dall'elenco (davanti si chiude come sempre)
+                let dietro: Bool = pila.voce(.wiretap).map { $0.id != pila.davanti } ?? false
                 mostraWiretap = false
+                if dietro { pila.togli(.wiretap) }
                 jarvis.verbaleWiretap(testo, minuti: minuti)
             }, chiudi: { mostraWiretap = false }, comando: comandoDaReparto, aJarvis: comandoDalWiretap, avviaSubito: jarvis.riunioneSubito)
         case .profiler:

@@ -468,6 +468,14 @@ final class Jarvis: NSObject, ObservableObject {
             SopraLaVoce.condivisa.ignora(per: 1.2)
         }
         cloud.finita = { [weak self] chiave in self?.fraseFinita(chiave, detta: true) }   // il cloud avvisa solo le frasi suonate fino in fondo
+        // 13.9 (3): aperto il Wiretap, JARVIS gli lascia subito il microfono; chiuso, il «Jarvis» in attesa torna (se può)
+        WiretapAperto.quandoSiApre = { [weak self] in self?.cediMicrofonoAlWiretap() }
+        WiretapAperto.quandoSiChiude = { [weak self] in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))      // l'audio del Wiretap si è spento
+                self?.aggiornaRichiamo()
+            }
+        }
         orecchio.interrotto = { [weak self] resto in self?.interrottoAVoce(resto) }
         orecchio.zittisci = { [weak self] in self?.zittisciPerAscolto() }
         orecchio.capito = { [weak self] in self?.chiusuraGentile() }               // 12 nov (P1): «ho capito» mentre parla
@@ -1092,6 +1100,11 @@ final class Jarvis: NSObject, ObservableObject {
     }
 
     private func aggiornaRichiamo() {
+        if WiretapAperto.aperto {                        // 13.9 (3): il microfono è del Wiretap, nemmeno il «Jarvis» in attesa
+            avvioRichiamo?.cancel()
+            if Jarvis.usaAscoltoCloud { attesaMac.ferma() } else { richiamo.ferma() }
+            return
+        }
         if Jarvis.usaAscoltoCloud {                      // Mac: l'attesa la fa AttesaMac (battiti e frasi in cloud)
             avvioRichiamo?.cancel()
             // sul Mac sente anche mentre JARVIS parla o pensa (come l'orecchio dell'iPhone): così gli si parla sopra
@@ -1150,6 +1163,7 @@ final class Jarvis: NSObject, ObservableObject {
     func rilasciaMusica() async {
         let sessione = AVAudioSession.sharedInstance()
         for _ in 0..<6 {
+            guard !WiretapAperto.aperto else { return }               // 13.9 (3): l'audio è del Wiretap che registra
             guard fase == .attesa, inCoda.isEmpty, !richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,
                   !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis else { return }   // la musica è nostra: l'audio resta
             try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
@@ -1766,6 +1780,14 @@ final class Jarvis: NSObject, ObservableObject {
         salva()
         flussoFinito = true
         accodaVoce(t, forza: true)
+    }
+
+    /// 13.9 (3): si apre il Wiretap: JARVIS lascia subito il microfono (l'ascolto in corso si butta, senza mandare niente),
+    /// il «Jarvis» in attesa e l'orecchio si spengono. La voce, se stava parlando, finisce la frase sull'audio del Wiretap.
+    func cediMicrofonoAlWiretap() {
+        if fase == .ascolto { fermaAscolto(invia: false) }   // torna in attesa da sé
+        orecchio.ferma()
+        aggiornaRichiamo()
     }
 
     func interrompi() {
@@ -2585,6 +2607,7 @@ final class Jarvis: NSObject, ObservableObject {
         // sul Mac niente orecchio mentre parla: è un secondo microfono (con il riconoscimento di Apple) che lascia muto quello
         // dell'attesa; lì per fermarlo basta toccare il reattore
         let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud && !musicaSuona   // 9 nov: la canzone lo interromperebbe
+            && !WiretapAperto.aperto       // 13.9 (3): il microfono è del Wiretap
         if inCoda.isEmpty {
             let sessione = AVAudioSession.sharedInstance()
             if Jarvis.usaAscoltoCloud {
@@ -2593,6 +2616,9 @@ final class Jarvis: NSObject, ObservableObject {
                 if sessione.category != .playAndRecord || !sessione.categoryOptions.contains(.mixWithOthers) {
                     try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
                 }
+            } else if WiretapAperto.aperto {
+                // 13.9 (3): il Wiretap registra con l'audio che suona e registra insieme: JARVIS parla su quello, senza cambiarlo né
+                // spegnerlo (ogni cambio fermava il microfono del Wiretap)
             } else {
                 // 13.8 (4) (issue #18: «la musica non si abbassa quando JARVIS risponde a un messaggio scritto, a volte sì a volte
                 // no»): scrivendo, mentre JARVIS pensa resta acceso il «Jarvis» in attesa, che tiene l'audio attivo SENZA abbassare
@@ -2713,7 +2739,8 @@ final class Jarvis: NSObject, ObservableObject {
             // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso;
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
-                  !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro else { return }   // 9 nov: né la canzone di Shazam
+                  !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,   // 9 nov: né la canzone di Shazam
+                  !WiretapAperto.aperto else { return }                          // 13.9 (3): né il microfono del Wiretap
             if self.musicaSuona { await self.rilasciaMusica() } else if !LettoreMusica.condiviso.suona {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
@@ -2772,6 +2799,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func avviaAscolto(bip: Bool = false, tentativo: Int = 0, dalNome: Bool = false, silenzio: Double? = nil) async {
         avviso = nil
         guard fase == .attesa, !micSpento else { return }      // microfono spento a mano: nessun ascolto finché non ritocca
+        guard !WiretapAperto.aperto else { return }            // 13.9 (3): il microfono è del Wiretap (anche il seguito, il diario…)
         guard await Jarvis.chiediPermessi() else {
             avviso = "Servono microfono e riconoscimento vocale: li attivi in Impostazioni › Jarvis."
             return
@@ -3259,7 +3287,8 @@ final class Jarvis: NSObject, ObservableObject {
         micChiusoFuori = true
         richiamo.ferma()
         orecchio.ferma()
-        if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro {
+        if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro,
+           !WiretapAperto.aperto {                                      // 13.9 (3): il Wiretap registra anche fuori dall'app
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         IsolaJarvis.fineVoce()
