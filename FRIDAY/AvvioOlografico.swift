@@ -22,9 +22,11 @@ nonisolated struct PostiTesta: PreferenceKey {
 
 /// La partitura dell'avvio olografico (secondi dall'inizio della voce d'avvio, come `Avvio.testaVoce`).
 enum AvvioOlo {
-    static let importing = 10.02          // «Importing»: si accendono il campo, l'anello e la percentuale
-    static let preferences = 10.64        // «preferences»: nasce il primo ologramma
-    static let operational = 14.44        // «operational»: OPERATIVI e il lampo dell'anello
+    // FRIDAY (23 nov): avvio.m4a è JARVIS II (16,64 s, stessa musica, effetti e click) con la voce di JARVIS tolta e al suo posto
+    // Fola, frase per frase dove parlava lui: parte a 4,68 s come lui; «importo» a 10,02 e «operativi» a 14,44 come «Importing» e «operational».
+    static let importing = 10.02          // «importo»: si accendono il campo, l'anello e la percentuale
+    static let preferences = 10.81        // «preferenze»: nasce il primo ologramma
+    static let operational = 14.44        // «operativi»: OPERATIVI e il lampo dell'anello
     static let spegni = 14.78             // si spegne tremolando…
     static let fine = 15.12               // …ed è sparito
     static let accensione = 0.34          // l'ologramma si accende
