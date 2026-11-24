@@ -767,7 +767,7 @@ final class OrecchioComandi {
     var comando: ((ComandoVocale) -> Void)?
     var dentro: Reparto?                  // il reparto in cui ascolta, per i suoi comandi («Jarvis, chi è passato?»)
 
-    private let motore = AVAudioEngine()
+    private var motore = AVAudioEngine()
     private let riconoscitore = SFSpeechRecognizer(locale: Locale(identifier: "it-IT"))
     private let presa = PresaRichiesta()
     private var compito: SFSpeechRecognitionTask?
@@ -775,24 +775,55 @@ final class OrecchioComandi {
     private var acceso = false
     private var ultimoTesto = ""
     private var silenzio: Timer?
+    /// 13.9 (4) (debug del 24 nov, punto 2): l'orecchio deve ascoltare (avviato e non fermato dalla sezione). Prima, se iOS gli
+    /// fermava il microfono (una telefonata, Siri, una sveglia, le cuffie, JARVIS che parla) o se all'apertura il microfono era
+    /// occupato, restava sordo fino alla chiusura della sezione. Ora si accorge (avvisi di iOS e un controllo ogni secondo) e riparte.
+    private var voluto = false
+    private var osservatori: [NSObjectProtocol] = []
+    private var guardia: Task<Void, Never>?
+    private var ultimaRipartenza = Date.distantPast
+    private var inizioFrase = Date.distantPast
 
     func avvia() {
-        guard !acceso, let riconoscitore, riconoscitore.isAvailable,
-              SFSpeechRecognizer.authorizationStatus() == .authorized,
-              AVAudioApplication.shared.recordPermission == .granted else { return }
-        do {
-            let s = AVAudioSession.sharedInstance()
-            try s.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
-            try s.setActive(true)
-            try OrecchioComandi.collega(motore.inputNode, presa: presa)
-            motore.prepare()
-            try motore.start()
-        } catch { return }
-        acceso = true
-        nuovaFrase()
+        guard !voluto else { return }
+        voluto = true
+        MicrofonoSezioni.entra(self)
+        sorveglia()
+        accendi()
     }
 
     func ferma() {
+        guard voluto else { return }
+        voluto = false
+        MicrofonoSezioni.esce(self)
+        smettiDiSorvegliare()
+        spegni()
+    }
+
+    /// Il microfono e la prima frase. Falso: non è partito (si riprova al prossimo controllo).
+    @discardableResult
+    private func accendi() -> Bool {
+        guard voluto, !acceso, let riconoscitore, riconoscitore.isAvailable,
+              SFSpeechRecognizer.authorizationStatus() == .authorized,
+              AVAudioApplication.shared.recordPermission == .granted else { return false }
+        do {
+            let s = AVAudioSession.sharedInstance()
+            // già «suona e registra» (il Wiretap dietro, JARVIS): non si cambia, cambiarlo fermerebbe l'altro microfono
+            if s.category != .playAndRecord {
+                try s.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
+            }
+            try s.setActive(true)
+            if motore.isRunning { motore.stop() }
+            try OrecchioComandi.collega(motore.inputNode, presa: presa)
+            motore.prepare()
+            try motore.start()
+        } catch { return false }
+        acceso = true
+        nuovaFrase()
+        return true
+    }
+
+    private func spegni() {
         guard acceso else { return }
         acceso = false
         turno += 1
@@ -804,6 +835,50 @@ final class OrecchioComandi {
         motore.inputNode.removeTap(onBus: 0)
     }
 
+    /// Gli avvisi di iOS (motore riconfigurato, interruzione finita, servizi audio ripartiti) e un controllo ogni secondo.
+    private func sorveglia() {
+        smettiDiSorvegliare()
+        let nc = NotificationCenter.default
+        osservatori.append(nc.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main) { [weak self] _ in
+            let io = self
+            Task { @MainActor in io?.riparti() }
+        })
+        osservatori.append(nc.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] n in
+            let finita = (n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) == AVAudioSession.InterruptionType.ended.rawValue
+            let io = self
+            Task { @MainActor in if finita { io?.riparti() } }
+        })
+        osservatori.append(nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+            let io = self
+            Task { @MainActor in io?.riparti(motoreNuovo: true) }
+        })
+        guardia = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, self.voluto else { return }
+                if !self.acceso || !self.motore.isRunning { self.riparti() }
+            }
+        }
+    }
+
+    private func smettiDiSorvegliare() {
+        for o in osservatori { NotificationCenter.default.removeObserver(o) }
+        osservatori = []
+        guardia?.cancel()
+        guardia = nil
+    }
+
+    /// Il microfono riparte da capo (al massimo una volta al secondo).
+    private func riparti(motoreNuovo: Bool = false) {
+        guard voluto else { return }
+        if acceso, motore.isRunning, !motoreNuovo { return }       // un cambio che non l'ha fermato
+        guard Date().timeIntervalSince(ultimaRipartenza) >= 1 else { return }
+        ultimaRipartenza = Date()
+        spegni()
+        if motoreNuovo { motore = AVAudioEngine() }
+        accendi()
+    }
+
     private func nuovaFrase() {
         guard acceso, let riconoscitore else { return }
         let r = SFSpeechAudioBufferRecognitionRequest()
@@ -812,6 +887,7 @@ final class OrecchioComandi {
         if riconoscitore.supportsOnDeviceRecognition, !ProcessInfo.processInfo.isiOSAppOnMac { r.requiresOnDeviceRecognition = true }   // sul Mac il motore locale non risponde (errore 1101): lì si usa quello di Apple
         presa.metti(r)
         turno += 1
+        inizioFrase = Date()
         let mio = turno
         ultimoTesto = ""
         compito = OrecchioComandi.riconosci(riconoscitore, r) { [weak self] testo, fine in
@@ -844,6 +920,17 @@ final class OrecchioComandi {
         if let c = ComandoVocale.riconosci(frase, serveJarvis: true, dentro: dentro) {
             // MARK XI: «sezioni aperte», «quella di prima», «chiudi il meteo»… li esegue la schermata principale
             if c.navigaSezioni { ComandiSezioni.invia(c) } else { comando?(c) }
+        }
+        guard acceso, compito == nil else { return }       // il comando ha fermato l'orecchio, o ne ha già aperta un'altra
+        // una frase chiusa appena aperta (un errore del riconoscimento): la prossima tra mezzo secondo, non a raffica
+        if Date().timeIntervalSince(inizioFrase) < 0.5 {
+            let atteso = turno
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, self.acceso, self.turno == atteso, self.compito == nil else { return }
+                self.nuovaFrase()
+            }
+            return
         }
         nuovaFrase()       // si continua ad ascoltare
     }

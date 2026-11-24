@@ -54,6 +54,26 @@ enum WiretapAperto {
     static var aperto: Bool { chiudi != nil }
 }
 
+/// 13.9 (4) (debug del 24 nov, punto 2): il microfono è di una sezione: il Wiretap aperto o l'orecchio dei comandi acceso di
+/// Sentinella, Allenatore, Profiler, Scanner, Interprete. Finché è vero JARVIS non cambia né spegne l'audio dell'iPhone (lo faceva
+/// a fine risposta, e l'orecchio della sezione restava sordo). Gli orecchi sono tenuti deboli: una sezione chiusa senza fermarlo
+/// non lascia il microfono «occupato» per sempre.
+@MainActor
+enum MicrofonoSezioni {
+    private final class Debole {
+        weak var oggetto: AnyObject?
+        init(_ o: AnyObject) { oggetto = o }
+    }
+    private static var orecchi: [ObjectIdentifier: Debole] = [:]
+    static func entra(_ o: AnyObject) { orecchi[ObjectIdentifier(o)] = Debole(o) }
+    static func esce(_ o: AnyObject) { orecchi[ObjectIdentifier(o)] = nil }
+    static var occupato: Bool {
+        if WiretapAperto.aperto { return true }
+        orecchi = orecchi.filter { $0.value.oggetto != nil }
+        return !orecchi.isEmpty
+    }
+}
+
 /// Una sezione del contenitore.
 enum Sezione: Hashable {
     // 9 nov notte (il signore: «si apre due volte ed è orribile così»): niente più la sezione a parte per scegliere la lingua

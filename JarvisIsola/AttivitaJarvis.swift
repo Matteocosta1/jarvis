@@ -44,6 +44,8 @@ enum ComandiIsola {
     static var esegui: ((String) -> Void)?
     /// 13.1 (2): il tasto Azione da bloccato (AscoltaDaBloccato): JARVIS ascolta senza aprirsi. Falso: non può (lo imposta Jarvis).
     static var ascoltaFuori: (() -> Bool)?
+    /// 13.9 (4): il Wiretap sta registrando (il microfono è suo): il tasto Azione lo dice invece di fingere di ascoltare.
+    static var wiretapRegistra: (() -> Bool)?
 }
 
 // niente «nonisolated» sul tipo: il @Parameter è una proprietà che cambia, e Swift 6 non lo permette (avviso di Xcode, 26 ott)
@@ -92,6 +94,8 @@ struct AscoltaDaBloccato: AudioRecordingIntent {
     init() {}
 
     func perform() async throws -> some IntentResult {
+        // 13.9 (4): col Wiretap aperto il microfono è suo: l'isola non dice «La ascolto» a vuoto
+        if await MainActor.run(body: { ComandiIsola.wiretapRegistra?() ?? false }) { throw ErroreAscoltoFuori.wiretap }
         // JARVIS appena svegliato da iOS (era chiuso): gli si lasciano al massimo 3 secondi per esserci
         var partito: Bool?
         for _ in 0..<15 {
@@ -107,9 +111,10 @@ struct AscoltaDaBloccato: AudioRecordingIntent {
 
 /// Quello che iOS mostra se JARVIS non riesce ad ascoltare da bloccato.
 nonisolated enum ErroreAscoltoFuori: Error, CustomLocalizedStringResourceConvertible {
-    case chiuso, microfono
+    case chiuso, microfono, wiretap
     var localizedStringResource: LocalizedStringResource {
         switch self {
+        case .wiretap: return "Il Wiretap sta registrando, Sir: il microfono è suo. Lo chiuda per parlarmi."
         case .chiuso: return "Apra JARVIS una volta, Sir: poi la ascolto anche da bloccato."
         case .microfono: return "Il microfono di JARVIS è spento, Sir: lo riaccenda toccando il reattore."
         }

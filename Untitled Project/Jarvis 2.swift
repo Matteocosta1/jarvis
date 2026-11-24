@@ -473,6 +473,7 @@ final class Jarvis: NSObject, ObservableObject {
         WiretapAperto.quandoSiChiude = { [weak self] in
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(300))      // l'audio del Wiretap si è spento
+                if self?.avviso?.hasPrefix("Il microfono è del Wiretap") == true { self?.avviso = nil }   // 13.9 (4)
                 self?.aggiornaRichiamo()
             }
         }
@@ -536,6 +537,7 @@ final class Jarvis: NSObject, ObservableObject {
         FiloCondiviso.condiviso.battute = { [weak self] in self?.messaggi ?? [] }
         FiloCondiviso.condiviso.riservato = { [weak self] in self?.riservato ?? false }
         ComandiIsola.ascoltaFuori = { [weak self] in self?.ascoltaDaFuori() ?? false }
+        ComandiIsola.wiretapRegistra = { WiretapAperto.aperto }        // 13.9 (4): il tasto Azione col Wiretap aperto
         // mentre la tastiera è aperta il battito di mani non conta (i click dei tasti lo ingannerebbero)
         NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
             BattitoMani.tastieraAperta(true)
@@ -610,6 +612,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// `bip`: il «parli adesso» del tocco sul reattore (il tocco durante l'avvio ascolta a sequenza finita, col suo bip).
     func ascoltaSubito(bip: Bool = false) {
         guard fase == .attesa else { return }
+        // 13.9 (4): il microfono è del Wiretap (aperto, anche dietro): lo dice invece di restare zitto
+        if WiretapAperto.aperto { avviso = "Il microfono è del Wiretap che registra, Sir."; return }
         Task { await avviaAscolto(bip: bip) }
     }
 
@@ -1163,7 +1167,7 @@ final class Jarvis: NSObject, ObservableObject {
     func rilasciaMusica() async {
         let sessione = AVAudioSession.sharedInstance()
         for _ in 0..<6 {
-            guard !WiretapAperto.aperto else { return }               // 13.9 (3): l'audio è del Wiretap che registra
+            guard !MicrofonoSezioni.occupato else { return }               // 13.9 (3–4): l'audio è del Wiretap o di una sezione
             guard fase == .attesa, inCoda.isEmpty, !richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,
                   !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis else { return }   // la musica è nostra: l'audio resta
             try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothA2DP])
@@ -2607,7 +2611,7 @@ final class Jarvis: NSObject, ObservableObject {
         // sul Mac niente orecchio mentre parla: è un secondo microfono (con il riconoscimento di Apple) che lascia muto quello
         // dell'attesa; lì per fermarlo basta toccare il reattore
         let conOrecchio = Impostazioni.interruzioneVocale && !Impostazioni.muto && !Jarvis.usaAscoltoCloud && !musicaSuona   // 9 nov: la canzone lo interromperebbe
-            && !WiretapAperto.aperto       // 13.9 (3): il microfono è del Wiretap
+            && !MicrofonoSezioni.occupato       // 13.9 (3–4): il microfono è del Wiretap o di una sezione
         if inCoda.isEmpty {
             let sessione = AVAudioSession.sharedInstance()
             if Jarvis.usaAscoltoCloud {
@@ -2616,7 +2620,7 @@ final class Jarvis: NSObject, ObservableObject {
                 if sessione.category != .playAndRecord || !sessione.categoryOptions.contains(.mixWithOthers) {
                     try? sessione.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
                 }
-            } else if WiretapAperto.aperto {
+            } else if MicrofonoSezioni.occupato {
                 // 13.9 (3): il Wiretap registra con l'audio che suona e registra insieme: JARVIS parla su quello, senza cambiarlo né
                 // spegnerlo (ogni cambio fermava il microfono del Wiretap)
             } else {
@@ -2740,7 +2744,7 @@ final class Jarvis: NSObject, ObservableObject {
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
             guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
                   !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,   // 9 nov: né la canzone di Shazam
-                  !WiretapAperto.aperto else { return }                          // 13.9 (3): né il microfono del Wiretap
+                  !MicrofonoSezioni.occupato else { return }                          // 13.9 (3–4): né il microfono del Wiretap o di una sezione
             if self.musicaSuona { await self.rilasciaMusica() } else if !LettoreMusica.condiviso.suona {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
@@ -3288,7 +3292,7 @@ final class Jarvis: NSObject, ObservableObject {
         richiamo.ferma()
         orecchio.ferma()
         if !LettoreMusica.condiviso.suona, !LettoreMusica.condiviso.fermataDaJarvis, !AscoltoShazam.condiviso.suonaDentro,
-           !WiretapAperto.aperto {                                      // 13.9 (3): il Wiretap registra anche fuori dall'app
+           !MicrofonoSezioni.occupato {                                      // 13.9 (3–4): il Wiretap registra anche fuori dall'app
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         IsolaJarvis.fineVoce()
@@ -4724,7 +4728,7 @@ extension Jarvis {
     /// approvata (Apri e Fine) e il pallino arancione di iOS. Il dialogo fuori dall'app è quello di sempre (#16): finito, il
     /// microfono si spegne da solo. Falso: non può (Mac, microfono spento a mano).
     func ascoltaDaFuori() -> Bool {
-        guard !Jarvis.usaAscoltoCloud, !micSpento else { return false }
+        guard !Jarvis.usaAscoltoCloud, !micSpento, !WiretapAperto.aperto else { return false }
         tacePerPolso = false                           // gli parla lui: JARVIS risponde a voce
         attesaPolso = false
         if UIApplication.shared.applicationState != .background {

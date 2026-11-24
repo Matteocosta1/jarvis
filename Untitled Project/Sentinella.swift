@@ -49,6 +49,13 @@ final class Sentinella: ObservableObject {
     private var ultimaFoto: Data?                          // l'ultimo fotogramma leggero, per «Guarda ora»
     private var presenzaPrima = false
     private var ultimoAllarme = Date.distantPast
+    /// 13.9 (4) (debug del 24 nov, punto 3: «la Sentinella può smettere di sorvegliare senza avvisare»): ogni 2 secondi si
+    /// controlla che le immagini arrivino. Ferme da 5 secondi (telefonata, telefono bloccato, app dietro, calore, errore della
+    /// fotocamera): si prova a ripartire; ferme da 10 secondi: lo scrive sullo schermo e avvisa iPhone e orologio; quando riparte lo dice.
+    private var sorveglianza: Task<Void, Never>?
+    private var fermaDa: Date?
+    private var fermaAvvisata = false
+    private var calore: NSObjectProtocol?
 
     /// Accende la sentinella. Falso se manca il permesso della fotocamera.
     func avvia() async -> Bool {
@@ -83,11 +90,73 @@ final class Sentinella: ObservableObject {
         // Sentinella non tocca più la luminosità dello schermo. Prima la portava al 25 % e la rialzava solo con «Jarvis, torna»: se
         // l'app si chiudeva in un altro modo lo schermo restava scuro. Per oscurare restano il tasto BUIO e «schermo nero».
         PonteSentinella.inviaStato(attiva: true)
+        fermaDa = nil
+        fermaAvvisata = false
+        motore.mostraImmagine(true)
+        motore.adattaAlCalore(ProcessInfo.processInfo.thermalState)
+        if calore == nil {
+            calore = NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil,
+                                                            queue: .main) { _ in
+                Task { @MainActor in Sentinella.condiviso.motore.adattaAlCalore(ProcessInfo.processInfo.thermalState) }
+            }
+        }
+        sorveglia()
         return true
+    }
+
+    /// 13.9 (4) (punto 4): con lo schermo nero (BUIO, «Jarvis, schermo nero») l'immagine non si prepara: nessuno la vede.
+    /// Il riconoscimento di persone e animali continua uguale.
+    func mostraImmagine(_ si: Bool) {
+        motore.mostraImmagine(si)
+    }
+
+    /// Il controllo ogni 2 secondi: le immagini arrivano?
+    private func sorveglia() {
+        sorveglianza?.cancel()
+        sorveglianza = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, self.attiva, !Task.isCancelled else { return }
+                let viva = await self.motore.viva()
+                guard self.attiva else { return }
+                if viva {
+                    if let da = self.fermaDa { self.ripartita(da: da) }
+                    continue
+                }
+                let da = self.fermaDa ?? Date().addingTimeInterval(-2)
+                self.fermaDa = da
+                let ferma = Date().timeIntervalSince(da)
+                // al secondo controllo mancato (4–5 s senza immagini) ci prova: se iOS lo permette riparte da sola
+                if ferma >= 4 { _ = await self.motore.riparti() }
+                if self.attiva, !self.fermaAvvisata, ferma >= 10 { self.avvisaFerma(da: da) }
+            }
+        }
+    }
+
+    private func avvisaFerma(da: Date) {
+        fermaAvvisata = true
+        let ora = da.formatted(date: .omitted, time: .shortened)
+        problema = "La fotocamera si è fermata alle \(ora), Sir: la Sentinella non sorveglia. Riparte da sola appena può."
+        Task { await Sentinella.notifica(titolo: "⚠️ SENTINELLA FERMA", testo: "Alle \(ora) la fotocamera si è fermata, Sir: la Sentinella non sorveglia.") }
+    }
+
+    private func ripartita(da: Date) {
+        fermaDa = nil
+        guard fermaAvvisata else { return }                    // una pausa breve, mai avvisata: niente da dire
+        fermaAvvisata = false
+        problema = nil
+        let dalle = da.formatted(date: .omitted, time: .shortened), alle = Date().formatted(date: .omitted, time: .shortened)
+        Task { await Sentinella.notifica(titolo: "SENTINELLA", testo: "La Sentinella sorveglia di nuovo, Sir (ferma dalle \(dalle) alle \(alle)).") }
     }
 
     func ferma() {
         guard attiva else { return }
+        sorveglianza?.cancel()
+        sorveglianza = nil
+        if let c = calore { NotificationCenter.default.removeObserver(c); calore = nil }
+        if fermaDa != nil || fermaAvvisata { problema = nil }
+        fermaDa = nil
+        fermaAvvisata = false
         motore.ferma()
         attiva = false
         bersagli = []
@@ -136,6 +205,12 @@ final class Sentinella: ObservableObject {
     /// Sul Mac non c'è l'orologio accanto: l'allarme arriva come notifica sull'iPhone (e da lì sull'Apple Watch),
     /// tramite il briefing, che sa già mandare avvisi a tutti i dispositivi di JARVIS.
     static func avvisaIPhone(cosa: String) async {
+        let ora = Date().formatted(date: .omitted, time: .shortened)
+        await notifica(titolo: "🚨 SENTINELLA · Mac", testo: "Alle \(ora): \(cosa) davanti al Mac, Sir.")
+    }
+
+    /// Un avviso a tutti i dispositivi di JARVIS (iPhone e orologio) tramite il briefing del cervello.
+    static func notifica(titolo: String, testo: String) async {
         let base = Impostazioni.indirizzo
         let indirizzo = base.hasSuffix("/jarvis") ? base + "-briefing" : base.replacingOccurrences(of: "/jarvis", with: "/jarvis-briefing")
         guard let url = URL(string: indirizzo) else { return }
@@ -144,9 +219,7 @@ final class Sentinella: ObservableObject {
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(Portachiavi.leggi(), forHTTPHeaderField: "x-jarvis-token")
-        let ora = Date().formatted(date: .omitted, time: .shortened)
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["titolo": "🚨 SENTINELLA · Mac",
-                                                                    "testo": "Alle \(ora): \(cosa) davanti al Mac, Sir."])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["titolo": titolo, "testo": testo])
         _ = try? await URLSession.shared.data(for: req)
     }
 
@@ -223,6 +296,10 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
     private var ultimaAnalisi = Date.distantPast
     private var suQuadro: (@Sendable (CGImage, Bool) -> Void)?
     private var suAnalisi: (@Sendable ([Sentinella.Bersaglio], Data?) -> Void)?
+    // 13.9 (4), tutti solo sulla coda della fotocamera:
+    private var ultimoArrivo = Date.distantPast        // l'ultimo fotogramma arrivato (la Sentinella controlla che arrivino)
+    private var mostra = true                          // falso con lo schermo nero: l'immagine non si prepara
+    private var passoAnalisi: TimeInterval = 0.33      // 3 volte al secondo; più lento se l'iPhone scalda
 
     func avvia(quadro: @escaping @Sendable (CGImage, Bool) -> Void,
                analisi: @escaping @Sendable ([Sentinella.Bersaglio], Data?) -> Void,
@@ -269,9 +346,45 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
         }
     }
 
+    /// 13.9 (4): le immagini arrivano? (negli ultimi 5 secondi, con la fotocamera accesa)
+    func viva() async -> Bool {
+        await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            coda.async { c.resume(returning: self.sessione.isRunning && Date().timeIntervalSince(self.ultimoArrivo) < 5) }
+        }
+    }
+
+    /// 13.9 (4): la fotocamera si è fermata: riparte (se iOS lo permette: con l'app dietro o una telefonata no, riprova dopo).
+    func riparti() async -> Bool {
+        await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            coda.async {
+                guard self.configurata, self.suQuadro != nil || self.suAnalisi != nil else { c.resume(returning: false); return }
+                if self.sessione.isRunning { self.sessione.stopRunning() }
+                self.sessione.startRunning()
+                c.resume(returning: self.sessione.isRunning)
+            }
+        }
+    }
+
+    /// 13.9 (4): con lo schermo nero l'immagine non si prepara (prima 30 al secondo che nessuno vedeva).
+    func mostraImmagine(_ si: Bool) {
+        coda.async { self.mostra = si }
+    }
+
+    /// 13.9 (4): se l'iPhone scalda il riconoscimento rallenta (prima iOS poteva spegnere la fotocamera per il calore).
+    func adattaAlCalore(_ stato: ProcessInfo.ThermalState) {
+        let passo: TimeInterval
+        switch stato {
+        case .critical: passo = 1.0
+        case .serious: passo = 0.6
+        default: passo = 0.33
+        }
+        coda.async { self.passoAnalisi = passo }
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput buffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixel = CMSampleBufferGetImageBuffer(buffer) else { return }
         let adesso = Date()
+        ultimoArrivo = adesso
 
         // luce della scena: il valore «Brightness» che la fotocamera scrive in ogni fotogramma (sotto ~-1,5 è buio)
         if let exif = CMGetAttachment(buffer, key: kCGImagePropertyExifDictionary, attachmentModeOut: nil) as? [String: Any],
@@ -285,14 +398,14 @@ nonisolated final class MotoreSentinella: NSObject, AVCaptureVideoDataOutputSamp
         let raddrizzata = CIImage(cvPixelBuffer: pixel).oriented(mac ? .upMirrored : .right)
 
         // 1) l'immagine da mostrare: tutti i fotogrammi della fotocamera, 30 al secondo (5 nov: prima 12, e «scattava»)
-        if adesso.timeIntervalSince(ultimoQuadro) > 0.025, let f = suQuadro {
+        if mostra, adesso.timeIntervalSince(ultimoQuadro) > 0.025, let f = suQuadro {
             ultimoQuadro = adesso
             let vista = notte ? MotoreSentinella.visioneNotturna(raddrizzata) : raddrizzata
             if let cg = contesto.createCGImage(vista, from: vista.extent) { f(cg, notte) }
         }
 
         // 2) riconoscimento di persone e animali, circa 3 volte al secondo, sulla sua coda (uno alla volta)
-        guard adesso.timeIntervalSince(ultimaAnalisi) > 0.33, !analizzando, let a = suAnalisi else { return }
+        guard adesso.timeIntervalSince(ultimaAnalisi) > passoAnalisi, !analizzando, let a = suAnalisi else { return }
         ultimaAnalisi = adesso
         analizzando = true
         let f = Fotogramma(pixel: pixel, immagine: raddrizzata, notte: notte, mac: mac)
@@ -470,9 +583,10 @@ struct VistaSentinella: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12)).padding()
             }
         }
+        .onChange(of: oscurato) { _, nero in s.mostraImmagine(!nero) }      // 13.9 (4): con lo schermo nero l'immagine non si prepara
         .onDisappear { orecchio.ferma(); s.ferma() }
         .pausaDietro(ferma: { orecchio.ferma(); s.ferma(); registro = false },            // MARK XI: dietro in pausa (4 nov: e il Registro si chiude)
-                     riprendi: { Task { if await s.avvia() { Suoni.aperturaCamera(); orecchio.avvia() } } })
+                     riprendi: { Task { if await s.avvia() { s.mostraImmagine(!oscurato); Suoni.aperturaCamera(); orecchio.avvia() } } })
         .aperturaHUD("Sentinella", icona: "dot.radiowaves.left.and.right", conX: true, fotocamera: true)
         // 4 nov: il Registro come nel mockup (il foglio che sale dal basso, la ✕ nel cerchio), non più la lista di iOS
         .fullScreenCover(isPresented: $registro) { RegistroSentinella() }
