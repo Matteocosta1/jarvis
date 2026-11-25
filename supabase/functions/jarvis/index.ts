@@ -3103,6 +3103,9 @@ function contesto(dispositivo: string, memoria: string[], fatte: string[] = [], 
   return `[Contesto: ${quando} · momento: ${momento} · ${iso} · dispositivo: ${disp}${pos}]${schermo}${voce}\n[Memoria:\n${mem}]${reg}`;
 }
 
+/// v157: le richieste per cui una risposta lunga (più paragrafi) è giusta: spiegazioni, testi da scrivere, elenchi, letture.
+const RICHIESTA_LUNGA = /(spieg|come funziona|nel dettaglio|nei dettagli|dettagliat|scriv|prepar|elenc|legg|riassum|raccont|tradu|lista|tutte le|tutti i|briefing|ricetta|passaggi|istruzion|analizz|confront|piano|programma|itinerario|proposta|mail|messaggio per)/i;
+
 /// v156 (prove sui dialoghi del 25 nov): la regola della lunghezza ripetuta subito prima della frase del signore viene rispettata molto
 /// di più che solo nelle istruzioni (Sonnet scriveva due paragrafi anche con la regola ferrea scritta in alto). Non nel briefing.
 const MISURA_TURNO = "[Come rispondere adesso: a voce, una o due frasi, al massimo tre; niente paragrafi né righe vuote; niente spiegazioni di come funzioni tu; se il signore chiede una spiegazione vera o un testo da scrivere, vale quello che chiede]";
@@ -5770,6 +5773,7 @@ Deno.serve(async (req) => {
         // 12 nov (A1, P5): il cervello può dire «[aspetto]» (il signore non ha finito) o «[silenzio]» (la frase non era per lui)
         let aspettoAttivo = false, silenzioAttivo = false;
         let segnale: "aspetto" | "silenzio" | null = null;
+        let tagliaParagrafi = false;   // v157: in una chiacchierata a voce la risposta si ferma alla fine del primo paragrafo
         let correzione = false;   // v154: il signore lo sta correggendo o è seccato con lui (niente risate né tono da gioco)
         let rapida = false;   // idea A: Opus a voce con sforzo «low» (si porta dietro in tutto il turno, anche dopo gli strumenti del dispositivo)
         // 13 nov (briefing già pronto): un passaggio solo, senza strumenti; con la posta dentro il turno ha letto testo altrui
@@ -5880,6 +5884,7 @@ Deno.serve(async (req) => {
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
           const ultimaDomanda = togliRipetute(senzaNoteApp(String(scelti.at(-1)?.m?.content ?? "")));   // revisione 24 ott: senza le note dell'app, che col significato non c'entrano
           correzione = ilSignoreCorregge(ultimaDomanda);   // v154
+          tagliaParagrafi = !briefingModo && !RICHIESTA_LUNGA.test(ultimaDomanda);
           // 13 nov (il signore: «A»): il briefing già pronto. La richiesta arriva segnata dal telefono (con calendario e salute) o si
           // riconosce dalla frase (a voce dal Mac o dall'orologio); i dati partono subito, insieme al resto del contesto
           const briefingModo = corpo.briefing === true || RICHIESTA_BRIEFING.test(ultimaDomanda.trim());
@@ -6022,6 +6027,7 @@ Deno.serve(async (req) => {
         }
 
         let tenuto = "";
+        let paragrafoChiuso = false;
         const giaRisposte = await ultimeRisposte();
         const tono = tenitoreTono(giaRisposte.registri, giaRisposte.risata, correzione);   // 25 nov: il registro tenuto su ogni frase, passaggi graduali; v153: niente due risate di fila
         let contaminato = turnoContaminato(lavoro) || briefingConPosta;
@@ -6040,6 +6046,13 @@ Deno.serve(async (req) => {
                 d = tenuto; tenuto = ""; aspettoAttivo = false; silenzioAttivo = false;
               }
               if (segnale) return;
+              // v157 (prove del 25 nov: due paragrafi anche col promemoria): in una chiacchierata a voce, senza strumenti e senza una
+              // spiegazione o un testo chiesti, la risposta finisce col primo paragrafo; il resto non va né alla voce né alla chat
+              if (paragrafoChiuso) return;
+              if (tagliaParagrafi && azioni.length === 0 && modello !== MODELLO) {
+                const k = (detto + d).indexOf("\n\n");
+                if (k >= 0 && (detto + d).slice(0, k).trim().length >= 20) { d = (detto + d).slice(detto.length, k); paragrafoChiuso = true; }
+              }
               primaTurno ??= Date.now(); detto += d;
               const conTono = tono.aggiungi(d); if (conTono) invia({ t: "testo", d: conTono });
             },
