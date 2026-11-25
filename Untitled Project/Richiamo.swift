@@ -26,6 +26,7 @@ final class Richiamo {
     private let condotto = Condotto()
     private let mani = BattitoMani()
     private var ultimoAvvio = Date.distantPast
+    private var avvioMotore = Date.distantPast      // 13.9 (6): da quando questo microfono sente (per la rilettura)
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
     private var timerSilenzio: Timer?
@@ -166,11 +167,15 @@ final class Richiamo {
 
     var attivo: Bool { voluto }
 
-    func avvia() {
+    func avvia(precarica secondi: Double = 0) {
         guard !voluto else { return }
         voluto = true
+        precarica = secondi
         accendi()
     }
+    /// 13.9 (6): i secondi di audio sentiti dall'orecchio dopo la voce di JARVIS (il signore ha cominciato a rispondere mentre il
+    /// microfono passava di mano): il primo trascrittore li rilegge prima dell'audio vivo, così le prime parole non si perdono.
+    private var precarica: Double = 0
 
     func ferma() {
         voluto = false
@@ -181,6 +186,10 @@ final class Richiamo {
         guard voluto, !acceso, let riconoscitore, riconoscitore.isAvailable else { return }
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
+        // 13.9 (6): l'attacco sentito dall'orecchio si prende prima che questo microfono scriva nel registro (niente doppioni)
+        let secondi = precarica
+        precarica = 0
+        var pezzo: AVAudioPCMBuffer?
         do {
             if !motore.isRunning {
                 let sessione = AVAudioSession.sharedInstance()
@@ -205,10 +214,13 @@ final class Richiamo {
                 BattitoMani.ignora(per: 1.0)
                 try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
+                if secondi > 0.2 { pezzo = Richiamo.bufferPrecarica(secondi, formato: motore.inputNode.outputFormat(forBus: 0)) }
                 try motore.start()
+                avvioMotore = Date()
             }
             azzera()
-            nuovoRiconoscimento(riconoscitore, recentiDa: nil)
+            // 13.9 (6): prima quello che ha detto durante il passaggio (dall'orecchio), poi l'audio di questo microfono dal suo avvio
+            nuovoRiconoscimento(riconoscitore, recentiDa: pezzo == nil ? nil : avvioMotore, prima: pezzo)
             programmaRiavvio()
         } catch {
             spegni()
@@ -221,7 +233,7 @@ final class Richiamo {
     }
 
     /// Un trascrittore nuovo sullo stesso microfono acceso. `recentiDa`: rilegge l'audio arrivato da quel momento.
-    private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?) {
+    private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?, prima pezzo: AVAudioPCMBuffer? = nil) {
         let vecchia = richiesta, vecchio = compito
         ultimoAvvio = Date()
         let r = SFSpeechAudioBufferRecognitionRequest()
@@ -237,6 +249,7 @@ final class Richiamo {
             if fine { condotto.segnaFine() }
             Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
         }
+        if let pezzo { r.append(pezzo) }            // 13.9 (6): l'attacco della frase, sentito dall'orecchio
         condotto.usa(r, recentiDa: recentiDa)       // prima il nuovo trascrittore, poi chiudo il vecchio: nessun buco
         vecchia?.endAudio()
         vecchio?.cancel()
@@ -576,6 +589,35 @@ final class Richiamo {
 
     // MARK: Ponti fuori dal thread principale
 
+    /// 13.9 (6): gli ultimi `secondi` del registro del microfono (sentiti dall'orecchio, con la sua frequenza) portati nel formato di
+    /// questo microfono, in un buffer solo da dare al trascrittore prima dell'audio vivo. Nil se non c'è niente o non si converte.
+    nonisolated private static func bufferPrecarica(_ secondi: Double, formato: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let (campioni, frequenza) = RegistroMicrofono.condiviso.nativi(secondi)
+        guard !campioni.isEmpty, frequenza > 0, formato.sampleRate > 0,
+              let sorgente = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: frequenza, channels: 1, interleaved: false),
+              let grezzo = AVAudioPCMBuffer(pcmFormat: sorgente, frameCapacity: AVAudioFrameCount(campioni.count)),
+              let canale = grezzo.floatChannelData?[0] else { return nil }
+        grezzo.frameLength = AVAudioFrameCount(campioni.count)
+        campioni.withUnsafeBufferPointer { p in
+            if let base = p.baseAddress { canale.update(from: base, count: campioni.count) }
+        }
+        if sorgente == formato { return grezzo }
+        guard let convertitore = AVAudioConverter(from: sorgente, to: formato) else { return nil }
+        let capienza = AVAudioFrameCount(Double(campioni.count) * formato.sampleRate / frequenza) + 1024
+        guard let uscita = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: capienza) else { return nil }
+        let dato = SegnoUnaVolta()
+        nonisolated(unsafe) let ingresso = grezzo      // il convertitore lo legge dentro questa stessa chiamata (come il tap dell'orecchio)
+        var errore: NSError?
+        let esito = convertitore.convert(to: uscita, error: &errore) { _, stato in
+            if dato.fatto { stato.pointee = .endOfStream; return nil }
+            dato.fatto = true
+            stato.pointee = .haveData
+            return ingresso
+        }
+        guard esito != .error, errore == nil, uscita.frameLength > 0 else { return nil }
+        return uscita
+    }
+
     nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto, _ mani: BattitoMani) throws {
         let input = motore.inputNode
         let formato = input.outputFormat(forBus: 0)
@@ -903,6 +945,11 @@ nonisolated final class BattitoMani: @unchecked Sendable {
 
 /// Il tubo fra il microfono e il trascrittore di turno. Il microfono scrive sempre qui; il trascrittore si può cambiare
 /// in un istante, e il nuovo può rileggere l'ultimo secondo e mezzo di audio (le parole dette durante il cambio).
+/// 13.9 (6): il buffer della rilettura si dà al convertitore una volta sola (il convertitore lo chiede dentro la stessa chiamata).
+nonisolated final class SegnoUnaVolta: @unchecked Sendable {
+    var fatto = false
+}
+
 nonisolated final class Condotto: @unchecked Sendable {
     private let lock = NSLock()
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?

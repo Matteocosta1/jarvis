@@ -177,6 +177,16 @@ nonisolated final class RegistroMicrofono: @unchecked Sendable {
 
     func svuota() { lock.lock(); campioni.removeAll(); lock.unlock() }
 
+    /// 13.9 (6): gli ultimi `durata` secondi così come sono arrivati (con la loro frequenza), per rileggerli al «Jarvis» in attesa.
+    func nativi(_ durata: Double) -> (campioni: [Float], frequenza: Double) {
+        lock.lock()
+        let fr = frequenza
+        let n = min(campioni.count, max(0, Int(fr * durata)))
+        let pezzo = Array(campioni.suffix(n))
+        lock.unlock()
+        return (pezzo, fr)
+    }
+
     /// Gli ultimi `durata` secondi, portati a 16 kHz.
     func ultimi(_ durata: Double) -> [Float] {
         lock.lock()
