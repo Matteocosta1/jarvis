@@ -230,7 +230,7 @@ Impegni della notte: se il contesto contiene [Impegni da confermare …], sono c
 Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti», «funziona tutto?» o lamenta che qualcosa non va senza sapere cosa, usa diagnostica. Riferisci in poche frasi: prima ciò che NON funziona o sta per finire (crediti voce quasi esauriti, chiave rifiutata, servizio che non risponde) con il rimedio in parole semplici; se è tutto a posto dillo in una frase e aggiungi i crediti voce rimasti. Non elencare i servizi che vanno bene uno per uno.
 Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando.
 Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa immagini_cerca; per dischi, copertine ed etichette preferisci discogs_cerca. Le immagini compaiono da sole in una galleria nell'app: non elencarle e non leggere indirizzi, di' solo in una frase cosa hai trovato.
-Foto del signore: per cercare nella sua galleria usa foto_cerca, per data, luogo, album o contenuto (parole chiave in inglese). Le foto trovate compaiono nell'app. Tu vedi solo quelle che arrivano allegate al risultato (le prime, se l'app le manda); delle altre hai solo le righe di testo (data, luogo, contenuto): di quelle non dire «vista» né descriverle. Una foto aperta nell'app non ti arriva. Se ti serve proprio una foto che non hai davanti, digli di sceglierla col tasto delle foto nella chat: ti arriva allegata al suo messaggio dopo (mai «la apra toccandola», errore vero, 25 nov: tre richieste di aprirla e poi «Vista, allora. Purtroppo però non mi arriva»).
+Foto del signore: per cercare nella sua galleria usa foto_cerca, per data, luogo, album o contenuto (parole chiave in inglese). Le foto trovate compaiono nell'app. Tu vedi solo quelle che arrivano allegate al risultato (le prime, se l'app le manda); delle altre hai solo le righe di testo (data, luogo, contenuto): di quelle non dire «vista» né descriverle. Se ne hai davanti più d'una e ne salvi una con ricorda, scegli quale con foto_n (1 = la prima allegata). Una foto aperta nell'app non ti arriva. Se ti serve proprio una foto che non hai davanti, digli di sceglierla col tasto delle foto nella chat: ti arriva allegata al suo messaggio dopo (mai «la apra toccandola», errore vero, 25 nov: tre richieste di aprirla e poi «Vista, allora. Purtroppo però non mi arriva»).
 Pagine web: per mostrare una pagina al signore usa apri_pagina se il dispositivo lo offre.
 Occhi: se il signore ti chiede di guardare qualcosa che ha davanti («cosa sto guardando», «cos'è questo», «guarda qua», «quanto vale questo disco», «leggimi questo», «che pianta è») e il dispositivo offre guarda, di' soltanto «Guardo.» e usa guarda: la fotocamera scatta da sola e la foto ti arriva allegata al risultato. Poi rispondi in due o tre frasi a ciò che ha chiesto, come se vedessi con i tuoi occhi («Vedo…»): oggetti, piante, animali, cibo, luoghi, testi, marche, persone note. Se è un disco, segui le regole FOTO (chiedi prima: Apple Music o Discogs?). Se la foto è buia, mossa o non mostra niente di chiaro, dillo con garbo e chiedi di riprovare. Se il risultato dice che non c'è foto, il signore ha chiuso la fotocamera: non insistere. Se una foto è già allegata al messaggio del signore, non usare guarda: guarda quella.
 Memoria visiva: una foto o un giro che hai visto in questa conversazione resta davanti a te nel messaggio in cui è arrivato, anche se il signore ti ha interrotto mentre la descrivevi. Quando ti chiede altro su «la foto», «quello che hai visto», «il disco di prima», guarda quella immagine e rispondi: non dire mai che non l'hai ricevuta o che non la vedi più. Se ti eri interrotto a metà descrizione, riprendi da dove serve senza ricominciare da capo.
@@ -278,6 +278,7 @@ const STRUMENTI_SERVER: any[] = [
       persona: { type: "string", description: "nome della persona, se il ricordo la riguarda" },
       quando: { type: "string", description: "per promessa: quando avvisare; per una cosa del passato (una foto di giorni fa, un fatto di ieri): quando è successa. ISO 8601 con fuso" },
       con_foto: { type: "boolean", description: "true per allegare l'ultima foto vista in questo turno (occhi o foto del signore)" },
+      foto_n: { type: "integer", description: "se hai davanti più foto insieme (i risultati di foto_cerca, i fotogrammi di un giro): quale salvare, contando da 1 nell'ordine in cui ti sono allegate" },
       qui: { type: "boolean", description: "false se il ricordo non riguarda il posto dove si trova adesso (una foto vecchia, una cosa successa altrove): allora non si salva la posizione attuale. Predefinito true" },
       luogo: { type: "string", description: "il nome del posto, se il signore lo dice o se si sa (es. «Rogoredo, Milano»)" },
     }, required: ["tipo", "testo"] } },
@@ -525,7 +526,7 @@ function turnoContaminato(lavoro: any[]) {
 }
 
 /// Ciò che il cervello sa del turno in corso: posizione dell'iPhone e ultima foto vista (occhi o foto del signore).
-type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; ip?: string; schermo?: string; voce?: string;
+type Turno = { lat?: number; lon?: number; precisione?: number; foto?: string | null; fotoTutte?: string[]; ip?: string; schermo?: string; voce?: string;
   salute?: SalutePronta | null };
 
 // Revisione 24 ott: uno strumento del cervello non tiene fermo il turno più di 90 secondi. Prima ci pensava il limite di 120 s
@@ -1214,7 +1215,10 @@ async function ricorda(i: Record<string, any>, turno: Turno) {
   }
   if (luogoDetto) riga.luogo = luogoDetto;
   if (i.quando) { const d = new Date(String(i.quando)); if (!isNaN(d.getTime()) && (tipo === "promessa" || d.getTime() < Date.now())) riga.quando = d.toISOString(); }
-  if (i.con_foto && turno.foto) riga.foto = turno.foto;
+  if (i.con_foto && turno.foto) {
+    const n = Math.trunc(Number(i.foto_n));   // v159: fra più foto allegate, quella scelta (1 = la prima)
+    riga.foto = (n >= 1 && turno.fotoTutte?.[n - 1]) || turno.foto;
+  }
   if (tipo === "parcheggio") await db.from("jarvis_ricordi").update({ fatto: true }).eq("tipo", "parcheggio").eq("fatto", false);   // conta solo l'ultimo parcheggio
   const { data, error } = await db.from("jarvis_ricordi").insert(riga).select("id").single();
   if (error) throw error;
@@ -5830,7 +5834,7 @@ Deno.serve(async (req) => {
             const testo = String(x.content ?? "").slice(0, 12000);
             // «guarda»: la foto (o i fotogrammi del giro) scattata dal dispositivo arriva insieme al risultato e il cervello la vede
             const foto = immaginiValide(x.immagine, x.immagini);
-            if (foto.length) turno.foto = foto[0];
+            if (foto.length) { turno.foto = foto[0]; turno.fotoTutte = foto; }
             return {
               type: "tool_result", tool_use_id: String(x.tool_use_id),
               content: foto.length ? [...foto.map(bloccoImmagine), { type: "text", text: testo }] : testo,
@@ -5842,8 +5846,15 @@ Deno.serve(async (req) => {
             for (const m of [...lavoro].reverse()) {
               if (m?.role !== "user" || !Array.isArray(m.content)) continue;
               for (const b of m.content) {
-                if (b?.type === "image" && b.source?.data) { turno.foto = String(b.source.data); break; }
-                if (b?.type === "tool_result" && Array.isArray(b.content)) { const im = b.content.find((c: any) => c?.type === "image"); if (im?.source?.data) { turno.foto = String(im.source.data); break; } }
+                // v159: tutte le foto di quel messaggio, nell'ordine, così ricorda può salvare quella scelta (foto_n)
+                if (b?.type === "image" && b.source?.data) {
+                  turno.fotoTutte = m.content.filter((c: any) => c?.type === "image" && c.source?.data).map((c: any) => String(c.source.data));
+                  turno.foto = turno.fotoTutte[0]; break;
+                }
+                if (b?.type === "tool_result" && Array.isArray(b.content)) {
+                  const imm = b.content.filter((c: any) => c?.type === "image" && c.source?.data).map((c: any) => String(c.source.data));
+                  if (imm.length) { turno.fotoTutte = imm; turno.foto = imm[0]; break; }
+                }
               }
               if (turno.foto) break;
             }
@@ -5901,7 +5912,7 @@ Deno.serve(async (req) => {
             }
             return { role: m.role, content: m.role === "assistant" ? tonoUnico(testo) : togliRipetute(testo) };   // v155
           });
-          if (fotoPrima.length) turno.foto = fotoPrima[0];   // anche «ricorda questo» può usare la foto di prima
+          if (fotoPrima.length) { turno.foto = fotoPrima[0]; turno.fotoTutte = fotoPrima; }   // anche «ricorda questo» può usare la foto di prima
           while (storia.length && storia[0].role !== "user") storia.shift();
           if (!storia.length || storia.at(-1).role !== "user") { invia({ t: "errore", d: "Non mi è arrivata la domanda, Sir. Me la ripete?" }); chiudi(); return; }
           // il filo: le battute di questa finestra, così come le ha mandate l'app (senza contesto né foto)
@@ -6020,7 +6031,7 @@ Deno.serve(async (req) => {
           briefingUnico = !!blocco && (telefonoBriefing !== null || client.size === 0);
           const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaSalute}${notaAspetto}${notaBriefing}${briefingModo ? "" : `\n${MISURA_TURNO}`}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
-          if (imgs.length) turno.foto = imgs[0];
+          if (imgs.length) { turno.foto = imgs[0]; turno.fotoTutte = imgs; }
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
           storia[storia.length - 1] = imgs.length
             ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }

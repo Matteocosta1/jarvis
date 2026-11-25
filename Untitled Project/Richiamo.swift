@@ -166,6 +166,36 @@ final class Richiamo {
     }
 
     var attivo: Bool { voluto }
+    /// 13.9 (7): sta ascoltando dal microfono dell'orecchio (la coda dopo la voce di JARVIS), senza un motore suo.
+    private(set) var suOrecchio = false
+    /// Il tubo verso il trascrittore, per l'orecchio che gli passa l'audio durante la coda.
+    var condottoPerCoda: Condotto { condotto }
+
+    /// 13.9 (7) (il signore, 25 nov: «sembra che mi rispondi più lentamente»): finita la voce di JARVIS, il «Jarvis» in attesa ascolta
+    /// subito dal microfono dell'orecchio, che resta acceso: la frase detta di slancio si capisce dal vivo, senza aspettare la fine
+    /// della coda per rileggerla. Falso se non può partire (allora resta la rilettura della 13.9 (6)).
+    @discardableResult
+    func avviaSuOrecchio() -> Bool {
+        guard !voluto, !motore.isRunning, let riconoscitore, riconoscitore.isAvailable,
+              SFSpeechRecognizer.authorizationStatus() == .authorized else { return false }
+        voluto = true
+        suOrecchio = true
+        precarica = 0
+        condotto.svuota()                   // l'audio del suo microfono di prima ha un altro formato
+        azzera()
+        nuovoRiconoscimento(riconoscitore, recentiDa: nil)
+        programmaRiavvio()
+        return true
+    }
+
+    /// Fine della coda: smette di ascoltare dall'orecchio (il suo microfono lo riaccende Jarvis). L'audio dell'orecchio rimasto nel
+    /// tubo si butta: ha un altro formato e non va riletto dal trascrittore del suo microfono.
+    func lasciaOrecchio() {
+        condotto.svuota()                   // anche senza ascolto dal vivo l'orecchio ci ha scritto durante la coda
+        guard suOrecchio else { return }
+        voluto = false
+        spegni()
+    }
 
     func avvia(precarica secondi: Double = 0) {
         guard !voluto else { return }
@@ -183,7 +213,7 @@ final class Richiamo {
     }
 
     private func accendi() {
-        guard voluto, !acceso, let riconoscitore, riconoscitore.isAvailable else { return }
+        guard voluto, !acceso, !suOrecchio, let riconoscitore, riconoscitore.isAvailable else { return }
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
         // 13.9 (6): l'attacco sentito dall'orecchio si prende prima che questo microfono scriva nel registro (niente doppioni)
@@ -294,6 +324,7 @@ final class Richiamo {
         richiesta = nil
         compito = nil
         acceso = false
+        suOrecchio = false
         azzera()
     }
 
@@ -303,7 +334,7 @@ final class Richiamo {
         timerRiavvio?.invalidate(); timerRiavvio = nil
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
-        guard motore.isRunning, let riconoscitore else {
+        guard suOrecchio || motore.isRunning, let riconoscitore else {
             spegni()
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
@@ -402,7 +433,11 @@ final class Richiamo {
                     // «stop». Senza impronta, o fuori da una risposta, tutto come prima
                     let soloLui = VoceDelSignore.attiva && (inRisposta?() ?? false)
                     if !t.isEmpty, soloLui {
-                        if voceConfermata || Benvenuto.eFraseDiTony(t) || (!affollato && Jarvis.eSoloSilenzio(t)) {
+                        // 13.9 (7) (dialogo delle 11:11: «…i colori da Astro Fat» buttata perché l'impronta ha detto «non è lui»):
+                        // in una stanza tranquilla, subito dopo la sua domanda, una frase vera (quattro parole o più) è il suo seguito
+                        // anche senza conferma dell'impronta, che su un pezzo corto sbaglia
+                        let seguitoSuo = !affollato && parole.count >= 4 && (inAggiunta || adesso < seguitoFinoA)
+                        if voceConfermata || Benvenuto.eFraseDiTony(t) || (!affollato && Jarvis.eSoloSilenzio(t)) || seguitoSuo {
                             trovato = t; soloDopoNome = false
                         } else if parole.count >= 2, !controlloInCorso, inAggiunta || Impostazioni.ascoltoSempre {
                             controllaVoce(turno: mio)             // l'impronta decide (circa 0,7 s), poi la frase continua da dov'era
@@ -532,7 +567,7 @@ final class Richiamo {
     /// l'ascolto senza perdere nulla; sarà il silenzio (timerSilenzio) a decidere quando la frase è davvero finita.
     private func continuaDopoFine() {
         guard sveglio else { return }
-        guard motore.isRunning, let riconoscitore else { chiudi(); return }
+        guard suOrecchio || motore.isRunning, let riconoscitore else { chiudi(); return }
         let detto = resto.isEmpty ? (vocativo ?? "") : resto
         vocativo = nil
         // il microfono non si ferma: cambio solo il trascrittore, e gli rileggo l'audio arrivato dopo la sua chiusura
@@ -576,7 +611,7 @@ final class Richiamo {
         let frase = resto.isEmpty ? (vocativo ?? "") : resto
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
-        if voluto, motore.isRunning, let riconoscitore {
+        if voluto, suOrecchio || motore.isRunning, let riconoscitore {
             azzera()
             nuovoRiconoscimento(riconoscitore, recentiDa: nil)
             programmaRiavvio()
@@ -965,6 +1000,9 @@ nonisolated final class Condotto: @unchecked Sendable {
         while let p = recenti.first, adesso.timeIntervalSince(p.quando) > 1.5 { recenti.removeFirst() }
         lock.unlock()
     }
+
+    /// 13.9 (7): l'audio tenuto per la rilettura si butta (il microfono che scrive qui sta cambiando).
+    func svuota() { lock.lock(); recenti.removeAll(); lock.unlock() }
 
     /// Il trascrittore ha chiuso il suo pezzo adesso.
     func segnaFine() { lock.lock(); fine = Date(); lock.unlock() }

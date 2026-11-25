@@ -259,9 +259,10 @@ final class Orecchio {
     }
 
     /// 13.9 (6): come `ferma`, ma il microfono resta acceso (senza riconoscimento) per la coda dopo la voce di JARVIS. Falso: non era
-    /// acceso, si è spento del tutto.
+    /// acceso, si è spento del tutto. 13.9 (7): `verso` è il tubo del «Jarvis» in attesa, che durante la coda ascolta dal vivo da
+    /// questo microfono (prima rileggeva l'audio solo a coda finita, e la risposta partiva quasi un secondo più tardi).
     @discardableResult
-    func tieniPerCoda() -> Bool {
+    func tieniPerCoda(verso: Condotto? = nil) -> Bool {
         guard acceso, motore.isRunning else { ferma(); return false }
         pulisci()                               // tutto come `ferma`, tranne il motore
         timerRiavvio?.invalidate()
@@ -272,7 +273,7 @@ final class Orecchio {
         richiesta = nil
         compito = nil
         do {
-            try Orecchio.collegaSolo(motore)     // stesso motore, già acceso: cambia solo chi riceve l'audio (niente riconoscimento)
+            try Orecchio.collegaSolo(motore, verso: verso)     // stesso motore, già acceso: cambia solo chi riceve l'audio
             if !motore.isRunning { try motore.start() }
             inCoda = true                       // `acceso` resta vero: il motore è suo finché la coda non si chiude
             return true
@@ -641,6 +642,9 @@ final class Orecchio {
         let input = motore.inputNode
         // cancellazione dell'eco: il microfono non sente la voce che esce dall'altoparlante
         if !input.isVoiceProcessingEnabled { try input.setVoiceProcessingEnabled(true) }
+        // 13.9 (7) (il signore, 25 nov: «nella Dynamic Island ti sento più piano»): con la cancellazione dell'eco iOS abbassa
+        // l'«altro audio», e per lui la voce di JARVIS è altro audio (esce da un altro motore). Abbassamento al minimo
+        input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Orecchio", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
@@ -659,16 +663,25 @@ final class Orecchio {
 
     /// 13.9 (6): la coda: lo stesso microfono con la cancellazione dell'eco, senza riconoscimento. L'audio va negli ultimi secondi
     /// (RegistroMicrofono) e alla misura della voce umana (SopraLaVoce), che dice quando il signore tace.
-    nonisolated private static func collegaSolo(_ motore: AVAudioEngine) throws {
+    /// 13.9 (7): con `verso` l'audio va anche al «Jarvis» in attesa (il suo tubo e le sue misure: voce, folla, ONDE), come dal suo
+    /// microfono.
+    nonisolated private static func collegaSolo(_ motore: AVAudioEngine, verso: Condotto?) throws {
         let input = motore.inputNode
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Orecchio", code: 2, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
         }
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, _ in
+        let ambiente = verso == nil ? nil : AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)
+        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
             RegistroMicrofono.condiviso.scrivi(buffer)
             SopraLaVoce.condivisa.misura(buffer)
+            if let verso {
+                verso.scrivi(buffer)
+                ambiente?.analizza(buffer, posizione: quando.sampleTime)
+                VoceAttiva.condivisa.misura(buffer)
+                Volume.voce.misuraAscolto(buffer)
+            }
         }
     }
 
