@@ -4399,6 +4399,50 @@ async function voceTts(testo: string, idVoce: unknown, flusso = false, primaGrez
   return json({ errore: errori.join(" · ") }, 502);
 }
 
+/// 25 nov (il signore: «eseguiamo con massima competenza»): la prova d'ascolto dei toni. Ogni risposta è un elenco di frasi, dette una
+/// dopo l'altra come fa l'app (stesso modello, la frase di prima come previous_text), con le impostazioni della voce di quella prova.
+/// Torna un mp3 per risposta, in base64. Solo collaudo: non cambia niente di come parla JARVIS.
+async function provaToni(risposte: any[], idVoce: unknown) {
+  const chiave = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
+  if (!chiave) return { errore: "ElevenLabs non configurato" };
+  const modello = await scegliModelloVoce(chiave);
+  // la voce: quella chiesta, altrimenti quella dell'ultima frase detta davvero (la voce scelta nell'app), altrimenti quella di base
+  let voce = idValido(idVoce) ? String(idVoce) : "";
+  if (!voce) {
+    try {
+      const r = await fetch(`${XI}/history?page_size=1`, { headers: { "xi-api-key": chiave }, signal: AbortSignal.timeout(6000) });
+      if (r.ok) voce = String((await r.json())?.history?.[0]?.voice_id ?? "");
+    } catch { /* sotto: la voce di base */ }
+  }
+  if (!idValido(voce)) voce = voceAttuale();
+  const tra = (x: unknown, min: number, max: number, base: number) => { const n = Number(x); return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : base; };
+  const uscita: any[] = [];
+  for (const risposta of risposte.slice(0, 16)) {
+    const frasi = (Array.isArray(risposta?.frasi) ? risposta.frasi : []).map((x: unknown) => String(x ?? "").trim()).filter(Boolean).slice(0, 8);
+    const imp = risposta?.impostazioni ?? {};
+    const vs = { stability: tra(imp.stability, 0, 1, 0.45), similarity_boost: 0.8, style: tra(imp.style, 0, 1, 0.2), use_speaker_boost: true, speed: tra(imp.speed, 0.7, 1.2, 1.05) };
+    const pezzi: Uint8Array[] = [];
+    let prima = "";
+    for (const frase of frasi) {
+      const r = await fetch(`${XI}/text-to-speech/${voce}?output_format=mp3_44100_128`, {
+        method: "POST", signal: AbortSignal.timeout(20000),
+        headers: { "xi-api-key": chiave, "content-type": "application/json", accept: "audio/mpeg" },
+        body: JSON.stringify({ text: toniPerVoce(frase, modello), model_id: modello,
+          ...(prima && conContesto(modello) ? { previous_text: toniPerVoce(prima, modello) } : {}),
+          ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}), voice_settings: vs }),
+      });
+      if (!r.ok) return { errore: `ElevenLabs ${r.status}: ${(await r.text()).slice(0, 200)}` };
+      pezzi.push(new Uint8Array(await r.arrayBuffer()));
+      prima = `${prima} ${frase}`.trim().slice(-300);
+    }
+    const tutto = new Uint8Array(pezzi.reduce((n, p) => n + p.length, 0));
+    let k = 0; for (const p of pezzi) { tutto.set(p, k); k += p.length; }
+    let bin = ""; for (let i = 0; i < tutto.length; i += 0x8000) bin += String.fromCharCode(...tutto.subarray(i, i + 0x8000));
+    uscita.push({ etichetta: String(risposta?.etichetta ?? "").slice(0, 80), byte: tutto.length, mp3: btoa(bin) });
+  }
+  return { modello, voce, risposte: uscita };
+}
+
 // L'iPhone chiede la voce frase per frase, tutte insieme: ElevenLabs accetta solo poche richieste in parallelo
 // (5 sul piano attuale). Qui si fa la fila: al massimo 4 alla volta, e se ElevenLabs dice «troppe» si riprova.
 const MAX_PARALLELO = 3;
@@ -5069,6 +5113,7 @@ Deno.serve(async (req) => {
   try { corpo = await req.json(); } catch { return json({ errore: "richiesta non valida" }, 400); }
   if (typeof corpo?.voce === "string") return await voceTts(corpo.voce, corpo.id_voce, corpo.flusso === true, corpo.prima);   // una frase da dire con la voce di JARVIS
   if (typeof corpo?.trascrivi === "string") return await trascriviVeloce(corpo.trascrivi);                      // Mac: la frase detta, da audio a testo
+  if (Array.isArray(corpo?.voce_prova)) return json(await provaToni(corpo.voce_prova, corpo.id_voce));   // 25 nov: prova d'ascolto dei toni (collaudo)
   if (typeof corpo?.edith === "string") {                                                    // la scheda EDITH (sicurezza)
     try { return json(await paginaEdith(corpo, ipChiamante)); } catch (e) { return json({ errore: (e as Error).message }); }
   }
