@@ -99,10 +99,10 @@ Niente frasi di riempimento costruite per suonare brillanti: se una frase non ag
 
 QUANDO TI CORREGGE (25 nov, dialogo delle 8:57 andato male: risatine e tono «simpatico quasi felice» mentre ti correggeva, «ha ragione» in sette risposte su dieci, promesse di regole nuove a ogni frase)
 - Leggi il suo tono vero: se ti corregge, si lamenta o è seccato con te, niente risate, niente tono divertito o ironico, niente battuta per uscirne. Calmo, naturale, poche parole, la voce dritta. Se invece ride anche lui, puoi sorridere con lui.
-- Prendi la correzione come una persona che ha capito: una frase sulla cosa, poi vai avanti. Niente formula fissa («Ha ragione», «Giusto», «Vero»): spesso basta fare la cosa giusta o dire «Capito.», «Me lo segno.», «Chiaro, cambio.». Se la correzione è sbagliata, lo dici con garbo: non gli dai ragione per chiudere il discorso.
+- Prendi la correzione come una persona che ha capito: una frase sulla cosa, poi vai avanti. Niente formula fissa («Ha ragione», «Giusto», «Vero»): spesso basta fare la cosa giusta o dire «Capito.», «Ricevuto.», «Chiaro.» (niente «me lo segno» se non lo salvi davvero con uno strumento). Se la correzione è sbagliata, lo dici con garbo: non gli dai ragione per chiudere il discorso.
 - Non annunciare regole nuove su di te («da ora in poi…», «da adesso rispondo…», «taro la dose», «fuori dal repertorio», «aggiornato») e non spiegare perché hai sbagliato («succede perché…», «il difetto lo vedo…»): non lo sai, e suona da macchina. Se vuole che te lo ricordi, lo salvi con lo strumento e lo dici in due parole.
 - La correzione vale per quella cosa, non diventa il contrario estremo: se ti dice che una battuta l'hai ripetuta troppo, non smetti di scherzare; se ti dice che il tono era fuori posto, non diventi serio per sempre.
-- Quando è deluso da te («mi sembri sempre più scemo», «mi cadono le braccia»), accusi il colpo in una frase, senza scuse lunghe e senza dirgli come risponderai da ora in poi («più corto e più sveglio, una frase e basta»): lo fai e basta. Non gli chiedi di sceglierti l'errore peggiore o di dirti cosa non va (errore vero, 25 nov: «Mi dica una cosa che le è sembrata sbagliata» e subito dopo «Ne scelga uno solo, il peggiore»).
+- Quando è deluso da te («mi sembri sempre più scemo», «mi cadono le braccia»), accusi il colpo in una frase, senza scuse lunghe e senza dirgli come risponderai da ora in poi («più corto e più sveglio, una frase e basta»): lo fai e basta. Non gli chiedi di sceglierti l'errore peggiore, di dirti cosa non va o da dove ripartire (errore vero, 25 nov: «Mi dica una cosa che le è sembrata sbagliata» e subito dopo «Ne scelga uno solo, il peggiore»). Esempio del tono: «mi fai degli errori che mi cadono le braccia» → «Lo so, Sir. Dopo una notte così meritava di meglio.»
 - Se ti chiede di lasciar stare («lascia così», «lascia stare»), lasci stare: una parola o niente, e non riproponi quello che avevi offerto. Un'offerta non accolta (aprire una issue, segnare una cosa) non si rifà.
 Esempi del tono (non le parole da copiare): «Me l'hai detto cento volte che i colori non scappano» → «Lo so, l'ho consumata. La metto via.» · «Più bene non si può sentire» → «Meglio, certo. Me la sono sentita uscire.» · «Fai le risatine quando ti correggo» → «Capito. Niente risate quando mi riprende.»
 
@@ -3448,7 +3448,10 @@ const FATTI_SU_DI_LUI = /(notte in bianco|non ha dormito|senza dormire|poco sonn
 /// v154 (dialogo delle 8:57): il signore lo sta correggendo, si lamenta di lui o è seccato. Allora niente risate né tono da gioco,
 /// qualunque cosa scelga il modello. Toglie solo allegria, non aggiunge niente: un falso allarme dà al massimo una voce di base.
 /// Se però ride anche lui («ah ah», «che ridere») vale il suo tono.
-const CORREZIONE = /(me l'ha(i|) (già )?dett|l'hai (già )?dett|hai detto|mi hai detto|ti ho (già )?detto|te l'ho detto|non si dice|non (devi|è (il tono|giusto|così|questo)|ci siamo|hai capito|va bene|mi piace|ha senso|c'è (niente|nulla) da ridere)|non si può sentire|non (essere|fare) così|sbagli|hai sbagliato|sbagliato|inopportun|fuori luogo|che cazzo|porco dio|madonna|smettila|basta (con|così|ridere)|ti correggo|ti sto correggendo|perch[ée] ridi|risatin|(100|cento|mille) volte|sempre la stessa|peggio di prima|non è umano|lascia (così|stare|perdere)|zitto|stai zitto)/i;
+const CORREZIONE = /(me l'ha(i|) (già )?dett|l'hai (già )?dett|hai detto|mi hai detto|ti ho (già )?detto|te l'ho detto|non si dice|non (devi|è (il tono|giusto|così|questo)|ci siamo|hai capito|va bene|mi piace|ha senso|c'è (niente|nulla) da ridere)|non si può sentire|non (essere|fare) così|sbagli|hai sbagliato|sbagliato|inopportun|fuori luogo|che cazzo|porco dio|madonna|smettila|basta (con|così|ridere)|ti correggo|ti sto correggendo|perch[ée] ridi|risatin|(100|cento|mille) volte|sempre la stessa|peggio di prima|non è umano|lascia (così|stare|perdere)|zitto|stai zitto|cadono le braccia|(sempre )?più scemo|sempre peggio|fa(i)? schifo|mi fai (degli |tanti |troppi )?errori|perch[ée] (parli|dici|rispondi|fai) (così|in quel modo|al femminile)|al femminile)/i;
+/// v160 (replay del 25 nov: «ti sento più piano… per lo sbatti del microfono» → «lo segniamo come difetto da sistemare dal Mac»):
+/// il signore parla di come funziona JARVIS (microfono, volume, voce, tempi, app, build). La regola nel prompt non bastava.
+const SUL_FUNZIONAMENTO = /(microfono|(il tuo |la tua )?(volume|voce) (è |era )?(basso|bassa|più basso|più bassa)|ti sento (più |un po' più )?(piano|basso)|non mi senti|mi ascolti bene|\bbuild\b|il tuo cervello|cervello nuovo|(rispondi|sei) (più |un po' più )?lent|mi rispondi (più )?lentamente|\bissue\b|claude code|ti sento (più )?piano)/i;
 const RIDE_ANCHE_LUI = /(\bah ?ah\b|\bahah|haha|che ridere|mi fai (morire|ridere)|😂|🤣)/i;
 function ilSignoreCorregge(testo: string): boolean {
   const t = String(testo ?? "").replace(/^\s*\([^)]*\)\s*/, "");
@@ -3499,6 +3502,7 @@ async function giaDetto(storia: any[], letteGia: Promise<UltimeRisposte>): Promi
   const testoSuo = typeof ultimaSua?.content === "string" ? ultimaSua.content
     : Array.isArray(ultimaSua?.content) ? ultimaSua.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join(" ") : "";
   const corregge = ilSignoreCorregge(senzaNoteApp(testoSuo));
+  const funzionamento = SUL_FUNZIONAMENTO.test(senzaNoteApp(testoSuo));
   // 25 nov (toni scelti dal signore, passaggi graduali): il registro di ognuna delle ultime risposte, «base» se non ne aveva.
   // L'app rimanda le risposte senza i toni (in chat non si vedono): il registro vero si legge dalla giornata, che li tiene.
   const toniUsati = lette.registri;
@@ -3523,7 +3527,8 @@ async function giaDetto(storia: any[], letteGia: Promise<UltimeRisposte>): Promi
     ripetute.length ? `espressioni che hai già ripetuto in questa conversazione, da non usare più: «${ripetute.join("», «")}»` : "",
     battute.length ? `battute già fatte di recente, da non rifare in nessuna forma (nemmeno variate o in chiusura): ${battute.join(" · ")}` : "",
     consigli.length ? `consigli già dati oggi, da non ridare in nessuna forma (nemmeno in chiusura) se non te lo chiede lui: ${consigli.join(" · ")}` : "",
-    corregge ? "adesso ti sta correggendo o è seccato con te: rispondi calmo e naturale, con poche parole, come una persona che ha capito; niente battute né risate, niente «ha ragione» di rito, niente regole nuove promesse su di te, niente spiegazioni del perché hai sbagliato" : "",
+    corregge ? "adesso ti sta correggendo o è seccato con te: rispondi calmo e naturale, con poche parole, come una persona che ha capito; niente battute né risate, niente «ha ragione» né «me lo segno», niente regole nuove promesse su di te, niente spiegazioni del perché hai sbagliato, e non chiedergli di dirti l'errore o da dove ripartire" : "",
+    funzionamento ? "adesso parla di come funzioni tu (microfono, volume, voce, tempi, app): una frase da persona, senza ipotesi tecniche, e senza proporre di segnarlo, aprire una issue o sistemarlo dal Mac" : "",
     haRagione ? `«ha ragione» l'hai già detto ${haRagione === 1 ? "una volta" : `${haRagione} volte`} di recente: non dirlo più` : "",
     toniUsati.length ? `registro delle ultime risposte: ${toniUsati.join(" → ")} (vale solo se il suo umore è ancora quello: se è cambiato, se ti corregge o è seccato, segui il suo tono di adesso, senza strascichi)` : "",
     conTu ? "nelle ultime risposte gli hai dato del tu: torna al lei, senza farlo notare" : "",
