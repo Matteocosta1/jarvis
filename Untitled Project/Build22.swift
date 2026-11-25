@@ -114,6 +114,9 @@ nonisolated enum Dialogo {
     static let finestraAggiunta: TimeInterval = 2
     /// Finita una risposta, per 4 secondi il seguito vale anche senza «Jarvis» («Perché?», «E domani?»), come tra due persone.
     static let finestraSeguito: TimeInterval = 4
+    /// 13.9 (5) (25 nov): se la risposta finisce con una domanda, il seguito vale 12 secondi: il signore ha il tempo di pensarci
+    /// e anche una parola sola («Virginia», «domani») è la risposta.
+    static let finestraDomanda: TimeInterval = 12
 
     // MARK: Il punto dell'interruzione
 

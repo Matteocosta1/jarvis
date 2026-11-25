@@ -2718,6 +2718,13 @@ final class Jarvis: NSObject, ObservableObject {
         if flussoFinito { fineParlato() } else if fase == .parlo { fase = .elaboro }   // detto tutto, il resto è in arrivo
     }
 
+    /// 13.9 (5): l'ultima risposta di JARVIS finisce con una domanda (aspetta una risposta dal signore).
+    private var ultimaRispostaChiede: Bool {
+        guard let t = messaggi.last(where: { $0.ruolo == "assistant" && !$0.testo.isEmpty })?.testo else { return false }
+        let pulito = t.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "»\"”)')")))
+        return pulito.hasSuffix("?")
+    }
+
     private func fineParlato() {
         let eraRisposta = flussoFinito && idTurno != nil   // la risposta a una domanda (non un annuncio, una notifica, un errore)
         let conSeguito = seguitoDopoAnnuncio && flussoFinito   // 12.0 (16): una frase del dialogo detta dall'app
@@ -2729,7 +2736,12 @@ final class Jarvis: NSObject, ObservableObject {
         lavoriDopoVoce.removeAll()
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
         // M6: finita la risposta, per qualche secondo il seguito vale anche senza «Jarvis» («Perché?», «E domani?»)
-        if eraRisposta || conSeguito { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
+        // 13.9 (5) (25 nov: «Come si chiama?» → «Virginia» detto dopo 4 secondi, una parola sola, lasciata andare): se la risposta
+        // finisce con una domanda, il seguito senza «Jarvis» vale 12 secondi (anche una parola sola), il tempo di pensarci
+        if eraRisposta || conSeguito {
+            richiamo.seguitoFinoA = Date().addingTimeInterval(ultimaRispostaChiede ? Dialogo.finestraDomanda : Dialogo.finestraSeguito)
+            fineUltimaRisposta = Date()
+        }
         fase = .attesa
         // 11 nov (#16): fuori dall'app il dialogo resta aperto per il seguito; se per 8 secondi non dice nulla, è finito
         if dialogoFuori { chiudiDialogoFuori(fra: 8) }
@@ -3279,7 +3291,8 @@ final class Jarvis: NSObject, ObservableObject {
             guard let self, !Task.isCancelled, self.dialogoFuori, UIApplication.shared.applicationState != .active else { return }
             // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
             // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
-            guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { self.chiudiDialogoFuori(fra: secondi); return }
+            // 13.9 (5): anche finché vale il seguito (12 secondi dopo una domanda): la risposta del signore deve arrivare
+            guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty, Date() >= self.richiamo.seguitoFinoA else { self.chiudiDialogoFuori(fra: secondi); return }
             self.spegniMicFuori()
         }
     }
@@ -4623,6 +4636,9 @@ extension Jarvis {
         // 13 nov (prova dei tre punti): le volte che la voce di JARVIS è scesa o si è fermata per lui, e com'è finita
         let esitazioni = orecchio.esitazioniPerMisura()
         if !esitazioni.isEmpty { misura["esitazioni"] = esitazioni }
+        // 13.9 (5): le frasi sentite in attesa e lasciate andare negli ultimi 3 minuti, col perché
+        let scartate = richiamo.scartatePerMisura()
+        if !scartate.isEmpty { misura["scartate"] = scartate }
         // 13 nov (punto 3): come si è chiusa la frase (pausa vera o tetto senza parole nuove) e il rumore della stanza
         if !chiusaDa.isEmpty { misura["fine_da"] = chiusaDa }
         chiusaDa = ""

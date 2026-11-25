@@ -83,6 +83,10 @@ final class Richiamo {
     private var inizioSegmento = 0       // da quale parola comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimeParole = 0
     private var ultimoParziale = Date.distantPast
+    /// 13.9 (5) (25 nov, il signore: «il microfono è andato in attesa e non ha ascoltato, non so perché»): le frasi sentite in
+    /// attesa e lasciate andare, col perché. Vanno al cervello con la misura del turno dopo (`scartatePerMisura`), così la prossima
+    /// volta si sa con certezza perché non l'ha presa. Una riga per pezzo di frase (dopo una pausa), le ultime sei.
+    private var scartate: [(quando: Date, segmento: Int, parole: String, motivo: String)] = []
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = FineFrase.nomiJarvis      // 12.0 (10): una lista sola per iPhone, Mac e polso
@@ -90,6 +94,39 @@ final class Richiamo {
     nonisolated static let risposteBrevi: Set<String> = ["sì", "si", "no", "ok", "okay", "grazie", "perfetto", "certo", "esatto",
                                                          "bravo", "basta", "avanti", "pausa", "stop", "dimmi", "allora", "senti"]
     nonisolated static let aperture = ["ascoltami", "ascolta", "ehi", "hey", "ei", "bro", "fratello", "frate", "socio", "amico", "capo"]
+
+    /// 13.9 (5): una frase sentita in attesa e lasciata andare. Il perché con le stesse regole di `valuta`: musica o RISERVATO (solo
+    /// «Jarvis»), orologio in uso, gente o TV intorno, ascolto sempre spento, una parola sola che non è un «sì», fuori dal seguito.
+    private func annotaScarto(_ segmento: String) {
+        let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+        guard !t.isEmpty else { return }
+        let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
+        let motivo: String
+        if soloNome { motivo = "solo_nome" }
+        else if OrologioInUso.attivo { motivo = "orologio" }
+        else if controlloInCorso { motivo = "impronta" }
+        else if AmbienteSonoro.condiviso.affollato { motivo = "folla" }
+        else if !Impostazioni.ascoltoSempre { motivo = "senza_nome" }
+        else if parole.count < 2 { motivo = "una_parola" }
+        else { motivo = "altro" }
+        let adesso = Date()
+        if let ultima = scartate.last, ultima.segmento == inizioSegmento, adesso.timeIntervalSince(ultima.quando) < 8 {
+            scartate[scartate.count - 1] = (quando: adesso, segmento: inizioSegmento, parole: String(t.prefix(120)), motivo: motivo)   // lo stesso pezzo che cresce
+        } else {
+            scartate.append((quando: adesso, segmento: inizioSegmento, parole: String(t.prefix(120)), motivo: motivo))
+            if scartate.count > 6 { scartate.removeFirst(scartate.count - 6) }
+        }
+    }
+
+    /// 13.9 (5): le frasi lasciate andare negli ultimi 3 minuti (per la misura del turno), poi si ricomincia.
+    func scartatePerMisura() -> [[String: Any]] {
+        let adesso = Date()
+        let out: [[String: Any]] = scartate.filter { adesso.timeIntervalSince($0.quando) < 180 }.map {
+            ["parole": $0.parole, "motivo": $0.motivo, "s_fa": Int(adesso.timeIntervalSince($0.quando).rounded())]
+        }
+        scartate.removeAll()
+        return out
+    }
 
     /// Se nella frase c'è un richiamo, restituisce ciò che viene dopo (anche vuoto); altrimenti nil.
     nonisolated static func dopoRichiamo(_ frase: String) -> String? {
@@ -377,6 +414,8 @@ final class Richiamo {
                         }
                     }
                 }
+                // 13.9 (5): la frase sentita e lasciata andare (non per lui, fuori dal seguito, folla…): si annota col perché
+                if trovato == nil { annotaScarto(segmento) }
                 guard let dopo = trovato else { if fine { riavvia(recentiDa: condotto.ultimaFine) }; return }
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 paroleFinoAlNome = soloDopoNome ? max(0, Richiamo.contaParole(segmento) - Richiamo.contaParole(dopo)) : 0
