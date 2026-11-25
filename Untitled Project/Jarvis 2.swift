@@ -2749,10 +2749,14 @@ final class Jarvis: NSObject, ObservableObject {
                 let passati = Date().timeIntervalSince(da)
                 let parla = SopraLaVoce.condivisa.voceUmana(ultimi: dalVivo ? 0.8 : 0.5) > 0.05
                 let raccoglie = dalVivo && self.richiamo.sveglio      // sta prendendo una frase: non si cambia microfono a metà
-                if !self.orecchio.inCoda || (dalVivo && !self.richiamo.suOrecchio) || passati >= 60
+                if !self.orecchio.inCoda || (dalVivo && !self.richiamo.suOrecchio) || passati >= 120
                     || (!raccoglie && (passati >= massimo || (passati >= minimo && !parla))) { break }
-                // il microfono serve ad altro (spento a mano, una sezione, il Wiretap) o JARVIS è ripartito: la coda finisce subito
-                if self.micSpento || !self.richiamoConsentito || WiretapAperto.aperto || self.fase != .attesa { break }
+                // il microfono serve ad altro (spento a mano, una sezione, il Wiretap) o JARVIS è ripartito: la coda finisce subito.
+                // 13.9 (8) (il signore, 25 nov 13:00: «prende la prima parola e si blocca»): il «Jarvis» che ascolta dall'orecchio e
+                // sente la sua frase mette l'app in ascolto (`richiamato`): quello non è «JARVIS ripartito». Prima la coda si chiudeva
+                // lì e spegneva il microfono che stava raccogliendo la frase: l'app restava in ascolto di una frase che non arrivava più
+                let ascoltaDalVivo = raccoglie && self.fase == .ascolto
+                if self.micSpento || !self.richiamoConsentito || WiretapAperto.aperto || (self.fase != .attesa && !ascoltaDalVivo) { break }
             }
             guard !Task.isCancelled else { return }
             self?.chiudiCoda()
