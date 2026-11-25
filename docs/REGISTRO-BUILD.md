@@ -569,7 +569,7 @@ Causa (dal codice): mentre parla ascolta l'orecchio (microfono con la cancellazi
 5. Il seguito dopo una domanda torna a 4 s (i 12 s della 13.9 (5) tolti: il signore, 09:30).
 6. **Frasi senza doppioni** (commit e2d0a32): quando il riconoscimento riscrive la frase da capo dopo una pausa, l'ascolto e il «Jarvis» in attesa non mettono più davanti il pezzo già detto (`Dialogo.unisci`: riscrittura → vale la versione più lunga; coda ripetuta → una volta sola). Anche il cervello toglie i doppioni (v155), per le app di prima e il polso.
 Polso: non cambia. Da verificare sul telefono: rispondere subito, di slancio, a una domanda di JARVIS (le prime parole devono arrivare); che non si senta ripetere da solo; che la musica e le sezioni col microfono vadano come prima; che le frasi lunghe con una pausa in mezzo arrivino intere e senza ripetizioni.
-Controllo di compilazione: run 45578213601 (commit 384b821) VERDE; poi con il punto 6: run 45582076049 — esito sotto.
+Controllo di compilazione: run 45578213601 (commit 384b821) VERDE; poi con il punto 6: run 45582076049 VERDE (0 errori, 0 warning). Pronta da caricare (Pull + Archive + TestFlight).
 
 ## Cervello — 25 nov, 09:25 · commit af51eb7 · versione 154 · dialogo delle 8:57 andato male
 Il signore (09:07): «questo è andato male rispetto a prima». Analisi delle 26 battute (08:57–09:06):
