@@ -3364,6 +3364,14 @@ async function filoAperto(): Promise<string> {
 
 /// C2/C3 · quello che JARVIS ha già detto: come sono cominciate le ultime risposte, se ha già detto «Sir», le battute recenti e
 /// i consigli di oggi. Così non ripete la stessa battuta per settimane né lo stesso consiglio cinque volte al giorno.
+/// Il registro delle ultime 3 risposte di JARVIS (20 minuti), dalla giornata che tiene i toni; «base» se una non ne aveva.
+async function ultimiRegistri(): Promise<string[]> {
+  try {
+    const { data: ultime } = await db.from("jarvis_giornata").select("jarvis").neq("dispositivo", "mac")
+      .gte("creato", new Date(Date.now() - 20 * 60_000).toISOString()).order("creato", { ascending: false }).limit(3);
+    return (ultime ?? []).reverse().map((r: any) => registroDi(String(r.jarvis ?? "")) ?? "base");
+  } catch { return []; }
+}
 async function giaDetto(storia: any[]): Promise<string> {
   const tutte = storia.filter((m) => m.role === "assistant" && typeof m.content === "string").map((m) => String(m.content));
   const mie = tutte.slice(-4);
@@ -3388,12 +3396,7 @@ async function giaDetto(storia: any[]): Promise<string> {
   const ripetute = [...conteggio].filter(([, n]) => n >= 2).map(([g]) => g).slice(0, 6);
   // 25 nov (toni scelti dal signore, passaggi graduali): il registro di ognuna delle ultime risposte, «base» se non ne aveva.
   // L'app rimanda le risposte senza i toni (in chat non si vedono): il registro vero si legge dalla giornata, che li tiene.
-  let toniUsati: string[] = [];
-  try {
-    const { data: ultime } = await db.from("jarvis_giornata").select("jarvis").neq("dispositivo", "mac")
-      .gte("creato", new Date(Date.now() - 20 * 60_000).toISOString()).order("creato", { ascending: false }).limit(3);
-    toniUsati = (ultime ?? []).reverse().map((r: any) => registroDi(String(r.jarvis ?? "")) ?? "base");
-  } catch { /* senza giornata: niente riga sul registro */ }
+  const toniUsati = await ultimiRegistri();
   let battute: string[] = [], consigli: string[] = [];
   try {
     const { data } = await db.from("jarvis_battute").select("tipo, testo, creato").gte("creato", new Date(Date.now() - 14 * 86400_000).toISOString()).order("creato", { ascending: false }).limit(40);
@@ -4365,10 +4368,10 @@ const TONO = /(^|\s)\[([a-z][a-z \-]{0,23})\](?!\()[ \t]*/g;
 /// impostazioni della voce, misurate nella prova. Il tono tra parentesi resta e in più cambiano stabilità, enfasi e velocità.
 const VOCE_BASE = { stability: 0.45, style: 0.2, speed: 1.12 };
 const VOCE_REGISTRI: Record<string, { stability: number; style: number; speed: number }> = {
-  softly: { stability: 0.6, style: 0.1, speed: 0.95 }, warm: { stability: 0.5, style: 0.3, speed: 1.0 }, amused: { stability: 0.35, style: 0.35, speed: 1.08 },
+  softly: { stability: 0.55, style: 0.15, speed: 1.0 },   // 25 nov 07:28 (il signore: «troppo triste, troppo soffusa… una via di mezzo») warm: { stability: 0.5, style: 0.3, speed: 1.0 }, amused: { stability: 0.35, style: 0.35, speed: 1.08 },
   serious: { stability: 0.7, style: 0.05, speed: 1.0 }, concerned: { stability: 0.6, style: 0.15, speed: 0.97 }, excited: { stability: 0.3, style: 0.45, speed: 1.1 },
   whispers: { stability: 0.6, style: 0.1, speed: 0.92 }, sarcastic: { stability: 0.4, style: 0.35, speed: 1.05 }, uncertain: { stability: 0.45, style: 0.15, speed: 0.98 },
-  reassuring: { stability: 0.6, style: 0.15, speed: 0.97 }, sad: { stability: 0.65, style: 0.1, speed: 0.93 }, firmly: { stability: 0.7, style: 0.1, speed: 1.0 },
+  reassuring: { stability: 0.6, style: 0.15, speed: 0.97 }, sad: { stability: 0.6, style: 0.12, speed: 0.97 }, firmly: { stability: 0.7, style: 0.1, speed: 1.0 },
   proud: { stability: 0.45, style: 0.35, speed: 1.0 }, curious: { stability: 0.4, style: 0.3, speed: 1.05 }, surprised: { stability: 0.35, style: 0.4, speed: 1.08 },
   impressed: { stability: 0.45, style: 0.35, speed: 1.0 }, thoughtful: { stability: 0.55, style: 0.15, speed: 0.95 }, apologetic: { stability: 0.6, style: 0.1, speed: 0.97 },
   urgent: { stability: 0.5, style: 0.3, speed: 1.15 }, relieved: { stability: 0.45, style: 0.3, speed: 1.0 }, conspiratorial: { stability: 0.45, style: 0.3, speed: 0.98 },
@@ -4382,9 +4385,19 @@ const VOCE_ALTRO = { stability: 0.5, style: 0.25, speed: 1.02 };
 const SUONI = new Set(["laughs", "sighs", "long pause", "pause", "in english", "clears throat", "exhales", "chuckles", "gasps", "laughs softly"]);
 /// Il registro di un testo: il primo tono che non è un suono («slightly softly» compreso), o null.
 function registroDi(t: string): string | null {
-  for (const m of String(t ?? "").matchAll(/\[([a-z][a-z \-]{0,23})\]/gi)) { const x = m[1].toLowerCase().trim(); if (!SUONI.has(x)) return x; }
+  for (const m of String(t ?? "").matchAll(/\[([a-z][a-z \-]{0,23})\]/gi)) {
+    const x = m[1].toLowerCase().trim();
+    if (SUONI.has(x)) continue;
+    if (x.startsWith("t ")) return x.slice(2);                 // registro tenuto pieno (segno del cervello)
+    if (x.startsWith("h ")) return `slightly ${x.slice(2)}`;   // registro tenuto a metà
+    return x;
+  }
   return null;
 }
+/// 25 nov 07:28 (il signore: «abbassa troppo la voce»): il registro si tiene sulle frasi dopo la prima con un segno («[t softly]»,
+/// «[h softly]» se a metà) che vale solo per le impostazioni della voce e non arriva a ElevenLabs: la parentesi vera, che con
+/// [softly] o [warm] abbassa il volume, resta solo sulla prima frase. L'app non mostra i segni (sono parentesi minuscole).
+const SEGNO_TENUTO = /(^|\s)\[(?:t|h) [a-z][a-z \-]{0,21}\][ \t]*/g;
 /// Le impostazioni della voce per una frase: dal suo registro; «slightly …» sta a metà strada fra il base e quel registro.
 function impostazioniVoce(t: string, modello: string) {
   let reg = capisceToni(modello) ? registroDi(t) : null;
@@ -4400,8 +4413,27 @@ function impostazioniVoce(t: string, modello: string) {
 /// 25 nov: il registro tenuto su tutta la risposta. L'app manda alla voce una frase alla volta (con al massimo le due frasi prima):
 /// qui, mentre la risposta arriva, il tono della risposta si rimette davanti a ogni frase nuova, così la voce non torna al base a
 /// metà. Solo nel testo che va all'app: «detto» (chat, ricordi, cronologia) resta com'è scritto.
-function tenitoreTono() {
+const SENZA_LIEVE = (x: string) => x.replace(/^(slightly|a bit|a little)\s+/, "");
+const REGISTRI_PESANTI = new Set(["softly", "sad", "concerned", "angry", "furious", "tired", "bored", "apologetic", "patient", "serious", "firmly"]);
+const SUBITO = new Set(["whispers", "urgent"]);   // questi non aspettano il passaggio graduale (sussurro chiesto, avviso urgente)
+/// 25 nov 07:28 (il signore: «non è troppo graduale… enfatizza»): il primo registro della risposta, corretto per i passaggi.
+/// Entrata in un registro nuovo: a metà ([slightly …]). Dopo due risposte piene dello stesso registro pesante: si spegne a metà.
+/// Dopo due risposte morbide di fila (vicino o triste): «via di mezzo», cioè caldo a metà.
+function registroGraduale(tag: string, prima: string[]): string {
+  const x = SENZA_LIEVE(tag), lieve = x !== tag;
+  if (SUBITO.has(x)) return tag;
+  const ultimo = prima.at(-1) ?? "base", penultimo = prima.at(-2) ?? "base";
+  const morbido = (r: string) => ["softly", "sad"].includes(SENZA_LIEVE(r));
+  if ((x === "softly" || x === "sad") && morbido(ultimo) && morbido(penultimo)) return "slightly warm";
+  if (lieve) return tag;
+  if (SENZA_LIEVE(ultimo) !== x) return `slightly ${x}`;
+  if (ultimo === x && penultimo === x && REGISTRI_PESANTI.has(x)) return `slightly ${x}`;
+  return tag;
+}
+function tenitoreTono(prima: string[] = []) {
   let attesa = "", registro: string | null = null, confine = false, spazio = false, inizio = true;
+  let primoOriginale = "", primoCorretto = "";
+  const segno = (r: string) => SENZA_LIEVE(r) === "whispers" ? `[${r}] ` : (SENZA_LIEVE(r) !== r ? `[h ${SENZA_LIEVE(r)}] ` : `[t ${r}] `);
   const passo = (finale: boolean) => {
     let out = "", i = 0;
     while (i < attesa.length) {
@@ -4412,23 +4444,31 @@ function tenitoreTono() {
         else {
           const dentro = attesa.slice(i + 1, chiusa);
           if (/^[a-z][a-z \-]{0,23}$/i.test(dentro)) {
-            const x = dentro.toLowerCase().trim();
-            if (!SUONI.has(x)) { registro = x; confine = false; inizio = false; }
-            else if (confine && spazio && registro) { out += `[${registro}] `; confine = false; }
+            let x = dentro.toLowerCase().trim();
+            if (!SUONI.has(x)) {
+              if (!primoOriginale) { primoOriginale = x; x = registroGraduale(x, prima); primoCorretto = x; }
+              registro = x; confine = false; inizio = false;
+              out += `[${x}]`; i = chiusa + 1; continue;
+            }
+            if (confine && spazio && registro) { out += segno(registro); confine = false; }
             out += attesa.slice(i, chiusa + 1); i = chiusa + 1; inizio = false; continue;
           }
         }
       }
       if (".!?…;:\n".includes(c)) { confine = true; spazio = c === "\n"; out += c; i++; continue; }
       if (/\s/.test(c)) { if (confine) spazio = true; out += c; i++; continue; }
-      if (confine && spazio && registro && !inizio) out += `[${registro}] `;
+      if (confine && spazio && registro && !inizio) out += segno(registro);
       confine = false; spazio = false; inizio = false;
       out += c; i++;
     }
     attesa = attesa.slice(i);
     return out;
   };
-  return { aggiungi: (d: string) => { attesa += d; return passo(false); }, svuota: () => passo(true) };
+  return {
+    aggiungi: (d: string) => { attesa += d; return passo(false); }, svuota: () => passo(true),
+    // la risposta salvata (giornata, ricordi) con il registro corretto, così il passaggio dopo parte dal registro vero
+    correggi: (t: string) => primoOriginale && primoCorretto !== primoOriginale ? t.replace(`[${primoOriginale}]`, `[${primoCorretto}]`) : t,
+  };
 }
 /// Nelle risposte di prima (che l'app rimanda) il tono ripetuto davanti a ogni frase si toglie: il modello deve vedere un tono solo.
 function tonoUnico(t: string): string {
@@ -4443,6 +4483,7 @@ function tonoUnico(t: string): string {
 const capisceToni = (modello: string) => /eleven_v3|eleven_v4/.test(modello);
 /// Il testo da mandare alla voce: con i toni accesi e un modello che li capisce restano solo quelli ammessi, altrimenti via tutti.
 function toniPerVoce(t: string, modello: string) {
+  t = t.replace(SEGNO_TENUTO, "$1");
   const tieni = VOCE_TONI && capisceToni(modello);
   // 25 nov (il signore: «tutti gli stati d'animo di un essere umano»): con la voce v4 passa ogni tono, non solo quelli di prima
   return t.replace(TONO, (intero, prima, tono) => tieni ? (tono === "in english" ? `${prima}[in English] ` : intero) : prima)
@@ -4453,7 +4494,8 @@ const SISTEMA_TONI = VOCE_TONI ? `
 TONI DELLA VOCE
 La tua voce ha tutti gli stati d'animo di una persona vera. Su iPhone e Apple Watch (mai sul Mac) metti il registro della risposta tra parentesi quadre, in inglese minuscolo, all'inizio della risposta: la voce lo tiene da sola su tutte le frasi, quindi non ripeterlo. Senza parentesi parli col tuo registro di base. Sullo schermo non si vedono.
 I registri scelti dal signore (25 nov), da usare per primi: [softly] vicino · [warm] caldo · [affectionate] affettuoso · [amused] divertito · [sarcastic] ironico · [excited] entusiasta · [proud] orgoglioso · [relieved] sollevato · [impressed] colpito · [surprised] sorpreso · [curious] curioso · [thoughtful] pensieroso · [uncertain] incerto · [reassuring] rassicurante · [serious] serio · [firmly] deciso · [concerned] preoccupato · [urgent] urgente · [apologetic] dispiaciuto · [patient] paziente (puoi aprire con un [sighs]) · [sad] triste · [conspiratorial] complice · [tired] stanco · [bored] annoiato · [angry] arrabbiato · [furious] incazzato · [whispers] sussurro (sempre quando chiede di parlare piano o qualcuno dorme). Quando nessuno di questi dice esattamente quello che provi, usa la parola inglese giusta per qualunque altro stato d'animo umano ([nostalgic], [disappointed], [hopeful], [embarrassed], [frustrated], [tender]…).
-Dentro la risposta, attaccati alle parole, i suoni veri quando capitano: [laughs] (solo se qualcosa fa ridere davvero), [sighs], [long pause].
+Dentro la risposta, attaccati alle parole, i suoni veri quando capitano: [laughs] (solo se qualcosa fa ridere davvero), [sighs], [long pause]. Non scrivere mai «ahah», «haha» o «eheh»: la risata è [laughs].
+MISURA (25 nov, il signore: «enfatizza… troppo triste, troppo soffusa… una via di mezzo»): quando ti racconta cose sue (Beatrice, la famiglia, la stanchezza) non vuol dire che è triste: il registro giusto è [warm], presente e con la voce dritta. [softly] solo se è giù davvero (lutto, sconforto) e anche lì presente, mai da veglia funebre; se ti dice che è sereno, torni subito al base. Le emozioni a piccole dosi, con understatement: niente frasi solenni o melodrammatiche («la cosa più bella che mi abbia detto», «una piccola consacrazione», «veglia funebre»). La voce fa da sola il passaggio graduale: tu scegli il registro che senti.
 PASSAGGI (scelti dal signore: graduali): il registro cambia come in una persona, per gradi. Dal base a un altro: la prima risposta con [slightly …] (es. [slightly softly], [slightly angry]), dalla seconda il registro pieno. Per tornare al base: una risposta con [slightly …] e poi niente. Da un registro a un altro: la prima risposta col nuovo in [slightly …]. Un fatto forte (una brutta notizia, una gioia vera, una provocazione pesante) può saltare il passaggio. [Già detto …] ti dice il registro delle ultime risposte: parti da lì. Su comandi secchi, conferme brevi e lavoro tecnico resta il base. Non spiegarli e non nominarli.
 LINGUE STRANIERE: le parole e i nomi stranieri si scrivono come sono, mai riscritti all'italiana (Apple Watch, Wake up, crème brûlée). Una frase intera in inglese (una citazione, un titolo, una battuta di Tony) la apri con [in english].` : "";
 
@@ -5814,7 +5856,7 @@ Deno.serve(async (req) => {
         }
 
         let tenuto = "";
-        const tono = tenitoreTono();   // 25 nov: il registro della risposta davanti a ogni frase che va alla voce
+        const tono = tenitoreTono(await ultimiRegistri());   // 25 nov: il registro della risposta tenuto su ogni frase, con i passaggi graduali
         let contaminato = turnoContaminato(lavoro) || briefingConPosta;
         modelloTurno = modello;
         for (let giro = 0; giro < 10; giro++) {
@@ -5863,6 +5905,7 @@ Deno.serve(async (req) => {
             chiudi(); return;
           }
           if (r.stop_reason !== "tool_use") {
+            detto = tono.correggi(detto);   // 25 nov 07:28: nella giornata il registro corretto dai passaggi
             let testo = detto.trim();
             if (!testo) testo = r.stop_reason === "max_tokens"
               ? "Sir, la richiesta era più lunga del fiato che ho. Me la chieda in una versione più mirata."
