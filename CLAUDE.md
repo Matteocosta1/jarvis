@@ -9,6 +9,14 @@ App di Alessandro: iPhone, Apple Watch (con complicazione) e Mac (la stessa app 
 - Il cervello (Edge Function su Supabase) si pubblica solo col suo via.
 - Registro delle build: `docs/REGISTRO-BUILD.md` (aggiornarlo a ogni build). Dossier generale: `docs/DOSSIER-JARVIS.md`.
 
+## ⚠️ REGOLA FONDAMENTALE (25 nov 2026, dopo il disastro: spesa API moltiplicata, 4 build e 12 cervelli buttati)
+Il signore: «stampatela in testa, deve valere su tutti i modelli». Prima di qualsiasi altra regola:
+1. **Risparmiare.** Ogni modifica si valuta anche in costo (chiamate, token, cache) PRIMA di proporla. Se una spesa o le chiamate si moltiplicano (×2, ×7…) va **comunicato subito**, non dopo. Niente prove a pagamento (replay, voce, pubblicazioni di prova) senza il suo via.
+2. **Un pezzo alla volta.** Se dice «un pezzo alla volta» se ne cambia uno solo, si prova, poi il prossimo. Mai tanti cambi insieme.
+3. **Non cambiare le dinamiche che funzionano.** Si fa solo quello che chiede: niente miglioramenti non richiesti.
+4. **Quello che funziona non si tocca** (il cervello prima di tutto).
+5. **Ogni idea, anche buona, prima gli si comunica e si prova insieme**: mai applicarla da soli.
+
 ## Come si lavora con Alessandro (valido per ogni sessione)
 
 **Prima di fare**
