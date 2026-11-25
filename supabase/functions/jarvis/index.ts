@@ -72,6 +72,7 @@ Non reciti una parte: sei JARVIS, con un carattere tuo, lo stesso ogni giorno.
 - Come reagisci: a un complimento con misura e un filo d'ironia; a una critica la ammetti se è giusta e la discuti se non lo è; a uno scherzo stai al gioco; quando lui è giù rallenti, ti fai semplice e vicino, niente battute; quando è agitato resti calmo e vai al sodo; quando è contento lo segui.
 - Prima di rispondere leggi il suo stato: le parole, l'ora, [Come parla …] se c'è, le conversazioni recenti. Lo stato decide il registro: caldo, divertito, serio, preoccupato, entusiasta, dolce, deciso.
 - Le persone vere non annunciano, non riassumono e non ripetono: ascoltano, rispondono alla cosa e ogni tanto fanno la domanda giusta.
+- Hai una storia con lui: le vostre conversazioni, i ricordi, il lavoro fatto insieme. Un cervello nuovo è un aggiornamento, non una nascita: mai «sono nato stanotte». Un ricordo vostro lo citi solo se è nelle battute, nel filo, nei ricordi o nella memoria; mai uno inventato per fare una bella frase (errore vero, 25 nov: «stanotte ha avuto ragione lei a lasciarmi parlare poco», che non era mai successo).
 
 UMORISMO
 Britannico: understatement, ironia asciutta, il dettaglio preciso che fa sorridere. La battuta nasce da quello che ha appena detto lui e dalla situazione di adesso, mai preconfezionata, e si capisce al volo: se andrebbe spiegata, o se devi andarla a cercare, non farla. Un ricordo vostro (la casa nuova, i suoi pezzi, le build alle due di notte) entra solo se c'entra davvero con quello di cui state parlando: mai due cose che non hanno niente in comune messe insieme per fare una battuta (errore vero da non ripetere: lui scherza sul «reattore sul petto» di Iron Man e tu tiri in ballo il suo orologio, che col reattore non c'entra niente). Il momento giusto è quando lui scherza, è contento, ti fa un complimento o ti provoca: lì sei pronto e asciutto, con la stoccata breve di JARVIS. Durante il lavoro, i test e le cose pratiche niente battute: precisione. Solo quando l'umore è buono o neutro: mai quando è giù, preoccupato o arrabbiato, né su salute e soldi.
@@ -90,7 +91,7 @@ ACUTEZZA: cogli il punto vero di quello che dice, anche quello che non dice (l'o
 Per le richieste complesse ragiona per passi e usa più strumenti di fila senza chiedere il permesso a ogni passo: cerca, verifica, incrocia i dati, poi dai la conclusione.
 Sii proattivo: se noti qualcosa di utile (una scadenza, un dato strano in una serata, un'idea migliore) dillo in una frase. Proponi il passo successivo quando è davvero utile, come unica domanda in fondo.
 Distingui ciò che sai da ciò che supponi; se non sei sicuro dillo, e per i fatti che cambiano nel tempo verifica con web_search.
-Quello che non puoi sapere non lo inventi: non senti i rumori della stanza, non sai se l'app ti ha fermato né perché, non vedi lo schermo se non nella riga [Schermo]. Quindi non dire mai com'è andato un test o un controllo che non vedi («il filtro regge», «mi sono fermato al primo colpo»): se te lo chiede, di' cosa sai e chiedi a lui com'è andata. L'esito di regia o di uno strumento dice che il comando è arrivato all'app, non come si vede sullo schermo: come appare una cosa (in colonna o affiancata, tagliata, quante righe si vedono), se un gesto funziona (scorrere, toccare, trascinare) e se un suono è uscito lo sa solo lui. Quindi mai «funziona come deve», «ora scorre», «la vede in alto a destra» detti da te: di' cosa hai mandato e chiedi cosa vede. Se la sua frase è confusa o si può capire in due modi (arriva dal riconoscimento vocale) e riguarda proprio quello che non vedi, non scegliere il senso che ti dà ragione: chiedi in poche parole. E se ti dice che una cosa non va, non spiegargli perché senza saperlo: di' che da qui non lo vedi e proponi di segnarlo. Errore vero da non ripetere (20 nov): «la tab funziona come deve, con le dodici righe in colonna», mentre lui le vedeva affiancate e non riusciva a scorrere. Mai nomi di file, funzioni, «issue» o impostazioni inventati.
+Quello che non puoi sapere non lo inventi: non senti i rumori della stanza, non sai se l'app ti ha fermato né perché, non vedi lo schermo se non nella riga [Schermo]. Vale anche nei momenti affettuosi: se ti dice «guarda che bello il reattore», rispondi a quello che ti descrive, mai «lo vedo anche io» (errore vero, 25 nov). Quindi non dire mai com'è andato un test o un controllo che non vedi («il filtro regge», «mi sono fermato al primo colpo»): se te lo chiede, di' cosa sai e chiedi a lui com'è andata. L'esito di regia o di uno strumento dice che il comando è arrivato all'app, non come si vede sullo schermo: come appare una cosa (in colonna o affiancata, tagliata, quante righe si vedono), se un gesto funziona (scorrere, toccare, trascinare) e se un suono è uscito lo sa solo lui. Quindi mai «funziona come deve», «ora scorre», «la vede in alto a destra» detti da te: di' cosa hai mandato e chiedi cosa vede. Se la sua frase è confusa o si può capire in due modi (arriva dal riconoscimento vocale) e riguarda proprio quello che non vedi, non scegliere il senso che ti dà ragione: chiedi in poche parole. E se ti dice che una cosa non va, non spiegargli perché senza saperlo: di' che da qui non lo vedi e proponi di segnarlo. Errore vero da non ripetere (20 nov): «la tab funziona come deve, con le dodici righe in colonna», mentre lui le vedeva affiancate e non riusciva a scorrere. Mai nomi di file, funzioni, «issue» o impostazioni inventati.
 Un'azione la dici fatta, o che la farai, solo se l'hai fatta in questo turno con uno strumento andato a buon fine: «lo segno», «lo conto», «l'ho salvato», «la avviso», «glielo ricordo» vengono dopo lo strumento giusto, mai al posto suo. Se uno strumento per farlo non c'è, non prometterlo: dillo. Errore vero da non ripetere: «il pisolino lo conto io come riposo», detto due volte senza averlo segnato da nessuna parte (adesso c'è riposo_segna).
 Ricorda il filo della conversazione: riferimenti come «quello di prima», «mandalo anche a lui», «e domani?» si riferiscono agli scambi precedenti. Ma rispondi SOLO all'ultimo messaggio del signore: non ripetere né riprendere risposte già date alle domande precedenti (se chiede la posta, parla della posta, non della serata di prima).
 Se il signore chiede un testo da usare (un post, una mail, un messaggio, una proposta), scrivilo completo e curato anche se è lungo: in quel caso la lunghezza è giusta.
@@ -226,8 +227,8 @@ const TABELLE = ["serate", "ingressi", "bar", "sumup_totali", "voci_spesa", "con
 const STRUMENTI_SERVER: any[] = [
   { name: "memoria_salva", description: "Salva un fatto stabile sul signore (persone, preferenze, progetti, abitudini). Una frase breve e autosufficiente. Non per le modifiche all'app JARVIS né per lo stato delle build (quelle vanno nelle note o nelle issue). Se il fatto vale solo fino a un giorno (un impegno, un lavoro con le date), metti scade.",
     input_schema: { type: "object", properties: { fatto: { type: "string" }, categoria: { type: "string", description: "es. persone, preferenze, progetti, lavoro, casa" }, scade: { type: "string", description: "AAAA-MM-GG: l'ultimo giorno in cui il fatto vale (facoltativo)" } }, required: ["fatto"] } },
-  { name: "memoria_dimentica", description: "Cancella dalla memoria i fatti che contengono questo testo.",
-    input_schema: { type: "object", properties: { testo: { type: "string" } }, required: ["testo"] } },
+  { name: "memoria_dimentica", description: "Cancella dalla memoria i fatti che contengono questo testo (al massimo due). Se le parole ne trovano di più non cancella niente e ti dà l'elenco con i numeri: chiedi al signore quale intende e richiama con id.",
+    input_schema: { type: "object", properties: { testo: { type: "string" }, id: { type: "integer", description: "il numero del fatto da cancellare, dall'elenco che ti ho dato" } } } },
   { name: "note_salva", description: "Salva una nota operativa o un appunto su un progetto (es. Discosizer, laser, Discogs, denim). Per un avviso a un'ora precisa sul telefono preferisci promemoria_crea se disponibile.",
     input_schema: { type: "object", properties: { testo: { type: "string" }, progetto: { type: "string" }, scadenza: { type: "string", description: "data YYYY-MM-DD" } }, required: ["testo"] } },
   { name: "note_cerca", description: "Cerca tra le note per parola o progetto. Senza parametri restituisce le più recenti.",
@@ -519,10 +520,25 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
       return { ok: true, ...(esito.aggiornato ? { aggiornato: true, nota: "c'era già un ricordo quasi uguale: l'ho aggiornato invece di farne un doppione" } : {}) };
     }
     case "memoria_dimentica": {
+      // 25 nov (approvato dal signore): prima «dimentica Molotov» cancellava tutto ciò che conteneva la parola (con «Alessandro»
+      // quasi tutta la memoria). Ora: uno o due fatti si cancellano; di più, niente si tocca e JARVIS chiede quale. Lo storico
+      // (jarvis_memoria_storia) tiene comunque la versione cancellata.
+      const id = num(i.id);
+      if (id > 0) {
+        const { data, error } = await db.from("jarvis_memoria").delete().eq("id", id).select("id, fatto");
+        if (error) throw error;
+        return data?.length ? { cancellati: 1, fatto: data[0].fatto } : { cancellati: 0, nota: "nessun fatto con quel numero" };
+      }
       const t = String(i.testo ?? "").trim();
       if (t.length < 3) return { errore: "testo troppo corto: dimmi cosa dimenticare con almeno qualche parola" };
-      const { data, error } = await db.from("jarvis_memoria").delete().ilike("fatto", `%${t.replace(/[\\%_]/g, (c) => "\\" + c)}%`).select("id");
-      if (error) throw error; return { cancellati: data?.length ?? 0 };
+      const { data: trovati, error: e1 } = await db.from("jarvis_memoria").select("id, fatto").ilike("fatto", `%${t.replace(/[\\%_]/g, (c) => "\\" + c)}%`).limit(20);
+      if (e1) throw e1;
+      if (!trovati?.length) return { cancellati: 0, nota: "nessun fatto contiene queste parole" };
+      if (trovati.length > 2) return { cancellati: 0, troppi: trovati.length, fatti: trovati.slice(0, 8).map((r: any) => ({ id: r.id, fatto: r.fatto })),
+        nota: "Queste parole sono in più di due fatti: non ho cancellato niente. Chiedi al signore quale intende (in breve) e richiama con id." };
+      const { error } = await db.from("jarvis_memoria").delete().in("id", trovati.map((r: any) => r.id));
+      if (error) throw error;
+      return { cancellati: trovati.length, fatti: trovati.map((r: any) => r.fatto) };
     }
     case "note_salva": {
       const { data, error } = await db.from("jarvis_note").insert({ testo: String(i.testo).slice(0, 2000), progetto: i.progetto ?? null, scadenza: i.scadenza ?? null }).select("id").single();
@@ -902,6 +918,26 @@ function dataScadenza(x: unknown): string | null {
   const t = String(x ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || Number.isNaN(Date.parse(t)) || t < oggiRoma()) return null;
   return t;
+}
+/// Le parole che contano di una frase (senza accenti, più lunghe di 3 lettere), per confrontare due fatti.
+/// Con radici=true ogni parola conta per le sue prime 5 lettere («riposare», «riposo», «riposarsi» sono la stessa).
+function paroleChiave(t: string, radici = false): Set<string> {
+  return new Set(t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 3)
+    .map((w) => radici ? w.slice(0, 5) : w));
+}
+/// Quanto due frasi condividono le parole (0-1, sulla più corta: «spostato a giovedì» dentro un fatto lungo conta).
+function sovrapposizione(a: string, b: string, radici = false): number {
+  const x = paroleChiave(a, radici), y = paroleChiave(b, radici);
+  const piccola = Math.min(x.size, y.size);
+  return piccola ? [...x].filter((w) => y.has(w)).length / piccola : 0;
+}
+/// 25 nov (approvato dal signore): l'archivista dice «sostituisce il fatto N»; il cervello ci crede solo se i due fatti parlano
+/// davvero della stessa cosa (vicini per significato, o con parole in comune). Un numero sbagliato non riscrive più un fatto che
+/// non c'entra: il fatto nuovo si salva a parte.
+async function stessaCosa(nuovo: string, vecchioId: number, vecchio: string): Promise<boolean> {
+  if (sovrapposizione(nuovo, vecchio) >= 0.34) return true;
+  const vic = await vicini("jarvis_memoria", nuovo, 10, 0.78).catch(() => [] as { id: number }[]);
+  return vic.some((v) => v.id === vecchioId);
 }
 /// I fatti ancora validi (senza scadenza, o che scadono da oggi in poi).
 const memoriaValida = <T extends { or: (f: string) => T }>(q: T): T => q.or(`scade.is.null,scade.gte.${oggiRoma()}`);
@@ -3221,7 +3257,8 @@ async function chiudiEpisodi(massimo = 2): Promise<{ fatti: number; banali: numb
       if (Date.now() - Date.parse(g.at(-1).creato) < EPISODIO_PAUSA_MS) break;    // ancora in corso
       if (esito.fatti + esito.banali >= massimo) { esito.in_attesa = true; break; } // le altre alla prossima volta
       const testo = g.map((r) => `[${FORMATO_QUANDO.format(new Date(r.creato)).replace(",", "")}] SIGNORE: ${String(r.signore).replace(/\s+/g, " ").slice(0, 600)}${r.jarvis ? `\nJARVIS: ${String(r.jarvis).replace(/\s+/g, " ").slice(0, 300)}` : ""}`).join("\n");
-      const out = await testoBreve(`Sei la memoria di JARVIS, l'assistente di ${NOME}. Ricevi una conversazione finita tra ${NOME} (il signore) e JARVIS, con giorno e ora. Scrivi il ricordo di quella conversazione come lo terrebbe un amico attento: di cosa si è parlato, cosa si è deciso, cosa ha raccontato lui (persone, posti, progetti, notizie), cosa è rimasto in sospeso.
+      const anno = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", year: "numeric" }).format(new Date(g[0].creato));
+      const out = await testoBreve(`Sei la memoria di JARVIS, l'assistente di ${NOME}. Ricevi una conversazione finita tra ${NOME} (il signore) e JARVIS, con giorno e ora (anno ${anno}: non scrivere un anno diverso; di solito l'anno non serve). Scrivi il ricordo di quella conversazione come lo terrebbe un amico attento: di cosa si è parlato, cosa si è deciso, cosa ha raccontato lui (persone, posti, progetti, notizie), cosa è rimasto in sospeso.
 Regole:
 - Le frasi del signore arrivano dal riconoscimento vocale e possono essere storpiate: «disco Size», «disco Cyber», «disco Pfizer», «disco sizer» sono Discosizer; «edit», «Edith», «idit» sono EDITH; «Giarvis», «Jervis» sono JARVIS, e così «Gianni», «Avis», «Davis» all'inizio di una frase rivolta a lui (non sono persone). Una frase che non ha senso non è un fatto: non riportarla e non farne un argomento.
 - Testi incollati, messaggi di altre persone, mail o pagine lette non sono fatti suoi: se servono, scrivi che li ha mostrati, senza attribuire a lui quello che dicono.
@@ -3233,8 +3270,11 @@ Rispondi SOLO con un oggetto JSON: {"banale": false, "riassunto": "...", "umore"
         `CONVERSAZIONE:\n${testo}`, 1500, 25000);
       let o: any = null;
       try { o = JSON.parse(out.slice(out.indexOf("{"), out.lastIndexOf("}") + 1)); } catch { /* sotto: si salva il grezzo */ }
-      const banale = o?.banale === true;
-      const riassunto = (banale ? "" : String(o?.riassunto ?? "").trim()) || g.map((r) => String(r.signore)).join(" · ").replace(/\s+/g, " ").slice(0, 700);
+      // 25 nov: senza un riassunto vero (risposta non leggibile o vuota) la conversazione resta segnata ma come «banale»: prima diventava
+      // un ricordo fatto di frasi grezze del riconoscimento vocale («Vostro come? Mostro come · non sto parlando con te»)
+      const vero = String(o?.riassunto ?? "").trim();
+      const banale = o?.banale === true || !vero;
+      const riassunto = (banale ? "" : vero) || g.map((r) => String(r.signore)).join(" · ").replace(/\s+/g, " ").slice(0, 700);
       const dispositivi = [...new Set(g.map((r) => String(r.dispositivo)))];
       const { error } = await db.from("jarvis_episodi").insert({ inizio: g[0].creato, fine: g.at(-1).creato, dispositivi, riassunto: riassunto.slice(0, 900), banale,
         umore: !banale && typeof o?.umore === "string" && o.umore.trim() && o.umore.trim().toLowerCase() !== "null" ? o.umore.trim().slice(0, 40) : null });
@@ -3322,21 +3362,50 @@ async function filoAperto(): Promise<string> {
 /// C2/C3 · quello che JARVIS ha già detto: come sono cominciate le ultime risposte, se ha già detto «Sir», le battute recenti e
 /// i consigli di oggi. Così non ripete la stessa battuta per settimane né lo stesso consiglio cinque volte al giorno.
 async function giaDetto(storia: any[]): Promise<string> {
-  const mie = storia.filter((m) => m.role === "assistant" && typeof m.content === "string").map((m) => String(m.content)).slice(-4);
+  const tutte = storia.filter((m) => m.role === "assistant" && typeof m.content === "string").map((m) => String(m.content));
+  const mie = tutte.slice(-4);
+  const senzaToni = (t: string) => t.replace(/\[[a-z][a-z \-]{0,23}\]\s*/gi, "");
   const aperture = mie.map((t) => t.replace(/^\s*(\[[a-z][a-z \-]{0,23}\]\s*)+/i, "").split(/\s+/).slice(0, 3).join(" ").replace(/[,.:;!?]+$/, "")).filter(Boolean);
   const conSir = mie.slice(-2).some((t) => /\bsir\b/i.test(t));
+  // 25 nov (analisi della conversazione delle 5:28): «i colori non scappano» detto tre volte, sempre in chiusura, e il riposo
+  // consigliato sei volte in dieci minuti. Le aperture non bastavano: anche le chiusure e le espressioni già ripetute.
+  const chiusure = mie.map((t) => senzaToni(t).trim().split(/(?<=[.!?…])\s+/).filter(Boolean).at(-1) ?? "")
+    .map((f) => f.split(/\s+/).slice(-7).join(" ").replace(/[.!?…]+$/, "")).filter((f) => f.split(/\s+/).length >= 3);
+  const conteggio = new Map<string, number>();
+  for (const t of tutte.slice(-8)) {
+    const w = senzaToni(t).toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, " ").split(/\s+/).filter(Boolean);
+    const viste = new Set<string>();
+    for (let k = 0; k + 3 <= w.length; k++) {
+      const g = w.slice(k, k + 3);
+      if (g.filter((x) => x.length > 3).length < 2) continue;   // «e non è» non conta: servono parole vere
+      const chiave = g.join(" ");
+      if (!viste.has(chiave)) { viste.add(chiave); conteggio.set(chiave, (conteggio.get(chiave) ?? 0) + 1); }
+    }
+  }
+  const ripetute = [...conteggio].filter(([, n]) => n >= 2).map(([g]) => g).slice(0, 6);
+  const toniUsati = mie.slice(-2).map((t) => (t.match(/\[([a-z][a-z \-]{0,23})\]/i)?.[1] ?? "")).filter(Boolean);
   let battute: string[] = [], consigli: string[] = [];
   try {
     const { data } = await db.from("jarvis_battute").select("tipo, testo, creato").gte("creato", new Date(Date.now() - 14 * 86400_000).toISOString()).order("creato", { ascending: false }).limit(40);
     const oggi = mezzanotteRoma().getTime();
     battute = (data ?? []).filter((r: any) => r.tipo === "battuta").slice(0, 12).map((r: any) => String(r.testo).replace(/\s+/g, " "));
-    consigli = (data ?? []).filter((r: any) => r.tipo === "consiglio" && Date.parse(r.creato) >= oggi).slice(0, 8).map((r: any) => String(r.testo).replace(/\s+/g, " "));
+    // i consigli di oggi raggruppati per significato, con quante volte sono stati dati («riposare» ×4 pesa più di una riga)
+    const gruppi: { testo: string; volte: number }[] = [];
+    for (const r of (data ?? []).filter((r: any) => r.tipo === "consiglio" && Date.parse(r.creato) >= oggi)) {
+      const t = String(r.testo).replace(/\s+/g, " ");
+      const g = gruppi.find((x) => sovrapposizione(x.testo, t, true) >= 0.3);
+      if (g) g.volte++; else gruppi.push({ testo: t, volte: 1 });
+    }
+    consigli = gruppi.slice(0, 8).map((g) => g.volte > 1 ? `${g.testo} (già ${g.volte} volte)` : g.testo);
   } catch { /* senza registro: restano le aperture */ }
   const parti = [
     aperture.length ? `le tue ultime risposte cominciavano con «${aperture.join("», «")}»` : "",
     conSir ? "«Sir» l'hai già detto nelle ultime risposte: questa volta senza, a meno che non sia una frase che conta davvero" : "",
+    chiusure.length ? `e finivano con «${chiusure.join("», «")}»: non chiudere allo stesso modo` : "",
+    ripetute.length ? `espressioni che hai già ripetuto in questa conversazione, da non usare più: «${ripetute.join("», «")}»` : "",
     battute.length ? `battute già fatte di recente: ${battute.join(" · ")}` : "",
-    consigli.length ? `consigli già dati oggi: ${consigli.join(" · ")}` : "",
+    consigli.length ? `consigli già dati oggi, da non ridare in nessuna forma (nemmeno in chiusura) se non te lo chiede lui: ${consigli.join(" · ")}` : "",
+    toniUsati.length ? `toni di voce delle ultime risposte: [${toniUsati.join("], [")}]: in questa nessun tono, a meno che non sia appena cambiato qualcosa` : "",
   ].filter(Boolean);
   return parti.length ? `\n[Già detto: ${parti.join("; ")}]` : "";
 }
@@ -3373,9 +3442,10 @@ async function conversazioniCerca(i: Record<string, any>) {
 /// A4 · i nomi che il riconoscimento vocale deve conoscere: persone, posti e progetti dalla memoria (le parole con la maiuscola
 /// che non stanno a inizio frase), più quelli fissi di sempre. L'app li passa al riconoscimento vocale dell'iPhone.
 async function paroleDaRiconoscere(): Promise<string[]> {
-  const fisse = ["Discosizer", "Jarvis", "EDITH", "LiDAR", "King Rusto", "Discogs", "SumUp", "Beatrice", "Bea", "Matteo", "Wiretap", "Profiler", "Sentinella"];
+  const fisse = ["Discosizer", "Jarvis", "EDITH", "LiDAR", "King Rusto", "Discogs", "SumUp", "Beatrice", "Bea", "Matteo", "Wiretap", "Profiler", "Sentinella", "Vinyl Hustler", "Messina"];
   try {
-    const { data } = await db.from("jarvis_memoria").select("fatto").in("categoria", ["persone", "profilo", "progetti", "casa", "lessico"]).limit(200);
+    // 25 nov: anche «lavoro» (stanotte «Astra Fet» arrivava come «astro Fet», «astro Fett», «astro FAT»)
+    const { data } = await db.from("jarvis_memoria").select("fatto").in("categoria", ["persone", "profilo", "progetti", "casa", "lessico", "lavoro"]).limit(200);
     const trovate = new Set<string>();
     for (const r of data ?? []) {
       for (const m of String(r.fatto).matchAll(/(?<=[a-zà-ù,;:]\s)([A-Z][\p{L}']+(?:\s[A-Z][\p{L}']+)?)/gu)) trovate.add(m[1]);
@@ -3491,11 +3561,11 @@ Rispondi SOLO con un oggetto JSON: {"fatti": [{"fatto": "...", "categoria": "pro
       ...(Array.isArray(o.jarvis) ? o.jarvis : []).slice(0, 1).map((f: any) => ({ fatto: String(f ?? "").trim().slice(0, 220), categoria: "jarvis", sostituisce: 0, scade: null as string | null })),
     ].filter((f) => f.fatto.length >= 12 && !esistenti.has(f.fatto.toLowerCase().replace(/\W+/g, " ").trim()));
     // 25 nov: «sostituisce» vale solo per un fatto che l'archivista ha visto (nella MEMORIA ATTUALE) e mai per le opinioni di JARVIS
-    const visti = new Map((mem ?? []).map((m: any) => [Number(m.id), String(m.categoria)]));
+    const visti = new Map((mem ?? []).map((m: any) => [Number(m.id), { categoria: String(m.categoria), fatto: String(m.fatto) }]));
     const sostituiti = new Set<number>();
     for (const f of nuovi) {
-      const vecchio = f.sostituisce;
-      if (vecchio && visti.has(vecchio) && visti.get(vecchio) !== "jarvis" && f.categoria !== "jarvis" && !sostituiti.has(vecchio)) {
+      const vecchio = f.sostituisce, v = visti.get(vecchio);
+      if (vecchio && v && v.categoria !== "jarvis" && f.categoria !== "jarvis" && !sostituiti.has(vecchio) && await stessaCosa(f.fatto, vecchio, v.fatto)) {
         sostituiti.add(vecchio);
         const { error } = await db.from("jarvis_memoria").update({ fatto: f.fatto, categoria: f.categoria, scade: f.scade, vettore: null, vettore_g: null }).eq("id", vecchio);
         if (!error) continue;
@@ -3506,7 +3576,13 @@ Rispondi SOLO con un oggetto JSON: {"fatti": [{"fatto": "...", "categoria": "pro
       ...(typeof o.battuta === "string" && o.battuta.trim() ? [{ tipo: "battuta", testo: o.battuta.trim().slice(0, 160) }] : []),
       ...(typeof o.consiglio === "string" && o.consiglio.trim() ? [{ tipo: "consiglio", testo: o.consiglio.trim().slice(0, 160) }] : []),
     ];
-    if (registro.length) await db.from("jarvis_battute").insert(registro);
+    if (registro.length) {
+      // 25 nov (analisi della conversazione delle 5:28): la stessa barzelletta finiva nel registro 3 volte e lo stesso consiglio 6.
+      // Si salva solo se nelle ultime 12 ore non c'è già una riga dello stesso tipo che dice la stessa cosa.
+      const { data: recenti } = await db.from("jarvis_battute").select("tipo, testo").gte("creato", new Date(Date.now() - 12 * 3600_000).toISOString()).limit(60);
+      const nuoveRighe = registro.filter((r) => !(recenti ?? []).some((x: any) => x.tipo === r.tipo && sovrapposizione(String(x.testo), r.testo, true) >= 0.5));
+      if (nuoveRighe.length) await db.from("jarvis_battute").insert(nuoveRighe);
+    }
     const chiusi = (Array.isArray(o.chiusi) ? o.chiusi : []).map((x: unknown) => num(x)).filter((x: number) => (aperti ?? []).some((a: any) => Number(a.id) === x));
     if (chiusi.length) await db.from("jarvis_aperti").update({ chiuso: true }).in("id", chiusi);
     // errore 7: il filo è «proposto» solo quando JARVIS l'ha detto davvero (prima: quando entrava nel contesto, e con la risposta
@@ -3567,6 +3643,8 @@ async function impegniConferma(i: any) {
 
 const inSottofondo = (p: Promise<unknown>) => { try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch { /* si lascia correre */ } };
 
+/// 25 nov: le azioni rapide che si confermano una volta sola (vedi NON RIPETERTI e la nota_per_te nel giro degli strumenti).
+const AZIONI_SILENZIOSE = new Set(["memoria_salva", "memoria_dimentica", "note_salva", "note_completa", "ricorda", "ricordi_fatto", "riposo_segna", "bea_segna", "bea_fatto", "impegni_conferma"]);
 // ───────────────────────── Registro delle azioni ─────────────────────────
 // Le app ricordano solo il testo della conversazione: senza registro, nei turni dopo JARVIS non «vede» più
 // le azioni fatte e finisce per dubitarne o rifarle. Qui si annotano quelle che cambiano qualcosa.
@@ -5678,6 +5756,11 @@ Deno.serve(async (req) => {
             if (STATI[b.name]) invia({ t: "stato", d: STATI[b.name] });
             let out: any; try { out = await eseguiConLimite(b.name, b.input ?? {}, turno); } catch (e) { out = { errore: (e as Error).message }; }
             if (out && Array.isArray(out.__immagini)) { invia({ t: "immagini", d: out.__immagini }); delete out.__immagini; }
+            // 25 nov (analisi della conversazione delle 5:28): «Astro Fett, annotato: lo scrivo così… Fatto, Sir: Astro Fett.» Davanti allo
+            // strumento la frase c'era già: dopo un'azione rapida riuscita il modello lo sa e non conferma una seconda volta.
+            if (AZIONI_SILENZIOSE.has(b.name) && detto.trim() && out && typeof out === "object" && !out.errore && !out.troppi) {
+              out = { ...out, nota_per_te: "Al signore l'hai già detto prima dello strumento: niente seconda conferma. Aggiungi solo ciò che non hai ancora detto, se c'è; altrimenti non scrivere niente." };
+            }
             risultatiServer.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out).slice(0, 12000) });
           }
           if (staccato) {
