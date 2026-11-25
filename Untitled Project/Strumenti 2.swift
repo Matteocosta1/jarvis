@@ -414,14 +414,6 @@ final class Strumenti {
         var out: [String: Any] = ["trovate": esito.trovate.count, "foto": esito.righe, "esaminate": esito.esaminate,
                                   "nota_per_te": "le foto trovate sono già sullo schermo del signore"]
         if let n = esito.nota { out["nota"] = n }
-        // 13.9 (7): le prime tre vanno anche al cervello, allegate qui (come la foto di «guarda»), così le vede davvero
-        let piccole = await FotoLocali.perIlCervello(Array(esito.trovate.prefix(3)))
-        let allegate: [(numero: Int, dati: Data)] = piccole.enumerated().compactMap { k, d in d.map { (numero: k + 1, dati: $0) } }
-        if !allegate.isEmpty {
-            fotoOcchi = allegate.map { $0.dati }
-            let numeri = allegate.map { String($0.numero) }.joined(separator: ", ")
-            out["nota_per_te"] = "le foto trovate sono già sullo schermo del signore. Sono allegate qui, nell'ordine, le foto numero \(numeri) della lista «foto» (contando da 1): quelle le vedi davvero; le altre no, di quelle hai solo la riga"
-        }
         return json(out)
     }
 

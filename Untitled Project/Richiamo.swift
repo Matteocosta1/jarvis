@@ -26,7 +26,6 @@ final class Richiamo {
     private let condotto = Condotto()
     private let mani = BattitoMani()
     private var ultimoAvvio = Date.distantPast
-    private var avvioMotore = Date.distantPast      // 13.9 (6): da quando questo microfono sente (per la rilettura)
     private var compito: SFSpeechRecognitionTask?
     private var timerRiavvio: Timer?
     private var timerSilenzio: Timer?
@@ -84,10 +83,6 @@ final class Richiamo {
     private var inizioSegmento = 0       // da quale parola comincia l'ultima frase (dopo una pausa) nella trascrizione
     private var ultimeParole = 0
     private var ultimoParziale = Date.distantPast
-    /// 13.9 (5) (25 nov, il signore: «il microfono è andato in attesa e non ha ascoltato, non so perché»): le frasi sentite in
-    /// attesa e lasciate andare, col perché. Vanno al cervello con la misura del turno dopo (`scartatePerMisura`), così la prossima
-    /// volta si sa con certezza perché non l'ha presa. Una riga per pezzo di frase (dopo una pausa), le ultime sei.
-    private var scartate: [(quando: Date, segmento: Int, parole: String, motivo: String)] = []
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = FineFrase.nomiJarvis      // 12.0 (10): una lista sola per iPhone, Mac e polso
@@ -95,39 +90,6 @@ final class Richiamo {
     nonisolated static let risposteBrevi: Set<String> = ["sì", "si", "no", "ok", "okay", "grazie", "perfetto", "certo", "esatto",
                                                          "bravo", "basta", "avanti", "pausa", "stop", "dimmi", "allora", "senti"]
     nonisolated static let aperture = ["ascoltami", "ascolta", "ehi", "hey", "ei", "bro", "fratello", "frate", "socio", "amico", "capo"]
-
-    /// 13.9 (5): una frase sentita in attesa e lasciata andare. Il perché con le stesse regole di `valuta`: musica o RISERVATO (solo
-    /// «Jarvis»), orologio in uso, gente o TV intorno, ascolto sempre spento, una parola sola che non è un «sì», fuori dal seguito.
-    private func annotaScarto(_ segmento: String) {
-        let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
-        guard !t.isEmpty else { return }
-        let parole = t.split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
-        let motivo: String
-        if soloNome { motivo = "solo_nome" }
-        else if OrologioInUso.attivo { motivo = "orologio" }
-        else if controlloInCorso { motivo = "impronta" }
-        else if AmbienteSonoro.condiviso.affollato { motivo = "folla" }
-        else if !Impostazioni.ascoltoSempre { motivo = "senza_nome" }
-        else if parole.count < 2 { motivo = "una_parola" }
-        else { motivo = "altro" }
-        let adesso = Date()
-        if let ultima = scartate.last, ultima.segmento == inizioSegmento, adesso.timeIntervalSince(ultima.quando) < 8 {
-            scartate[scartate.count - 1] = (quando: adesso, segmento: inizioSegmento, parole: String(t.prefix(120)), motivo: motivo)   // lo stesso pezzo che cresce
-        } else {
-            scartate.append((quando: adesso, segmento: inizioSegmento, parole: String(t.prefix(120)), motivo: motivo))
-            if scartate.count > 6 { scartate.removeFirst(scartate.count - 6) }
-        }
-    }
-
-    /// 13.9 (5): le frasi lasciate andare negli ultimi 3 minuti (per la misura del turno), poi si ricomincia.
-    func scartatePerMisura() -> [[String: Any]] {
-        let adesso = Date()
-        let out: [[String: Any]] = scartate.filter { adesso.timeIntervalSince($0.quando) < 180 }.map {
-            ["parole": $0.parole, "motivo": $0.motivo, "s_fa": Int(adesso.timeIntervalSince($0.quando).rounded())]
-        }
-        scartate.removeAll()
-        return out
-    }
 
     /// Se nella frase c'è un richiamo, restituisce ciò che viene dopo (anche vuoto); altrimenti nil.
     nonisolated static func dopoRichiamo(_ frase: String) -> String? {
@@ -166,46 +128,12 @@ final class Richiamo {
     }
 
     var attivo: Bool { voluto }
-    /// 13.9 (7): sta ascoltando dal microfono dell'orecchio (la coda dopo la voce di JARVIS), senza un motore suo.
-    private(set) var suOrecchio = false
-    /// Il tubo verso il trascrittore, per l'orecchio che gli passa l'audio durante la coda.
-    var condottoPerCoda: Condotto { condotto }
 
-    /// 13.9 (7) (il signore, 25 nov: «sembra che mi rispondi più lentamente»): finita la voce di JARVIS, il «Jarvis» in attesa ascolta
-    /// subito dal microfono dell'orecchio, che resta acceso: la frase detta di slancio si capisce dal vivo, senza aspettare la fine
-    /// della coda per rileggerla. Falso se non può partire (allora resta la rilettura della 13.9 (6)).
-    @discardableResult
-    func avviaSuOrecchio() -> Bool {
-        guard !voluto, !motore.isRunning, let riconoscitore, riconoscitore.isAvailable,
-              SFSpeechRecognizer.authorizationStatus() == .authorized else { return false }
-        voluto = true
-        suOrecchio = true
-        precarica = 0
-        condotto.svuota()                   // l'audio del suo microfono di prima ha un altro formato
-        azzera()
-        nuovoRiconoscimento(riconoscitore, recentiDa: nil)
-        programmaRiavvio()
-        return true
-    }
-
-    /// Fine della coda: smette di ascoltare dall'orecchio (il suo microfono lo riaccende Jarvis). L'audio dell'orecchio rimasto nel
-    /// tubo si butta: ha un altro formato e non va riletto dal trascrittore del suo microfono.
-    func lasciaOrecchio() {
-        condotto.svuota()                   // anche senza ascolto dal vivo l'orecchio ci ha scritto durante la coda
-        guard suOrecchio else { return }
-        voluto = false
-        spegni()
-    }
-
-    func avvia(precarica secondi: Double = 0) {
+    func avvia() {
         guard !voluto else { return }
         voluto = true
-        precarica = secondi
         accendi()
     }
-    /// 13.9 (6): i secondi di audio sentiti dall'orecchio dopo la voce di JARVIS (il signore ha cominciato a rispondere mentre il
-    /// microfono passava di mano): il primo trascrittore li rilegge prima dell'audio vivo, così le prime parole non si perdono.
-    private var precarica: Double = 0
 
     func ferma() {
         voluto = false
@@ -213,13 +141,9 @@ final class Richiamo {
     }
 
     private func accendi() {
-        guard voluto, !acceso, !suOrecchio, let riconoscitore, riconoscitore.isAvailable else { return }
+        guard voluto, !acceso, let riconoscitore, riconoscitore.isAvailable else { return }
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               AVAudioApplication.shared.recordPermission == .granted else { return }
-        // 13.9 (6): l'attacco sentito dall'orecchio si prende prima che questo microfono scriva nel registro (niente doppioni)
-        let secondi = precarica
-        precarica = 0
-        var pezzo: AVAudioPCMBuffer?
         do {
             if !motore.isRunning {
                 let sessione = AVAudioSession.sharedInstance()
@@ -244,13 +168,10 @@ final class Richiamo {
                 BattitoMani.ignora(per: 1.0)
                 try Richiamo.collega(motore, condotto, mani)
                 motore.prepare()
-                if secondi > 0.2 { pezzo = Richiamo.bufferPrecarica(secondi, formato: motore.inputNode.outputFormat(forBus: 0)) }
                 try motore.start()
-                avvioMotore = Date()
             }
             azzera()
-            // 13.9 (6): prima quello che ha detto durante il passaggio (dall'orecchio), poi l'audio di questo microfono dal suo avvio
-            nuovoRiconoscimento(riconoscitore, recentiDa: pezzo == nil ? nil : avvioMotore, prima: pezzo)
+            nuovoRiconoscimento(riconoscitore, recentiDa: nil)
             programmaRiavvio()
         } catch {
             spegni()
@@ -263,7 +184,7 @@ final class Richiamo {
     }
 
     /// Un trascrittore nuovo sullo stesso microfono acceso. `recentiDa`: rilegge l'audio arrivato da quel momento.
-    private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?, prima pezzo: AVAudioPCMBuffer? = nil) {
+    private func nuovoRiconoscimento(_ ric: SFSpeechRecognizer, recentiDa: Date?) {
         let vecchia = richiesta, vecchio = compito
         ultimoAvvio = Date()
         let r = SFSpeechAudioBufferRecognitionRequest()
@@ -279,7 +200,6 @@ final class Richiamo {
             if fine { condotto.segnaFine() }
             Task { @MainActor [weak self] in self?.valuta(testo, fine: fine, turno: mio) }
         }
-        if let pezzo { r.append(pezzo) }            // 13.9 (6): l'attacco della frase, sentito dall'orecchio
         condotto.usa(r, recentiDa: recentiDa)       // prima il nuovo trascrittore, poi chiudo il vecchio: nessun buco
         vecchia?.endAudio()
         vecchio?.cancel()
@@ -324,7 +244,6 @@ final class Richiamo {
         richiesta = nil
         compito = nil
         acceso = false
-        suOrecchio = false
         azzera()
     }
 
@@ -334,7 +253,7 @@ final class Richiamo {
         timerRiavvio?.invalidate(); timerRiavvio = nil
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
-        guard suOrecchio || motore.isRunning, let riconoscitore else {
+        guard motore.isRunning, let riconoscitore else {
             spegni()
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
@@ -433,11 +352,7 @@ final class Richiamo {
                     // «stop». Senza impronta, o fuori da una risposta, tutto come prima
                     let soloLui = VoceDelSignore.attiva && (inRisposta?() ?? false)
                     if !t.isEmpty, soloLui {
-                        // 13.9 (7) (dialogo delle 11:11: «…i colori da Astro Fat» buttata perché l'impronta ha detto «non è lui»):
-                        // in una stanza tranquilla, subito dopo la sua domanda, una frase vera (quattro parole o più) è il suo seguito
-                        // anche senza conferma dell'impronta, che su un pezzo corto sbaglia
-                        let seguitoSuo = !affollato && parole.count >= 4 && (inAggiunta || adesso < seguitoFinoA)
-                        if voceConfermata || Benvenuto.eFraseDiTony(t) || (!affollato && Jarvis.eSoloSilenzio(t)) || seguitoSuo {
+                        if voceConfermata || Benvenuto.eFraseDiTony(t) || (!affollato && Jarvis.eSoloSilenzio(t)) {
                             trovato = t; soloDopoNome = false
                         } else if parole.count >= 2, !controlloInCorso, inAggiunta || Impostazioni.ascoltoSempre {
                             controllaVoce(turno: mio)             // l'impronta decide (circa 0,7 s), poi la frase continua da dov'era
@@ -462,8 +377,6 @@ final class Richiamo {
                         }
                     }
                 }
-                // 13.9 (5): la frase sentita e lasciata andare (non per lui, fuori dal seguito, folla…): si annota col perché
-                if trovato == nil { annotaScarto(segmento) }
                 guard let dopo = trovato else { if fine { riavvia(recentiDa: condotto.ultimaFine) }; return }
                 if soloDopoNome { VoceDelSignore.rinnovaFiducia() }   // ha detto «Jarvis»: la conversazione è sua
                 paroleFinoAlNome = soloDopoNome ? max(0, Richiamo.contaParole(segmento) - Richiamo.contaParole(dopo)) : 0
@@ -504,7 +417,7 @@ final class Richiamo {
                     corrente = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,;:"))
                 }
             }
-            resto = Dialogo.unisci(prima, corrente)        // 13.9 (6): senza doppioni se il riconoscimento ha riscritto la frase
+            resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
             self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
             // 14 nov (tempi del 13 nov): il riconoscimento ritocca la frase anche dopo che il signore ha smesso (punteggiatura,
             // maiuscole) e ogni ritocco faceva ripartire da capo la pausa che la chiude. Con le stesse parole la pausa continua a
@@ -567,7 +480,7 @@ final class Richiamo {
     /// l'ascolto senza perdere nulla; sarà il silenzio (timerSilenzio) a decidere quando la frase è davvero finita.
     private func continuaDopoFine() {
         guard sveglio else { return }
-        guard suOrecchio || motore.isRunning, let riconoscitore else { chiudi(); return }
+        guard motore.isRunning, let riconoscitore else { chiudi(); return }
         let detto = resto.isEmpty ? (vocativo ?? "") : resto
         vocativo = nil
         // il microfono non si ferma: cambio solo il trascrittore, e gli rileggo l'audio arrivato dopo la sua chiusura
@@ -611,7 +524,7 @@ final class Richiamo {
         let frase = resto.isEmpty ? (vocativo ?? "") : resto
         timerSilenzio?.invalidate(); timerSilenzio = nil
         timerTetto?.invalidate(); timerTetto = nil
-        if voluto, suOrecchio || motore.isRunning, let riconoscitore {
+        if voluto, motore.isRunning, let riconoscitore {
             azzera()
             nuovoRiconoscimento(riconoscitore, recentiDa: nil)
             programmaRiavvio()
@@ -623,35 +536,6 @@ final class Richiamo {
     }
 
     // MARK: Ponti fuori dal thread principale
-
-    /// 13.9 (6): gli ultimi `secondi` del registro del microfono (sentiti dall'orecchio, con la sua frequenza) portati nel formato di
-    /// questo microfono, in un buffer solo da dare al trascrittore prima dell'audio vivo. Nil se non c'è niente o non si converte.
-    nonisolated private static func bufferPrecarica(_ secondi: Double, formato: AVAudioFormat) -> AVAudioPCMBuffer? {
-        let (campioni, frequenza) = RegistroMicrofono.condiviso.nativi(secondi)
-        guard !campioni.isEmpty, frequenza > 0, formato.sampleRate > 0,
-              let sorgente = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: frequenza, channels: 1, interleaved: false),
-              let grezzo = AVAudioPCMBuffer(pcmFormat: sorgente, frameCapacity: AVAudioFrameCount(campioni.count)),
-              let canale = grezzo.floatChannelData?[0] else { return nil }
-        grezzo.frameLength = AVAudioFrameCount(campioni.count)
-        campioni.withUnsafeBufferPointer { p in
-            if let base = p.baseAddress { canale.update(from: base, count: campioni.count) }
-        }
-        if sorgente == formato { return grezzo }
-        guard let convertitore = AVAudioConverter(from: sorgente, to: formato) else { return nil }
-        let capienza = AVAudioFrameCount(Double(campioni.count) * formato.sampleRate / frequenza) + 1024
-        guard let uscita = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: capienza) else { return nil }
-        let dato = SegnoUnaVolta()
-        nonisolated(unsafe) let ingresso = grezzo      // il convertitore lo legge dentro questa stessa chiamata (come il tap dell'orecchio)
-        var errore: NSError?
-        let esito = convertitore.convert(to: uscita, error: &errore) { _, stato in
-            if dato.fatto { stato.pointee = .endOfStream; return nil }
-            dato.fatto = true
-            stato.pointee = .haveData
-            return ingresso
-        }
-        guard esito != .error, errore == nil, uscita.frameLength > 0 else { return nil }
-        return uscita
-    }
 
     nonisolated private static func collega(_ motore: AVAudioEngine, _ condotto: Condotto, _ mani: BattitoMani) throws {
         let input = motore.inputNode
@@ -980,11 +864,6 @@ nonisolated final class BattitoMani: @unchecked Sendable {
 
 /// Il tubo fra il microfono e il trascrittore di turno. Il microfono scrive sempre qui; il trascrittore si può cambiare
 /// in un istante, e il nuovo può rileggere l'ultimo secondo e mezzo di audio (le parole dette durante il cambio).
-/// 13.9 (6): il buffer della rilettura si dà al convertitore una volta sola (il convertitore lo chiede dentro la stessa chiamata).
-nonisolated final class SegnoUnaVolta: @unchecked Sendable {
-    var fatto = false
-}
-
 nonisolated final class Condotto: @unchecked Sendable {
     private let lock = NSLock()
     private var richiesta: SFSpeechAudioBufferRecognitionRequest?
@@ -1000,9 +879,6 @@ nonisolated final class Condotto: @unchecked Sendable {
         while let p = recenti.first, adesso.timeIntervalSince(p.quando) > 1.5 { recenti.removeFirst() }
         lock.unlock()
     }
-
-    /// 13.9 (7): l'audio tenuto per la rilettura si butta (il microfono che scrive qui sta cambiando).
-    func svuota() { lock.lock(); recenti.removeAll(); lock.unlock() }
 
     /// Il trascrittore ha chiuso il suo pezzo adesso.
     func segnaFine() { lock.lock(); fine = Date(); lock.unlock() }

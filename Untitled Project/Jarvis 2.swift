@@ -513,7 +513,7 @@ final class Jarvis: NSObject, ObservableObject {
         // congedo («Will that be all, Sir?») solo a cosa vera finita, quando il signore tace
         Insieme.condiviso.parla = { [weak self] frase in self?.annunciaConSeguito(frase) }
         Congedo.condiviso.chiedi = { [weak self] frase in self?.annunciaConSeguito(frase) }
-        Congedo.condiviso.inAttesa = { [weak self] in self?.fase == .attesa && self?.inCoda.isEmpty == true && self?.codaDa == nil }   // 13.9 (6)
+        Congedo.condiviso.inAttesa = { [weak self] in self?.fase == .attesa && self?.inCoda.isEmpty == true }
         Congedo.condiviso.ultimaFrase = { [weak self] in
             guard let self else { return .distantPast }
             return max(self.inizioUltimaFrase ?? .distantPast, self.messaggi.last(where: { $0.ruolo == "user" })?.data ?? .distantPast)
@@ -525,7 +525,7 @@ final class Jarvis: NSObject, ObservableObject {
         Iniziativa.condivisa.aspettaSi = { Insieme.condiviso.aspettaIlSi || Regia.condivisa.aspettaIlSi || ManiJarvis.aspettaIlSi || Piano.condiviso.passoInAttesa != nil }   // 14 nov; 13.2: anche il piano
         Iniziativa.condivisa.inConversazione = { [weak self] in
             guard let self else { return false }
-            return self.fase != .attesa || !self.inCoda.isEmpty || self.richiamo.sveglio || Date() < self.richiamo.seguitoFinoA || self.codaDa != nil
+            return self.fase != .attesa || !self.inCoda.isEmpty || self.richiamo.sveglio || Date() < self.richiamo.seguitoFinoA
         }
         Iniziativa.condivisa.avvia()
         // 13.1 (2) · FUORI DALL'APP (FuoriApp.swift): il sì dal polso, il filo col Mac, il tasto Azione da bloccato
@@ -1098,7 +1098,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Acceso solo in attesa, con l'app in primo piano e nulla aperto sopra; spento in ogni altro momento.
     /// In attesa e mentre pensa (prima che inizi a parlare): «Jarvis» lo chiama o lo ferma. Mentre parla c'è l'orecchio.
     private var richiamoServe: Bool {
-        !inBenvenuto && !avvioInCorso && !micSpento && !micChiusoFuori && Impostazioni.richiamo && richiamoConsentito && codaDa == nil
+        !inBenvenuto && !avvioInCorso && !micSpento && !micChiusoFuori && Impostazioni.richiamo && richiamoConsentito
             && (fase == .attesa || (fase == .elaboro && !orecchio.attivo))
             && !(occhi != nil && fase == .elaboro)      // Occhi aperti dal cervello, che aspetta la foto: lì non si interrompe
     }
@@ -1124,7 +1124,6 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         if richiamo.sveglio { return }                   // sta raccogliendo la frase dopo «Jarvis»: non lo tocco
-        if codaDa != nil, richiamo.suOrecchio { return } // 13.9 (7): ascolta dall'orecchio nella coda: lo lascia la fine della coda
         richiamo.soloNome = musicaSuona || riservato     // 9 nov: RISERVATO (a mano o con la musica): solo «Jarvis»
         avvioRichiamo?.cancel()
         guard richiamoServe else { richiamo.ferma(); restituisciMusica(); return }
@@ -1134,17 +1133,14 @@ final class Jarvis: NSObject, ObservableObject {
         // un «Perché?» detto appena JARVIS aveva finito cadeva nel vuoto
         restituisciMusica()                              // 9 nov: tornato in attesa con la musica, fra 1,5 s la musica risale
         // 9 nov: con la musica, finita la risposta l'orecchio riparte dopo che la musica è risalita (1,5 s, come vuole il signore)
-        // 13.9 (6): dopo la coda il microfono di prima si è appena spento: il «Jarvis» riparte quasi subito e rilegge l'attacco
-        let rilettura = richiamoPrecarica
-        richiamoPrecarica = 0
-        let ritardo = rilettura > 0 ? 30 : (fase == .attesa ? (musicaSuona ? 1700 : 150) : 100)
+        let ritardo = fase == .attesa ? (musicaSuona ? 1700 : 150) : 100
         avvioRichiamo = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(ritardo))
             guard let self, !Task.isCancelled, self.richiamoServe else { return }
             // 9 nov sera: con la musica, prima di riaccendere il «Jarvis» la musica dev'essere tornata su
             if self.musicaSuona, self.fase == .attesa { await self.rilasciaMusica() }
             guard !Task.isCancelled, self.richiamoServe, !self.richiamo.attivo else { return }
-            self.richiamo.avvia(precarica: rilettura)
+            self.richiamo.avvia()
         }
     }
 
@@ -1302,7 +1298,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// dito lontano dallo schermo da 6 (con una sezione davanti e con la musica sì: il signore, 14 nov).
     private func puoDireDaSolo(urgente: Bool) -> Bool {
         guard UIApplication.shared.applicationState == .active, fase == .attesa, !avvioInCorso, !inBenvenuto, inCoda.isEmpty,
-              !richiamo.sveglio, !micSpento, !micOccupato, !Impostazioni.muto, richiamoConsentito, occhi == nil, codaDa == nil,
+              !richiamo.sveglio, !micSpento, !micOccupato, !Impostazioni.muto, richiamoConsentito, occhi == nil,
               Date().timeIntervalSince(richiamo.ultimaVoce) > 4 else { return false }
         // 14 nov (il signore: «deve parlare anche quando l'app è aperta e non sto facendo niente… vabbè, ci sta durante la missione»):
         // mai durante la missione; per il resto anche con una sezione davanti e con la musica, se lui non parla e non tocca lo schermo
@@ -2722,94 +2718,18 @@ final class Jarvis: NSObject, ObservableObject {
         if flussoFinito { fineParlato() } else if fase == .parlo { fase = .elaboro }   // detto tutto, il resto è in arrivo
     }
 
-    // MARK: 13.9 (6) · la coda dopo la voce: nessun buco fra il microfono di quando parla e quello dell'attesa
-
-    /// Da quando JARVIS ha finito di parlare con l'orecchio ancora acceso (nil: nessuna coda).
-    private(set) var codaDa: Date?
-    private var compitoCoda: Task<Void, Never>?
-    /// L'ultima coda, per la misura del turno dopo: quanto è durata, se il signore ha parlato e quanti secondi sono stati riletti.
-    private var ultimaCoda: [String: Any]?
-
-    /// La coda dura almeno 1,5 s (le risposte di slancio cominciano lì) e poi finché il signore tace; se parla, finché ha finito
-    /// (al massimo 7 s: il registro del microfono ne tiene 8).
-    /// 13.9 (7): il «Jarvis» in attesa ascolta dal vivo dal microfono dell'orecchio (`avviaSuOrecchio`), con le sue regole di sempre
-    /// (seguito, aggiunta, nome, folla): la frase gli arriva mentre la dice. Allora la coda dura almeno 4 s e poi finché il signore
-    /// tace e il «Jarvis» non sta raccogliendo una frase (al massimo 15 s, tranne a frase in corso); il passaggio al suo microfono
-    /// avviene in un silenzio. Se non può partire così, resta la rilettura della 13.9 (6).
-    private func iniziaCoda() {
-        codaDa = Date()
-        richiamo.soloNome = musicaSuona || riservato
-        let dalVivo = !richiamo.attivo && richiamo.avviaSuOrecchio()
-        let minimo: Double = dalVivo ? 4 : 1.5, massimo: Double = dalVivo ? 15 : 7
-        compitoCoda?.cancel()
-        compitoCoda = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard let self, !Task.isCancelled, let da = self.codaDa else { return }
-                let passati = Date().timeIntervalSince(da)
-                let parla = SopraLaVoce.condivisa.voceUmana(ultimi: dalVivo ? 0.8 : 0.5) > 0.05
-                let raccoglie = dalVivo && self.richiamo.sveglio      // sta prendendo una frase: non si cambia microfono a metà
-                if !self.orecchio.inCoda || (dalVivo && !self.richiamo.suOrecchio) || passati >= 120
-                    || (!raccoglie && (passati >= massimo || (passati >= minimo && !parla))) { break }
-                // il microfono serve ad altro (spento a mano, una sezione, il Wiretap) o JARVIS è ripartito: la coda finisce subito.
-                // 13.9 (8) (il signore, 25 nov 13:00: «prende la prima parola e si blocca»): il «Jarvis» che ascolta dall'orecchio e
-                // sente la sua frase mette l'app in ascolto (`richiamato`): quello non è «JARVIS ripartito». Prima la coda si chiudeva
-                // lì e spegneva il microfono che stava raccogliendo la frase: l'app restava in ascolto di una frase che non arrivava più
-                let ascoltaDalVivo = raccoglie && self.fase == .ascolto
-                if self.micSpento || !self.richiamoConsentito || WiretapAperto.aperto || (self.fase != .attesa && !ascoltaDalVivo) { break }
-            }
-            guard !Task.isCancelled else { return }
-            self?.chiudiCoda()
-        }
-    }
-
-    /// Fine della coda: l'orecchio si spegne e il «Jarvis» in attesa riparte subito. Se il signore ha parlato durante la coda, il
-    /// «Jarvis» rilegge quell'audio (da 0,3 s dopo la fine della voce di JARVIS: l'ultima eco resta fuori) e il seguito resta aperto.
-    private func chiudiCoda(precarica: Bool = true) {
-        guard let da = codaDa else { return }
-        codaDa = nil
-        compitoCoda?.cancel()
-        compitoCoda = nil
-        let durata = Date().timeIntervalSince(da)
-        let eraInCoda = orecchio.inCoda
-        let haParlato = eraInCoda && SopraLaVoce.condivisa.voceUmana(ultimi: durata) >= 0.15
-        // 13.9 (7): se il «Jarvis» ascoltava dal vivo, quello che il signore ha detto l'ha già sentito: niente rilettura
-        let dalVivo = richiamo.suOrecchio
-        if eraInCoda { orecchio.ferma() }        // prima il microfono dell'orecchio, poi il tubo si svuota: nessun pezzo rimasto
-        richiamo.lasciaOrecchio()
-        let rilettura = precarica && haParlato && !dalVivo ? max(0, durata - 0.3) : 0
-        ultimaCoda = ["ms": Int((durata * 1000).rounded()), "parlato": haParlato, "dal_vivo": dalVivo, "riletti_ms": Int((rilettura * 1000).rounded())]
-        if rilettura > 0, fase == .attesa {
-            // ha cominciato a rispondere dentro il seguito: la frase vale senza «Jarvis» anche se il riconoscimento arriva adesso
-            if richiamo.seguitoFinoA > da { richiamo.seguitoFinoA = max(richiamo.seguitoFinoA, Date().addingTimeInterval(3)) }
-            richiamoPrecarica = rilettura
-        }
-        aggiornaRichiamo()
-        richiamoPrecarica = 0                    // se il «Jarvis» non è ripartito adesso, la rilettura non vale più
-    }
-    /// I secondi da rileggere al prossimo avvio del «Jarvis» in attesa (dalla coda).
-    private var richiamoPrecarica: Double = 0
-
     private func fineParlato() {
         let eraRisposta = flussoFinito && idTurno != nil   // la risposta a una domanda (non un annuncio, una notifica, un errore)
         let conSeguito = seguitoDopoAnnuncio && flussoFinito   // 12.0 (16): una frase del dialogo detta dall'app
         if flussoFinito { seguitoDopoAnnuncio = false }
         if flussoFinito { idTurno = nil }        // risposta detta tutta: da qui in poi una frase nuova è una domanda nuova
+        orecchio.ferma()
+        orecchio.testoDetto = ""
         let lavori = lavoriDopoVoce              // 12.0 (10): la regia aspettava la fine della voce
         lavoriDopoVoce.removeAll()
-        // 13.9 (6) (il signore: «a volte inizio la frase e lui perde le prime parole»): il microfono di quando parlava resta acceso finché
-        // il signore tace, poi passa al «Jarvis» in attesa, che rilegge quello che ha detto intanto. Non se dopo la voce si apre altro
-        // col microfono (una sezione, l'interprete, il diario) o con la musica (lì il «Jarvis» aspetta che la musica risalga, come prima)
-        let coda = flussoFinito && fase != .ascolto && lavori.isEmpty && strumenti.interpreteDaAprire == nil && !ascoltaDopo
-            && !musicaSuona && inCoda.isEmpty && !Jarvis.usaAscoltoCloud && !micSpento && !micChiusoFuori && !WiretapAperto.aperto
-            && !inBenvenuto && !avvioInCorso && Impostazioni.richiamo && richiamoConsentito && !MicrofonoSezioni.occupato
-            && orecchio.tieniPerCoda(verso: richiamo.condottoPerCoda)
-        if !coda { orecchio.ferma() }
-        orecchio.testoDetto = ""
         guard fase != .ascolto else { return }   // il signore l'ha interrotto e sta già parlando
         // M6: finita la risposta, per qualche secondo il seguito vale anche senza «Jarvis» («Perché?», «E domani?»)
         if eraRisposta || conSeguito { richiamo.seguitoFinoA = Date().addingTimeInterval(Dialogo.finestraSeguito); fineUltimaRisposta = Date() }
-        if coda { iniziaCoda() }                 // 13.9 (6): prima di `fase = .attesa`, così il «Jarvis» non riparte sopra l'orecchio
         fase = .attesa
         // 11 nov (#16): fuori dall'app il dialogo resta aperto per il seguito; se per 8 secondi non dice nulla, è finito
         if dialogoFuori { chiudiDialogoFuori(fra: 8) }
@@ -2822,7 +2742,7 @@ final class Jarvis: NSObject, ObservableObject {
             if self?.musicaSuona == true { try? await Task.sleep(for: .milliseconds(1500)) }   // 9 nov: la musica risale dopo 1,5 s
             // i Clash non si spengono; sul Mac il microfono dell'attesa sta già ripartendo: l'audio resta acceso;
             // se il «Jarvis» in attesa è già ripartito l'audio è suo (spegnerlo qui gli fermerebbe il microfono)
-            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud, self.codaDa == nil,   // 13.9 (6)
+            guard let self, self.fase == .attesa, self.inCoda.isEmpty, !self.inBenvenuto, !Jarvis.usaAscoltoCloud,
                   !self.richiamo.attivo, !AscoltoShazam.condiviso.suonaDentro,   // 9 nov: né la canzone di Shazam
                   !MicrofonoSezioni.occupato else { return }                          // 13.9 (3–4): né il microfono del Wiretap o di una sezione
             if self.musicaSuona { await self.rilasciaMusica() } else if !LettoreMusica.condiviso.suona {
@@ -2890,7 +2810,6 @@ final class Jarvis: NSObject, ObservableObject {
         }
         guard fase == .attesa else { return }   // nel frattempo è partito un altro ascolto (doppio tocco)
         Posizione.scalda()                      // difetto 5: il GPS si sveglia mentre il signore parla, la domanda non lo aspetta
-        if codaDa != nil { chiudiCoda(precarica: false) }   // 13.9 (6): un microfono alla volta
         avvioRichiamo?.cancel()
         richiamo.ferma()                        // il microfono passa all'ascolto normale
         if Jarvis.usaAscoltoCloud {
@@ -3178,7 +3097,7 @@ final class Jarvis: NSObject, ObservableObject {
             }
             precedenteAscolto = testo
             ultimoParzialeAscolto = adesso
-            parziale = Dialogo.unisci(baseAscolto, testo)   // 13.9 (6): senza doppioni se il riconoscimento ha riscritto la frase
+            parziale = [baseAscolto, testo].filter { !$0.isEmpty }.joined(separator: " ")
             if inizioParlato == nil { inizioParlato = adesso }                    // 12 nov (A3)
             // 12 nov (A1): la pausa lunga chiesta dalla risposta anticipata vale finché la frase è quella; parole nuove, si riparte
             if pausaMinimaAscolto > 0, Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(parziale)) != aspettoSu { pausaMinimaAscolto = 0 }
@@ -3360,7 +3279,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard let self, !Task.isCancelled, self.dialogoFuori, UIApplication.shared.applicationState != .active else { return }
             // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
             // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
-            guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty, self.codaDa == nil else { self.chiudiDialogoFuori(fra: secondi); return }
+            guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { self.chiudiDialogoFuori(fra: secondi); return }
             self.spegniMicFuori()
         }
     }
@@ -4704,11 +4623,6 @@ extension Jarvis {
         // 13 nov (prova dei tre punti): le volte che la voce di JARVIS è scesa o si è fermata per lui, e com'è finita
         let esitazioni = orecchio.esitazioniPerMisura()
         if !esitazioni.isEmpty { misura["esitazioni"] = esitazioni }
-        // 13.9 (5): le frasi sentite in attesa e lasciate andare negli ultimi 3 minuti, col perché
-        let scartate = richiamo.scartatePerMisura()
-        if !scartate.isEmpty { misura["scartate"] = scartate }
-        // 13.9 (6): la coda dopo l'ultima voce di JARVIS (durata, se ha parlato, quanto audio è stato riletto)
-        if let c = ultimaCoda { misura["coda"] = c; ultimaCoda = nil }
         // 13 nov (punto 3): come si è chiusa la frase (pausa vera o tetto senza parole nuove) e il rumore della stanza
         if !chiusaDa.isEmpty { misura["fine_da"] = chiusaDa }
         chiusaDa = ""

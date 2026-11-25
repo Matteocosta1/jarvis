@@ -71,18 +71,11 @@ final class Orecchio {
     /// risposta la fermano solo le parole d'ordine («Jarvis», «basta», «aspetta»…), non una frase qualsiasi detta a qualcun altro.
     var soloParoleDOrdine = false
 
-    var attivo: Bool { acceso && !inCoda }
-    /// 13.9 (6) (il signore, 25 nov: «a volte inizio la frase e lui perde le prime parole»): JARVIS ha finito di parlare e il microfono
-    /// dell'orecchio resta acceso ancora un poco, senza riconoscimento, solo per tenere l'audio negli ultimi secondi (RegistroMicrofono).
-    /// Prima si spegneva subito e il «Jarvis» in attesa ripartiva con un motore nuovo: per circa mezzo secondo nessuno ascoltava, e la
-    /// risposta detta di slancio perdeva le prime parole. Il passaggio al «Jarvis» in attesa ora si fa quando il signore tace, e quello
-    /// che ha detto intanto il «Jarvis» lo rilegge dall'inizio (Jarvis, `chiudiCoda`).
-    private(set) var inCoda = false
+    var attivo: Bool { acceso }
     /// Il signore gli sta parlando sopra e l'orecchio sta raccogliendo la sua frase (difetto 6 del 25 ott: in sottofondo si butta).
     var raccoglie: Bool { inPresa }
 
     func avvia() {
-        if inCoda { spegni() }              // 13.9 (6): era rimasto acceso solo per la coda: riparte da capo, col riconoscimento
         voluto = true
         chiusuraChiesta = false
         // 13 nov (punto 1): la voce forte del signore sopra quella di JARVIS si misura da capo per ogni risposta; quando scatta
@@ -238,12 +231,6 @@ final class Orecchio {
     }
 
     func ferma() {
-        pulisci()
-        spegni()
-    }
-
-    /// Lo stato di una risposta finita (comune a `ferma` e alla coda).
-    private func pulisci() {
         chiudiTentativo()                   // 13 nov (punto 2): JARVIS ha finito di parlare, il tentativo in corso si registra
         dimenticaEsitazione("fine")         // 13 nov: niente voce abbassata o attesa rimasta in sospeso
         voluto = false
@@ -256,31 +243,7 @@ final class Orecchio {
         timerSilenzio = nil
         timerTetto?.invalidate()
         timerTetto = nil
-    }
-
-    /// 13.9 (6): come `ferma`, ma il microfono resta acceso (senza riconoscimento) per la coda dopo la voce di JARVIS. Falso: non era
-    /// acceso, si è spento del tutto. 13.9 (7): `verso` è il tubo del «Jarvis» in attesa, che durante la coda ascolta dal vivo da
-    /// questo microfono (prima rileggeva l'audio solo a coda finita, e la risposta partiva quasi un secondo più tardi).
-    @discardableResult
-    func tieniPerCoda(verso: Condotto? = nil) -> Bool {
-        guard acceso, motore.isRunning else { ferma(); return false }
-        pulisci()                               // tutto come `ferma`, tranne il motore
-        timerRiavvio?.invalidate()
-        timerRiavvio = nil
-        turno += 1                              // le trascrizioni ancora in arrivo non contano più
-        richiesta?.endAudio()
-        compito?.cancel()
-        richiesta = nil
-        compito = nil
-        do {
-            try Orecchio.collegaSolo(motore, verso: verso)     // stesso motore, già acceso: cambia solo chi riceve l'audio
-            if !motore.isRunning { try motore.start() }
-            inCoda = true                       // `acceso` resta vero: il motore è suo finché la coda non si chiude
-            return true
-        } catch {
-            spegni()
-            return false
-        }
+        spegni()
     }
 
     private func accendi() {
@@ -330,7 +293,6 @@ final class Orecchio {
         richiesta = nil
         compito = nil
         acceso = false
-        inCoda = false
     }
 
     private func riavvia() {
@@ -642,9 +604,6 @@ final class Orecchio {
         let input = motore.inputNode
         // cancellazione dell'eco: il microfono non sente la voce che esce dall'altoparlante
         if !input.isVoiceProcessingEnabled { try input.setVoiceProcessingEnabled(true) }
-        // 13.9 (7) (il signore, 25 nov: «nella Dynamic Island ti sento più piano»): con la cancellazione dell'eco iOS abbassa
-        // l'«altro audio», e per lui la voce di JARVIS è altro audio (esce da un altro motore). Abbassamento al minimo
-        input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
         let formato = input.outputFormat(forBus: 0)
         guard formato.sampleRate > 0, formato.channelCount > 0 else {
             throw NSError(domain: "Orecchio", code: 1, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
@@ -658,30 +617,6 @@ final class Orecchio {
             RegistroMicrofono.condiviso.scrivi(buffer)          // gli ultimi secondi, per riconoscere la voce del signore
             SopraLaVoce.condivisa.misura(buffer)                // 13 nov (punto 1): la sua voce forte sopra quella di JARVIS
             Volume.voce.misuraAscolto(buffer)                   // 13.8 (3): dopo avergli parlato sopra, le ONDE seguono la sua voce
-        }
-    }
-
-    /// 13.9 (6): la coda: lo stesso microfono con la cancellazione dell'eco, senza riconoscimento. L'audio va negli ultimi secondi
-    /// (RegistroMicrofono) e alla misura della voce umana (SopraLaVoce), che dice quando il signore tace.
-    /// 13.9 (7): con `verso` l'audio va anche al «Jarvis» in attesa (il suo tubo e le sue misure: voce, folla, ONDE), come dal suo
-    /// microfono.
-    nonisolated private static func collegaSolo(_ motore: AVAudioEngine, verso: Condotto?) throws {
-        let input = motore.inputNode
-        let formato = input.outputFormat(forBus: 0)
-        guard formato.sampleRate > 0, formato.channelCount > 0 else {
-            throw NSError(domain: "Orecchio", code: 2, userInfo: [NSLocalizedDescriptionKey: "nessun ingresso audio"])
-        }
-        input.removeTap(onBus: 0)
-        let ambiente = verso == nil ? nil : AmbienteSonoro.condiviso.nuovaAnalisi(formato: formato)
-        input.installTap(onBus: 0, bufferSize: 2048, format: formato) { buffer, quando in
-            RegistroMicrofono.condiviso.scrivi(buffer)
-            SopraLaVoce.condivisa.misura(buffer)
-            if let verso {
-                verso.scrivi(buffer)
-                ambiente?.analizza(buffer, posizione: quando.sampleTime)
-                VoceAttiva.condivisa.misura(buffer)
-                Volume.voce.misuraAscolto(buffer)
-            }
         }
     }
 

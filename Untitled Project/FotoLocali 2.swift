@@ -6,8 +6,7 @@ import CoreLocation
 import UIKit
 
 /// Ricerca nella galleria del signore: per data, luogo, album e — con l'AI di Apple sul telefono (Vision) — per contenuto.
-/// Tutto resta sull'iPhone: al cervello vanno le date e le etichette trovate e, dalla 13.9 (7), solo le prime tre foto trovate, piccole
-/// (`perIlCervello`), perché possa vederle davvero quando il signore gliele chiede.
+/// Tutto resta sull'iPhone: le foto non vanno mai al cervello, solo le date e le etichette trovate.
 /// 4 nov (i problemi trovati col signore, corretti): prima cercava solo nel periodo scelto e solo fra le 400 foto più recenti,
 /// capiva una trentina di parole e confrontava pezzi di parola, e una foto che una volta non si apriva restava «vuota» per sempre.
 /// Ora l'analisi copre tutta la galleria (IndiceFoto: una volta sola, dalle più recenti, poi solo le nuove), le parole passano dal
@@ -249,33 +248,6 @@ nonisolated enum FotoLocali {
 
     /// Contenitore per il risultato delle richieste sincrone di Photos (il callback arriva prima del ritorno).
     nonisolated private final class Scatola: @unchecked Sendable { var img: UIImage? }
-
-    /// 13.9 (7) (il signore, 25 nov: il treno dell'8 novembre trovato, ma il cervello non poteva vederlo): le foto trovate, piccole
-    /// (lato 640, JPEG), per allegarle al risultato di foto_cerca. Solo quelle già sul telefono, senza aspettare iCloud mentre il
-    /// signore aspetta la risposta: una foto che non si apre resta nil, nello stesso ordine degli identificativi.
-    static func perIlCervello(_ ids: [String]) async -> [Data?] {
-        await Task.detached(priority: .userInitiated) { () -> [Data?] in
-            let trovate = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-            var perId: [String: PHAsset] = [:]
-            for k in 0..<trovate.count {
-                let a = trovate.object(at: k)
-                perId[a.localIdentifier] = a
-            }
-            let o = PHImageRequestOptions()
-            o.isSynchronous = true
-            o.deliveryMode = .highQualityFormat
-            o.resizeMode = .fast
-            o.isNetworkAccessAllowed = false
-            return ids.map { id -> Data? in
-                guard let a = perId[id] else { return nil }
-                let out = Scatola()
-                PHImageManager.default().requestImage(for: a, targetSize: CGSize(width: 640, height: 640), contentMode: .aspectFit, options: o) { img, _ in
-                    out.img = img
-                }
-                return out.img?.jpegData(compressionQuality: 0.6)
-            }
-        }.value
-    }
 
     /// Per le miniature e la vista a schermo intero.
     static func immagine(id: String, lato: CGFloat) async -> UIImage? {

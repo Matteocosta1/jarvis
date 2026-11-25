@@ -115,40 +115,6 @@ nonisolated enum Dialogo {
     /// Finita una risposta, per 4 secondi il seguito vale anche senza «Jarvis» («Perché?», «E domani?»), come tra due persone.
     static let finestraSeguito: TimeInterval = 4
 
-    /// 13.9 (6) (25 nov, 9:43: «cosa stai facendo? È sbagliato… cosa stai facendo? È sbagliato…» tre volte nella stessa frase): il
-    /// riconoscimento, dopo una pausa, a volte non riparte da capo ma riscrive la frase dall'inizio con qualche parola cambiata; l'app
-    /// lo prendeva per una ripartenza e metteva davanti di nuovo quello che aveva già. Qui le due parti si uniscono senza doppioni:
-    /// se il pezzo nuovo contiene già l'inizio di quello vecchio (entro le sue prime 8 parole) è una riscrittura e vale da solo; se
-    /// comincia con la coda di quello vecchio (almeno 3 parole) la coda non si ripete.
-    static func unisci(_ vecchio: String, _ nuovo: String) -> String {
-        let v = vecchio.trimmingCharacters(in: .whitespacesAndNewlines), n = nuovo.trimmingCharacters(in: .whitespacesAndNewlines)
-        if v.isEmpty { return n }
-        if n.isEmpty { return v }
-        func parole(_ t: String) -> [String] {
-            t.split(whereSeparator: { $0 == " " || $0 == "\n" }).map { String($0).lowercased().filter { $0.isLetter || $0.isNumber || $0 == "'" } }
-        }
-        let pv = parole(v), pn = parole(n)
-        // riscrittura: le prime parole del vecchio ricompaiono all'inizio del nuovo
-        let k = min(4, pv.count)
-        if k >= 3, pn.count >= k {
-            let testa = Array(pv.prefix(k))
-            for s in 0...min(8, max(0, pn.count - k)) where Array(pn[s..<(s + k)]) == testa {
-                return pn.count + 2 >= pv.count ? n : v          // la versione più lunga
-            }
-        }
-        // sovrapposizione: la coda del vecchio è l'inizio del nuovo
-        var migliore = 0
-        let massimo = min(pv.count, pn.count, 12)
-        if massimo >= 3 {
-            for l in stride(from: massimo, through: 3, by: -1) where Array(pv.suffix(l)) == Array(pn.prefix(l)) { migliore = l; break }
-        }
-        if migliore > 0 {
-            let resto = n.split(separator: " ", omittingEmptySubsequences: true).dropFirst(migliore).joined(separator: " ")
-            return resto.isEmpty ? v : v + " " + resto
-        }
-        return v + " " + n
-    }
-
     // MARK: Il punto dell'interruzione
 
     /// La risposta interrotta come la rilegge il cervello nei turni dopo: quello che il signore ha sentito, la nota con il punto
