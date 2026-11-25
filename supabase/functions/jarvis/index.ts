@@ -5884,10 +5884,10 @@ Deno.serve(async (req) => {
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
           const ultimaDomanda = togliRipetute(senzaNoteApp(String(scelti.at(-1)?.m?.content ?? "")));   // revisione 24 ott: senza le note dell'app, che col significato non c'entrano
           correzione = ilSignoreCorregge(ultimaDomanda);   // v154
-          tagliaParagrafi = !briefingModo && !RICHIESTA_LUNGA.test(ultimaDomanda);
           // 13 nov (il signore: «A»): il briefing già pronto. La richiesta arriva segnata dal telefono (con calendario e salute) o si
           // riconosce dalla frase (a voce dal Mac o dall'orologio); i dati partono subito, insieme al resto del contesto
           const briefingModo = corpo.briefing === true || RICHIESTA_BRIEFING.test(ultimaDomanda.trim());
+          tagliaParagrafi = !briefingModo && !RICHIESTA_LUNGA.test(ultimaDomanda);   // v157
           const telefonoBriefing = briefingModo && corpo.briefing_telefono && typeof corpo.briefing_telefono === "object" ? corpo.briefing_telefono : null;
           const datiBriefing: Promise<any> | null = briefingModo
             ? briefingDati({ attendi: corpo.senza_filo !== true, prova: provaGenerale, lat: turno.lat, lon: turno.lon })
