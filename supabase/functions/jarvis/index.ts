@@ -4427,7 +4427,8 @@ async function provaToni(risposte: any[], idVoce: unknown) {
       const r = await fetch(`${XI}/text-to-speech/${voce}?output_format=mp3_44100_128`, {
         method: "POST", signal: AbortSignal.timeout(20000),
         headers: { "xi-api-key": chiave, "content-type": "application/json", accept: "audio/mpeg" },
-        body: JSON.stringify({ text: toniPerVoce(frase, modello), model_id: modello,
+        // nella prova i toni passano tutti (anche quelli non ancora ammessi, come [sad] o [reassuring]): servono proprio per sceglierli
+        body: JSON.stringify({ text: capisceToni(modello) ? frase : toniPerVoce(frase, modello), model_id: modello,
           ...(prima && conContesto(modello) ? { previous_text: toniPerVoce(prima, modello) } : {}),
           ...(/flash_v2_5|turbo_v2_5/.test(modello) ? { language_code: "it" } : {}), voice_settings: vs }),
       });
