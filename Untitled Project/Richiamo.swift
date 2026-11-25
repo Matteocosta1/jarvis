@@ -469,7 +469,7 @@ final class Richiamo {
                     corrente = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,;:"))
                 }
             }
-            resto = [prima, corrente].filter { !$0.isEmpty }.joined(separator: " ")
+            resto = Dialogo.unisci(prima, corrente)        // 13.9 (6): senza doppioni se il riconoscimento ha riscritto la frase
             self.testo?(resto.isEmpty ? (vocativo ?? "") : resto)
             // 14 nov (tempi del 13 nov): il riconoscimento ritocca la frase anche dopo che il signore ha smesso (punteggiatura,
             // maiuscole) e ogni ritocco faceva ripartire da capo la pausa che la chiude. Con le stesse parole la pausa continua a

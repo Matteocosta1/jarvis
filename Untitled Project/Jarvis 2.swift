@@ -3161,7 +3161,7 @@ final class Jarvis: NSObject, ObservableObject {
             }
             precedenteAscolto = testo
             ultimoParzialeAscolto = adesso
-            parziale = [baseAscolto, testo].filter { !$0.isEmpty }.joined(separator: " ")
+            parziale = Dialogo.unisci(baseAscolto, testo)   // 13.9 (6): senza doppioni se il riconoscimento ha riscritto la frase
             if inizioParlato == nil { inizioParlato = adesso }                    // 12 nov (A3)
             // 12 nov (A1): la pausa lunga chiesta dalla risposta anticipata vale finché la frase è quella; parole nuove, si riparte
             if pausaMinimaAscolto > 0, Jarvis.normaAnticipo(Jarvis.fraseAnticipabile(parziale)) != aspettoSu { pausaMinimaAscolto = 0 }
