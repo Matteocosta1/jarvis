@@ -3502,7 +3502,6 @@ async function giaDetto(storia: any[], letteGia: Promise<UltimeRisposte>): Promi
   const testoSuo = typeof ultimaSua?.content === "string" ? ultimaSua.content
     : Array.isArray(ultimaSua?.content) ? ultimaSua.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join(" ") : "";
   const corregge = ilSignoreCorregge(senzaNoteApp(testoSuo));
-  const funzionamento = SUL_FUNZIONAMENTO.test(senzaNoteApp(testoSuo));
   // 25 nov (toni scelti dal signore, passaggi graduali): il registro di ognuna delle ultime risposte, «base» se non ne aveva.
   // L'app rimanda le risposte senza i toni (in chat non si vedono): il registro vero si legge dalla giornata, che li tiene.
   const toniUsati = lette.registri;
@@ -3528,7 +3527,6 @@ async function giaDetto(storia: any[], letteGia: Promise<UltimeRisposte>): Promi
     battute.length ? `battute già fatte di recente, da non rifare in nessuna forma (nemmeno variate o in chiusura): ${battute.join(" · ")}` : "",
     consigli.length ? `consigli già dati oggi, da non ridare in nessuna forma (nemmeno in chiusura) se non te lo chiede lui: ${consigli.join(" · ")}` : "",
     corregge ? "adesso ti sta correggendo o è seccato con te: rispondi calmo e naturale, con poche parole, come una persona che ha capito; niente battute né risate, niente «ha ragione» né «me lo segno», niente regole nuove promesse su di te, niente spiegazioni del perché hai sbagliato, e non chiedergli di dirti l'errore o da dove ripartire" : "",
-    funzionamento ? "adesso parla di come funzioni tu (microfono, volume, voce, tempi, app): una frase da persona, senza ipotesi tecniche, e senza proporre di segnarlo, aprire una issue o sistemarlo dal Mac" : "",
     haRagione ? `«ha ragione» l'hai già detto ${haRagione === 1 ? "una volta" : `${haRagione} volte`} di recente: non dirlo più` : "",
     toniUsati.length ? `registro delle ultime risposte: ${toniUsati.join(" → ")} (vale solo se il suo umore è ancora quello: se è cambiato, se ti corregge o è seccato, segui il suo tono di adesso, senza strascichi)` : "",
     conTu ? "nelle ultime risposte gli hai dato del tu: torna al lei, senza farlo notare" : "",
@@ -5928,6 +5926,12 @@ Deno.serve(async (req) => {
           const conFilo = !provaGenerale && corpo.senza_filo !== true;
           const ultimaDomanda = togliRipetute(senzaNoteApp(String(scelti.at(-1)?.m?.content ?? "")));   // revisione 24 ott: senza le note dell'app, che col significato non c'entrano
           correzione = ilSignoreCorregge(ultimaDomanda);   // v154
+          // v161 (replay del v160: «Ha ragione, sbaglio io», «mi dica pure se vuole che lo segni» anche col [Già detto]): le note
+          // che valgono per QUESTA risposta stanno subito prima delle sue parole, accanto al promemoria della misura
+          const notaAdesso = [
+            correzione ? "ti sta correggendo o è deluso: calmo, poche parole; niente «ha ragione», niente «me lo segno», niente promesse su di te né domande su cosa sistemare" : "",
+            SUL_FUNZIONAMENTO.test(ultimaDomanda) ? "parla di come funzioni tu: una frase da persona, senza ipotesi tecniche; non proporre di segnarlo, annotarlo o aprire una issue" : "",
+          ].filter(Boolean).join("; ");
           // 13 nov (il signore: «A»): il briefing già pronto. La richiesta arriva segnata dal telefono (con calendario e salute) o si
           // riconosce dalla frase (a voce dal Mac o dall'orologio); i dati partono subito, insieme al resto del contesto
           const briefingModo = corpo.briefing === true || RICHIESTA_BRIEFING.test(ultimaDomanda.trim());
@@ -6034,7 +6038,7 @@ Deno.serve(async (req) => {
           briefingConPosta = blocco?.conPosta === true;
           // un passaggio solo quando i dati ci sono tutti: il telefono ha mandato calendario e salute, o non ha strumenti suoi (le 9)
           briefingUnico = !!blocco && (telefonoBriefing !== null || client.size === 0);
-          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaSalute}${notaAspetto}${notaBriefing}${briefingModo ? "" : `\n${MISURA_TURNO}`}\n\n${ultimo}`;
+          const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaSalute}${notaAspetto}${notaBriefing}${briefingModo ? "" : `\n${MISURA_TURNO}`}${notaAdesso ? `\n[Adesso: ${notaAdesso}]` : ""}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) { turno.foto = imgs[0]; turno.fotoTutte = imgs; }
           const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
