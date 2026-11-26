@@ -162,7 +162,8 @@ Rispondi SOLO con un array JSON (vuoto [] se non c'è niente), oggetti {"testo":
 }
 
 // ───────── Il giro delle novità (26 nov, via del signore alle 03:41) ─────────
-// Una volta a notte Haiku cerca sul web le novità sui temi del signore e ne tiene al massimo 3, solo quelle che valgono davvero.
+// Una volta a notte Haiku cerca sul web le novità sui temi del signore e ne tiene al massimo 3, di temi diversi, graffiti prima di tutto
+// (26 nov, 03:47: «carino che tratti più argomenti, soprattutto i graffiti»).
 // Tetto fisso: 8 ricerche a giro (circa 1 centesimo l'una) e un giro solo al giorno, anche se pg_cron chiama due volte.
 // Quelle già dette non tornano: le ultime 40 si passano a Haiku come «già dette» e il briefing segna quelle che usa.
 const MODELLO_NOVITA = Deno.env.get("MODELLO_NOVITA") || "claude-haiku-5-5";
@@ -186,9 +187,11 @@ Cerca sul web le NOVITÀ degli ultimi giorni che potrebbero interessargli davver
 ${TEMI_NOVITA}
 Regole:
 - solo fatti veri e recenti (ultimi 7 giorni, o annunci di cose in arrivo), con una fonte affidabile; niente voci, niente pubblicità, niente notizie generiche;
-- scegli solo quello che a lui farebbe dire «questa è bella»: meglio 1 novità forte che 3 deboli; se non c'è niente che valga, rispondi [];
+- gli piace la varietà: cerca su più temi diversi e scegli fino a 3 novità di temi DIVERSI (mai due dello stesso tema);
+- i graffiti sono il tema che gli sta più a cuore: almeno 2 ricerche sui graffiti, e se c'è una novità di graffiti che vale, mettila sempre; poi la musica, poi il resto;
+- solo quello che a lui farebbe dire «questa è bella»: una novità debole non la metti; se non c'è niente che valga, rispondi [];
 - mai una novità già nella lista GIÀ DETTE, anche se scritta con altre parole;
-- usa al massimo ${RICERCHE_MAX} ricerche, mirate.
+- usa al massimo ${RICERCHE_MAX} ricerche, mirate e spalmate sui temi.
 Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità in una frase breve, in italiano", "perche": "perché interessa a lui, in poche parole", "fonte": "l'indirizzo web della fonte"}.`;
   const messaggi: any[] = [{ role: "user", content: `OGGI: ${oraLeggibile(new Date().toISOString())}\n\nGIÀ DETTE:\n${giaDette}\n\nCerca le novità di oggi per lui.` }];
   const uso = { in: 0, cache: 0, scrittura: 0, out: 0, ricerche: 0 };
