@@ -241,7 +241,8 @@ Scanner: il signore scansiona i prodotti dalla voce Scanner dell'app; se ti scri
 Credito: JARVIS funziona con il credito delle API di Anthropic: dal 20 nov 2026 sono 200 dollari al mese inclusi nel piano dell'account (si rinnovano da soli ogni mese, il conto riparte da 200), più eventuali ricariche a mano del signore (mai automatiche). «Il credito si rinnova il 3», «ho 300 dollari al mese» → credito mensile con importo (dollari al mese) e giorno (del rinnovo). «Ho ricaricato 50 dollari» → credito ricarica con importo 50; «il saldo nella Console è 42» → credito saldo; «quanto credito ho?», «quanto mi resta?» → credito stato, e rispondi con il residuo stimato in una frase («circa 31 dollari su 50, Sir; è una stima»). Se il signore parla di euro, usa il numero com'è e ricordagli che la Console conta in dollari. Se il contesto contiene [Avviso credito …], dillo in una frase all'inizio della risposta.
 Impegni della notte: se il contesto contiene [Impegni da confermare …], sono cose che il signore ha detto ieri di passaggio, trovate di notte; il briefing del mattino gli ha già chiesto se segnarle. Non riproporle tu di tua iniziativa. Quando ne parla o risponde («sì», «segnali», «il primo sì, il secondo no», «quello di Matteo mettilo alle 18»), usa impegni_conferma con i numeri giusti: segna diventa una promessa con l'avviso, scarta la toglie. Poi conferma in una frase.
 Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti», «funziona tutto?» o lamenta che qualcosa non va senza sapere cosa, usa diagnostica. Riferisci in poche frasi: prima ciò che NON funziona o sta per finire (crediti voce quasi esauriti, chiave rifiutata, servizio che non risponde) con il rimedio in parole semplici; se è tutto a posto dillo in una frase e aggiungi i crediti voce rimasti. Non elencare i servizi che vanno bene uno per uno.
-Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando.
+Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando. Se mentre suona ti dice «questo è X, non è Y» (o «questo non è Y»), vuol dire che sta suonando la cosa sbagliata: rimetti Y, quello che aveva chiesto, mai X; se la risposta di musica_riproduci dice che il primo brano è di un altro artista, diglielo.
+DOCUMENTI (26 nov): ritenuta d'acconto, prestazione occasionale e fattura (copia di cortesia) li prepara l'app con lo strumento documento: i conti, il PDF, l'anteprima, l'invio e l'archivio li fa lei. Tu riconosci la richiesta e chiedi i dati che mancano, uno alla volta e in poche parole, in quest'ordine: per chi (cliente: nome o ragione sociale, codice fiscale o partita IVA, indirizzo), i suoi dati (nome, codice fiscale per ritenuta e occasionale o partita IVA per la fattura, indirizzo, IBAN), per la fattura il regime (forfettario o ordinario), poi importo lordo e descrizione. Quello che ha già detto non lo richiedi. I dati del documento non si salvano mai: niente memoria_salva né ricordi per questi dati. Quando hai tutto chiami documento una volta sola; poi, in una frase, i conti che ti restituisce (il netto o il totale). Se dopo vuole cambiare qualcosa (importo, descrizione, cliente), richiami documento con tutti i dati aggiornati e modifica: true. Se lo strumento documento non c'è: dall'Apple Watch di' che i documenti si preparano sull'iPhone; altrimenti che serve la build nuova dell'app.
 Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa immagini_cerca; per dischi, copertine ed etichette preferisci discogs_cerca. Le immagini compaiono da sole in una galleria nell'app: non elencarle e non leggere indirizzi, di' solo in una frase cosa hai trovato.
 Foto del signore: per cercare nella sua galleria usa foto_cerca, per data, luogo, album o contenuto (parole chiave in inglese). Le foto trovate compaiono nell'app. Tu vedi solo quelle che arrivano allegate al risultato (le prime, se l'app le manda); delle altre hai solo le righe di testo (data, luogo, contenuto): di quelle non dire «vista» né descriverle. Se ne hai davanti più d'una e ne salvi una con ricorda, scegli quale con foto_n (1 = la prima allegata). Una foto aperta nell'app non ti arriva. Se ti serve proprio una foto che non hai davanti, digli di sceglierla col tasto delle foto nella chat: ti arriva allegata al suo messaggio dopo (mai «la apra toccandola», errore vero, 25 nov: tre richieste di aprirla e poi «Vista, allora. Purtroppo però non mi arriva»).
 Pagine web: per mostrare una pagina al signore usa apri_pagina se il dispositivo lo offre.
@@ -452,6 +453,16 @@ const STRUMENTI_CLIENT: Record<string, any> = {
     input_schema: { type: "object", properties: { cosa: { type: "array", items: { type: "string" }, description: "parole chiave in inglese" }, da: { type: "string", description: "ISO 8601" }, a: { type: "string", description: "ISO 8601" }, luogo: { type: "string" }, album: { type: "string" }, quante: { type: "number", description: "1-30, default 12" } } } },
   musica_riproduci: { description: "Fa suonare subito su Apple Music (abbonamento del signore) un brano, un album, un artista (i suoi brani più ascoltati) o una playlist.",
     input_schema: { type: "object", properties: { cerca: { type: "string", description: "es. «Around the World Daft Punk»" }, tipo: { type: "string", enum: ["brano", "album", "artista", "playlist"] } }, required: ["cerca"] } },
+  documento: { description: "Prepara sull'iPhone una ritenuta d'acconto, una prestazione occasionale o una fattura (copia di cortesia): l'app fa i conti, il PDF e l'anteprima a pagina piena (MODIFICA · INVIA); inviato, il PDF va da solo in Archivio › Documenti. Restituisce i conti.",
+    input_schema: { type: "object", properties: {
+      tipo: { type: "string", enum: ["ritenuta", "occasionale", "fattura"] },
+      regime: { type: "string", enum: ["forfettario", "ordinario"], description: "solo per la fattura" },
+      cliente: { type: "object", properties: { nome: { type: "string" }, codice: { type: "string", description: "codice fiscale o partita IVA, come detto" }, indirizzo: { type: "string" } }, required: ["nome"] },
+      prestatore: { type: "object", description: "i dati del signore", properties: { nome: { type: "string" }, codice: { type: "string" }, indirizzo: { type: "string" }, iban: { type: "string" } }, required: ["nome"] },
+      importo: { type: "number", description: "lordo (ritenuta, occasionale) o imponibile (fattura), in euro" },
+      descrizione: { type: "string" },
+      modifica: { type: "boolean", description: "true quando si corregge il documento appena fatto (stesso numero)" } },
+      required: ["tipo", "cliente", "prestatore", "importo", "descrizione"] } },
   musica_controllo: { description: "Comanda la musica che suona sull'iPhone: play, pausa, avanti, indietro.",
     input_schema: { type: "object", properties: { azione: { type: "string", enum: ["play", "pausa", "avanti", "indietro"] } }, required: ["azione"] } },
   meteo_qui: { description: "Meteo di Apple esattamente dove si trova il signore adesso: condizioni attuali e prossime ore con probabilità di pioggia.",
@@ -4096,6 +4107,14 @@ function togliRipetute(t: string): string {
   return w.join(" ");
 }
 
+/// 26 nov (DOCUMENTI): la frase chiede un documento, o risponde a una domanda di JARVIS sui dati del documento.
+function inDocumento(testo: string, primaDiLui: string): boolean {
+  const t = senzaNoteApp(String(testo ?? "")).toLowerCase();
+  if (/(ritenut|prestazione occasionale|fattur)/.test(t)) return true;
+  const j = String(primaDiLui ?? "").toLowerCase();
+  return /(ritenuta d'acconto|prestazione occasionale|fattura|i suoi dati|per chi\?|regime forfettario o ordinario|importo lordo|importo e descrizione|cosa cambio)/.test(j);
+}
+
 function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone", chiestoPrima = false) {
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
   // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
@@ -6064,6 +6083,9 @@ Deno.serve(async (req) => {
           const chiestoPrima = primaDiLui?.role === "assistant" && haChiesto(primaDiLui.content);
           const conImmagine = imgs.length > 0 || fotoPrima.length > 0;
           modello = scegliModello(ultimo, conImmagine, dispositivo, chiestoPrima);
+          // 26 nov (DOCUMENTI, chiesto dal signore: «modello economico»): la richiesta di un documento e le risposte alle domande sui dati
+          // vanno su Haiku. Solo con l'app che ha lo strumento documento e senza foto.
+          if (!conImmagine && client.has("documento") && inDocumento(ultimo, typeof primaDiLui?.content === "string" ? primaDiLui.content : "")) modello = MODELLO_RAPIDO;
           // decisione 53: «continua» dopo un'interruzione → lo stesso modello della risposta interrotta (con una foto mai il rapido)
           const ripresa = modelloDaRiprendere(scelti.map(({ m, i }) => ({ r: m.role, t: String(m.content), foto: fotoPrima.length > 0 && i === fs?.indice })), dispositivo);
           if (ripresa && !(ripresa === MODELLO_RAPIDO && conImmagine)) modello = ripresa;

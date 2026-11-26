@@ -14,7 +14,7 @@ final class Strumenti {
     private static let nomiBase = ["calendario_crea", "calendario_leggi", "promemoria_crea", "contatti_cerca", "chiama", "messaggio", "naviga",
                        "invia_messaggio", "riconosci_musica", "apri_apple_music", "foto_cerca", "apri_pagina",
                        "musica_riproduci", "musica_controllo", "meteo_qui", "salute_riepilogo", "conversazione_pulisci", "guarda", "interprete_avvia",
-                       "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando", "comando_app"]
+                       "telefono_torcia", "telefono_luminosita", "telefono_batteria", "telefono_comando", "comando_app", "documento"]
 
     /// Nome del Comando rapido che invia SMS e iMessage senza conferma.
     static let comandoInvio = "JARVIS invia"
@@ -45,6 +45,7 @@ final class Strumenti {
         case "telefono_batteria": return "controllo la batteria"
         case "telefono_comando": return "comando il telefono"
         case "comando_app": return "subito"
+        case "documento": return "preparo il documento"
         case "mac_comando": return "comando il Mac"
         case "regia": return "all'opera"                            // 12.0 (10)
         case "piano": return "seguo il piano"                       // 14 nov
@@ -75,6 +76,8 @@ final class Strumenti {
     var interpreteDaAprire: Lingua?
     /// Un comando dell'app capito dal cervello in una frase storpiata («rito» o un reparto): parte appena JARVIS ha finito di parlare.
     var comandoDaEseguire: String?
+    /// 26 nov · DOCUMENTI: il documento preparato dal cervello; l'anteprima si apre appena JARVIS ha finito di parlare.
+    var documentoDaAprire: DocumentoJarvis?
 
     func prendiFotoOcchi() -> [Data] {
         defer { fotoOcchi = [] }
@@ -101,7 +104,7 @@ final class Strumenti {
         }
     }
 
-    func annullaInSospeso() { daAprire.removeAll(); comandoDaEseguire = nil }
+    func annullaInSospeso() { daAprire.removeAll(); comandoDaEseguire = nil; documentoDaAprire = nil }
 
     // MARK: Permessi
     // Versioni a callback con chiusura @Sendable: i callback arrivano su un thread qualsiasi e non devono
@@ -159,6 +162,10 @@ final class Strumenti {
             case "piano": return Piano.condiviso.esegui(i)              // 14 nov: più passi senza guida (Piano.swift)
             case "mano": return await ManiJarvis.esegui(i)              // 14 nov: le mani su tutto JARVIS (ManiJarvis.swift)
             case "schermo": return (Regia.condivisa.catalogo(rigaVecchia: Regia.condivisa.rigaVecchia?()), false)
+            case "documento":                                          // 26 nov: ritenuta, prestazione occasionale, fattura (Documenti.swift)
+                let (esito, errore, d) = Documenti.prepara(i)
+                if let d { documentoDaAprire = d }
+                return (esito, errore)
             case "comando_app":
                 let c = i["comando"] as? String ?? ""
                 guard c == "rito" || Reparto(rawValue: c) != nil else { return (json(["errore": "comando sconosciuto"]), true) }

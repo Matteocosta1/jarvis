@@ -274,6 +274,7 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var pagina: PaginaWeb?      // pagina aperta nel browser interno
     @Published var occhi: Occhiata? { didSet { if (occhi == nil) != (oldValue == nil) { aggiornaRichiamo() } } }   // fotocamera aperta (occhi di JARVIS)
     @Published var interprete: Lingua?     // modalità interprete aperta
+    @Published var documento: DocumentoJarvis?   // 26 nov · DOCUMENTI: l'anteprima del documento preparato (Documenti.swift)
     @Published var allenatore = false      // modalità allenatore aperta
     private var attesaOcchi: CheckedContinuation<[Data], Never>?
 
@@ -2755,6 +2756,10 @@ final class Jarvis: NSObject, ObservableObject {
         if let l = strumenti.interpreteDaAprire {   // «traduci in spagnolo»: l'interprete parte appena ha finito la frase
             strumenti.interpreteDaAprire = nil
             interprete = l
+        }
+        if let d = strumenti.documentoDaAprire {    // 26 nov · DOCUMENTI: l'anteprima a pagina piena, appena ha detto i conti
+            strumenti.documentoDaAprire = nil
+            documento = d
         }
         if ascoltaDopo {             // diario della sera: finita la domanda, il microfono si apre da solo
             ascoltaDopo = false

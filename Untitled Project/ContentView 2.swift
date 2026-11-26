@@ -112,7 +112,7 @@ struct ContentView: View {
     private var qualcosaAperto: Bool {
         scheda != nil || mostraRicordi != nil || sorgenteFoto != nil || mostraImpostazioni || mostraBrowser || mostraSentinella
             || mostraWiretap || mostraProfiler || mostraVitals || mostraConfidente || mostraLidar || mostraSistemi
-            || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.allenatore || scegliLingua || chiediPulizia
+            || jarvis.pagina != nil || jarvis.interprete != nil || jarvis.documento != nil || jarvis.allenatore || scegliLingua || chiediPulizia
     }
     @FocusState private var tastiera: Bool
     /// Sta premendo i tasti: vero a ogni tasto, torna falso 1,2 secondi dopo l'ultimo (e subito con Invia o con la tastiera chiusa).
@@ -442,6 +442,12 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(item: $jarvis.pagina) { p in BrowserInterno(url: p.url).ignoresSafeArea().aperturaHUD("Browser", icona: "globe").paginaPiena() }
+        // 26 nov · DOCUMENTI: l'anteprima del PDF a pagina piena (MODIFICA · INVIA), come tutte le sezioni
+        .fullScreenCover(item: $jarvis.documento) { d in
+            VistaDocumento(doc: d,
+                           modifica: { jarvis.annunciaConSeguito("Cosa cambio, Sir?") },
+                           inviato: { jarvis.annuncia("Fatto, Sir. Una copia è nell'Archivio, cartella Documenti.") })
+        }
         // Studio e Social: lo strato sopra JARVIS, nel corpo qui sopra (dopo la tendina)
         .onReceive(NotificationCenter.default.publisher(for: .jarvisApriPagina)) { n in
             guard let a = n.userInfo?["a"] as? AperturaPagina else { return }

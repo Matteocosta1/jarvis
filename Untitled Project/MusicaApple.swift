@@ -34,9 +34,15 @@ enum MusicaApple {
                 var r = MusicCatalogSearchRequest(term: testo, types: [Artist.self]); r.limit = 1
                 guard let artista = try await r.response().artists.first else { return nessuno(testo) }
                 let dettagli = try await artista.with([.topSongs])
-                guard let brani = dettagli.topSongs, !brani.isEmpty else { return nessuno(testo) }
+                guard let tutti = dettagli.topSongs, !tutti.isEmpty else { return nessuno(testo) }
+                // 26 nov (dialogo delle 4:29: chiesto Tony Boy, partiva un brano di Sfera Ebbasta): fra i più ascoltati dell'artista
+                // Apple Music mette anche i brani di altri dove lui è solo ospite. In coda vanno solo quelli dove è l'artista
+                // principale (il suo nome in testa); se non ce n'è nessuno, la classifica com'è. Al cervello torna il brano che parte.
+                let suoi = tutti.filter { MusicaApple.principale(artista.name, di: $0.artistName) }
+                let brani: [Song] = suoi.isEmpty ? Array(tutti) : suoi
                 lettore.queue = ApplicationMusicPlayer.Queue(for: brani)
-                suona = "i brani più ascoltati di \(artista.name)"
+                let primo = brani[0]
+                suona = "i brani più ascoltati di \(artista.name): parte «\(primo.title)» di \(primo.artistName)"
             default:
                 var r = MusicCatalogSearchRequest(term: testo, types: [Song.self]); r.limit = 1
                 guard let b = try await r.response().songs.first else { return nessuno(testo) }
@@ -63,6 +69,13 @@ enum MusicaApple {
         }
         if let e = l.errore { return (json(["errore": e]), true) }
         return (json(["ok": true]), false)
+    }
+
+    /// L'artista cercato è il principale del brano? «Tony Boy» sì per «Tony Boy» e «Tony Boy & Guè», no per «Sfera Ebbasta & Tony Boy».
+    nonisolated static func principale(_ artista: String, di nomeBrano: String) -> Bool {
+        let a = artista.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "it_IT"))
+        let b = nomeBrano.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "it_IT"))
+        return !a.isEmpty && b.hasPrefix(a)
     }
 
     private static func nessuno(_ testo: String) -> (String, Bool) {
