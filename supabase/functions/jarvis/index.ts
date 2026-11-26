@@ -4107,14 +4107,6 @@ function togliRipetute(t: string): string {
   return w.join(" ");
 }
 
-/// 26 nov (DOCUMENTI): la frase chiede un documento, o risponde a una domanda di JARVIS sui dati del documento.
-function inDocumento(testo: string, primaDiLui: string): boolean {
-  const t = senzaNoteApp(String(testo ?? "")).toLowerCase();
-  if (/(ritenut|prestazione occasionale|fattur)/.test(t)) return true;
-  const j = String(primaDiLui ?? "").toLowerCase();
-  return /(ritenuta d'acconto|prestazione occasionale|fattura|i suoi dati|per chi\?|regime forfettario o ordinario|importo lordo|importo e descrizione|cosa cambio)/.test(j);
-}
-
 function scegliModello(testo: string, conImmagine: boolean, dispositivo = "iphone", chiestoPrima = false) {
   // il modello rapido solo per comandi secchi e brevi (pausa, avanti, che ore sono…); per tutto il resto il cervello completo.
   // v108: la nota d'interruzione che aggiunge l'app («(ti ho interrotto mentre rispondevi a…») non conta: prima allungava
@@ -6083,9 +6075,6 @@ Deno.serve(async (req) => {
           const chiestoPrima = primaDiLui?.role === "assistant" && haChiesto(primaDiLui.content);
           const conImmagine = imgs.length > 0 || fotoPrima.length > 0;
           modello = scegliModello(ultimo, conImmagine, dispositivo, chiestoPrima);
-          // 26 nov (DOCUMENTI, chiesto dal signore: «modello economico»): la richiesta di un documento e le risposte alle domande sui dati
-          // vanno su Haiku. Solo con l'app che ha lo strumento documento e senza foto.
-          if (!conImmagine && client.has("documento") && inDocumento(ultimo, typeof primaDiLui?.content === "string" ? primaDiLui.content : "")) modello = MODELLO_RAPIDO;
           // decisione 53: «continua» dopo un'interruzione → lo stesso modello della risposta interrotta (con una foto mai il rapido)
           const ripresa = modelloDaRiprendere(scelti.map(({ m, i }) => ({ r: m.role, t: String(m.content), foto: fotoPrima.length > 0 && i === fs?.indice })), dispositivo);
           if (ripresa && !(ripresa === MODELLO_RAPIDO && conImmagine)) modello = ripresa;
