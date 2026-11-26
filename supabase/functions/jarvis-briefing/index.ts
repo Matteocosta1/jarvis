@@ -8,6 +8,8 @@
 //   26 ott sera: insieme alla notifica accende anche la Dynamic Island PIOGGIA sull'iPhone, anche ad app chiusa (push-to-start);
 // { isola_gettone: "…" } (dall'app) il gettone push-to-start dell'iPhone per l'isola della PIOGGIA (tabella jarvis_isola);
 // { notte: true } (pg_cron, alle 4 di Roma) rilegge le frasi del giorno e trova gli impegni detti di passaggio: il briefing li chiede.
+// { novita: true } (pg_cron, alle 5 di Roma) il giro delle novità: Haiku cerca sul web sui temi del signore, ne tiene al massimo 3
+//   (jarvis_novita) e il briefing delle 9:30 le dice con le parole di JARVIS. Il cervello non si tocca (26 nov, via del signore).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
@@ -157,6 +159,82 @@ Rispondi SOLO con un array JSON (vuoto [] se non c'è niente), oggetti {"testo":
   // lette: la notte dopo non si rileggono (restano ancora 3 giorni, poi si cancellano)
   await db.from("jarvis_giornata").update({ letto: true }).in("id", frasi.map((f: any) => f.id));
   return { frasi: frasi.length, impegni: righe.length, trovati: righe.map((x) => x.testo) };
+}
+
+// ───────── Il giro delle novità (26 nov, via del signore alle 03:41) ─────────
+// Una volta a notte Haiku cerca sul web le novità sui temi del signore e ne tiene al massimo 3, solo quelle che valgono davvero.
+// Tetto fisso: 8 ricerche a giro (circa 1 centesimo l'una) e un giro solo al giorno, anche se pg_cron chiama due volte.
+// Quelle già dette non tornano: le ultime 40 si passano a Haiku come «già dette» e il briefing segna quelle che usa.
+const MODELLO_NOVITA = Deno.env.get("MODELLO_NOVITA") || "claude-haiku-5-5";
+const RICERCHE_MAX = 8;
+const TEMI_NOVITA = `- graffiti e writing: la scena old school di New York (Kaws, Part, la crew The Death Squad), writer famosi, mostre e festival di graffiti e street art, nuove vernici spray;
+- musica: punk inglese (Clash, Sex Pistols, Iggy Pop), jazz, hip hop americano, trap italiana (Sfera Ebbasta, Tony Boy), musica elettronica: dischi e tracce nuove, concerti a Milano;
+- cinema e serie: Marvel (film, serie, annunci), serie crime (Mr. Robot, Prison Break, Breaking Bad, Romanzo Criminale), film nuovi nel genere;
+- tecnologia: computer, iPhone, Apple Watch e strumenti nuovi per creativi e programmatori (Mac, Xcode, intelligenza artificiale);
+- Milano: mostre, eventi e occasioni per un artista e writer con molti follower.`;
+
+async function giroNovita(forza: boolean) {
+  const oggi = giornoRoma();
+  if (!forza) {
+    const { data: fatto } = await db.from("jarvis_novita").select("id").eq("giorno", oggi).limit(1);
+    if (fatto?.length) return { saltato: true, motivo: "il giro di oggi è già fatto" };
+  }
+  const { data: gia } = await db.from("jarvis_novita").select("titolo").order("creato", { ascending: false }).limit(40);
+  const giaDette = (gia ?? []).map((r: any) => `- ${r.titolo}`).join("\n") || "(niente)";
+  const sistema = `Sei il servizio notizie di JARVIS, l'assistente personale di Alessandro (King Rusto): writer di graffiti molto famoso in Italia (quasi 150.000 follower), artista, programmatore di app, socio di Discosizer (serate di musica elettronica a Milano).
+Cerca sul web le NOVITÀ degli ultimi giorni che potrebbero interessargli davvero, su questi temi:
+${TEMI_NOVITA}
+Regole:
+- solo fatti veri e recenti (ultimi 7 giorni, o annunci di cose in arrivo), con una fonte affidabile; niente voci, niente pubblicità, niente notizie generiche;
+- scegli solo quello che a lui farebbe dire «questa è bella»: meglio 1 novità forte che 3 deboli; se non c'è niente che valga, rispondi [];
+- mai una novità già nella lista GIÀ DETTE, anche se scritta con altre parole;
+- usa al massimo ${RICERCHE_MAX} ricerche, mirate.
+Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità in una frase breve, in italiano", "perche": "perché interessa a lui, in poche parole", "fonte": "l'indirizzo web della fonte"}.`;
+  const messaggi: any[] = [{ role: "user", content: `OGGI: ${oraLeggibile(new Date().toISOString())}\n\nGIÀ DETTE:\n${giaDette}\n\nCerca le novità di oggi per lui.` }];
+  const uso = { in: 0, cache: 0, scrittura: 0, out: 0, ricerche: 0 };
+  let finale: any = null;
+  for (let giro = 0; giro < 3; giro++) {                       // «pause_turn»: le ricerche lunghe si riprendono, al massimo 3 volte
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", signal: AbortSignal.timeout(110_000),
+      headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: MODELLO_NOVITA, max_tokens: 2000, system: sistema, messages: messaggi,
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: RICERCHE_MAX,
+          user_location: { type: "approximate", city: "Milano", country: "IT", timezone: "Europe/Rome" } }],
+      }),
+    });
+    if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const d = await r.json();
+    const u = d.usage ?? {};
+    uso.in += u.input_tokens ?? 0; uso.cache += u.cache_read_input_tokens ?? 0; uso.scrittura += u.cache_creation_input_tokens ?? 0;
+    uso.out += u.output_tokens ?? 0; uso.ricerche += u.server_tool_use?.web_search_requests ?? 0;
+    finale = d;
+    if (d.stop_reason !== "pause_turn" || uso.ricerche >= RICERCHE_MAX) break;
+    messaggi.push({ role: "assistant", content: d.content });
+  }
+  await db.from("jarvis_consumi").insert({ servizio: "novita", modello: MODELLO_NOVITA, token_in: uso.in, token_cache: uso.cache,
+    token_cache_scrittura: uso.scrittura, token_out: uso.out, esito: finale?.stop_reason ?? null, app: { ricerche: uso.ricerche } }).then(() => {}, () => {});
+  const out = (finale?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+  const a = out.lastIndexOf("[", out.indexOf("{") >= 0 ? out.indexOf("{") : out.length), b = out.lastIndexOf("]");
+  let trovate: any[] = [];
+  if (a >= 0 && b > a) { try { const x = JSON.parse(out.slice(a, b + 1)); if (Array.isArray(x)) trovate = x; } catch { /* risposta non leggibile: niente novità */ } }
+  if (!trovate.length && out.trim().startsWith("[")) { try { const x = JSON.parse(out); if (Array.isArray(x)) trovate = x; } catch { /* vuoto */ } }
+  const righe = trovate.slice(0, 3).map((t) => ({
+    giorno: oggi,
+    titolo: String(t?.titolo ?? "").trim().slice(0, 240),
+    perche: t?.perche ? String(t.perche).trim().slice(0, 240) : null,
+    fonte: /^https?:\/\//.test(String(t?.fonte ?? "")) ? String(t.fonte).slice(0, 500) : null,
+  })).filter((x) => x.titolo.length >= 8);
+  if (righe.length) { const ins = await db.from("jarvis_novita").insert(righe); if (ins.error) throw ins.error; }
+  else await db.from("jarvis_novita").insert({ giorno: oggi, titolo: "(nessuna novità che valga)", detta: true });   // il giro di oggi è fatto
+  return { ricerche: uso.ricerche, novita: righe.length, trovate: righe };
+}
+
+/// Al mattino: le novità del giro di stanotte (non ancora dette), da passare al cervello per il briefing.
+async function novitaDaDire() {
+  const da = giornoRoma(new Date(Date.now() - 2 * 86_400_000));
+  const { data } = await db.from("jarvis_novita").select("id, titolo, perche").eq("detta", false).gte("giorno", da).order("id").limit(3);
+  return (data ?? []) as { id: number; titolo: string; perche: string | null }[];
 }
 
 /// Al mattino: la domanda sugli impegni trovati stanotte, da mettere in fondo al briefing (vuota se non ce ne sono).
@@ -317,6 +395,10 @@ Deno.serve(async (req) => {
       return json({ ...esito, ...isola, testo: d.testo });
     } catch (e) { return json({ inviata: false, errore: (e as Error).message }); }
   }
+  if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
+    if (daCron && !corpo.forza && oraRoma() !== 5) return json({ saltato: true, ora_roma: oraRoma() });
+    try { return json(await giroNovita(daApp && corpo.forza === true)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
   if (corpo.notte === true) {                                                        // la notte di JARVIS, alle 4 di Roma
     if (daCron && !corpo.forza && oraRoma() !== 4) return json({ saltato: true, ora_roma: oraRoma() });
     try { return json(await leggiNotte()); } catch (e) { return json({ errore: (e as Error).message }, 500); }
@@ -340,10 +422,17 @@ Deno.serve(async (req) => {
   if (daCron && !corpo.forza && oraRoma() !== ORA_BRIEFING) return json({ saltato: true, ora_roma: oraRoma(), motivo: `il briefing si manda alle ${ORA_BRIEFING}` });
 
   try {
+    // 26 nov: le novità del giro di stanotte, se ci sono: il cervello le dice con le sue parole, in una frase in più
+    const novita = await novitaDaDire().catch(() => []);
+    const conNovita = novita.length
+      ? " In più, con parole tue e in una sola frase, digli le novità trovate stanotte per lui (lascia fuori quelle che non ti sembrano all'altezza): " +
+        novita.map((n) => n.titolo + (n.perche ? ` (${n.perche})` : "")).join("; ") + "."
+      : "";
     const testoCervello = await chiediAlCervello(
       "Buongiorno Jarvis. Preparami il briefing del mattino per una notifica sul telefono: meteo di oggi a Milano, email importanti arrivate da ieri sera, " +
-      "note aperte o in scadenza, prossima serata se nota. Al massimo quattro frasi brevi, da maggiordomo al mattino, senza elenchi. " +
-      "Non hai calendario né dati di salute in questo momento: non nominarli. Non nominare gli impegni da confermare: li aggiungo io in fondo.");
+      `note aperte o in scadenza, prossima serata se nota. Al massimo ${novita.length ? "cinque" : "quattro"} frasi brevi, da maggiordomo al mattino, senza elenchi. ` +
+      "Non hai calendario né dati di salute in questo momento: non nominarli. Non nominare gli impegni da confermare: li aggiungo io in fondo." + conNovita);
+    if (novita.length) await db.from("jarvis_novita").update({ detta: true }).in("id", novita.map((n) => n.id)).then(() => {}, () => {});
     const testo = testoCervello + await domandaImpegni().catch(() => "");   // la notte di JARVIS: gli impegni trovati, da confermare
     const esito = await mandaATutti("Buongiorno, Sir", testo, "briefing");   // decisione 13 (24 ott): «Sir», come le altre frasi fisse
     await db.from("jarvis_azioni").insert({ dispositivo: "cervello", strumento: "briefing_push", dettagli: JSON.stringify({ ora: oraRoma() }), esito: JSON.stringify(esito).slice(0, 200), errore: !!(esito as any).errore }).then(() => {}, () => {});
