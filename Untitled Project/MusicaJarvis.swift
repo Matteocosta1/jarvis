@@ -31,6 +31,8 @@ final class LettoreMusica: ObservableObject {
 
     /// 9 nov sera: messa in pausa da JARVIS perché il signore gli parla («Jarvis» o tocco): riparte da sola dopo la risposta.
     private(set) var fermataDaJarvis = false
+    /// 26 nov: quando JARVIS l'ha messa in pausa (la ripresa di riserva aspetta almeno 2 s, così non anticipa l'ascolto).
+    private(set) var fermataDa: Date?
 
     /// L'audio di JARVIS pronto per la musica: se era sul «solo effetti» (che col silenzioso tace e in background si ferma) passa
     /// alla riproduzione vera, come un'app musicale. Se il «Jarvis» in attesa ha già il microfono (registra e riproduce), resta così.
@@ -45,6 +47,7 @@ final class LettoreMusica: ObservableObject {
         guard suona else { return }
         lettore.pause()
         fermataDaJarvis = true
+        fermataDa = Date()
         aggiorna()
     }
     func riprendiDopoJarvis() async {
@@ -201,6 +204,7 @@ final class LettoreMusica: ObservableObject {
     }
 
     func play() async {
+        fermataDaJarvis = false     // 26 nov: la musica la fa ripartire qualcuno (JARVIS a voce o un tasto): non è più «ferma per JARVIS»
         LettoreMusica.preparaAudio()
         // 12 nov (screenshot del signore: «Apple Music: Impossibile completare l'operazione. MPMusicPlayerControllerErrorDomain 1»):
         // il lettore è di JARVIS e appena aperto è vuoto; Play con la coda vuota dava quell'errore (lo spiega Apple: «no queue»).

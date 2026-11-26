@@ -211,14 +211,31 @@ final class Jarvis: NSObject, ObservableObject {
         let lettore = LettoreMusica.condiviso
         lettore.aggiorna()
         let suona: Bool = altre || lettore.suona || lettore.fermataDaJarvis || AscoltoShazam.condiviso.suonaOra
+        riprendiSeDimenticata(lettore)
         if suona { silenzioMusica = 0; musicaSuona = true; return }
         silenzioMusica += 1
         if silenzioMusica >= 2 { musicaSuona = false }
     }
 
+    /// 26 nov (il signore: «gli dicevo metti un po' di musica, lui andava in riservato e la musica si bloccava»): la musica messa
+    /// in pausa per «Jarvis» ripartiva con un tentativo solo, 1,5 s dopo la risposta; se in quell'attimo JARVIS non era libero
+    /// (parlava ancora, una frase in coda, un ascolto) il tentativo saltava e nessuno lo rifaceva: musica ferma e RISERVATO acceso
+    /// (la pausa di JARVIS conta come musica che suona). Ora, una volta al secondo: se la pausa di JARVIS c'è ancora e JARVIS è
+    /// libero da almeno 2 s (e la pausa è di almeno 2 s fa), la musica riparte. La regola resta quella: pausa con «Jarvis», ripresa
+    /// dopo la risposta.
+    private var attesaDa = Date()
+    private func riprendiSeDimenticata(_ lettore: LettoreMusica) {
+        guard lettore.fermataDaJarvis, fase == .attesa, inCoda.isEmpty, !richiamo.sveglio, !inBenvenuto else { return }
+        let ora = Date()
+        let da: Date = max(attesaDa, lettore.fermataDa ?? .distantPast)
+        guard ora.timeIntervalSince(da) >= 2 else { return }
+        Task { @MainActor in await lettore.riprendiDopoJarvis() }
+    }
+
     @Published var fase: Fase = .attesa {
         didSet {
             guard fase != oldValue else { return }
+            if fase == .attesa { attesaDa = Date() }                       // 26 nov (musica ferma): da quando è libero
             AmbienteSonoro.condiviso.jarvisSuona(avvioInCorso || (Jarvis.usaAscoltoCloud && fase == .parlo))   // la musica d'avvio (e sul Mac la sua voce) non è «confusione»
             BattitoMani.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // Mac: la sua voce rientra dal microfono dell'attesa, non sono battiti
             EcoMac.condivisa.jarvisParla(Jarvis.usaAscoltoCloud && fase == .parlo)   // difetto 2: quello che sente mentre parla può essere eco
