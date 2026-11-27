@@ -4548,13 +4548,18 @@ async function chiamaClaudeUnaVolta(messages: any[], modello: string, tools: any
   let nessunoStrumento = senzaStrumenti && !senzaScelta.has(modello);
   let senzaPensiero = senzaStrumenti && /haiku/i.test(modello) && !pensieroObbligato.has(modello);
   const cacheSistema = modello === MODELLO ? { type: "ephemeral", ttl: "1h" } : senzaStrumenti && /haiku/i.test(modello) ? null : { type: "ephemeral" };
+  // 27 nov (issue 21, prova delle 16:27): con lo sforzo «low» Sonnet chiude intorno ai 300 token, e con 4 foto insieme ne descriveva 2
+  // qualunque cosa dicesse la nota. Solo quando il messaggio del signore ha più foto insieme (le etichette «Foto N di M») lo sforzo è «medium»
+  const ultimoVero = [...messages].reverse().find((m: any) => m?.role === "user" && utenteVero(m));
+  const fotoInsieme = Array.isArray(ultimoVero?.content) && ultimoVero.content.filter((b: any) => b?.type === "text" && ETICHETTA_FOTO.test(String(b.text))).length > 1;
+  const sforzoTurno = (() => { const s0 = sforzo(modello, voceRapida); return s0 && fotoInsieme ? "medium" : s0; })();
   const corpo = (conSforzo: boolean) => JSON.stringify({
     model: modello, max_tokens: 8000, stream: true, tools, messages: cacheSistema ? conCacheStoria(pulisci(messages)) : pulisci(messages),
     // 25 nov (approvato dal signore): la cache da 1 ora (scrittura a prezzo doppio) solo per il modello di tutti i giorni, che la rilegge
     // davvero. Il briefing già pronto (Haiku, un passaggio, una volta al giorno) la scriveva ogni volta senza rileggerla mai: niente
     // cache. Opus e Haiku con gli strumenti: la cache normale da 5 minuti (basta per i giri di strumenti dello stesso turno).
     system: [{ type: "text", text: SISTEMA + SISTEMA_TONI, ...(cacheSistema ? { cache_control: cacheSistema } : {}) }],
-    ...(conSforzo && sforzo(modello, voceRapida) ? { output_config: { effort: sforzo(modello, voceRapida) } } : {}),
+    ...(conSforzo && sforzoTurno ? { output_config: { effort: sforzoTurno } } : {}),
     ...(nessunoStrumento ? { tool_choice: { type: "none" } } : {}),
     ...(senzaPensiero ? { thinking: { type: "disabled" } } : {}),
   });
