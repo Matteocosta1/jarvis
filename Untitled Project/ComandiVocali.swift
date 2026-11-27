@@ -55,6 +55,22 @@ enum Pronunce {
     nonisolated static let verbiComando: Set<String> = ["apri", "aprimi", "attiva", "avvia", "accendi", "lancia", "mostra", "mostrami", "vai",
                                                         "entra", "fammi", "portami", "vediamo", "chiudi", "chiudimi", "esci", "togli", "toglimi", "levami"]
 
+    /// 27 nov: il signore fa vedere qualcosa a JARVIS («ti faccio vedere…», «ti voglio far vedere…», «te la faccio vedere», «ti mostro…»):
+    /// «ti/te» e una forma di «fare» poco prima di «vedere», oppure «ti/te» subito prima di «mostro». Le parole arrivano già senza
+    /// accenti e minuscole («farò» è «faro»).
+    nonisolated static func mostraAJarvis(_ t: [String]) -> Bool {
+        let a: Set<String> = ["ti", "te"]
+        let fare: Set<String> = ["faccio", "far", "fare", "faro", "facciamo"]
+        if let k = t.firstIndex(of: "vedere"), k > 0 {
+            let prima = t[max(0, k - 4)..<k]
+            if prima.contains(where: { a.contains($0) }) && prima.contains(where: { fare.contains($0) }) { return true }
+        }
+        if let k = t.firstIndex(where: { $0 == "mostro" || $0 == "mostrero" }), k > 0 {
+            if t[max(0, k - 2)..<k].contains(where: { a.contains($0) }) { return true }
+        }
+        return false
+    }
+
     /// Tra il verbo e il nome possono stare solo queste parole: «apri il leader», «vai su leader», «fammi vedere la sezione edit».
     nonisolated static let ponte: Set<String> = ["il", "lo", "la", "l", "i", "gli", "le", "su", "a", "al", "alla", "in", "nella", "sezione", "vedere"]
 
@@ -381,6 +397,10 @@ enum ComandoVocale: Equatable {
         if dentro != .profiler { t = Pronunce.sistema(t) }        // «laidar» → lidar, «idit» → edith… (nel Profiler no: lì si dettano nomi)
         // MARK XI: «sezioni aperte», «quella di prima», «mettila da parte», «chiudi tutto» (prima di togliere «sezione»)
         if let n = navigazione(t) { return n }
+        // 27 nov (il signore: «gli ho detto ti faccio vedere una foto e mi ha aperto l'app foto»): quando è LUI che fa vedere qualcosa
+        // a JARVIS («ti faccio vedere una foto», «ti voglio far vedere il pezzo», «te la faccio vedere», «ti mostro una foto») non è
+        // un comando d'apertura: la frase va al cervello, che aspetta la foto. «Fammi vedere le foto», «mostrami le foto» aprono come prima.
+        if Pronunce.mostraAJarvis(t) { return nil }
         #if os(iOS)
         // 13.1 (debug 14 nov): con qualcosa in FILO, «togli tutto» e «pulisci tutto» sono di FILO (il dialogo, Insieme), come nel
         // mockup. Prima li prendeva questo elenco, che gira prima del dialogo: «togli tutto» chiudeva la sezione davanti e «pulisci
