@@ -10,6 +10,7 @@
 // { notte: true } (pg_cron, alle 4 di Roma) rilegge le frasi del giorno e trova gli impegni detti di passaggio: il briefing li chiede.
 // { novita: true } (pg_cron, alle 5 di Roma) il giro delle novità: Haiku cerca sul web sui temi del signore, ne tiene al massimo 3
 //   (jarvis_novita) e il briefing delle 9:30 le dice con le parole di JARVIS. Il cervello non si tocca (26 nov, via del signore).
+//   27 nov: nello stesso giro le USCITE MUSICALI degli artisti della sua lista (jarvis_artisti) da Apple Music, a costo zero.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8 } from "npm:jose@5";
@@ -180,8 +181,10 @@ async function giroNovita(forza: boolean) {
     const { data: fatto } = await db.from("jarvis_novita").select("id").eq("giorno", oggi).limit(1);
     if (fatto?.length) return { saltato: true, motivo: "il giro di oggi è già fatto" };
   }
+  let musica: { giorno: string; titolo: string; perche: string | null; fonte: string | null }[] = [];
+  try { musica = await usciteMusica(oggi); } catch (e) { console.error("uscite musicali:", (e as Error).message); }   // 27 nov: se Apple Music non risponde, il giro va avanti
   const { data: gia } = await db.from("jarvis_novita").select("titolo").order("creato", { ascending: false }).limit(40);
-  const giaDette = (gia ?? []).map((r: any) => `- ${r.titolo}`).join("\n") || "(niente)";
+  const giaDette = [...(gia ?? []).map((r: any) => `- ${r.titolo}`), ...musica.map((m) => `- ${m.titolo}`)].join("\n") || "(niente)";
   const sistema = `Sei il servizio notizie di JARVIS, l'assistente personale di Alessandro (King Rusto): writer di graffiti molto famoso in Italia (quasi 150.000 follower), artista, programmatore di app, socio di Discosizer (serate di musica elettronica a Milano).
 Cerca sul web le NOVITÀ degli ultimi giorni che potrebbero interessargli davvero, su questi temi:
 ${TEMI_NOVITA}
@@ -228,9 +231,66 @@ Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità 
     perche: t?.perche ? String(t.perche).trim().slice(0, 240) : null,
     fonte: /^https?:\/\//.test(String(t?.fonte ?? "")) ? String(t.fonte).slice(0, 500) : null,
   })).filter((x) => x.titolo.length >= 8);
-  if (righe.length) { const ins = await db.from("jarvis_novita").insert(righe); if (ins.error) throw ins.error; }
+  const tutte = [...righe, ...musica];                         // prima le novità del web (i graffiti davanti), poi le uscite
+  if (tutte.length) { const ins = await db.from("jarvis_novita").insert(tutte); if (ins.error) throw ins.error; }
   else await db.from("jarvis_novita").insert({ giorno: oggi, titolo: "(nessuna novità che valga)", detta: true });   // il giro di oggi è fatto
-  return { ricerche: uso.ricerche, novita: righe.length, trovate: righe };
+  return { ricerche: uso.ricerche, novita: righe.length, uscite: musica.length, trovate: tutte };
+}
+
+// ───────── 27 nov · USCITE MUSICALI (issue #19, pezzo 2): Apple Music, gli artisti della sua lista (tabella jarvis_artisti) ─────────
+// Ogni mattina, dentro il giro delle novità: per ogni artista l'ultima uscita (album, EP o singolo) dal catalogo italiano; se è
+// uscita negli ultimi 7 giorni e non è già stata detta, diventa una novità. Nessun modello: costo zero (l'API è inclusa nel
+// Developer Program). Segreti: MUSICKIT_KEY_P8, MUSICKIT_KEY_ID (chiave MusicKit del portale) e APNS_TEAM_ID (lo stesso team).
+// Senza la chiave non fa niente.
+const AM = "https://api.music.apple.com/v1/catalog/it";
+let cacheJwtMusica: { token: string; creato: number } | null = null;
+async function jwtMusica() {
+  const p8 = Deno.env.get("MUSICKIT_KEY_P8"), keyId = Deno.env.get("MUSICKIT_KEY_ID"), teamId = Deno.env.get("APNS_TEAM_ID");
+  if (!p8 || !keyId || !teamId) return null;
+  if (cacheJwtMusica && Date.now() - cacheJwtMusica.creato < 40 * 60_000) return cacheJwtMusica.token;
+  const chiave = await importPKCS8(p8.replace(/\\n/g, "\n").trim(), "ES256");
+  const token = await new SignJWT({}).setProtectedHeader({ alg: "ES256", kid: keyId }).setIssuer(teamId).setIssuedAt()
+    .setExpirationTime("1h").sign(chiave);
+  cacheJwtMusica = { token, creato: Date.now() };
+  return token;
+}
+async function am(token: string, percorso: string) {
+  const r = await fetch(AM + percorso, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+  if (r.status === 404) return { data: [] };
+  if (!r.ok) throw new Error(`Apple Music ${r.status}`);
+  return await r.json();
+}
+async function usciteMusica(oggi: string) {
+  const token = await jwtMusica();
+  if (!token) return [];
+  const { data: artisti } = await db.from("jarvis_artisti").select("id, nome, am_id, ultima_uscita").eq("attivo", true).order("id");
+  const limite = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const nuove: { giorno: string; titolo: string; perche: string | null; fonte: string | null }[] = [];
+  let richieste = 0;
+  for (const a of (artisti ?? []) as any[]) {
+    try {
+      let id: string | null = a.am_id;
+      if (!id) {                                                // la prima volta: si cerca l'artista nel catalogo e si ricorda
+        richieste++;
+        const s = await am(token, `/search?types=artists&limit=1&term=${encodeURIComponent(a.nome)}`);
+        id = s?.results?.artists?.data?.[0]?.id ?? null;
+        if (!id) continue;
+        await db.from("jarvis_artisti").update({ am_id: id }).eq("id", a.id);
+      }
+      richieste++;
+      const u = (await am(token, `/artists/${id}/view/latest-release`))?.data?.[0];
+      const at = u?.attributes;
+      if (!u?.id || !at?.releaseDate || at.releaseDate < limite || at.releaseDate > oggi || u.id === a.ultima_uscita) continue;
+      const tipo = at.isSingle ? "il singolo" : (at.trackCount ?? 0) <= 6 ? "l'EP" : "l'album";
+      const quando = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long" }).format(new Date(at.releaseDate + "T12:00:00Z"));
+      nuove.push({ giorno: oggi, titolo: `È uscito ${tipo} «${String(at.name).slice(0, 120)}» di ${String(at.artistName ?? a.nome).slice(0, 80)}, il ${quando}`,
+        perche: "È uno degli artisti della sua lista su Apple Music.", fonte: /^https:\/\//.test(at.url ?? "") ? at.url : null });
+      await db.from("jarvis_artisti").update({ ultima_uscita: u.id }).eq("id", a.id);
+    } catch (e) { console.error(`uscite musicali, ${a.nome}:`, (e as Error).message); }
+  }
+  await db.from("jarvis_consumi").insert({ servizio: "uscite", modello: "apple-music", token_in: 0, token_out: 0, esito: "fine",
+    app: { artisti: (artisti ?? []).length, richieste, uscite: nuove.length } }).then(() => {}, () => {});
+  return nuove;
 }
 
 /// Al mattino: le novità del giro di stanotte (non ancora dette), da passare al cervello per il briefing.
