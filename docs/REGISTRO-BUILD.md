@@ -550,7 +550,7 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 - 3.3 · cervello v167: strumento `instagram` (sola lettura: follower, commenti con chi/follower/post/testo, tag, nelle ultime N ore; solo_importanti). Fra i NON_FIDATI (i commenti sono testo di altri). Regola nel cervello: like, follower nuovi o persi e menzioni nelle storie non si possono sapere, va detto subito. Costo: pubblicazione ~1 $, cache riscritta una volta (strumento nuovo).
 - Menzioni @kingrusto in didascalie e commenti di altri: servono i webhook di Meta (configurazione nell'app Meta «JARVIS KR»): pezzo a parte.
 
-## 27 nov, ~04:10 · 13.9 (12) · FOTO INSIEME dalla chat + la correzione di «ti faccio vedere» (la build da caricare)
+## 27 nov, 04:10 · 13.9 (12) · FOTO INSIEME dalla chat + la correzione di «ti faccio vedere» (la build da caricare) · controllo di compilazione VERDE (0 errori, 0 warning, run 45931635070, commit 3f006c0) · cervello v166 pubblicato (versione 171)
 Richiesta del signore (03:50, 03:57): più foto insieme dalla chat, tutto in una build. Mockup approvato (JARVIS Mark XIII v111, 03:56 «mi va bene così»).
 - `SceltaFoto.swift` (nuovo, solo iPhone): «Scegli dalla libreria» apre il selettore di iOS (PHPicker) con la scelta multipla, fino a 6, nell'ordine toccato. «Scatta una foto» resta la fotocamera di sempre (una).
 - `Jarvis 2.swift`: `fotoInsieme` (2–6 foto pronte), `impostaFoto([UIImage])`, `togliFoto(_:)` (con una sola rimasta torna la «foto pronta» di sempre), `riduci` (1280 px, JPEG 70%, come prima); l'invio manda le foto come `immagini` con `foto_insieme: true`; il messaggio ricorda `nFoto`; le foto restano «di cui si parla» per i turni dopo, come una foto sola.
