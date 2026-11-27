@@ -10,6 +10,7 @@
 // { notte: true } (pg_cron, alle 4 di Roma) rilegge le frasi del giorno e trova gli impegni detti di passaggio: il briefing li chiede.
 // { novita: true } (pg_cron, alle 5 di Roma) il giro delle novità: Haiku cerca sul web sui temi del signore, ne tiene al massimo 3
 //   (jarvis_novita) e il briefing delle 9:30 le dice con le parole di JARVIS. Il cervello non si tocca (26 nov, via del signore).
+//   27 nov: nel briefing anche INSTAGRAM (commenti, tag, follower delle ultime 24 ore; importanti = più di 10.000 follower).
 //   27 nov: nello stesso giro le USCITE MUSICALI degli artisti della sua lista (jarvis_artisti) da Apple Music, a costo zero.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -296,6 +297,78 @@ async function usciteMusica(oggi: string, prova = false) {
   return nuove;
 }
 
+// ───────── 27 nov · INSTAGRAM NEL BRIEFING (issue #19, pezzo 3.1): commenti e tag delle ultime 24 ore, follower guadagnati ─────────
+// Scelte del signore (03:04): «importante» = più di 10.000 follower. Si leggono con la chiave della sezione Social (social_token,
+// Instagram Login) e, per i follower di chi commenta o tagga, con Business Discovery (social_facebook, login di Facebook: solo i
+// profili professionali). Nessun modello: i dati vanno al cervello insieme al resto del briefing, che li dice in una frase.
+// Limiti di Meta: chi mette like, chi segue o smette di seguire, le menzioni nelle storie non si possono sapere. La spunta blu nemmeno.
+const IG = "https://graph.instagram.com/v23.0", FBG = "https://graph.facebook.com/v23.0";
+const SOGLIA_IMPORTANTE = 10_000;
+async function igLeggi(t: string, percorso: string, params: Record<string, string> = {}) {
+  const u = new URL(IG + percorso);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  u.searchParams.set("access_token", t);
+  const r = await fetch(u, { signal: AbortSignal.timeout(15_000) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error(`Instagram: ${String(d?.error?.message ?? r.status).slice(0, 120)}`);   // mai l'indirizzo: c'è la chiave
+  return d;
+}
+const numeroIt = (n: number) => n.toLocaleString("it-IT");
+async function instagramDaDire(ore = 24): Promise<string> {
+  const { data: tk } = await db.from("social_token").select("token").eq("id", 1).maybeSingle();
+  const t = tk?.token ?? Deno.env.get("INSTAGRAM_TOKEN") ?? "";
+  if (!t) return "";
+  const da = Date.now() - ore * 3600_000;
+  const me = await igLeggi(t, "/me", { fields: "id,username,followers_count" });
+  // i commenti nuovi sui post dell'ultimo mese che ne hanno
+  const media: any[] = (await igLeggi(t, "/me/media", { fields: "id,caption,timestamp,comments_count,media_product_type", limit: "12" })).data ?? [];
+  const commenti: { chi: string; su: string }[] = [];
+  for (const m of media.filter((x) => x.comments_count && Date.parse(x.timestamp) > Date.now() - 30 * 86_400_000).slice(0, 8)) {
+    try {
+      const c: any[] = (await igLeggi(t, `/${m.id}/comments`, { fields: "username,timestamp", limit: "50" })).data ?? [];
+      const su = `${m.media_product_type === "REELS" ? "il reel" : "il post"} «${String(m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 40) || "senza didascalia"}»`;
+      for (const x of c) if (x.username && x.username !== me.username && Date.parse(x.timestamp) > da) commenti.push({ chi: x.username, su });
+    } catch { /* un post non leggibile si salta */ }
+  }
+  // i post di altri in cui l'hanno taggato
+  let tag: { chi: string }[] = [];
+  try {
+    const d: any[] = (await igLeggi(t, "/me/tags", { fields: "username,timestamp", limit: "25" })).data ?? [];
+    tag = d.filter((x) => x.username && x.username !== me.username && Date.parse(x.timestamp) > da).map((x) => ({ chi: x.username }));
+  } catch { /* tag non leggibili: si va avanti */ }
+  // follower: il numero di oggi contro quello di ieri (una riga al giorno)
+  const oggi = giornoRoma(), ieri = giornoRoma(new Date(Date.now() - 86_400_000));
+  const follower = Number(me.followers_count ?? 0);
+  const { data: prima } = await db.from("jarvis_social_giorni").select("follower").eq("giorno", ieri).maybeSingle();
+  if (follower) await db.from("jarvis_social_giorni").upsert({ giorno: oggi, follower }).then(() => {}, () => {});
+  // chi è importante: i follower di chi ha commentato o taggato (solo profili professionali), al massimo 15 nomi
+  const { data: fb } = await db.from("social_facebook").select("token, ig_id, scade").eq("id", 1).maybeSingle();
+  const fbOk = !!fb?.token && !!fb?.ig_id && (!fb?.scade || Date.parse(fb.scade) > Date.now());
+  const nomi = [...new Set([...tag.map((x) => x.chi), ...commenti.map((x) => x.chi)])].filter((n) => /^[a-z0-9._]{1,30}$/i.test(n)).slice(0, 15);
+  const pesi = new Map<string, number>();
+  if (fbOk) await Promise.all(nomi.map(async (n) => {
+    try {
+      const u = new URL(`${FBG}/${fb!.ig_id}`);
+      u.searchParams.set("fields", `business_discovery.username(${n}){followers_count}`);
+      u.searchParams.set("access_token", fb!.token);
+      const r = await fetch(u, { signal: AbortSignal.timeout(10_000) });
+      const d = await r.json().catch(() => ({}));
+      const f = Number(d?.business_discovery?.followers_count ?? 0);
+      if (r.ok && f) pesi.set(n, f);
+    } catch { /* profilo personale o non trovato: non si sa */ }
+  }));
+  const importante = (n: string) => (pesi.get(n) ?? 0) >= SOGLIA_IMPORTANTE;
+  const visti = new Set<string>();
+  const commImp = commenti.filter((c) => importante(c.chi) && !visti.has(c.chi) && visti.add(c.chi))
+    .sort((a, b) => pesi.get(b.chi)! - pesi.get(a.chi)!).slice(0, 3);
+  const tagImp = [...new Set(tag.map((x) => x.chi))].filter(importante).sort((a, b) => pesi.get(b)! - pesi.get(a)!).slice(0, 3);
+  const parti: string[] = [];
+  parti.push(`${commenti.length} commenti nuovi` + (commImp.length ? ` (da account importanti: ${commImp.map((c) => `@${c.chi}, ${numeroIt(pesi.get(c.chi)!)} follower, su ${c.su}`).join("; ")})` : ""));
+  parti.push(`${tag.length} post di altri in cui l'hanno taggato` + (tagImp.length ? ` (importanti: ${tagImp.map((n) => `@${n}, ${numeroIt(pesi.get(n)!)} follower`).join("; ")})` : ""));
+  if (follower) parti.push(`follower ${numeroIt(follower)}` + (prima?.follower ? ` (${follower - prima.follower >= 0 ? "+" : ""}${numeroIt(follower - prima.follower)} da ieri)` : ""));
+  return `Instagram, ultime ${ore} ore: ${parti.join("; ")}.`;
+}
+
 /// Al mattino: le novità del giro di stanotte (non ancora dette), da passare al cervello per il briefing.
 async function novitaDaDire() {
   const da = giornoRoma(new Date(Date.now() - 2 * 86_400_000));
@@ -470,6 +543,9 @@ Deno.serve(async (req) => {
     cacheJwtMusica = null;                                                           // in prova si firma sempre da capo
     try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva, controllo }); } catch (e) { return json({ errore: (e as Error).message, controllo }, 500); }
   }
+  if (corpo.instagram_prova === true) {                                              // 27 nov: prova di Instagram nel briefing (niente modello)
+    try { return json({ instagram: await instagramDaDire() }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+  }
   if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
     if (daCron && !corpo.forza && oraRoma() !== 5) return json({ saltato: true, ora_roma: oraRoma() });
     try { return json(await giroNovita(daApp && corpo.forza === true)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
@@ -503,10 +579,13 @@ Deno.serve(async (req) => {
       ? " In più, con parole tue e in una sola frase, digli le novità trovate stanotte per lui (lascia fuori quelle che non ti sembrano all'altezza): " +
         novita.map((n) => n.titolo + (n.perche ? ` (${n.perche})` : "")).join("; ") + "."
       : "";
+    // 27 nov: Instagram delle ultime 24 ore (commenti, tag, follower), se la chiave della sezione Social c'è
+    const ig = await instagramDaDire().catch((e) => { console.error("instagram nel briefing:", (e as Error).message); return ""; });
+    const conIg = ig ? ` Poi, in una sola frase, Instagram: nomina prima gli account importanti (più di 10.000 follower) che hanno commentato o l'hanno taggato, poi i numeri; se non ci sono account importanti, solo i numeri in mezza frase. Dati: ${ig}` : "";
     const testoCervello = await chiediAlCervello(
       "Buongiorno Jarvis. Preparami il briefing del mattino per una notifica sul telefono: meteo di oggi a Milano, email importanti arrivate da ieri sera, " +
-      `note aperte o in scadenza, prossima serata se nota. Al massimo ${novita.length ? "cinque" : "quattro"} frasi brevi, da maggiordomo al mattino, senza elenchi. ` +
-      "Non hai calendario né dati di salute in questo momento: non nominarli. Non nominare gli impegni da confermare: li aggiungo io in fondo." + conNovita);
+      `note aperte o in scadenza, prossima serata se nota. Al massimo ${["quattro", "cinque", "sei"][(novita.length ? 1 : 0) + (ig ? 1 : 0)]} frasi brevi, da maggiordomo al mattino, senza elenchi. ` +
+      "Non hai calendario né dati di salute in questo momento: non nominarli. Non nominare gli impegni da confermare: li aggiungo io in fondo." + conNovita + conIg);
     if (novita.length) await db.from("jarvis_novita").update({ detta: true }).in("id", novita.map((n) => n.id)).then(() => {}, () => {});
     const testo = testoCervello + await domandaImpegni().catch(() => "");   // la notte di JARVIS: gli impegni trovati, da confermare
     const esito = await mandaATutti("Buongiorno, Sir", testo, "briefing");   // decisione 13 (24 ott): «Sir», come le altre frasi fisse
