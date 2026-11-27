@@ -257,6 +257,7 @@ async function jwtMusica() {
 async function am(token: string, percorso: string) {
   const r = await fetch(AM + percorso, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
   if (r.status === 404) return { data: [] };
+  if (r.status === 401) cacheJwtMusica = null;                  // firma rifiutata: la prossima volta si rifà da capo
   if (!r.ok) throw new Error(`Apple Music ${r.status}`);
   return await r.json();
 }
@@ -464,7 +465,9 @@ Deno.serve(async (req) => {
     // controllo (solo dati non segreti): con che Key ID e Team ID si firma, e se il .p8 ha la forma giusta
     const p8 = Deno.env.get("MUSICKIT_KEY_P8") ?? "";
     const controllo = { kid: Deno.env.get("MUSICKIT_KEY_ID") ?? null, iss: Deno.env.get("APNS_TEAM_ID") ?? null,
-      p8_forma: /BEGIN PRIVATE KEY/.test(p8) && /END PRIVATE KEY/.test(p8), p8_righe: p8.replace(/\\n/g, "\n").trim().split("\n").length };
+      p8_forma: /BEGIN PRIVATE KEY/.test(p8) && /END PRIVATE KEY/.test(p8), p8_righe: p8.replace(/\\n/g, "\n").trim().split("\n").length,
+      p8_impronta: [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(p8.replace(/\s+/g, ""))))].slice(0, 4).map((x) => x.toString(16).padStart(2, "0")).join("") };
+    cacheJwtMusica = null;                                                           // in prova si firma sempre da capo
     try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva, controllo }); } catch (e) { return json({ errore: (e as Error).message, controllo }, 500); }
   }
   if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
