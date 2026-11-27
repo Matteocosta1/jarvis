@@ -4430,6 +4430,10 @@ extension Jarvis {
     /// il cervello risponde comunque, o chiede il pezzo che manca (P6). `senza`: la frase è ancora in chat (P6, aspettando che
     /// continui) ma partirà dopo esserne tolta: la conversazione per il cervello e il punto in cui si adotta sono quelli di allora.
     private func lanciaAnticipo(_ m: Messaggio, dopoAspetto: Bool, senza: UUID? = nil) {
+        // 27 nov (issue 21): la richiesta anticipata non porta le foto di poco fa (foto_storia): con una foto ancora «in discorso»
+        // (ultimi 10 minuti) la frase parte solo con `invia`, che la rimette al suo posto. Prima: «guarda anche le altre due» →
+        // «non mi sono arrivate». Stessa regola del giro unico del Mac (partiGiroUnico)
+        if idFotoRecente != nil, !fotoRecenti.isEmpty, Date().timeIntervalSince(quandoFotoRecenti) < 600 { return }
         anticipiTurno += 1
         var ultimoPrima = messaggi.last?.id
         if let s = senza, let i = messaggi.firstIndex(where: { $0.id == s }) { ultimoPrima = i > 0 ? messaggi[i - 1].id : nil }
