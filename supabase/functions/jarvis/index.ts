@@ -151,7 +151,7 @@ In [Memoria:] le righe (profilo) sono il suo profilo stabile: chi è, cosa fa, l
 
 MEMORIA
 Quando il signore ti dice qualcosa di stabile e utile su di sé, sulle sue persone, i suoi progetti o le sue preferenze, salvalo con memoria_salva, senza chiedere e con un breve «me lo segno». Categorie: profilo (chi è, cosa fa, come vuole le risposte), persone, preferenze, progetti, lavoro, casa, lessico (i suoi modi di dire e cosa vogliono dire), jarvis (le tue opinioni e i tuoi gusti già espressi). Non salvare dettagli passeggeri. Se ti chiede di dimenticare, usa memoria_dimentica. Note e promemoria operativi vanno nelle note, non nella memoria.
-Quando ti chiede «ti ricordi…?» di una cosa vostra, prima di dire che non la ricordi la cerchi, in silenzio e senza chiedere il permesso: ricordi_cerca, conversazioni_cerca e, se è una foto, foto_cerca (errore vero, 25 nov: «la foto del treno no, non la ritrovo. Posso cercarla?»).
+Quando ti chiede «ti ricordi…?» di una cosa vostra, prima di dire che non la ricordi la cerchi, in silenzio e senza chiedere il permesso: ricordi_cerca, conversazioni_cerca e, se è una foto, foto_viste (quelle che ti ha fatto vedere) e foto_cerca (il rullino) (errore vero, 25 nov: «la foto del treno no, non la ritrovo. Posso cercarla?»).
 Ricordi anche le conversazioni: «cosa ci siamo detti ieri sera?», «cosa mi avevi consigliato martedì?», «di cosa parlavamo l'altra volta?» → conversazioni_cerca.
 A fine conversazione un tuo collaboratore silenzioso rilegge lo scambio e annota da solo i fatti stabili che ti fossero sfuggiti: quindi non interrompere il discorso per segnare ogni cosa, segna con memoria_salva solo ciò che il signore ti chiede esplicitamente di ricordare o che è chiaramente importante.
 
@@ -244,6 +244,7 @@ Diagnostica: se il signore chiede «diagnostica», «controlla i collegamenti»,
 Apple Music: per «metti…», «fammi sentire…», un album, un artista o una playlist usa musica_riproduci; per pausa, riprendi, avanti e indietro usa musica_controllo. Conferma in poche parole cosa sta suonando. Se mentre suona ti dice «questo è X, non è Y» (o «questo non è Y»), vuol dire che sta suonando la cosa sbagliata: rimetti Y, quello che aveva chiesto, mai X; se la risposta di musica_riproduci dice che il primo brano è di un altro artista, diglielo.
 DOCUMENTI (26 nov): ritenuta d'acconto, prestazione occasionale e fattura (copia di cortesia) li prepara l'app con lo strumento documento: i conti, il PDF, l'anteprima, l'invio e l'archivio li fa lei. Tu riconosci la richiesta e chiedi i dati che mancano, uno alla volta e in poche parole, in quest'ordine: per chi (cliente: nome o ragione sociale, codice fiscale o partita IVA, indirizzo), i suoi dati (nome, codice fiscale per ritenuta e occasionale o partita IVA per la fattura, indirizzo, IBAN), per la fattura il regime (forfettario o ordinario), poi importo lordo e descrizione. Quello che ha già detto non lo richiedi. I dati del documento non si salvano mai: niente memoria_salva né ricordi per questi dati. Quando hai tutto chiami documento una volta sola; poi, in una frase, i conti che ti restituisce (il netto o il totale). Se dopo vuole cambiare qualcosa (importo, descrizione, cliente), richiami documento con tutti i dati aggiornati e modifica: true. Se lo strumento documento non c'è: dall'Apple Watch di' che i documenti si preparano sull'iPhone; altrimenti che serve la build nuova dell'app.
 Immagini dal web: se il signore vuole vedere foto o immagini di qualcosa usa immagini_cerca; per dischi, copertine ed etichette preferisci discogs_cerca. Le immagini compaiono da sole in una galleria nell'app: non elencarle e non leggere indirizzi, di' solo in una frase cosa hai trovato.
+Cronologia delle foto (27 nov): ogni foto che ti fa vedere (mandata in chat o scattata con i tuoi occhi, da qualsiasi sezione) si salva da sola, con la tua descrizione: non serve chiedere né dire che la salvi. Quando ti chiede di una foto che ti ha mostrato («la foto di oggi pomeriggio», «quella del treno che ti ho fatto vedere ieri», «com'era il pezzo di stamattina?») usa foto_viste: le foto ritrovate ti arrivano allegate e le guardi davvero, poi rispondi come chi se ne ricorda.
 Foto del signore: per cercare nella sua galleria usa foto_cerca, per data, luogo, album o contenuto (parole chiave in inglese). Le foto trovate compaiono nell'app. Tu vedi solo quelle che arrivano allegate al risultato (le prime, se l'app le manda); delle altre hai solo le righe di testo (data, luogo, contenuto): di quelle non dire «vista» né descriverle. Se ne hai davanti più d'una e ne salvi una con ricorda, scegli quale con foto_n (1 = la prima allegata). Una foto aperta nell'app non ti arriva. Se ti serve proprio una foto che non hai davanti, digli di sceglierla col tasto delle foto nella chat: ti arriva allegata al suo messaggio dopo (mai «la apra toccandola», errore vero, 25 nov: tre richieste di aprirla e poi «Vista, allora. Purtroppo però non mi arriva»).
 Pagine web: per mostrare una pagina al signore usa apri_pagina se il dispositivo lo offre.
 Occhi: se il signore ti chiede di guardare qualcosa che ha davanti («cosa sto guardando», «cos'è questo», «guarda qua», «quanto vale questo disco», «leggimi questo», «che pianta è») e il dispositivo offre guarda, di' soltanto «Guardo.» e usa guarda: la fotocamera scatta da sola e la foto ti arriva allegata al risultato. Poi rispondi in due o tre frasi a ciò che ha chiesto, come se vedessi con i tuoi occhi («Vedo…»): oggetti, piante, animali, cibo, luoghi, testi, marche, persone note. Se è un disco, segui le regole FOTO (chiedi prima: Apple Music o Discogs?). Se la foto è buia, mossa o non mostra niente di chiaro, dillo con garbo e chiedi di riprovare. Se il risultato dice che non c'è foto, il signore ha chiuso la fotocamera: non insistere. Se una foto è già allegata al messaggio del signore, non usare guarda: guarda quella.
@@ -313,6 +314,10 @@ const STRUMENTI_SERVER: any[] = [
     input_schema: { type: "object", properties: { query: { type: "string" }, tipo: { type: "string", enum: ["oggetto", "posto", "persona", "promessa", "visto", "idea", "spesa", "nota"] }, persona: { type: "string" }, anche_fatti: { type: "boolean", description: "includere spesa già comprata, promesse mantenute, oggetti ritrovati" }, quanti: { type: "number", description: "1-50, default 15" } } } },
   { name: "conversazioni_cerca", description: "La memoria delle conversazioni: cerca nelle chiacchierate passate con il signore (riassunti di ogni conversazione, e le sue frasi degli ultimi giorni) per argomento, persona o parole. Per «cosa ci siamo detti ieri sera?», «cosa mi avevi consigliato sul vino?», «di cosa parlavamo martedì?».",
     input_schema: { type: "object", properties: { cerca: { type: "string", description: "argomento o parole da cercare; vuoto = le ultime conversazioni" }, giorni: { type: "number", description: "quanti giorni indietro (default 30)" } } } },
+  { name: "foto_viste", description: "La cronologia delle foto che il signore ti ha fatto vedere (mandate in chat o scattate con i tuoi occhi, da qualsiasi sezione): si salvano da sole, con data, ora, luogo, la sua domanda e la tua descrizione. Cerca per giorno (o intervallo) e/o per contenuto («il treno», «il disco»). Le foto trovate (al massimo 3) ti arrivano allegate qui e compaiono sullo schermo del signore. Non è il rullino del telefono: per quello c'è foto_cerca.",
+    input_schema: { type: "object", properties: { cerca: { type: "string", description: "cosa c'era nella foto o di cosa parlavate, parole libere; vuoto = le ultime" },
+      da: { type: "string", description: "YYYY-MM-DD, primo giorno (compreso)" }, a: { type: "string", description: "YYYY-MM-DD, ultimo giorno (compreso); con solo da vale quel giorno" },
+      quante: { type: "number", description: "quante foto allegare, 1-3 (default 3)" } } } },
   { name: "ricordi_oggi", description: "Il filo della giornata: tutti i ricordi, le azioni e gli spostamenti di un giorno (default oggi) in ordine di tempo, per raccontare com'è andata.",
     input_schema: { type: "object", properties: { giorno: { type: "string", description: "YYYY-MM-DD, default oggi" } } } },
   { name: "ricordi_fatto", description: "Segna un ricordo come fatto (spesa comprata, promessa mantenuta, oggetto ritrovato) oppure lo elimina del tutto.",
@@ -523,7 +528,7 @@ const METEO_CODICI: Record<number, string> = { 0: "sereno", 1: "quasi sereno", 2
 // ───────── Difesa dalle istruzioni nascoste ─────────
 // Strumenti che portano dentro testo scritto da altri (web, email, GitHub, prodotti, log, foto, trascrizioni).
 const NON_FIDATI = new Set(["edith_link", "edith_dominio", "edith_reputazione", "web_search", "web_fetch", "email_leggi", "posta_priorita", "calendario_leggi", "github_file", "github_commit", "github_commit_dettaglio", "github_issue",
-  "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "supabase_log"]);
+  "prodotto_scansiona", "discogs_cerca", "immagini_cerca", "guarda", "foto_viste", "supabase_log"]);
 // Azioni che escono verso il mondo o cancellano: dopo aver letto testo altrui, servono una conferma del signore.
 const SEMPRE_PERICOLOSI = new Set(["posta_rispondi", "invia_messaggio", "messaggio", "chiama", "apri_pagina", "telefono_comando", "github_scrivi", "archivio_apri", "archivio_elimina",
   "diario_cancella", "memoria_dimentica", "memoria_salva", "comando_app", "mac_comando"]);
@@ -639,6 +644,7 @@ async function esegui(nome: string, i: Record<string, any>, turno: Turno = {}) {
     case "vitals": return await vitals(num(i.giorni) || 30);
     case "ricordi_cerca": return await ricordiCerca(i, turno);
     case "ricordi_oggi": return await ricordiOggi(i);
+    case "foto_viste": return await fotoViste(i);
     case "conversazioni_cerca": return await conversazioniCerca(i);
     case "bea_segna": return await beaSegna(i);
     case "bea_scheda": return await beaScheda();
@@ -909,7 +915,7 @@ async function vitals(giorniRichiesti: number) {
 // Ogni riga di memoria, ricordi, note e diario ha il suo vettore: una domanda trova anche le righe che dicono la stessa cosa
 // con parole diverse («il portafoglio» → «il borsello sul mobile»). La ricerca per parole resta: i due risultati si uniscono,
 // prima le parole esatte poi i significati. Se il modello non c'è o non risponde, resta la ricerca per parole e basta.
-type TabellaSignificato = "jarvis_memoria" | "jarvis_ricordi" | "jarvis_note" | "jarvis_diario" | "jarvis_episodi";
+type TabellaSignificato = "jarvis_memoria" | "jarvis_ricordi" | "jarvis_note" | "jarvis_diario" | "jarvis_episodi" | "jarvis_foto";
 const SOGLIA_SIGNIFICATO = Math.min(Math.max(Number(Deno.env.get("SOGLIA_SIGNIFICATO")) || 0.82, 0.5), 0.99);
 const TESTO_DA_VETTORE: Record<TabellaSignificato, { colonne: string; testo: (r: any) => string }> = {
   jarvis_memoria: { colonne: "id, fatto", testo: (r) => String(r.fatto ?? "") },
@@ -917,6 +923,7 @@ const TESTO_DA_VETTORE: Record<TabellaSignificato, { colonne: string; testo: (r:
   jarvis_note: { colonne: "id, testo, progetto", testo: (r) => [r.progetto, r.testo].filter(Boolean).join(": ") },
   jarvis_diario: { colonne: "id, risposta, temi", testo: (r) => [r.risposta, ...(Array.isArray(r.temi) ? r.temi : [])].filter(Boolean).join(". ") },
   jarvis_episodi: { colonne: "id, riassunto", testo: (r) => String(r.riassunto ?? "") },
+  jarvis_foto: { colonne: "id, domanda, descrizione", testo: (r) => [r.domanda, r.descrizione].filter(Boolean).join(". ") },   // 27 nov
 };
 let sessioneSignificato: any = null;
 let significatoAssente = false;
@@ -3762,6 +3769,137 @@ async function registraGiornata(lavoro: any[], risposta: string, dispositivo: st
   } catch (e) { console.log(`giornata non registrata: ${(e as Error).message}`); }
 }
 
+// ───────── 27 nov · CRONOLOGIA DELLE FOTO (issue #20, pezzo 1, approvato dal signore alle 02:36) ─────────
+// Ogni foto che JARVIS vede davvero (mandata in chat, scattata con gli occhi da qualsiasi sezione; dei giri il primo fotogramma)
+// si salva da sola a fine turno, per sempre e con le persone: l'immagine nello Storage («foto-viste», privato), in jarvis_foto
+// la data, il luogo, la frase del signore e la descrizione che JARVIS ha appena detto (nessuna chiamata in più). Le foto del
+// rullino non si copiano (c'è foto_cerca); quelle ritrovate con foto_viste nemmeno. Stesse eccezioni della giornata: niente Mac
+// (lo usa anche Matteo), niente modalità riservate, niente prova generale (chi chiama lo esclude).
+const BUCKET_FOTO = "foto-viste";
+let bucketFotoPronto = false;
+async function bucketFoto() {
+  if (bucketFotoPronto) return;
+  const { data } = await db.storage.getBucket(BUCKET_FOTO);
+  if (!data) {
+    const { error } = await db.storage.createBucket(BUCKET_FOTO, { public: false, fileSizeLimit: "10MB", allowedMimeTypes: ["image/jpeg"] });
+    if (error && !/already exists|duplicate/i.test(error.message)) throw new Error(`la cronologia delle foto non si crea: ${error.message}`);
+  }
+  bucketFotoPronto = true;
+}
+async function improntaDi(base64: string) {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(base64));
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+/// Le foto nuove del turno: quelle del messaggio del signore e quelle arrivate col risultato di «guarda».
+function fotoDelTurno(lavoro: any[]): { origine: string; dati: string }[] {
+  let k = -1;
+  for (let j = lavoro.length - 1; j >= 0; j--) if (utenteVero(lavoro[j])) { k = j; break; }
+  if (k < 0) return [];
+  const usoNome = new Map<string, string>();
+  for (const m of lavoro.slice(k)) if (m?.role === "assistant" && Array.isArray(m.content))
+    for (const b of m.content) if (b?.type === "tool_use") usoNome.set(String(b.id), String(b.name));
+  const immagini = (blocchi: any[]) => blocchi.filter((b: any) => b?.type === "image" && b.source?.type === "base64" && typeof b.source.data === "string" && b.source.data.length > 100)
+    .map((b: any) => String(b.source.data));
+  const out: { origine: string; dati: string }[] = [];
+  const primo = lavoro[k];
+  if (Array.isArray(primo.content)) {
+    const imm = immagini(primo.content);
+    const mandata = /\(il signore ha mandato una foto\)/i.test(testoDi(primo.content));
+    if (imm.length) (mandata ? imm : imm.slice(0, 1)).forEach((d) => out.push({ origine: mandata ? "chat" : imm.length > 1 ? "giro" : "occhi", dati: d }));
+  }
+  for (const m of lavoro.slice(k + 1)) {
+    if (m?.role !== "user" || !Array.isArray(m.content)) continue;
+    for (const b of m.content) {
+      if (b?.type !== "tool_result" || !Array.isArray(b.content) || usoNome.get(String(b.tool_use_id)) !== "guarda") continue;
+      const imm = immagini(b.content);
+      if (imm.length) out.push({ origine: imm.length > 1 ? "giro" : "occhi", dati: imm[0] });
+    }
+  }
+  return out.slice(0, 4);
+}
+async function registraFoto(lavoro: any[], risposta: string, dispositivo: string, turno?: Turno) {
+  if (dispositivo === "mac") return;
+  try {
+    const foto = fotoDelTurno(lavoro);
+    if (!foto.length) return;
+    let k = -1;
+    for (let j = lavoro.length - 1; j >= 0; j--) if (utenteVero(lavoro[j])) { k = j; break; }
+    const frase = senzaNoteApp(senzaContesto(testoDi(lavoro[k]?.content))).trim();
+    const prima = k > 0 && lavoro[k - 1]?.role === "assistant" ? testoDi(lavoro[k - 1].content) : "";
+    if (NON_MEMORIZZARE.test(frase) || NON_MEMORIZZARE.test(prima)) return;
+    await bucketFoto();
+    const giorno = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
+    for (const f of foto) {
+      const impronta = await improntaDi(f.dati);
+      const { data: gia } = await db.from("jarvis_foto").select("id").eq("impronta", impronta).maybeSingle();
+      if (gia) continue;                                          // la stessa foto rimandata: c'è già
+      const percorso = `${giorno.slice(0, 7)}/${impronta.slice(0, 32)}.jpg`;
+      const dati = Uint8Array.from(atob(f.dati), (c) => c.charCodeAt(0));
+      const { error } = await db.storage.from(BUCKET_FOTO).upload(percorso, dati, { contentType: "image/jpeg", upsert: true });
+      if (error) { console.log(`foto non salvata: ${error.message}`); continue; }
+      const { error: e2 } = await db.from("jarvis_foto").insert({
+        dispositivo, origine: f.origine, percorso, impronta, domanda: frase.slice(0, 400) || null,
+        descrizione: risposta.replace(/\[[a-z][a-z \-]{0,23}\]\s*/g, "").trim().slice(0, 900) || null,
+        lat: Number.isFinite(turno?.lat) ? turno!.lat : null, lon: Number.isFinite(turno?.lon) ? turno!.lon : null,
+      });
+      if (e2 && !/duplicate|unique/i.test(e2.message)) console.log(`foto non registrata: ${e2.message}`);
+    }
+  } catch (e) { console.log(`cronologia delle foto: ${(e as Error).message}`); }
+}
+/// foto_viste: le foto che il signore ha fatto vedere, per giorno e/o contenuto; le prime tornano allegate al modello e sullo schermo.
+async function fotoViste(i: Record<string, any>) {
+  const giornoOk = (x: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(x ?? "")) ? String(x) : null;
+  const da = giornoOk(i.da), a = giornoOk(i.a) ?? da;
+  const quante = Math.min(Math.max(num(i.quante) || 3, 1), 3);
+  const cerca = String(i.cerca ?? "").trim();
+  const colonne = "id, creato, dispositivo, origine, percorso, domanda, descrizione, lat, lon";
+  const filtri = (q: any) => {
+    if (da) q = q.gte("creato", mezzanotteDi(da).toISOString());
+    if (a) { const d = new Date(`${a}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); q = q.lt("creato", mezzanotteDi(d.toISOString().slice(0, 10)).toISOString()); }
+    return q;
+  };
+  let righe: any[] = [];
+  if (cerca) {
+    const parole = [...paroleChiave(cerca)].filter((w) => !PAROLE_VUOTE.has(w)).slice(0, 5);
+    const [perParole, simili] = await Promise.all([
+      parole.length ? filtri(db.from("jarvis_foto").select(colonne)).or(parole.map((w) => `descrizione.ilike.%${w}%,domanda.ilike.%${w}%`).join(",")).order("creato", { ascending: false }).limit(10) : Promise.resolve({ data: [] }),
+      vicini("jarvis_foto", cerca, 10).catch(() => [] as { id: number }[]),
+    ]);
+    righe = (perParole as any).data ?? [];
+    const gia = new Set(righe.map((r) => Number(r.id)));
+    const nuovi = simili.filter((v) => !gia.has(v.id)).map((v) => v.id);
+    if (nuovi.length) {
+      const { data } = await filtri(db.from("jarvis_foto").select(colonne)).in("id", nuovi);
+      const posto = new Map(nuovi.map((id, k) => [id, k]));
+      righe = [...righe, ...(data ?? []).sort((x: any, y: any) => posto.get(Number(x.id))! - posto.get(Number(y.id))!)];
+    }
+  } else {
+    righe = (await filtri(db.from("jarvis_foto").select(colonne)).order("creato", { ascending: false }).limit(10)).data ?? [];
+  }
+  if (!righe.length) return { trovate: 0, nota: cerca || da ? "nessuna foto vista con questi criteri: prova senza il giorno o con altre parole" : "la cronologia delle foto è ancora vuota" };
+  const elenco = righe.slice(0, 10).map((r: any, k: number) => ({
+    n: k + 1, quando: fmtQuando.format(new Date(r.creato)), come: r.origine === "chat" ? "mandata in chat" : r.origine === "giro" ? "giro con gli occhi" : "occhi",
+    dove: r.lat != null && r.lon != null ? `${Number(r.lat).toFixed(4)}, ${Number(r.lon).toFixed(4)}` : null,
+    lui: r.domanda ?? null, tu: r.descrizione ?? null,
+  }));
+  const viste: string[] = [], schermo: any[] = [];
+  for (const r of righe.slice(0, quante)) {
+    try {
+      const { data, error } = await db.storage.from(BUCKET_FOTO).download(r.percorso);
+      if (error || !data) continue;
+      const b = new Uint8Array(await data.arrayBuffer());
+      let bin = ""; for (let x = 0; x < b.length; x += 0x8000) bin += String.fromCharCode(...b.subarray(x, x + 0x8000));
+      const b64 = btoa(bin);
+      viste.push(b64);
+      const u = `data:image/jpeg;base64,${b64}`;
+      schermo.push({ titolo: `Foto vista · ${fmtQuando.format(new Date(r.creato))}`, miniatura: u, grande: u, fonte: "Cronologia delle foto" });
+    } catch { /* una foto non leggibile si salta */ }
+  }
+  return { trovate: righe.length, foto: elenco, allegate: viste.length,
+    nota: viste.length ? `le prime ${viste.length} sono allegate qui, nell'ordine dell'elenco, e sono già sullo schermo del signore` : "le immagini non si sono potute leggere: hai solo le descrizioni",
+    ...(viste.length ? { __vedi: viste, __immagini: schermo } : {}) };
+}
+
 /// Le proposte della notte ancora senza risposta, per il contesto del turno (vuoto se non ce ne sono: niente in più nel turno).
 async function impegniDaConfermare(): Promise<string> {
   try {
@@ -5443,6 +5581,7 @@ function strumentiDelTurno(lavoro: any[]): number {
 }
 
 const STATI: Record<string, string> = {
+  foto_viste: "riguardo le foto",
   web_search: "cerco sul web", meteo: "guardo il meteo", serata_riepilogo: "faccio i conti della serata", dati_leggi: "consulto le serate",
   bar_magazzino: "controllo bar e magazzino", immagini_cerca: "cerco le immagini", diagnostica: "controllo tutti i collegamenti",
   github_repo: "guardo GitHub", github_commit: "leggo i commit", github_issue: "controllo le issue", github_file: "apro il file su GitHub", github_commit_dettaglio: "leggo il commit", github_scrivi: "scrivo su GitHub",
@@ -5521,6 +5660,7 @@ Deno.serve(async (req) => {
     if (!contaminato) inSottofondo(memoriaAutomatica(lavoro, testo, String(corpo.dispositivo ?? "iphone")));
     segnaPromessaVuota(testo, strumentiDelTurno(lavoro), String(corpo.dispositivo ?? "iphone"));   // 13 nov (punto 5)
     inSottofondo(registraGiornata(lavoro, testo, String(corpo.dispositivo ?? "iphone"), contaminato));
+    inSottofondo(registraFoto(lavoro, testo, String(corpo.dispositivo ?? "iphone")));   // 27 nov: la cronologia delle foto
     return json({ ok: true });
   }
   if (corpo?.archivio === true) {                                                           // scheda Archivio
@@ -5858,6 +5998,12 @@ Deno.serve(async (req) => {
             daEseguire = true;
           }
           const risultati = daEseguire ? [] : (Array.isArray(c.risultati) ? c.risultati : []).map((x: any) => {
+            // 27 nov: un risultato del cervello con le foto della cronologia torna dal dispositivo così com'era (immagini + testo)
+            if (Array.isArray(x.content)) {
+              const blocchi = x.content.filter((b: any) => (b?.type === "text" && typeof b.text === "string")
+                || (b?.type === "image" && b.source?.type === "base64" && typeof b.source.data === "string" && b.source.data.length < 7_000_000)).slice(0, 4);
+              return { type: "tool_result", tool_use_id: String(x.tool_use_id), content: blocchi.length ? blocchi : "nessun esito", ...(x.is_error ? { is_error: true } : {}) };
+            }
             const testo = String(x.content ?? "").slice(0, 12000);
             // «guarda»: la foto (o i fotogrammi del giro) scattata dal dispositivo arriva insieme al risultato e il cervello la vede
             const foto = immaginiValide(x.immagine, x.immagini);
@@ -6172,6 +6318,8 @@ Deno.serve(async (req) => {
             if (!provaGenerale && !anticipo) segnaPromessaVuota(testo, strumentiDelTurno(lavoro), dispositivo);   // 13 nov (punto 5)
             // la notte di JARVIS: solo le frasi del signore (il briefing chiede al cervello con senza_filo: non è lui che parla)
             if (!provaGenerale && !anticipo && corpo.senza_filo !== true) inSottofondo(registraGiornata(lavoro, testo, dispositivo, contaminato));
+            if (!provaGenerale && !anticipo && corpo.senza_filo !== true) inSottofondo(registraFoto(lavoro, testo, dispositivo, turno));   // 27 nov
+
             if (!provaGenerale) inSottofondo(completaVettori());   // le righe nuove di memoria, ricordi, note e diario prendono il loro vettore
             if (!provaGenerale) inSottofondo(completaVettoriG());  // 20 nov: e quello di Gemini (il motore di riserva)
             chiudi(); return;
@@ -6191,12 +6339,16 @@ Deno.serve(async (req) => {
             if (STATI[b.name]) invia({ t: "stato", d: STATI[b.name] });
             let out: any; try { out = await eseguiConLimite(b.name, b.input ?? {}, turno); } catch (e) { out = { errore: (e as Error).message }; }
             if (out && Array.isArray(out.__immagini)) { invia({ t: "immagini", d: out.__immagini }); delete out.__immagini; }
+            // 27 nov · cronologia delle foto: le foto ritrovate arrivano anche al modello, che così le rivede davvero
+            const vedi: string[] = out && Array.isArray(out.__vedi) ? immaginiValide(null, out.__vedi).slice(0, 3) : [];
+            if (out && "__vedi" in out) delete out.__vedi;
             // 25 nov (analisi della conversazione delle 5:28): «Astro Fett, annotato: lo scrivo così… Fatto, Sir: Astro Fett.» Davanti allo
             // strumento la frase c'era già: dopo un'azione rapida riuscita il modello lo sa e non conferma una seconda volta.
             if (AZIONI_SILENZIOSE.has(b.name) && detto.trim() && out && typeof out === "object" && !out.errore && !out.troppi) {
               out = { ...out, nota_per_te: "Al signore l'hai già detto prima dello strumento: niente seconda conferma. Aggiungi solo ciò che non hai ancora detto, se c'è; altrimenti non scrivere niente." };
             }
-            risultatiServer.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out).slice(0, 12000) });
+            risultatiServer.push({ type: "tool_result", tool_use_id: b.id,
+              content: vedi.length ? [...vedi.map(bloccoImmagine), { type: "text", text: JSON.stringify(out).slice(0, 12000) }] : JSON.stringify(out).slice(0, 12000) });
           }
           if (staccato) {
             // decisione 4: niente passaggio al dispositivo e niente altro giro; gli strumenti già fatti restano nel registro
