@@ -19,4 +19,4 @@ begin
 end; $$;
 revoke all on function public.sveglia_jarvis_instagram() from public, anon, authenticated;
 grant execute on function public.sveglia_jarvis_instagram() to service_role;
--- il cron si accende dopo la prima prova: select cron.schedule('jarvis-instagram', '*/15 * * * *', 'select public.sveglia_jarvis_instagram()');
+-- acceso il 27 nov alle 04:22 (job jarvis-instagram): select cron.schedule('jarvis-instagram', '*/15 * * * *', 'select public.sveglia_jarvis_instagram()');
