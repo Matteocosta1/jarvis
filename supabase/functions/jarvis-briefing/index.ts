@@ -407,8 +407,10 @@ async function instagramAvvisi(prova = false) {
   const { count: postNoti } = await db.from("jarvis_ig_post").select("id", { count: "exact", head: true });
   const primoGiro = !postNoti;                                     // la prima volta: si segna tutto come visto, niente avvisi
   const media: any[] = (await igLeggi(t, "/me/media", { fields: "id,caption,comments_count,media_product_type", limit: "12" })).data ?? [];
-  const { data: prima } = await db.from("jarvis_ig_post").select("id, commenti").in("id", media.map((m) => String(m.id)));
+  const { data: prima } = await db.from("jarvis_ig_post").select("id, commenti, aggiornato").in("id", media.map((m) => String(m.id)));
   const contiPrima = new Map<string, number>((prima ?? []).map((r: any) => [String(r.id), Number(r.commenti)] as [string, number]));
+  // dall'ultimo controllo di quel post (2 minuti di margine): i commenti di prima non sono «nuovi» anche se non li aveva mai aperti
+  const dalle = new Map<string, number>((prima ?? []).map((r: any) => [String(r.id), Date.parse(r.aggiornato) - 120_000] as [string, number]));
   const nuovi: { chiave: string; chi: string; cosa: string }[] = [];
   for (const m of media) {
     const ora = Number(m.comments_count ?? 0), era = contiPrima.get(String(m.id));
@@ -417,7 +419,8 @@ async function instagramAvvisi(prova = false) {
       try {
         const c: any[] = (await igLeggi(t, `/${m.id}/comments`, { fields: "id,username,text,timestamp", limit: "50" })).data ?? [];
         const su = `${m.media_product_type === "REELS" ? "il suo reel" : "il suo post"} «${String(m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 30) || "senza didascalia"}»`;
-        for (const x of c) if (x.id && x.username && x.username !== me.username)
+        const da = dalle.get(String(m.id)) ?? 0;
+        for (const x of c) if (x.id && x.username && x.username !== me.username && Date.parse(x.timestamp) > da)
           nuovi.push({ chiave: `c:${x.id}`, chi: x.username, cosa: `ha commentato ${su}: «${String(x.text ?? "").replace(/\s+/g, " ").trim().slice(0, 80)}»` });
       } catch { /* si riprova al prossimo giro */ continue; }
     }
