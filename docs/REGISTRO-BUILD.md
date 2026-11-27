@@ -571,7 +571,7 @@ Richiesta del signore (03:46): «gli ho detto ti faccio vedere una foto e mi ha 
 - App invariata, nessuna build. Costi: pubblicazione ~1 $ (prova generale), cache riscritta una volta (strumento nuovo); salvare costa zero, ogni foto ripescata ~0,3 cent. Per tornare indietro: v164 (commit 8edac36).
 
 ## 27 nov, 03:25 · jarvis-briefing v45 · USCITE MUSICALI e INSTAGRAM NEL BRIEFING (pubblicati col via del signore, costo zero)
-- Uscite musicali: pubblicate (v39→v42). Chiave MusicKit 8X893UTL2N col Media ID media.CKHH4HMH7R.jarvis.musica, segreti MUSICKIT_KEY_ID e MUSICKIT_KEY_P8 (impronta 4386dfa8, file giusto confermato). Apple risponde ancora 401 (contratti accettati): si aspetta l'attivazione; il giro delle 5 riprova, prova gratuita `{"uscite_prova": true}`.
+- Uscite musicali: pubblicate (v39→v42). 27 nov 04:16: Apple ha attivato la chiave, la prova legge le uscite (Sfera «PUROSANGUE» 20 nov, The Clash, Tony Boy…). Chiave MusicKit 8X893UTL2N col Media ID media.CKHH4HMH7R.jarvis.musica, segreti MUSICKIT_KEY_ID e MUSICKIT_KEY_P8 (impronta 4386dfa8, file giusto confermato). Apple risponde ancora 401 (contratti accettati): si aspetta l'attivazione; il giro delle 5 riprova, prova gratuita `{"uscite_prova": true}`.
 - Instagram nel briefing (v43→v45): commenti nuovi sugli ultimi 12 post, tag, follower da ieri (tabella `jarvis_social_giorni`); importanti = più di 10.000 follower (Business Discovery). Prova gratuita `{"instagram_prova": true, "ore": N}`: 0 commenti e 0 tag negli ultimi 30 giorni (il signore non pubblica da un mese), follower 143.930.
 - Nota sicurezza: due letture di prova hanno riportato la chiave Instagram nel link «pagina successiva» di Meta; risposte cancellate da net._http_response. La chiave si rinnova da sola ogni lunedì.
 

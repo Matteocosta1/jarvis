@@ -288,7 +288,7 @@ async function usciteMusica(oggi: string, prova = false) {
       if (!u?.id || !at?.releaseDate || at.releaseDate < limite || at.releaseDate > oggi || (!prova && u.id === a.ultima_uscita)) continue;
       const tipo = at.isSingle ? "il singolo" : (at.trackCount ?? 0) <= 6 ? "l'EP" : "l'album";
       const quando = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long" }).format(new Date(at.releaseDate + "T12:00:00Z"));
-      nuove.push({ giorno: oggi, titolo: `È uscito ${tipo} «${String(at.name).slice(0, 120)}» di ${String(at.artistName ?? a.nome).slice(0, 80)}, il ${quando}`,
+      nuove.push({ giorno: oggi, titolo: `È uscito ${tipo} «${String(at.name).replace(/\s+-\s+(Single|EP)$/i, "").slice(0, 120)}» di ${String(at.artistName ?? a.nome).slice(0, 80)}, il ${quando}`,
         perche: "È uno degli artisti della sua lista su Apple Music.", fonte: /^https:\/\//.test(at.url ?? "") ? at.url : null });
       if (!prova) await db.from("jarvis_artisti").update({ ultima_uscita: u.id }).eq("id", a.id);
     } catch (e) { if (prova) throw e; console.error(`uscite musicali, ${a.nome}:`, (e as Error).message); }
