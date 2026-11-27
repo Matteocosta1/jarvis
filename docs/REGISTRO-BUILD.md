@@ -551,7 +551,7 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 - Costo: pubblicazione ~1 $, cache del testo fisso riscritta una volta; con 4 foto la risposta passa da 2 a ~4 frasi.
 - ✓ PROVATA (14:32, il signore: «funziona»): 3 foto, una frase per ciascuna (marker Molotow, storia Instagram, chat con Andre Astrofat). Da tenere d'occhio: in quella risposta è scappato il «tu» («ti chiede… le tue cose») invece del Lei.
 
-## 27 nov, ~14:00 · issue 21 · 13.9 (13) (controllo VERDE, run 46001979543, commit b309539, 0 errori, 0 warning) + cervello v169 PUBBLICATO (versione 174, prova generale superata) · via del signore (13:47, «fai le semplici modifiche richieste»)
+## 27 nov, ~14:00 · issue 21 · 13.9 (13) (controllo VERDE, run 46001979543, commit b309539, 0 errori, 0 warning · CARICATA e installata dal signore) + cervello v169 PUBBLICATO (versione 174, prova generale superata) · via del signore (13:47, «fai le semplici modifiche richieste»)
 Analisi dei dialoghi di stamattina:
 - 11:14, 4 foto insieme: arrivate TUTTE al cervello (nota «4 foto diverse», 4 righe nella cronologia, ~4.100 token di immagini), ma JARVIS ne ha descritte 2. 11:15 «guarda anche le altre due»: partita come RISPOSTA ANTICIPATA, che non porta le foto di poco fa (foto_storia) → «non mi sono arrivate» (in quel turno era vero: nessuna immagine nei token).
 - Colloquio: alle 5:25 «domattina» → la memoria automatica (archivista) ha scritto «sabato 28» (jarvis_memoria_storia #41); JARVIS alle 11:18 «in bocca al lupo per domani», alle 11:20 «è domani, sabato 28». Memoria già corretta alle 11:21 (#155: venerdì 27).
