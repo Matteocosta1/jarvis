@@ -26,6 +26,9 @@ struct Messaggio: Identifiable, Codable, Equatable {
     /// 7 nov (il signore): quello che va al cervello ma non si vede in chat (il Confidente: lo stato fisico di oggi). Prima la riga
     /// «[Stato fisico di oggi: …]» compariva nel messaggio del signore.
     var nascosto: String? = nil
+    /// 13.9 (16) · tolto dallo schermo con lo swipe (il signore, 28 nov: «solo esteticamente»): in chat non si vede più, ma il
+    /// cervello lo legge ancora come prima (finestra, filo e cache restano uguali). «Pulisci» lo cancella con tutto il resto.
+    var tolto: Bool? = nil
 
     /// Come il messaggio viene ricordato al cervello nei turni successivi (solo testo).
     var testoPerCervello: String {
@@ -2003,6 +2006,13 @@ final class Jarvis: NSObject, ObservableObject {
             // idea D (25 ott): il cervello sa ricevere la frase come audio insieme alla richiesta della risposta (Mac)
             UserDefaults.standard.set(o["giro_unico"] as? Bool ?? false, forKey: "giroUnicoCervello")
         }
+    }
+
+    /// 13.9 (16): toglie un messaggio solo dallo schermo (lo swipe verso sinistra in chat). Al cervello non cambia niente.
+    func togliDalloSchermo(_ id: UUID) {
+        guard let k = messaggi.firstIndex(where: { $0.id == id }) else { return }
+        messaggi[k].tolto = true
+        salva()
     }
 
     func nuovaConversazione() {

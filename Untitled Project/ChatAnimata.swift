@@ -270,6 +270,15 @@ enum CorniceChat {
     static let luce = Color(red: 79 / 255, green: 227 / 255, blue: 1)          // #4fe3ff
     static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)       // #bff6ff
 
+    /// Il vetro olografico delle tab (senza sfocatura di Apple): scuro, dal 62 % in alto all'82 %, con la luce ciano tenue dentro
+    /// ai bordi. 13.9 (16): è anche il fondo del campo «Oppure scriva qui» (il signore, 28 nov 00:32).
+    static var vetro: some ShapeStyle {
+        let scuro = Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255)
+        return LinearGradient(stops: [.init(color: scuro.opacity(0.62), location: 0), .init(color: scuro.opacity(0.82), location: 0.45),
+                                      .init(color: scuro.opacity(0.82), location: 1)], startPoint: .top, endPoint: .bottom)
+            .shadow(.inner(color: luce.opacity(0.08), radius: 20))
+    }
+
     /// La curva con cui la scheda si apre da sinistra (1 − (1 − u)³).
     static func apre(_ t: Double) -> Double { let u = min(1, max(0, t / 0.45)); return 1 - pow(1 - u, 3) }
 
@@ -318,11 +327,7 @@ struct SfondoChatTab: View {
                 ZStack {
                     // il vetro delle tab: scuro, più leggero verso il reattore, con la luce dentro ai bordi; si apre da sinistra
                     Rectangle()
-                        .fill(LinearGradient(stops: [.init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.62), location: 0),
-                                                     .init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82), location: 0.45),
-                                                     .init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82), location: 1)],
-                                             startPoint: .top, endPoint: .bottom)
-                            .shadow(.inner(color: CorniceChat.luce.opacity(0.08), radius: 20)))
+                        .fill(CorniceChat.vetro)
                         .mask(alignment: .leading) {
                             GeometryReader { g in Rectangle().frame(width: g.size.width * u) }
                         }
@@ -337,6 +342,68 @@ struct SfondoChatTab: View {
             }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+        }
+    }
+}
+
+/// 13.9 (16) · lo swipe verso sinistra toglie un messaggio dallo schermo (il signore, 28 nov 00:21–00:27: «senza X», «senza
+/// click», «un aiuto in più nell'eliminare i messaggi, ma solo esteticamente»: il cervello lo legge ancora). Il messaggio segue il
+/// dito; lasciato oltre il 40 % della sua larghezza esce a sinistra col suono (e il tocco) della tab mandata via e lo spazio si
+/// chiude; prima di lì torna a posto, in silenzio. Il gesto si decide al primo movimento, come le righe di FILO: chiaramente di
+/// lato e verso sinistra (il doppio del verticale) scivola il messaggio; altrimenti la chat scorre come sempre.
+struct ScivolaVia: ViewModifier {
+    let attivo: Bool                      // solo a chat ferma (non mentre si carica, si stampa o si svuota)
+    let via: () -> Void
+    @State private var dx: CGFloat = 0
+    @State private var asse: Bool?        // true: di lato verso sinistra · false: in su o in giù (deciso al primo movimento)
+    @State private var seguito = false    // in questo gesto il messaggio ha seguito il dito
+    @State private var esce = false
+    @State private var larghezza: CGFloat = 1
+    @GestureState private var tocca = false
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: dx)
+            .opacity(esce ? 0 : 1)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { larghezza = max(1, $0) }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)                              // come le righe di FILO: lo scorrimento resta libero
+                    .updating($tocca) { _, stato, _ in stato = true }
+                    .onChanged { v in
+                        guard attivo, !esce else { return }
+                        if asse == nil {
+                            asse = v.translation.width < 0 && -v.translation.width > abs(v.translation.height) * 2
+                            seguito = false
+                        }
+                        guard asse == true else { return }
+                        seguito = true
+                        dx = min(0, v.translation.width)
+                    }
+                    .onEnded { v in
+                        // deciso da quello che il messaggio ha fatto (non da `asse`, che il fine del gesto azzera)
+                        guard seguito, attivo, !esce else { return }
+                        seguito = false
+                        if -v.translation.width > larghezza * 0.4 { manda() }
+                        else { withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { dx = 0 } }
+                    }
+            )
+            // finito o interrotto (lo scorrimento si è preso il dito): si decide di nuovo al prossimo; se non è uscito torna a posto
+            .onChange(of: tocca) { _, v in
+                guard !v else { return }
+                asse = nil
+                if !esce, dx != 0 { withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26)) { dx = 0 } }
+            }
+            .onChange(of: attivo) { _, a in if !a, !esce { dx = 0 } }
+            .accessibilityAction(named: Text("Togli dallo schermo")) { if attivo, !esce { manda() } }
+    }
+
+    private func manda() {
+        esce = true
+        Suoni.filoVia()                                                    // suono e tocco insieme (Aptica.tabVia), come FILO
+        withAnimation(.timingCurve(0.4, 0, 1, 1, duration: 0.22)) {
+            dx = -larghezza * 1.1
+        } completion: {
+            via()
         }
     }
 }

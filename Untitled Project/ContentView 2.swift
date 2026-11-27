@@ -529,7 +529,7 @@ struct ContentView: View {
         Suoni.preparaAudio()                // l'audio è dell'app prima che suoni l'avvio: i tasti del volume lo regolano (solo la prima volta)
         withAnimation(.spring(duration: 0.6 / Avvio.velocita, bounce: 0.35)) { acceso = true }   // il reattore è pieno prima della prima icona
         sottotitolo = "AVVIO SISTEMI"                                    // 13.7: si scrive lettera per lettera mentre la testata compare
-        let chatDaCaricare = !jarvis.messaggi.isEmpty && !UIAccessibility.isReduceMotionEnabled
+        let chatDaCaricare = !visibili.isEmpty && !UIAccessibility.isReduceMotionEnabled
         if chatDaCaricare { regiaChat.fase = .nascosta }      // la chat aspetta la fine delle icone
         Task { @MainActor in
             let v = Avvio.velocita
@@ -692,7 +692,7 @@ struct ContentView: View {
     /// Il caricamento HUD (dura `TempiChat.carica`). Falso: non c'è niente da caricare.
     private func preparaChat() -> Bool {
         guard regiaChat.fase == .nascosta else { return false }
-        if jarvis.messaggi.isEmpty { regiaChat.fase = .normale; return false }
+        if visibili.isEmpty { regiaChat.fase = .normale; return false }
         withAnimation(.easeOut(duration: 0.2)) { regiaChat.fase = .carica }
         return true
     }
@@ -710,7 +710,7 @@ struct ContentView: View {
 
     /// Cestino › Pulisci: la chat si svuota settore per settore verso sinistra, poi si cancella davvero.
     private func svuotaChat() {
-        guard !jarvis.messaggi.isEmpty, regiaChat.fase == .normale, !UIAccessibility.isReduceMotionEnabled else {
+        guard !visibili.isEmpty, regiaChat.fase == .normale, !UIAccessibility.isReduceMotionEnabled else {
             jarvis.nuovaConversazione(); return
         }
         jarvis.interrompi()
@@ -2224,8 +2224,12 @@ struct ContentView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
-                    ForEach(jarvis.messaggi) { m in
-                        RigaAnimata { q in RigaMessaggio(m: m, rimescola: q) }.id(m.id)
+                    ForEach(visibili) { m in
+                        RigaAnimata { q in RigaMessaggio(m: m, rimescola: q) }
+                            .modifier(ScivolaVia(attivo: regiaChat.fase == .normale) {          // 13.9 (16): via dallo schermo
+                                withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { jarvis.togliDalloSchermo(m.id) }
+                            })
+                            .id(m.id)
                     }
                 }
                 .padding(CorniceChat.margine)                                     // 13.9 (15) · chat TAB: dentro la scheda
@@ -2234,21 +2238,21 @@ struct ContentView: View {
             .modifier(SfumaChat(attiva: !inStampa))
             .padding(CorniceChat.scheda)                                          // le scritte scorrono dentro il vetro, lontane dagli angoli
             .onChange(of: jarvis.messaggi.count) {
-                if let ultimo = jarvis.messaggi.last {
+                if let ultimo = visibili.last {
                     withAnimation { proxy.scrollTo(ultimo.id, anchor: .bottom) }
                 }
             }
             .onAppear {
-                if let ultimo = jarvis.messaggi.last { proxy.scrollTo(ultimo.id, anchor: .bottom) }
+                if let ultimo = visibili.last { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
             // si apre la tastiera e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: tastiera) { _, aperta in
-                guard aperta, telefono, let ultimo = jarvis.messaggi.last else { return }
+                guard aperta, telefono, let ultimo = visibili.last else { return }
                 withAnimation(ContentView.curvaTastiera) { proxy.scrollTo(ultimo.id, anchor: .bottom) }
             }
             // il reattore grande rientra e la chat si accorcia: l'ultimo messaggio resta in vista
             .onChange(of: reattoreGrande) { _, grande in
-                guard grande, let ultimo = jarvis.messaggi.last else { return }
+                guard grande, let ultimo = visibili.last else { return }
                 withAnimation(.timingCurve(0.38, 0.7, 0.125, 1, duration: durataRientro)) { proxy.scrollTo(ultimo.id, anchor: .bottom) }   // insieme al reattore
             }
         }
@@ -2258,6 +2262,9 @@ struct ContentView: View {
         .modifier(EffettiChat(regia: regiaChat))
         .background { SfondoChatTab(regia: regiaChat, fermo: pilaCopre) }        // 13.9 (15) · il vetro e la cornice delle tab
     }
+
+    /// 13.9 (16): i messaggi che si vedono in chat (senza quelli tolti con lo swipe; il cervello li legge tutti).
+    private var visibili: [Messaggio] { jarvis.messaggi.filter { $0.tolto != true } }
 
     /// 13.9 (15): la chat si sta stampando (la maschera è quella della riga che scende, niente sfumature).
     private var inStampa: Bool {
@@ -2329,7 +2336,7 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
-                .background(Color(red: 0.04, green: 0.12, blue: 0.15).opacity(0.8))
+                .background(RoundedRectangle(cornerRadius: 12).fill(CorniceChat.vetro))   // 13.9 (16): il vetro olografico della chat
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.11, green: 0.21, blue: 0.25)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             Button {
