@@ -18,6 +18,8 @@ enum FaseChat: Equatable {
 struct RegiaChat: Equatable {
     var fase: FaseChat = .normale
     var altezza: CGFloat = 1
+    /// 13.9 (15) · chat TAB: quando è nata la cornice (l'inizio della stampa). nil = già nata (nessuna stampa: chat vuota all'avvio).
+    var nata: Date? = nil
 }
 
 private struct ChiaveRegiaChat: EnvironmentKey { static let defaultValue = RegiaChat() }
@@ -250,6 +252,117 @@ struct LineaProgresso: View {
             }
         }
         .frame(height: 3)
+    }
+}
+
+// MARK: - 13.9 (15) · la chat TAB (scelta dal signore il 27 nov, mockup «JARVIS Telefono» v7 / Mark XIII v121)
+// La chat come le due tab piccole (PAGINE e FILO): il vetro scuro senza bordo e senza sfocatura di Apple, il punto di luce che
+// pulsa in alto a sinistra, il filo che corre sopra la scheda, i quattro angoli di luce. Nasce sul suono della chat, quando parte
+// la stampa (stessi tempi di prima: nessun tempo in più); durante il cerchio di caricamento non c'è. Le scritte scorrono dentro.
+
+enum CorniceChat {
+    /// Dove sta la scheda dentro lo spazio della chat (inset 26 · 12 · 6 · 12 del mockup).
+    static let scheda = EdgeInsets(top: 26, leading: 12, bottom: 6, trailing: 12)
+    /// Il margine delle scritte dentro la scheda (16 · 18 · 16 · 18 del mockup).
+    static let margine = EdgeInsets(top: 16, leading: 18, bottom: 16, trailing: 18)
+    /// Quanto la tela esce dallo spazio della chat, così il punto di luce e il suo anello non si tagliano (come FILO).
+    static let sporge: CGFloat = 12
+    static let luce = Color(red: 79 / 255, green: 227 / 255, blue: 1)          // #4fe3ff
+    static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)       // #bff6ff
+
+    /// La curva con cui la scheda si apre da sinistra (1 − (1 − u)³).
+    static func apre(_ t: Double) -> Double { let u = min(1, max(0, t / 0.45)); return 1 - pow(1 - u, 3) }
+
+    /// Punto di luce, filo e angoli (la tela del mockup). `size` è lo spazio della chat, senza la parte che sporge.
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double) {
+        let W = Double(size.width), H = Double(size.height)
+        let u0 = min(1, t / 0.5)
+        gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1           // si accende sfarfallando
+        let u = apre(t)
+        let ax = 10.0, ay = 8.0, ly = 26.0, bx = 12.0, by = ly, bw = W - 24, bh = H - by - 6
+        let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
+        gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(luce.opacity(0.7 * (1 - pul))), lineWidth: 1)
+        Olo.alone(&gc, CGPoint(x: ax, y: ay), 10, 0.5, luce)
+        gc.fill(Olo.ellisse(ax, ay, 2.4, 2.4), with: .color(chiaro))
+        var filo = Path()
+        filo.move(to: CGPoint(x: ax, y: ay))
+        filo.addLine(to: CGPoint(x: 28, y: ly - 4))
+        filo.addLine(to: CGPoint(x: 28 + max(0, W - 40) * u, y: ly - 4))
+        gc.stroke(filo, with: .color(luce.opacity(0.85)), lineWidth: 1.1)
+        var ang = Path()
+        let k = 9.0
+        let angoli: [(x: Double, y: Double, sx: Double, sy: Double)] = [(x: bx, y: by, sx: 1, sy: 1), (x: bx + bw * u, y: by, sx: -1, sy: 1),
+                                                                         (x: bx, y: by + bh, sx: 1, sy: -1), (x: bx + bw * u, y: by + bh, sx: -1, sy: -1)]
+        for (px, py, sx, sy) in angoli {
+            ang.move(to: CGPoint(x: px + sx * k, y: py)); ang.addLine(to: CGPoint(x: px, y: py)); ang.addLine(to: CGPoint(x: px, y: py + sy * k))
+        }
+        gc.stroke(ang, with: .color(chiaro.opacity(0.9)), lineWidth: 1.5)
+    }
+}
+
+/// Il vetro e la cornice dietro le scritte. Non c'è mentre la chat aspetta l'avvio e durante il cerchio di caricamento.
+/// `fermo`: una sezione copre tutto, il punto di luce smette di pulsare (niente lavoro inutile).
+struct SfondoChatTab: View {
+    let regia: RegiaChat
+    var fermo = false
+
+    var body: some View {
+        switch regia.fase {
+        case .nascosta, .carica:
+            Color.clear
+        case .normale, .stampa, .svuota:
+            TimelineView(.animation(minimumInterval: nil, paused: fermo)) { tl in
+                // nata all'inizio della stampa; senza stampa è già nata (il tempo grande tiene il pulsare continuo)
+                let t = regia.nata.map { tl.date.timeIntervalSince($0) } ?? tl.date.timeIntervalSinceReferenceDate
+                let u = CorniceChat.apre(t)
+                ZStack {
+                    // il vetro delle tab: scuro, più leggero verso il reattore, con la luce dentro ai bordi; si apre da sinistra
+                    Rectangle()
+                        .fill(LinearGradient(stops: [.init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.62), location: 0),
+                                                     .init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82), location: 0.45),
+                                                     .init(color: Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(0.82), location: 1)],
+                                             startPoint: .top, endPoint: .bottom)
+                            .shadow(.inner(color: CorniceChat.luce.opacity(0.08), radius: 20)))
+                        .mask(alignment: .leading) {
+                            GeometryReader { g in Rectangle().frame(width: g.size.width * u) }
+                        }
+                        .padding(CorniceChat.scheda)
+                    Canvas(rendersAsynchronously: false) { gc, size in
+                        gc.translateBy(x: CorniceChat.sporge, y: CorniceChat.sporge)
+                        CorniceChat.disegna(&gc, CGSize(width: max(0, size.width - 2 * CorniceChat.sporge),
+                                                        height: max(0, size.height - 2 * CorniceChat.sporge)), t: t)
+                    }
+                    .padding(-CorniceChat.sporge)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Le scritte sfumano in basso (16 punti) e, solo quando la chat è scorsa in su, anche in alto (22 punti). Durante la stampa
+/// niente sfumature: la maschera è quella della riga che scende (come il mockup).
+struct SfumaChat: ViewModifier {
+    let attiva: Bool
+    @State private var sopra = false
+
+    func body(content: Content) -> some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                content
+                    .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y > 2 } action: { _, v in sopra = v }
+            } else {
+                content
+            }
+        }
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [attiva && sopra ? .clear : .black, .black], startPoint: .top, endPoint: .bottom).frame(height: 22)
+                Color.black
+                LinearGradient(colors: [.black, attiva ? .clear : .black], startPoint: .top, endPoint: .bottom).frame(height: 16)
+            }
+        }
     }
 }
 #endif

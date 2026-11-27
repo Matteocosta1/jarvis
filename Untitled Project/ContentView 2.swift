@@ -700,7 +700,9 @@ struct ContentView: View {
     /// v266: la stampa dall'alto, con i caratteri che si decodificano.
     private func stampaChat() async {
         Suoni.chatCarica()                    // il suono dei caratteri parte con la stampa: dura quanto la decodifica
-        regiaChat.fase = .stampa(Date())
+        let ora = Date()
+        regiaChat.nata = ora                  // 13.9 (15) · chat TAB: la cornice nasce con la stampa, sul suono della chat
+        regiaChat.fase = .stampa(ora)
         try? await Task.sleep(for: .seconds(TempiChat.stampa + TempiChat.decodifica + 0.1))
         Suoni.chatPronta()
         regiaChat.fase = .normale
@@ -2226,10 +2228,11 @@ struct ContentView: View {
                         RigaAnimata { q in RigaMessaggio(m: m, rimescola: q) }.id(m.id)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(CorniceChat.margine)                                     // 13.9 (15) · chat TAB: dentro la scheda
             }
             .scrollDismissesKeyboard(.interactively)
+            .modifier(SfumaChat(attiva: !inStampa))
+            .padding(CorniceChat.scheda)                                          // le scritte scorrono dentro il vetro, lontane dagli angoli
             .onChange(of: jarvis.messaggi.count) {
                 if let ultimo = jarvis.messaggi.last {
                     withAnimation { proxy.scrollTo(ultimo.id, anchor: .bottom) }
@@ -2253,6 +2256,13 @@ struct ContentView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { regiaChat.altezza = $0 }
         .environment(\.regiaChat, regiaChat)
         .modifier(EffettiChat(regia: regiaChat))
+        .background { SfondoChatTab(regia: regiaChat, fermo: pilaCopre) }        // 13.9 (15) · il vetro e la cornice delle tab
+    }
+
+    /// 13.9 (15): la chat si sta stampando (la maschera è quella della riga che scende, niente sfumature).
+    private var inStampa: Bool {
+        if case .stampa = regiaChat.fase { return true }
+        return false
     }
 
     private var barraTesto: some View {
@@ -2520,6 +2530,7 @@ struct RigaMessaggio: View {
             Rectangle()
                 .fill(jarvis ? Color.ciano : Color(red: 0.11, green: 0.21, blue: 0.25))
                 .frame(width: 2)
+                .shadow(color: jarvis ? Color.ciano.opacity(0.75) : .clear, radius: jarvis ? 3 : 0)   // 13.9 (15) · chat TAB: la barra di JARVIS si illumina
             VStack(alignment: .leading, spacing: 4) {
                 Text(Glifi.rimescola("\(jarvis ? "JARVIS" : "SIGNORE") · \(m.data.formatted(date: .omitted, time: .shortened))", rimescola))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
@@ -2528,6 +2539,7 @@ struct RigaMessaggio: View {
                 Text(Glifi.rimescola(m.testo.isEmpty ? "…" : (m.conFoto ? (m.nFoto.map { "📷 \($0) foto · " } ?? "📷 ") + m.testo : m.testo), rimescola))
                     .font(.system(size: 16))
                     .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
+                    .shadow(color: jarvis ? Color.ciano.opacity(0.2) : .clear, radius: jarvis ? 5 : 0)  // 13.9 (15) · il testo di JARVIS ha la sua luce
                     .textSelection(.enabled)
                 if let immagini = m.immagini, !immagini.isEmpty {
                     GalleriaMessaggio(immagini: immagini)
