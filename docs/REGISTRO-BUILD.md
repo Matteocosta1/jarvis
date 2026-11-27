@@ -549,6 +549,7 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 - Prova delle 16:27 (v170): 4 foto arrivate, due frasi sulle prime due e stop (token_out 299, come alle 14:23). Causa vera: lo sforzo «low» chiesto a Sonnet su ogni risposta, con cui chiude intorno ai 300 token (nei consumi tantissime risposte a 287–316). Con 3 foto (14:32) ci stava, con 4 no.
 - Correzione: in `chiamaClaudeUnaVolta`, se l'ultimo messaggio vero del signore ha più foto insieme (etichette «Foto N di M») lo sforzo è «medium»; tutto il resto resta «low».
 - Costo: pubblicazione ~1 $; solo nei messaggi con più foto, risposta ~500–700 token invece di ~300 (centesimi), prima parola forse ~1 s più tarda.
+- ✓ PROVATA (16:33, il signore: «bravissimo, tutto perfetto»): 4 foto, tutte e quattro descritte in ordine; prima parola a 2,2 s, 273 token d'uscita. Unico errore: il nome letto «Darwayne» invece di Wayne Santana (corretto e salvato in memoria su richiesta).
 
 ## 27 nov, 14:30 · cervello v170 PUBBLICATO (versione 175, prova generale superata) · issue 21: le foto insieme descritte TUTTE · via del signore (14:27, «esegui»)
 - Prova delle 14:23 (v169): 4 foto arrivate con le etichette, ma due frasi sulla prima e basta (risposta intera, non tagliata). Causa: la misura del turno («una o due frasi, al massimo tre», subito prima della nota) e la «regola ferrea» del testo fisso vincevano sulla nota delle foto. Con 2 foto (5:13) ci stava, con 4 no.
