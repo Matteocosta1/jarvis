@@ -549,6 +549,7 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 - Prova delle 14:23 (v169): 4 foto arrivate con le etichette, ma due frasi sulla prima e basta (risposta intera, non tagliata). Causa: la misura del turno («una o due frasi, al massimo tre», subito prima della nota) e la «regola ferrea» del testo fisso vincevano sulla nota delle foto. Con 2 foto (5:13) ci stava, con 4 no.
 - Correzione: con `foto_insieme` e più di una foto, al posto di MISURA_TURNO va `misuraFotoInsieme(n)` («una frase, al massimo due, per ciascuna delle n foto, TUTTE»); nella regola ferrea del testo fisso l'eccezione «foto mandate insieme: una frase per ciascuna, tutte». Con una foto sola niente cambia.
 - Costo: pubblicazione ~1 $, cache del testo fisso riscritta una volta; con 4 foto la risposta passa da 2 a ~4 frasi.
+- ✓ PROVATA (14:32, il signore: «funziona»): 3 foto, una frase per ciascuna (marker Molotow, storia Instagram, chat con Andre Astrofat). Da tenere d'occhio: in quella risposta è scappato il «tu» («ti chiede… le tue cose») invece del Lei.
 
 ## 27 nov, ~14:00 · issue 21 · 13.9 (13) (controllo VERDE, run 46001979543, commit b309539, 0 errori, 0 warning) + cervello v169 PUBBLICATO (versione 174, prova generale superata) · via del signore (13:47, «fai le semplici modifiche richieste»)
 Analisi dei dialoghi di stamattina:
