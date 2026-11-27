@@ -461,7 +461,11 @@ Deno.serve(async (req) => {
     } catch (e) { return json({ inviata: false, errore: (e as Error).message }); }
   }
   if (corpo.uscite_prova === true) {                                                 // 27 nov: prova delle uscite musicali, senza dirle né segnarle
-    try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+    // controllo (solo dati non segreti): con che Key ID e Team ID si firma, e se il .p8 ha la forma giusta
+    const p8 = Deno.env.get("MUSICKIT_KEY_P8") ?? "";
+    const controllo = { kid: Deno.env.get("MUSICKIT_KEY_ID") ?? null, iss: Deno.env.get("APNS_TEAM_ID") ?? null,
+      p8_forma: /BEGIN PRIVATE KEY/.test(p8) && /END PRIVATE KEY/.test(p8), p8_righe: p8.replace(/\\n/g, "\n").trim().split("\n").length };
+    try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva, controllo }); } catch (e) { return json({ errore: (e as Error).message, controllo }, 500); }
   }
   if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
     if (daCron && !corpo.forza && oraRoma() !== 5) return json({ saltato: true, ora_roma: oraRoma() });
