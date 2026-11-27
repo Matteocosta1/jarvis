@@ -10,6 +10,7 @@
 // { notte: true } (pg_cron, alle 4 di Roma) rilegge le frasi del giorno e trova gli impegni detti di passaggio: il briefing li chiede.
 // { novita: true } (pg_cron, alle 5 di Roma) il giro delle novità: Haiku cerca sul web sui temi del signore, ne tiene al massimo 3
 //   (jarvis_novita) e il briefing delle 9:30 le dice con le parole di JARVIS. Il cervello non si tocca (26 nov, via del signore).
+//   27 nov: { instagram_avvisi: true } (pg_cron ogni 15 minuti) l'avviso subito quando commenta o tagga un account importante.
 //   27 nov: nel briefing anche INSTAGRAM (commenti, tag, follower delle ultime 24 ore; importanti = più di 10.000 follower).
 //   27 nov: nello stesso giro le USCITE MUSICALI degli artisti della sua lista (jarvis_artisti) da Apple Music, a costo zero.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -369,6 +370,83 @@ async function instagramDaDire(ore = 24): Promise<string> {
   return `Instagram, ultime ${ore} ore: ${parti.join("; ")}.`;
 }
 
+// ───────── 27 nov · INSTAGRAM, L'AVVISO SUBITO (issue #19, pezzo 3.2): quando commenta o lo tagga un account importante ─────────
+// pg_cron ogni 15 minuti ({ instagram_avvisi: true }). Nessun modello: costo zero. Si legge la lista dei post (una chiamata) e si
+// aprono i commenti solo dei post il cui numero di commenti è cresciuto; i tag, una chiamata. Ogni commento o tag si guarda una
+// volta sola (jarvis_ig_visti). Il primo giro segna tutto come già visto, senza avvisare. Di notte (01–09 di Roma) zitto: quello
+// che arriva la notte lo dice il briefing. I follower di chi commenta si ricordano per 7 giorni (jarvis_ig_profili).
+const ORE_ZITTO = [1, 9];   // dall'una alle nove
+async function followerDi(nomi: string[]): Promise<Map<string, number>> {
+  const pesi = new Map<string, number>();
+  const validi = [...new Set(nomi)].filter((n) => /^[a-z0-9._]{1,30}$/i.test(n)).slice(0, 15);
+  if (!validi.length) return pesi;
+  const { data: noti } = await db.from("jarvis_ig_profili").select("username, follower, aggiornato").in("username", validi);
+  const freschi = new Set<string>();
+  for (const r of noti ?? []) if (Date.parse(r.aggiornato) > Date.now() - 7 * 86_400_000) { pesi.set(r.username, r.follower); freschi.add(r.username); }
+  const { data: fb } = await db.from("social_facebook").select("token, ig_id, scade").eq("id", 1).maybeSingle();
+  if (!fb?.token || !fb?.ig_id || (fb.scade && Date.parse(fb.scade) <= Date.now())) return pesi;
+  await Promise.all(validi.filter((n) => !freschi.has(n)).map(async (n) => {
+    try {
+      const u = new URL(`${FBG}/${fb.ig_id}`);
+      u.searchParams.set("fields", `business_discovery.username(${n}){followers_count}`);
+      u.searchParams.set("access_token", fb.token);
+      const r = await fetch(u, { signal: AbortSignal.timeout(10_000) });
+      const d = await r.json().catch(() => ({}));
+      const f = r.ok ? Number(d?.business_discovery?.followers_count ?? 0) : 0;   // profilo personale o non trovato: 0
+      pesi.set(n, f);
+      await db.from("jarvis_ig_profili").upsert({ username: n, follower: f, aggiornato: new Date().toISOString() });
+    } catch { /* si riprova al prossimo giro */ }
+  }));
+  return pesi;
+}
+async function instagramAvvisi(prova = false) {
+  const { data: tk } = await db.from("social_token").select("token").eq("id", 1).maybeSingle();
+  const t = tk?.token ?? Deno.env.get("INSTAGRAM_TOKEN") ?? "";
+  if (!t) return { saltato: true, motivo: "manca la chiave della sezione Social" };
+  const me = await igLeggi(t, "/me", { fields: "username" });
+  const { count: postNoti } = await db.from("jarvis_ig_post").select("id", { count: "exact", head: true });
+  const primoGiro = !postNoti;                                     // la prima volta: si segna tutto come visto, niente avvisi
+  const media: any[] = (await igLeggi(t, "/me/media", { fields: "id,caption,comments_count,media_product_type", limit: "12" })).data ?? [];
+  const { data: prima } = await db.from("jarvis_ig_post").select("id, commenti").in("id", media.map((m) => String(m.id)));
+  const contiPrima = new Map<string, number>((prima ?? []).map((r: any) => [String(r.id), Number(r.commenti)] as [string, number]));
+  const nuovi: { chiave: string; chi: string; cosa: string }[] = [];
+  for (const m of media) {
+    const ora = Number(m.comments_count ?? 0), era = contiPrima.get(String(m.id));
+    if (!primoGiro && era !== undefined && ora <= era) continue;      // niente di nuovo su questo post
+    if (!primoGiro && ora > 0) {
+      try {
+        const c: any[] = (await igLeggi(t, `/${m.id}/comments`, { fields: "id,username,text,timestamp", limit: "50" })).data ?? [];
+        const su = `${m.media_product_type === "REELS" ? "il suo reel" : "il suo post"} «${String(m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 30) || "senza didascalia"}»`;
+        for (const x of c) if (x.id && x.username && x.username !== me.username)
+          nuovi.push({ chiave: `c:${x.id}`, chi: x.username, cosa: `ha commentato ${su}: «${String(x.text ?? "").replace(/\s+/g, " ").trim().slice(0, 80)}»` });
+      } catch { /* si riprova al prossimo giro */ continue; }
+    }
+    await db.from("jarvis_ig_post").upsert({ id: String(m.id), commenti: ora, aggiornato: new Date().toISOString() });
+  }
+  try {
+    const d: any[] = (await igLeggi(t, "/me/tags", { fields: "id,username", limit: "25" })).data ?? [];
+    for (const x of d) if (x.id && x.username && x.username !== me.username) nuovi.push({ chiave: `t:${x.id}`, chi: x.username, cosa: "l'ha taggata in un post" });
+  } catch { /* tag non leggibili: si va avanti */ }
+  if (!nuovi.length) return { primo_giro: primoGiro, nuovi: 0 };
+  const { data: visti } = await db.from("jarvis_ig_visti").select("chiave").in("chiave", nuovi.map((x) => x.chiave));
+  const giaVisti = new Set((visti ?? []).map((r: any) => r.chiave));
+  const daGuardare = nuovi.filter((x) => !giaVisti.has(x.chiave));
+  if (!daGuardare.length) return { primo_giro: primoGiro, nuovi: 0 };
+  await db.from("jarvis_ig_visti").upsert(daGuardare.map((x) => ({ chiave: x.chiave })));
+  if (primoGiro) return { primo_giro: true, segnati: daGuardare.length };
+  const h = oraRoma();
+  const zitto = h >= ORE_ZITTO[0] && h < ORE_ZITTO[1];
+  const pesi = await followerDi(daGuardare.map((x) => x.chi));
+  const importanti = daGuardare.filter((x) => (pesi.get(x.chi) ?? 0) >= SOGLIA_IMPORTANTE);
+  if (!importanti.length) return { nuovi: daGuardare.length, importanti: 0 };
+  if (zitto && !prova) return { nuovi: daGuardare.length, importanti: importanti.length, zitto: true };   // li dice il briefing
+  const uno = (x: typeof importanti[number]) => `@${x.chi} (${numeroIt(pesi.get(x.chi)!)} follower) ${x.cosa}`;
+  const testo = importanti.length === 1 ? `Sir, ${uno(importanti[0])}.`
+    : `Sir, ${importanti.length} account importanti su Instagram: ${importanti.slice(0, 3).map(uno).join("; ")}${importanti.length > 3 ? "; e altri" : ""}.`;
+  const esito = prova ? { prova: true } : await mandaATutti("Instagram", testo, "leggi");
+  return { nuovi: daGuardare.length, importanti: importanti.length, testo, esito };
+}
+
 /// Al mattino: le novità del giro di stanotte (non ancora dette), da passare al cervello per il briefing.
 async function novitaDaDire() {
   const da = giornoRoma(new Date(Date.now() - 2 * 86_400_000));
@@ -542,6 +620,9 @@ Deno.serve(async (req) => {
       p8_impronta: [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(p8.replace(/\s+/g, ""))))].slice(0, 4).map((x) => x.toString(16).padStart(2, "0")).join("") };
     cacheJwtMusica = null;                                                           // in prova si firma sempre da capo
     try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva, controllo }); } catch (e) { return json({ errore: (e as Error).message, controllo }, 500); }
+  }
+  if (corpo.instagram_avvisi === true) {                                             // 27 nov: l'avviso subito (pg_cron ogni 15 minuti)
+    try { return json(await instagramAvvisi(daApp && corpo.prova === true)); } catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
   if (corpo.instagram_prova === true) {                                              // 27 nov: prova di Instagram nel briefing (niente modello)
     try { return json({ instagram: await instagramDaDire(Math.min(Math.max(Number(corpo.ore) || 24, 1), 24 * 30)) }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
