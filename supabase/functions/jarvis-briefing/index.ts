@@ -544,7 +544,7 @@ Deno.serve(async (req) => {
     try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva, controllo }); } catch (e) { return json({ errore: (e as Error).message, controllo }, 500); }
   }
   if (corpo.instagram_prova === true) {                                              // 27 nov: prova di Instagram nel briefing (niente modello)
-    try { return json({ instagram: await instagramDaDire() }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
+    try { return json({ instagram: await instagramDaDire(Math.min(Math.max(Number(corpo.ore) || 24, 1), 24 * 30)) }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
   if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
     if (daCron && !corpo.forza && oraRoma() !== 5) return json({ saltato: true, ora_roma: oraRoma() });
