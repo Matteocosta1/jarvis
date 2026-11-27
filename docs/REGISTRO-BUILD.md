@@ -565,6 +565,7 @@ Analisi dei dialoghi di stamattina:
 Correzioni:
 - A · app 13.9 (13): `lanciaAnticipo` non parte con una foto «in discorso» (ultimi 10 minuti, stessa regola del giro unico del Mac): la frase va con `invia`, che rimette le foto al loro posto. Costo zero (una chiamata anticipata in meno); in quei 10 minuti la risposta può arrivare ~1 s dopo.
 - B · cervello: con `foto_insieme` ogni immagine ha l'etichetta davanti («Foto 1 di 4:», come consiglia Anthropic); `testoDi` e il controllo delle correzioni saltano le etichette (non sono testo del signore). ~10 token per messaggio con foto.
+- ✓ A PROVATA (21:19–21:24, il signore: «funziona da dio»): dopo le 3 foto delle 21:19 nessuna risposta anticipata (prima delle foto sì, 21:18–21:19), e le domande successive hanno le foto con sé (cache letta da 59.727 a 62.568 token: le immagini ci sono); correzioni su Schiche, la sfera di JARVIS e il terreno di Balbano capite e salvate.
 - C · cervello: regola «Ore e date» nel testo fisso (confrontare con l'ora di adesso, dire se è passato; di notte «domani/domattina» = oggi dopo il sonno, nel dubbio chiedere); archivista con l'ora e la stessa regola; ricordi delle conversazioni: guardare l'ora della frase. Cache riscritta una volta (testo fisso cambiato).
 
 ## 27 nov, 05:05 · cervello v168 PUBBLICATO (versione 173, prova generale superata) · FOTO INSIEME: parlare di tutte le foto · via del signore (05:02, «procedi… deve dire tutte le foto»)
