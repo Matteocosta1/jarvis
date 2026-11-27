@@ -3165,9 +3165,12 @@ final class Jarvis: NSObject, ObservableObject {
             }
             programmaAnticipo(parziale)                // 11 nov: la risposta si prepara durante la pausa
             preparaSalute(parziale)                    // 13 nov (12.0 (17)): se parla di salute, Salute si legge adesso
-            if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a un minuto (90 s con «ascoltami»)
+            // 27 nov (il signore: «allunghiamolo, se faccio un discorso lungo non voglio che venga tagliato»): alle 22:24 un discorso
+            // su FRIDAY tagliato a metà parola dal tetto di un minuto. Ora 3 minuti (5 con «ascoltami»): la frase la chiude il silenzio
+            // vero, il tetto resta solo come sicurezza se il microfono restasse aperto per sbaglio
+            if timerTetto == nil {                     // il signore ha iniziato a parlare: può andare avanti fino a 3 minuti (5 con «ascoltami»)
                 let mio = turnoAscolto
-                timerTetto = Timer.scheduledTimer(withTimeInterval: ascoltoLungo ? 90 : 60, repeats: false) { [weak self] _ in
+                timerTetto = Timer.scheduledTimer(withTimeInterval: ascoltoLungo ? 300 : 180, repeats: false) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.turnoAscolto == mio else { return }
                         self.motivoChiusura = "tetto"
@@ -3180,7 +3183,7 @@ final class Jarvis: NSObject, ObservableObject {
             // 11 nov (il signore: «dico tre parole e già risponde»): il riconoscimento di Apple chiude un pezzo («finito» o errore)
             // anche quando il signore sta solo pensando. Con delle parole già sentite si riparte senza chiudere, come fa già il
             // richiamo dopo «Jarvis»: la frase la chiude solo il silenzio vero (parole E voce).
-            if !parziale.isEmpty, riavviiAscolto < 6, riavviaRiconoscimento(ascolto: ascolto) { return }
+            if !parziale.isEmpty, riavviiAscolto < 30, riavviaRiconoscimento(ascolto: ascolto) { return }   // 27 nov: 30 (era 6), per i discorsi lunghi
             motivoChiusura = errore ? "errore" : "finale"
             fermaAscolto(invia: true)
         }
