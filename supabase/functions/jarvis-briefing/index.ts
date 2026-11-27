@@ -320,10 +320,10 @@ async function instagramDaDire(ore = 24): Promise<string> {
   if (!t) return "";
   const da = Date.now() - ore * 3600_000;
   const me = await igLeggi(t, "/me", { fields: "id,username,followers_count" });
-  // i commenti nuovi sui post dell'ultimo mese che ne hanno
+  // i commenti nuovi sugli ultimi 12 post che ne hanno, anche vecchi (il signore non pubblica spesso: i commenti arrivano anche dopo)
   const media: any[] = (await igLeggi(t, "/me/media", { fields: "id,caption,timestamp,comments_count,media_product_type", limit: "12" })).data ?? [];
   const commenti: { chi: string; su: string }[] = [];
-  for (const m of media.filter((x) => x.comments_count && Date.parse(x.timestamp) > Date.now() - 30 * 86_400_000).slice(0, 8)) {
+  for (const m of media.filter((x) => x.comments_count)) {
     try {
       const c: any[] = (await igLeggi(t, `/${m.id}/comments`, { fields: "username,timestamp", limit: "50" })).data ?? [];
       const su = `${m.media_product_type === "REELS" ? "il reel" : "il post"} «${String(m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 40) || "senza didascalia"}»`;
