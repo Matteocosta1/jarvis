@@ -6291,7 +6291,7 @@ Deno.serve(async (req) => {
           if (imgs.length) { turno.foto = imgs[0]; turno.fotoTutte = imgs; }
           // 27 nov · FOTO INSIEME: dall'app 13.9 (12) più foto scelte dalla libreria arrivano con foto_insieme: sono foto diverse, non un giro
           const nota = imgs.length > 1 ? (corpo.foto_insieme === true
-            ? `\n[${imgs.length} foto diverse mandate insieme dal signore, nell'ordine in cui le ha scelte: guardale una per una (la prima, la seconda…)]`
+            ? `\n[${imgs.length} foto diverse mandate insieme dal signore, nell'ordine in cui le ha scelte: parla di TUTTE le ${imgs.length} nella stessa risposta, in ordine, almeno una frase per ciascuna («La prima…», «La seconda…»), senza saltarne nessuna; qui la misura è una o due frasi per foto, non le tre frasi di sempre]`
             : `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]`) : "";
           storia[storia.length - 1] = imgs.length
             ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }
