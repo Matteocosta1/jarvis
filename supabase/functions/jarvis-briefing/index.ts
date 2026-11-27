@@ -260,11 +260,12 @@ async function am(token: string, percorso: string) {
   if (!r.ok) throw new Error(`Apple Music ${r.status}`);
   return await r.json();
 }
-async function usciteMusica(oggi: string) {
+const visteInProva: string[] = [];
+async function usciteMusica(oggi: string, prova = false) {
   const token = await jwtMusica();
-  if (!token) return [];
+  if (!token) { if (prova) throw new Error("manca la chiave MusicKit (MUSICKIT_KEY_P8, MUSICKIT_KEY_ID o APNS_TEAM_ID)"); return []; }
   const { data: artisti } = await db.from("jarvis_artisti").select("id, nome, am_id, ultima_uscita").eq("attivo", true).order("id");
-  const limite = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const limite = new Date(Date.now() - (prova ? 120 : 7) * 86_400_000).toISOString().slice(0, 10);   // in prova: 4 mesi, per vedere che legge
   const nuove: { giorno: string; titolo: string; perche: string | null; fonte: string | null }[] = [];
   let richieste = 0;
   for (const a of (artisti ?? []) as any[]) {
@@ -280,15 +281,16 @@ async function usciteMusica(oggi: string) {
       richieste++;
       const u = (await am(token, `/artists/${id}/view/latest-release`))?.data?.[0];
       const at = u?.attributes;
-      if (!u?.id || !at?.releaseDate || at.releaseDate < limite || at.releaseDate > oggi || u.id === a.ultima_uscita) continue;
+      if (prova) visteInProva.push(`${a.nome} (${id}): ${at?.name ?? "nessuna uscita recente"} ${at?.releaseDate ?? ""}`.trim());
+      if (!u?.id || !at?.releaseDate || at.releaseDate < limite || at.releaseDate > oggi || (!prova && u.id === a.ultima_uscita)) continue;
       const tipo = at.isSingle ? "il singolo" : (at.trackCount ?? 0) <= 6 ? "l'EP" : "l'album";
       const quando = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long" }).format(new Date(at.releaseDate + "T12:00:00Z"));
       nuove.push({ giorno: oggi, titolo: `È uscito ${tipo} «${String(at.name).slice(0, 120)}» di ${String(at.artistName ?? a.nome).slice(0, 80)}, il ${quando}`,
         perche: "È uno degli artisti della sua lista su Apple Music.", fonte: /^https:\/\//.test(at.url ?? "") ? at.url : null });
-      await db.from("jarvis_artisti").update({ ultima_uscita: u.id }).eq("id", a.id);
-    } catch (e) { console.error(`uscite musicali, ${a.nome}:`, (e as Error).message); }
+      if (!prova) await db.from("jarvis_artisti").update({ ultima_uscita: u.id }).eq("id", a.id);
+    } catch (e) { if (prova) throw e; console.error(`uscite musicali, ${a.nome}:`, (e as Error).message); }
   }
-  await db.from("jarvis_consumi").insert({ servizio: "uscite", modello: "apple-music", token_in: 0, token_out: 0, esito: "fine",
+  if (!prova) await db.from("jarvis_consumi").insert({ servizio: "uscite", modello: "apple-music", token_in: 0, token_out: 0, esito: "fine",
     app: { artisti: (artisti ?? []).length, richieste, uscite: nuove.length } }).then(() => {}, () => {});
   return nuove;
 }
@@ -457,6 +459,9 @@ Deno.serve(async (req) => {
       const isola = await isolaPioggia(titolo, d.testo, d).catch((e) => ({ isola: (e as Error).message }));   // 26 ott sera
       return json({ ...esito, ...isola, testo: d.testo });
     } catch (e) { return json({ inviata: false, errore: (e as Error).message }); }
+  }
+  if (corpo.uscite_prova === true) {                                                 // 27 nov: prova delle uscite musicali, senza dirle né segnarle
+    try { visteInProva.length = 0; const uscite = await usciteMusica(giornoRoma(), true); return json({ uscite, lette: visteInProva }); } catch (e) { return json({ errore: (e as Error).message }, 500); }
   }
   if (corpo.novita === true) {                                                       // il giro delle novità, alle 5 di Roma (26 nov)
     if (daCron && !corpo.forza && oraRoma() !== 5) return json({ saltato: true, ora_roma: oraRoma() });
