@@ -217,7 +217,18 @@ struct ContentView: View {
             // 9 nov: la lingua c'è (scelta nel pannello, a voce o cambiata dentro): la sezione la ricorda, la scelta è finita
             .onChange(of: jarvis.interprete) { _, l in if let l { scegliLingua = false; pila.linguaInterprete(l) } }
             .fullScreenCover(isPresented: Binding(get: { sorgenteFoto != nil }, set: { if !$0 { sorgenteFoto = nil } })) {
-                Fotocamera(sorgente: sorgenteFoto ?? .photoLibrary) { immagine in
+                // 27 nov · FOTO INSIEME: dalla libreria il selettore di iOS con la scelta multipla (fino a 6); la fotocamera, una foto
+                Group {
+                    if sorgenteFoto == .photoLibrary || !UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        SceltaFoto(limite: 6) { immagini in
+                            jarvis.impostaFoto(immagini)
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(450))   // il selettore finisce di chiudersi
+                                tastiera = true
+                            }
+                        }
+                    } else {
+                Fotocamera(sorgente: .camera) { immagine in
                     jarvis.impostaFoto(immagine)
                     // 13.8 (4) (issue #18: «dopo aver selezionato una foto non deve partire subito con "Che cos'è?" e l'analisi»):
                     // prima partiva l'ascolto e, in silenzio, la foto andava al cervello con «Che cos'è?». Ora la foto resta sopra il
@@ -226,6 +237,8 @@ struct ContentView: View {
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(450))   // la fotocamera/libreria finisce di chiudersi
                         tastiera = true
+                    }
+                }
                     }
                 }
                 .ignoresSafeArea()
@@ -2256,6 +2269,26 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            // 27 nov · FOTO INSIEME (mockup v111): le foto scelte in fila, ognuna con la sua x; la x a destra le toglie tutte
+            if !jarvis.fotoInsieme.isEmpty {
+                HStack(spacing: 10) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(jarvis.fotoInsieme.enumerated()), id: \.offset) { k, dati in
+                                MiniaturaPronta(dati: dati) { jarvis.togliFoto(k) }
+                            }
+                        }
+                        .padding(.top, 6).padding(.trailing, 6)
+                    }
+                    .frame(width: min(CGFloat(jarvis.fotoInsieme.count) * 50 + 6, 200))
+                    Text("\(jarvis.fotoInsieme.count) foto pronte: mi dica cosa vuole sapere, o invii così.")
+                        .font(.footnote).foregroundStyle(Color.tenue)
+                    Spacer(minLength: 0)
+                    Button { jarvis.fotoInsieme = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.tenue) }
+                        .accessibilityLabel("Togli le foto")
+                }
+                .padding(.horizontal, 16)
+            }
             HStack(spacing: 8) {
             Menu {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -2302,7 +2335,7 @@ struct ContentView: View {
                     .background(Color.ciano2)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled((testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil) || (!telefono && jarvis.fase == .elaboro))   // iPhone: anche mentre pensa (vale come interromperlo); iPad e Mac come prima
+            .disabled((testo.trimmingCharacters(in: .whitespaces).isEmpty && jarvis.foto == nil && jarvis.fotoInsieme.isEmpty) || (!telefono && jarvis.fase == .elaboro))   // iPhone: anche mentre pensa (vale come interromperlo); iPad e Mac come prima
             .accessibilityLabel("Invia")
             }
             .padding(.horizontal, 16)
@@ -2492,7 +2525,7 @@ struct RigaMessaggio: View {
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(jarvis ? Color.ciano : Color.tenue)
-                Text(Glifi.rimescola(m.testo.isEmpty ? "…" : (m.conFoto ? "📷 " + m.testo : m.testo), rimescola))
+                Text(Glifi.rimescola(m.testo.isEmpty ? "…" : (m.conFoto ? (m.nFoto.map { "📷 \($0) foto · " } ?? "📷 ") + m.testo : m.testo), rimescola))
                     .font(.system(size: 16))
                     .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
                     .textSelection(.enabled)
@@ -2713,6 +2746,26 @@ func descriviAzioni(_ azioni: [String]) -> String {
         let n = conta[a] ?? 1
         return n > 1 ? "\(frase) (\(n) \(unita))" : frase
     }.joined(separator: " · ")
+}
+
+/// 27 nov · FOTO INSIEME: una delle foto scelte, sopra il campo, con la sua x per toglierla.
+private struct MiniaturaPronta: View {
+    let dati: Data
+    let togli: () -> Void
+    var body: some View {
+        if let img = UIImage(data: dati) {
+            Image(uiImage: img).resizable().scaledToFill()
+                .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(alignment: .topTrailing) {
+                    Button(action: togli) {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 16))
+                            .symbolRenderingMode(.palette).foregroundStyle(Color.tenue, Color.fondo)
+                    }
+                    .offset(x: 6, y: -6)
+                    .accessibilityLabel("Togli questa foto")
+                }
+        }
+    }
 }
 
 /// Fotocamera o libreria foto (UIKit dentro SwiftUI).

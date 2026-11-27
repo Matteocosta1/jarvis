@@ -15,6 +15,7 @@ struct Messaggio: Identifiable, Codable, Equatable {
     var azioni: [String] = []
     var data = Date()
     var conFoto = false
+    var nFoto: Int? = nil             // 27 nov · FOTO INSIEME: quante foto ha mandato insieme (nil: una sola o nessuna)
     var immagini: [Immagine]? = nil   // galleria sotto la risposta (web, Discogs, Shazam, foto del signore)
     var aggiunta: Bool? = nil         // il signore completa la richiesta precedente («Jarvis, aspetta, ascoltami…»)
     var seguito: Bool? = nil          // riprende il discorso poco dopo: forse completa il pensiero di prima, decide il cervello
@@ -251,6 +252,7 @@ final class Jarvis: NSObject, ObservableObject {
     @Published var stato: String?          // es. «cerco sul web»
     @Published var avviso: String?
     @Published var foto: Data?             // foto in attesa di essere mandata col prossimo messaggio
+    @Published var fotoInsieme: [Data] = []   // 27 nov · FOTO INSIEME: da 2 a 6 foto scelte dalla libreria, in attesa del prossimo messaggio
     private var fotoGiro: [Data] = []      // fotogrammi di un giro con gli occhi, in attesa del prossimo messaggio
     private var allegato: String?          // un testo lungo (la trascrizione del Wiretap) che parte col prossimo messaggio
     @Published var repartoRichiesto: Reparto?   // comando vocale: la schermata apre questo reparto
@@ -1676,6 +1678,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Le foto scelte dal signore partono col prossimo messaggio: una come foto, più d'una come giro.
     private func preparaFoto(_ dati: [Data]) {
+        fotoInsieme = []                   // 27 nov: le foto degli occhi prendono il posto di quelle scelte insieme dalla libreria
         if dati.count > 1 { fotoGiro = dati } else { foto = dati.first }
     }
 
@@ -1872,10 +1875,12 @@ final class Jarvis: NSObject, ObservableObject {
         var testo = testoGrezzo.trimmingCharacters(in: .whitespacesAndNewlines)
         let fotoDaMandare = foto
         let giroDaMandare = fotoGiro
-        if testo.isEmpty && fotoDaMandare == nil && giroDaMandare.isEmpty { fase = .attesa; return }
+        let insiemeDaMandare = fotoInsieme       // 27 nov · FOTO INSIEME
+        if testo.isEmpty && fotoDaMandare == nil && giroDaMandare.isEmpty && insiemeDaMandare.isEmpty { fase = .attesa; return }
         if testo.isEmpty { testo = "Che cos'è?" }
         foto = nil
         fotoGiro = []
+        fotoInsieme = []
         let allegatoDaMandare = allegato
         allegato = nil
         interrompi()
@@ -1886,15 +1891,17 @@ final class Jarvis: NSObject, ObservableObject {
             messaggi[i].testo += " … " + testo
             messaggi.removeSubrange((i + 1)...)
         } else {
-            var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty)
+            var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty || !insiemeDaMandare.isEmpty)
+            if !insiemeDaMandare.isEmpty { m.nFoto = insiemeDaMandare.count }
             // foto nuova: diventa quella di cui si parla, legata a questo messaggio
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
+            else if !insiemeDaMandare.isEmpty { fotoRecenti = insiemeDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             if comeAggiunta { m.aggiunta = true } else if let q = interrottoSu { m.interruzione = q } else if comeSeguito { m.seguito = true }
             if let n = nascosto?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty { m.nascosto = n }
             // 11 nov · risposta anticipata: la frase è proprio quella su cui JARVIS stava già preparando la risposta? Allora si
             // adotta quella (è già pronta o quasi) invece di farne un'altra
-            if let a = anticipo, !a.adottato, fotoDaMandare == nil, giroDaMandare.isEmpty, allegatoDaMandare == nil, a.vale(per: m, dopo: messaggi.last?.id) {
+            if let a = anticipo, !a.adottato, fotoDaMandare == nil, giroDaMandare.isEmpty, insiemeDaMandare.isEmpty, allegatoDaMandare == nil, a.vale(per: m, dopo: messaggi.last?.id) {
                 adotta(a, fineVoce: fineVoce, libera: libera)
                 return
             }
@@ -1905,7 +1912,7 @@ final class Jarvis: NSObject, ObservableObject {
         let storia: [[String: Any]] = recenti.map(Jarvis.perCervello)
         // la foto vista prima torna al suo posto nella storia (non per la domanda che la porta già con sé)
         var fotoStoria: (Int, [Data])?
-        if fotoDaMandare == nil, giroDaMandare.isEmpty, let idF = idFotoRecente, !fotoRecenti.isEmpty,
+        if fotoDaMandare == nil, giroDaMandare.isEmpty, insiemeDaMandare.isEmpty, let idF = idFotoRecente, !fotoRecenti.isEmpty,
            Date().timeIntervalSince(quandoFotoRecenti) < 600,
            let k = recenti.firstIndex(where: { $0.id == idF }), k < recenti.count - 1 {
             fotoStoria = (k, fotoRecenti)
@@ -1928,7 +1935,8 @@ final class Jarvis: NSObject, ObservableObject {
         fase = .elaboro
         flussoFinito = false
         let fotoDaRimettere = fotoStoria
-        compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: giroDaMandare, allegato: allegatoDaMandare,
+        compitoRete = Task { await self.turno(storia: storia, foto: fotoDaMandare, giro: insiemeDaMandare.isEmpty ? giroDaMandare : insiemeDaMandare,
+                                              insieme: !insiemeDaMandare.isEmpty, allegato: allegatoDaMandare,
                                               fotoStoria: fotoDaRimettere, id: risposta.id, fineVoce: fineVoce,
                                               dopoAspetto: dopoAspetto, comeParla: comeParla, libera: libera,
                                               recupero: recupero, inizioFrase: inizioFrase) }
@@ -2015,7 +2023,7 @@ final class Jarvis: NSObject, ObservableObject {
     fileprivate enum Esito { case fine(String, [String]), client([String: Any]), errore(String), doppione, lascia(String), ripiega,
                          sospeso([String: Any]), noAnticipo, aspetto, silenzio }
 
-    private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], allegato: String? = nil,
+    private func turno(storia: [[String: Any]], foto: Data?, giro: [Data] = [], insieme: Bool = false, allegato: String? = nil,
                        fotoStoria: (Int, [Data])? = nil, id: UUID, fineVoce: Date? = nil, unico: GiroUnicoMac? = nil,
                        primo: Esito? = nil, dopoAspetto: Bool = false, comeParla: String? = nil, libera: Bool = false,
                        recupero: String? = nil, inizioFrase: Date? = nil) async {
@@ -2053,6 +2061,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         if let foto { corpo["immagine"] = foto.base64EncodedString() }
         if !giro.isEmpty { corpo["immagini"] = giro.map { $0.base64EncodedString() } }   // i fotogrammi del giro, in ordine
+        if insieme { corpo["foto_insieme"] = true }   // 27 nov · FOTO INSIEME: non è un giro, sono foto diverse scelte dal signore
         if let allegato { corpo["allegato"] = allegato }                                  // la trascrizione del Wiretap
         // 8 nov notte: la sezione aperta e cosa mostra (campi scritti, voce aperta, risultati): JARVIS vede quello che vede lui.
         // 12.0 (10): il catalogo della regia (davanti, dietro, azioni, cosa si apre, cosa è appena successo)
@@ -2366,7 +2375,7 @@ final class Jarvis: NSObject, ObservableObject {
     private func partiGiroUnico(_ audio: Data, origine: GiroUnicoMac.Origine, fine: Date, fatto: (() -> Void)?) -> Bool {
         guard Jarvis.giroUnicoMac else { return false }
         guard Jarvis.usaAscoltoCloud, UserDefaults.standard.bool(forKey: "giroUnicoCervello"), !micSpento,
-              foto == nil, fotoGiro.isEmpty, allegato == nil, occhi == nil, !lidarAperto, !LidarAperta.aperta, !BrowserVoce.aperto,
+              foto == nil, fotoGiro.isEmpty, fotoInsieme.isEmpty, allegato == nil, occhi == nil, !lidarAperto, !LidarAperta.aperta, !BrowserVoce.aperto,
               ConfidenteAperto.domanda == nil, audio.count > 1_000 else { return false }
         if case .stanza = origine { guard fase == .attesa else { return false } } else { guard fase == .elaboro else { return false } }
         // la foto vista poco fa tornerebbe nella cronologia (foto_storia): lì la strada di prima, che la sa rimettere al suo posto
@@ -2387,7 +2396,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// La frase che è arrivata con «trascritto» è una domanda normale, con la stessa nota che il cervello le ha messo davanti?
     /// Allora si accoglie come farebbero `instrada` e `invia`, senza un'altra richiesta: la risposta sta già arrivando in questa.
     private func accettaGiroUnico(_ giro: GiroUnicoMac, testo: String, id: UUID) -> Bool {
-        guard !testo.isEmpty, !micSpento, foto == nil, fotoGiro.isEmpty, allegato == nil else { return false }
+        guard !testo.isEmpty, !micSpento, foto == nil, fotoGiro.isEmpty, fotoInsieme.isEmpty, allegato == nil else { return false }
         var frase = testo
         switch giro.origine {
         case .ascolto(let t):
@@ -2808,13 +2817,32 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Foto
 
     func impostaFoto(_ immagine: UIImage) {
+        fotoInsieme = []
+        foto = Jarvis.riduci(immagine)
+    }
+
+    /// 27 nov · FOTO INSIEME: le foto scelte dalla libreria (al massimo 6). Una sola resta la «foto pronta» di sempre.
+    func impostaFoto(_ immagini: [UIImage]) {
+        let dati: [Data] = immagini.prefix(6).compactMap { Jarvis.riduci($0) }
+        if dati.count > 1 { foto = nil; fotoInsieme = dati } else { fotoInsieme = []; foto = dati.first }
+    }
+
+    /// Toglie una delle foto scelte insieme; se ne resta una sola, torna la «foto pronta» di sempre.
+    func togliFoto(_ k: Int) {
+        guard fotoInsieme.indices.contains(k) else { return }
+        fotoInsieme.remove(at: k)
+        if fotoInsieme.count == 1 { foto = fotoInsieme[0]; fotoInsieme = [] }
+    }
+
+    /// La foto pronta per il cervello: lato lungo al massimo 1280 pixel, JPEG al 70%.
+    static func riduci(_ immagine: UIImage) -> Data? {
         let lato: CGFloat = 1280
         let scala = min(1, lato / max(immagine.size.width, immagine.size.height))
         let misura = CGSize(width: immagine.size.width * scala, height: immagine.size.height * scala)
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = 1                   // pixel veri, non punti ×3: la foto resta sotto i limiti del cervello
         let ridotta = UIGraphicsImageRenderer(size: misura, format: formato).image { _ in immagine.draw(in: CGRect(origin: .zero, size: misura)) }
-        foto = ridotta.jpegData(compressionQuality: 0.7)
+        return ridotta.jpegData(compressionQuality: 0.7)
     }
 
     // MARK: Ascolto
@@ -4453,7 +4481,7 @@ extension Jarvis {
     private func messaggioAnticipabile(_ t: String) -> Messaggio? {
         let frase = t.trimmingCharacters(in: .whitespacesAndNewlines)
         guard frase.count >= 6, Dialogo.volume(frase).cambio == nil, !Jarvis.eSoloSilenzio(frase), !Seguito.soloAspetta(frase) else { return nil }
-        guard ConfidenteAperto.domanda == nil, occhi == nil, foto == nil, fotoGiro.isEmpty, allegato == nil, !lidarAperto,
+        guard ConfidenteAperto.domanda == nil, occhi == nil, foto == nil, fotoGiro.isEmpty, fotoInsieme.isEmpty, allegato == nil, !lidarAperto,
               !LidarAperta.aperta, !BrowserVoce.aperto, !micSpento else { return nil }
         let (_, chiede) = Jarvis.togliRichiamo(frase)
         guard !chiede, !aggiuntaInArrivo, dopoAspetta == .no, interruzioneValida() == nil else { return nil }

@@ -3815,7 +3815,7 @@ function fotoDelTurno(lavoro: any[]): { origine: string; dati: string }[] {
       if (imm.length) out.push({ origine: imm.length > 1 ? "giro" : "occhi", dati: imm[0] });
     }
   }
-  return out.slice(0, 4);
+  return out.slice(0, 6);
 }
 async function registraFoto(lavoro: any[], risposta: string, dispositivo: string, turno?: Turno) {
   if (dispositivo === "mac") return;
@@ -6211,7 +6211,10 @@ Deno.serve(async (req) => {
           const testoUtente = `${contesto(dispositivo, memOrdinata.map((m: any) => `(${m.categoria}) ${unaRiga(String(m.fatto))}`), fatte, turno)}${episodiCr}${testoFilo}${altriCr}${apertoCr}${giaCr}${avvisoCr}${impegniCr}${notaAccettata}${notaSalute}${notaAspetto}${notaBriefing}${briefingModo ? "" : `\n${MISURA_TURNO}`}${notaAdesso ? `\n[Adesso: ${notaAdesso}]` : ""}\n\n${ultimo}`;
           const imgs = immaginiValide(corpo.immagine, corpo.immagini);
           if (imgs.length) { turno.foto = imgs[0]; turno.fotoTutte = imgs; }
-          const nota = imgs.length > 1 ? `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]` : "";
+          // 27 nov · FOTO INSIEME: dall'app 13.9 (12) più foto scelte dalla libreria arrivano con foto_insieme: sono foto diverse, non un giro
+          const nota = imgs.length > 1 ? (corpo.foto_insieme === true
+            ? `\n[${imgs.length} foto diverse mandate insieme dal signore, nell'ordine in cui le ha scelte: guardale una per una (la prima, la seconda…)]`
+            : `\n[${imgs.length} fotogrammi in ordine di tempo, da un giro di pochi secondi con gli occhi: una sola scena vista muovendosi]`) : "";
           storia[storia.length - 1] = imgs.length
             ? { role: "user", content: [...blocchiImmagine(imgs), { type: "text", text: testoUtente + nota }] }
             : { role: "user", content: testoUtente };
