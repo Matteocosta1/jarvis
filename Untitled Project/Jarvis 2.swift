@@ -332,6 +332,9 @@ final class Jarvis: NSObject, ObservableObject {
     private var chiusuraFuori: Task<Void, Never>?
     /// 13.9 (22): le FOTO di Occhi che partono adesso, da legare al messaggio che parte con loro.
     private var fotoOcchiDaLegare: [UUID]?
+    /// 13.9 (22) (il signore, 07:09: «dall'icona mi parla mentre sono dentro Occhi, non me la manda in chat»): il prossimo messaggio
+    /// e la sua risposta restano fuori dallo schermo della chat (come lo swipe: il cervello li legge, «cosa vedevi prima?» funziona).
+    private var prossimaNascosta = false
     /// 13.9 (21): fuori dall'app, da quando l'ascolto è fermo (nessuna parola nuova) e su quale frase: dopo 30 s si chiude da solo.
     private var ascoltoFermoDa: Date?
     private var ascoltoFermoSu = ""
@@ -544,7 +547,7 @@ final class Jarvis: NSObject, ObservableObject {
             guard let self, !dati.isEmpty else { return }
             _ = FotoOcchi.condivise.aggiungi(dati)
             let detta = self.prendiDomandaOcchi()
-            if self.occhi?.aVoce == true { if let detta { self.mandaFotoOcchi(detta) } } else { self.mandaFotoOcchi(detta) }
+            if self.occhi?.aVoce == true { if let detta { self.mandaFotoOcchi(detta) } } else { self.mandaFotoOcchi(detta, nascosta: true) }
         }
         FotoOcchi.condivise.sceltaFinita = { [weak self] in self?.mandaFotoOcchi(nil) }
         // 13.9 (22): nell'Archivio la foto porta come descrizione la prima frase di quello che ha detto JARVIS guardandola
@@ -1777,10 +1780,11 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 13.9 (22): le FOTO di Occhi non scartate e non ancora mandate partono adesso a JARVIS, in un solo messaggio (una come foto,
     /// più d'una come FOTO INSIEME, al massimo 6), con la frase detta o «Cosa vedi?». Il messaggio in chat porta la loro pila.
-    private func mandaFotoOcchi(_ domanda: String?) {
+    private func mandaFotoOcchi(_ domanda: String?, nascosta: Bool = false) {
         let (ids, dati) = FotoOcchi.condivise.prendiDaMandare(massimo: 6)
         guard !dati.isEmpty else { return }
         fotoOcchiDaLegare = ids
+        prossimaNascosta = nascosta
         fotoGiro = []
         if dati.count > 1 { foto = nil; fotoInsieme = dati } else { fotoInsieme = []; foto = dati[0] }
         let d = domanda ?? (dati.count > 1 ? "Cosa vedi in queste foto?" : "Cosa vedi?")
@@ -2015,6 +2019,8 @@ final class Jarvis: NSObject, ObservableObject {
         let insiemeDaMandare = fotoInsieme       // 27 nov · FOTO INSIEME
         let legaFoto = fotoOcchiDaLegare          // 13.9 (22): la FOTO di Occhi che va sotto questa domanda in chat
         fotoOcchiDaLegare = nil
+        let nascosta = prossimaNascosta           // 13.9 (22): dagli Occhi aperti dall'icona: domanda e risposta non vanno in chat
+        prossimaNascosta = false
         if testo.isEmpty && fotoDaMandare == nil && giroDaMandare.isEmpty && insiemeDaMandare.isEmpty { fase = .attesa; return }
         if testo.isEmpty { testo = "Che cos'è?" }
         foto = nil
@@ -2033,6 +2039,7 @@ final class Jarvis: NSObject, ObservableObject {
             var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty || !insiemeDaMandare.isEmpty)
             if !insiemeDaMandare.isEmpty { m.nFoto = insiemeDaMandare.count }
             if let legaFoto, fotoDaMandare != nil || !giroDaMandare.isEmpty || !insiemeDaMandare.isEmpty { m.fotoOcchi = legaFoto }
+            if nascosta { m.tolto = true }
             // foto nuova: diventa quella di cui si parla, legata a questo messaggio
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
@@ -2058,7 +2065,8 @@ final class Jarvis: NSObject, ObservableObject {
             fotoStoria = (k, fotoRecenti)
             quandoFotoRecenti = Date()          // finché se ne parla, la tiene davanti
         }
-        let risposta = Messaggio(ruolo: "assistant", testo: "")
+        var risposta = Messaggio(ruolo: "assistant", testo: "")
+        if nascosta { risposta.tolto = true }     // 13.9 (22): la dice negli Occhi, in chat non si vede (il cervello la ricorda)
         messaggi.append(risposta)
         idTurno = risposta.id
         salva()
