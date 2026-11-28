@@ -131,8 +131,7 @@ enum Battute {
         case .sentinella: v = ["Sentinella in posizione, Sir.", "Sentinella attiva. Nessuno passa senza che io lo sappia.",
                               "Faccio io la guardia, Sir. Lei si rilassi.", "Perimetro sotto controllo. Occhio aperto.",
                               "Sentinella pronta: se si muove una foglia, glielo dico."]
-        case .occhi: v = ["Occhi aperti, Sir.", "Vista attiva. Mi mostri pure.", "Ottiche accese: cosa guardiamo?",
-                         "Eccomi: vedo quello che vede lei.", "Sensori ottici in linea, Sir."]
+        case .occhi: v = ["Sistemi ottici attivi."]   // 13.9 (22) (il signore, 28 nov 06:40): aperti a voce, solo questa frase
         case .giro: v = ["Sistemi ottici attivi. Cinque secondi, Sir: muova pure, cerco di non soffrire il mal di mare.",
                         "Panoramica: cinque secondi. Giri piano, io registro tutto.", "Giro d'orizzonte, Sir. Lei muova, io guardo.",
                         "Cinque secondi di riprese, Sir. Con calma: ho uno stomaco digitale delicato."]

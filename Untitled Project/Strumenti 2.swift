@@ -467,7 +467,17 @@ final class Strumenti {
         // («che», «come» no: «apri gli occhi che ti faccio vedere» è ancora un'apertura; nel dubbio a mano, aspettando «scatta»)
         let chiede = t.contains { ["cosa", "cos", "quale", "quanto", "quanti", "dove", "guarda", "guardami", "vedi", "dimmi", "leggi",
                                    "leggimi", "descrivi", "riconosci", "scatta", "giro"].contains($0) }
-        return apre && occhi && !chiede
+        if apre && occhi && !chiede { return true }
+        // 13.9 (22) (il signore, 28 nov 07:05: «diciamo Jarvis guarda e va nell'app Occhi»; «in chat gli chiediamo di scattare una
+        // foto e ci apre Occhi»): «guarda», «guarda qui», «guarda un po'», «scatta una foto», «fammi una foto», «fotografa» da soli
+        // (senza una domanda su cosa c'è) aprono gli Occhi a mano: le foto si scattano e si scelgono, e partono insieme
+        let riempitivi: Set<String> = ["jarvis", "sir", "qui", "qua", "un", "po", "una", "la", "mi", "per", "favore", "piacere", "fammi",
+                                       "fai", "ora", "adesso", "subito", "dai", "ehi", "allora", "senti", "foto", "fotografia", "puoi", "potresti"]
+        let ordini: Set<String> = ["guarda", "guardi", "scatta", "scatti", "fotografa", "fotografi"]
+        let resto = t.filter { !riempitivi.contains($0) }
+        let soloFoto = t.contains("foto") && t.contains { ["fai", "fammi", "scatta", "scatti", "fare"].contains($0) }
+        return t.count <= 6 && (resto.count == 1 && ordini.contains(resto[0]) || resto.isEmpty && soloFoto
+                                || resto == ["fare"] && soloFoto)
     }
 
     // MARK: Browser interno

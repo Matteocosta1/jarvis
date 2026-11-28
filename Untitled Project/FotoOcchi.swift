@@ -21,6 +21,8 @@ nonisolated struct ScattoOcchi: Identifiable, Codable, Equatable, Sendable {
     var stato: StatoFotoOcchi
     /// 1 la foto; 4 i fotogrammi del giro (REC).
     let fotogrammi: Int
+    /// Già mandata a JARVIS (con le altre del suo messaggio).
+    var inviata: Bool = false
 }
 
 @MainActor
@@ -29,14 +31,34 @@ final class FotoOcchi: ObservableObject {
     typealias Scatto = ScattoOcchi
 
     @Published private(set) var scatti: [Scatto] = []
-    /// FOTO aperto dalla chat (sopra la chat, con «Chiudi»), da questo scatto.
-    @Published var dallaChat: UUID?
+    /// FOTO aperto dalla chat (sopra la chat): da questo scatto, con le foto di quel messaggio.
+    @Published var dallaChat: (id: UUID, ids: [UUID])?
     /// FOTO aperto: «salvala» / «scartala» a voce sulla foto al centro, con lo stesso volo dello swipe (-1 su, +1 giù).
     var flusso: ((Int) -> Bool)?
     /// La descrizione per l'Archivio (la prima frase della risposta di JARVIS): la dà Jarvis.
     var descrizione: ((UUID) -> String?)?
 
     var inAttesa: [Scatto] { scatti.filter { $0.stato == .attesa } }
+
+    /// 06:54 (il signore): le foto scelte e quelle non ancora scelte, non scartate, partono insieme a JARVIS quando in FOTO sono state
+    /// scelte tutte (lo fa Jarvis: `sceltaFinita`), quando gli Occhi si chiudono, o con una domanda detta insieme allo scatto.
+    var sceltaFinita: (() -> Void)?
+
+    /// Le foto non scartate e non ancora mandate (al massimo `massimo` immagini; un giro conta i suoi fotogrammi), segnate come
+    /// mandate: gli id per il messaggio in chat e le immagini per il cervello.
+    func prendiDaMandare(massimo: Int) -> (ids: [UUID], dati: [Data]) {
+        var ids: [UUID] = [], dati: [Data] = []
+        for i in scatti.indices where !scatti[i].inviata {
+            let s = scatti[i]
+            let fotogrammi = (0..<s.fotogrammi).compactMap { try? Data(contentsOf: file(s.id, $0)) }
+            guard !fotogrammi.isEmpty, dati.count + fotogrammi.count <= massimo else { continue }
+            dati += fotogrammi
+            ids.append(s.id)
+            scatti[i].inviata = true
+        }
+        if !ids.isEmpty { salvaIndice() }
+        return (ids, dati)
+    }
 
     private var anteprime: [UUID: UIImage] = [:]
     private let cartella: URL
@@ -91,7 +113,7 @@ final class FotoOcchi: ObservableObject {
     /// Su: nell'Archivio di JARVIS (cartella «occhi»), con la coda sicura dell'Archivio (riparte da sola se manca la rete).
     /// Esce dalle FOTO da scegliere; in chat resta, col bordo acceso.
     @discardableResult
-    func archivia(_ id: UUID) -> Bool {
+    func archivia(_ id: UUID, muto: Bool = false) -> Bool {
         guard let i = scatti.firstIndex(where: { $0.id == id }), scatti[i].stato == .attesa else { return false }
         let s = scatti[i]
         let nome = "Occhi " + ArchivioCentrale.quando(s.quando)
@@ -104,8 +126,16 @@ final class FotoOcchi: ObservableObject {
         }
         scatti[i].stato = .archivio
         salvaIndice()
-        Suoni.pronto()
+        if !muto { Suoni.pronto() }
         return true
+    }
+
+    /// Gli Occhi si sono chiusi: le foto non scartate e non ancora scelte vanno tutte nell'Archivio (un suono solo).
+    func archiviaTutte() {
+        let ids = inAttesa.map(\.id)
+        guard !ids.isEmpty else { return }
+        for id in ids { archivia(id, muto: true) }
+        Suoni.pronto()
     }
 
     /// Giù: via dal telefono (le FOTO da scegliere e la chat). Al cervello era già arrivata con la domanda.
@@ -191,33 +221,65 @@ struct MiniaturaFoto: View {
     }
 }
 
-// MARK: - La foto in chat, sotto la domanda
+// MARK: - Le foto in chat: la pila del messaggio
 
-/// Un tocco apre FOTO da lì; archiviata ha il bordo acceso (e un tocco dice dov'è).
+/// 06:54 (il signore: «se ho scattato 4 foto e ne ho scartata una, gli arriva l'icona con 3 foto e ne legge 3»): sotto la domanda la
+/// pila delle foto mandate con lei (quelle scartate dopo escono): l'ultima davanti, dietro un bordo per foto fino a tre, il numero dalla
+/// seconda. Un tocco apre FOTO con quelle ancora da scegliere; tutte archiviate: il bordo è acceso e il tocco dice dove sono.
 struct FotoInChat: View {
-    let id: UUID
+    let ids: [UUID]
     @ObservedObject private var foto = FotoOcchi.condivise
 
     var body: some View {
-        if let s = foto.scatto(id), let a = foto.anteprima(id) {
-            let archivio = s.stato == .archivio
-            Image(uiImage: a)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: 120, alignment: .leading)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.ciano.opacity(archivio ? 1 : 0.4), lineWidth: 1))
-                .shadow(color: Color.ciano.opacity(archivio ? 0.35 : 0), radius: 4)
-                .padding(.top, 4)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    Suoni.tocco()
-                    if archivio { OcchiAperti.parla?("È nell'archivio, Sir: Sistemi, Archivio, cartella occhi.") }
-                    else { withAnimation(.easeOut(duration: 0.22)) { foto.dallaChat = id } }
+        let gruppo = ids.compactMap { foto.scatto($0) }
+        if let ultima = gruppo.last, let a = foto.anteprima(ultima.id) {
+            let archivio = gruppo.allSatisfy { $0.stato == .archivio }
+            let forma = RoundedRectangle(cornerRadius: 11, style: .continuous)
+            ZStack {
+                if gruppo.count >= 3 { dietro(forma).offset(x: 10, y: -10).opacity(0.55) }
+                if gruppo.count >= 2 { dietro(forma).offset(x: 5, y: -5) }
+                Image(uiImage: a)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 56, height: 56)
+                    .clipShape(forma)
+                    .overlay(forma.stroke(Color.ciano.opacity(archivio ? 1 : 0.6), lineWidth: 1))
+                    .shadow(color: Color.ciano.opacity(0.3), radius: 4)
+            }
+            .frame(width: 56, height: 56)
+            .overlay(alignment: .topTrailing) {
+                if gruppo.count > 1 {
+                    Text("\(gruppo.count)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.ciano)
+                        .padding(.horizontal, 4)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Capsule().fill(Color(red: 0.01, green: 0.06, blue: 0.09)))
+                        .overlay(Capsule().stroke(Color.ciano, lineWidth: 1))
+                        .offset(x: 20, y: -17)
                 }
-                .accessibilityLabel(archivio ? "Foto di Occhi, nell'archivio" : "Foto di Occhi, da scegliere")
-                .accessibilityAddTraits(.isButton)
+            }
+            .padding(.top, 14)
+            .padding(.trailing, 22)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Suoni.tocco()
+                if let prima = gruppo.first(where: { $0.stato == .attesa }) {
+                    withAnimation(.easeOut(duration: 0.22)) { foto.dallaChat = (prima.id, gruppo.map(\.id)) }
+                } else {
+                    OcchiAperti.parla?("Sono nell'archivio, Sir: Sistemi, Archivio, cartella occhi.")
+                }
+            }
+            .accessibilityLabel(gruppo.count > 1 ? "\(gruppo.count) foto di Occhi" : "Foto di Occhi")
+            .accessibilityAddTraits(.isButton)
         }
+    }
+
+    private func dietro(_ forma: RoundedRectangle) -> some View {
+        forma.fill(Color(red: 0.016, green: 0.07, blue: 0.1))
+            .overlay(forma.stroke(Color.ciano.opacity(0.45), lineWidth: 1))
+            .frame(width: 56, height: 56)
     }
 }
 
@@ -226,7 +288,7 @@ struct FotoDallaChat: View {
     @ObservedObject private var foto = FotoOcchi.condivise
     var body: some View {
         if let k = foto.dallaChat {
-            FlussoFoto(conCamera: false, inizio: k) { withAnimation(.easeIn(duration: 0.16)) { foto.dallaChat = nil } }
+            FlussoFoto(conCamera: false, inizio: k.id, solo: k.ids) { withAnimation(.easeIn(duration: 0.16)) { foto.dallaChat = nil } }
                 .transition(.opacity)
         }
     }
@@ -235,9 +297,12 @@ struct FotoDallaChat: View {
 // MARK: - FOTO, il cover flow
 
 struct FlussoFoto: View {
-    /// Aperto dagli Occhi (sopra la fotocamera) o dalla chat: stesso FOTO, si torna con un tocco fuori dalla foto.
+    /// Aperto dagli Occhi (sopra la fotocamera: finite le scelte le foto partono a JARVIS) o dalla chat: stesso FOTO, si torna con un
+    /// tocco fuori dalla foto.
     let conCamera: Bool
     let inizio: UUID?
+    /// Dalla chat: solo le foto di quel messaggio.
+    var solo: [UUID]? = nil
     let chiudi: () -> Void
 
     @ObservedObject private var foto = FotoOcchi.condivise
@@ -287,7 +352,7 @@ struct FlussoFoto: View {
         .onTapGesture { Suoni.tocco(); chiudi() }
         .accessibilityAction(named: "Torna indietro") { chiudi() }
         .onAppear {
-            lista = foto.inAttesa.map(\.id)
+            lista = daScegliere
             guard !lista.isEmpty else { chiudi(); return }
             off = Double(inizio.flatMap { lista.firstIndex(of: $0) } ?? 0)
             withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.24)) { aperto = true }
@@ -299,7 +364,7 @@ struct FlussoFoto: View {
         }
         .onDisappear { foto.flusso = nil }
         // archiviata o scartata a voce da fuori (FOTO chiuso non succede; qui per sicurezza): esce anche dal flusso
-        .onChange(of: foto.inAttesa.map(\.id)) { _, ids in
+        .onChange(of: daScegliere) { _, ids in
             let restano = lista.filter { ids.contains($0) || $0 == vola?.id }
             if restano.count != lista.count { lista = restano; off = min(off, Double(max(0, restano.count - 1))) }
             if lista.isEmpty { chiudi() }
@@ -307,6 +372,9 @@ struct FlussoFoto: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Foto")
     }
+
+    /// Le foto da scegliere (dalla chat solo quelle di quel messaggio).
+    private var daScegliere: [UUID] { foto.inAttesa.map(\.id).filter { solo?.contains($0) ?? true } }
 
     private var testata: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -534,6 +602,8 @@ struct FlussoFoto: View {
                 off = min(off, Double(max(0, lista.count - 1)))
             }
             if lista.isEmpty {
+                // scelte tutte: quelle non scartate partono adesso a JARVIS, in un solo messaggio (dalla chat erano già partite)
+                if conCamera { foto.sceltaFinita?() }
                 try? await Task.sleep(for: .milliseconds(200))
                 chiudi()
                 return

@@ -2018,7 +2018,7 @@ struct ContentView: View {
             case .sentinella: mostraSentinella = true
             case .wiretap: mostraWiretap = true
             case .profiler: profiler()
-            case .occhi: jarvis.guardaManuale()
+            case .occhi: jarvis.guardaManuale(aVoce: true)        // 13.9 (22): aperti a voce, le foto si scelgono e partono insieme
             case .giro: jarvis.giroAVoce()
             case .cucina: jarvis.guardaCucina()
             case .scanner: scheda = .scanner
@@ -2557,7 +2557,7 @@ struct RigaMessaggio: View {
                     .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
                     .shadow(color: jarvis ? Color.ciano.opacity(0.2) : .clear, radius: jarvis ? 5 : 0)  // 13.9 (15) · il testo di JARVIS ha la sua luce
                     .textSelection(.enabled)
-                if let k = m.fotoOcchi { FotoInChat(id: k) }        // 13.9 (22): la FOTO di Occhi, un tocco apre FOTO
+                if let k = m.fotoOcchi, !k.isEmpty { FotoInChat(ids: k) }   // 13.9 (22): la pila delle FOTO di Occhi, un tocco apre FOTO
                 if let immagini = m.immagini, !immagini.isEmpty {
                     GalleriaMessaggio(immagini: immagini)
                         .padding(.top, 2)

@@ -341,7 +341,7 @@ final class Richiamo {
                 // 13.9 (21): Occhi aperti che aspettano lo scatto: «scatta…» vale senza «Jarvis»
                 if trovato == nil, !soloNome, occhiAspettano?() == true {
                     let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
-                    if Richiamo.cominciaConScatto(t) || Jarvis.azioneFoto(t) != nil { trovato = t; soloDopoNome = false }   // 13.9 (22): anche «salvala», «scartala»
+                    if Richiamo.cominciaConScatto(t) || Jarvis.azioneFoto(t) != nil || Jarvis.azioneFotoSecca(t) != nil { trovato = t; soloDopoNome = false }   // 13.9 (22): anche «salvala», «archivia», «elimina»
                 }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
                 // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)

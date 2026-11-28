@@ -48,6 +48,9 @@ struct Occhiata: Identifiable {
     var manda: String? = nil
     /// MARK X · AEREO, aperti a voce: il comando (AEREO, AEREO_DOVE…) e la frase detta.
     var aereo: (p: String, frase: String)? = nil
+    /// 13.9 (22) (il signore, 28 nov 07:01): aperti a voce («apri gli occhi», «Jarvis, …» o scritto): gli scatti si raccolgono e si
+    /// scelgono in FOTO, e le foto tenute partono a JARVIS tutte insieme. Dall'icona: ogni scatto va a JARVIS subito.
+    var aVoce = false
 }
 
 struct Occhi: View {

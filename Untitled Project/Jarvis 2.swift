@@ -26,8 +26,8 @@ struct Messaggio: Identifiable, Codable, Equatable {
     /// 7 nov (il signore): quello che va al cervello ma non si vede in chat (il Confidente: lo stato fisico di oggi). Prima la riga
     /// «[Stato fisico di oggi: …]» compariva nel messaggio del signore.
     var nascosto: String? = nil
-    /// 13.9 (22): la FOTO di Occhi mandata con questa domanda (si vede in chat sotto il testo, finché è sul telefono).
-    var fotoOcchi: UUID? = nil
+    /// 13.9 (22): le FOTO di Occhi mandate con questa domanda (in chat la loro pila sotto il testo, finché sono sul telefono).
+    var fotoOcchi: [UUID]? = nil
     /// 13.9 (16) · tolto dallo schermo con lo swipe (il signore, 28 nov: «solo esteticamente»): in chat non si vede più, ma il
     /// cervello lo legge ancora come prima (finestra, filo e cache restano uguali). «Pulisci» lo cancella con tutto il resto.
     var tolto: Bool? = nil
@@ -330,8 +330,8 @@ final class Jarvis: NSObject, ObservableObject {
     /// Pubblicati: la schermata (ContentView) li legge per tenere acceso il microfono fuori dall'app finché il dialogo continua.
     @Published private(set) var dialogoFuori = false
     private var chiusuraFuori: Task<Void, Never>?
-    /// 13.9 (22): la FOTO di Occhi appena scattata, da legare al messaggio che parte con lei.
-    private var fotoOcchiDaLegare: UUID?
+    /// 13.9 (22): le FOTO di Occhi che partono adesso, da legare al messaggio che parte con loro.
+    private var fotoOcchiDaLegare: [UUID]?
     /// 13.9 (21): fuori dall'app, da quando l'ascolto è fermo (nessuna parola nuova) e su quale frase: dopo 30 s si chiude da solo.
     private var ascoltoFermoDa: Date?
     private var ascoltoFermoSu = ""
@@ -533,16 +533,20 @@ final class Jarvis: NSObject, ObservableObject {
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
-        strumenti.apriOcchiManuali = { [weak self] in self?.guardaManuale() }   // 13.9 (20): «apri gli occhi» → a mano, aspettano «scatta»
-        // 13.9 (21–22): ogni scatto degli Occhi manuali (che restano aperti) va a JARVIS con la frase detta («scatta, cos'è?» →
-        // «cos'è?») e diventa una FOTO da scegliere (la miniatura sopra CERCA, la foto in chat sotto la domanda)
+        strumenti.apriOcchiManuali = { [weak self] in self?.guardaManuale(aVoce: true) }   // 13.9 (20–22): «apri gli occhi» → a mano, le foto si scelgono
+        // 13.9 (22) (il signore, 28 nov 06:54: «faccio tre foto, ne scelgo due, una la scarto: le due vanno a JARVIS e lui me le legge»):
+        // negli Occhi manuali (che restano aperti) ogni scatto diventa una FOTO da scegliere, e a JARVIS non va subito. Le foto non
+        // scartate partono tutte insieme, in un solo messaggio (in chat la loro pila): quando in FOTO sono state scelte tutte, quando gli
+        // Occhi si chiudono, o subito se lo scatto porta una domanda («scatta, cos'è?»)
+        // 07:01 (il signore: «il miglior compromesso»): aperti dall'icona invece ogni scatto va a JARVIS subito, e lui dice cos'è (lo
+        // scatto dopo lo interrompe); la scelta in FOTO è la stessa. Alla chiusura degli Occhi le foto non scartate vanno nell'Archivio
         OcchiAperti.consegna = { [weak self] dati in
             guard let self, !dati.isEmpty else { return }
+            _ = FotoOcchi.condivise.aggiungi(dati)
             let detta = self.prendiDomandaOcchi()
-            self.fotoOcchiDaLegare = FotoOcchi.condivise.aggiungi(dati)
-            self.preparaFoto(dati)
-            Task { await self.invia(detta ?? (dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?")) }
+            if self.occhi?.aVoce == true { if let detta { self.mandaFotoOcchi(detta) } } else { self.mandaFotoOcchi(detta) }
         }
+        FotoOcchi.condivise.sceltaFinita = { [weak self] in self?.mandaFotoOcchi(nil) }
         // 13.9 (22): nell'Archivio la foto porta come descrizione la prima frase di quello che ha detto JARVIS guardandola
         FotoOcchi.condivise.descrizione = { [weak self] id in self?.descrizioneFotoOcchi(id) }
         // 13.9 (21–22): con gli Occhi aperti che aspettano lo scatto a voce, «scatta» (e «salvala», «scartala») vale anche senza «Jarvis»
@@ -598,7 +602,7 @@ final class Jarvis: NSObject, ObservableObject {
             Task { @MainActor [weak self] in self?.audioInterrotto(iniziato: tipo == .began) }
         }
         carica()
-        FotoOcchi.condivise.tieni(Set(messaggi.compactMap(\.fotoOcchi)))   // 13.9 (22): sul telefono restano le FOTO ancora in chat (e quelle da scegliere)
+        FotoOcchi.condivise.tieni(Set(messaggi.flatMap { $0.fotoOcchi ?? [] }))   // 13.9 (22): sul telefono restano le FOTO ancora in chat (e quelle da scegliere)
     }
 
     /// L'audio dell'iPhone è stato preso da altro (telefonata, Siri, allarme) o restituito.
@@ -699,7 +703,7 @@ final class Jarvis: NSObject, ObservableObject {
         compitoPonte?.cancel()
         compitoRete?.cancel()
         compitoRete = nil
-        occhiChiusi([])
+        chiudiOcchiNonManuali()             // 13.9 (22): gli Occhi manuali restano aperti
         sintesi.stopSpeaking(at: .immediate)
         cloud.ferma()
         bufferVoce = ""
@@ -844,6 +848,18 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 13.9 (22) · FOTO: «salvala», «archiviala», «mettila in archivio», «salva la foto» → -1 (su, archivio); «scartala», «buttala»,
     /// «scarta la foto» → +1 (giù, scarta). Solo la frase intera (al più «Sir» in fondo): «salvala nelle note» non lo è.
+    /// 07:05 (il signore: «con una foto selezionata, Jarvis salva, archivia, Jarvis elimina»): anche «salva», «archivia», «elimina»,
+    /// «cancella», «scarta» da soli, ma quelli solo con FOTO o gli Occhi aperti (`azioneFotoSecca`).
+    nonisolated static func azioneFotoSecca(_ frase: String) -> Int? {
+        let t = frase.lowercased().folding(options: .diacriticInsensitive, locale: Locale(identifier: "it_IT"))
+            .replacingOccurrences(of: #"[^a-z ]"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+(sir|jarvis)\s*$"#, with: "", options: .regularExpression)
+            .split(separator: " ").joined(separator: " ")
+        if ["salva", "archivia", "salvalo", "archivialo"].contains(t) { return -1 }
+        if ["elimina", "cancella", "scarta", "eliminala", "cancellala", "butta"].contains(t) { return 1 }
+        return nil
+    }
+
     nonisolated static func azioneFoto(_ frase: String) -> Int? {
         let t = frase.lowercased().folding(options: .diacriticInsensitive, locale: Locale(identifier: "it_IT"))
             .replacingOccurrences(of: #"[^a-z' ]"#, with: " ", options: .regularExpression)
@@ -1143,7 +1159,9 @@ final class Jarvis: NSObject, ObservableObject {
         // 13.9 (22) · FOTO (il signore, 28 nov 06:04–06:14): «salvala» la mette nell'Archivio (cartella occhi), «scartala» la toglie.
         // Con FOTO aperto vale per la foto al centro (con lo stesso volo dello swipe), se no per l'ultima scattata. Solo quando si sta
         // parlando delle foto (Occhi aperti, FOTO aperto, o l'ultima domanda era una foto di Occhi): se no la frase va al cervello
-        if let verso = Jarvis.azioneFoto(Jarvis.togliRichiamo(frase).0), comandoFoto(verso) { return }
+        let fraseFoto = Jarvis.togliRichiamo(frase).0
+        if let verso = Jarvis.azioneFoto(fraseFoto), comandoFoto(verso) { return }
+        if let verso = Jarvis.azioneFotoSecca(fraseFoto), occhi != nil || FotoOcchi.condivise.flusso != nil, comandoFoto(verso) { return }
         fraseAVoce = ""
         let (pulito, chiede) = Jarvis.togliRichiamo(frase)
         if chiede && pulito.isEmpty {                 // solo «aspetta, ascoltami»: lo riascolto, la frase vera arriva adesso
@@ -1640,7 +1658,7 @@ final class Jarvis: NSObject, ObservableObject {
             return
         }
         if let r = c.risposta ?? c.annuncioApertura ?? Reparto.occhi.annuncio { annuncia(r) }
-        guardaManuale(iniziale: c)
+        guardaManuale(iniziale: c, aVoce: true)
     }
 
     /// «Traduci in inglese»: l'Interprete si apre già sulla lingua, senza passare dalla scelta.
@@ -1732,7 +1750,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Occhi
 
     /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
-    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil) async -> [Data] {
+    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil, aVoce: Bool = false) async -> [Data] {
         // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
         if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
         if soccorsoAperto { return [] }               // il Tocco d'aiuto di Bea è aperto: non si copre mai
@@ -1743,6 +1761,7 @@ final class Jarvis: NSObject, ObservableObject {
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c
             var o = Occhiata(automatico: automatico, video: video, cucina: cucina, zoom: zoom)
+            o.aVoce = aVoce                    // 13.9 (22): aperti a voce, le foto si scelgono e partono insieme
             switch iniziale {                  // build 23: aperti a voce, acceso solo quello che chiede
             case .etichette(true)?: o.eti = true
             case .ologramma(true)?: o.olo = true
@@ -1754,6 +1773,42 @@ final class Jarvis: NSObject, ObservableObject {
             }
             occhi = o
         }
+    }
+
+    /// 13.9 (22): le FOTO di Occhi non scartate e non ancora mandate partono adesso a JARVIS, in un solo messaggio (una come foto,
+    /// più d'una come FOTO INSIEME, al massimo 6), con la frase detta o «Cosa vedi?». Il messaggio in chat porta la loro pila.
+    private func mandaFotoOcchi(_ domanda: String?) {
+        let (ids, dati) = FotoOcchi.condivise.prendiDaMandare(massimo: 6)
+        guard !dati.isEmpty else { return }
+        fotoOcchiDaLegare = ids
+        fotoGiro = []
+        if dati.count > 1 { foto = nil; fotoInsieme = dati } else { fotoInsieme = []; foto = dati[0] }
+        let d = domanda ?? (dati.count > 1 ? "Cosa vedi in queste foto?" : "Cosa vedi?")
+        Task { await invia(d) }
+    }
+
+    /// 13.9 (22) (il signore, 07:01: «quelle salvate vanno sia in chat sia in archivio, sotto dettatura di Jarvis»): gli Occhi si sono
+    /// chiusi: le FOTO non scartate e non ancora scelte vanno nell'Archivio. Si aspetta che JARVIS abbia risposto (al massimo 40
+    /// secondi), così la descrizione è la sua prima frase.
+    private func archiviaFotoOcchi() {
+        guard !FotoOcchi.condivise.inAttesa.isEmpty else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))      // il messaggio con le foto è partito: JARVIS pensa, poi parla
+            for _ in 0..<80 {
+                guard let self else { return }
+                if self.fase == .attesa || self.fase == .ascolto { break }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            FotoOcchi.condivise.archiviaTutte()
+        }
+    }
+
+    /// 13.9 (22): gli Occhi manuali (dall'icona o «apri gli occhi») restano aperti anche se JARVIS viene interrotto o gli si parla
+    /// sopra: si chiudono solo con la X o con «chiudi». Gli altri (aperti dal cervello, che aspetta la foto; la Cucina) si chiudono.
+    private func chiudiOcchiNonManuali() {
+        if let o = occhi, !o.automatico, !o.cucina, !o.video { return }
+        occhiChiusi([])
     }
 
     /// Le foto scelte dal signore partono col prossimo messaggio: una come foto, più d'una come giro.
@@ -1779,11 +1834,13 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Icona 👁️: mirino con il tasto, poi JARVIS guarda la foto (comodo per le copertine).
     /// `iniziale`: aperti a voce con un comando degli Occhi (build 23).
-    func guardaManuale(iniziale: ComandoOcchi? = nil) {
+    func guardaManuale(iniziale: ComandoOcchi? = nil, aVoce: Bool = false) {
         Task {
-            let dati = await apriOcchi(automatico: false, iniziale: iniziale)
+            let dati = await apriOcchi(automatico: false, iniziale: iniziale, aVoce: aVoce)
             let detta = prendiDomandaOcchi()
-            guard !dati.isEmpty else { return }
+            // 13.9 (22): gli Occhi si sono chiusi: le FOTO non scartate e non ancora mandate partono adesso, tutte insieme, e quelle non
+            // scartate vanno nell'Archivio (con la frase di JARVIS, appena ha risposto)
+            guard !dati.isEmpty else { mandaFotoOcchi(detta); archiviaFotoOcchi(); return }
             preparaFoto(dati)
             await invia(detta ?? (dati.count > 1 ? "Cosa vedi in questo giro?" : "Cosa vedi?"))
         }
@@ -1799,7 +1856,7 @@ final class Jarvis: NSObject, ObservableObject {
                 occhi = o
             }
             let detta = prendiDomandaOcchi()
-            guard !dati.isEmpty else { return }
+            guard !dati.isEmpty else { if !o.cucina { mandaFotoOcchi(detta); archiviaFotoOcchi() }; return }   // 13.9 (22): come guardaManuale
             preparaFoto(dati)
             if o.cucina {
                 await invia(detta.map { "Cucina: \($0)" } ?? "Cosa cucino stasera con quello che vedi? Proponimi due o tre piatti e dimmi se manca qualcosa da mettere nella lista della spesa.")
@@ -1906,7 +1963,7 @@ final class Jarvis: NSObject, ObservableObject {
         compitoRete = nil
         compitoPonte?.cancel()
         compitoPonte = nil
-        occhiChiusi([])                    // interrotto mentre guardava: la fotocamera si chiude
+        chiudiOcchiNonManuali()            // interrotto mentre guardava: la fotocamera si chiude (13.9 (22): non gli Occhi manuali)
         orecchio.ferma()
         orecchio.testoDetto = ""
         sintesi.stopSpeaking(at: .immediate)
@@ -1975,7 +2032,7 @@ final class Jarvis: NSObject, ObservableObject {
         } else {
             var m = Messaggio(ruolo: "user", testo: testo, conFoto: fotoDaMandare != nil || !giroDaMandare.isEmpty || !insiemeDaMandare.isEmpty)
             if !insiemeDaMandare.isEmpty { m.nFoto = insiemeDaMandare.count }
-            if let legaFoto, fotoDaMandare != nil || !giroDaMandare.isEmpty { m.fotoOcchi = legaFoto }
+            if let legaFoto, fotoDaMandare != nil || !giroDaMandare.isEmpty || !insiemeDaMandare.isEmpty { m.fotoOcchi = legaFoto }
             // foto nuova: diventa quella di cui si parla, legata a questo messaggio
             if let f = fotoDaMandare { fotoRecenti = [f]; idFotoRecente = m.id; quandoFotoRecenti = Date() }
             else if !giroDaMandare.isEmpty { fotoRecenti = giroDaMandare; idFotoRecente = m.id; quandoFotoRecenti = Date() }
@@ -2110,7 +2167,7 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// 13.9 (22): la prima frase della risposta di JARVIS alla domanda con quella FOTO (per l'Archivio), al massimo 160 caratteri.
     private func descrizioneFotoOcchi(_ id: UUID) -> String? {
-        guard let i = messaggi.firstIndex(where: { $0.fotoOcchi == id }),
+        guard let i = messaggi.firstIndex(where: { $0.fotoOcchi?.contains(id) == true }),
               let r = messaggi[(i + 1)...].first(where: { $0.ruolo == "assistant" && !$0.testo.isEmpty }) else { return nil }
         let t = r.testo.replacingOccurrences(of: #"\[[^\]]*\]\s*"#, with: "", options: .regularExpression)   // i tag della voce ([slightly warm])
         let frase = t.split(whereSeparator: { ".!?\n".contains($0) }).first.map(String.init) ?? t
