@@ -328,7 +328,7 @@ final class Jarvis: NSObject, ObservableObject {
     /// Pubblicati: la schermata (ContentView) li legge per tenere acceso il microfono fuori dall'app finché il dialogo continua.
     @Published private(set) var dialogoFuori = false
     private var chiusuraFuori: Task<Void, Never>?
-    /// 13.9 (21): fuori dall'app, da quando l'ascolto è fermo (nessuna parola nuova) e su quale frase: dopo 20 s si chiude da solo.
+    /// 13.9 (21): fuori dall'app, da quando l'ascolto è fermo (nessuna parola nuova) e su quale frase: dopo 30 s si chiude da solo.
     private var ascoltoFermoDa: Date?
     private var ascoltoFermoSu = ""
     @Published private(set) var micChiusoFuori = false   // dialogo finito fuori dall'app: microfono spento finché non torna nell'app
@@ -3375,12 +3375,12 @@ final class Jarvis: NSObject, ObservableObject {
             // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
             // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
             // 13.9 (21) (il signore: «dopo un po' che non lo cago si chiude da sola»): fuori dall'app l'ascolto che non sente parole
-            // nuove per 20 s si chiude da solo, come «Fine» sull'isola (prima restava aperto fino al tetto dei 3 minuti)
+            // nuove per 30 s si chiude da solo, come «Fine» sull'isola (prima restava aperto fino al tetto dei 3 minuti)
             let inAscolto = self.fase == .ascolto || (self.fase == .attesa && self.richiamo.sveglio)
             if inAscolto {
                 if self.ascoltoFermoDa == nil || self.ascoltoFermoSu != self.parziale {
                     self.ascoltoFermoDa = Date(); self.ascoltoFermoSu = self.parziale
-                } else if let da = self.ascoltoFermoDa, Date().timeIntervalSince(da) >= 20 {
+                } else if let da = self.ascoltoFermoDa, Date().timeIntervalSince(da) >= 30 {
                     self.ascoltoFermoDa = nil
                     self.fineDialogoFuori()
                     return

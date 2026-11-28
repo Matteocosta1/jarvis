@@ -852,7 +852,7 @@ struct Occhi: View {
                 if resta && manualeStark, let jpeg, let consegna = OcchiAperti.consegna {
                     consegna([jpeg])
                     scattando = false
-                    stato = "SISTEMI OTTICI ATTIVI"
+                    stato = "INQUADRI E SCATTI"
                     return
                 }
                 chiudi(jpeg.map { [$0] } ?? [])
