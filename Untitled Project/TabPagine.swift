@@ -167,13 +167,12 @@ final class Pagine: ObservableObject {
         // 13.9 (19) · ISSUE 24 (il signore, 28 nov: «con la tastiera la tab alta la posso aprire, la bassa no: voglio poterla aprire»).
         // 13.9 (20) (il signore, 04:59, foto: «la tab bassa si apre sopra quella alta, hai fatto un casino»): con la tastiera la tab
         // sta in BASSO a sinistra della chat, appoggiata al suo fondo (come senza tastiera: FILO in alto a destra, PAGINE in basso a
-        // sinistra), e non sale mai sopra FILO; alta al massimo 164. Come il mockup (Telefono v17)
+        // sinistra); alta al massimo 164. 05:07 (il signore: «quando quella alta è grande, quella bassa si abbassa: questa cosa
+        // dinamica non è bella da vedere»): la misura non segue più FILO, dipende solo dalla chat, quindi sta sempre ferma. Come il
+        // mockup (Telefono v18)
         if tastiera, let a = chatAlto {
             let fondo = (chatBasso ?? (a + 200)) - 8
-            var cima = a + 32                                        // sotto il filo e l'angolo della chat
-            let f = Filo.condiviso
-            if f.rettScheda.height > 0, !f.visti.isEmpty || f.vuota { cima = max(cima, f.rettScheda.maxY + 10) }
-            let h = min(134 + 30, max(Pagine.altaPiccola, fondo - cima))
+            let h = min(134 + 30, max(Pagine.altaPiccola, fondo - (a + 32)))   // fino a sotto il filo e l'angolo della chat
             return CGRect(x: S + 12, y: (fondo - h).rounded(), width: max(90, rigaMin, 212), height: h.rounded())
         }
         // 13.8 (il signore, 22 nov: «la tab bassa si muove a caso»): la riga sotto lo stato (TelemetriaHUD) cambia ogni 2,5 s e
