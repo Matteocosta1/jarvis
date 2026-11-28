@@ -3652,9 +3652,10 @@ const NOTA_RECUPERO_LIBERO = `\n[Recupero possibile: sulla prima parte (prima di
 /// «[silenzio]», magari dopo un tono («[softly] [aspetto]»). «forse»: è ancora presto per dirlo (c'è solo una parentesi quadra aperta,
 /// o solo dei toni). Una risposta normale non si trattiene mai: alla prima lettera fuori da una parentesi quadra passa.
 function segnaleIniziale(t: string, aspetto: boolean, silenzio: boolean): "aspetto" | "silenzio" | "forse" | "no" {
-  const resto = t.replace(/^(?:\[(?!\s*(?:aspett|silenz))[a-z][a-z \-]{0,23}\]\s*)+/i, "");
-  if (aspetto && /^\[\s*aspett/i.test(resto)) return "aspetto";
-  if (silenzio && /^\[\s*silenz/i.test(resto)) return "silenzio";
+  // 28 nov: anche il segnale dentro un tono («[slightly silenzio]», «[softly aspetto]») è il segnale, non un tono
+  const resto = t.replace(/^(?:\[(?![^\]]*(?:aspett|silenz))[a-z][a-z \-]{0,23}\]\s*)+/i, "");
+  if (aspetto && /^\[[a-z \-]{0,24}aspett/i.test(resto)) return "aspetto";
+  if (silenzio && /^\[[a-z \-]{0,24}silenz/i.test(resto)) return "silenzio";
   if (t.length < 48 && /^(?:\[[a-z][a-z \-]{0,23}\]\s*)*(?:\[\s*[a-z \-]{0,23})?$/i.test(t)) return "forse";
   return "no";
 }
