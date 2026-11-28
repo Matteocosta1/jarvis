@@ -328,6 +328,9 @@ final class Jarvis: NSObject, ObservableObject {
     /// Pubblicati: la schermata (ContentView) li legge per tenere acceso il microfono fuori dall'app finché il dialogo continua.
     @Published private(set) var dialogoFuori = false
     private var chiusuraFuori: Task<Void, Never>?
+    /// 13.9 (21): fuori dall'app, da quando l'ascolto è fermo (nessuna parola nuova) e su quale frase: dopo 20 s si chiude da solo.
+    private var ascoltoFermoDa: Date?
+    private var ascoltoFermoSu = ""
     @Published private(set) var micChiusoFuori = false   // dialogo finito fuori dall'app: microfono spento finché non torna nell'app
     /// 11 nov · risposta anticipata: la risposta preparata durante la pausa del signore (nil: nessuna)
     private var anticipo: Anticipo?
@@ -525,7 +528,16 @@ final class Jarvis: NSObject, ObservableObject {
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
-        strumenti.apriOcchiManuali = { [weak self] in self?.guardaManuale() }   // 13.9 (20): «apri gli occhi» → a mano, aspettano «scatta»
+        strumenti.apriOcchiManuali = { [weak self] in self?.guardaManuale(resta: true) }   // 13.9 (20–21): «apri gli occhi» → a mano, aspettano «scatta», restano aperti
+        // 13.9 (21): ogni scatto degli Occhi che restano aperti va a JARVIS con la frase detta («scatta, cos'è?» → «cos'è?»)
+        OcchiAperti.consegna = { [weak self] dati in
+            guard let self, !dati.isEmpty else { return }
+            let detta = self.prendiDomandaOcchi()
+            self.preparaFoto(dati)
+            Task { await self.invia(detta ?? "Cosa vedi?") }
+        }
+        // 13.9 (21): con gli Occhi aperti che aspettano lo scatto a voce, «scatta» vale anche senza «Jarvis»
+        richiamo.occhiAspettano = { [weak self] in self?.occhi != nil && OcchiAperti.scatta != nil }
         // 12.0 (10): la regia (Regia.swift): il sì delle conferme lo controlla l'app sull'ultima frase del signore; le sezioni col
         // microfono o la fotocamera aperte dal cervello si aprono quando JARVIS ha finito di parlare
         Regia.condivisa.ultimaFrase = { [weak self] in
@@ -1674,7 +1686,7 @@ final class Jarvis: NSObject, ObservableObject {
     // MARK: Occhi
 
     /// Apre la fotocamera e aspetta le foto: una, o i 4 fotogrammi del giro (vuoto se il signore chiude).
-    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil) async -> [Data] {
+    func apriOcchi(automatico: Bool, video: Bool = false, cucina: Bool = false, zoom: CGFloat = 1, iniziale: ComandoOcchi? = nil, resta: Bool = false) async -> [Data] {
         // LiDAR sta scansionando: la foto viene dalla sua fotocamera, senza aprire Occhi né fermare la scansione
         if let scatta = OcchiLidar.scatta { return scatta().map { [$0] } ?? [] }   // niente fotogramma: nessuna foto, ma la scansione resta
         if soccorsoAperto { return [] }               // il Tocco d'aiuto di Bea è aperto: non si copre mai
@@ -1685,6 +1697,7 @@ final class Jarvis: NSObject, ObservableObject {
         return await withCheckedContinuation { (c: CheckedContinuation<[Data], Never>) in
             attesaOcchi = c
             var o = Occhiata(automatico: automatico, video: video, cucina: cucina, zoom: zoom)
+            o.resta = resta                    // 13.9 (21): aperti a voce con «apri gli occhi», restano aperti dopo ogni scatto
             switch iniziale {                  // build 23: aperti a voce, acceso solo quello che chiede
             case .etichette(true)?: o.eti = true
             case .ologramma(true)?: o.olo = true
@@ -1721,9 +1734,9 @@ final class Jarvis: NSObject, ObservableObject {
 
     /// Icona 👁️: mirino con il tasto, poi JARVIS guarda la foto (comodo per le copertine).
     /// `iniziale`: aperti a voce con un comando degli Occhi (build 23).
-    func guardaManuale(iniziale: ComandoOcchi? = nil) {
+    func guardaManuale(iniziale: ComandoOcchi? = nil, resta: Bool = false) {
         Task {
-            let dati = await apriOcchi(automatico: false, iniziale: iniziale)
+            let dati = await apriOcchi(automatico: false, iniziale: iniziale, resta: resta)
             let detta = prendiDomandaOcchi()
             guard !dati.isEmpty else { return }
             preparaFoto(dati)
@@ -3361,6 +3374,20 @@ final class Jarvis: NSObject, ObservableObject {
             guard let self, !Task.isCancelled, self.dialogoFuori, UIApplication.shared.applicationState != .active else { return }
             // revisione 11 nov: il dialogo è ancora vivo (lo ascolta, pensa, parla): si riguarda fra poco. Prima qui si usciva e
             // basta, e se l'ascolto finiva senza frase (silenzio) nessuno richiudeva più il microfono
+            // 13.9 (21) (il signore: «dopo un po' che non lo cago si chiude da sola»): fuori dall'app l'ascolto che non sente parole
+            // nuove per 20 s si chiude da solo, come «Fine» sull'isola (prima restava aperto fino al tetto dei 3 minuti)
+            let inAscolto = self.fase == .ascolto || (self.fase == .attesa && self.richiamo.sveglio)
+            if inAscolto {
+                if self.ascoltoFermoDa == nil || self.ascoltoFermoSu != self.parziale {
+                    self.ascoltoFermoDa = Date(); self.ascoltoFermoSu = self.parziale
+                } else if let da = self.ascoltoFermoDa, Date().timeIntervalSince(da) >= 20 {
+                    self.ascoltoFermoDa = nil
+                    self.fineDialogoFuori()
+                    return
+                }
+            } else {
+                self.ascoltoFermoDa = nil
+            }
             guard self.fase == .attesa, !self.richiamo.sveglio, self.inCoda.isEmpty else { self.chiudiDialogoFuori(fra: secondi); return }
             self.spegniMicFuori()
         }

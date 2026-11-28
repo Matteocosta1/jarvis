@@ -48,6 +48,10 @@ final class Richiamo {
     /// Idea C (25 ott): JARVIS sta preparando la risposta a una domanda (lo dice Jarvis). Con l'impronta della sua voce
     /// registrata, in quel momento senza «Jarvis» la risposta la ferma solo la voce del signore.
     var inRisposta: (() -> Bool)?
+    /// 13.9 (21) (il signore, 05:50: «non devo per forza dire Jarvis scatta, è ovvio che devo dire anche solo scatta»): gli Occhi
+    /// sono aperti e aspettano lo scatto a voce (lo imposta Jarvis). Allora «scatta» (e «scattala», «scatto», «fotografa», «fai una
+    /// foto»), detto da solo o all'inizio della frase, vale anche senza «Jarvis».
+    var occhiAspettano: (() -> Bool)?
     /// L'ultima volta che ha sentito parlare (anche frasi non per lui): JARVIS non attacca il riempitivo sopra il signore.
     private(set) var ultimaVoce = Date.distantPast
     /// 13 nov (punto 3): come si è chiusa l'ultima frase: «pausa» (ha taciuto) o «tetto» (niente parole nuove, ma si sentiva ancora qualcosa).
@@ -86,6 +90,10 @@ final class Richiamo {
 
     /// Il nome, anche come lo storpia il riconoscimento («Giarvis», «Jervis»…): vale in qualsiasi punto della frase.
     nonisolated static let nomi = FineFrase.nomiJarvis      // 12.0 (10): una lista sola per iPhone, Mac e polso
+    /// 13.9 (21): la frase comincia con lo scatto («scatta», «scatta, cos'è?», «fai una foto»): negli Occhi vale senza «Jarvis».
+    nonisolated static func cominciaConScatto(_ t: String) -> Bool {
+        t.range(of: #"^(?i)(scatta(la|mi)?|scatto|scatti|fotografa(la|mi)?|fa(i|mmi) (una|la) foto)\b"#, options: .regularExpression) != nil
+    }
     /// Parole di richiamo che valgono solo a inizio frase (dopo una pausa): «ascoltami, …», «ehi, …», «bro, …», «fratello, …».
     nonisolated static let risposteBrevi: Set<String> = ["sì", "si", "no", "ok", "okay", "grazie", "perfetto", "certo", "esatto",
                                                          "bravo", "basta", "avanti", "pausa", "stop", "dimmi", "allora", "senti"]
@@ -330,6 +338,11 @@ final class Richiamo {
                 soloDopoNome = true
                 vocativo = trovato?.isEmpty == true && !soloNome && !AmbienteSonoro.condiviso.affollato && Richiamo.nomeInFondo(segmento) ? segmento.trimmingCharacters(in: .whitespacesAndNewlines) : nil
                 var perIlRecupero = false
+                // 13.9 (21): Occhi aperti che aspettano lo scatto: «scatta…» vale senza «Jarvis»
+                if trovato == nil, !soloNome, occhiAspettano?() == true {
+                    let t = segmento.trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?;:"))
+                    if Richiamo.cominciaConScatto(t) { trovato = t; soloDopoNome = false }
+                }
                 // decisione del signore (24 ott, M8): mentre usa l'orologio, per 10 secondi l'iPhone non prende le frasi senza «Jarvis»
                 // (sentirebbe la domanda fatta al polso, o la voce dell'orologio, e risponderebbe anche lui)
                 if trovato == nil, !OrologioInUso.attivo, !soloNome {

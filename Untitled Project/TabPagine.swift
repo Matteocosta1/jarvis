@@ -195,7 +195,11 @@ final class Pagine: ObservableObject {
         let alto = (colonna.max().map { $0 + 4 } ?? giu - 112) - 10 - 30
         let h = min(134 + 30, giu - alto)
         let z = CGRect(x: S, y: alto.rounded(), width: max(90, rigaMin, (destra - S).rounded()), height: max(Pagine.altaPiccola, h.rounded()))
-        misuraNormale = z.size                                    // 13.9 (20): con la tastiera la tab tiene questa misura
+        // 13.9 (20): con la tastiera la tab tiene questa misura. 13.9 (21) (il signore, 05:49: «con la tastiera la tab alta grande e
+        // la bassa torna piccola: devono convivere entrambe grandi»): la misura cresce soltanto, come la riga di stato. Mentre la
+        // tastiera si chiude la chat è ancora in alto e un calcolo di passaggio dava una tab piccola, che poi restava con la tastiera
+        let m = misuraNormale ?? .zero
+        misuraNormale = CGSize(width: max(m.width, z.width), height: max(m.height, z.height))
         return z
     }
 
@@ -279,6 +283,9 @@ final class Pagine: ObservableObject {
         // 23 nov (il signore: «le tab possono rimanere ingrandite entrambe»): il dito su FILO (la tab alta) non la rimpicciolisce
         let filo = Filo.condiviso
         if filo.rettScheda.width > 0, !filo.daParte, !filo.visti.isEmpty || filo.vuota, filo.rettScheda.contains(p) { return }
+        // 13.9 (21) (il signore: «se apro la tab alta grande, quella bassa torna piccola»): anche i tre tasti della tab alta
+        // (apri, riduci, chiudi) sono la tab alta, non «fuori»: la tab bassa resta grande
+        if filo.rettTasti.width > 0, filo.rettTasti.insetBy(dx: -4, dy: -7).contains(p) { return }
         if !fissa { stringi(true) }
     }
 

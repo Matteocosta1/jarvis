@@ -22,6 +22,8 @@ enum OcchiAperti {
     static var stark: ((ComandoOcchi) -> Bool)?
     /// Build 23: la voce di JARVIS dagli Occhi («Ecco cosa ho trovato, Sir.»): la imposta Jarvis.
     static var parla: ((String) -> Void)?
+    /// 13.9 (21): gli Occhi che restano aperti consegnano qui ogni foto (la imposta Jarvis: la manda col prossimo messaggio).
+    static var consegna: (([Data]) -> Void)?
     /// 26 ott: aperti dallo Studio (tasto OCCHI): STUDIO già acceso, inquadra e scatta e la foto torna nello Studio.
     static var studioAcceso = false
     /// 26 ott sera: aperti da Social (riquadro OCCHI di PUBBLICA): lo scatto torna a Social, pronto da pubblicare.
@@ -45,6 +47,9 @@ struct Occhiata: Identifiable {
     var manda: String? = nil
     /// MARK X · AEREO, aperti a voce: il comando (AEREO, AEREO_DOVE…) e la frase detta.
     var aereo: (p: String, frase: String)? = nil
+    /// 13.9 (21) (il signore, 05:50: «ha chiuso occhi»): aperti a voce con «apri gli occhi», restano aperti dopo ogni scatto (la
+    /// foto va a JARVIS e lui risponde, la fotocamera resta lì per lo scatto dopo); si chiudono con la X o con «chiudi».
+    var resta = false
 }
 
 struct Occhi: View {
@@ -62,6 +67,8 @@ struct Occhi: View {
     var mandaIniziale: String? = nil
     /// MARK X · AEREO: aperti a voce con «che aereo è quello?» (o una domanda sull'aereo).
     var aereoIniziale: (p: String, frase: String)? = nil
+    /// 13.9 (21): restano aperti dopo lo scatto (aperti a voce con «apri gli occhi»).
+    var resta = false
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -840,7 +847,16 @@ struct Occhi: View {
         }
         motore.scatta(veloce: false) { dati in
             let jpeg = dati.flatMap { Occhi.riduci($0) }
-            Task { @MainActor in chiudi(jpeg.map { [$0] } ?? []) }
+            Task { @MainActor in
+                // 13.9 (21): aperti a voce con «apri gli occhi»: la foto va a JARVIS e la fotocamera resta aperta per lo scatto dopo
+                if resta && manualeStark, let jpeg, let consegna = OcchiAperti.consegna {
+                    consegna([jpeg])
+                    scattando = false
+                    stato = "SISTEMI OTTICI ATTIVI"
+                    return
+                }
+                chiudi(jpeg.map { [$0] } ?? [])
+            }
         }
     }
 

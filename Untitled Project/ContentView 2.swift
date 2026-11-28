@@ -1722,7 +1722,8 @@ struct ContentView: View {
         case .occhi:
             if let o = v.occhiata {
                 Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
-                      oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
+                      oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo,
+                      resta: o.resta) { dati in jarvis.occhiChiusi(dati) }
                     .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "fork.knife" : "eye", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
