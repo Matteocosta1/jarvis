@@ -196,7 +196,8 @@ Regole:
 - i graffiti sono il tema che gli sta più a cuore: almeno 2 ricerche sui graffiti, e se c'è una novità di graffiti che vale, mettila sempre; poi la musica, poi il resto;
 - solo quello che a lui farebbe dire «questa è bella»: una novità debole non la metti; se non c'è niente che valga, rispondi [];
 - mai una novità già nella lista GIÀ DETTE, anche se scritta con altre parole;
-- usa al massimo ${RICERCHE_MAX} ricerche, mirate e spalmate sui temi.
+- usa al massimo ${RICERCHE_MAX} ricerche, mirate e spalmate sui temi;
+- fra una ricerca e l'altra non scrivere niente (nessun commento, nessun riassunto): alla fine scrivi solo l'array JSON.
 Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità in una frase breve, in italiano", "perche": "perché interessa a lui, in poche parole", "fonte": "l'indirizzo web della fonte"}.`;
   const messaggi: any[] = [{ role: "user", content: `OGGI: ${oraLeggibile(new Date().toISOString())}\n\nGIÀ DETTE:\n${giaDette}\n\nCerca le novità di oggi per lui.` }];
   const uso = { in: 0, cache: 0, scrittura: 0, out: 0, ricerche: 0 };
@@ -206,7 +207,7 @@ Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità 
       method: "POST", signal: AbortSignal.timeout(110_000),
       headers: { "content-type": "application/json", "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "", "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: MODELLO_NOVITA, max_tokens: 2000, system: sistema, messages: messaggi,
+        model: MODELLO_NOVITA, max_tokens: 4000, system: sistema, messages: messaggi,   // 28 nov: con 2000 la lista restava tagliata
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: RICERCHE_MAX,
           user_location: { type: "approximate", city: "Milano", country: "IT", timezone: "Europe/Rome" } }],
       }),
@@ -227,6 +228,11 @@ Rispondi SOLO con un array JSON di al massimo 3 oggetti: {"titolo": "la novità 
   let trovate: any[] = [];
   if (a >= 0 && b > a) { try { const x = JSON.parse(out.slice(a, b + 1)); if (Array.isArray(x)) trovate = x; } catch { /* risposta non leggibile: niente novità */ } }
   if (!trovate.length && out.trim().startsWith("[")) { try { const x = JSON.parse(out); if (Array.isArray(x)) trovate = x; } catch { /* vuoto */ } }
+  // 28 nov (il briefing senza graffiti né musica): la risposta tagliata a metà (max_tokens) si buttava tutta; ora si tengono le
+  // novità già scritte per intero
+  if (!trovate.length) {
+    for (const m of out.match(/\{[^{}]*"titolo"[^{}]*\}/g) ?? []) { try { trovate.push(JSON.parse(m)); } catch { /* incompleta */ } }
+  }
   const righe = trovate.slice(0, 3).map((t) => ({
     giorno: oggi,
     titolo: String(t?.titolo ?? "").trim().slice(0, 240),
