@@ -235,6 +235,7 @@ struct FotoDallaChat: View {
 // MARK: - FOTO, il cover flow
 
 struct FlussoFoto: View {
+    /// Aperto dagli Occhi (sopra la fotocamera) o dalla chat: stesso FOTO, si torna con un tocco fuori dalla foto.
     let conCamera: Bool
     let inizio: UUID?
     let chiudi: () -> Void
@@ -281,6 +282,10 @@ struct FlussoFoto: View {
         }
         .background(Color(red: 0.008, green: 0.03, blue: 0.047).opacity(0.95).ignoresSafeArea())
         .contentShape(Rectangle())
+        // 06:48 (il signore: «quella X sembra che chiuda l'app»): niente X né «Chiudi»; il tocco fuori dalla foto (testata, scritte,
+        // il vuoto intorno) torna dov'era, negli Occhi o in chat. Sulle foto decidono le foto (lì sopra c'è il loro gesto)
+        .onTapGesture { Suoni.tocco(); chiudi() }
+        .accessibilityAction(named: "Torna indietro") { chiudi() }
         .onAppear {
             lista = foto.inAttesa.map(\.id)
             guard !lista.isEmpty else { chiudi(); return }
@@ -314,18 +319,8 @@ struct FlussoFoto: View {
             }
             .foregroundStyle(Color.ciano)
             Spacer(minLength: 0)
-            Button { Suoni.tocco(); chiudi() } label: {
-                if conCamera {
-                    TondoX()
-                } else {
-                    Text("Chiudi").font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.ciano).frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-            }
-            .buttonStyle(StileStark())
-            .accessibilityLabel("Chiudi")
         }
+        .frame(minHeight: 44)
         .padding(.horizontal, 20)
         .padding(.top, 8)
     }
@@ -474,8 +469,9 @@ struct FlussoFoto: View {
         guard vola == nil, !lista.isEmpty else { return }
         switch asse {
         case .nessuno:
-            // un tocco: su una foto di lato la porta al centro; sulla foto al centro la apre a tutto schermo (un altro tocco torna)
-            guard let s = cartaSotto(v.startLocation, W: W, H: H, w: w, h: h), let i = lista.firstIndex(of: s) else { return }
+            // un tocco: su una foto di lato la porta al centro; sulla foto al centro la apre a tutto schermo (un altro tocco torna);
+            // fuori dalle foto torna dov'era (negli Occhi o in chat)
+            guard let s = cartaSotto(v.startLocation, W: W, H: H, w: w, h: h), let i = lista.firstIndex(of: s) else { Suoni.tocco(); chiudi(); return }
             Suoni.tocco()
             if i != Int(off.rounded()) { piena = false; vaiA(i) }
             else {
