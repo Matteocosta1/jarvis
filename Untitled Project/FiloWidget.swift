@@ -319,11 +319,14 @@ private struct SchedaFilo: View {
                     let t = tl.date.timeIntervalSince(nata)
                     let p = min(1, max(0, tl.date.timeIntervalSince(scuro.t0) / 0.35))
                     let fondo = scuro.da + (scuro.a - scuro.da) * Olo.liscia(p)
+                    // 13.9 (18) · issue 22: sulla schermata di JARVIS il vetro si scalda con lo sfondo; sopra una sezione dietro c'è la
+                    // sezione, non lo sfondo: resta com'è
+                    let caldo = vetro ? 0 : CaloreVetro.condiviso.valore(tl.date)
                     // 23 nov (il signore: «il cerchio che le lancia è tagliato da 2 spigoli, come fosse un quadrato»): il bagliore del
                     // punto di luce (6 punti dall'angolo, largo 10) usciva dalla tela; la tela sporge 12 punti per lato
                     Canvas(rendersAsynchronously: false) { gc, size in
                         gc.translateBy(x: CorniceFilo.sporge, y: CorniceFilo.sporge)
-                        CorniceFilo.disegna(&gc, CorniceFilo.dentro(size), t: t, fondo: fondo)
+                        CorniceFilo.disegna(&gc, CorniceFilo.dentro(size), t: t, fondo: fondo, caldo: caldo)
                     }
                     .padding(-CorniceFilo.sporge)
                 }
@@ -728,13 +731,14 @@ enum CorniceFilo {
         CGSize(width: max(0, tela.width - 2 * sporge), height: max(0, tela.height - 2 * sporge))
     }
 
-    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93, specchio: Bool = false) {
+    static func disegna(_ gc: inout GraphicsContext, _ size: CGSize, t: Double, fondo: Double = 0.93, specchio: Bool = false, caldo: Double = 0) {
         let W = Double(size.width), H = Double(size.height)
         let u0 = min(1, t / 0.5)
         gc.opacity = u0 < 1 ? (sin(u0 * 40) > -0.2 ? u0 : u0 * 0.3) : 1          // si accende sfarfallando
         let ax = specchio ? 6 : W - 6, ay = 6.0, u = Olo.liscia(t / 0.45), ly = 24.0, bx = 4.0, by = ly, bw = W - 8, bh = H - by - 3
         // il fondo (meno trasparente: la corona dietro si intuisce appena); 13.1: sopra una sezione segue il fuoco (vetro della PILA)
-        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(fondo)))
+        // 13.9 (18) · issue 22: il fondo è vetro, si scalda con lo sfondo quando JARVIS pensa e parla (CaloreVetro)
+        gc.fill(Path(CGRect(x: bx, y: by, width: bw * u, height: bh)), with: .color(CaloreVetro.fondo(caldo).opacity(fondo)))
         gc.blendMode = .plusLighter
         let pul = (t * 0.9).truncatingRemainder(dividingBy: 1)
         gc.stroke(Olo.ellisse(ax, ay, 2 + pul * 8, 2 + pul * 8), with: .color(Olo.ciano.opacity(0.7 * (1 - pul))), lineWidth: 1)

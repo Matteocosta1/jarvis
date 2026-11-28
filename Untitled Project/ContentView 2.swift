@@ -285,6 +285,7 @@ struct ContentView: View {
             let scala = max(0.3, min(3, (g.size.width - 32) / 430, max(0.7, (alto - 70 - altezzaTesti - altezzaChat - 60 - 10) / (altezzaCorona + 12))))   // anche la larghezza conta
             ZStack {
                 SfondoHUD(fase: jarvis.fase)
+                    .onChange(of: caldoVetro, initial: true) { _, c in CaloreVetro.condiviso.imposta(c) }   // 13.9 (18): i vetri seguono lo sfondo
                 if mostraSistemi { menuSistemi.zIndex(10) }
                 if grande {
                     ZStack(alignment: .bottom) {
@@ -2263,6 +2264,9 @@ struct ContentView: View {
         .background { SfondoChatTab(regia: regiaChat, fermo: pilaCopre) }        // 13.9 (15) · il vetro e la cornice delle tab
     }
 
+    /// 13.9 (18) · issue 22: JARVIS pensa o parla, lo sfondo è caldo (come SfondoHUD).
+    private var caldoVetro: Bool { jarvis.fase == .elaboro || jarvis.fase == .parlo }
+
     /// 13.9 (16): i messaggi che si vedono in chat (senza quelli tolti con lo swipe; il cervello li legge tutti).
     private var visibili: [Messaggio] { jarvis.messaggi.filter { $0.tolto != true } }
 
@@ -2337,7 +2341,8 @@ struct ContentView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background {                                                         // 13.9 (18): il vetro delle tab, come la chat
-                    RoundedRectangle(cornerRadius: 12).fill(CorniceChat.fondo.opacity(TintaTab.vetroPiccola))
+                    RoundedRectangle(cornerRadius: 12).fill(CaloreVetro.fondo(caldoVetro ? 1 : 0).opacity(TintaTab.vetroPiccola))
+                        .animation(.easeInOut(duration: 0.9), value: caldoVetro)                 // issue 22: si scalda con lo sfondo
                     LuceOlografica(forma: RoundedRectangle(cornerRadius: 12), conBordo: false)   // il contorno resta quello di sempre
                 }
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.11, green: 0.21, blue: 0.25)))

@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import Combine
 
 // MARK: - La chat che si carica e si svuota, come le schede
 // All'avvio, se la chat ha già dei messaggi: caricamento HUD (barra a linea unica, percentuale, voci), poi la chat
@@ -260,6 +261,38 @@ struct LineaProgresso: View {
 // pulsa in alto a sinistra, il filo che corre sopra la scheda, i quattro angoli di luce. Nasce sul suono della chat, quando parte
 // la stampa (stessi tempi di prima: nessun tempo in più); durante il cerchio di caricamento non c'è. Le scritte scorrono dentro.
 
+/// 13.9 (18) · ISSUE 22 (il signore, 28 nov 02:08: «se è un vetro trasparente, come fa a rimanere celeste se dietro c'è
+/// l'arancione?»). Quando JARVIS pensa e parla lo sfondo si scalda (SfondoHUD, 0,9 s): il fondo dei vetri (chat, campo di testo,
+/// FILO, PAGINE) lo lascia passare e si scalda insieme. La luce dell'ologramma (bordo, bagliore, luce dall'alto, punto di luce, filo,
+/// angoli), le scritte e le icone restano ciano: sono luce proiettata, non vetro. Come il mockup (Telefono v14, Mark XIII v128).
+@MainActor
+final class CaloreVetro: ObservableObject {
+    static let condiviso = CaloreVetro()
+    @Published private(set) var caldo = false
+    private var da: Double = 0
+    private var t0: Date = .distantPast
+
+    /// Dalla fase di JARVIS (ContentView): caldo mentre pensa e parla.
+    func imposta(_ nuovo: Bool) {
+        guard nuovo != caldo else { return }
+        let adesso = Date()
+        da = valore(adesso)                      // riparte da dove si trova (anche a metà di un cambio)
+        t0 = adesso
+        caldo = nuovo
+    }
+
+    /// Quanto è caldo adesso (0 ciano, 1 caldo): la stessa dissolvenza dello sfondo (0,9 s, morbida ai due capi).
+    func valore(_ adesso: Date) -> Double {
+        let p = min(1, max(0, adesso.timeIntervalSince(t0) / 0.9))
+        return da + ((caldo ? 1 : 0) - da) * (p * p * (3 - 2 * p))
+    }
+
+    /// Il colore del fondo del vetro: lo scuro-ciano di sempre (3, 12, 16) o lo scuro-caldo (16, 7, 2), come lo sfondo.
+    nonisolated static func fondo(_ k: Double) -> Color {
+        Color(red: (3 + 13 * k) / 255, green: (12 - 5 * k) / 255, blue: (16 - 14 * k) / 255)
+    }
+}
+
 enum CorniceChat {
     /// Dove sta la scheda dentro lo spazio della chat (inset 26 · 12 · 6 · 12 del mockup).
     static let scheda = EdgeInsets(top: 26, leading: 12, bottom: 6, trailing: 12)
@@ -269,10 +302,6 @@ enum CorniceChat {
     static let sporge: CGFloat = 12
     static let luce = Color(red: 79 / 255, green: 227 / 255, blue: 1)          // #4fe3ff
     static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)       // #bff6ff
-
-    /// 13.9 (18) (il signore, 28 nov 01:15, foto con FILO accanto: «identica alla tab come trasparenza e design»): il fondo del
-    /// vetro è quello delle tab a riposo (StileOlo SCURO, 62 %); sopra la stessa luce olografica (LuceOlografica).
-    static let fondo = Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255)
 
     /// La curva con cui la scheda si apre da sinistra (1 − (1 − u)³).
     static func apre(_ t: Double) -> Double { let u = min(1, max(0, t / 0.45)); return 1 - pow(1 - u, 3) }
@@ -319,10 +348,11 @@ struct SfondoChatTab: View {
                 // nata all'inizio della stampa; senza stampa è già nata (il tempo grande tiene il pulsare continuo)
                 let t = regia.nata.map { tl.date.timeIntervalSince($0) } ?? tl.date.timeIntervalSinceReferenceDate
                 let u = CorniceChat.apre(t)
+                let k = CaloreVetro.condiviso.valore(tl.date)
                 ZStack {
                     // il vetro delle tab (lo stesso di FILO e PAGINE, senza sfocatura di Apple); si apre da sinistra
                     ZStack {
-                        Rectangle().fill(CorniceChat.fondo.opacity(TintaTab.vetroPiccola))
+                        Rectangle().fill(CaloreVetro.fondo(k).opacity(TintaTab.vetroPiccola))   // 13.9 (18): si scalda con lo sfondo
                         LuceOlografica()                                            // luce dall'alto, bordo di luce, bagliore dai bordi
                     }
                         .mask(alignment: .leading) {

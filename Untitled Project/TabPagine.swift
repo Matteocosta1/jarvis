@@ -486,6 +486,7 @@ private struct TabPagineVista: View {
     let chiudi: (UUID) -> Void
     @State private var nascita: Double = 0
     @State private var tremolio: Double = 0
+    @ObservedObject private var calore = CaloreVetro.condiviso          // 13.9 (18) · issue 22
 
     var body: some View {
         let piccola = p.piccola
@@ -494,9 +495,10 @@ private struct TabPagineVista: View {
             // 13.8 (4) (il signore, 12:22: «come nello swipe»): la sfocatura senza la tinta di iOS, il fondo delle pagine olografiche
             // (aperta 50 %, piccola 45 %), sopra la luce ciano, il bagliore e le righe; poi la cornice
             Rectangle()
-                .fill(Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255).opacity(piccola ? TintaTab.vetroPiccola : TintaTab.vetroAperta))
+                .fill(CaloreVetro.fondo(calore.caldo ? 1 : 0).opacity(piccola ? TintaTab.vetroPiccola : TintaTab.vetroAperta))
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
                 .animation(.easeOut(duration: 0.3), value: piccola)
+                .animation(.easeInOut(duration: 0.9), value: calore.caldo)       // 13.9 (18) · issue 22: si scalda con lo sfondo
             LuceOlografica()
                 .padding(EdgeInsets(top: 24, leading: 4, bottom: 3, trailing: 4))
             TimelineView(.animation) { tl in
