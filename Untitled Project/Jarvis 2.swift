@@ -893,6 +893,18 @@ final class Jarvis: NSObject, ObservableObject {
         return true
     }
 
+    /// 13.9 (22): la frase chiede cosa c'è davanti adesso («cosa vedi?», «che vedi», «cosa sto guardando?», «cos'è questo?», «dimmi
+    /// cosa vedi»): ci vuole una foto nuova. Non «cos'è quello a destra?» (parla della foto di prima).
+    nonisolated static func chiedeVista(_ frase: String) -> Bool {
+        let t = " " + frase.lowercased().folding(options: .diacriticInsensitive, locale: Locale(identifier: "it_IT"))
+            .replacingOccurrences(of: #"[^a-z ]"#, with: " ", options: .regularExpression)
+            .split(separator: " ").joined(separator: " ") + " "
+        guard t.split(separator: " ").count <= 7 else { return false }
+        return [" cosa vedi ", " che vedi ", " che cosa vedi ", " cosa stai vedendo ", " cosa sto guardando ", " che sto guardando ",
+                " cos e questo ", " cos e questa ", " che cos e questo ", " che cos e questa ", " cosa c e qui ", " cosa c e davanti "]
+            .contains { t.contains($0) }
+    }
+
     /// 13.9 (19) · issue 23: la domanda sulla foto, senza la parola dello scatto («scatta, che cos'è?» → «che cos'è?»).
     nonisolated static func senzaScatta(_ frase: String) -> String {
         frase.replacingOccurrences(of: paroleScatto + #"[\s,.!;:]*"#, with: "", options: .regularExpression)
@@ -1152,9 +1164,13 @@ final class Jarvis: NSObject, ObservableObject {
         // 13.9 (19) · ISSUE 23 (il signore, 28 nov 04:25: «sia io che gli dia come comando vocale scatta, non che qualsiasi parola lo
         // faccia scattare»): negli Occhi la foto parte solo con «scatta» (e con «fotografa», «fai una foto»); il resto della frase è
         // la domanda sulla foto. Le altre frasi vanno a JARVIS come sempre, senza foto. La Cucina resta com'era.
-        if let o = occhi, let scatta = OcchiAperti.scatta, o.cucina || Jarvis.chiedeScatto(frase) {
+        // 13.9 (22) (il signore, 28 nov 08:44: «cosa vedi dice sempre la stessa cosa»): con gli Occhi manuali aperti anche «cosa vedi?»,
+        // «cosa sto guardando?», «cos'è questo?» scattano e partono con la foto nuova (prima andavano al cervello senza foto, e lui
+        // rispondeva sulla foto di prima)
+        let vista = !(occhi?.cucina ?? true) && Jarvis.chiedeVista(frase)
+        if let o = occhi, let scatta = OcchiAperti.scatta, o.cucina || Jarvis.chiedeScatto(frase) || vista {
             let detta = Jarvis.togliRichiamo(frase).0
-            let domanda = o.cucina ? detta : Jarvis.senzaScatta(detta)
+            let domanda = o.cucina || vista && !Jarvis.chiedeScatto(frase) ? detta : Jarvis.senzaScatta(detta)
             domandaOcchi = domanda.isEmpty ? nil : domanda
             if !scatta() { domandaOcchi = nil }          // lo scatto non è partito: la frase non resta in giro
             return
@@ -2059,7 +2075,8 @@ final class Jarvis: NSObject, ObservableObject {
         let storia: [[String: Any]] = recenti.map(Jarvis.perCervello)
         // la foto vista prima torna al suo posto nella storia (non per la domanda che la porta già con sé)
         var fotoStoria: (Int, [Data])?
-        if fotoDaMandare == nil, giroDaMandare.isEmpty, insiemeDaMandare.isEmpty, let idF = idFotoRecente, !fotoRecenti.isEmpty,
+        // 13.9 (22): «cosa vedi?» chiede una foto nuova: la foto di prima non torna (se no il cervello risponde su quella)
+        if fotoDaMandare == nil, giroDaMandare.isEmpty, insiemeDaMandare.isEmpty, !Jarvis.chiedeVista(testo), let idF = idFotoRecente, !fotoRecenti.isEmpty,
            Date().timeIntervalSince(quandoFotoRecenti) < 600,
            let k = recenti.firstIndex(where: { $0.id == idF }), k < recenti.count - 1 {
             fotoStoria = (k, fotoRecenti)
