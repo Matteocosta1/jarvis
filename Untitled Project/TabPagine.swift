@@ -164,14 +164,17 @@ final class Pagine: ObservableObject {
     /// LUNGA con i tasti ALTA (parte 30 punti più su), larga fino alle scritte, alta al massimo 164.
     func zona() -> CGRect {
         let S: CGFloat = 10
-        // 13.9 (19) · ISSUE 24 (il signore, 28 nov: «con la tastiera la tab alta la posso aprire, la bassa no: voglio poterla aprire»):
-        // con la tastiera la corona e le scritte non ci sono; la tab sta sopra la chat, in alto a sinistra (come FILO sta sopra la
-        // corona), alta al massimo 164 e mai più giù della chat. Come il mockup (Telefono v16)
+        // 13.9 (19) · ISSUE 24 (il signore, 28 nov: «con la tastiera la tab alta la posso aprire, la bassa no: voglio poterla aprire»).
+        // 13.9 (20) (il signore, 04:59, foto: «la tab bassa si apre sopra quella alta, hai fatto un casino»): con la tastiera la tab
+        // sta in BASSO a sinistra della chat, appoggiata al suo fondo (come senza tastiera: FILO in alto a destra, PAGINE in basso a
+        // sinistra), e non sale mai sopra FILO; alta al massimo 164. Come il mockup (Telefono v17)
         if tastiera, let a = chatAlto {
-            let b = chatBasso ?? (a + 200)
-            // sotto il filo e l'angolo della chat (32 punti più giù, 12 più a destra): i due punti di luce non si toccano
-            let h = min(134 + 30, max(Pagine.altaPiccola, b - a - 42))
-            return CGRect(x: S + 12, y: (a + 32).rounded(), width: max(90, rigaMin, 212), height: h.rounded())
+            let fondo = (chatBasso ?? (a + 200)) - 8
+            var cima = a + 32                                        // sotto il filo e l'angolo della chat
+            let f = Filo.condiviso
+            if f.rettScheda.height > 0, !f.visti.isEmpty || f.vuota { cima = max(cima, f.rettScheda.maxY + 10) }
+            let h = min(134 + 30, max(Pagine.altaPiccola, fondo - cima))
+            return CGRect(x: S + 12, y: (fondo - h).rounded(), width: max(90, rigaMin, 212), height: h.rounded())
         }
         // 13.8 (il signore, 22 nov: «la tab bassa si muove a caso»): la riga sotto lo stato (TelemetriaHUD) cambia ogni 2,5 s e
         // ha lunghezze diverse; la tab la seguiva e si allargava e stringeva. Ora si ferma prima della più lunga (MEMORIA SINCRONIZZATA
@@ -198,6 +201,8 @@ final class Pagine: ObservableObject {
     /// Dove sta adesso: piccola, lo stesso inizio e alta 72 (misurata a tab aperta e tenuta, così non salta dietro alle icone).
     func posto() -> CGRect {
         let z = zona()
+        // 13.9 (20): con la tastiera anche la piccola sta appoggiata al fondo della chat
+        if piccola, tastiera { return CGRect(x: z.minX, y: z.maxY - Pagine.altaPiccola, width: max(z.width, rigaMin), height: Pagine.altaPiccola) }
         if piccola {
             let zp = zonaPiccola ?? CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola)
             return CGRect(x: zp.minX, y: zp.minY, width: max(zp.width, rigaMin), height: zp.height)   // revisione 13.8 (6): anche piccola, i tasti dentro
