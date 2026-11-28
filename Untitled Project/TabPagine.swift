@@ -132,6 +132,8 @@ final class Pagine: ObservableObject {
     /// 13.9 (19) · issue 24: dove finisce la chat e se la tastiera è aperta (allora la tab si apre sopra la chat, in alto a sinistra).
     var chatBasso: CGFloat?
     var tastiera = false
+    /// 13.9 (20): la misura della tab a tastiera chiusa (l'ultima calcolata): con la tastiera resta esattamente questa.
+    private var misuraNormale: CGSize?
     /// Dove sta la tab adesso e dove i suoi tre tasti (un tocco fuori la rimpicciolisce; sui tasti fanno solo il loro).
     var rett: CGRect = .zero
     var rettTasti: CGRect = .zero
@@ -165,15 +167,13 @@ final class Pagine: ObservableObject {
     func zona() -> CGRect {
         let S: CGFloat = 10
         // 13.9 (19) · ISSUE 24 (il signore, 28 nov: «con la tastiera la tab alta la posso aprire, la bassa no: voglio poterla aprire»).
-        // 13.9 (20) (il signore, 04:59, foto: «la tab bassa si apre sopra quella alta, hai fatto un casino»): con la tastiera la tab
-        // sta in BASSO a sinistra della chat, appoggiata al suo fondo (come senza tastiera: FILO in alto a destra, PAGINE in basso a
-        // sinistra); alta al massimo 164. 05:07 (il signore: «quando quella alta è grande, quella bassa si abbassa: questa cosa
-        // dinamica non è bella da vedere»): la misura non segue più FILO, dipende solo dalla chat, quindi sta sempre ferma. Come il
-        // mockup (Telefono v18)
+        // 13.9 (20) (il signore, 04:59–05:10: «si apre sopra quella alta», «tutte e due grandi si toccano», «l'esatta misura di quando
+        // la tastiera è chiusa, punto»): con la tastiera la tab ha ESATTAMENTE la misura che ha a tastiera chiusa (l'ultima misurata
+        // lì) e sta in basso a sinistra, appoggiata al fondo della chat. FILO non cambia. Come il mockup (Telefono v19)
         if tastiera, let a = chatAlto {
-            let fondo = (chatBasso ?? (a + 200)) - 8
-            let h = min(134 + 30, max(Pagine.altaPiccola, fondo - (a + 32)))   // fino a sotto il filo e l'angolo della chat
-            return CGRect(x: S + 12, y: (fondo - h).rounded(), width: max(90, rigaMin, 212), height: h.rounded())
+            let m = misuraNormale ?? CGSize(width: max(90, rigaMin, 212), height: 134 + 30)
+            let fondo = chatBasso ?? (a + 200)
+            return CGRect(x: S, y: (fondo - m.height).rounded(), width: m.width, height: m.height)
         }
         // 13.8 (il signore, 22 nov: «la tab bassa si muove a caso»): la riga sotto lo stato (TelemetriaHUD) cambia ogni 2,5 s e
         // ha lunghezze diverse; la tab la seguiva e si allargava e stringeva. Ora si ferma prima della più lunga (MEMORIA SINCRONIZZATA
@@ -194,7 +194,9 @@ final class Pagine: ObservableObject {
         }
         let alto = (colonna.max().map { $0 + 4 } ?? giu - 112) - 10 - 30
         let h = min(134 + 30, giu - alto)
-        return CGRect(x: S, y: alto.rounded(), width: max(90, rigaMin, (destra - S).rounded()), height: max(Pagine.altaPiccola, h.rounded()))
+        let z = CGRect(x: S, y: alto.rounded(), width: max(90, rigaMin, (destra - S).rounded()), height: max(Pagine.altaPiccola, h.rounded()))
+        misuraNormale = z.size                                    // 13.9 (20): con la tastiera la tab tiene questa misura
+        return z
     }
 
     /// Dove sta adesso: piccola, lo stesso inizio e alta 72 (misurata a tab aperta e tenuta, così non salta dietro alle icone).
