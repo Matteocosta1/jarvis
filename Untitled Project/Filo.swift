@@ -104,6 +104,10 @@ final class Filo: ObservableObject {
     @Published private(set) var fuoco = true
     /// Quando il dito l'ha appena svegliata (era compatta): quel tocco la riapre e basta, non apre e non chiude niente.
     private var svegliataAlle: Date?
+    /// 13.9 (22) (il signore, 28 nov 07:35: «quando è grande anche quell'altra rimane grande»): aperta grande da lui (richiamata dal
+    /// bordo, il tasto «apri», riaperta col dito) resta grande, come la tab bassa: si stringe solo col tasto «riduci» o col dito fuori.
+    /// Arrivata da sola (una notifica) si stringe dopo 2,8 s come sempre.
+    private var grandeDaLui = false
     /// 21 nov: quando la pressione lunga ha appena fissato (o sganciato) un argomento: il dito che si alza non apre e non chiude niente.
     private var fissatoAlle: Date?
     /// 14 nov (scelta del signore: «si accende la riga che dice»): la frase che JARVIS sta dicendo adesso, piegata (minuscole, senza
@@ -418,6 +422,7 @@ final class Filo: ObservableObject {
             let eraVia = !vuota
             vuota = true
             richiamato = true
+            grandeDaLui = true
             controllo?.cancel()
             svegli()
             if eraVia { Suoni.filo() }
@@ -429,6 +434,7 @@ final class Filo: ObservableObject {
             argomenti[k].nascostoAlle = nil
         }
         richiamato = true
+        grandeDaLui = true
         controllo?.cancel()
         svegli()
         Suoni.filo()
@@ -443,6 +449,7 @@ final class Filo: ObservableObject {
             argomenti[k].nascostoAlle = ora
         }
         richiamato = false
+        grandeDaLui = false
         vuota = false
         controllo?.cancel()
         riposa?.cancel()
@@ -487,7 +494,7 @@ final class Filo: ObservableObject {
             try? await Task.sleep(for: .seconds(attesa))
             // 14 nov (il signore: «il saltello tra un'azione e l'altra, no»): durante la missione non si stringe, se no a ogni passo
             // si riaprirebbe (a missione finita riparte il conto)
-            guard let self, !Task.isCancelled, !self.tocco, !self.voce, !Piano.condiviso.inCorso else { return }
+            guard let self, !Task.isCancelled, !self.tocco, !self.voce, !Piano.condiviso.inCorso, !self.grandeDaLui else { return }
             let tra = Date().addingTimeInterval(0.6)
             let resta = self.richiamato || self.visti.contains { $0.fisso || ($0.scade ?? .distantFuture) > tra }
             guard resta else { return }
@@ -508,11 +515,12 @@ final class Filo: ObservableObject {
         // 13.9 (22): anche il dito che richiama la tab bassa dal bordo sinistro (la sua fascia) lascia la tab alta com'è
         if !pagine.su, pagine.fascia(pagine.zona()).contains(p) { return }
         if rettScheda.contains(p) {
-            if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
+            if !fuoco { Aptica.click(); grandeDaLui = true }             // 14 nov: si riapre sotto il dito, la selezione fine (13.9 (22): e resta)
             svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta
             toccato(true, da: "appoggiato")
         } else if fuoco, !tocco {
             riposa?.cancel()
+            grandeDaLui = false
             fuoco = false
         }
     }
@@ -522,12 +530,14 @@ final class Filo: ObservableObject {
     func riduci() {
         riposa?.cancel()
         guard !visti.isEmpty || vuota else { return }
+        grandeDaLui = false
         fuoco = false
     }
 
     /// 13.7 · il tasto «apri»: la tab intera (poi, come sempre, compatta 2,8 s dopo se nessuno la tocca).
     func apri() {
         guard !visti.isEmpty || vuota else { return }
+        grandeDaLui = true
         svegli()
     }
 
