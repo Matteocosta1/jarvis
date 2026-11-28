@@ -256,7 +256,7 @@ struct LineaProgresso: View {
 }
 
 // MARK: - 13.9 (15) · la chat TAB (scelta dal signore il 27 nov, mockup «JARVIS Telefono» v7 / Mark XIII v121)
-// La chat come le due tab piccole (PAGINE e FILO): il vetro scuro senza bordo e senza sfocatura di Apple, il punto di luce che
+// La chat come le due tab piccole (PAGINE e FILO): il loro vetro (13.9 (18): identico, bordo di luce compreso), senza sfocatura di Apple; il punto di luce che
 // pulsa in alto a sinistra, il filo che corre sopra la scheda, i quattro angoli di luce. Nasce sul suono della chat, quando parte
 // la stampa (stessi tempi di prima: nessun tempo in più); durante il cerchio di caricamento non c'è. Le scritte scorrono dentro.
 
@@ -270,14 +270,9 @@ enum CorniceChat {
     static let luce = Color(red: 79 / 255, green: 227 / 255, blue: 1)          // #4fe3ff
     static let chiaro = Color(red: 191 / 255, green: 246 / 255, blue: 1)       // #bff6ff
 
-    /// Il vetro olografico delle tab (senza sfocatura di Apple): scuro, dal 62 % in alto all'82 %, con la luce ciano tenue dentro
-    /// ai bordi. 13.9 (16): è anche il fondo del campo «Oppure scriva qui» (il signore, 28 nov 00:32).
-    static var vetro: some ShapeStyle {
-        let scuro = Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255)
-        return LinearGradient(stops: [.init(color: scuro.opacity(0.62), location: 0), .init(color: scuro.opacity(0.82), location: 0.45),
-                                      .init(color: scuro.opacity(0.82), location: 1)], startPoint: .top, endPoint: .bottom)
-            .shadow(.inner(color: luce.opacity(0.08), radius: 20))
-    }
+    /// 13.9 (18) (il signore, 28 nov 01:15, foto con FILO accanto: «identica alla tab come trasparenza e design»): il fondo del
+    /// vetro è quello delle tab a riposo (StileOlo SCURO, 62 %); sopra la stessa luce olografica (LuceOlografica).
+    static let fondo = Color(red: 3 / 255, green: 12 / 255, blue: 16 / 255)
 
     /// La curva con cui la scheda si apre da sinistra (1 − (1 − u)³).
     static func apre(_ t: Double) -> Double { let u = min(1, max(0, t / 0.45)); return 1 - pow(1 - u, 3) }
@@ -325,9 +320,11 @@ struct SfondoChatTab: View {
                 let t = regia.nata.map { tl.date.timeIntervalSince($0) } ?? tl.date.timeIntervalSinceReferenceDate
                 let u = CorniceChat.apre(t)
                 ZStack {
-                    // il vetro delle tab: scuro, più leggero verso il reattore, con la luce dentro ai bordi; si apre da sinistra
-                    Rectangle()
-                        .fill(CorniceChat.vetro)
+                    // il vetro delle tab (lo stesso di FILO e PAGINE, senza sfocatura di Apple); si apre da sinistra
+                    ZStack {
+                        Rectangle().fill(CorniceChat.fondo.opacity(TintaTab.vetroPiccola))
+                        LuceOlografica()                                            // luce dall'alto, bordo di luce, bagliore dai bordi
+                    }
                         .mask(alignment: .leading) {
                             GeometryReader { g in Rectangle().frame(width: g.size.width * u) }
                         }

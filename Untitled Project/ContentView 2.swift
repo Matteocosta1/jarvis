@@ -2336,7 +2336,10 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
-                .background(RoundedRectangle(cornerRadius: 12).fill(CorniceChat.vetro))   // 13.9 (16): il vetro olografico della chat
+                .background {                                                         // 13.9 (18): il vetro delle tab, come la chat
+                    RoundedRectangle(cornerRadius: 12).fill(CorniceChat.fondo.opacity(TintaTab.vetroPiccola))
+                    LuceOlografica(forma: RoundedRectangle(cornerRadius: 12), conBordo: false)   // il contorno resta quello di sempre
+                }
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.11, green: 0.21, blue: 0.25)))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             Button {

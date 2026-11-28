@@ -815,6 +815,8 @@ final class VetroSenzaTinta: UIVisualEffectView {
 struct LuceOlografica<Forma: InsettableShape>: View {
     let forma: Forma
     var forza: Double = 1
+    /// 13.9 (18): il bordo di luce (il campo di testo della chat tiene il suo contorno di sempre e non lo vuole).
+    var conBordo = true
 
     var body: some View {
         let s = StileOlo.scelto
@@ -834,7 +836,7 @@ struct LuceOlografica<Forma: InsettableShape>: View {
                 }
             }
             .clipShape(forma)
-            forma.strokeBorder(s.bordo.opacity(forza), lineWidth: 1)
+            if conBordo { forma.strokeBorder(s.bordo.opacity(forza), lineWidth: 1) }
         }
         .background {
             if s.fuori > 0 {
