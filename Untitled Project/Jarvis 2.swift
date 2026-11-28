@@ -811,6 +811,20 @@ final class Jarvis: NSObject, ObservableObject {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
+    /// 13.9 (19) · issue 23: le parole che negli Occhi fanno partire la foto.
+    nonisolated private static let paroleScatto = #"(?i)\b(scatta(la|mi)?|scatto|scatti|fotografa(la|mi)?|fa(i|mmi) (una|la) foto)\b"#
+
+    /// 13.9 (19) · issue 23: negli Occhi il signore chiede la foto («scatta», «scattala», «fotografa», «fai una foto»).
+    nonisolated static func chiedeScatto(_ frase: String) -> Bool {
+        frase.range(of: paroleScatto, options: .regularExpression) != nil
+    }
+
+    /// 13.9 (19) · issue 23: la domanda sulla foto, senza la parola dello scatto («scatta, che cos'è?» → «che cos'è?»).
+    nonisolated static func senzaScatta(_ frase: String) -> String {
+        frase.replacingOccurrences(of: paroleScatto + #"[\s,.!;:]*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " ,.!;:…-"))
+    }
+
     /// Parole di richiamo all'inizio della frase: «Jarvis», «aspetta», «ascoltami»…
     /// Restituisce la frase senza richiamo e se il signore sta chiaramente completando la richiesta di prima.
     nonisolated static func togliRichiamo(_ frase: String) -> (String, Bool) {
@@ -1061,9 +1075,13 @@ final class Jarvis: NSObject, ObservableObject {
         // nel Confidente con la conversazione incollata: la frase è la domanda su quella conversazione («ho esagerato io?»)
         if let domanda = ConfidenteAperto.domanda, domanda(Jarvis.togliRichiamo(frase).0) { return }
         // dentro Occhi o Cucina: la frase fa scattare la foto e parte insieme a lei («Jarvis, guarda là in fondo»)
-        if occhi != nil, let scatta = OcchiAperti.scatta {
+        // 13.9 (19) · ISSUE 23 (il signore, 28 nov 04:25: «sia io che gli dia come comando vocale scatta, non che qualsiasi parola lo
+        // faccia scattare»): negli Occhi la foto parte solo con «scatta» (e con «fotografa», «fai una foto»); il resto della frase è
+        // la domanda sulla foto. Le altre frasi vanno a JARVIS come sempre, senza foto. La Cucina resta com'era.
+        if let o = occhi, let scatta = OcchiAperti.scatta, o.cucina || Jarvis.chiedeScatto(frase) {
             let detta = Jarvis.togliRichiamo(frase).0
-            domandaOcchi = detta.isEmpty ? nil : detta
+            let domanda = o.cucina ? detta : Jarvis.senzaScatta(detta)
+            domandaOcchi = domanda.isEmpty ? nil : domanda
             if !scatta() { domandaOcchi = nil }          // lo scatto non è partito: la frase non resta in giro
             return
         }

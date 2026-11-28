@@ -1013,6 +1013,10 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         func c(_ x: String) -> Bool { f.contains(" \(x) ") }
         let aereo = c("aereo") || c("aerei") || c("aereoplano") || c("volo") || c("velivolo")
         guard aereo || aereoAgganciato else { return nil }
+        // 13.9 (19) (il signore, 28 nov 04:25: «stavo facendo l'esempio di una scena di Iron Man 2 dove c'è Pepper e Tony su un
+        // aereo… alla parola aereo ha aperto la sezione 3-4 volte»): un comando è una frase corta, non un racconto. Oltre 8 parole
+        // niente aereo: la frase va a JARVIS come tutte le altre.
+        guard t.split(separator: " ").count <= 8 else { return nil }
         if aereo && (c("spegni") || c("togli") || c("basta")) { return "AEREO_OFF" }
         if c("altro") && (aereo || c("aggancia")) { return "AEREO_ALTRO" }
         if c("da dove viene") || c("da dove arriva") || c("da dove parte") || c("da dove e partito") { return "AEREO_DA" }
@@ -1020,7 +1024,13 @@ nonisolated enum ComandoOcchi: Equatable, Sendable {
         if c("quota") || c("quanto e alto") || c("a che altezza") || c("quanto vola alto") { return "AEREO_QUOTA" }
         if c("compagnia") || c("di chi e") { return "AEREO_COMP" }
         // 27 ott (il signore): anche «Jarvis, target aereo» e «Jarvis, guarda l'aereo» (l'apostrofo diventa uno spazio: «guarda l aereo»)
-        if aereo && (c("che") || c("quale") || c("cos e") || c("cosa e") || c("cerca") || c("trova") || c("guarda") || c("target") || c("punta") || c("inquadra") || c("aggancia")) { return "AEREO" }
+        // 13.9 (19): la domanda o l'ordine sull'aereo, non una parola qualsiasi nella frase: «che aereo è quello?», «quale volo è?»,
+        // «cos'è quell'aereo?», oppure la frase che comincia con l'ordine («guarda l'aereo», «target aereo», «cerca l'aereo»)
+        let domandaAereo = ["che aereo", "quale aereo", "che volo", "quale volo", "che aerei", "quali aerei", "cos e quell aereo",
+                            "cosa e quell aereo", "cos e quello aereo", "cos e quel volo"].contains { f.contains(" \($0) ") }
+        let primo = t.split(separator: " ").first.map(String.init) ?? ""
+        let ordine = ["cerca", "trova", "guarda", "target", "punta", "inquadra", "aggancia"].contains(primo)
+        if aereo && (domandaAereo || ordine) { return "AEREO" }
         return nil
     }
 

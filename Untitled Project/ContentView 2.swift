@@ -312,7 +312,7 @@ struct ContentView: View {
                         .overlayPreferenceValue(PostiTesta.self) { posti in ologrammiAvvio(posti) }   // 20 nov: avvio SINGOLO
                         VStack(spacing: 0) {
                             registro
-                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.chatAlto = $0.minY; Pagine.condivisa.chatBasso = $0.maxY }
                             barraTesto
                         }
                         .frame(width: max(0, min(860, g.size.width - 32)) / zc, height: (altezzaChat + 60) / zc)
@@ -337,7 +337,7 @@ struct ContentView: View {
                                 .transition(.opacity)
                         }
                         registro
-                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { Pagine.condivisa.chatAlto = $0 }   // 13.7
+                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Pagine.condivisa.chatAlto = $0.minY; Pagine.condivisa.chatBasso = $0.maxY }   // 13.7
                         barraTesto
                     }
                     // 14 nov: con una sezione davanti del tutto, JARVIS sotto non è più «sullo schermo» per l'accessibilità (VoiceOver e

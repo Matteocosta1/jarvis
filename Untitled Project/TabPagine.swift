@@ -129,6 +129,9 @@ final class Pagine: ObservableObject {
     var tele: CGRect = .zero
     var sugg: CGRect = .zero
     var chatAlto: CGFloat?
+    /// 13.9 (19) · issue 24: dove finisce la chat e se la tastiera è aperta (allora la tab si apre sopra la chat, in alto a sinistra).
+    var chatBasso: CGFloat?
+    var tastiera = false
     /// Dove sta la tab adesso e dove i suoi tre tasti (un tocco fuori la rimpicciolisce; sui tasti fanno solo il loro).
     var rett: CGRect = .zero
     var rettTasti: CGRect = .zero
@@ -161,6 +164,15 @@ final class Pagine: ObservableObject {
     /// LUNGA con i tasti ALTA (parte 30 punti più su), larga fino alle scritte, alta al massimo 164.
     func zona() -> CGRect {
         let S: CGFloat = 10
+        // 13.9 (19) · ISSUE 24 (il signore, 28 nov: «con la tastiera la tab alta la posso aprire, la bassa no: voglio poterla aprire»):
+        // con la tastiera la corona e le scritte non ci sono; la tab sta sopra la chat, in alto a sinistra (come FILO sta sopra la
+        // corona), alta al massimo 164 e mai più giù della chat. Come il mockup (Telefono v16)
+        if tastiera, let a = chatAlto {
+            let b = chatBasso ?? (a + 200)
+            // sotto il filo e l'angolo della chat (32 punti più giù, 12 più a destra): i due punti di luce non si toccano
+            let h = min(134 + 30, max(Pagine.altaPiccola, b - a - 42))
+            return CGRect(x: S + 12, y: (a + 32).rounded(), width: max(90, rigaMin, 212), height: h.rounded())
+        }
         // 13.8 (il signore, 22 nov: «la tab bassa si muove a caso»): la riga sotto lo stato (TelemetriaHUD) cambia ogni 2,5 s e
         // ha lunghezze diverse; la tab la seguiva e si allargava e stringeva. Ora si ferma prima della più lunga (MEMORIA SINCRONIZZATA
         // / ELABORAZIONE IN CORSO, 21 lettere da 6,8 punti: monospaziato 8 punti con tracking 2), centrata dove sta la riga: non si muove più
@@ -416,7 +428,7 @@ struct StratoPagine: View {
     let ultima: UUID?
     /// Una sezione è davanti: la tab non c'è (si richiude da sola) e la fascia è spenta.
     let sezioneDavanti: Bool
-    /// La tastiera o la tendina aperte: la fascia è spenta (e con la tastiera la tab si richiude).
+    /// La tendina aperta: la fascia è spenta. La tastiera (13.9 (19), issue 24): la tab aperta si richiude, poi si richiama sopra la chat.
     let tastiera: Bool
     let tendina: Bool
     let apri: (UUID) -> Void
@@ -436,7 +448,7 @@ struct StratoPagine: View {
                             .offset(x: q.minX - o.x, y: q.minY - o.y)
                             .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25), value: q)
                             .zIndex(1)
-                    } else if !sezioneDavanti && !tastiera && !tendina && p.avvio == nil {
+                    } else if !sezioneDavanti && !tendina && p.avvio == nil {          // 13.9 (19) · issue 24: anche con la tastiera
                         let f = p.fascia(p.zona())
                         FasciaPagine(totale: voci.count, ultima: voci.firstIndex { $0.id == ultima } ?? max(0, voci.count - 1))
                             .frame(width: f.width, height: f.height)
@@ -447,7 +459,11 @@ struct StratoPagine: View {
         }
         .ignoresSafeArea()
         .onChange(of: sezioneDavanti) { _, si in if si { p.chiudi(muto: true) } }
-        .onChange(of: tastiera) { _, si in if si { p.chiudi(muto: true) } }
+        .onChange(of: tastiera, initial: true) { prima, si in
+            // la tab aperta prima della tastiera si richiude (il suo posto cambia); dopo si può richiamare sopra la chat
+            if si, prima != si { p.chiudi(muto: true) }
+            p.tastiera = si
+        }
         .onChange(of: Set(voci.map(\.id))) { _, ids in p.tieni(ids) }
     }
 }
