@@ -363,6 +363,11 @@ struct ScivolaVia: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // 13.9 (17) (il signore, 01:13: «posso cancellare solo i messaggi di JARVIS e non i miei»): una riga corta (le sue
+            // risposte brevi) era larga solo quanto il testo e lo spazio a destra non si poteva prendere col dito. Ora ogni
+            // messaggio occupa tutta la riga, come nel mockup, e si prende ovunque
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .offset(x: dx)
             .opacity(esce ? 0 : 1)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { larghezza = max(1, $0) }
