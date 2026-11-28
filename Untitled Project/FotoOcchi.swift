@@ -23,6 +23,8 @@ nonisolated struct ScattoOcchi: Identifiable, Codable, Equatable, Sendable {
     let fotogrammi: Int
     /// Già mandata a JARVIS (con le altre del suo messaggio).
     var inviata: Bool = false
+    /// Il nome con cui è andata nell'Archivio: cancellata lì, sparisce anche dal telefono e dalla chat.
+    var nomeArchivio: String? = nil
 }
 
 @MainActor
@@ -116,7 +118,7 @@ final class FotoOcchi: ObservableObject {
     func archivia(_ id: UUID, muto: Bool = false) -> Bool {
         guard let i = scatti.firstIndex(where: { $0.id == id }), scatti[i].stato == .attesa else { return false }
         let s = scatti[i]
-        let nome = "Occhi " + ArchivioCentrale.quando(s.quando)
+        let nome = "Occhi " + FotoOcchi.quando(s.quando)          // coi secondi: due foto dello stesso minuto non si sovrascrivono
         let detto = descrizione?(id)
         let gruppo = s.fotogrammi > 1 ? "occhi-\(id.uuidString)" : nil
         for k in 0..<s.fotogrammi {
@@ -125,9 +127,35 @@ final class FotoOcchi: ObservableObject {
                                    descrizione: detto.map { "Occhi · \($0)" } ?? "Occhi", gruppo: gruppo)
         }
         scatti[i].stato = .archivio
+        scatti[i].nomeArchivio = nome
         salvaIndice()
         if !muto { Suoni.pronto() }
         return true
+    }
+
+    /// «28 nov 2026 06.10.23»: data e ora coi secondi per il nome nell'Archivio.
+    nonisolated static func quando(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "it_IT")
+        f.dateFormat = "d MMM yyyy HH.mm.ss"
+        return f.string(from: d)
+    }
+
+    /// 07:13 (il signore: «cancellando dall'archivio sparisca anche dalla chat, senza Pulisci»): il file `nome` della cartella «occhi»
+    /// è stato cancellato dall'Archivio: la sua foto sparisce dal telefono e dalla pila in chat.
+    func toltaDallArchivio(nome: String) {
+        func base(_ n: String) -> String {
+            var t = n.replacingOccurrences(of: #"\.[A-Za-z]{2,5}$"#, with: "", options: .regularExpression)
+            t = t.replacingOccurrences(of: #"\s*·?\s*giro\s*\d+$"#, with: "", options: [.regularExpression, .caseInsensitive])
+            return t.lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let b = base(nome)
+        guard !b.isEmpty else { return }
+        let via = scatti.filter { $0.stato == .archivio && $0.nomeArchivio.map(base) == b }
+        guard !via.isEmpty else { return }
+        via.forEach(togliFile)
+        scatti.removeAll { s in via.contains { $0.id == s.id } }
+        salvaIndice()
     }
 
     /// Gli Occhi si sono chiusi: le foto non scartate e non ancora scelte vanno tutte nell'Archivio (un suono solo).
@@ -588,7 +616,7 @@ struct FlussoFoto: View {
             return
         }
         UIImpactFeedbackGenerator(style: verso < 0 ? .medium : .light).impactOccurred()
-        let nome = foto.scatto(id).map { "Occhi " + ArchivioCentrale.quando($0.quando) }
+        let nome = foto.scatto(id).map { "Occhi " + FotoOcchi.quando($0.quando) }
         mostra(verso < 0 ? "ARCHIVIO › OCCHI · \((nome ?? "").uppercased())" : "SCARTATA")
         withAnimation(.timingCurve(0.4, 0, 0.6, 1, duration: 0.26)) { vola = (id, CGFloat(verso)) }
         Task { @MainActor in

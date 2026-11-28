@@ -842,7 +842,9 @@ struct VistaArchivio: View {
 
     private func elimina(_ f: Voce) async {
         daEliminare = nil
-        _ = await VistaVitals.chiama(["archivio_elimina": f.s("percorso")])
+        let o = await VistaVitals.chiama(["archivio_elimina": f.s("percorso")])
+        // 13.9 (22): una foto di Occhi cancellata qui sparisce anche dal telefono e dalla pila in chat
+        if let o, o["errore"] == nil, f.s("cartella") == "occhi" { FotoOcchi.condivise.toltaDallArchivio(nome: f.s("nome")) }
         Suoni.tocco()
         await carica()
     }
