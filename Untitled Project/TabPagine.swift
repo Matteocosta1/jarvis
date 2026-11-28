@@ -137,6 +137,12 @@ final class Pagine: ObservableObject {
     /// 13.9 (23) (il signore, 08:48: «la piccola non è la stessa dimensione con la tastiera»): l'ultima larghezza a tastiera chiusa.
     /// La piccola con la tastiera prende questa (come la piccola senza tastiera), non la più larga mai vista.
     private var larghezzaNormale: CGFloat?
+    /// 13.9 (24) (il signore, 09:23: «ancora non è della stessa dimensione»): la larghezza esatta della piccola nella schermata
+    /// principale, l'ultima volta che si è vista lì (ricordata anche fra un avvio e l'altro): la piccola con la tastiera è questa, punto.
+    private var larghezzaPiccolaCasa: CGFloat? = {
+        let w = UserDefaults.standard.double(forKey: "tabBassaPiccolaLarga")
+        return w > 0 ? CGFloat(w) : nil
+    }()
     /// Dove sta la tab adesso e dove i suoi tre tasti (un tocco fuori la rimpicciolisce; sui tasti fanno solo il loro).
     var rett: CGRect = .zero
     var rettTasti: CGRect = .zero
@@ -212,12 +218,18 @@ final class Pagine: ObservableObject {
         let z = zona()
         // 13.9 (20): con la tastiera anche la piccola sta appoggiata al fondo della chat
         if piccola, tastiera {
-            let w = zonaPiccola?.width ?? larghezzaNormale ?? z.width           // 13.9 (23): la stessa larghezza della piccola senza tastiera
+            // 13.9 (24): esattamente la larghezza della piccola nella schermata principale (l'ultima vista lì)
+            let w = larghezzaPiccolaCasa ?? zonaPiccola?.width ?? larghezzaNormale ?? z.width
             return CGRect(x: z.minX, y: z.maxY - Pagine.altaPiccola, width: max(w, rigaMin), height: Pagine.altaPiccola)
         }
         if piccola {
             let zp = zonaPiccola ?? CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola)
-            return CGRect(x: zp.minX, y: zp.minY, width: max(zp.width, rigaMin), height: zp.height)   // revisione 13.8 (6): anche piccola, i tasti dentro
+            let w = max(zp.width, rigaMin)
+            if larghezzaPiccolaCasa != w {                                        // 13.9 (24): la sua misura, per la tastiera
+                larghezzaPiccolaCasa = w
+                UserDefaults.standard.set(Double(w), forKey: "tabBassaPiccolaLarga")
+            }
+            return CGRect(x: zp.minX, y: zp.minY, width: w, height: zp.height)   // revisione 13.8 (6): anche piccola, i tasti dentro
         }
         return z
     }
@@ -270,7 +282,7 @@ final class Pagine: ObservableObject {
         if si {
             let z = zona()
             // 13.9 (23): stretta con la tastiera, la larghezza è quella a tastiera chiusa (come la piccola di sempre)
-            let w = tastiera ? (larghezzaNormale ?? z.width) : z.width
+            let w = tastiera ? (larghezzaPiccolaCasa ?? larghezzaNormale ?? z.width) : z.width
             zonaPiccola = CGRect(x: z.minX, y: z.minY, width: w, height: Pagine.altaPiccola)
         }
         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25)) { piccola = si }

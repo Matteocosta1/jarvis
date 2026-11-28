@@ -545,6 +545,12 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 5. **Memoria per significato**: l'avviso vero nei log è «Built-in ONNX inference is being considered for deprecation… (used: Supabase.ai.Session("gte-small"))», senza data. Ora ogni riga di memoria, ricordi, note, diario ed episodi ha anche il vettore **Gemini** (`gemini-embedding-001`, 768 numeri, colonna `vettore_g`, funzione `jarvis_significato_g`), con la chiave Gemini già nei segreti (quota gratuita; in Europa i dati non servono a Google per addestrare: termini di Gemini API, «Paid Services» valgono anche per la quota gratuita in SEE/CH/UK). Misurato sulle righe vere (4 domande dette con parole diverse sulla memoria): **Gemini mette la riga giusta al primo posto 4 su 4, gte-small 1 su 4** (gte dà ≥ 0,82 all'88 % delle coppie di righe qualsiasi: in italiano non distingue). Quindi dal **cervello v140** il motore primo è Gemini, gte-small resta di riserva (se Gemini non risponde o finisce la quota del minuto). Soglie tradotte con la taratura misurata (0,82 → 0,65; doppioni 0,97 → 0,96). Per tornare a prima: segreto `MOTORE_SIGNIFICATO=gte`. Limite: la quota gratuita ha dato 429 dopo ~86 vettori in un minuto (riempimento iniziale); per le domande di tutti i giorni (1-3 al turno) basta, e se scatta risponde gte.
 6. **Fatto n. 42** corretto: «Alessandro usa per JARVIS i 200 $ al mese di crediti API Anthropic inclusi nel piano dell'account di Matteo (dal 20 nov 2026…)».
 
+## 28 nov, 09:30 · 13.9 (24) · tab bassa piccola con la tastiera: esattamente la larghezza della schermata principale
+
+- Il signore (09:23, sulla 23): «la tab piccola con la tastiera è diversa di dimensione dalla piccola nella pagina principale».
+- Causa: con la tastiera la larghezza era ricalcolata (l'ultima della tab grande a tastiera chiusa), non presa dalla piccola vera; bastava che la schermata cambiasse un poco (la tastiera che si chiude, le scritte sotto il reattore) perché venisse diversa.
+- Ora la piccola con la tastiera prende esattamente la larghezza della piccola vista per ultima nella schermata principale (ricordata anche fra un avvio e l'altro); l'altezza era già la stessa (72). Anche nel mockup.
+
 ## 28 nov, 08:50 · 13.9 (23) (controllo VERDE, run 46123457641, commit b0dc181, 0 errori, 0 warning) · «cosa vedi?» guarda di nuovo davvero
 
 - 13.9 (22) provata dal signore (08:44): «funziona praticamente tutto». Unico errore: «cosa vedi?» rispondeva sempre sulla stessa foto (dialogo 08:42–08:43: «Vedo la stessa foto del comodino, Sir»).
