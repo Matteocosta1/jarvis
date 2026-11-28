@@ -525,6 +525,7 @@ final class Jarvis: NSObject, ObservableObject {
         }
         strumenti.apriPagina = { [weak self] url in self?.pagina = PaginaWeb(url: url) }
         strumenti.domandaOcchi = { [weak self] in self?.prendiDomandaOcchi() }
+        strumenti.apriOcchiManuali = { [weak self] in self?.guardaManuale() }   // 13.9 (20): «apri gli occhi» → a mano, aspettano «scatta»
         // 12.0 (10): la regia (Regia.swift): il sì delle conferme lo controlla l'app sull'ultima frase del signore; le sezioni col
         // microfono o la fotocamera aperte dal cervello si aprono quando JARVIS ha finito di parlare
         Regia.condivisa.ultimaFrase = { [weak self] in

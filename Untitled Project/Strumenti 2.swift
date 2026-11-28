@@ -70,6 +70,8 @@ final class Strumenti {
     var apriOcchi: ((Bool, Bool, Double) async -> [Data])?
     /// La frase che il signore ha detto mentre la fotocamera era aperta (lo scatto è partito a voce).
     var domandaOcchi: (() -> String?)?
+    /// 13.9 (20) · issue 23: «apri gli occhi» senza una domanda: gli Occhi si aprono a mano e aspettano «scatta» (la imposta Jarvis).
+    var apriOcchiManuali: (() -> Void)?
     /// Le foto scattate da «guarda» (una, o i fotogrammi del giro): Jarvis le allega al risultato, così il cervello le vede.
     private var fotoOcchi: [Data] = []
     /// «Jarvis, traduci in spagnolo»: la lingua dell'interprete da aprire appena JARVIS ha finito di parlare.
@@ -428,6 +430,15 @@ final class Strumenti {
 
     private func guarda(video: Bool, zoom: Double = 1) async -> (String, Bool) {
         guard let apri = apriOcchi else { return (json(["errore": "fotocamera non disponibile"]), true) }
+        // 13.9 (20) · ISSUE 23 (il signore, 28 nov 04:57: «ho aperto occhi dicendogli: Jarvis, apri occhi. Lui ha aperto e ha
+        // scattato subito»): se ha chiesto solo di aprirli, senza una domanda su cosa c'è davanti, gli Occhi si aprono a mano e la
+        // foto parte quando dice «scatta». «Cosa sto guardando?», «guarda là» e il giro scattano da soli come sempre.
+        if !video, let apriMano = apriOcchiManuali, let f = Regia.condivisa.ultimaFrase?(), Date().timeIntervalSince(f.quando) < 60,
+           Strumenti.soloApriOcchi(f.testo) {
+            apriMano()
+            return (json(["aperto": true, "visto": false,
+                          "nota": "gli Occhi sono aperti a mano e aspettano: la foto parte quando il signore dice «scatta» (il resto di quella frase è la domanda). Adesso non c'è nessuna foto: digli solo, in breve, che sono aperti"]), false)
+        }
         let foto = await apri(true, video, min(max(zoom, 0.5), 15))
         guard !foto.isEmpty else {
             return (json(["visto": false, "nota": "il signore ha chiuso la fotocamera o non ha dato il permesso: nessuna foto"]), false)
@@ -442,6 +453,21 @@ final class Strumenti {
                           "nota": "qui sono allegati \(foto.count) fotogrammi in ordine di tempo, presi durante un giro di 5 secondi mentre il signore muoveva il telefono: è una sola scena, mettili insieme e rispondi"]), false)
         }
         return (json(["visto": true, "nota": "la foto appena scattata dalla fotocamera posteriore è allegata qui: guardala e rispondi al signore"]), false)
+    }
+
+    /// 13.9 (20): la frase chiede solo di aprire gli Occhi («apri gli occhi», «fammi un piacere, apri occhi», «accendi la fotocamera»),
+    /// senza chiedere cosa c'è davanti («cosa vedi», «che cos'è», «guarda»…).
+    nonisolated static func soloApriOcchi(_ frase: String) -> Bool {
+        let t = frase.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "it_IT")).lowercased()
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: " ", options: .regularExpression)
+            .split(separator: " ").map(String.init)
+        guard !t.isEmpty, t.count <= 10 else { return false }
+        let apre = t.contains { ["apri", "aprimi", "accendi", "attiva", "apra", "accenda"].contains($0) }
+        let occhi = t.contains { ["occhi", "occhio", "fotocamera"].contains($0) }
+        // («che», «come» no: «apri gli occhi che ti faccio vedere» è ancora un'apertura; nel dubbio a mano, aspettando «scatta»)
+        let chiede = t.contains { ["cosa", "cos", "quale", "quanto", "quanti", "dove", "guarda", "guardami", "vedi", "dimmi", "leggi",
+                                   "leggimi", "descrivi", "riconosci", "scatta", "giro"].contains($0) }
+        return apre && occhi && !chiede
     }
 
     // MARK: Browser interno
