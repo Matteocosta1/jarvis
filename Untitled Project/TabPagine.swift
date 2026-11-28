@@ -134,6 +134,9 @@ final class Pagine: ObservableObject {
     var tastiera = false
     /// 13.9 (20): la misura della tab a tastiera chiusa (l'ultima calcolata): con la tastiera resta esattamente questa.
     private var misuraNormale: CGSize?
+    /// 13.9 (23) (il signore, 08:48: «la piccola non è la stessa dimensione con la tastiera»): l'ultima larghezza a tastiera chiusa.
+    /// La piccola con la tastiera prende questa (come la piccola senza tastiera), non la più larga mai vista.
+    private var larghezzaNormale: CGFloat?
     /// Dove sta la tab adesso e dove i suoi tre tasti (un tocco fuori la rimpicciolisce; sui tasti fanno solo il loro).
     var rett: CGRect = .zero
     var rettTasti: CGRect = .zero
@@ -200,6 +203,7 @@ final class Pagine: ObservableObject {
         // tastiera si chiude la chat è ancora in alto e un calcolo di passaggio dava una tab piccola, che poi restava con la tastiera
         let m = misuraNormale ?? .zero
         misuraNormale = CGSize(width: max(m.width, z.width), height: max(m.height, z.height))
+        larghezzaNormale = z.width
         return z
     }
 
@@ -207,7 +211,10 @@ final class Pagine: ObservableObject {
     func posto() -> CGRect {
         let z = zona()
         // 13.9 (20): con la tastiera anche la piccola sta appoggiata al fondo della chat
-        if piccola, tastiera { return CGRect(x: z.minX, y: z.maxY - Pagine.altaPiccola, width: max(z.width, rigaMin), height: Pagine.altaPiccola) }
+        if piccola, tastiera {
+            let w = zonaPiccola?.width ?? larghezzaNormale ?? z.width           // 13.9 (23): la stessa larghezza della piccola senza tastiera
+            return CGRect(x: z.minX, y: z.maxY - Pagine.altaPiccola, width: max(w, rigaMin), height: Pagine.altaPiccola)
+        }
         if piccola {
             let zp = zonaPiccola ?? CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola)
             return CGRect(x: zp.minX, y: zp.minY, width: max(zp.width, rigaMin), height: zp.height)   // revisione 13.8 (6): anche piccola, i tasti dentro
@@ -260,8 +267,26 @@ final class Pagine: ObservableObject {
     /// Piccola (una riga con le icone delle pagine aperte) o aperta (le pagine a dischi), morbida.
     func stringi(_ si: Bool) {
         guard su, avvio == nil, chiusura == nil, piccola != si else { return }
-        if si { let z = zona(); zonaPiccola = CGRect(x: z.minX, y: z.minY, width: z.width, height: Pagine.altaPiccola) }
+        if si {
+            let z = zona()
+            // 13.9 (23): stretta con la tastiera, la larghezza è quella a tastiera chiusa (come la piccola di sempre)
+            let w = tastiera ? (larghezzaNormale ?? z.width) : z.width
+            zonaPiccola = CGRect(x: z.minX, y: z.minY, width: w, height: Pagine.altaPiccola)
+        }
         withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25)) { piccola = si }
+    }
+
+    /// 13.9 (23): la tastiera si apre o si chiude con la tab aperta: resta aperta; la piccola rimisura il suo posto (con la tastiera sta
+    /// sul fondo della chat, senza al posto di sempre), appena la chat si è fermata.
+    func cambiaTastiera() {
+        guard su, piccola else { return }
+        zonaPiccola = nil
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            guard self.su, self.piccola, self.zonaPiccola == nil else { return }
+            let z = self.zona()
+            self.zonaPiccola = CGRect(x: z.minX, y: z.minY, width: self.larghezzaNormale ?? z.width, height: Pagine.altaPiccola)
+        }
     }
 
     /// Tenuta premuta: si fissa ◆ (allora non si stringe più) o si sgancia, come la tab alta.
@@ -476,9 +501,11 @@ struct StratoPagine: View {
         .ignoresSafeArea()
         .onChange(of: sezioneDavanti) { _, si in if si { p.chiudi(muto: true) } }
         .onChange(of: tastiera, initial: true) { prima, si in
-            // la tab aperta prima della tastiera si richiude (il suo posto cambia); dopo si può richiamare sopra la chat
-            if si, prima != si { p.chiudi(muto: true) }
+            // 13.9 (23) (il signore, 08:48: «apro entrambe le tab, passo alla tastiera: quella piccola viene chiusa, voglio che rimanga
+            // aperta»): la tab aperta resta aperta, grande o piccola com'era, e scivola al suo posto con la tastiera (sul fondo della
+            // chat) e di nuovo al suo posto di sempre quando la tastiera si chiude
             p.tastiera = si
+            if prima != si { p.cambiaTastiera() }
         }
         .onChange(of: Set(voci.map(\.id))) { _, ids in p.tieni(ids) }
     }

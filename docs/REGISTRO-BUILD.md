@@ -550,6 +550,9 @@ Cervello **v139** (commit 784a26a, impronta 6ac92616…) poi **v140** (Gemini pr
 - 13.9 (22) provata dal signore (08:44): «funziona praticamente tutto». Unico errore: «cosa vedi?» rispondeva sempre sulla stessa foto (dialogo 08:42–08:43: «Vedo la stessa foto del comodino, Sir»).
 - Causa: per 10 minuti l'ultima foto torna al cervello insieme alla storia; con «cosa vedi?» il cervello rispondeva su quella invece di guardare di nuovo. E con gli Occhi aperti «cosa vedi?» non scattava (andava al cervello senza foto).
 - Ora: «cosa vedi?», «che vedi», «cosa sto guardando?», «cos'è questo?» non rimandano la foto vecchia (il cervello apre gli Occhi e scatta da solo, come prima); con gli Occhi aperti scattano e partono con la foto nuova. «Cos'è quello a destra?» continua a parlare della foto di prima.
+- **Tab bassa con la tastiera** (il signore, 08:48): aprendo la tastiera con la tab bassa aperta, la tab non si chiude più: resta aperta, grande o piccola com'era, e va al suo posto sul fondo della chat (e torna al suo posto chiudendo la tastiera).
+- **Tab bassa piccola con la tastiera larga come senza** (il signore, 08:48): prima prendeva la larghezza più grande mai vista a tastiera chiusa; ora quella di adesso, come la piccola senza tastiera. Anche nel mockup.
+- Mockup: corretto un errore nella tab alta del mockup (un commento messo a metà riga nella versione di stamattina la bloccava).
 - Costo: meno token (la foto vecchia non viaggia più con quelle domande). Cervello non toccato.
 
 ## 28 nov, 06:45 · 13.9 (22) (controllo VERDE, run 46117600310, commit 76d162e, 0 errori, 0 warning) · FOTO di Occhi (cover flow), tab alta e bassa grandi insieme, isola che si chiude in attesa dopo 30 s
