@@ -120,6 +120,9 @@ final class Filo: ObservableObject {
     /// 13.7: dove stanno i tre tasti (chiudi, riduci, apri): il dito lì non sveglia la tab (se no da piccola si aprirebbe sotto il
     /// dito e il tasto non arriverebbe), come il mockup.
     var rettTasti: CGRect = .zero
+    /// 13.9 (22): dove sta la fascia invisibile del bordo destro che la richiama (zero quando la tab c'è): il dito che parte da lì
+    /// per richiamare la tab alta non è «fuori» per la tab bassa, che resta grande.
+    var rettFascia: CGRect = .zero
     /// 13.7: l'argomento che sta uscendo a sinistra (chiuso con lo swipe): la sua uscita va verso sinistra invece che a destra.
     @Published var esceASinistra: String?
     private var pulizia: Task<Void, Never>?
@@ -502,6 +505,8 @@ final class Filo: ObservableObject {
         // non è «fuori»: FILO resta com'è
         let pagine = Pagine.condivisa
         if pagine.su, pagine.rett.contains(p) { return }
+        // 13.9 (22): anche il dito che richiama la tab bassa dal bordo sinistro (la sua fascia) lascia la tab alta com'è
+        if !pagine.su, pagine.fascia(pagine.zona()).contains(p) { return }
         if rettScheda.contains(p) {
             if !fuoco { Aptica.click() }                                 // 14 nov: si riapre sotto il dito, la selezione fine
             svegliataAlle = fuoco ? nil : Date()                         // era compatta: questo tocco la riapre e basta

@@ -286,6 +286,9 @@ final class Pagine: ObservableObject {
         // 13.9 (21) (il signore: «se apro la tab alta grande, quella bassa torna piccola»): anche i tre tasti della tab alta
         // (apri, riduci, chiudi) sono la tab alta, non «fuori»: la tab bassa resta grande
         if filo.rettTasti.width > 0, filo.rettTasti.insetBy(dx: -4, dy: -7).contains(p) { return }
+        // 13.9 (22) (il signore, 06:34: «apro quella grande e quella bassa diventa piccola»): il dito che richiama la tab alta dal
+        // bordo destro (la sua fascia) non è «fuori»: la tab bassa resta grande
+        if filo.rettFascia.width > 0, filo.rettFascia.insetBy(dx: -6, dy: -6).contains(p) { return }
         if !fissa { stringi(true) }
     }
 
@@ -516,6 +519,8 @@ private struct TabPagineVista: View {
     @State private var nascita: Double = 0
     @State private var tremolio: Double = 0
     @ObservedObject private var calore = CaloreVetro.condiviso          // 13.9 (18) · issue 22
+    /// 13.9 (22): dove stanno le carte nella tab (lì lo swipe lo decidono le carte: lento scorre, deciso chiude)
+    @State private var rettLibro: CGRect = .zero
 
     var body: some View {
         let piccola = p.piccola
@@ -546,6 +551,7 @@ private struct TabPagineVista: View {
                     LibroPagine(p: p, voci: voci, icone: icone, apri: apri, chiudi: chiudi)
                         .padding(.top, 2)
                         .padding(.horizontal, -4)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("tabPagine")) } action: { rettLibro = $0 }
                         .modifier(TremolioLibro(p: tremolio))
                 }
                 piede
@@ -553,8 +559,15 @@ private struct TabPagineVista: View {
             .padding(EdgeInsets(top: 24, leading: 10, bottom: 6, trailing: 8))
         }
         .contentShape(Rectangle())
+        .coordinateSpace(.named("tabPagine"))
         // piccola: il dito non apre subito; se corre verso sinistra la chiude, se si alza fermo la apre (i tasti restano tasti)
         .gesture(DragGesture(minimumDistance: 0).onEnded { v in finePiccola(v) }, including: piccola ? .all : .subviews)
+        // 13.9 (22) (il signore, 06:40: «ovunque»): aperta, lo swipe deciso verso sinistra la manda via da tutta la tab (anche dai
+        // margini e dalla cornice); sulle carte decidono le carte (lento scorre, deciso chiude)
+        .simultaneousGesture(DragGesture(minimumDistance: 10, coordinateSpace: .named("tabPagine")).onEnded { v in
+            guard !p.piccola, !rettLibro.contains(v.startLocation) else { return }
+            fineTesta(v)
+        })
         // tenuta premuta (0,45 s, il dito fermo): si fissa ◆ / si sgancia
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.45, maximumDistance: 10).onEnded { _ in
             withAnimation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22)) { p.fissaOSgancia() }
@@ -882,7 +895,9 @@ private struct LibroPagine: View {
             // 0,6 punti al millisecondo dall'appoggio) chiude la tab anche da aperta, dalle carte; il dito lento le fa scorrere
             let dx = Double(v.translation.width), dy = abs(Double(v.translation.height))
             let ms = max(1, Date().timeIntervalSince(partito ?? Date()) * 1000)
-            if dx < -40, -dx > dy * 1.8, -dx / ms > 0.6 {
+            // 13.9 (22) (il signore, 06:40: «ovunque, anche sulle carte»): basta uno swipe normale e deciso verso sinistra (40 punti,
+            // 0,35 punti al millisecondo dall'appoggio, o lasciato andare a 500 punti al secondo); il dito lento le fa scorrere
+            if dx < -40, -dx > dy * 1.8, -dx / ms > 0.35 || v.velocity.width < -500 {
                 p.chiudi(muto: false)
                 return
             }

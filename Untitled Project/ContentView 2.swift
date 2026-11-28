@@ -143,6 +143,7 @@ struct ContentView: View {
         collegata
             .onChange(of: comandi.richiesta) { eseguiComando() }
             .fullScreenCover(item: $aiutoBea) { a in VistaAiutoBea(aiuto: a) { aiutoBea = nil } }
+            .overlay { FotoDallaChat() }                          // 13.9 (22): FOTO aperto toccando una foto di Occhi in chat
             .onChange(of: jarvis.fase) { _, nuova in if nuova == .attesa { iconaAttiva = nil } }
             .onChange(of: tastiera) { _, aperta in if aperta { ruota.spegni() } }       // MARK XI: si scrive, l'ologramma della ruota si spegne
             .onChange(of: schermoLibero, initial: true) { _, libero in consentiRichiamo(libero) }
@@ -1722,8 +1723,7 @@ struct ContentView: View {
         case .occhi:
             if let o = v.occhiata {
                 Occhi(automatico: o.automatico, video: o.video, cucina: o.cucina, zoomIniziale: o.zoom,
-                      oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo,
-                      resta: o.resta) { dati in jarvis.occhiChiusi(dati) }
+                      oloIniziale: o.olo, etiIniziale: o.eti, agganciaIniziale: o.aggancia, mandaIniziale: o.manda, aereoIniziale: o.aereo) { dati in jarvis.occhiChiusi(dati) }
                     .aperturaHUD(o.cucina ? "Cucina" : "Occhi", icona: o.cucina ? "fork.knife" : "eye", conX: true, soloSfuma: true)      // 26 ott notte: il caricamento come le altre schede
             }
         case .interprete:
@@ -2557,6 +2557,7 @@ struct RigaMessaggio: View {
                     .foregroundStyle(Color(red: 0.81, green: 0.91, blue: 0.95))
                     .shadow(color: jarvis ? Color.ciano.opacity(0.2) : .clear, radius: jarvis ? 5 : 0)  // 13.9 (15) · il testo di JARVIS ha la sua luce
                     .textSelection(.enabled)
+                if let k = m.fotoOcchi { FotoInChat(id: k) }        // 13.9 (22): la FOTO di Occhi, un tocco apre FOTO
                 if let immagini = m.immagini, !immagini.isEmpty {
                     GalleriaMessaggio(immagini: immagini)
                         .padding(.top, 2)

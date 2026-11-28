@@ -122,6 +122,51 @@ enum IsolaJarvis {
 
     /// «Fine» sull'isola della VOCE: il dialogo finisce e il microfono si spegne (lo imposta JARVIS).
     static var fineDialogo: (() -> Void)?
+    /// 13.9 (22) (il signore, 28 nov 06:36: «ogni volta che la dynamic è in attesa, dopo 30 secondi deve sparire, in qualsiasi
+    /// contesto: tasto Azione o no, app aperta o in background»): l'isola ferma su IN ATTESA da 30 secondi si chiude da sola, come
+    /// con «Fine». Lo fa JARVIS (`attesaScaduta`: microfono spento se l'app è dietro); risponde falso se proprio adesso lui sta parlando
+    /// (allora si riguarda fra 10 secondi). Il conto vale anche con l'app sospesa da iOS: un compito in background la tiene sveglia
+    /// per quei secondi, e se iOS lo toglie prima l'isola si chiude subito, invece di restare accesa.
+    static var attesaScaduta: (() -> Bool)?
+    static let durataAttesa: TimeInterval = 30
+    private static var chiusuraAttesa: Task<Void, Never>?
+    private static let compitoAttesa = CompitoSfondo()
+
+    /// L'isola VOCE è su `fase`: su IN ATTESA parte il conto (una volta sola finché resta in attesa), su ogni altra fase si ferma.
+    private static func seguiAttesa(_ fase: String) {
+        guard fase == Fase.attesa.rawValue else { fermaAttesa(); return }
+        guard chiusuraAttesa == nil else { return }
+        if compitoAttesa.id == .invalid {
+            compitoAttesa.id = UIApplication.shared.beginBackgroundTask(withName: "jarvis-isola-attesa") {
+                MainActor.assumeIsolated {
+                    // iOS sta per sospendere JARVIS prima dei 30 secondi: l'isola non resta accesa da sola
+                    chiusuraAttesa?.cancel(); chiusuraAttesa = nil
+                    if attesaScaduta?() ?? true { chiudiVoci() }
+                    compitoAttesa.chiudi()
+                }
+            }
+        }
+        chiusuraAttesa = Task { @MainActor in
+            var attesa = durataAttesa
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(attesa))
+                guard !Task.isCancelled else { return }
+                if attesaScaduta?() ?? true { break }
+                attesa = 10                                    // stava parlando proprio adesso: si riguarda fra poco
+            }
+            guard !Task.isCancelled else { return }
+            chiusuraAttesa = nil
+            if attivita?.content.state.tipo == "voce" { attivita = nil }
+            chiudiVoci()
+            compitoAttesa.chiudi()
+        }
+    }
+
+    private static func fermaAttesa() {
+        chiusuraAttesa?.cancel()
+        chiusuraAttesa = nil
+        compitoAttesa.chiudi()
+    }
 
     /// La VOCE si accende (iOS lo permette solo con l'app ancora davanti: si chiama quando l'app sta uscendo) o si aggiorna.
     /// Non prende mai il posto di un'altra attività di JARVIS (Travel, Guida, Rec): quelle contano di più, e il pallino
@@ -136,10 +181,12 @@ enum IsolaJarvis {
         }
         if let a = attivita {
             guard a.content.state.tipo == "voce" else { return }
+            seguiAttesa(fase)
             guard a.content.state != s else { return }
             Task { await a.update(ActivityContent(state: s, staleDate: scade)) }
         } else {
             avvia(s, meta: "JARVIS", fine: scade)
+            if attivita != nil { seguiAttesa(fase) }
         }
     }
 
@@ -155,6 +202,7 @@ enum IsolaJarvis {
     /// 12.0 (11): spegne tutte le isole VOCE che iOS tiene accese, non solo quella che l'app ricorda (dopo una chiusura in
     /// sottofondo l'app non la ricordava più, e «Fine» non la chiudeva).
     static func chiudiVoci() {
+        fermaAttesa()
         for a in Activity<AttivitaJarvis>.activities where a.content.state.tipo == "voce" {
             Task { await a.end(nil, dismissalPolicy: .immediate) }
         }

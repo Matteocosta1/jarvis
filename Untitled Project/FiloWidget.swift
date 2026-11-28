@@ -129,6 +129,8 @@ private struct FasciaFilo: View {
         Color.clear
             .frame(width: FasciaFilo.largo, height: FasciaFilo.alto)
             .contentShape(Rectangle())
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { Filo.condiviso.rettFascia = $0 }
+            .onDisappear { Filo.condiviso.rettFascia = .zero }
             .gesture(
                 DragGesture(minimumDistance: 10)
                     .onEnded { v in

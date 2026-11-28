@@ -22,7 +22,8 @@ enum OcchiAperti {
     static var stark: ((ComandoOcchi) -> Bool)?
     /// Build 23: la voce di JARVIS dagli Occhi («Ecco cosa ho trovato, Sir.»): la imposta Jarvis.
     static var parla: ((String) -> Void)?
-    /// 13.9 (21): gli Occhi che restano aperti consegnano qui ogni foto (la imposta Jarvis: la manda col prossimo messaggio).
+    /// 13.9 (21–22): gli Occhi manuali restano aperti e consegnano qui ogni foto (la imposta Jarvis: la manda a JARVIS con la
+    /// frase detta e la mette fra le FOTO da scegliere).
     static var consegna: (([Data]) -> Void)?
     /// 26 ott: aperti dallo Studio (tasto OCCHI): STUDIO già acceso, inquadra e scatta e la foto torna nello Studio.
     static var studioAcceso = false
@@ -47,9 +48,6 @@ struct Occhiata: Identifiable {
     var manda: String? = nil
     /// MARK X · AEREO, aperti a voce: il comando (AEREO, AEREO_DOVE…) e la frase detta.
     var aereo: (p: String, frase: String)? = nil
-    /// 13.9 (21) (il signore, 05:50: «ha chiuso occhi»): aperti a voce con «apri gli occhi», restano aperti dopo ogni scatto (la
-    /// foto va a JARVIS e lui risponde, la fotocamera resta lì per lo scatto dopo); si chiudono con la X o con «chiudi».
-    var resta = false
 }
 
 struct Occhi: View {
@@ -67,8 +65,6 @@ struct Occhi: View {
     var mandaIniziale: String? = nil
     /// MARK X · AEREO: aperti a voce con «che aereo è quello?» (o una domanda sull'aereo).
     var aereoIniziale: (p: String, frase: String)? = nil
-    /// 13.9 (21): restano aperti dopo lo scatto (aperti a voce con «apri gli occhi»).
-    var resta = false
     /// Le foto scattate: una, oppure i fotogrammi del giro. Vuoto = chiuso senza scattare.
     let fine: ([Data]) -> Void
 
@@ -122,6 +118,8 @@ struct Occhi: View {
     @State private var modoStudio = false
     /// 26 ott sera: aperti da Social › OCCHI: il prossimo scatto torna a Social.
     @State private var modoSocial = false
+    /// 13.9 (22): FOTO, il cover flow degli scatti da scegliere (su: archivio, giù: scarta), aperto dalla miniatura sopra CERCA.
+    @State private var fotoAperte = false
     /// Gli Occhi manuali (non la Cucina, non l'automatico, non il giro): qui c'è il riconoscimento del mockup 23.
     private var manualeStark: Bool { !automatico && !video && !cucina }
     private var occupato: Bool { scattando || registrando }
@@ -292,6 +290,12 @@ struct Occhi: View {
                     }
                 }
                 if manualeStark {
+                    // 13.9 (22) (il signore, 06:23–06:27): l'ultimo scatto da scegliere, piccolo, sopra CERCA; con più foto la pila e il
+                    // numero; un tocco apre FOTO dalla prima
+                    MiniaturaFoto { Suoni.tocco(); withAnimation(.easeOut(duration: 0.22)) { fotoAperte = true } }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { riservati["foto"] = $0.width > 0 ? $0 : nil }
+                }
+                if manualeStark {
                     // le tre icone sopra lo zoom: ETICHETTE, OLOGRAMMA (si accendono e si spengono), CERCA (il solo bersaglio)
                     // 8 nov (il signore): cinque icone più piccole, 14 fra l'una e l'altra; AEREO sempre, l'ultima a destra
                     HStack(alignment: .top, spacing: 14) {
@@ -399,6 +403,12 @@ struct Occhi: View {
                 .padding(.bottom, 12)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .id(w.id)
+            }
+            // 13.9 (22): FOTO sopra la fotocamera (che resta accesa sotto); si chiude con la X, o da solo finite le foto
+            if fotoAperte {
+                FlussoFoto(conCamera: true, inizio: nil) { withAnimation(.easeIn(duration: 0.16)) { fotoAperte = false } }
+                    .transition(.opacity)
+                    .zIndex(10)
             }
         }
         .statusBarHidden()
@@ -848,8 +858,9 @@ struct Occhi: View {
         motore.scatta(veloce: false) { dati in
             let jpeg = dati.flatMap { Occhi.riduci($0) }
             Task { @MainActor in
-                // 13.9 (21): aperti a voce con «apri gli occhi»: la foto va a JARVIS e la fotocamera resta aperta per lo scatto dopo
-                if resta && manualeStark, let jpeg, let consegna = OcchiAperti.consegna {
+                // 13.9 (21–22) (il signore: «sia nell'apertura dall'icona che a voce»): negli Occhi manuali la foto va a JARVIS (e fra le
+                // FOTO da scegliere) e la fotocamera resta aperta per lo scatto dopo; si chiudono con la X o con «chiudi»
+                if manualeStark, let jpeg, let consegna = OcchiAperti.consegna {
                     consegna([jpeg])
                     scattando = false
                     stato = "INQUADRI E SCATTI"
@@ -891,8 +902,14 @@ struct Occhi: View {
         conto.cancel()
         guard !chiuso else { return }
         registrando = false
-        stato = "ANALISI"
         Suoni.tocco()
+        // 13.9 (22): il giro dal tasto REC degli Occhi manuali: i fotogrammi vanno a JARVIS e la fotocamera resta aperta, come lo scatto
+        if manualeStark, !fotogrammi.isEmpty, let consegna = OcchiAperti.consegna {
+            consegna(fotogrammi)
+            stato = "INQUADRI E SCATTI"
+            return
+        }
+        stato = "ANALISI"
         chiudi(fotogrammi)
     }
 

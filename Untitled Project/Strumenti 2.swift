@@ -437,7 +437,7 @@ final class Strumenti {
            Strumenti.soloApriOcchi(f.testo) {
             apriMano()
             return (json(["aperto": true, "visto": false,
-                          "nota": "gli Occhi sono aperti a mano e aspettano: la foto parte quando il signore dice «scatta» (il resto di quella frase è la domanda). Adesso non c'è nessuna foto: digli solo, in breve, che sono aperti"]), false)
+                          "nota": "gli Occhi sono aperti e aspettano la foto. Adesso non c'è nessuna foto. Rispondi esattamente «Sistemi ottici attivi.» e nient'altro: niente spiegazioni su come si scatta, niente domande"]), false)
         }
         let foto = await apri(true, video, min(max(zoom, 0.5), 15))
         guard !foto.isEmpty else {
